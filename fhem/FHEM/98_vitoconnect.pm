@@ -636,21 +636,22 @@ my $RequestList = {
     "heating.power.consumption.total.year"  => "Stromverbrauch_Total/Jahr",
     "heating.power.consumption.total.unit"  => "Stromverbrauch_Total/Einheit",
 
-    "heating.power.production.day" => "Stromproduktion_Total/Tag",
     "heating.power.production.demandCoverage.current.unit" =>
       "Stromproduktion_Bedarfsabdeckung/Einheit",
     "heating.power.production.demandCoverage.current.value" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung",
     "heating.power.production.demandCoverage.total.day" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung_total/Tag",
     "heating.power.production.demandCoverage.total.month" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung_total/Monat",
     "heating.power.production.demandCoverage.total.unit" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung_total/Einheit",
     "heating.power.production.demandCoverage.total.week" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung_total/Woche",
     "heating.power.production.demandCoverage.total.year" =>
-      "Stromproduktion_Bedarfsabdeckung/Tag",
+      "Stromproduktion_Bedarfsabdeckung_total/Jahr",
+
+    "heating.power.production.day"   => "Stromproduktion_Total/Tag",
     "heating.power.production.month" => "Stromproduktion_Total/Monat",
     "heating.power.production.productionCoverage.current.unit" =>
       "Stromproduktion_Produktionsabdeckung/Einheit",
