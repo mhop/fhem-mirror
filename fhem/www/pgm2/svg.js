@@ -53,10 +53,12 @@ function
 svg_prepareHash(el)
 {
   var obj = { y_mul:0,y_h:0,y_min:0, decimals:0,
-              t_mul:0,x_off:0,x_min:0, x_mul:0, log_scale:undefined };
+              t_mul:0,x_off:0,x_min:0, x_mul:0, scale:"" };
   for(var name in obj) {
     var n = $(el).attr(name);
-    if(n)
+    if(name == "scale" && n)
+      obj[name] = n;
+    else if(n)
       obj[name] = parseFloat(n);
   }
   return obj;
@@ -76,7 +78,12 @@ svg_click(evt)
     y -= off.top;
   }
 
-  var y_org = (((o.y_h-y)/o.y_mul)+o.y_min).toFixed(o.decimals);
+  var y_org = (((o.y_h-y)/o.y_mul)+o.y_min);
+  if(o.scale == "log")
+    y_org = Math.pow(10,y_org);
+  else
+    y_org = y_org.toFixed(o.decimals);
+
   var d = new Date((((x-o.x_min)/o.t_mul)+o.x_off) * 1000);
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
@@ -118,6 +125,12 @@ sv_menu(evt, embed)
       var xy = this.arr[pos].split(",");
       return { x:parseFloat(xy[0]), y:parseFloat(xy[1]) };
     }
+  }
+  
+  var embedOffsetY = 0;
+  if(embed) {
+    var name = $(evt.target).parent("svg").attr("id").substr(8);
+    embedOffsetY = $("div.SVGplot.SVG_"+name).offset().top;
   }
 
   function
@@ -251,7 +264,6 @@ sv_menu(evt, embed)
           $(svg).append(par.circle);
 
           par.div = $('<div id="svgmarker">');
-          par.divoffY = -50;
           var parent = (embed ? $(embed).parent() : $(svg).parent()); 
           $(parent).append(par.div);
 
@@ -300,14 +312,10 @@ sv_menu(evt, embed)
 
     var y = (((par.y_h-yRaw)/par.y_mul)+par.y_min);
 
-    if( par.log_scale ) {
-      y *= par.log_scale;
-      if( par.y_min )
-        y += Math.log(par.y_min)/Math.log(10);
+    if(par.scale == "log")
       y = Math.pow(10,y);
-    }
-
-    y = y.toFixed(par.decimals);
+    else
+      y = y.toFixed(par.decimals);
 
     if(selNode.isInt) {
       if(selNode.clicked) {
@@ -347,7 +355,13 @@ sv_menu(evt, embed)
     }
 
     $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
-    var yd = Math.floor((yRaw+par.divoffY) / 20)*20;
+    var yd = Math.floor(yRaw / 20)*20;
+
+    if(embed)
+      yd += embedOffsetY-90;
+    else 
+      yd += $(svg).offset().top-90;
+
     $(par.div).html(ts+" "+y)
               .css({ left:xRaw-20, top:yd });
   }
@@ -380,8 +394,8 @@ sv_menu(evt, embed)
   function
   animateVisibility(sel, currval, maxval)
   {
-      var h = parseFloat(sel.attr("y_h"));
-      sel.attr("transform", "translate(0,"+h*(1-currval)+") "+
+    var h = parseFloat(sel.attr("y_h"));
+    sel.attr("transform", "translate(0,"+h*(1-currval)+") "+
                                 "scale(1,"+currval+")");
 
     if(currval != maxval) {

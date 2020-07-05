@@ -959,7 +959,7 @@ RESCAN:
 
       }
 
-      next if(!defined($val) || $val !~ m/^-?[.\d]+$/o);
+      next if(!defined($val) || $val !~ m/^-?[.0-9]+(e[-+0-9]+)?$/i);
       if($val < $min[$i]) {
         $min[$i] = $val;
         $mind[$i] = $dte;

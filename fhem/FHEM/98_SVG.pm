@@ -203,9 +203,15 @@ SVG_log10($)
 {
   my ($n) = @_;
 
-  return 0.0000000001 if( $n <= 0 );
+  $n = 0.0000000001 if($n <= 0);
+  return log($n)/log(10);
+}
 
-  return log(1+$n)/log(10);
+sub
+SVG_exp10($)
+{
+  my ($n) = @_;
+  return 10**$n;
 }
 
 
@@ -766,7 +772,7 @@ SVG_readgplotfile($$$)
   {
     return "%$_[0]%" if(!$pr);
     my $v = $pr->{$_[0]};
-    return "%$_[0]%" if(!$v);
+    return "%$_[0]%" if(!defined($v));
     if($v =~ m/^{.*}$/) {
       $cmdFromAnalyze = $v;
       return eval $v;
@@ -1760,6 +1766,12 @@ SVG_render($$$$$$$$$$)
     $htics{$a} = defined($conf{$yt}) ? $conf{$yt} : "";
 
     #-- Round values, compute a nice step  
+    my $scale = $conf{"y".($idx ? $idx+1:"")."scale"};
+    $scale = "" if(!defined($scale));
+    if($scale eq "log") {
+      $hmax{$a} = SVG_log10($hmax{$a});
+      $hmin{$a} = SVG_log10($hmin{$a});
+    }
     ($hstep{$a}, $hmin{$a}, $hmax{$a}) =
         SVG_getSteps($conf{$yra},$hmin{$a},$hmax{$a});
 
@@ -1772,24 +1784,14 @@ SVG_render($$$$$$$$$$)
 
     next if(!defined($hmin{$a})); # Bogus case
 
-    #-- safeguarding against pathological data
-    if( !$hstep{$a} ){
-        $hmax{$a} = $hmin{$a}+1;
-        $hstep{$a} = 1;
-    }
+    my $axis = 1;
+    $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
+    my $scale = $conf{"y".($axis==1?"":$axis)."scale"};
+    $scale = "" if(!defined($scale));
 
     #-- Draw the y-axis values and grid
     my $dh = $hmax{$a} - $hmin{$a};
     my $hmul = $dh>0 ? $h/$dh : $h;
-
-    my $axis = 1;
-    $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
-
-    my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
-    my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
-    my $f_log = (int($hmax{$a}) && $dh > 0) ? 
-                    ((SVG_log10($hmax{$a})-SVG_log10($hmin{$a})) / $dh) :
-                    1;
 
     # offsets
     my ($align,$display,$cll);
@@ -1827,23 +1829,18 @@ SVG_render($$$$$$$$$$)
     #-- tics handling
     my $tic = $htics{$a};
     #-- tics as in the config-file
-    if($tic && $tic !~ m/mirror/) {
+    if($tic) {
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
-      for(my $decimal = 0;
-          $decimal <($log eq 'log'?SVG_log10($hmax{$a})-SVG_log10($hmin{$a}):1);
-          $decimal++) {
       foreach my $onetic (split(",", $tic)) {
+        last if($onetic eq "nomirror");
         $onetic =~ s/^ *(.*) *$/$1/;
         my ($tlabel, $tvalue) = split(" ", $onetic);
         $tlabel =~ s/^"(.*)"$/$1/;
         $tvalue = 0 if( !$tvalue );
-        $tvalue /= 10 ** $decimal;
         $tlabel = $tvalue if( !$tlabel );
+        $tvalue = SVG_log10($tvalue) if($scale eq "log");
 
         $off2 = int($y+($hmax{$a}-$tvalue)*$hmul);
-        $off2 = int($y+($hmax{$a}-
-                        (SVG_log10($tvalue)-SVG_log10($hmin{$a}))/$f_log)*$hmul)
-                if( $log eq 'log' );
         #-- tics
         SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1860,22 +1857,11 @@ SVG_render($$$$$$$$$$)
         SVG_pO
           "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$tlabel</text>";
       }
-      }
+
     #-- tics automatically 
-    } elsif( $hstep{$a}>0 ) {            
-      for(my $decimal = 0;
-          $decimal <($log eq 'log'?SVG_log10($hmax{$a})-SVG_log10($hmin{$a}):1);
-          $decimal++) {
-      for(my $i = ($log eq 'log' ? 0 : $hmin{$a});
-             $i <= $hmax{$a}; $i += $hstep{$a}) {
-        my $i = $i / 10 ** $decimal;
-        if( $log eq 'log' ) {
-          next if( $i < $hmin{$a} );
-          $off2 = int($y + ($hmax{$a} -
-                    (SVG_log10($i) - SVG_log10($hmin{$a})) / $f_log) * $hmul);
-        } else {
-          $off2 = int($y+($hmax{$a}-$i)*$hmul);
-        }
+    } elsif( $hstep{$a}>0 ) {
+      for(my $i = $hmin{$a}; $i <= $hmax{$a}; $i += $hstep{$a}) {
+        $off2 = int($y+($hmax{$a}-$i)*$hmul);
         #-- tics
         SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
         #--grids
@@ -1891,10 +1877,11 @@ SVG_render($$$$$$$$$$)
         $off2 += $th/4;
         #--  text   
         my $name = ($axis==1 ? "y":"y$axis")."sprintf"; # Forum #88460
-        my $txt = sprintf($conf{$name} ? $conf{$name} : "%g", $i);
+        my $txt = sprintf($conf{$name} ? $conf{$name} : 
+                          ($scale eq "log" ? "%0.0e" : "%g"),
+                          ($scale eq "log" ? SVG_exp10($i) : $i));
         SVG_pO
           "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
-      }
       }
     }
     SVG_pO "</g>";
@@ -1911,8 +1898,8 @@ SVG_render($$$$$$$$$$)
     next if(!defined($a));
 
     my $axis = 1; $axis = $1 if( $a =~ m/x\d+y(\d+)/ );
-    my $scale = "y".($axis)."scale"; $scale = "yscale" if( $axis == 1 );
-    my $log = ""; $log = $conf{$scale} if( $conf{$scale} );
+    my $scale = $conf{"y".($axis==1?"":$axis)."scale"};
+    $scale = "" if(!defined($scale));
 
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
@@ -1925,11 +1912,9 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
-    my $f_log = int($hmax{$a}) ? ((SVG_log10($hmax{$a}) -
-                        SVG_log10($hmin{$a})) / ($hmax{$a}-$hmin{$a})) : 1;
-    if( $log eq 'log' ) {
+    if($scale eq 'log') {
       foreach my $i (0..int(@{$dyp})-1) {
-        $dyp->[$i] = (SVG_log10($dyp->[$i])-SVG_log10($hmin{$a})) / $f_log;
+        $dyp->[$i] = SVG_log10($dyp->[$i]);
       }
     }
 
@@ -1945,7 +1930,7 @@ SVG_render($$$$$$$$$$)
           ($conf{xrange}?"x_off=\"$xmin\" ":"x_off=\"$fromsec\" ").
           ($conf{xrange}?"x_mul=\"$xmul\" ":"t_mul=\"$tmul\" ").
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
-          ($log eq 'log'?"log_scale=\"$f_log\" ":"").
+          "scale=\"$scale\" ".
           "onclick=\"parent.svg_click(evt)\"";
     my $lStyle = $conf{lStyle}[$idx];
     my $isFill = ($conf{lStyle}[$idx] =~ m/fill/);
