@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 22263 2020-06-25 16:48:36Z DS_Starter $
+# $Id: 49_SSCam.pm 22329 2020-07-02 17:16:52Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.4.1"  => "05.07.2020  new Zoom icons ", 
   "9.4.0"  => "01.07.2020  switch to packages, much more changes according PBP ",  
   "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
   "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
@@ -464,11 +465,11 @@ my %imc = (                                                                 # di
 );
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
-    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide.png",  },
-    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom-in.png",       },
-    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,               },
-    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom-out.png",      },
-    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide.png", }
+    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide_w.png", },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in_w.png",     },
+    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,                   },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out_w.png",    },
+    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide_w.png",}
 );
 
 # Standardvariablen und Forward-Deklaration
@@ -7654,7 +7655,7 @@ sub ptzPanel {
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
 
-      my @za  = qw(.++ + &nbsp;&nbsp;Zoom&nbsp;&nbsp; - --.);
+      my @za  = qw(.++ + Zoom - --.);
       
       for my $cmd (@za) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
@@ -7673,7 +7674,7 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  my $zbs = $pbsf*1.55;
+                  my $zbs = $pbsf*1.5;
                   $img    = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
@@ -10732,12 +10733,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22263 2020-06-25 16:48:36Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22329 2020-07-02 17:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22263 2020-06-25 16:48:36Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22329 2020-07-02 17:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
