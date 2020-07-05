@@ -171,6 +171,9 @@
 #                 Information aus dem GW auslesen (Attribut "vitoconnect_gw_readings" auf "1" setzen;
 #                    noch unvollständig!)
 #
+#                 readings for heating.power.production.demandCoverage.* fixed
+#                 bei logResponseOnce wird bei getCode angefangen damit auch gw.json neu erzeugt wird
+#
 #
 #   ToDo:         timeout konfigurierbar machen
 #				  Attribute implementieren und dokumentieren
@@ -812,7 +815,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "logResponseOnce" ) {
         $hash->{".logResponseOnce"} = 1;
         RemoveInternalTimer($hash);
-        vitoconnect_GetUpdate($hash);
+        vitoconnect_getCode($hash);
         return;
     }
     elsif ( $opt eq "clearReadings" ) {
