@@ -465,11 +465,11 @@ my %imc = (                                                                 # di
 );
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
-    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide_w.png", },
-    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in_w.png",     },
-    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,                   },
-    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out_w.png",    },
-    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide_w.png",}
+    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide_w.png",     },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in_w.png",          },
+    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => "black_btn_CAMBLANK.png", },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out_w.png",         },
+    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide_w.png",    }
 );
 
 # Standardvariablen und Forward-Deklaration
@@ -7370,7 +7370,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
+return 1;
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7655,7 +7655,7 @@ sub ptzPanel {
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
 
-      my @za  = qw(.++ + Zoom - --.);
+      my @za  = qw(.++ + stop - --.);
       
       for my $cmd (@za) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
