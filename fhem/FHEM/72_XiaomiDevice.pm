@@ -608,7 +608,7 @@ sub XiaomiDevice_Set($$@) {
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "VacuumCleaner"){
     $list  .=  ' start:noArg stop:noArg pause:noArg spot:noArg charge:noArg locate:noArg dnd_enabled:on,off dnd_start dnd_end move remotecontrol:start,stop,forward,left,right reset_consumable:filter,mainbrush,sidebrush,sensors timezone volume:slider,0,1,100 volume_test:noArg';
     $list  .=  ' carpet_mode:on,off';
-    $list  .=  '  sleep:noArg wakeup:noArg';
+    $list  .=  ' sleep:noArg wakeup:noArg';
 
     $list  .=  ' fan_power:slider,1,1,100' if(!defined($hash->{model}) || $hash->{model} eq "rockrobo.vacuum.v1");
     $list  .=  ' cleaning_mode:off,quiet,balanced,turbo,max';
@@ -616,16 +616,16 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  ',auto' if(!defined($hash->{model}) || ($hash->{model} eq "roborock.vacuum.s5e" || $hash->{model} eq "roborock.vacuum.s6" || $hash->{model} eq "roborock.vacuum.t6"));
 
     if(!defined($hash->{model}) || $hash->{model} ne "roborock.vacuum.c1") {
-    if(defined($hash->{helper}{zone_names})) {
+      if(defined($hash->{helper}{zone_names})) {
         $list  .=  ' zone:'.$hash->{helper}{zone_names}.' resume:noArg';
-    } else {
+      } else {
         $list  .=  ' zone resume:noArg';
-    }
-    if(defined($hash->{helper}{point_names})) {
-      $list  .=  ' goto:'.$hash->{helper}{point_names};
-    } else {
-      $list  .=  ' goto';
-    }
+      }
+      if(defined($hash->{helper}{point_names})) {
+        $list  .=  ' goto:'.$hash->{helper}{point_names};
+      } else {
+        $list  .=  ' goto';
+      }
     }
     if(!defined($hash->{model}) || ($hash->{model} ne "rockrobo.vacuum.v1" && $hash->{model} ne "rockrobo.vacuum.c1")) { #roborock.vacuum.s5
       if(defined($hash->{helper}{map_names})) {
@@ -825,8 +825,8 @@ sub XiaomiDevice_Set($$@) {
     if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "RiceCooker") {
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_func","params":["end02"]}' );
     } else {
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_stop","params":[""]}' );
-  }
+      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_stop","params":[""]}' );
+    }
   }
   elsif ($cmd eq 'spot')
   {
@@ -1089,7 +1089,7 @@ sub XiaomiDevice_Set($$@) {
     my $segment = join(",", @arg);
     $segment = $hash->{helper}{segments}{$arg[0]} if(defined($hash->{helper}{segments}) && defined($hash->{helper}{segments}{$arg[0]}));
 
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_segment_clean","params":['.$arg[0].']}' );
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"app_segment_clean","params":['.$segment.']}' );
   }
   elsif ($cmd eq 'segment_stop')
   {
@@ -1586,7 +1586,7 @@ sub XiaomiDevice_Set($$@) {
       }
       else
       {
-      XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_power","params":["off"]}' );
+        XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_power","params":["off"]}' );
       }
     } else {
       if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFan1X")
@@ -2335,8 +2335,8 @@ sub XiaomiDevice_WriteJSON($$)
   {
     RemoveInternalTimer($hash);
     Log3 ($name, 1, "$name: internal error, values missing");
-	$hash->{helper}{delay} += 300;
-	InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
+    $hash->{helper}{delay} += 300;
+    InternalTimer( gettimeofday() + $hash->{helper}{delay}, "XiaomiDevice_connect", $hash);
     return undef;
   }
   my $sequence = sprintf("%.8x", ( int(time) - $hash->{helper}{sequence} ));
@@ -2743,7 +2743,7 @@ sub XiaomiDevice_ParseJSON($$)
     return undef;
   }
 
-#"power","bright","ct","color_mode","delayoff","flowing","flow_params","name"
+  #"power","bright","ct","color_mode","delayoff","flowing","flow_params","name"
   if($msgtype eq "fan_data")
   {
     return undef if(!defined($json->{result}));
@@ -2887,22 +2887,22 @@ sub XiaomiDevice_ParseJSON($$)
     return undef if(!defined($json->{result}));
     return undef if(ref($json->{result}) ne "ARRAY");
     if(ref($json->{result}[0]) eq "HASH"){
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "power", $json->{result}[0]{power}, 1 ) if(defined($json->{result}[0]{power}));
-    readingsBulkUpdate( $hash, "temperature", $json->{result}[0]{temperature}, 1 ) if(defined($json->{result}[0]{temperature}));
-    readingsBulkUpdate( $hash, "current", $json->{result}[0]{current}, 1 ) if(defined($json->{result}[0]{current}));
-    readingsBulkUpdate( $hash, "power_mode", $json->{result}[0]{mode}, 1 ) if(defined($json->{result}[0]{mode}));
-    readingsBulkUpdate( $hash, "power_consume_rate", $json->{result}[0]{power_consume_rate}, 1 ) if(defined($json->{result}[0]{power_consume_rate}));
-    readingsBulkUpdate( $hash, "wifi_led", $json->{result}[0]{wifi_led}, 1 ) if(defined($json->{result}[0]{wifi_led}));
-    readingsBulkUpdate( $hash, "power_price", $json->{result}[0]{power_price}, 1 ) if(defined($json->{result}[0]{power_price}));
-    readingsBulkUpdate( $hash, "voltage", $json->{result}[0]{voltage}, 1 ) if(defined($json->{result}[0]{voltage}));
-    readingsBulkUpdate( $hash, "power_factor", $json->{result}[0]{power_factor}, 1 ) if(defined($json->{result}[0]{power_factor}));
-    readingsBulkUpdate( $hash, "elec_leakage", $json->{result}[0]{elec_leakage}, 1 ) if(defined($json->{result}[0]{elec_leakage}));
+      readingsBeginUpdate($hash);
+      readingsBulkUpdate( $hash, "power", $json->{result}[0]{power}, 1 ) if(defined($json->{result}[0]{power}));
+      readingsBulkUpdate( $hash, "temperature", $json->{result}[0]{temperature}, 1 ) if(defined($json->{result}[0]{temperature}));
+      readingsBulkUpdate( $hash, "current", $json->{result}[0]{current}, 1 ) if(defined($json->{result}[0]{current}));
+      readingsBulkUpdate( $hash, "power_mode", $json->{result}[0]{mode}, 1 ) if(defined($json->{result}[0]{mode}));
+      readingsBulkUpdate( $hash, "power_consume_rate", $json->{result}[0]{power_consume_rate}, 1 ) if(defined($json->{result}[0]{power_consume_rate}));
+      readingsBulkUpdate( $hash, "wifi_led", $json->{result}[0]{wifi_led}, 1 ) if(defined($json->{result}[0]{wifi_led}));
+      readingsBulkUpdate( $hash, "power_price", $json->{result}[0]{power_price}, 1 ) if(defined($json->{result}[0]{power_price}));
+      readingsBulkUpdate( $hash, "voltage", $json->{result}[0]{voltage}, 1 ) if(defined($json->{result}[0]{voltage}));
+      readingsBulkUpdate( $hash, "power_factor", $json->{result}[0]{power_factor}, 1 ) if(defined($json->{result}[0]{power_factor}));
+      readingsBulkUpdate( $hash, "elec_leakage", $json->{result}[0]{elec_leakage}, 1 ) if(defined($json->{result}[0]{elec_leakage}));
       readingsBulkUpdate( $hash, "usb_power", $json->{result}[0]{usb_power}, 1 ) if(defined($json->{result}[0]{usb_power}));
       readingsBulkUpdate( $hash, "load_power", $json->{result}[0]{load_power}, 1 ) if(defined($json->{result}[0]{load_power}));
       readingsBulkUpdate( $hash, "usb_power", ($json->{result}[0]{usb_on} eq "0" ? 'off' : 'on' ), 1 ) if(defined($json->{result}[0]{usb_on}));
       #readingsBulkUpdate( $hash, "setting", (($json->{result}[0]{setting} ne "0")?"yes":"no"), 1 ) if(defined($json->{result}[0]{setting}));
-    readingsEndUpdate($hash,1);
+      readingsEndUpdate($hash,1);
     } else {
       readingsBeginUpdate($hash);
       readingsBulkUpdate( $hash, "power", $json->{result}[0], 1 ) if(defined($json->{result}[0]));
@@ -3165,7 +3165,7 @@ sub XiaomiDevice_ParseJSON($$)
       my $timercron = $timerstring[2][0];
       my $timerprogram = $timerstring[2][1][0] if(defined($timerstring[2][1][0]));
       my $timerpower = $timerstring[2][1][1] if(defined($timerstring[2][1][1]));
-     $hash->{helper}{"timer".$i} = $timestamp if(defined($timestamp));
+      $hash->{helper}{"timer".$i} = $timestamp if(defined($timestamp));
       $hash->{helper}{"timer".$i."_cron"} = $timercron if(defined($timercron));
       readingsBeginUpdate($hash);
       #readingsBulkUpdate( $hash, "timer".$i."_created", FmtDateTime(int($timestamp/1000)), 1 ) if(defined($timestamp));
@@ -3677,7 +3677,7 @@ sub XiaomiDevice_Attr($$$) {
     return undef;
   }
 
-  if($attrName eq "zone_names" || $attrName eq "point_names" || $attrName eq "map_names") {
+  if($attrName eq "zone_names" || $attrName eq "point_names" || $attrName eq "map_names" || $attrName eq "segment_names") {
     my $hash = $defs{$name};
     InternalTimer( gettimeofday() + 2, "XiaomiDevice_ReadZones", $hash);
   }
