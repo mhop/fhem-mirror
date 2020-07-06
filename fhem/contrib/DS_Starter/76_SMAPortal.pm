@@ -136,6 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.3.3"  => "05.07.2020  change extractLiveData ",
+  "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
   "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
   "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
   "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
@@ -204,11 +206,11 @@ my %vNotesIntern = (
 );
 
 # Voreinstellungen
-my $maxretries   = 8;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
+my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
 my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
 my $sleepretry   = 60;                     # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
 my $sleepexc     = 90;                     # Sleep vor neuem Datencall nach Überschreitung Threshold (neues Cookie wird angelegt)
-my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
+my $defmaxcycles = 10;                     # Standard max. Anzahl Datenabrufzyklen
 
 my %statkeys = (                           # Statistikdaten auszulesende Schlüssel
   Energy                => 1,
@@ -434,7 +436,8 @@ sub Set {                             ## no critic 'complexity'
       
       CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
       
-      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}. 
+      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
+           qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are privided by SMA!\n}.      
            qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
            qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
       
@@ -716,7 +719,7 @@ sub CallInfo {
   
   RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
   
-  my ($interval,$maxcycles,$timeout,$ctime) = controlParams ($name);
+  my ($interval,$maxcycles,$timeout) = controlParams ($name);
   
   if($init_done == 1) {
       if(!$hash->{CREDENTIALS}) {
@@ -754,7 +757,6 @@ sub CallInfo {
       
       if ($hash->{HELPER}{RUNNING_PID}) {
           Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
-          InternalTimer(gettimeofday()+5, "FHEM::SMAPortal::CallInfo", $hash, 0) if($interval);
           return;
       } 
       
@@ -765,7 +767,6 @@ sub CallInfo {
           Log3 ($name, 3, "$name - ################################################################");
           Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
           Log3 ($name, 3, "$name - ################################################################"); 
-          Log3 ($name, 4, "$name - calculated cycles summary time: $ctime");
           Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:             $timeout");
       }
@@ -811,31 +812,14 @@ sub controlParams {
   my $name = shift;
 
   # Voreinstellungen
-  my $timeoutdef   = 290;                    # Standard Timeout
+  my $timeoutdef   = 3600;                   # Standard Timeout
   my $definterval  = 300;                    # Standard Interval
   my $buffer       = 5;                      # Sicherheitspuffer zum nächsten Intervall
 
   my $interval     = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
   my $maxcycles    = $defmaxcycles;
-  
-  # prognostizierte Zeit eines Zyklus
-  my $proctime = ($maxretries * 0.1);
-  my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;
-  $ctime       = ReadingsVal ($name, "lastCycleTime", $ctime);
-  $ctime       = 7 if($ctime > 7);                                       # Ausreißer ignorieren
-   
-  if(!$interval) {                                                       # manueller Datenabruf 
-      return ($interval,$maxcycles,$timeoutdef,$ctime);
-  }
 
-  # max Anzahl Zyklen
-  $maxcycles = int(($interval - $buffer) / $ctime) if($ctime); 
-
-  # Timeout kalkulieren
-  my $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
-  $timeout    = $timeoutdef if($timeout < 10);
-
-return ($interval,$maxcycles,$timeout,$ctime);
+return ($interval,$maxcycles,$timeoutdef);
 }
 
 ################################################################
@@ -1859,8 +1843,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
     
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
-  my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
+  my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
+  my $attstr     = "Attempts read data again in $sleepretry seconds... ($act of $maxretries)";   # Log vorbereiten
   
   my $wm1e = qq{Updating of the live data was interrupted};
   my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
@@ -2010,10 +1994,15 @@ sub ParseData {                                                    ## no critic 
   my $gc   = ReadingsNum($name, "${ldlv}_GridConsumption", 0);
   my $sum  = $fi-$gc;
   
-  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
+#  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
-      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
-      Log3 ($name, 2, "$name - $state");
+#      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
+#      Log3 ($name, 2, "$name - $state");
+#  }
+  
+  my $ts = strftime('%Y-%m-%d %H:%M:%S', localtime);
+  if(AttrVal("global", "language", "EN") eq "DE") {
+      $ts = strftime('%d.%m.%Y %H:%M:%S', localtime);
   }
   
   readingsBeginUpdate($hash);
@@ -2024,9 +2013,9 @@ sub ParseData {                                                    ## no critic 
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
           readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
-      readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
-  
+      readingsBulkUpdate($hash, "lastCycleTime",   $ctime   ) if($ctime > 0);
+      readingsBulkUpdate($hash, "summary",         $sum." W") if($subs{$name}{liveData}{doit});
+      readingsBulkUpdate($hash, "lastSuccessTime", $ts      );
   }
   
   readingsBulkUpdate($hash, "state", $state);
@@ -2118,14 +2107,14 @@ sub extractLiveData {                  ## no critic 'complexity'
   );
   
   if (ref $live eq "HASH") {
-      push @$daref, "${lv}_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
-      push @$daref, "${lv}_GridConsumption:"         .($live->{GridConsumption}      // 0)." W";
-      push @$daref, "${lv}_PV:"                      .($live->{PV}                   // 0)." W";
-      push @$daref, "${lv}_AutarkyQuote:"            .($live->{AutarkyQuote}         // 0)." %";
-      push @$daref, "${lv}_SelfConsumption:"         .($live->{SelfConsumption}      // 0)." W";
-      push @$daref, "${lv}_SelfConsumptionQuote:"    .($live->{SelfConsumptionQuote} // 0)." %";
-      push @$daref, "${lv}_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
-      push @$daref, "${lv}_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
+      push @$daref, "${lv}_FeedIn:"                  .$live->{FeedIn}." W"                 if(defined $live->{FeedIn});
+      push @$daref, "${lv}_GridConsumption:"         .$live->{GridConsumption}." W"        if(defined $live->{GridConsumption});
+      push @$daref, "${lv}_PV:"                      .$live->{PV}." W"                     if(defined $live->{PV});    
+      push @$daref, "${lv}_AutarkyQuote:"            .$live->{AutarkyQuote}." %"           if(defined $live->{AutarkyQuote});
+      push @$daref, "${lv}_SelfConsumption:"         .$live->{SelfConsumption}." W"        if(defined $live->{SelfConsumption});
+      push @$daref, "${lv}_SelfConsumptionQuote:"    .$live->{SelfConsumptionQuote}." %"   if(defined $live->{SelfConsumptionQuote});
+      push @$daref, "${lv}_SelfSupply:"              .$live->{SelfSupply}." W"             if(defined $live->{SelfSupply});
+      push @$daref, "${lv}_TotalConsumption:"        .$live->{TotalConsumption}." W"       if(defined $live->{TotalConsumption});
       
       push @$daref, "${lv}_BatteryIn:"               .$live->{BatteryIn}. " W"             if(defined $live->{BatteryIn});
       push @$daref, "${lv}_BatteryOut:"              .$live->{BatteryOut}." W"             if(defined $live->{BatteryOut});
@@ -3167,7 +3156,7 @@ sub PortalAsHtml {                                                              
       if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
           $header .= "<tr>";
           $header .= "<td><b>PV&nbsp;=></b></td>"; 
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>"; 
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>" if($subs{$name}{liveData}{doit}); 
           $header .= "<td><b>$lblPv4h</b></td> <td align=right>$pv4h</td>"; 
           $header .= "<td><b>$lblPvRe</b></td> <td align=right>$pvRe</td>"; 
           $header .= "<td><b>$lblPvTo</b></td> <td align=right>$pvTo</td>"; 
@@ -3178,7 +3167,7 @@ sub PortalAsHtml {                                                              
       if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
           $header .= "<tr>";
           $header .= "<td><b>CO&nbsp;=></b></td>";
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>";           
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>" if($subs{$name}{liveData}{doit});           
           $header .= "<td><b>$lblPv4h</b></td> <td align=right>$co4h</td>"; 
           $header .= "<td><b>$lblPvRe</b></td> <td align=right>$coRe</td>"; 
           $header .= "<td><b>$lblPvTo</b></td> <td align=right>$coTo</td>"; 
