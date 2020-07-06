@@ -156,6 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.4.1"  => "05.07.2020  new Zoom icons ", 
   "9.4.0"  => "01.07.2020  switch to packages, much more changes according PBP ",  
   "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
   "9.2.3"  => "30.05.2020  change SSChatBot_formText to SSChatBot_formString ",
@@ -464,11 +465,11 @@ my %imc = (                                                                 # di
 );
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
-    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide.png",  },
-    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom-in.png",       },
-    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => undef,               },
-    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom-out.png",      },
-    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide.png", }
+    ".++"  => {dir => "in",  sttime => 6,     moveType => "Start", panimg => "Zoom_in_wide_w.png",     },
+    "+"    => {dir => "in",  sttime => 0.5,   moveType => "Start", panimg => "Zoom_in_w.png",          },
+    "stop" => {dir => undef, sttime => undef, moveType => "Stop" , panimg => "black_btn_CAMBLANK.png", },
+    "-"    => {dir => "out", sttime => 0.5,   moveType => "Start", panimg => "Zoom_out_w.png",         },
+    "--."  => {dir => "out", sttime => 6,     moveType => "Start", panimg => "Zoom_out_wide_w.png",    }
 );
 
 # Standardvariablen und Forward-Deklaration
@@ -7653,8 +7654,11 @@ sub ptzPanel {
       
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style='text-align:center' colspan=10>Zoom</td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "<tr>";
 
-      my @za  = qw(.++ + &nbsp;&nbsp;Zoom&nbsp;&nbsp; - --.);
+      my @za  = qw(.++ + stop - --.);
       
       for my $cmd (@za) {                 
           $ptz_ret .= "<td class='ptzcontrol'>";
@@ -7673,8 +7677,7 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  my $zbs = $pbsf*1.55;
-                  $img    = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
+                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
               }
