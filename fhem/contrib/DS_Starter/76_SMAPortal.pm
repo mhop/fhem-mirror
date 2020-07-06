@@ -1947,7 +1947,7 @@ sub ParseData {                                                    ## no critic 
       delcookiefile ($hash);      
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;   
-      CallInfo($hash,1,1);                          # neuer Versuch (nach Threshold exceed) im gleichen Cycle mit gelöschtem Cookie 
+      CallInfo($hash,1,1);                                     # neuer Versuch (nach Threshold exceed) im gleichen Cycle mit gelöschtem Cookie 
       return;
   } 
   
@@ -1957,7 +1957,7 @@ sub ParseData {                                                    ## no critic 
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;
       $hash->{HELPER}{ACTCYCLE}++;    
-      CallInfo($hash,1,0);                          # neuer Abrufcycle 
+      CallInfo($hash,1,0);                                     # neuer Abrufcycle 
       return;
   }
   
@@ -1965,7 +1965,7 @@ sub ParseData {                                                    ## no critic 
   my $btime  = $hash->{HELPER}{CYCLEBTIME};
   my $etime  = (gettimeofday())[0];
   my $cycles = $hash->{HELPER}{ACTCYCLE};
-  my $ctime  = int(($etime - $btime) / $cycles);    # durchschnittliche Laufzeit für einen Zyklus
+  my $ctime  = int(($etime - $btime) / $cycles);               # durchschnittliche Laufzeit für einen Zyklus
   
   $state = decode_base64($a[6]);
   
@@ -1974,7 +1974,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  deleteData($hash, 1) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
+  deleteData($hash, 0) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
   
   readingsBeginUpdate($hash);
   
