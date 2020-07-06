@@ -7654,6 +7654,9 @@ sub ptzPanel {
       
       $ptz_ret .= '<table class="rc_body defsize">';
       $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style='text-align:center' colspan=10>Zoom</td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "<tr>";
 
       my @za  = qw(.++ + stop - --.);
       
@@ -7674,8 +7677,7 @@ sub ptzPanel {
               my $iPath = FW_iconPath($img);
 
               if($ftui) {
-                  my $zbs = $pbsf*1.5;
-                  $img    = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$zbs%\" width=\"$zbs%\">";
+                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
               } else {
                   $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
               }
