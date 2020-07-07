@@ -1,6 +1,6 @@
-REV 22356
+REV 22364
 DIR unused
-UPD 2020-07-05_07:45:03 344982 ./CHANGED
+UPD 2020-07-07_07:45:06 345073 ./CHANGED
 UPD 2020-06-29_07:45:03 42464 ./MAINTAINER.txt
 UPD 2020-07-05_07:45:03 41333 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -254,7 +254,7 @@ UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2020-05-20_07:45:04 92458 FHEM/48_BlinkCamera.pm
 UPD 2020-02-18_07:45:02 66733 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2020-07-03_07:45:03 778562 FHEM/49_SSCam.pm
+UPD 2020-07-07_07:45:06 778693 FHEM/49_SSCam.pm
 UPD 2020-07-03_07:45:03 37560 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
@@ -369,7 +369,7 @@ UPD 2019-10-14_07:45:02 89155 FHEM/72_FB_CALLLIST.pm
 UPD 2020-04-16_07:45:03 124570 FHEM/72_FB_CALLMONITOR.pm
 UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
-UPD 2020-06-07_07:45:04 195963 FHEM/72_XiaomiDevice.pm
+UPD 2020-07-07_07:45:06 196050 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
 UPD 2020-07-03_07:45:03 96948 FHEM/73_AutoShuttersControl.pm
 UPD 2020-05-05_07:45:02 201709 FHEM/73_DoorBird.pm
@@ -738,8 +738,8 @@ UPD 2020-07-05_07:45:07 4323626 docs/commandref.html
 UPD 2020-07-05_07:45:09 2679039 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-07-06_07:45:12 232326 docs/commandref_modular.html
-UPD 2020-07-06_07:45:13 243033 docs/commandref_modular_DE.html
+UPD 2020-07-07_07:45:14 232326 docs/commandref_modular.html
+UPD 2020-07-07_07:45:15 243033 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2150,8 +2150,10 @@ UPD 2015-07-28_14:05:33 1824 www/images/openautomation/weather_wind_directions_s
 UPD 2015-07-28_14:05:33 1728 www/images/openautomation/weather_wind_directions_w.svg
 UPD 2015-07-28_14:05:33 2221 www/images/openautomation/weather_wind_speed.svg
 UPD 2015-07-28_14:05:33 3958 www/images/openautomation/weather_winter.svg
-UPD 2020-07-02_07:45:06 923 www/images/sscam/Zoom_in_wide.png
-UPD 2020-07-02_07:45:06 929 www/images/sscam/Zoom_out_wide.png
+UPD 2020-07-07_07:45:06 767 www/images/sscam/Zoom_in_w.png
+UPD 2020-07-07_07:45:06 811 www/images/sscam/Zoom_in_wide_w.png
+UPD 2020-07-07_07:45:06 775 www/images/sscam/Zoom_out_w.png
+UPD 2020-07-07_07:45:06 771 www/images/sscam/Zoom_out_wide_w.png
 UPD 2018-04-09_07:45:03 191 www/images/sscam/black_btn_CAMBLANK.png
 UPD 2018-04-09_07:45:03 972 www/images/sscam/black_btn_CAMDOWN.png
 UPD 2018-04-09_07:45:03 1193 www/images/sscam/black_btn_CAMDOWNFAST.png
