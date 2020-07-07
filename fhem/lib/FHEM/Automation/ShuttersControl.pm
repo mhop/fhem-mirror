@@ -519,15 +519,15 @@ sub EventProcessingGeneral {
         while ( my ( $device, $deviceAttr ) =
             each %{ $hash->{monitoredDevs}{$devname} } )
         {
-            if ( $devname eq $name ) {
+            if ( $device eq $name ) {
                 EventProcessingResidents( $hash, $device, $events )
-                if ( $deviceAttr eq 'ASC_residentsDev' );
+                  if ( $deviceAttr eq 'ASC_residentsDev' );
                 EventProcessingRain( $hash, $device, $events )
-                if ( $deviceAttr eq 'ASC_rainSensor' );
+                  if ( $deviceAttr eq 'ASC_rainSensor' );
                 EventProcessingWind( $hash, $device, $events )
-                if ( $deviceAttr eq 'ASC_windSensor' );
+                  if ( $deviceAttr eq 'ASC_windSensor' );
                 EventProcessingTwilightDevice( $hash, $device, $events )
-                if ( $deviceAttr eq 'ASC_twilightDevice' );
+                  if ( $deviceAttr eq 'ASC_twilightDevice' );
             }
 
             EventProcessingWindowRec( $hash, $device, $events )
