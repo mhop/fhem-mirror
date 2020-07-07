@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  73_AutoShuttersControl: add condition in Fn EventProcessingGeneral
+               to differentiate ASC device and other sensor device in NOTIFYDEV
  - change:  49_SSCam: new Zoom icons
  - bugfix:  72_XiaomiDevice: Vacuum segment names fix
  - feature: 51_MOBILEALERTS: Added Sensor MA 10238

@@ -519,20 +519,24 @@ sub EventProcessingGeneral {
         while ( my ( $device, $deviceAttr ) =
             each %{ $hash->{monitoredDevs}{$devname} } )
         {
+            if ( $devname eq $name ) {
+                EventProcessingResidents( $hash, $device, $events )
+                if ( $deviceAttr eq 'ASC_residentsDev' );
+                EventProcessingRain( $hash, $device, $events )
+                if ( $deviceAttr eq 'ASC_rainSensor' );
+                EventProcessingWind( $hash, $device, $events )
+                if ( $deviceAttr eq 'ASC_windSensor' );
+                EventProcessingTwilightDevice( $hash, $device, $events )
+                if ( $deviceAttr eq 'ASC_twilightDevice' );
+            }
+
             EventProcessingWindowRec( $hash, $device, $events )
               if ( $deviceAttr eq 'ASC_WindowRec' )
               ;    # ist es ein Fensterdevice wird die Funktion gestartet
             EventProcessingRoommate( $hash, $device, $events )
               if ( $deviceAttr eq 'ASC_Roommate_Device' )
               ;    # ist es ein Bewohner Device wird diese Funktion gestartet
-            EventProcessingResidents( $hash, $device, $events )
-              if ( $deviceAttr eq 'ASC_residentsDev' );
-            EventProcessingRain( $hash, $device, $events )
-              if ( $deviceAttr eq 'ASC_rainSensor' );
-            EventProcessingWind( $hash, $device, $events )
-              if ( $deviceAttr eq 'ASC_windSensor' );
-            EventProcessingTwilightDevice( $hash, $device, $events )
-              if ( $deviceAttr eq 'ASC_twilightDevice' );
+
             EventProcessingExternalTriggerDevice( $hash, $device, $events )
               if ( $deviceAttr eq 'ASC_ExternalTrigger' );
 
