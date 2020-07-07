@@ -1051,6 +1051,7 @@ sub MAX_Set
       }
  
     }
+    return;
   }# letztes Set Kommando 
 
   if (($setting =~ /(open|close)/) && ($devtype == 6) && ($hash->{IODev}->{TYPE} eq 'CUL_MAX'))
