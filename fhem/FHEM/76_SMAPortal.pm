@@ -136,6 +136,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
+  "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
+  "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
   "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
   "3.2.0"  => "30.06.2020  add data provider balanceCurrentData (experimental), balanceMonthData, balanceYearData ",
   "3.1.2"  => "25.06.2020  don't delete cookie after every data retrieval, change login management ",
@@ -203,11 +206,11 @@ my %vNotesIntern = (
 );
 
 # Voreinstellungen
-my $maxretries   = 8;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
+my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
 my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
-my $sleepretry   = 0.5;                    # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
-my $sleepexc     = 2;                      # Sleep vor neuem Datencall nach Überschreitung Threshold (Data Calls mit gleichem Cookie)
-my $defmaxcycles = 19;                     # Standard max. Anzahl Datenabrufzyklen abgeleitet von Interval 120 (wird bei Automatic berechnet)
+my $sleepretry   = 60;                     # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
+my $sleepexc     = 90;                     # Sleep vor neuem Datencall nach Überschreitung Threshold (neues Cookie wird angelegt)
+my $defmaxcycles = 10;                     # Standard max. Anzahl Datenabrufzyklen
 
 my %statkeys = (                           # Statistikdaten auszulesende Schlüssel
   Energy                => 1,
@@ -224,24 +227,24 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
-my %mandatory;                                                                                           # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
-my %subs;                                                                                                # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
-my %stpl = (                                                                                             # Ausgangstemplate Subfunktionen der Datenprovider
-    consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
-    plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
-    liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
-    weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
-    forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
-    consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
-    consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
-    consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
-    consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
-    plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
-    balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
-    balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
-    balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
-    balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
-    balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
+my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
+my %subs;                                                                                              # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
+my %stpl = (                                                                                           # Ausgangstemplate Subfunktionen der Datenprovider
+  consumerMasterdata  => { doit => 1, nohm => 1, level => 'L00', func => '_getConsumerMasterdata'  },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+  plantMasterData     => { doit => 1, nohm => 1, level => 'L00', func => '_getPlantMasterData'     },  # mandatory (außer wenn kein SMA Home Manager vorhanden)
+  liveData            => { doit => 0, nohm => 0, level => 'L01', func => '_getLiveData'            },
+  weatherData         => { doit => 0, nohm => 0, level => 'L02', func => '_getWeatherData'         },
+  forecastData        => { doit => 0, nohm => 1, level => 'L04', func => '_getForecastData'        },
+  consumerCurrentdata => { doit => 0, nohm => 1, level => 'L05', func => '_getConsumerCurrData'    },
+  consumerDayData     => { doit => 0, nohm => 1, level => 'L06', func => '_getConsumerDayData'     },
+  consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
+  consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
+  plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
+  balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
+  balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
+  balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
+  balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
+  balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
                                            # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
@@ -433,7 +436,8 @@ sub Set {                             ## no critic 'complexity'
       
       CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
       
-      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}. 
+      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
+           qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are privided by SMA!\n}.      
            qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
            qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
       
@@ -715,7 +719,7 @@ sub CallInfo {
   
   RemoveInternalTimer($hash,"FHEM::SMAPortal::CallInfo");
   
-  my ($interval,$maxcycles,$timeout,$ctime) = controlParams ($name);
+  my ($interval,$maxcycles,$timeout) = controlParams ($name);
   
   if($init_done == 1) {
       if(!$hash->{CREDENTIALS}) {
@@ -752,8 +756,8 @@ sub CallInfo {
       }
       
       if ($hash->{HELPER}{RUNNING_PID}) {
-          BlockingKill($hash->{HELPER}{RUNNING_PID});
-          delete($hash->{HELPER}{RUNNING_PID});
+          Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
+          return;
       } 
       
       my $getp = $hash->{HELPER}{GETTER};
@@ -763,7 +767,6 @@ sub CallInfo {
           Log3 ($name, 3, "$name - ################################################################");
           Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
           Log3 ($name, 3, "$name - ################################################################"); 
-          Log3 ($name, 4, "$name - calculated cycles summary time: $ctime");
           Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:             $timeout");
       }
@@ -809,31 +812,14 @@ sub controlParams {
   my $name = shift;
 
   # Voreinstellungen
-  my $timeoutdef   = 290;                    # Standard Timeout
+  my $timeoutdef   = 3600;                   # Standard Timeout
   my $definterval  = 300;                    # Standard Interval
   my $buffer       = 5;                      # Sicherheitspuffer zum nächsten Intervall
 
   my $interval     = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
   my $maxcycles    = $defmaxcycles;
-  
-  # prognostizierte Zeit eines Zyklus
-  my $proctime = ($maxretries * 0.1);
-  my $ctime    = ($maxretries * $sleepretry) + $sleepexc + $proctime;
-  $ctime       = ReadingsVal ($name, "lastCycleTime", $ctime);
-  $ctime       = 7 if($ctime > 7);                                       # Ausreißer ignorieren
-   
-  if(!$interval) {                                                       # manueller Datenabruf 
-      return ($interval,$maxcycles,$timeoutdef,$ctime);
-  }
 
-  # max Anzahl Zyklen
-  $maxcycles = int(($interval - $buffer) / $ctime) if($ctime); 
-
-  # Timeout kalkulieren
-  my $timeout = int(($maxcycles * $ctime) + $proctime - $buffer);
-  $timeout    = $timeoutdef if($timeout < 10);
-
-return ($interval,$maxcycles,$timeout,$ctime);
+return ($interval,$maxcycles,$timeoutdef);
 }
 
 ################################################################
@@ -984,7 +970,7 @@ sub GetSetData {                                                       ## no cri
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
               if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
-                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry ...}); 
+                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry in $sleepretry seconds ...}); 
                   sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
@@ -999,7 +985,7 @@ sub GetSetData {                                                       ## no cri
           my $ac        = $hash->{HELPER}{ACTCYCLE};
           my $maxcycles = (controlParams $name)[1];
           if($retry && $ac < $maxcycles) {                                                         # neuer Zyklus (nicht wenn Verbraucher schalten)     
-              Log3 ($name, 3, qq{$name - Maximum retries reached, start new data get cycle ...}); 
+              Log3 ($name, 3, qq{$name - Maximum retries reached, start new data get cycle in $sleepexc seconds ...}); 
               $newcycle = 1;
               return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
           }    
@@ -1857,8 +1843,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
     
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
-  my $act        = $hash->{HELPER}{RETRIES};                                   # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again ... ($act of $maxretries)";       # Log vorbereiten
+  my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
+  my $attstr     = "Attempts read data again in $sleepretry seconds... ($act of $maxretries)";   # Log vorbereiten
   
   my $wm1e = qq{Updating of the live data was interrupted};
   my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
@@ -1961,7 +1947,7 @@ sub ParseData {                                                    ## no critic 
       delcookiefile ($hash);      
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;   
-      CallInfo($hash,1,1);                          # neuer Versuch (nach Threshold exceed) im gleichen Cycle mit gelöschtem Cookie 
+      CallInfo($hash,1,1);                                     # neuer Versuch (nach Threshold exceed) im gleichen Cycle mit gelöschtem Cookie 
       return;
   } 
   
@@ -1971,7 +1957,7 @@ sub ParseData {                                                    ## no critic 
       $hash->{HELPER}{GETTER} = $getp;
       $hash->{HELPER}{SETTER} = $setp;
       $hash->{HELPER}{ACTCYCLE}++;    
-      CallInfo($hash,1,0);                          # neuer Abrufcycle 
+      CallInfo($hash,1,0);                                     # neuer Abrufcycle 
       return;
   }
   
@@ -1979,7 +1965,7 @@ sub ParseData {                                                    ## no critic 
   my $btime  = $hash->{HELPER}{CYCLEBTIME};
   my $etime  = (gettimeofday())[0];
   my $cycles = $hash->{HELPER}{ACTCYCLE};
-  my $ctime  = int(($etime - $btime) / $cycles);    # durchschnittliche Laufzeit für einen Zyklus
+  my $ctime  = int(($etime - $btime) / $cycles);               # durchschnittliche Laufzeit für einen Zyklus
   
   $state = decode_base64($a[6]);
   
@@ -1988,7 +1974,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  deleteData($hash, 1) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
+  deleteData($hash, 0) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
   
   readingsBeginUpdate($hash);
   
@@ -2008,10 +1994,15 @@ sub ParseData {                                                    ## no critic 
   my $gc   = ReadingsNum($name, "${ldlv}_GridConsumption", 0);
   my $sum  = $fi-$gc;
   
-  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
+#  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
       # keine Anlagendaten vorhanden
-      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
-      Log3 ($name, 2, "$name - $state");
+#      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
+#      Log3 ($name, 2, "$name - $state");
+#  }
+  
+  my $ts = strftime('%Y-%m-%d %H:%M:%S', localtime);
+  if(AttrVal("global", "language", "EN") eq "DE") {
+      $ts = strftime('%d.%m.%Y %H:%M:%S', localtime);
   }
   
   readingsBeginUpdate($hash);
@@ -2022,9 +2013,9 @@ sub ParseData {                                                    ## no critic 
           $op         = ($op eq "auto") ? "off (automatic)" : $op;
           readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
       }
-      readingsBulkUpdate($hash, "lastCycleTime", $ctime   ) if($ctime > 0);
-      readingsBulkUpdate($hash, "summary"      , $sum." W") if($subs{$name}{liveData}{doit});
-  
+      readingsBulkUpdate($hash, "lastCycleTime",   $ctime   ) if($ctime > 0);
+      readingsBulkUpdate($hash, "summary",         $sum." W") if($subs{$name}{liveData}{doit});
+      readingsBulkUpdate($hash, "lastSuccessTime", $ts      );
   }
   
   readingsBulkUpdate($hash, "state", $state);
@@ -2116,14 +2107,14 @@ sub extractLiveData {                  ## no critic 'complexity'
   );
   
   if (ref $live eq "HASH") {
-      push @$daref, "${lv}_FeedIn:"                  .($live->{FeedIn}               // 0)." W";
-      push @$daref, "${lv}_GridConsumption:"         .($live->{GridConsumption}      // 0)." W";
-      push @$daref, "${lv}_PV:"                      .($live->{PV}                   // 0)." W";
-      push @$daref, "${lv}_AutarkyQuote:"            .($live->{AutarkyQuote}         // 0)." %";
-      push @$daref, "${lv}_SelfConsumption:"         .($live->{SelfConsumption}      // 0)." W";
-      push @$daref, "${lv}_SelfConsumptionQuote:"    .($live->{SelfConsumptionQuote} // 0)." %";
-      push @$daref, "${lv}_SelfSupply:"              .($live->{SelfSupply}           // 0)." W";
-      push @$daref, "${lv}_TotalConsumption:"        .($live->{TotalConsumption}     // 0)." W";
+      push @$daref, "${lv}_FeedIn:"                  .$live->{FeedIn}." W"                 if(defined $live->{FeedIn});
+      push @$daref, "${lv}_GridConsumption:"         .$live->{GridConsumption}." W"        if(defined $live->{GridConsumption});
+      push @$daref, "${lv}_PV:"                      .$live->{PV}." W"                     if(defined $live->{PV});    
+      push @$daref, "${lv}_AutarkyQuote:"            .$live->{AutarkyQuote}." %"           if(defined $live->{AutarkyQuote});
+      push @$daref, "${lv}_SelfConsumption:"         .$live->{SelfConsumption}." W"        if(defined $live->{SelfConsumption});
+      push @$daref, "${lv}_SelfConsumptionQuote:"    .$live->{SelfConsumptionQuote}." %"   if(defined $live->{SelfConsumptionQuote});
+      push @$daref, "${lv}_SelfSupply:"              .$live->{SelfSupply}." W"             if(defined $live->{SelfSupply});
+      push @$daref, "${lv}_TotalConsumption:"        .$live->{TotalConsumption}." W"       if(defined $live->{TotalConsumption});
       
       push @$daref, "${lv}_BatteryIn:"               .$live->{BatteryIn}. " W"             if(defined $live->{BatteryIn});
       push @$daref, "${lv}_BatteryOut:"              .$live->{BatteryOut}." W"             if(defined $live->{BatteryOut});
@@ -3101,14 +3092,14 @@ sub PortalAsHtml {                                                              
  
   $icon    = FW_makeImage($icon) if (defined($icon));
   my $co4h = ReadingsNum ($name,"${fmin}_Next04Hours_Consumption", 0);
-  my $coRe = ReadingsNum ($name,"${fmin}_RestOfDay_Consumption", 0); 
-  my $coTo = ReadingsNum ($name,"${fmin}_Tomorrow_Consumption", 0);
-  my $coCu = ReadingsNum ($name,"${ldlv}_GridConsumption", 0);
+  my $coRe = ReadingsNum ($name,"${fmin}_RestOfDay_Consumption",   0); 
+  my $coTo = ReadingsNum ($name,"${fmin}_Tomorrow_Consumption",    0);
+  my $coCu = ReadingsNum ($name,"${ldlv}_GridConsumption",         0);
 
-  my $pv4h = ReadingsNum($name,"${fmin}_Next04Hours_PV", 0);
-  my $pvRe = ReadingsNum($name,"${fmin}_RestOfDay_PV", 0); 
-  my $pvTo = ReadingsNum($name,"${fmin}_Tomorrow_PV", 0);
-  my $pvCu = ReadingsNum($name,"${ldlv}_PV", 0);
+  my $pv4h = ReadingsNum ($name,"${fmin}_Next04Hours_PV",          0);
+  my $pvRe = ReadingsNum ($name,"${fmin}_RestOfDay_PV",            0); 
+  my $pvTo = ReadingsNum ($name,"${fmin}_Tomorrow_PV",             0);
+  my $pvCu = ReadingsNum ($name,"${ldlv}_PV",                      0);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -3165,7 +3156,7 @@ sub PortalAsHtml {                                                              
       if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
           $header .= "<tr>";
           $header .= "<td><b>PV&nbsp;=></b></td>"; 
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>"; 
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>" if($subs{$name}{liveData}{doit}); 
           $header .= "<td><b>$lblPv4h</b></td> <td align=right>$pv4h</td>"; 
           $header .= "<td><b>$lblPvRe</b></td> <td align=right>$pvRe</td>"; 
           $header .= "<td><b>$lblPvTo</b></td> <td align=right>$pvTo</td>"; 
@@ -3176,7 +3167,7 @@ sub PortalAsHtml {                                                              
       if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
           $header .= "<tr>";
           $header .= "<td><b>CO&nbsp;=></b></td>";
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>";           
+          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>" if($subs{$name}{liveData}{doit});           
           $header .= "<td><b>$lblPv4h</b></td> <td align=right>$co4h</td>"; 
           $header .= "<td><b>$lblPvRe</b></td> <td align=right>$coRe</td>"; 
           $header .= "<td><b>$lblPvTo</b></td> <td align=right>$coTo</td>"; 
@@ -3210,16 +3201,16 @@ sub PortalAsHtml {                                                              
       $_        =~ s/^\s+|\s+$//gx;                                           #trim it, if blanks were used
     
       #check if listed device is planned
-      if (ReadingsVal($name, "${cclv}_".$itemName."_Planned", "no") eq "yes") {
+      if (ReadingsVal($name, "${fmaj}_".$itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                   # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
           if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
           } else {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
 
           $start   = int($start);
@@ -3992,7 +3983,7 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>- generates readings of the current generation and consumption data </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>- Weather data offered by SMA are retrieved </td></tr>
-          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>- Forecast data of generation/consumption and consumer planning data are generated (an SMA Home Manager must be available) </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>- current consumer data are generated </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>- consumer data day are generated </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
@@ -4246,7 +4237,7 @@ return;
        <colgroup> <col width=5%> <col width=95%> </colgroup>
           <tr><td> <b>liveData</b>            </td><td>-  erzeugt Readings der aktuellen Erzeugungs- und Verbrauchsdaten </td></tr>
           <tr><td> <b>weatherData</b>         </td><td>-  von SMA angebotene Wetterdaten werden abgerufen </td></tr>
-          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt </td></tr>
+          <tr><td> <b>forecastData</b>        </td><td>-  Vorhersagedaten der Erzeugung / Verbrauch und Verbraucherplanungsdaten werden erzeugt (ein SMA Home Manager muss vorhanden sein) </td></tr>
           <tr><td> <b>consumerCurrentdata</b> </td><td>-  aktuelle Verbraucherdaten werden erzeugt </td></tr>
           <tr><td> <b>consumerDayData</b>     </td><td>-  Verbraucherdaten Tag werden erzeugt </td></tr>
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
