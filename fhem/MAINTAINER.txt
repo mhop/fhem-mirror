@@ -605,7 +605,6 @@ contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
 contrib/98_exportdevice.pm   loredo               (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
-contrib/98_Heating_Control.pm Beta-User           Unterstützende Dienste
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
