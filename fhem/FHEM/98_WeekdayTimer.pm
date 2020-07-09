@@ -86,6 +86,8 @@ sub WeekdayTimer_Undef {
   for my $idx (keys %{$hash->{profil}}) {
      WeekdayTimer_RemoveInternalTimer($idx, $hash);
   }
+  WeekdayTimer_RemoveInternalTimer($hash->{VERZOEGRUNG_IDX},$hash) if defined ($hash->{VERZOEGRUNG_IDX}); 
+
   delete $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}};
   return WeekdayTimer_RemoveInternalTimer("SetTimerOfDay", $hash);
 }
@@ -95,11 +97,14 @@ sub WeekdayTimer_Start {
   my $hash = shift // return;
   my $name = $hash->{NAME};
   my $def = $hash->{DEF};
-
+  WeekdayTimer_RemoveInternalTimer($hash->{VERZOEGRUNG_IDX},$hash) if defined ($hash->{VERZOEGRUNG_IDX}); 
   my @arr = split m{\s+}xms, $def;
   my $device   = shift @arr;
 
   my $language = WeekdayTimer_Language  ($hash, \@arr);
+  
+  $hash->{CONDITION}  = ""; 
+  $hash->{COMMAND}    = "";
 
   my $idx = 0;
   $hash->{'.dayNumber'}    = {map {$_ => $idx++}     @{$hash->{'.shortDays'}{$language}}};
@@ -127,8 +132,6 @@ sub WeekdayTimer_Start {
 
   $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}} = $hash;
 
-  $hash->{CONDITION}  = ""; 
-  $hash->{COMMAND}    = "";
   if($conditionOrCommand =~  m{\A\(.*\)\z}xms) {         #condition (*)
     $hash->{CONDITION} = $conditionOrCommand;
   } elsif(length($conditionOrCommand) > 0 ) {
