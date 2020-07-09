@@ -1002,7 +1002,7 @@ FW_escapeSelector(s)
 {
   if(typeof s != 'string')
     return s;
-  return s.replace(/[ .#\[\]>]/g, function(r) { return '\\'+r });
+  return s.replace(/[ .#\[\]>,]/g, function(r) { return '\\'+r });
 }
 
 /*************** LONGPOLL START **************/
