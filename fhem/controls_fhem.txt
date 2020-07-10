@@ -1,7 +1,7 @@
-REV 22370
+REV 22375
 DIR unused
-UPD 2020-07-08_07:45:03 345292 ./CHANGED
-UPD 2020-06-29_07:45:03 42464 ./MAINTAINER.txt
+UPD 2020-07-10_07:45:03 345343 ./CHANGED
+UPD 2020-07-10_07:45:03 42390 ./MAINTAINER.txt
 UPD 2020-07-05_07:45:03 41333 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2020-07-05_07:45:12 163793 ./fhem.pl
@@ -502,7 +502,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2020-04-23_07:45:04 26890 FHEM/98_WOL.pm
-UPD 2020-06-22_07:45:03 65834 FHEM/98_WeekdayTimer.pm
+UPD 2020-07-10_07:45:03 66051 FHEM/98_WeekdayTimer.pm
 UPD 2020-03-26_07:45:03 3895 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -738,8 +738,8 @@ UPD 2020-07-08_07:45:06 4323666 docs/commandref.html
 UPD 2020-07-08_07:45:09 2679082 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-07-09_07:45:10 232326 docs/commandref_modular.html
-UPD 2020-07-09_07:45:11 243033 docs/commandref_modular_DE.html
+UPD 2020-07-10_07:45:10 232326 docs/commandref_modular.html
+UPD 2020-07-10_07:45:12 243033 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2150,10 +2150,10 @@ UPD 2015-07-28_14:05:33 1824 www/images/openautomation/weather_wind_directions_s
 UPD 2015-07-28_14:05:33 1728 www/images/openautomation/weather_wind_directions_w.svg
 UPD 2015-07-28_14:05:33 2221 www/images/openautomation/weather_wind_speed.svg
 UPD 2015-07-28_14:05:33 3958 www/images/openautomation/weather_winter.svg
-UPD 2020-07-07_07:45:06 767 www/images/sscam/Zoom_in_w.png
-UPD 2020-07-07_07:45:06 811 www/images/sscam/Zoom_in_wide_w.png
-UPD 2020-07-07_07:45:06 775 www/images/sscam/Zoom_out_w.png
-UPD 2020-07-07_07:45:06 771 www/images/sscam/Zoom_out_wide_w.png
+UPD 2020-07-10_07:45:03 1059 www/images/sscam/Zoom_in_w.png
+UPD 2020-07-10_07:45:03 1052 www/images/sscam/Zoom_in_wide_w.png
+UPD 2020-07-10_07:45:03 1052 www/images/sscam/Zoom_out_w.png
+UPD 2020-07-10_07:45:03 1073 www/images/sscam/Zoom_out_wide_w.png
 UPD 2018-04-09_07:45:03 191 www/images/sscam/black_btn_CAMBLANK.png
 UPD 2018-04-09_07:45:03 972 www/images/sscam/black_btn_CAMDOWN.png
 UPD 2018-04-09_07:45:03 1193 www/images/sscam/black_btn_CAMDOWNFAST.png
@@ -2212,7 +2212,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2020-05-04_07:45:02 31081 www/pgm2/f18.js
 UPD 2020-05-04_07:45:02 10024 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2020-06-26_07:45:03 61607 www/pgm2/fhemweb.js
+UPD 2020-07-10_07:45:03 61608 www/pgm2/fhemweb.js
 UPD 2019-11-26_07:45:03 13796 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
