@@ -7740,6 +7740,9 @@ sub ptzPanel {
   $ptz_ret .= "<tr>";
   $ptz_ret .= "<td style='text-align:center' colspan=10>PTZ Control</td>";
   $ptz_ret .= "</tr>";
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
+  $ptz_ret .= "</tr>";
 
   for my $rownr (0..9) {
       $rownr = sprintf("%2.2d",$rownr);
