@@ -7508,7 +7508,7 @@ return $cap;
 sub IsCapZoom {                                                           # PTZ Zoom Eigenschaft
   my $hash = shift;
   my $name = $hash->{NAME};
-
+return 1;
   my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
   
 return $cap;
@@ -7787,13 +7787,16 @@ sub ptzPanel {
       }
       $ptz_ret .= "</tr>\n";  
   }
-  $ptz_ret .= "</table>";
+  # $ptz_ret .= "</table>";
   
   ### Zoom
   ###############################
   if(IsCapZoom($hash)) {                                                                            # wenn Zoom Eigenschaft
       
-      $ptz_ret .= '<table class="rc_body defsize">';
+      # $ptz_ret .= '<table class="rc_body defsize">';
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
+      $ptz_ret .= "</tr>";
       $ptz_ret .= "<tr>";
 
       my @za  = qw(.++ + stop - --.);
@@ -7830,8 +7833,10 @@ sub ptzPanel {
       }
       
       $ptz_ret .= "</tr>";
-      $ptz_ret .= "</table>";
+      # $ptz_ret .= "</table>";
   }
+  
+  $ptz_ret .= "</table>";
   
   ###  add Preset / Patrols
   ###############################
