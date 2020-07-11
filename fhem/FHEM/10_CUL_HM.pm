@@ -1089,7 +1089,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   }
   $hash->{helper}{io}{newChn} = "";
   $hash->{helper}{io}{rxt} = (($rxt & 0x18)            #wakeup || #lazyConfig
-                             && AttrVal($name,"model",0) ne "HM-WDS100-C6-O") #Todo - not completely clear how it works
+                             && AttrVal($name,"model",0) =~ m/HM-WDS100-C6-O/) #Todo - not completely clear how it works - O and O2
                                  ?2:0;
   $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
@@ -4141,7 +4141,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
     if(!$roleV){
       $ret   .= " - activity:".$act if ($act ne "-");
-      $ret   .= "\n   protState\t: "     .InternalVal($devName,"protState"  ,(!$roleC ? InternalVal($devName,"STATE","unknown"):"unknown"));
+      $ret   .= "\n   protState\t: "     .ReadingsVal($devName,"commState"  ,"unknown");
       $ret   .= " pending: ".InternalVal($devName,"protCmdPend","none"   );
       $ret   .= "\n";
     }
@@ -4158,8 +4158,8 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     else{
       foreach(sort keys %{$hash->{helper}{cfgChk}}){
         my( $Fkt,$shtxt,$txt) = HMinfo_getTxt2Check($_);
-        $ret .= "\n   $shtxt: $txt"
-               ."\n      =>$hash->{helper}{cfgChk}{$_}";
+        $ret .= "\n   $shtxt: $txt";
+        $ret .= "\n      =>$_" foreach(split("\n",$hash->{helper}{cfgChk}{$_}));
       }
     }
     return $ret;
@@ -9418,8 +9418,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
               $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
                                                  ? ($actHash->{helper}{$devId}{try} + 1)
                                                  : 1;
-              if (CUL_HM_SearchCmd($devName,"statusRequest")){
-                CUL_HM_Set($defs{$devName},$devName,"statusRequest");
+              if (CUL_HM_qStateUpdatIfEnab($devName,1)){
                 $state = $oldState eq "unset" ? "unknown" 
                                               : $oldState;
               }
@@ -9908,14 +9907,16 @@ sub CUL_HM_qStateUpdatIfEnab($@){#in:name or id, queue stat-request
   $name = substr($name,6) if ($name =~ m/^sUpdt:/);
   $name = CUL_HM_id2Name($name) if ($name =~ m/^[A-F0-9]{6,8}$/i);
   $name =~ s/_chn-\d\d$//;
-  
+  my $ret = 0;
   foreach my $chNm(CUL_HM_getAssChnNames($name)){
     next if (  !$defs{$chNm}                  #device unknown, ignore
                || 0 == CUL_HM_SearchCmd($chNm,"statusRequest"));
     if ($force || ((CUL_HM_getAttrInt($chNm,"autoReadReg") & 0x0f) > 3)){
-      CUL_HM_qEntity($chNm,"qReqStat") ;
+      CUL_HM_qEntity($chNm,"qReqStat");
+      $ret = 1;
     }
   }
+  return $ret;
 }
 sub CUL_HM_qAutoRead($$){
   my ($name,$lvl) = @_;
@@ -10562,9 +10563,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
             known. fhem will extract the device type from a "pairing request"
             message, even if it won't respond to it (see <a
             href="#hmPairSerial">hmPairSerial</a> and <a
-            href="#hmPairForSec">hmPairForSec</a> to enable pairing).
-            As an alternative, set the correct subType and model attributes, for a
-            list of possible subType values see "attr hmdevice ?".</li>
+            href="#hmPairForSec">hmPairForSec</a> to enable pairing).</li>
         <a name="HMAES"></a>
         <li>The so called "AES-Encryption" is in reality a signing request: if it is
             enabled, an actor device will only execute a received command, if a
@@ -12041,9 +12040,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           bekannt ist. FHEM erh&auml;lt den Ger&auml;tetyp aus einer"pairing request"
           Nachricht, selbst wenn es darauf keine Antwort erh&auml;lt (siehe <a
           href="#hmPairSerial">hmPairSerial</a> und <a
-          href="#hmPairForSec">hmPairForSec</a> um Parinig zu erm&ouml;glichen).
-          Alternativ, setzen des richtigen subType sowie Modelattributes, f&uuml;r eine Liste der
-          m&ouml;glichen subType-Werte siehe "attr hmdevice ?".</li>
+          href="#hmPairForSec">hmPairForSec</a> um Parinig zu erm&ouml;glichen).</li>
         <a name="HMAES"></a>
         <li>Die sogenannte "AES-Verschl&uuml;sselung" ist eigentlich eine Signaturanforderung: Ist sie
           aktiviert wird ein Aktor den erhaltenen Befehl nur ausf&uuml;hren falls er die korrekte
