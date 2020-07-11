@@ -687,7 +687,7 @@ sub HMinfo_paramCheck(@) { ####################################################
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
       my $pairId =  ReadingsVal($eName,"R-pairCentral", ReadingsVal($eName,".R-pairCentral","undefined"));
-      my $IoDev =  $ehash->{IODev} if ($ehash->{IODev});
+      my $IoDev =  $ehash->{IODev} ? $ehash->{IODev} :"";
       if (!$IoDev->{NAME}){push @noIoDev,"$eName:\t";next;}
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
@@ -1548,7 +1548,8 @@ sub HMinfo_GetFn($@) {#########################################################
     my $th = \%HMConfig::culHmModel;
     my @model;
     foreach (keys %{$th}){
-      my $mode = $th->{$_}{rxt};
+      my $modelId = CUL_HM_getmIdFromModel($th->{$_}{alias});
+      my $mode = $th->{$modelId}{rxt};
       $mode =~ s/\bc\b/config/;
       $mode =~ s/\bw\b/wakeup/;
       $mode =~ s/\bb\b/burst/;
@@ -1557,20 +1558,20 @@ sub HMinfo_GetFn($@) {#########################################################
       $mode =~ s/\bf\b/burstCond/;
       $mode =~ s/:/,/g;
       $mode = "normal" if (!$mode);
-      my $list = $th->{$_}{lst};
+      my $list = $th->{$modelId}{lst};
       $list =~ s/.://g;
       $list =~ s/p//;
       my $chan = "";
-      foreach (split",",$th->{$_}{chn}){
-        my ($n,$s,$e) = split(":",$_);
+      foreach (split",",$th->{$modelId}{chn}){
+        my ($n,$s,$e) = split(":",$modelId);
         $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
       }
       push @model,sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s"
-                          ,$th->{$_}{st}
+                          ,$th->{$modelId}{st}
                           ,$th->{$_}{name}
                           ,$_
                           ,$mode
-                          ,$th->{$_}{cyc}
+                          ,$th->{$modelId}{cyc}
                           ,$list
                           ,$chan
                           );
@@ -2106,7 +2107,7 @@ sub HMinfo_loadConfig($@) {####################################################
     foreach my $reg (keys %{$changes{$eN}}){
       $defs{$eN}{READINGS}{$reg}{VAL}  = $changes{$eN}{$reg}{d};
       $defs{$eN}{READINGS}{$reg}{TIME} = $changes{$eN}{$reg}{t};
-      my ($list,$pN) = ($1,$2) if ($reg =~ m/RegL_(..)\.(.*)/);
+      my ($list,$pN) = $reg =~ m/RegL_(..)\.(.*)/?($1,$2):("","");
       next if (!$list);
       my $pId = CUL_HM_name2Id($pN);# allow devices also as peer. Regfile is korrekt
       # my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));#old - removed
@@ -2520,8 +2521,10 @@ sub HMinfo_configCheck ($){ ###################################################
       my ($p,$t)=split(">",$_);
       $p = 0 if ($p eq "none");
       my $tck = HMinfo_templateChk($dName,$t,$p,split(" ",$defs{$dName}{helper}{tmpl}{$_}));
-      push @tlr,$tck if ($tck);
-      $configRes{$dName}{template} = $tck if($tck);
+      if ($tck){
+        push @tlr,"$_" foreach(split("\n",$tck));
+        $configRes{$dName}{template} = $tck;
+      }
     }
   }
   $ret .="\n\n idTp01\n    ".(join "\n    ",sort @tlr)  if(@tlr);
@@ -2799,7 +2802,7 @@ sub HMinfo_templateSet(@){#####################################################
     return "Device doesn't support literal $regV for reg $regN"           if ($ret =~ m/literal:/ && $ret !~ m/\b$regV\b/);
     
     if ($ret =~ m/special:/ && $ret !~ m/\b$regV\b/){# if covered by "special" we are good
-      my ($min,$max) = ($1,$2) if ($ret =~ m/range:(.*) to (.*) :/);
+      my ($min,$max) = $ret =~ m/range:(.*) to (.*) :/ ? ($1,$2) : ("","");
       $max = 0 if (!$max);
       $max =~ s/([0-9\.]+).*/$1/;
       return "$regV out of range: $min to $max"                           if ($regV !~ m /^set_/ && $min && ($regV < $min || ($max && $regV > $max)));
@@ -2922,14 +2925,13 @@ sub HMinfo_templateChk(@){#####################################################
   return "$aName: unknown\n"                                          if(!$defs{$aName});
   return "$aName: - $tmpl:give <peer>:[short|long|both] wrong:$pSet\n"if($pSet && $pSet !~ m/:(short|long|both)$/);
   $pSet = "0:0" if (!$pSet);
-  
   my $repl = "";
   my($pName,$pTyp) = split(":",$pSet);
   
   $pName = $1 if($pName =~ m/(.*)_chn-(..)$/);
-
+ 
   if($pName && (0 == scalar grep /^$pName$/,split(",",ReadingsVal($aName,"peerList" ,"")))){
-    $repl = "  no peer:$pName - ".ReadingsVal($aName,"peerList" ,"")."\n";
+    $repl = "$aName: $pSet->no peer:$pName - ".ReadingsVal($aName,"peerList" ,"")."\n";
   }
   else{
     my $pRnm = "";
@@ -2957,14 +2959,13 @@ sub HMinfo_templateChk(@){#####################################################
                                                          if (@p < ($1+1));
           $tplV = $p[$1];
         }
-        $repl .= "  $rn :$regV should $tplV \n" if ($regV ne $tplV);
+        $repl .= "$aName: $pSet->$tmpl - $rn :$regV should $tplV \n" if ($regV ne $tplV);
       }
       else{
-        $repl .= "  reg not found: $rn :$pRnm\n";
+        $repl .= "$aName: $pSet->$tmpl - reg not found: $rn :$pRnm\n";
       }
     }
   }
-  $repl = "$aName: $pSet-> failed\n$repl" if($repl);
 
   return $repl;
 }
