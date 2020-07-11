@@ -156,7 +156,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.4.2"  => "10.07.2020  more changes according PBP level 3, headline PTZ Control ",
+  "9.4.2"  => "11.07.2020  more changes according PBP level 3, headline PTZ Control, revised comref ",
   "9.4.1"  => "05.07.2020  new Zoom icons ", 
   "9.4.0"  => "01.07.2020  switch to packages, much more changes according PBP ",  
   "9.3.0"  => "21.06.2020  SVS device 'inctive' if disabled, add zoom capability, much more internal code changes ",
@@ -7769,7 +7769,7 @@ sub ptzPanel {
               if ($img =~ m/\.svg/x) {                                                                       # Verwendung für SVG's
                   $img = FW_makeImage($img, $cmd, "rc-button");
               
-              } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+              } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
                   if($ftui) {
                       $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
                   } else {
@@ -7816,12 +7816,17 @@ sub ptzPanel {
               $img = FW_makeImage($img, $cmd, "rc-button");
           
           } else {                                                                                    # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
-              my $iPath = FW_iconPath($img);
-
-              if($ftui) {
-                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
+              my $iPath = FW_iconPath($img);                                                          # automatisches Suchen der Icons im FHEMWEB iconPath
+              if($iPath) {
+                  $iPath = "$FW_ME/$FW_icondir/$iPath";
               } else {
-                  $img = "<img src=\"$FW_ME/$FW_icondir/$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
+                  $iPath = "$FW_ME/$iconpath/$img";
+              }
+              
+              if($ftui) {
+                  $img = "<img src=\"$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
+              } else {
+                  $img = "<img src=\"$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
               }
           }
           
@@ -10945,6 +10950,7 @@ return;
        <li>automatized definition of all in SVS available cameras in FHEM (autocreateCams) </li>
        <li>save the last recording of camera locally </li>
        <li>Selection of several cache types for image data storage (attribute cacheType) </li>
+       <li>execute Zoom actions (only if PTZ camera supports Zoom) </li>
     </ul>
    </ul>
    <br>
@@ -10995,10 +11001,14 @@ return;
     
     <br>
     
-    The PTZ panel (only PTZ cameras) in SSCam use its own icons. 
-    Thereby the system find the icons, in FHEMWEB device the attribute "iconPath" has to be completed by "sscam" 
-    (e.g. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
-    <br><br> 
+    SSCam uses its own icons. 
+    In order for the system to find the icons, the attribute <b>iconPath</b> must be supplemented with <b>sscam</b> in the FHEMWEB device. <br><br>
+    
+    <ul>
+      <b>Example</b> <br>    
+      attr WEB iconPath default:fhemSVG:openautomation:sscam 
+    </ul>
+    <br><br>
   </ul>  
 
   <a name="SSCamdefine"></a>
@@ -12871,6 +12881,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <li>Automatisiertes Anlegen aller in der SVS vorhandenen Kameras in FHEM (autocreateCams) </li>
       <li>lokales Abspeichern der letzten Kamera-Aufnahme </li>
       <li>Auswahl unterschiedlicher Cache-Typen zur Bilddatenspeicherung (Attribut cacheType) </li>
+      <li>ausführen von Zoom-Aktionen (bei PTZ-Kameras die Zoom unterstützen) </li>
      </ul> 
     </ul>
     <br>
@@ -12921,17 +12932,21 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <tr><td>Meta                </td><td>(FHEM-Modul)                       </td></tr>
     <tr><td>Net::SMTP           </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
     <tr><td>MIME::Lite          </td><td>(wenn Bilddaten-Versand verwendet) </td></tr>
-    <tr><td>CHI                 </td><td>(wenn Cache verwendet)             </td></tr>
-    <tr><td>CHI::Driver::Redis  </td><td>(wenn Cache verwendet)             </td></tr>
-    <tr><td>Cache::Cache        </td><td>(wenn Cache verwendet)             </td></tr>
+    <tr><td>CHI                 </td><td>(wenn Cache verwendet wird)        </td></tr>
+    <tr><td>CHI::Driver::Redis  </td><td>(wenn Cache verwendet wird)        </td></tr>
+    <tr><td>Cache::Cache        </td><td>(wenn Cache verwendet wird)        </td></tr>
     </table>
     
     <br>
     
-    Das PTZ-Paneel (nur PTZ Kameras) in SSCam benutzt einen eigenen Satz Icons. 
-    Damit das System sie findet, ist im FHEMWEB Device das Attribut "iconPath" um "sscam" zu ergänzen 
-    (z.B. "attr WEB iconPath default:fhemSVG:openautomation:sscam").
-    <br><br>    
+    SSCam benutzt einen eigenen Satz Icons. 
+    Damit das System sie findet, ist im FHEMWEB Device das Attribut <b>iconPath</b> um <b>sscam</b> zu ergänzen. <br><br>
+
+      <ul>
+        <b>Beispiel</b> <br>
+        attr WEB iconPath default:fhemSVG:openautomation:sscam
+      </ul>
+    <br><br>       
     </ul>
 
 <a name="SSCamdefine"></a>
