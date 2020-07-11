@@ -1500,13 +1500,13 @@ SVG_render($$$$$$$$$$)
       $xmax= $data{"xmax$idx"} if($data{"xmax$idx"}> $xmax);
       $idx++;
     }
-    #main::Debug "xmin= $xmin   xmax=$xmax";
     $conf{xrange} = AnalyzeCommand(undef, $1) if($conf{xrange} =~ /^(\{.*\})$/);
     if($conf{xrange} =~ /\[(.*):(.*)\]/) {
       $xmin = $1 if($1 ne "");
       $xmax = $2 if($2 ne "");
     }
   }
+  my $xmul = ($xmax > $xmin) ? $w/($xmax-$xmin) : 0;
   $xtics = defined($conf{xtics}) ? $conf{xtics} : "";
 
   ######################
@@ -1514,7 +1514,7 @@ SVG_render($$$$$$$$$$)
   my ($fromsec, $tosec);
   $fromsec = SVG_time_to_sec($from) if($from ne "0"); # 0 is special
   $tosec   = SVG_time_to_sec($to)   if($to ne "9");   # 9 is special
-  my $tmul; 
+  my $tmul=0; 
   $tmul = $w/($tosec-$fromsec) if($tosec && $fromsec && $tosec != $fromsec);
 
   my ($min, $max, $idx) = (9e+30, -9e+30, 0);
@@ -1551,7 +1551,6 @@ SVG_render($$$$$$$$$$)
 
       } elsif( $l =~ /^;/ ) { #allow ;special lines
         if( $l =~ m/^;p (\S+)\s(\S+)/ ) {# point
-          my $xmul = $w/($xmax-$xmin) if($xmax-$xmin > 0 );
           my $x1;
           if( $conf{xrange} ) {
             $x1 = int(($1-$xmin)*$xmul);
@@ -1654,7 +1653,6 @@ SVG_render($$$$$$$$$$)
   my $initoffset = $tstep;
   if( $conf{xrange} ) { # user defined range
     if( !$xtics || $xtics ne "()" ) { # auto tics
-      my $xmul = $w/($xmax-$xmin);
       my ($step,$mi,$ma) = SVG_getSteps( $conf{xrange}, $xmin, $xmax );
       $step /= 5 if( $step > 50 );
       $step /= 2 if( $step > 10 );
@@ -1692,7 +1690,6 @@ SVG_render($$$$$$$$$$)
   }
 
   if( $conf{xrange} ) { # user defined range
-    my $xmul = $w/($xmax-$xmin);
     if( $xtics ) { #user tics and grid
       my $tic = $xtics;
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
@@ -1903,8 +1900,6 @@ SVG_render($$$$$$$$$$)
 
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
-    my $xmul;
-    $xmul = $w/($xmax-$xmin) if( $conf{xrange} );
     my $hmul = $h/($hmax{$a}-$min);
     my $hfill = $hmul*$hmax{$a}; # Fill only to the 0-line, #108858
     my $ret = "";
@@ -1944,7 +1939,7 @@ SVG_render($$$$$$$$$$)
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
         next if($x1 == $lx && $y1 == $ly);
-        $ly = $x1; $ly = $y1;
+        $lx = $x1; $ly = $y1;
         $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
               $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
         SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
@@ -2430,7 +2425,6 @@ plotAsPng(@)
       last;
     }
   }
-  #Debug "FW_wname= $FW_wname, plotName= $plotName[0]";
 
   $FW_RET                 = undef;
   $FW_webArgs{dev}        = $plotName[0];
@@ -2441,9 +2435,6 @@ plotAsPng(@)
   $FW_pos{off}            = $plotName[2] if $plotName[2];
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
-
-  #Debug "MIME type= $mimetype";
-  #Debug "SVG= $svgdata";
 
   my ($w, $h) = split(",", AttrVal($plotName[0],"plotsize","800,160"));
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
