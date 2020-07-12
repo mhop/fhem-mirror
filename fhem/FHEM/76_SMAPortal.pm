@@ -136,6 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
   "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
@@ -3130,14 +3131,14 @@ sub PortalAsHtml {                                                              
       my $lup     = ReadingsTimestamp($name, "${fmin}_ForecastToday_Consumption", "0000-00-00 00:00:00");   # letzter Forecast Update  
       
       my $lupt    = "last update:";  
-      my $lblPv4h = "next 4h:";
+      my $lblPv4h = "next&nbsp;4h:";
       my $lblPvRe = "today:";
       my $lblPvTo = "tomorrow:";
       my $lblPvCu = "actual";
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
           $lupt    = "Stand:"; 
-          $lblPv4h = encode("utf8", "nächste 4h:");
+          $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
           $lblPvRe = "heute:";
           $lblPvTo = "morgen:";
           $lblPvCu = "aktuell";
