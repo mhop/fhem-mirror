@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.3.3"  => "05.07.2020  change extractLiveData ",
+  "3.3.4"  => "12.07.2020  fix break in header if hourCount was reduced ",
+  "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
   "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
   "3.3.0"  => "02.07.2020  fix typo, new attribute noHomeManager ",
@@ -2779,12 +2780,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22332 2020-07-02 20:47:30Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -3092,14 +3093,14 @@ sub PortalAsHtml {                                                              
  
   $icon    = FW_makeImage($icon) if (defined($icon));
   my $co4h = ReadingsNum ($name,"${fmin}_Next04Hours_Consumption", 0);
-  my $coRe = ReadingsNum ($name,"${fmin}_RestOfDay_Consumption", 0); 
-  my $coTo = ReadingsNum ($name,"${fmin}_Tomorrow_Consumption", 0);
-  my $coCu = ReadingsNum ($name,"${ldlv}_GridConsumption", 0);
+  my $coRe = ReadingsNum ($name,"${fmin}_RestOfDay_Consumption",   0); 
+  my $coTo = ReadingsNum ($name,"${fmin}_Tomorrow_Consumption",    0);
+  my $coCu = ReadingsNum ($name,"${ldlv}_GridConsumption",         0);
 
-  my $pv4h = ReadingsNum($name,"${fmin}_Next04Hours_PV", 0);
-  my $pvRe = ReadingsNum($name,"${fmin}_RestOfDay_PV", 0); 
-  my $pvTo = ReadingsNum($name,"${fmin}_Tomorrow_PV", 0);
-  my $pvCu = ReadingsNum($name,"${ldlv}_PV", 0);
+  my $pv4h = ReadingsNum ($name,"${fmin}_Next04Hours_PV",          0);
+  my $pvRe = ReadingsNum ($name,"${fmin}_RestOfDay_PV",            0); 
+  my $pvTo = ReadingsNum ($name,"${fmin}_Tomorrow_PV",             0);
+  my $pvCu = ReadingsNum ($name,"${ldlv}_PV",                      0);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -3130,14 +3131,14 @@ sub PortalAsHtml {                                                              
       my $lup     = ReadingsTimestamp($name, "${fmin}_ForecastToday_Consumption", "0000-00-00 00:00:00");   # letzter Forecast Update  
       
       my $lupt    = "last update:";  
-      my $lblPv4h = "next 4h:";
+      my $lblPv4h = "next&nbsp;4h:";
       my $lblPvRe = "today:";
       my $lblPvTo = "tomorrow:";
       my $lblPvCu = "actual";
      
       if(AttrVal("global","language","EN") eq "DE") {                              # Header globales Sprachschema Deutsch
           $lupt    = "Stand:"; 
-          $lblPv4h = encode("utf8", "nächste 4h:");
+          $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
           $lblPvRe = "heute:";
           $lblPvTo = "morgen:";
           $lblPvCu = "aktuell";
@@ -3201,16 +3202,16 @@ sub PortalAsHtml {                                                              
       $_        =~ s/^\s+|\s+$//gx;                                           #trim it, if blanks were used
     
       #check if listed device is planned
-      if (ReadingsVal($name, "${cclv}_".$itemName."_Planned", "no") eq "yes") {
+      if (ReadingsVal($name, "${fmaj}_".$itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                   # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
           if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
           } else {
-              (undef,undef,undef,$start) = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name,"${cclv}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+              (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
 
           $start   = int($start);
