@@ -241,6 +241,7 @@ sub HMinfo_status($){##########################################################
   # - show ActionDetector status
   # - prot events if error
   # - rssi - eval minimum values
+
   my $hash = shift;
   my $name = $hash->{NAME};
   my ($nbrE,$nbrD,$nbrC,$nbrV) = (0,0,0,0);# count entities and types
@@ -251,7 +252,12 @@ sub HMinfo_status($){##########################################################
   my @erro = split ",",$attr{$name}{sumERROR};
   
   # clearout internals prior to update
-  delete $hash->{$_} foreach (grep(/^(ERR|W_|I_|C_|CRI_)/,keys%{$hash}));
+  delete $hash->{helper}{lastList};
+  foreach (grep(/^i(ERR|W_|CRI_)/,keys%{$hash})){
+    $hash->{helper}{lastList}{$_} = $hash->{$_}; #save old entity list
+    delete $hash->{$_};
+  }
+  delete $hash->{$_} foreach (grep(/^i*(ERR|W_|I_|C_|CRI_)/,keys%{$hash}));
 
   my %errFlt;
   my %errFltN;
@@ -270,7 +276,7 @@ sub HMinfo_status($){##########################################################
     $errFlt{$p}{x}=1; # add at least one reading
     $errFlt{$p}{$_}=1 foreach (@a);
     my @b;
-    $errFltN{$p} = \@b;# will need an array to collect the relevant names
+#    $errFltN{$p} = \@b;# will need an array to collect the relevant names
   }
   #--- used for IO, protocol  and communication (e.g. rssi)
   my @IOdev;
@@ -305,7 +311,7 @@ sub HMinfo_status($){##########################################################
     foreach my $read (grep {$ehash->{READINGS}{$_}} keys %errFlt){#---- count error readings
       my $val = $ehash->{READINGS}{$read}{VAL};
       next if (grep (/$val/,(keys%{$errFlt{$read}})));# filter non-Error
-      push @{$errFltN{$read}},$eName;
+      $errFltN{$read."_".$val}{$eName} = 1;
       $err{$read}{$val} = 0 if (!$err{$read}{$val});
       $err{$read}{$val}++;
     }
@@ -356,8 +362,7 @@ sub HMinfo_status($){##########################################################
     }
   }
   foreach(keys %errFltN){
-    next if (!@{$errFltN{$_}});
-    $hash->{"ERR_".$_} = join(",",sort @{$errFltN{$_}});
+    $hash->{"iERR_".$_} = join(",",sort keys %{$errFltN{$_}});
   }
 
   push @updates,"C_sumDefined:"."entities:$nbrE,device:$nbrD,channel:$nbrC,virtual:$nbrV";
@@ -368,24 +373,24 @@ sub HMinfo_status($){##########################################################
   push @IOdev,split ",",AttrVal($_,"IOList","")foreach (keys %IOccu);
 
   my %tmp; # remove duplicates
-  $hash->{I_HM_IOdevices} = "";
+  $hash->{iI_HM_IOdevices} = "";
   $tmp{ReadingsVal($_,"cond",
        InternalVal($_,"STATE","unknown"))}{$_} = 1 foreach( @IOdev);
   foreach my $IOstat (sort keys %tmp){
-    $hash->{I_HM_IOdevices} .= "$IOstat: ".join(",",sort keys %{$tmp{$IOstat}}).";";
+    $hash->{iI_HM_IOdevices} .= "$IOstat: ".join(",",sort keys %{$tmp{$IOstat}}).";";
   }
 
   # ------- what about protocol events ------
   # Current Events are Rcv,NACK,IOerr,Resend,ResendFail,Snd
   # additional variables are protCmdDel,protCmdPend,protState,protLastRcv
 
-  push @updates,"CRI__protocol:"  .join(",",map {"$_:$protC{$_}"} grep {$protC{$_}} sort keys(%protC));
-  push @updates,"ERR__protocol:"  .join(",",map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
-  push @updates,"W__protocol:"    .join(",",map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
+  push @updates,"CRI__protocol:"  .join(",",sort map {"$_:$protC{$_}"} grep {$protC{$_}} sort keys(%protC));
+  push @updates,"ERR__protocol:"  .join(",",sort map {"$_:$protE{$_}"} grep {$protE{$_}} sort keys(%protE));
+  push @updates,"W__protocol:"    .join(",",sort map {"$_:$protW{$_}"} grep {$protW{$_}} sort keys(%protW));
 
   my @tpu = devspec2array("TYPE=CUL_HM:FILTER=state=unreachable");
   push @updates,"ERR__unreachable:".scalar(@tpu);
-  push @updates,"I_autoReadPend:". scalar @{$modules{CUL_HM}{helper}{qReqConf}};
+  push @updates,"I_autoReadPend:"  .scalar @{$modules{CUL_HM}{helper}{qReqConf}};
   # ------- what about rssi low readings ------
   foreach (grep {$rssiMin{$_} != 0}keys %rssiMin){
     if    ($rssiMin{$_}> -60) {$rssiMinCnt{"59<"}++;}
@@ -396,19 +401,32 @@ sub HMinfo_status($){##########################################################
   }
 
   my @ta;
-                                              if(@tpu)      {$hash->{W__unreachNames} = join(",",@tpu)      };
-  @ta = grep !/^$/,HMinfo_noDup(@protNamesC); if(@ta)       {$hash->{CRI__protocol}   = join(",",@ta)       };
-  @ta = grep !/^$/,HMinfo_noDup(@protNamesE); if(@ta)       {$hash->{ERR__protocol}   = join(",",@ta)       };
-  @ta = grep !/^$/,HMinfo_noDup(@protNamesW); if(@ta)       {$hash->{W__protoNames}   = join(",",@ta)       };
-  @ta = @{$modules{CUL_HM}{helper}{qReqConf}};if(@ta)       {$hash->{I_autoReadPend}  = join(",",@ta)       };
-                                              if(@shdwNames){$hash->{W_unConfRegs}    = join(",",@shdwNames)};
-                                              if(@rssiNames){$hash->{ERR___rssiCrit}  = join(",",@rssiNames)};
-                                              if(@Anames)   {$hash->{ERR__actDead}    = join(",",@Anames)   };
+                                              if(@tpu)      {$hash->{iW__unreachNames} = join(",",sort @tpu)      };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesC); if(@ta)       {$hash->{iCRI__protocol}   = join(",",sort @ta)       };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesE); if(@ta)       {$hash->{iERR__protocol}   = join(",",sort @ta)       };
+  @ta = grep !/^$/,HMinfo_noDup(@protNamesW); if(@ta)       {$hash->{iW__protoNames}   = join(",",sort @ta)       };
+  @ta = @{$modules{CUL_HM}{helper}{qReqConf}};if(@ta)       {$hash->{iI_autoReadPend}  = join(",",sort @ta)       };
+                                              if(@shdwNames){$hash->{iW_unConfRegs}    = join(",",sort @shdwNames)};
+                                              if(@rssiNames){$hash->{iERR___rssiCrit}  = join(",",sort @rssiNames)};
+                                              if(@Anames)   {$hash->{iERR__actDead}    = join(",",sort @Anames)   };
  
   push @updates,"I_rssiMinLevel:".join(" ",map {"$_:$rssiMinCnt{$_}"} sort keys %rssiMinCnt);
   
   # ------- update own status ------
   $hash->{STATE} = "updated:".TimeNow();
+  my $changed = 0;
+  if (join(",",sort keys %{$hash->{helper}{lastList}}) ne join(",",sort grep(/^i(ERR|W_|CRI_)/,keys%{$hash}))){
+    $changed = 1;    
+  }
+  else{
+    foreach (keys %{$hash->{helper}{lastList}}){
+      if ($hash->{$_} ne $hash->{helper}{lastList}{$_}){
+        $changed = 1;
+        last;
+      }
+    }
+  }
+  push @updates,"lastErrChange:".$hash->{STATE} if ($changed);
     
   # ------- update own status ------
   my %curRead;
@@ -420,9 +438,9 @@ sub HMinfo_status($){##########################################################
     my ($rdName, $rdVal) = split(":",$rd, 2);
     delete $curRead{$rdName};
     next if (defined $hash->{READINGS}{$rdName} &&
-             $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
+                     $hash->{READINGS}{$rdName}{VAL} eq $rdVal);
     readingsBulkUpdate($hash,$rdName,
-                             ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
+                             ((defined($rdVal) && $rdVal ne "") ? $rdVal : 0));
   }
   readingsEndUpdate($hash,1);
 
@@ -687,8 +705,8 @@ sub HMinfo_paramCheck(@) { ####################################################
     if ($defs{$eName}{helper}{role}{dev}){
       my $ehash = $defs{$eName};
       my $pairId =  ReadingsVal($eName,"R-pairCentral", ReadingsVal($eName,".R-pairCentral","undefined"));
-      my $IoDev =  $ehash->{IODev} ? $ehash->{IODev} :"";
-      if (!$IoDev->{NAME}){push @noIoDev,"$eName:\t";next;}
+      my $IoDev =  $ehash->{IODev} ? $ehash->{IODev} :undef;
+      if (!$IoDev || !$IoDev->{NAME}){push @noIoDev,"$eName:\t";next;}
       my $ioHmId = AttrVal($IoDev->{NAME},"hmId","-");
       my ($ioCCU,$prefIO) = split":",AttrVal($eName,"IOgrp","");
       if ($ioCCU){
