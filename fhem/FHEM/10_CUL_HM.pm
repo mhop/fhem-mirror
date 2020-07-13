@@ -201,7 +201,7 @@ sub CUL_HM_Initialize($) {
                        ;
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:0_defReg,1_allReg,2_defReg+raw,3_allReg+raw,4_off,8_templ+default,12_templOnly,251_anything "
+                       ."expert:multiple,defReg,allReg,rawReg,templ "
                        ."param "
                        ."readOnly:0,1 "                       
                        ."actAutoTry:0_off,1_on "
@@ -440,7 +440,7 @@ sub CUL_HM_updateConfig($){##########################
     # --- set default attributes if missing ---
     if ($hash->{helper}{role}{dev}){
       if( $st ne "virtual"){
-        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"2_raw");
+        $attr{$name}{expert}     = AttrVal($name,"expert"     ,"rawReg");
         $attr{$name}{autoReadReg}= AttrVal($name,"autoReadReg","4_reqStatus");
         CUL_HM_hmInitMsg($hash);
       }
@@ -448,8 +448,13 @@ sub CUL_HM_updateConfig($){##########################
         $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
       }
     }
-    CUL_HM_Attr("attr",$name,"expert",$attr{$name}{expert}) 
-          if ($attr{$name}{expert});#need update after readings are available
+    if ($attr{$name}{expert}){
+      CUL_HM_Attr("set",$name,"expert",$attr{$name}{expert});
+    }
+    else{
+      CUL_HM_Attr("del",$name,"expert"); # need to update settings and readings
+    }
+          ;#need update after readings are available
     if ($chn eq "03" && 
         $md =~ /(-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
       $attr{$name}{stateFormat} = "last:trigLast";
@@ -457,7 +462,6 @@ sub CUL_HM_updateConfig($){##########################
     foreach(keys %{$attr{$name}}){
       delete $attr{$name}{$_} if(CUL_HM_AttrCheck($name,$_));
     }
-    CUL_HM_chgExpLvl($hash);# need to update expert visib as of device
     # -+-+-+-+-+ add default web-commands
     my $webCmd;
     $webCmd  = AttrVal($name,"webCmd",undef);
@@ -706,9 +710,39 @@ sub CUL_HM_Attr(@) {#################################
   my $hash = CUL_HM_name2Hash($name);
   return $chk if ($chk);
   my $updtReq = 0;
-  if   ($attrName eq "expert"){#[0,1,2]
-    $attr{$name}{$attrName} = $attrVal;
-    CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
+  if   ($attrName eq "expert"){
+    if   ($init_done){
+      my $ret = 0;
+      if ($cmd eq "set"){
+        my @expLst = ();
+        if ($attrVal =~ m/^(\d+)/){# old style
+          push @expLst, "defReg" if(!($1 & 0x04));#default register on
+          push @expLst, "allReg" if( ($1 & 0x01));#detail register on
+          push @expLst, "rawReg" if( ($1 & 0x02));#raw register on
+          push @expLst, "templ"  if( ($1 & 0x08));#template on
+          $ret = 1;
+        }
+        else{
+          $modules{CUL_HM}{AttrList} =~ m/.*expert:multiple,(.*?) .*/;
+          my $expOpts = $1;
+          foreach (split(",",$attrVal)){
+             if($expOpts =~ m/\b$_\b/){
+               push @expLst,$_ ;
+             }
+             else{
+               $ret = 1;
+             }
+          }
+        }
+        $attr{$name}{$attrName} = join(",",@expLst);
+        CUL_HM_chgExpLvl($hash) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
+      }
+      else{#delete
+        delete $attr{$name}{$attrName};
+      }
+      CUL_HM_chgExpLvl($hash) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
+      return $attr{$name}{$attrName} if ($ret);
+    }
   }
   elsif($attrName eq "readOnly"){#[0,1]
     if ($cmd eq "set"){
@@ -1089,7 +1123,7 @@ sub CUL_HM_hmInitMsg($){ #define device init msg for HMLAN
   }
   $hash->{helper}{io}{newChn} = "";
   $hash->{helper}{io}{rxt} = (($rxt & 0x18)            #wakeup || #lazyConfig
-                             && AttrVal($name,"model",0) =~ m/HM-WDS100-C6-O/) #Todo - not completely clear how it works - O and O2
+                             && AttrVal($name,"model",0) !~ m/HM-WDS100-C6-O/) #Todo - not completely clear how it works - O and O2
                                  ?2:0;
   $hash->{helper}{io}{p} = \@p;
   CUL_HM_hmInitMsgUpdt($hash);
@@ -8471,11 +8505,14 @@ sub CUL_HMTmplSetParam($){
 
 sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert 
   my $tHash = shift;
-  my $exLvl = CUL_HM_getAttrInt($tHash->{NAME},"expert");
-  $tHash->{helper}{expert}{def} = (!($exLvl & 0x04))?1:0;#default register on
-  $tHash->{helper}{expert}{det} = ( ($exLvl & 0x01))?1:0;#detail register on
-  $tHash->{helper}{expert}{raw} = ( ($exLvl & 0x02))?1:0;#raw register on
-  $tHash->{helper}{expert}{tpl} = ( ($exLvl & 0x08))?1:0;#template on
+  
+  foreach my $expSet (split(",",CUL_HM_getAttr($tHash->{NAME},"expert","defReg"))){
+    $tHash->{helper}{expert}{def} = ($expSet eq "defReg") ? 1 : 0;#default register on
+    $tHash->{helper}{expert}{det} = ($expSet eq "allReg") ? 1 : 0;#detail register on
+    $tHash->{helper}{expert}{raw} = ($expSet eq "rawReg") ? 1 : 0;#raw register on
+    $tHash->{helper}{expert}{tpl} = ($expSet eq "templ")  ? 1 : 0;#template on
+  }
+  
   my ($nTag,$grp);
 
   if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
@@ -9414,10 +9451,9 @@ sub CUL_HM_ActCheck($) {# perform supervision
           || $tSince gt $tLast){   #no message received in window
         if ($actHash->{helper}{$devId}{start} lt $tSince){  
           if($autoTry) { #try to send a statusRequest?
-            if (!$actHash->{helper}{$devId}{try} || $actHash->{helper}{$devId}{try} < 4){
-              $actHash->{helper}{$devId}{try} = $actHash->{helper}{$devId}{try}
-                                                 ? ($actHash->{helper}{$devId}{try} + 1)
-                                                 : 1;
+            my $try = $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0;
+            if ($try < 4 || !($try % 4)){#try 3 times, then reduce speed
+              $actHash->{helper}{$devId}{try} = $try + 1;
               if (CUL_HM_qStateUpdatIfEnab($devName,1)){
                 $state = $oldState eq "unset" ? "unknown" 
                                               : $oldState;
