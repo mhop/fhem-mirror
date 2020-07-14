@@ -995,7 +995,7 @@ sub WeekdayTimer_isAnActiveTimer {
 
 ################################################################################
 sub WeekdayTimer_isHeizung {
-  my $hash  = shift // return;
+  my $hash  = shift // return '';
 
   my $name = $hash->{NAME};
 
@@ -1016,7 +1016,7 @@ sub WeekdayTimer_isHeizung {
       return $ts
     }
   }
-  return;
+  return '';
 }
 
 ################################################################################
