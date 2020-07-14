@@ -349,7 +349,39 @@ sub DOIF_RegisterCell
   return ""
 }
 
-sub DOIF_DEF_TPL 
+sub DOIF_DEF_TPL {
+  my ($hash,$table,$tail) = @_;
+  my $beginning;
+  my $currentBlock;
+  my $output="";
+  my $err;
+  
+  while ($tail ne "") {
+    if ($tail =~ /(?:^|\n)\s*DEF\s/g) {
+      my $prefix=substr($tail,0,pos($tail));
+      my $begin=substr($tail,0,pos($tail)-4);
+      $tail=substr($tail,pos($tail)-4);
+      if ($tail =~ /^DEF\s*(TPL_[^ ^\t^\(]*)[^\(]*\(/) {
+        ($beginning,$currentBlock,$err,$tail)=GetBlockDoIf($tail,'[\(\)]');
+        if ($err) {
+            return ("DEF TPL: $err",$currentBlock);
+        } elsif ($currentBlock ne "") {
+          $hash->{$table}{tpl}{$1}=$currentBlock;
+          $output.=$begin;
+        }
+      }  else {
+        $tail=substr($tail,4);
+        $output.=$prefix;
+      }
+    } else {
+      $output.=$tail;
+      $tail="";
+    }
+  }
+  return ("",$output);
+}
+
+sub DOIF_DEF_TPL_OLD
 {
   my ($hash,$table,$tail) =@_;
   my ($beginning,$currentBlock,$err);
@@ -462,13 +494,12 @@ sub import_tpl
 
 sub DOIF_FOR
 {
-  my ($hash,$table,$wcmd)=@_;
+  my ($hash,$table,$wcmd,$count)=@_;
   my $err="";
   my $tail=$wcmd;
   my $beginning;
   my $currentBlock;
   my $output="";
-
   while ($tail ne "") {
     if ($tail =~ /FOR/g) {
       my $prefix=substr($tail,0,pos($tail));
@@ -480,11 +511,42 @@ sub DOIF_FOR
           return ("FOR: $err $currentBlock","");
         } elsif ($currentBlock ne "") {
           my ($array,$command) = SplitDoIf(',',$currentBlock);
+          my $cmd=$command;
+          if ($cmd =~ /^\s*\(/) {
+            my ($begin,$curr,$error,$end)=GetBlockDoIf($command,'[\(\)]');
+            if ($error) {
+              return ("FOR: $error $curr","");
+            } else {
+              $command=$curr;
+            }
+          }
           my $commandoutput="";
+          if (!defined $count) {
+            $count=0;
+          }
+          $count++;
+          my $i=0;
           for (eval($array)) {
             my $temp=$command;
-            $temp =~ s/\$_/$_/g;
+            my $item=$_;
+            if (ref($item) eq "ARRAY"){
+              my $j=1;
+              for (@{$item}) {
+                $temp =~ s/\$_\$$j/$_/g;
+                $temp =~ s/\$$count\$$j/$_/g;
+                $j++;
+              }
+            } else {
+              $temp =~ s/\$$count/$_/g;
+              $temp =~ s/\$_/$_/g;
+            }
+            $temp =~ s/\$COUNT$count/$i/g;
+            if ($temp =~ /FOR\s*\(/) {
+              ($err,$temp)=DOIF_FOR($hash,"defs",$temp,$count);
+              return($temp,$err) if ($err); 
+            }
             $commandoutput.=$temp."\n";
+            $i++;
           }
           $output.=($begin.$commandoutput);
         }
@@ -496,6 +558,7 @@ sub DOIF_FOR
       $output.=$tail;
       $tail="";
     }
+    $count=undef;
   }
   return ("",$output);
 }
@@ -508,7 +571,8 @@ sub DOIF_TPL {
   my $err;
   
   while ($tail ne "") {
-    if ($tail =~ /TPL_/g) {
+    if ($tail =~ /(\w*)\s*TPL_/g) {
+      next if $1 eq "DEF";
       my $prefix=substr($tail,0,pos($tail));
       my $begin=substr($tail,0,pos($tail)-4);
       $tail=substr($tail,pos($tail)-4);
@@ -3104,6 +3168,39 @@ DOIF_SleepTrigger ($)
   return undef;
 }
 
+sub DOIF_Perlblock 
+{
+  my ($hash,$table,$tail,$subs) =@_;
+  my ($beginning,$perlblock,$err,$i);
+  $i=0;
+  while($tail =~ /(?:^|\n)\s*(\w*)\s*\{/g) {
+    my $blockname=$1;
+    ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+    if ($err) {
+        return ("Perlblck: $err",$perlblock);
+    } elsif (defined $subs) {
+      if ($blockname eq "subs") {
+        $perlblock ="no warnings 'redefine';package DOIF;".$perlblock;
+        eval ($perlblock);
+        if ($@) {
+          return ("error in defs block",$@);
+        }
+        return("","");
+      }
+    } elsif ($blockname ne "subs") {
+      ($perlblock,$err)=ReplaceAllReadingsDoIf($hash,$perlblock,$i,0);
+      return ($perlblock,$err) if ($err);
+      $hash->{condition}{$i}=$perlblock;
+      $hash->{perlblock}{$i}=$blockname ? $blockname:sprintf("block_%02d",($i+1));
+      if ($blockname eq "init") {
+        $hash->{perlblock}{init}=$i;
+      }
+      $i++;
+    }
+  }
+  return ("","");
+}
+
 sub
 CmdDoIfPerl($$)
 {
@@ -3114,6 +3211,7 @@ CmdDoIfPerl($$)
   my $err="";
   my $i=0;
   $hs=$hash;
+  my $msg;
   
   
   #def modify
@@ -3138,6 +3236,13 @@ CmdDoIfPerl($$)
   $hash->{helper}{sleeptimer}=-1;
 
   return("","") if ($tail =~ /^ *$/);
+  
+  $tail =~ s/\$VAR/\$hash->{var}/g;
+  $tail =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
+  $tail =~ s/\$SELF/$hash->{NAME}/g;
+
+  ($err,$msg)=DOIF_Perlblock($hash,"defs",$tail,1);
+  return ($msg,$err) if ($err);
 
   ($err,$tail)=DOIF_DEF_TPL($hash,"defs",$tail);
   return ($tail,$err) if ($err);
@@ -3147,35 +3252,35 @@ CmdDoIfPerl($$)
  
   ($err,$tail)=DOIF_TPL($hash,"defs",$tail);
   return ($tail,$err) if ($err);
-  
-  $tail =~ s/\$VAR/\$hash->{var}/g;
-  $tail =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
-  
-  while ($tail ne "") {
-    ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
-    return ($perlblock,$err) if ($err);
-    next if (!$perlblock);
-    if ($beginning =~ /(\w*)[\s]*$/) {
-      my $blockname=$1;
-      if ($blockname eq "subs") {
-        $perlblock =~ s/\$SELF/$hash->{NAME}/g;
-        $perlblock ="no warnings 'redefine';package DOIF;".$perlblock;
-        eval ($perlblock);
-        if ($@) {
-          return ("error in defs block",$@);
-        }
-        next;
-      }
-      ($perlblock,$err)=ReplaceAllReadingsDoIf($hash,$perlblock,$i,0);
-      return ($perlblock,$err) if ($err);
-      $hash->{condition}{$i}=$perlblock;
-      $hash->{perlblock}{$i}=$blockname ? $blockname:sprintf("block_%02d",($i+1));
-      if ($blockname eq "init") {
-        $hash->{perlblock}{init}=$i;
-      }
-    }
-    $i++;
-  }
+
+  ($err,$msg)=DOIF_Perlblock($hash,"defs",$tail);
+  return ($tail,$msg) if ($err);
+
+#  while ($tail ne "") {
+#    ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
+#    return ($perlblock,$err) if ($err);
+#    next if (!$perlblock);
+#    if ($beginning =~ /(\w*)[\s]*$/) {
+#      my $blockname=$1;
+#      if ($blockname eq "subs") {
+#        $perlblock =~ s/\$SELF/$hash->{NAME}/g;
+#        $perlblock ="no warnings 'redefine';package DOIF;".$perlblock;
+#        eval ($perlblock);
+#        if ($@) {
+#          return ("error in defs block",$@);
+#        }
+#        next;
+#      }
+#      ($perlblock,$err)=ReplaceAllReadingsDoIf($hash,$perlblock,$i,0);
+#      return ($perlblock,$err) if ($err);
+#      $hash->{condition}{$i}=$perlblock;
+#      $hash->{perlblock}{$i}=$blockname ? $blockname:sprintf("block_%02d",($i+1));
+#      if ($blockname eq "init") {
+#        $hash->{perlblock}{init}=$i;
+#      }
+#    }
+#    $i++;
+#  }
   if (defined $hash->{perlblock}{init}) {
     if ($init_done) {
       if (($ret,$err)=DOIF_CheckCond($hash,$hash->{perlblock}{init})) {
