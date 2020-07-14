@@ -96,7 +96,8 @@ BEGIN {
           IsDisabled
           Log
           Log3    
-          makeReadingName          
+          makeReadingName  
+          makeDeviceName          
           modules          
           readingsSingleUpdate
           readingsBulkUpdate
@@ -156,6 +157,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.4.4"  => "14.07.2020  fix crash while autocreate makeDeviceName is missing ",
   "9.4.3"  => "13.07.2020  streamDev refactored, comref revised ",
   "9.4.2"  => "11.07.2020  more changes according PBP level 3, headline PTZ Control, revised comref ",
   "9.4.1"  => "05.07.2020  new Zoom icons ", 
