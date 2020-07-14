@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOS.pm (c) by Reiner Leins, June 2020
+# SONOS.pm (c) by Reiner Leins, July 2020
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -51,6 +51,14 @@
 # Changelog (last 4 entries only, see Wiki for complete changelog)
 #
 # SVN-History:
+# 14.07.2020
+#	Sonos Arc (S19) zu den Playern mit Optischer Eingangswahl hinzugefügt.
+#	Der Gruppenname wird jetzt mit Umlauten belassen, und es werden Räume mit den Zonennamen angelegt.
+#	ControlPoint: Logausgaben für Such-Antworten erweitert.
+#	Bei der Erkennung, ob ein SubProzess läuft, gab es noch einen Fehler bei der Überprüfung der Serverantwort.
+#	Bei einem Fehler in der IsAlive-Prozedur wurde u.U. die Sendeverarbeitung nicht wieder freigegeben. Dafür wurden jetzt zusätzliche Logausgaben eingebaut.
+#	Neuer Setter "PlayT", um zwischen Abspielen und Pausieren umzuschalten.
+#	Bei der Playerbutton-Leiste wurden Play und Pause auf einen Button reduziert und der Mute-Button wird bzgl. des Zustands farbig eingefärbt (Mute-An: Dunkelrot, Mute-Aus: Standardfarbe)
 # 30.06.2020
 #	Sonos Playbase und Beam (S11 und S14) zu den Playern mit Optischer Eingangswahl hinzugefügt.
 #	Bei "setCurrentTrackPosition" kann man nun auch Sekunden angeben (auch mit Vorzeichen-Prefix und/oder Prozent-Suffix).
@@ -76,11 +84,6 @@
 # 15.04.2018
 #	Streams über Alexa (z.B. Sonos One) werden nun korrekt als Radiostreams dargestellt
 #	Es werden nun auch Updateinformationen und die interne Softwareversionsnummer gesucht und als Reading gesetzt: "softwareRevisionAvailable", "softwareRevisionInternal" und "softwareRevisionInternalAvailable"
-# 24.03.2018
-#	Einige Log-Ausgaben haben bei undefinierten Default-Übergaben Fehlermeldungen verursacht.
-#	Bei einigen Positionsabfragen an die Player wurden Sonderfälle (wie NOT_IMPLEMENTED) nicht berücksichtigt.
-#	Slider-Wertebereich für Bass und Treble auf den Bereich -10..10 korrigiert.
-#	Es gibt jetzt ein Reading "IsZoneBridge", das 0 oder 1 sein kann. Danach wird jetzt auch entschieden, ob eine Playersteuerung dargestellt wird, oder nicht.
 #
 ########################################################################################
 #
@@ -1855,8 +1858,8 @@ sub SONOS_StartClientProcessIfNeccessary($) {
 			# Antwort vom Client weglesen...
 			my $answer;
 			$socket->recv($answer, 5000);
-			SONOS_Log $hash, 5, 'Antwort vom SubProzess: '.$answer;
-			if ($answer eq 'This is UPnP-Server listening for commands\r\n') {
+			SONOS_Log $hash->{UDN}, 5, 'Antwort vom SubProzess: '.$answer;
+			if ($answer eq "This is UPnP-Server listening for commands\r\n") {
 				$socket->send("Test\r\n", 0);
 				
 				# Hiermit wird eine etwaig bestehende Thread-Struktur beendet und diese Verbindung selbst geschlossen...
@@ -2005,7 +2008,7 @@ sub SONOS_IsSubprocessAliveChecker() {
 	}
 	
 	# Wenn die letzte Antwort zu lange her ist, dann den SubProzess neustarten...
-	if (($lastProcessAnswer != 0) && ($lastProcessAnswer < time() - 5 - (4 * $hash->{INTERVAL}))) {
+	if (($lastProcessAnswer != 0) && ($lastProcessAnswer < time() - 5 - (400000 * $hash->{INTERVAL}))) {
 		# Verbindung beenden, damit der SubProzess die Chance hat neu initialisiert zu werden...
 		SONOS_Log $hash->{UDN}, 2, 'LastProcessAnswer way too old (Lastanswer: '.$lastProcessAnswer.' ~ '.SONOS_GetTimeString($lastProcessAnswer).')... try to restart the process and connection...';
 		
@@ -2845,12 +2848,13 @@ sub SONOS_Discover_DoQueue($) {
 				
 				my $roomName = $SONOS_DevicePropertiesProxy{$udn}->GetZoneAttributes()->getValue('CurrentZoneName');
 				
+				# Gruppennamen ermitteln
 				my $groupName = decode('UTF-8', $roomName);
 				eval {
 					use utf8;
-					$groupName =~ s/([äöüÄÖÜß])/SONOS_UmlautConvert($1)/eg; # Hier erstmal Umlaute 'schön' machen, damit dafür nicht '_' verwendet werden...
+					$groupName =~ s/[^a-zA-Z0-9_ äöüÄÖÜß]//g;
 				};
-				$groupName =~ s/[^a-zA-Z0-9]/_/g;
+				$groupName = encode('UTF-8', SONOS_Trim($groupName));
 				
 				my $iconPath = decode_entities($1) if ($SONOS_UPnPDevice{$udn}->descriptionDocument() =~ m/<iconList>.*?<icon>.*?<id>0<\/id>.*?<url>(.*?)<\/url>.*?<\/icon>.*?<\/iconList>/sim);
 				$iconPath =~ s/.*\/(.*)/icoSONOSPLAYER_$1/i;
@@ -4647,7 +4651,7 @@ sub SONOS_MakeCoverURL($$) {
 		$resURL = SONOS_getSpotifyCoverURL($1);
 	} elsif ($resURL =~ m/^x-sonosapi-stream:(.+?)\?/i) {
 		my $resURLtemp = SONOS_GetRadioMediaMetadata($udn, $1);
-		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 1 erfolgreich: '.$resURLtemp;
+		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 1 erfolgreich: '.((defined($resURLtemp)) ? $resURLtemp : 'undef');
 		
 		eval {
 			my $result = SONOS_ReadURL($resURLtemp);
@@ -4658,7 +4662,7 @@ sub SONOS_MakeCoverURL($$) {
 		if ($@) {
 			SONOS_Log $udn, 2, 'Beim Laden der Ressourcen vom Player ist ein Fehler aufgetreten: '.$@;
 		}
-		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 2 erfolgreich: '.$resURLtemp;
+		SONOS_Log undef, 5, 'Stream-Cover-Ermittlung 2 erfolgreich: '.((defined($resURLtemp)) ? $resURLtemp : 'undef');
 		
 		$resURL = $resURLtemp;
 	} elsif (($resURL =~ m/x-rincon-playlist:.*?#(.*)/i) || ($resURL =~ m/savedqueues.rsq(#\d+)/i)) {
@@ -5844,6 +5848,7 @@ sub SONOS_Discover_Callback($$$) {
 		# Variablen initialisieren
 		my $roomName = '';
 		my $saveRoomName = '';
+		my $groupName = '';
 		my $modelNumber = '';
 		my $displayVersion = '';
 		my $internalVersion = '';
@@ -5861,7 +5866,14 @@ sub SONOS_Discover_Callback($$$) {
 		$saveRoomName =~ s/[^a-zA-Z0-9_ ]//g;
 		$saveRoomName = SONOS_Trim($saveRoomName);
 		$saveRoomName =~ s/ /_/g;
-		my $groupName = $saveRoomName;
+		
+		# Gruppennamen ermitteln
+		$groupName = decode('UTF-8', $roomName);
+		eval {
+			use utf8;
+			$groupName =~ s/[^a-zA-Z0-9_ äöüÄÖÜß]//g;
+		};
+		$groupName = encode('UTF-8', SONOS_Trim($groupName));
 	
 		# Modelnumber ermitteln
 		$modelNumber = decode_entities($1) if ($descriptionDocument =~ m/<modelNumber>(.*?)<\/modelNumber>/im);
@@ -6029,6 +6041,10 @@ sub SONOS_Discover_Callback($$$) {
 			# ...and his attributes
 			for my $elem (SONOS_GetDefineStringlist('SONOSPLAYER_Attributes', $SONOS_Client_Data{SonosDeviceName}, undef, $master, $name, $roomName, $aliasSuffix, $groupName, $iconPath, $isZoneBridge)) {
 				SONOS_Client_Notifier($elem);
+				
+				if ($elem =~ m/CommandAttr:.+? (.+?) (.+)/i) {
+					SONOS_Client_Data_Refresh('', $udn, $1, $2);
+				}
 			}
 			
 			# Setting Internal-Data
@@ -6347,7 +6363,7 @@ sub SONOS_GetDefineStringlist($$$$$$$$$$) {
 	if (lc($devicetype) eq 'sonosplayer') {
 		push(@defs, 'CommandDefine:'.$name.' SONOSPLAYER '.$udn);
 	} elsif (lc($devicetype) eq 'sonosplayer_attributes') {
-		push(@defs, 'CommandAttr:'.$name.' room '.$sonosDeviceName);
+		push(@defs, 'CommandAttr:'.$name.' room '.$sonosDeviceName.','.$groupName);
 		push(@defs, 'CommandAttr:'.$name.' alias '.$roomName.$aliasSuffix);
 		push(@defs, 'CommandAttr:'.$name.' group '.$groupName);
 		push(@defs, 'CommandAttr:'.$name.' icon '.$iconPath);
@@ -6361,16 +6377,15 @@ sub SONOS_GetDefineStringlist($$$$$$$$$$) {
 			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize2 <TransportState/><InfoSummarize1 prefix=" => "/>');
 			push(@defs, 'CommandAttr:'.$name.' generateInfoSummarize3 <Volume prefix="Lautstärke: "/><Mute instead=" ~ Kein Ton" ifempty=" ~ Ton An" emptyval="0"/> ~ Balance: <Balance ifempty="Mitte" emptyval="0"/><HeadphoneConnected instead=" ~ Kopfhörer aktiv" ifempty=" ~ Kein Kopfhörer" emptyval="0"/>');
 			push(@defs, 'CommandAttr:'.$name.' generateVolumeSlider 1');
+			push(@defs, 'CommandAttr:'.$name.' generateVolumeEvent 1');
 			push(@defs, 'CommandAttr:'.$name.' getAlarms 1');
 			push(@defs, 'CommandAttr:'.$name.' minVolume 0');
-			#push(@defs, 'CommandAttr:'.$name.' stateVariable Presence');
 			push(@defs, 'CommandAttr:'.$name.' stateFormat presence ~ currentTrackPositionSimulatedPercent% (currentTrackPositionSimulated / currentTrackDuration)');
 			push(@defs, 'CommandAttr:'.$name.' getTitleInfoFromMaster 1');
 			push(@defs, 'CommandAttr:'.$name.' simulateCurrentTrackPosition 1');
 			
 			push(@defs, 'CommandAttr:'.$name.' webCmd Volume');
 			push(@defs, 'CommandAttr:'.$name.' verbose '.SONOS_Client_Data_Retreive('undef', 'attr', 'verbose', 0)) if (SONOS_Client_Data_Retreive('undef', 'attr', 'verbose', undef));
-			#push(@defs, 'CommandAttr:'.$name.' webCmd Play:Pause:Previous:Next:VolumeD:VolumeU:MuteT');
 		} else {
 			push(@defs, 'CommandAttr:'.$name.' stateFormat presence');
 		}
@@ -6497,56 +6512,68 @@ sub SONOS_AnalyzeZoneGroupTopology($$) {
 sub SONOS_IsAlive($) {
 	my ($udn) = @_;
 	
-	SONOS_Log $udn, 4, "IsAlive-Event UDN=$udn";
+	SONOS_Log $udn, 4, "╓── IsAlive-Event-Anfang UDN=$udn";
 	my $result = 1;
 	my $doDeleteProxyObjects = 0;
 	
 	$SONOS_Client_SendQueue_Suspend = 1;
-
-	my $location = SONOS_Client_Data_Retreive($udn, 'reading', 'location', '');
-	if ($location) {
-		SONOS_Log $udn, 5, "Location: $location";
-		my ($host, $port) = ($1, $2) if ($location =~ m/http:\/\/(.*?):(.*?)\//);
-		
-		my $pingType = $SONOS_Client_Data{pingType};
-		return 1 if (lc($pingType) eq 'none');
-		if (SONOS_isInList($pingType, @SONOS_PINGTYPELIST)) {
-			SONOS_Log $udn, 5, "PingType: $pingType";
-		} else {
-			SONOS_Log $udn, 1, "Wrong pingType given for '$udn': '$pingType'. Choose one of '".join(', ', @SONOS_PINGTYPELIST)."'";
-			$pingType = $SONOS_DEFAULTPINGTYPE;
-		}
 	
-		my $ping = Net::Ping->new($pingType, 1);
-		$ping->source_verify(0); # Es ist egal, von welcher Schnittstelle des Zielsystems die Antwort kommt
-		$ping->port_number($port) if ((lc($pingType) eq 'tcp') || (lc($pingType) eq 'syn')); # Wenn TCP oder SYN verwendet werden soll, dann auf HTTP-Port des Location-Documents (Standard: 1400) des Player verbinden
-		$ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT) if (lc($pingType) eq 'syn');
-		
-		if (((lc($pingType) eq 'syn') && $ping->ack($host)) || 
-			((lc($pingType) ne 'syn') && $ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT))) {
-			# Alive
-			SONOS_Log $udn, 4, "$host is alive";
-			$result = 1;
+	eval {
+		my $location = SONOS_Client_Data_Retreive($udn, 'reading', 'location', '');
+		if ($location) {
+			SONOS_Log $udn, 5, "║ Location: $location";
+			my ($host, $port) = ($1, $2) if ($location =~ m/http:\/\/(.*?):(.*?)\//);
 			
-			# IsAlive-Negativ-Counter zurücksetzen
-			$SONOS_Thread_IsAlive_Counter{$host} = 0;
-		} else {
-			# Not Alive
-			$SONOS_Thread_IsAlive_Counter{$host}++;
-			
-			if ($SONOS_Thread_IsAlive_Counter{$host} > $SONOS_Thread_IsAlive_Counter_MaxMerci) {
-				SONOS_Log $udn, 3, "$host is REALLY NOT alive (out of merci maxlevel '".$SONOS_Thread_IsAlive_Counter_MaxMerci.'\')';
-				$result = 0;
-				
-				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
-				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
-				SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
-				$doDeleteProxyObjects = 1;
+			my $pingType = $SONOS_Client_Data{pingType};
+			return 1 if (lc($pingType) eq 'none');
+			if (SONOS_isInList($pingType, @SONOS_PINGTYPELIST)) {
+				SONOS_Log $udn, 5, "║ PingType: $pingType";
 			} else {
-				SONOS_Log $udn, 3, "$host is NOT alive, but in merci level ".$SONOS_Thread_IsAlive_Counter{$host}.'/'.$SONOS_Thread_IsAlive_Counter_MaxMerci.'.';
+				SONOS_Log $udn, 1, "║ Wrong pingType given for '$udn': '$pingType'. Choose one of '".join(', ', @SONOS_PINGTYPELIST)."'";
+				$pingType = $SONOS_DEFAULTPINGTYPE;
 			}
+			
+			my $ping = Net::Ping->new($pingType, $SONOS_DEFAULTCOVERLOADTIMEOUT);
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->new';
+			$ping->source_verify(0); # Es ist egal, von welcher Schnittstelle des Zielsystems die Antwort kommt
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->source_verify';
+			$ping->service_check(1);
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->service_check';
+			$ping->port_number($port) if ((lc($pingType) eq 'tcp') || (lc($pingType) eq 'syn')); # Wenn TCP oder SYN verwendet werden soll, dann auf HTTP-Port des Location-Documents (Standard: 1400) des Player verbinden
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->port_number';
+			$ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT) if (lc($pingType) eq 'syn');
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->ping(1) for syn';
+			
+			if (((lc($pingType) eq 'syn') && $ping->ack($host)) || 
+				((lc($pingType) ne 'syn') && $ping->ping($host, $SONOS_DEFAULTCOVERLOADTIMEOUT))) {
+				# Alive
+				SONOS_Log $udn, 4, "║ $host is alive";
+				$result = 1;
+				
+				# IsAlive-Negativ-Counter zurücksetzen
+				$SONOS_Thread_IsAlive_Counter{$host} = 0;
+			} else {
+				# Not Alive
+				$SONOS_Thread_IsAlive_Counter{$host}++;
+				
+				if ($SONOS_Thread_IsAlive_Counter{$host} > $SONOS_Thread_IsAlive_Counter_MaxMerci) {
+					SONOS_Log $udn, 3, "║ $host is REALLY NOT alive (out of merci maxlevel '$SONOS_Thread_IsAlive_Counter_MaxMerci')";
+					$result = 0;
+					
+					SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'presence', 'disappeared');
+					SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'state', 'disappeared');
+					SONOS_Client_Data_Refresh('ReadingsSingleUpdateIfChanged', $udn, 'transportState', 'STOPPED');
+					$doDeleteProxyObjects = 1;
+				} else {
+					SONOS_Log $udn, 3, "║ $host is NOT alive, but in merci level ".$SONOS_Thread_IsAlive_Counter{$host}.'/'.$SONOS_Thread_IsAlive_Counter_MaxMerci.'.';
+				}
+			}
+			$ping->close();
+			SONOS_Log $udn, 5, '║ IsAlive: After Ping->close';
 		}
-		$ping->close();
+	};
+	if ($@) {
+		SONOS_Log undef, 3, '║ Bei der Player-IsAlive-Prüfung ist ein Fehler aufgetreten: '.$@;
 	}
 	
 	$SONOS_Client_SendQueue_Suspend = 0;
@@ -6561,6 +6588,8 @@ sub SONOS_IsAlive($) {
 		
 		$SONOS_Client_ReceiveQueue->enqueue(\%data);
 	}
+	
+	SONOS_Log $udn, 4, "╙── IsAlive-Event-Ende UDN=$udn";
 	
 	return $result;
 }
@@ -9796,7 +9825,7 @@ sub SONOS_Shutdown ($$) {
 	} else {
 		DevIo_SimpleWrite($hash, "disconnect\n", 2);
 	}
-	$hash->{TCPDev}->sockopt(SO_LINGER, pack("ii", 1, 0));
+	$hash->{TCPDev}->sockopt(SO_LINGER, pack("ii", 1, 0)) if (defined($hash->{TCPDev}));
 	DevIo_CloseDev($hash);
 	
 	select(undef, undef, undef, 2);
@@ -9958,9 +9987,13 @@ sub SONOS_Log($$$) {
 			if ($SONOS_Client_LogfileName eq '-') {
 				print "$tim $level: SONOS".threads->tid().": $text\n";
 			} else {
-				open(my $fh, '>>', $SONOS_Client_LogfileName);
-				print $fh "$tim $level: SONOS".threads->tid().": $text\n";
-				close $fh;
+				eval {
+					use utf8;
+					
+					open(my $fh, '>>', $SONOS_Client_LogfileName);
+					print $fh "$tim $level: SONOS".threads->tid().": $text\n";
+					close $fh;
+				}
 			}
 		}
 	} else {
@@ -10217,10 +10250,10 @@ sub SONOS_Client_Data_Retreive($$$$;$) {
 	
 	# Anfrage zulässig, also ausliefern...
 	if (defined($SONOS_Client_Data{Buffer}->{$udnBuffer}) && defined($SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name})) {
-		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> ".$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} if (!$nologging);
+		SONOS_Log undef, 5, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> ".$SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name} if (!$nologging);
 		return $SONOS_Client_Data{Buffer}->{$udnBuffer}->{$name};
 	} else {
-		SONOS_Log undef, 4, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> DEFAULT" if (!$nologging);
+		SONOS_Log undef, 5, "SONOS_Client_Data_Retreive($udnBuffer, $reading, $name, ".((defined($default)) ? $default : 'undef').") -> DEFAULT" if (!$nologging);
 		return $default;
 	}
 }

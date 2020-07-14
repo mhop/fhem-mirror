@@ -35,6 +35,7 @@ use IO::Select;
 use HTTP::Daemon;
 use HTTP::Headers;
 use LWP::UserAgent;
+use Time::HiRes qw(usleep gettimeofday);
 use UPnP::Common;
 
 use     vars qw($VERSION @ISA);
@@ -457,13 +458,19 @@ sub _receiveSearchResponse {
 		# Bad header
 		return;
 	}
+	
+	my ($seconds, $microseconds) = gettimeofday();
+	my @t = localtime($seconds);
+	my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d", $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0], $microseconds / 1000);
+	
+    print $tim.' 5: ControlPoint: Receive Search-Response: "'.$buf.'"'."\n" if ($LogLevel >= 5);
 
         # Basic check to see if the response is actually for a search
         my $found = 0;
         foreach my $searchkey (keys %{$self->{_activeSearches}}) {
             my $search = $self->{_activeSearches}->{$searchkey};
             if ($search->{_type} && $buf =~ $search->{_type}) {
-            	print 'xxxx.xx.xx xx:xx:xx 5: ControlPoint: Accepted Search-Response: "'.$buf.'"'."\n" if ($LogLevel >= 5);
+            	print "$tim 5: ControlPoint: Accept Search-Response...\n" if ($LogLevel >= 5);
                 $found = 1;
                 last;
             }
@@ -481,7 +488,7 @@ sub _receiveSearchResponse {
         }
 
         if (! $found) {
-            print 'xxxx.xx.xx xx:xx:xx 5: ControlPoint: Unknown Search-Response: "'.$buf.'"'."\n" if ($LogLevel >= 5);
+            print "$tim 5: ControlPoint: Unknown Search-Response...\n" if ($LogLevel >= 5);
             return;
         } 
 

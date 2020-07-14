@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# SONOSPLAYER.pm (c) by Reiner Leins, March 2018
+# SONOSPLAYER.pm (c) by Reiner Leins, July 2020
 # rleins at lmsoft dot de
 #
 # $Id$
@@ -69,7 +69,7 @@ use vars qw{%modules %defs};
 # Variable Definitions
 ########################################################################################
 my @possibleRoomIcons = qw(bathroom library office foyer dining tvroom hallway garage garden guestroom den bedroom kitchen portable media family pool masterbedroom playroom patio living);
-my @SONOSPLAYER_opticalInputDeviceTypes = qw(S9 S11 S14);
+my @SONOSPLAYER_opticalInputDeviceTypes = qw(S9 S11 S14 S19);
 
 my %gets = (
 	'CurrentTrackPosition' => '',
@@ -91,6 +91,7 @@ my %gets = (
 
 my %sets = (
 	'Play' => '',
+	'PlayT' => '',
 	'Pause' => '',
 	'Stop' => '',
 	'Next' => '',
@@ -267,23 +268,23 @@ sub SONOSPLAYER_Detail($$$;$) {
 	$html .= SONOS_getCoverTitleRG($d);
 	$html .= '</div>';
 	
-	# Close Inform-Div
-	$html .= '</div>';
-	
 	# Control-Buttons
 	if (!AttrVal($d, 'suppressControlButtons', 0) && ($withRC)) {
 		$html .= '<div class="rc_body" style="border: 1px solid gray; border-radius: 10px; padding: 5px;">';
 		$html .= '<table style="text-align: center;"><tr>';
-		$html .= '<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Previous\')">'.FW_makeImage('rc_PREVIOUS.svg', 'Previous', 'rc-button').'</a></td> 
-			<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Play\')">'.FW_makeImage('rc_PLAY.svg', 'Play', 'rc-button').'</a></td> 
-			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Pause\')">'.FW_makeImage('rc_PAUSE.svg', 'Pause', 'rc-button').'</a></td> 
-			<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Next\')">'.FW_makeImage('rc_NEXT.svg', 'Next', 'rc-button').'</a></td> 
+		$html .= '<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Previous\')">'.FW_makeImage('rc_PREVIOUS.svg', 'Previous', 'rc-button').'</a></td>'; 
+		$html .= '<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Play\')">'.FW_makeImage('rc_PLAY.svg', 'Play', 'rc-button').'</a></td>' if (ReadingsVal($d, 'transportState', 'PLAYING') ne 'PLAYING');
+		$html .= '<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Pause\')">'.FW_makeImage('rc_PAUSE.svg', 'Pause', 'rc-button').'</a></td>' if (ReadingsVal($d, 'transportState', 'PLAYING') eq 'PLAYING');
+		$html .= '<td><a style="padding-left: 10px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' Next\')">'.FW_makeImage('rc_NEXT.svg', 'Next', 'rc-button').'</a></td> 
 			<td><a style="padding-left: 20px;" onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' VolumeD\')">'.FW_makeImage('rc_VOLDOWN.svg', 'VolDown', 'rc-button').'</a></td>
-			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' MuteT\')">'.FW_makeImage('rc_MUTE.svg', 'Mute', 'rc-button').'</a></td>
+			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' MuteT\')">'.FW_makeImage('rc_MUTE'.((ReadingsVal($d, 'Mute', '0') ne '0') ? '@8B0000' : ''), 'Mute', 'rc-button').'</a></td>
 			<td><a onclick="FW_cmd(\'?XHR=1&amp;cmd.dummy=set '.$d.' VolumeU\')">'.FW_makeImage('rc_VOLUP.svg', 'VolUp', 'rc-button').'</a></td>';
 		$html .= '</tr></table>';
 		$html .= '</div>';
 	}
+	
+	# Close Inform-Div
+	$html .= '</div>';
 	
 	# Close
 	$html .= '</html>';
@@ -361,7 +362,7 @@ sub SONOSPLAYER_Notify($$) {
 		next if(!defined($event));
 		
 		# Wenn ein CoverTitle-Trigger gesendet werden muss...
-		if ($event =~ m/^(currentAlbumArtURL|currentTrackProviderIconRoundURL|currentTrackDuration|currentTrack|numberOfTracks|currentTitle|currentArtist|currentAlbum|nextAlbumArtURL|nextTrackProviderIconRoundURL|nextTitle|nextArtist|nextAlbum|currentSender|currentSenderInfo|currentSenderCurrent|transportState):/is) {
+		if ($event =~ m/^(currentAlbumArtURL|currentTrackProviderIconRoundURL|currentTrackDuration|currentTrack|numberOfTracks|currentTitle|currentArtist|currentAlbum|nextAlbumArtURL|nextTrackProviderIconRoundURL|nextTitle|nextArtist|nextAlbum|currentSender|currentSenderInfo|currentSenderCurrent|transportState|Mute):/is) {
 			SONOSPLAYER_Log $hash->{NAME}, 5, 'Notify-CoverTitle: '.$event;
 			$triggerCoverTitle = 1;
 		}
@@ -398,7 +399,7 @@ sub SONOSPLAYER_Notify($$) {
 sub SONOSPLAYER_TriggerCoverTitleLater($) {
 	my ($hash) = @_;
 	
-	my $html = SONOSPLAYER_Detail('', $hash->{NAME}, '', 0);
+	my $html = SONOSPLAYER_Detail('', $hash->{NAME}, '', 1);
 	DoTrigger($hash->{NAME}, 'display_covertitle: '.$html, 1);
 	
 	return undef;
@@ -785,6 +786,15 @@ sub SONOSPLAYER_Set($@) {
 		$udn = $hash->{UDN};
 	
 		SONOS_DoWork($udn, 'play');
+	} elsif (lc($key) eq 'playt') {
+		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
+		$udn = $hash->{UDN};
+		
+		if (ReadingsVal($hash->{NAME}, 'transportState', '') eq 'PLAYING') {
+			SONOS_DoWork($udn, 'pause');
+		} else {
+			SONOS_DoWork($udn, 'play');
+		}
 	} elsif (lc($key) eq 'stop') {
 		$hash = SONOSPLAYER_GetRealTargetPlayerHash($hash);
 		$udn = $hash->{UDN};
@@ -1392,6 +1402,9 @@ sub SONOSPLAYER_Log($$$) {
 <li><a name="SONOSPLAYERPlay">
 <b><code>Play</code></b></a>
 <br /> Starts playing</li>
+<li><a name="SONOSPLAYERPlayT">
+<b><code>PlayT</code></b></a>
+<br /> Starts playing, if player is currently stopped, pauses playing otherwise</li>
 <li><a name="SONOSPLAYERPlayURI">
 <b><code>PlayURI &lt;songURI&gt; [Volume]</code></b></a>
 <br />Plays the given MP3-File with the optional given volume.</li>
@@ -1776,6 +1789,9 @@ Here an event is defined, where in time of 2 seconds the Mute-Button has to be p
 <li><a name="SONOSPLAYERPlay">
 <b><code>Play</code></b></a>
 <br /> Startet die Wiedergabe</li>
+<li><a name="SONOSPLAYERPlayT">
+<b><code>PlayT</code></b></a>
+<br /> Startet die Wiedergabe, wenn gerade nichts abgespielt wird und pausiert sonst.</li>
 <li><a name="SONOSPLAYERPlayURI">
 <b><code>PlayURI &lt;songURI&gt; [Volume]</code></b></a>
 <br /> Spielt die angegebene MP3-Datei ab. Dabei kann eine Lautstärke optional mit angegeben werden.</li>
