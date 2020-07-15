@@ -5232,7 +5232,7 @@ json2nameValue($;$$)
       return ($err,undef) if($err);
       my $idx = 1;
       $val =~ s/^\s*//;
-      while($val) {
+      while(defined($val) && $val ne "") {
         ($err,$val) = eObj($ret, $map, 
                                 $firstLevel ? "$prefix$idx" : $name."_$idx",
                                 $val, $val, $prefix);
