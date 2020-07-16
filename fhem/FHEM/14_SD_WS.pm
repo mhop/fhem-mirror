@@ -865,14 +865,14 @@ sub SD_WS_Parse($$)
 	      my $bitData = unpack("B$blen", pack("H$hlen", $rawData));
 	     
 	      my $temptyp = substr($bitData,0,8);
-	      if( $temptyp == "11111110" ) {
+	      if( $temptyp eq '11111110' ) {
 	          $rawData = SD_WS_WH2SHIFT($rawData);
 	          $msg = $msg_vor.$rawData;
 	          $bitData = unpack("B$blen", pack("H$hlen", $rawData));
 	          Log3 $iohash, 4, "$name: SD_WS_WH2_1 msg=$msg length:".length($bitData) ;
 	          Log3 $iohash, 4, "$name: SD_WS_WH2_1 bitdata: $bitData" ;
 	        } else{
-	        if ( $temptyp == "11111101" ) {
+	        if ( $temptyp eq '11111101' ) {
 	          $rawData = SD_WS_WH2SHIFT($rawData);
 	          $rawData = SD_WS_WH2SHIFT($rawData);
 	          $msg = $msg_vor.$rawData;
@@ -882,7 +882,7 @@ sub SD_WS_Parse($$)
 	          }
 	      }
 	
-	      if( $temptyp == "11111111" ) {
+	      if( $temptyp eq '11111111' ) {
 	            $vorpre = 8;
 	          }else{
 	            Log3 $iohash, 4, "$name: SD_WS_WH2_4 Error kein WH2: Typ: $temptyp" ;
