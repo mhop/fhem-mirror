@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $
+# $Id: 49_SSCamSTRM.pm 22329 2020-07-02 17:16:52Z DS_Starter $
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
@@ -42,6 +42,7 @@ BEGIN {
       qw(
           AnalyzePerlCommand
           AttrVal
+          data
           defs
           devspec2array
           FmtDateTime
@@ -61,7 +62,9 @@ BEGIN {
           sortTopicNum
           FW_cmd
           FW_directNotify                                                              
-          FW_wname    
+          FW_wname   
+          FW_pH    
+          FW_widgetFallbackFn          
           FHEM::SSCam::ptzPanel 
           FHEM::SSCam::streamDev
           FHEM::SSCam::composeGallery
@@ -84,9 +87,9 @@ BEGIN {
   
 }
 
-
 # Versions History intern
 my %vNotesIntern = (
+  "2.13.0" => "14.07.2020  integrate streamDev master ",
   "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
   "2.11.0" => "24.06.2020  switch to packages, changes according to PBP ",
   "2.10.2" => "08.11.2019  undef \$link in FwFn / streamAsHtml to save memory ",
@@ -131,6 +134,8 @@ my %SSCAM_imc = (                                                           # di
     0 => { 0 => "initialized", 1 => "inactive" },
     1 => { 0 => "off",         1 => "inactive" },              
 );
+
+my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
 
 my $todef = 5;                                                              # Default Popup Zeit für set <> popupStream
 
@@ -253,9 +258,19 @@ sub Set {
   
   return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/x);
   
-  my $setlist = "Unknown argument $opt, choose one of ".
+  my $setlist;
+  
+  if(!IsModelMaster($hash)) {
+      $setlist = "Unknown argument $opt, choose one of ".
                  "popupStream "
                  ;
+  } else {
+      my $sd   = streamDevs();           
+      $setlist = "Unknown argument $opt, choose one of ".
+                 "adoptFrom:$sd ".
+                 "reset:noArg "
+                 ;  
+  }
   
   if ($opt eq "popupStream") {
       my $txt = FHEM::SSCam::getClHash($hash);
@@ -269,10 +284,8 @@ sub Set {
       unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
       $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
       
-      my $pd         = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
-      my $parent     = $hash->{PARENT};
-      my $parentHash = $defs{$parent};
-      my $htmlCode   = $hash->{HELPER}{STREAM};
+      my $pd       = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+      my $htmlCode = $hash->{HELPER}{STREAM};
       
       if ($hash->{HELPER}{STREAMACTIVE}) {
           my $out = "<html>";
@@ -289,6 +302,42 @@ sub Set {
           } 
       }
   
+  } elsif ($opt eq "adoptFrom") {
+      shift @a; shift @a;
+      $prop     = join "#", @a;
+      my $strmd = $sdevs{"$prop"};
+      my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
+      
+      return qq{The command "$opt" needs a valid SSCamSTRM device as argument} if(!$valid);
+      
+      # Übernahme der Readings
+      my @r;
+      delReadings($hash);
+      for my $key (keys %{$defs{$strmd}{READINGS}}) {
+          my $val = ReadingsVal($strmd, $key, "");
+          next if(!$val);
+          push @r, "$key:$val";        
+      }
+      
+      # Übernahme LINK
+      $hash->{LINK} = $defs{$strmd}{LINK};
+      readingsSingleUpdate($hash,"clientLink", $hash->{LINK}, 0); 
+      
+      if(@r) {
+          readingsBeginUpdate($hash);
+          
+          for my $elem (@r) {
+              my ($rn,$rval) = split ":", $elem, 2;
+              readingsBulkUpdate($hash, $rn, $rval);      
+          }
+
+          readingsEndUpdate($hash, 1);
+      }
+      
+  } elsif ($opt eq "reset") {
+      delReadings($hash);
+      $hash->{LINK} = $hash->{DEF};
+      
   } else {
       return "$setlist";
   }
@@ -354,26 +403,40 @@ return;
 #############################################################################################
 sub FwFn {
   my ($FW_wname, $name, $room, $pageHash) = @_;               # pageHash is set for summaryFn.
-  my $hash   = $defs{$name};
-  my $link   = $hash->{LINK};
+  my $hash = $defs{$name};
   
   RemoveInternalTimer($hash);
+  
   $hash->{HELPER}{FW} = $FW_wname;
+  my $clink           = ReadingsVal($name, "clientLink", "");
+  $hash->{LINK}       = $clink if($clink);
+  
+  my $link = $hash->{LINK};
        
   $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
   
   my $ret = "";
+  
+  if(IsModelMaster($hash) && $clink) {
+      my $alias = AttrVal($name, "alias", $name);                                                         # Linktext als Aliasname oder Devicename setzen
+      my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> is Streaming master of device ";
+      $dlink    = "$alias is Streaming master of device "   if(AttrVal($name, "noLink", 0));              # keine Links im Stream-Dev generieren
+      $ret     .= "<span align=\"center\">$dlink </span>"   if(!AttrVal($name,"hideDisplayName",0));
+  }
+  
   if(IsDisabled($name)) {
       if(AttrVal($name,"hideDisplayName",0)) {
           $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
       } else {
           $ret .= "<html>Stream-device is disabled</html>";
-      }  
+      } 
+      
   } else {
-      $ret .= $link;  
+      $ret .= $link;
+      $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
   }
-  
-  my $al = AttrVal($name, "autoRefresh", 0);                           # Autorefresh nur des aufrufenden FHEMWEB-Devices
+   
+  my $al = AttrVal($name, "autoRefresh", 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
@@ -392,10 +455,21 @@ sub explodeDEF {
   my $link = shift;
   
   my $arg = (split("[()]",$link))[1];
-  $arg   =~ s/'//xg;
+  $arg    =~ s/'//xg;
   ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
   
 return;
+}
+
+#############################################################################################
+#                       Ist das MODEL "master" ?
+#############################################################################################
+sub IsModelMaster {                                                          
+  my $hash = shift;
+
+  my $mm = $hash->{MODEL} eq "master" ? 1 : 0;
+  
+return $mm;
 }
 
 #############################################################################################
@@ -436,12 +510,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                                     # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSCamSTRM}{META}}
-      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                       # {x_version} ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22329 2020-07-02 17:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22267 2020-06-25 21:07:13Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                          # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCamSTRM.pm 22329 2020-07-02 17:16:52Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -479,12 +553,104 @@ sub streamAsHtml {
       }
 
   } else {
-      $ret .= $link;  
+      $ret .= $link;     
   }
   
   $ret .= "</html>";
   undef $link;
   
+return $ret;
+}
+
+################################################################
+#                    delete Readings
+#        $rd = angegebenes Reading löschen
+################################################################
+sub delReadings {
+  my $hash = shift;
+  my $rd   = shift;
+  my $name = $hash->{NAME};
+  
+  my $bl   = "state|parentState";                                          # Blacklist
+   
+  if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
+      delete($hash->{READINGS}{$rd}) if($rd !~ /$bl/x);
+      return;
+  } 
+
+  for my $key (keys %{$hash->{READINGS}}) {
+      delete($hash->{READINGS}{$key}) if($key !~ /$bl/x);
+  }
+
+return;
+}
+
+################################################################
+#  liefert String aller Streamingdevices außer MODEL = master
+#  und füllt Hash %sdevs{Alias} = Devicename zu Auflösung
+#
+#  (es wird Alias (wenn gesetzt) oder Devicename verwendet,
+#   Leerzeichen werden durch "#" ersetzt)
+################################################################
+sub streamDevs {
+
+  my $sd = "";
+  undef %sdevs;
+  
+  my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL!=master");            # Liste Streaming devices außer MODEL = master
+  for my $d (@strmdevs) {
+      next if(!$defs{$d});
+      my $alias      = AttrVal($d, "alias", $d); 
+      $alias         =~ s/\s+/#/gx;
+      $sdevs{$alias} = "$d";        
+  }
+  
+  for my $a (sort keys %sdevs) {
+      $sd .= "," if($sd);
+      $sd .= $a;
+  }
+
+return $sd;
+}
+
+################################################################
+#   Streaming Devices Drop-Down Widget zur Auswahl 
+#   in einem Master Streaming Device
+################################################################
+sub sDevsWidget {
+  my $name = shift;
+  
+  my $Adopts;
+  my $ret       = "";
+  my $cmdAdopt  = "adoptFrom";
+  my $valAdopts = streamDevs();
+  
+  for my $fn (sort keys %{$data{webCmdFn}}) {
+      next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
+      no strict "refs";                                                                    ## no critic 'NoStrict'  
+      $Adopts = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdAdopt,$valAdopts);
+      use strict "refs";
+      last if(defined($Adopts));
+  }
+  
+  if($Adopts) {
+      $Adopts =~ s,^<td[^>]*>(.*)</td>$,$1,;
+  } else {
+      $Adopts = FW_pH "cmd.$name=set $name $cmdAdopt", $cmdAdopt, 0, "", 1, 1;
+  }
+       
+  ## Tabellenerstellung
+  $ret .= "<style>.defsize { font-size:16px; } </style>";
+  $ret .= '<table class="rc_body defsize">';
+  
+  if($valAdopts) {
+      $ret .= "<tr>";
+      $ret .= "<td>Adopt: </td><td>$Adopts</td>";  
+      $ret .= "</tr>"; 
+  }
+
+  $ret .= "</table>"; 
+
 return $ret;
 }
 
