@@ -1,6 +1,6 @@
 # $Id$
 #
-# v3.4.3 - https://github.com/RFD-FHEM/RFFHEM/tree/dev-r34
+# v3.4.4 - https://github.com/RFD-FHEM/RFFHEM/tree/master
 # The module is inspired by the FHEMduino project and modified in serval ways for processing the incoming messages
 # see http://www.fhemwiki.de/wiki/SIGNALDuino
 # It was modified also to provide support for raw message handling which can be send from the SIGNALduino
@@ -13,20 +13,20 @@
 
 
 package main;
-#use version 0.77; our $VERSION = version->declare('v3.4.3');
+use strict;
+use warnings;
+#use version 0.77; our $VERSION = version->declare('v3.4.4');
 
 my $missingModulSIGNALduino="";
 
-use strict;
-use warnings;
 use DevIo;
 no warnings 'portable';
 
-eval "use Data::Dumper qw(Dumper);1";
-eval "use JSON;1" or $missingModulSIGNALduino .= "JSON ";
+eval {use Data::Dumper qw(Dumper);1};
+eval {use JSON;1 or $missingModulSIGNALduino .= 'JSON '};
 
-eval "use Scalar::Util qw(looks_like_number);1";
-eval "use Time::HiRes qw(gettimeofday);1" ;
+eval {use Scalar::Util qw(looks_like_number);1};
+eval {use Time::HiRes qw(gettimeofday);1} ;
 use lib::SD_Protocols;
 
 #$| = 1;		#Puffern abschalten, Hilfreich fuer PEARL WARNINGS Search
@@ -36,7 +36,7 @@ use lib::SD_Protocols;
 
 
 use constant {
-	SDUINO_VERSION            => "v3.4.3",
+	SDUINO_VERSION            => "v3.4.4",
 	SDUINO_INIT_WAIT_XQ       => 1.5,       # wait disable device
 	SDUINO_INIT_WAIT          => 2,
 	SDUINO_INIT_MAXRETRY      => 3,
@@ -54,16 +54,15 @@ use constant {
 };
 
 
-sub SIGNALduino_Attr(@);
+#sub SIGNALduino_Attr(@);
 sub SIGNALduino_HandleWriteQueue($);
-sub SIGNALduino_Parse($$$$@);
-sub SIGNALduino_Read($);
-sub SIGNALduino_Ready($);
-sub SIGNALduino_Write($$$);
-sub SIGNALduino_SimpleWrite(@);
-sub SIGNALduino_LoadProtocolHash($);
-sub SIGNALduino_Log3($$$);
-
+#sub SIGNALduino_Parse($$$$@);
+#sub SIGNALduino_Read($);
+#sub SIGNALduino_Ready($);
+#sub SIGNALduino_Write($$$);
+#sub SIGNALduino_SimpleWrite(@);
+#sub SIGNALduino_LoadProtocolHash($);
+#sub SIGNALduino_Log3($$$);
 #my $debug=0;
 
 our %modules;
@@ -238,7 +237,7 @@ my %matchListSIGNALduino = (
 			"14:Dooya"						=> '^P16#[A-Fa-f0-9]+',
 			"15:SOMFY"						=> '^Ys[0-9A-F]+',
 			"16:SD_WS_Maverick"		=> '^P47#[A-Fa-f0-9]+',
-			"17:SD_UT"						=> '^P(?:14|20|26|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95|97)#.*',	# universal - more devices with different protocols
+			"17:SD_UT"						=> '^P(?:14|20|26|29|30|34|46|68|69|76|81|83|86|90|91|91.1|92|93|95|97|99|104)#.*',	# universal - more devices with different protocols
 			"18:FLAMINGO"					=> '^P13\.?1?#[A-Fa-f0-9]+',							# Flamingo Smoke
 			"19:CUL_WS"						=> '^K[A-Fa-f0-9]{5,}',
 			"20:Revolt"						=> '^r[A-Fa-f0-9]{22}',
@@ -248,7 +247,7 @@ my %matchListSIGNALduino = (
 			"24:FS20"							=> "^81..(04|0c)..0101a001",
 			"25:CUL_EM"						=> "^E0.................",
 			"26:Fernotron"				=> '^P82#.*',
-			"27:SD_BELL"					=> '^P(?:15|32|41|42|57|79|96)#.*',
+			"27:SD_BELL"					=> '^P(?:15|32|41|42|57|79|96|98)#.*',
 			"28:SD_Keeloq"				=> '^P(?:87|88)#.*',
 			"29:SD_GT"						=> '^P49#[A-Fa-f0-9]+',
 			"X:SIGNALduino_un"		=> '^[u]\d+#.*',
@@ -270,17 +269,17 @@ sub SIGNALduino_Initialize($) {
   }
 
 # Provider
-  $hash->{ReadFn}  = "SIGNALduino_Read";
-  $hash->{WriteFn} = "SIGNALduino_Write";
-  $hash->{ReadyFn} = "SIGNALduino_Ready";
+  $hash->{ReadFn}  = \&SIGNALduino_Read;
+  $hash->{WriteFn} = \&SIGNALduino_Write;
+  $hash->{ReadyFn} = \&SIGNALduino_Ready;
 
 # Normal devices
-  $hash->{DefFn}  		 	= "SIGNALduino_Define";
-  $hash->{FingerprintFn} 	= "SIGNALduino_FingerprintFn";
-  $hash->{UndefFn} 		 	= "SIGNALduino_Undef";
-  $hash->{GetFn}   			= "SIGNALduino_Get";
-  $hash->{SetFn}   			= "SIGNALduino_Set";
-  $hash->{AttrFn}  			= "SIGNALduino_Attr";
+  $hash->{DefFn}  		 	= \&SIGNALduino_Define;
+  $hash->{FingerprintFn} 	= \&SIGNALduino_FingerprintFn;
+  $hash->{UndefFn} 		 	= \&SIGNALduino_Undef;
+  $hash->{GetFn}   			= \&SIGNALduino_Get;
+  $hash->{SetFn}   			= \&SIGNALduino_Set;
+  $hash->{AttrFn}  			= \&SIGNALduino_Attr;
   $hash->{AttrList}			=
                        "Clients MatchList do_not_notify:1,0 dummy:1,0"
 					  ." hexFile"
@@ -321,7 +320,7 @@ sub SIGNALduino_Initialize($) {
   if (exists($ProtocolListSIGNALduino{error})  ) {
   	Log3 "SIGNALduino", 1, "Error loading Protocol Hash. Module is in inoperable mode error message:($ProtocolListSIGNALduino{error})";
   	delete($ProtocolListSIGNALduino{error});
-  	return undef;
+  	return ;
   }
 }
 #
@@ -375,7 +374,7 @@ sub SIGNALduino_Define($$) {
   if (!exists &round)
   {
       Log3 $name, 1, "$name: Define, Signalduino can't be activated (sub round not found). Please update Fhem via update command";
-	  return undef;
+	  return ;
   }
 
   my $dev = $a[2];
@@ -384,14 +383,14 @@ sub SIGNALduino_Define($$) {
   #Debug "hardware: $hardware" if ($debug);
 
 
-  if($dev eq "none") {
+  if($dev eq 'none') {
     Log3 $name, 1, "$name: Define, device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
-    #return undef;
+    #return ;
   }
 
 
-  if ($dev ne "none" && $dev =~ m/[a-zA-Z]/ && $dev !~ m/\@/) {    # bei einer IP wird kein \@57600 angehaengt
+  if ($dev ne 'none' && $dev =~ m/[a-zA-Z]/ && $dev !~ m/\@/) {    # bei einer IP wird kein \@57600 angehaengt
 	$dev .= "\@57600";
   }
 
@@ -403,18 +402,18 @@ sub SIGNALduino_Define($$) {
 
   my $ret=undef;
 
-  InternalTimer(gettimeofday(), 'SIGNALduino_IdList',"sduino_IdList:$name",0);       # verzoegern bis alle Attribute eingelesen sind
+  InternalTimer(gettimeofday(), \&SIGNALduino_IdList,"sduino_IdList:$name",0);       # verzoegern bis alle Attribute eingelesen sind
 
-  if($dev ne "none") {
-    $ret = DevIo_OpenDev($hash, 0, "SIGNALduino_DoInit", 'SIGNALduino_Connect');
+  if($dev ne 'none') {
+    $ret = DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
   } else {
 		$hash->{DevState} = 'initialized';
-  		readingsSingleUpdate($hash, "state", "opened", 1);
+  		readingsSingleUpdate($hash, 'state', 'opened', 1);
   }
 
-  $hash->{DMSG}="nothing";
-  $hash->{LASTDMSG} = "nothing";
-  $hash->{LASTDMSGID} = "nothing";
+  $hash->{DMSG}='nothing';
+  $hash->{LASTDMSG} = 'nothing';
+  $hash->{LASTDMSGID} = 'nothing';
   $hash->{TIME}=time();
   $hash->{versionmodul} = SDUINO_VERSION;
   $hash->{versionProtocols} = lib::SD_Protocols::getProtocolVersion();
@@ -457,7 +456,7 @@ sub SIGNALduino_Undef($$) {
 
   DevIo_CloseDev($hash);
   RemoveInternalTimer($hash);
-  return undef;
+  return ;
 }
 
 ############################# package main
@@ -465,7 +464,7 @@ sub SIGNALduino_Shutdown($) {
   my ($hash) = @_;
   #DevIo_SimpleWrite($hash, "XQ\n",2);
   SIGNALduino_SimpleWrite($hash, "XQ");  # Switch reception off, it may hang up the SIGNALduino
-  return undef;
+  return ;
 }
 
 ############################# package main
@@ -518,7 +517,7 @@ sub SIGNALduino_avrdude($) {
 		$hash->{FLASH_RESULT}= "WARNING: avrdude created no log file";         # processed in tests
 	}
 
-	DevIo_OpenDev($hash, 0, "SIGNALduino_DoInit", 'SIGNALduino_Connect');
+	DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
 	$hash->{helper}{avrdudelogs} .= "$name reopen started\n";
 	return $hash->{FLASH_RESULT};
 }
@@ -600,9 +599,9 @@ sub SIGNALduino_PrepareFlash {
 	}
 	$hash->{helper}{avrdudecmd} =~ s/\Q[BAUDRATE]\E/$baudrate/;
 	$log .= "command: $hash->{helper}{avrdudecmd}\n\n";
-	InternalTimer(gettimeofday() + 1,"SIGNALduino_avrdude",$name);
+	InternalTimer(gettimeofday() + 1,\&SIGNALduino_avrdude,$name);
  	$hash->{helper}{avrdudelogs} = $log;
-    return undef;
+    return ;
 }
 
 #$hash,$name,"sendmsg","P17;R6#".substr($arg,2)
@@ -652,7 +651,7 @@ sub SIGNALduino_Set_raw {
 	my ($hash, @a) = @_;
 	$hash->{logMethod}->($hash->{NAME}, 4, "$hash->{NAME}: Set_raw, ".join(" ",@a));
 	SIGNALduino_AddSendQueue($hash,$a[1]);
-	return undef;
+	return ;
 }
 
 ############################# package main
@@ -878,7 +877,7 @@ sub SIGNALduino_Set_bWidth
 		$hash->{ucCmd}->{asyncOut} = $hash->{CL} if (defined($hash->{CL}));
 		$hash->{ucCmd}->{timenow}=time();
 		#return "Register 10 requested";
-		return undef;
+		return ;
 	}
 }
 
@@ -981,7 +980,7 @@ sub SIGNALduino_Get_Command
 	$hash->{ucCmd}->{responseSub}=$gets{$a[0]}[3];
 	$hash->{ucCmd}->{asyncOut}=$hash->{CL}  if (defined($hash->{CL}));
 	$hash->{ucCmd}->{timenow}=time();
-	return undef;
+	return ;
 }
 
 ############################# package main
@@ -1034,7 +1033,7 @@ sub SIGNALduino_Get_delayed($) {
   	
 	if (exists($hash->{ucCmd})  && $hash->{ucCmd}->{timenow}+10 > time() ) {
 		$hash->{logMethod}->($hash->{NAME}, 5, "$name: Get_delayed, ".join(" ",@cmds)." delayed");
-		main::InternalTimer(main::gettimeofday() + main::SDUINO_GET_CONFIGQUERY_DELAY, "SIGNALduino_Get_delayed", "SIGNALduino_Get_delayed:$name:".join(" ",@cmds), 0);
+		main::InternalTimer(main::gettimeofday() + main::SDUINO_GET_CONFIGQUERY_DELAY, \&SIGNALduino_Get_delayed, "SIGNALduino_Get_delayed:$name:".join(" ",@cmds), 0);
 	} else {
 		delete($hash->{ucCmd});	
 		$hash->{logMethod}->($hash->{NAME}, 5, "$name: Get_delayed, ".join(" ",@cmds)." executed");
@@ -1165,7 +1164,7 @@ sub SIGNALduino_CheckSendRawResponse
 		#RemoveInternalTimer("HandleWriteQueue:$name");
 		delete($hash->{ucCmd});
 		#SIGNALduino_HandleWriteQueue("x:$name"); # Todo #823 on github
-		InternalTimer(gettimeofday() + 0.1, "SIGNALduino_HandleWriteQueue", "HandleWriteQueue:$name") if (scalar @{$hash->{QUEUE}} > 0 && InternalVal($name,"sendworking",0) == 0);
+		InternalTimer(gettimeofday() + 0.1, \&SIGNALduino_HandleWriteQueue, "HandleWriteQueue:$name") if (scalar @{$hash->{QUEUE}} > 0 && InternalVal($name,"sendworking",0) == 0);
 	}
 	return (undef);
 }
@@ -1182,7 +1181,7 @@ sub SIGNALduino_ResetDevice($) {
 		if (IsDummy($name)) { # for dummy device
 			$hash->{DevState} = "initialized";
 			readingsSingleUpdate($hash, "state", "opened", 1);
-			return undef;
+			return ;
 		}
 
 		DevIo_CloseDev($hash);
@@ -1197,15 +1196,15 @@ sub SIGNALduino_ResetDevice($) {
 			# Mit dem Linux-Kommando 'stty' die Port-Einstellungen setzen
 			system("stty -F $dev ospeed 1200 ispeed 1200");
 			$hash->{helper}{resetInProgress}=1;
-			InternalTimer(gettimeofday()+10,"SIGNALduino_ResetDevice",$hash);
+			InternalTimer(gettimeofday()+10,\&SIGNALduino_ResetDevice,$hash);
 			$hash->{logMethod}->($name, 3, "$name: ResetDevice, reopen delayed for 10 second");
-			return undef;
+			return ;
 		}
 	} else {
 		delete($hash->{helper}{resetInProgress});
 	}
- 	DevIo_OpenDev($hash, 0, "SIGNALduino_DoInit", 'SIGNALduino_Connect');
-	return undef;
+ 	DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
+	return ;
 }
 
 ############################# package main
@@ -1217,7 +1216,7 @@ sub SIGNALduino_CloseDevice($) {
 	DevIo_CloseDev($hash);
 	readingsSingleUpdate($hash, "state", "closed", 1);
 
-	return undef;
+	return ;
 }
 
 ############################# package main
@@ -1243,15 +1242,15 @@ sub SIGNALduino_DoInit($) {
 		RemoveInternalTimer($hash);
 
 		#SIGNALduino_SimpleWrite($hash, "XQ"); # Disable receiver
-		InternalTimer(gettimeofday() + SDUINO_INIT_WAIT_XQ, "SIGNALduino_SimpleWrite_XQ", $hash, 0);
-		InternalTimer(gettimeofday() + SDUINO_INIT_WAIT, "SIGNALduino_StartInit", $hash, 0);
+		InternalTimer(gettimeofday() + SDUINO_INIT_WAIT_XQ, \&SIGNALduino_SimpleWrite_XQ, $hash, 0);
+		InternalTimer(gettimeofday() + SDUINO_INIT_WAIT, \&SIGNALduino_StartInit, $hash, 0);
 	}
 	# Reset the counter
 	delete($hash->{XMIT_TIME});
 	delete($hash->{NR_CMD_LAST_H});
 
 	return;
-	return undef;
+	return ;
 }
 
 
@@ -1294,7 +1293,7 @@ sub SIGNALduino_StartInit($) {
 		#DevIo_SimpleWrite($hash, "V\n",2);
 		$hash->{DevState} = 'waitInit';
 		RemoveInternalTimer($hash);
-		InternalTimer(gettimeofday() + SDUINO_CMD_TIMEOUT, "SIGNALduino_CheckVersionResp", $hash, 0);
+		InternalTimer(gettimeofday() + SDUINO_CMD_TIMEOUT, \&SIGNALduino_CheckVersionResp, $hash, 0);
 	}
 }
 
@@ -1343,7 +1342,7 @@ sub SIGNALduino_CheckVersionResp
 		# initialize keepalive
 		$hash->{keepalive}{ok}    = 0;
 		$hash->{keepalive}{retry} = 0;
-		InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, "SIGNALduino_KeepAlive", $hash, 0);
+		InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, \&SIGNALduino_KeepAlive, $hash, 0);
 		if ($hash->{version} =~ m/cc1101/) {
 			$hash->{cc1101_available} = 1;
 			$hash->{logMethod}->($name, 5, "$name: CheckVersionResp, cc1101 available");
@@ -1392,7 +1391,7 @@ sub SIGNALduino_CheckCmdResp($) {
 			# initialize keepalive
 			$hash->{keepalive}{ok}    = 0;
 			$hash->{keepalive}{retry} = 0;
-			InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, "SIGNALduino_KeepAlive", $hash, 0);
+			InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, \&SIGNALduino_KeepAlive, $hash, 0);
 		 	$hash->{cc1101_available} = 1  if ($ver =~ m/cc1101/);
 		}
 	}
@@ -1472,7 +1471,7 @@ sub SIGNALduino_AddSendQueue($$) {
   #SIGNALduino_Log3 $hash , 5, Dumper($hash->{QUEUE});
 
   $hash->{logMethod}->($hash, 5,"$name: AddSendQueue, " . $hash->{NAME} . ": $msg (" . @{$hash->{QUEUE}} . ")");
-  InternalTimer(gettimeofday() + 0.1, "SIGNALduino_HandleWriteQueue", "HandleWriteQueue:$name") if (scalar @{$hash->{QUEUE}} == 1 && InternalVal($name,"sendworking",0) == 0);
+  InternalTimer(gettimeofday() + 0.1, \&SIGNALduino_HandleWriteQueue, "HandleWriteQueue:$name") if (scalar @{$hash->{QUEUE}} == 1 && InternalVal($name,"sendworking",0) == 0);
 }
 
 ############################# package main
@@ -1511,9 +1510,9 @@ sub SIGNALduino_SendFromQueue($$) {
   # else it will be sent too early by the SIGNALduino, resulting in a collision, or may the last command is not finished
 
   if (defined($hash->{ucCmd}->{cmd}) && $hash->{ucCmd}->{cmd} eq 'sendraw') {
-     InternalTimer(gettimeofday() + SDUINO_WRITEQUEUE_TIMEOUT, "SIGNALduino_HandleWriteQueue", "HandleWriteQueue:$name");
+     InternalTimer(gettimeofday() + SDUINO_WRITEQUEUE_TIMEOUT, \&SIGNALduino_HandleWriteQueue, "HandleWriteQueue:$name");
   } else {
-     InternalTimer(gettimeofday() + SDUINO_WRITEQUEUE_NEXT, "SIGNALduino_HandleWriteQueue", "HandleWriteQueue:$name");
+     InternalTimer(gettimeofday() + SDUINO_WRITEQUEUE_NEXT, \&SIGNALduino_HandleWriteQueue, "HandleWriteQueue:$name");
   }
 }
 
@@ -1655,8 +1654,9 @@ sub SIGNALduino_Read($) {
 				readingsSingleUpdate($hash, $hash->{ucCmd}->{cmd}, $returnMessage, $event) if (defined($returnMessage) && defined($event));
 				if (exists($hash->{ucCmd}->{asyncOut})) {
 					$hash->{logMethod}->($name, 5, "$name: Read, try asyncOutput of message $returnMessage");
-					my $ao = asyncOutput( $hash->{ucCmd}->{asyncOut}, $hash->{ucCmd}->{cmd}.": " . $returnMessage ) if (defined($returnMessage));
-					$hash->{logMethod}->($name, 5, "$name: Read, asyncOutput failed $ao") if ($ao);
+					my $ao = undef;
+					$ao = asyncOutput( $hash->{ucCmd}->{asyncOut}, $hash->{ucCmd}->{cmd}.": " . $returnMessage ) if (defined($returnMessage));
+					$hash->{logMethod}->($name, 5, "$name: Read, asyncOutput failed $ao") if (defined($ao));
 				}
 				delete($hash->{ucCmd});
 			}
@@ -1707,7 +1707,7 @@ sub SIGNALduino_KeepAlive($){
 	}
 	$hash->{keepalive}{ok} = 0;
 
-	InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, "SIGNALduino_KeepAlive", $hash);
+	InternalTimer(gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, \&SIGNALduino_KeepAlive, $hash);
 }
 
 
@@ -1817,8 +1817,6 @@ sub SIGNALduino_PatternExists {
 	#Debug "plist: ".Dumper($patternList) if($debug);
 	#Debug "searchlist: ".Dumper($search) if($debug);
 
-
-	my $searchpattern;
 	my $valid=1;
 	my @pstr;
 	my $debug = AttrVal($hash->{NAME},"debug",0);
@@ -1827,7 +1825,7 @@ sub SIGNALduino_PatternExists {
 
 	my $maxcol=0;
 
-	foreach $searchpattern (@{$search}) # z.B. [1, -4]
+	foreach my $searchpattern (@{$search}) # z.B. [1, -4]
 	{
 		#my $patt_id;
 		# Calculate tolernace for search
@@ -2169,7 +2167,7 @@ sub SIGNALduino_Parse_MS($$$$%) {
 		## Make a lookup table for our pattern index ids
 		#Debug "List of pattern:";
 		my $clockabs= $msg_parts{pattern}{$msg_parts{clockidx}};
-		return undef if ($clockabs == 0);
+		return if ($clockabs == 0);
 		$patternList{$_} = round($msg_parts{pattern}{$_}/$clockabs,1) for keys %{$msg_parts{pattern}};
 
 
@@ -2183,11 +2181,10 @@ sub SIGNALduino_Parse_MS($$$$%) {
 
 		## Iterate over the data_array and find zero, one, float and sync bits with the signalpattern
 		## Find matching protocols
-		my $id;
 		my $message_dispatched=0;
 
 		IDLOOP:
-		foreach $id (@{$hash->{msIdList}}) {
+		foreach my $id (@{$hash->{msIdList}}) {
 
 			Debug "Testing against protocol id $id -> $ProtocolListSIGNALduino{$id}{name}"  if ($debug);
 
@@ -2348,7 +2345,7 @@ sub SIGNALduino_getProtoProp {
 	#my $propNameLst = shift;
 	return $ProtocolListSIGNALduino{$id}{$propNameLst} if exists($ProtocolListSIGNALduino{$id}{$propNameLst}) && defined($ProtocolListSIGNALduino{$id}{$propNameLst});
 	return $default; # Will return undef if $default is not provided
-	#return undef;
+	#return ;
 }
 
 ############################# package main
@@ -2383,10 +2380,9 @@ sub SIGNALduino_Parse_MU($$$$@) {
 		#Debug "List of pattern:"; 		#Debug Dumper(\%patternList);
 
 		## Find matching protocols
-		my $id;
 
 		IDLOOP:
-		foreach $id (@{$hash->{muIdList}}) {
+		foreach my $id (@{$hash->{muIdList}}) {
 
 			$clockabs= $ProtocolListSIGNALduino{$id}{clockabs};
 			my %patternList;
@@ -2593,7 +2589,7 @@ sub SIGNALduino_Parse_MC($$$$@) {
 		$rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74)); # todo: passt dies so? habe ich vom 00_cul.pm
 	}
 
-	return undef if (!$clock);
+	return if (!$clock);
 	#my $protocol=undef;
 	#my %patternListRaw = %msg_parts{patternList};
 
@@ -2606,12 +2602,11 @@ sub SIGNALduino_Parse_MC($$$$@) {
 	#} else {
 		$blen = $hlen * 4;
 	#}
-	my $id;
 
 	my $rawDataInverted;
 	($rawDataInverted = $rawData) =~ tr/0123456789ABCDEF/FEDCBA9876543210/;   # Some Manchester Data is inverted
 
-	foreach $id (@{$hash->{mcIdList}}) {
+	foreach my $id (@{$hash->{mcIdList}}) {
 
 		#next if ($blen < $ProtocolListSIGNALduino{$id}{length_min} || $blen > $ProtocolListSIGNALduino{$id}{length_max});
 		#if ( $clock >$ProtocolListSIGNALduino{$id}{clockrange}[0] and $clock <$ProtocolListSIGNALduino{$id}{clockrange}[1]);
@@ -2702,7 +2697,7 @@ sub SIGNALduino_Parse($$$$@) {
 	if (!($rmsg=~ s/^\002(M.;.*;)\003/$1/)) 			# Check if a Data Message arrived and if it's complete  (start & end control char are received)
 	{							# cut off start end end character from message for further processing they are not needed
 		$hash->{logMethod}->($name, AttrVal($name,"noMsgVerbose",5), "$name: Parse, noMsg: $rmsg");
-		return undef;
+		return ;
 	}
 
 	if (defined($hash->{keepalive})) {
@@ -2742,7 +2737,7 @@ sub SIGNALduino_Parse($$$$@) {
 	}
 	else {
 		Debug "$name: unknown Messageformat, aborting\n" if ($debug);
-		return undef;
+		return ;
 	}
 
 	if ( AttrVal($hash->{NAME},"verbose","0") > 4 && !$dispatched)
@@ -2759,7 +2754,7 @@ sub SIGNALduino_Parse($$$$@) {
 		$notdisplist = join('#',@lines);
 
 		$hash->{unknownmessages}=$notdisplist;
-		return undef;
+		return ;
 		#Todo  compare Sync/Clock fact and length of D= if equal, then it's the same protocol!
 	}
 	return $dispatched;
@@ -2773,7 +2768,7 @@ sub SIGNALduino_Ready($) {
 
   if ($hash->{STATE} eq 'disconnected') {
     $hash->{DevState} = 'disconnected';
-    return DevIo_OpenDev($hash, 1, "SIGNALduino_DoInit", 'SIGNALduino_Connect')
+    return DevIo_OpenDev($hash, 1, \&SIGNALduino_DoInit, \&SIGNALduino_Connect)
   }
 
   # This is relevant for windows/USB only
@@ -2832,7 +2827,7 @@ sub SIGNALduino_Attr(@) {
 	} elsif( $aName eq "MatchList" ) {	## Change matchList
 		my $match_list;
 		if( $cmd eq "set" ) {
-			$match_list = eval $aVal;
+			$match_list = eval {$aVal};
 			if( $@ ) {
 				$hash->{logMethod}->($name, 2, $name .": Attr, $aVal: ". $@);
 			}
@@ -2925,7 +2920,7 @@ sub SIGNALduino_Attr(@) {
 		}
 	}
 
-  	return undef;
+  	return ;
 }
 
 ############################# package main
@@ -3097,8 +3092,8 @@ sub SIGNALduino_IdList($@) {
 		}
 	}
 
-	my $id;
-	foreach $id (keys %ProtocolListSIGNALduino)
+
+	foreach my $id (keys %ProtocolListSIGNALduino)
 	{
 		if ($wflag == 1)				# whitelist active
 		{
@@ -3890,7 +3885,7 @@ sub SIGNALduino_OSV2 {
 			}
 			$rvosv2byte =~ tr/10/01/;
 
-			if (length($rvosv2byte) eq 8) {
+			if (length($rvosv2byte) == 8) {
 				$osv2hex=$osv2hex.sprintf('%02X', oct("0b$rvosv2byte"))  ;
 			} else {
 				$osv2hex=$osv2hex.sprintf('%X', oct("0b$rvosv2byte"))  ;
@@ -4002,11 +3997,11 @@ sub SIGNALduino_OSV1() {
 	my $newBitData = "00001010";                       # Byte 0:   Id1 = 0x0A
     $newBitData .= "01001101";                         # Byte 1:   Id2 = 0x4D
 	my $channel = substr($bitData,6,2);						# Byte 2 h: Channel
-	if ($channel == "00") {										# in 0 LSB first
+	if ($channel eq "00") {										# in 0 LSB first
 		$newBitData .= "0001";									# out 1 MSB first
-	} elsif ($channel == "10") {								# in 4 LSB first
+	} elsif ($channel eq "10") {								# in 4 LSB first
 		$newBitData .= "0010";									# out 2 MSB first
-	} elsif ($channel == "01") {								# in 4 LSB first
+	} elsif ($channel eq "01") {								# in 4 LSB first
 		$newBitData .= "0011";									# out 3 MSB first
 	} else {															# in 8 LSB first
 		return (-1,"$name: OSV1 - ERROR channel not valid: $channel");
@@ -4185,7 +4180,8 @@ sub SIGNALduino_SomfyRTS() {
 ############################# package main
 sub SIGNALduino_TestLength {
 	my ($name, $id, $message_length, $logMsg) = @_;
-	my $hash=$defs{$name} if (defined($name) && exists($defs{$name}));
+	my $hash = undef;
+	$hash = $defs{$name} if (defined($name) && exists($defs{$name}));
 	if (defined($ProtocolListSIGNALduino{$id}{length_min}) && $message_length < $ProtocolListSIGNALduino{$id}{length_min}) {
 		$hash->{logMethod}->($name, 4, "$name: $logMsg: message with length=$message_length is to short") if (defined($logMsg));
 		return (0, "message is to short");
@@ -4433,7 +4429,6 @@ sub SIGNALduino_FW_getProtocolList {
 	my $name = shift;
 
 	my $hash = $defs{$name};
-	my $id;
 	my $ret;
 	my $devText = "";
 	my $blackTxt = "";
@@ -4465,7 +4460,7 @@ sub SIGNALduino_FW_getProtocolList {
 		#SIGNALduino_Log3 $name,4, "$name IdList IDsNoDispatch=" . join ', ' => map "$_" => keys %IDsNoDispatch;
 	}
 
-	foreach $id (keys %ProtocolListSIGNALduino)
+	foreach my $id (keys %ProtocolListSIGNALduino)
 	{
 		push (@IdList, $id);
 	}
@@ -4486,7 +4481,7 @@ sub SIGNALduino_FW_getProtocolList {
 	my $checked;
 	my $checkAll;
 
-	foreach $id (@IdList)
+	foreach my $id (@IdList)
 	{
 		my $msgtype = "";
 		my $chkbox;
@@ -4667,7 +4662,7 @@ sub SetPatable {
 		$hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetPatable, Setting patable $paFreq $a[1] $pa");
 		main::SIGNALduino_AddSendQueue($hash,$pa);
 		main::SIGNALduino_WriteInit($hash);
-		return undef;
+		return ;
 	} else {
 		return "$hash->{NAME}: Frequency $paFreq MHz not supported (supported frequency ranges: 433.05-434.79 MHz, 863.00-870.00 MHz).";
 	}
@@ -4692,7 +4687,7 @@ sub SetRegisters  {
 		main::SIGNALduino_AddSendQueue($hash,$argcmd);
 	}
 	main::SIGNALduino_WriteInit($hash);
-	return undef;
+	return ;
 }
 
 ############################# package cc1101
@@ -4713,7 +4708,7 @@ sub SetFreq  {
 	main::SIGNALduino_AddSendQueue($hash,"W10$f1");
 	main::SIGNALduino_AddSendQueue($hash,"W11$f0");
 	main::SIGNALduino_WriteInit($hash);
-	return undef;
+	return ;
 }
 
 ############################# package cc1101
@@ -4729,14 +4724,14 @@ sub setrAmpl  {
 	$hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: setrAmpl, Setting AGCCTRL2 (1B) to $v / $w dB");
 	main::SIGNALduino_AddSendQueue($hash,"W1D$v");
 	main::SIGNALduino_WriteInit($hash);
-	return undef;
+	return ;
 }
 
 ############################# package cc1101
 sub GetRegister {
 	my ($hash, $reg) = @_;
 	main::SIGNALduino_AddSendQueue($hash,"C".$reg);
-	return undef;
+	return ;
 }
 
 ############################# package cc1101
@@ -4769,7 +4764,7 @@ sub SetSens {
 	$hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetSens, Setting AGCCTRL0 (1D) to $v / $w dB");
 	main::SIGNALduino_AddSendQueue($hash,"W1F$v");
 	main::SIGNALduino_WriteInit($hash);
-	return undef;
+	return ;
 }
 
 

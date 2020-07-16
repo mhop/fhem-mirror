@@ -1,5 +1,13 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  00_SIGNALduino.pm
+               Fix some perlcritic 5 warnings
+               some operator fixes #835
+               Changed stingrefs to coderefs
+ - feature: lib/SD_ProtocolData.pm
+               new protocol 104 for remote control TR60C-1 
+               new protocol 99 NAVARIS touch light switch 
+               new protocol 98 for wireless door bell GEA-028DB   
  - bugfix:  76_SMAPortal: fix break in header if attribute hourCount is reduced
  - change:  49_SSCam: panel PTZ Control changed
  - new:     10_SD_GT: Processing of messages from remote controls GT-9000 like

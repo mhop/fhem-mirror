@@ -63,13 +63,13 @@
 # Please provide at least three messages for each new MU/MC/MS protocol and a URL of issue in GitHub or discussion in FHEM Forum
 # https://forum.fhem.de/index.php/topic,58396.975.html | https://github.com/RFD-FHEM/RFFHEM
 ###########################################################################################################################################
-
+# $Id$
 package lib::SD_ProtocolData;
 { 
 	use strict;
 	use warnings;
 	
-	our $VERSION = '1.17';
+	our $VERSION = '1.20';
 	our %protocols = (
 		"0"	=>	## various weather sensors (500 | 9100)
 						# Mebus | Id:237 Ch:1 T: 1.9 Bat:low           MS;P0=-9298;P1=495;P2=-1980;P3=-4239;D=1012121312131313121313121312121212121212131212131312131212;CP=1;SP=0;R=223;O;m2;
@@ -1581,7 +1581,10 @@ package lib::SD_ProtocolData;
 				length_min			=> '24',
 				length_max			=> '24',
 			},
-		"56"	=>	## Celexon
+		"56"	=>	## Celexon Motorleinwand
+							# https://forum.fhem.de/index.php/topic,52025.0.html @Horst12345
+							# MU;P0=5036;P1=-624;P2=591;P3=-227;P4=187;P5=-5048;D=0123412341414123234141414141414141412341232341414141232323234123234141414141414123414141414141414141234141414123234141412341232323250123412341414123234141414141414141412341232341414141232323234123234141414141414123414141414141414141234141414123234141412;CP=4;O;
+							# MU;P0=-228;P1=185;P2=-625;P3=593;P4=-5050;P5=5050;D=012121234523012301212123030121212121212121212301230301212121230303030123030303030301212123452301230121212303012121212121212121230123030121212123030303012303012121212121212301212121212121212121230121230121230303030301212123;CP=1;
 			{
 				name						=> 'Celexon',
 				id							=> '56',
@@ -1593,7 +1596,7 @@ package lib::SD_ProtocolData;
 				format					=> 'twostate',
 				preamble				=> 'u56#',						# prepend to converted message
 				#clientmodule		=> '',
-				modulematch			=> '',
+				#modulematch			=> '',
 				length_min			=> '56',
 				length_max			=> '68',
 			},
@@ -1696,21 +1699,20 @@ package lib::SD_ProtocolData;
 							#  Bit 0      Bit 1
 							# kurz 400 mikroSek / lang 800 mikroSek / gesamt 800 mikroSek = 0, gesamt 1200 mikroSek = 1 - Sollzeiten
 			{
-				name					=> 'FS10',
-				comment				=> 'remote control',
-				id						=> '61',
-				knownFreqs		=> '433.92',
-				one						=> [1,-2],
-				zero					=> [1,-1],
-				clockabs			=> 400,
-				pause					=> [-81],				# 400*81=32400*6=194400 - pause between repeats of send messages (clockabs*pause must be < 32768)
-				format				=> 'twostate',
-				preamble			=> 'P61#',			# prepend to converted message
-				postamble			=> '',					# Append to converted message
-				clientmodule	=> 'FS10',
-				#modulematch	=> '',
-				length_min		=> '38',				# eigentlich 41 oder 46 (Pruefsumme nicht bei allen)
-				length_max		=> '48',				# eigentlich 46
+				name         => 'FS10',
+				comment      => 'remote control',
+				id           => '61',
+				knownFreqs   => '433.92',
+				one          => [1,-2],
+				zero         => [1,-1],
+				clockabs     => 400,
+				pause        => [-81],      # 400*81=32400*6=194400 - pause between repeats of send messages (clockabs*pause must be < 32768)
+				format       => 'twostate',
+				preamble     => 'P61#',     # prepend to converted message
+				postamble    => '',         # Append to converted message
+				clientmodule => 'FS10',
+				length_min   => '30',       # 43-1=42 (letztes Bit fehlt) 42-12=30 (12 Bit Preambel)
+				length_max   => '48',
 			},
 		"62"	=>	## Clarus_Switch
 							# ! some message are decode as protocol 32 !
@@ -2612,6 +2614,68 @@ package lib::SD_ProtocolData;
 				clientmodule    => 'SD_UT',
 				length_min      => '40',
 				length_max      => '40',
+			},
+		"98"	=>	# Funk-Tuer-Gong: Modell GEA-028DB, Ningbo Rui Xiang Electrical Co.,Ltd., Vertrieb durch Walter Werkzeuge Salzburg GmbH, Art. Nr. K612021A
+							# https://forum.fhem.de/index.php/topic,109952.0.html 2020-04-12
+							# SD_BELL_6A2C   MU;P0=1488;P1=-585;P2=520;P3=-1509;P4=1949;P5=-5468;CP=2;R=38;D=01232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501;O;
+							# SD_BELL_6A2C   MU;P0=-296;P1=-1542;P2=1428;P3=-665;P4=483;P5=1927;P6=-5495;P7=92;CP=4;R=31;D=1234141232356562341412341234123232341234141232356562341412341234123232341234141232356562341412341234123232341234141232356562341412341234123232341234141232356562341412341234123232341234141232356562341412341234123232341234141232370;e;i;
+			{
+				name            => 'GEA-028DB',
+				comment         => 'Wireless doorbell',
+				knownFreqs      => '433.92',
+				id              => '98',
+				one             => [1,-3],
+				zero            => [3,-1],
+				start           => [4,-11,4,-11],
+				clockabs        => 500,
+				format          => 'twostate',
+				clientmodule    => 'SD_BELL',
+				modulematch     => '^P98#',
+				preamble        => 'P98#',
+				length_min      => '16',
+				length_max      => '16',
+			},
+		"99"	=>	# NAVARIS touch light switch Model No.: 44344.04
+							# https://github.com/RFD-FHEM/RFFHEM/issues/828
+							# Navaris_211073   MU;P0=-302;P1=180;P2=294;P3=-208;P4=419;P5=-423;D=01023101010101023232310102323451010231010101023101010231010101010232323101023234510102310101010231010102310101010102323231010232345101023101010102310101023101010101023232310102323451010231010101023101010231010101010232323101023234510102310101010231010102;CP=1;R=36;O;
+							# Navaris_13F8E3   MU;P0=406;P1=-294;P2=176;P3=286;P4=-191;P6=-415;D=01212134212134343434343434212121343434212121343406212121342121343434343434342121213434342121213434062121213421213434343434343421212134343421212134340621212134212134343434343434212121343434212121343406212121342121343434343434342121213434342121213434062121;CP=2;R=67;O;
+			{
+				name            => 'Navaris 44344.04',
+				comment         => 'Wireless touch light switch',
+				knownFreqs      => '433.92',
+				id              => '99',
+				one             => [3,-2],
+				zero            => [2,-3],
+				start           => [4,-4],
+				clockabs        => 100,
+				format          => 'twostate',
+				clientmodule    => 'SD_UT',
+				modulematch     => '^P99#',
+				preamble        => 'P99#',
+				length_min      => '24',
+				length_max      => '24',
+			},
+		"104"	=>	# Remote control TR60C-1 with touch screen from Satellite Electronic (Zhongshan) Ltd., Importer Westinghouse Lighting for ceiling fan Bendan
+							# https://forum.fhem.de/index.php?topic=53282.msg1045428#msg1045428 phoenix-anasazi 2020-04-21
+							# TR60C1_0 light_off_fan_off  MU;P0=18280;P1=-737;P2=419;P3=-331;P4=799;P5=-9574;P6=-7080;D=012121234343434341212121212121252121212123434343434121212121212125212121212343434343412121212121212521212121234343434341212121212121252121212123434343434121212121212126;CP=2;R=2;
+							# TR60C1_9 light_off_fan_4    MU;P0=14896;P1=-751;P2=394;P3=-370;P4=768;P5=-9572;P6=-21472;D=0121234123434343412121212121212523412123412343434341212121212121252341212341234343434121212121212125234121234123434343412121212121212523412123412343434341212121212121252341212341234343434121212121212126;CP=2;R=4;
+							# TR60C1_B light_on_fan_2     MU;P0=-96;P1=152;P2=-753;P3=389;P4=-374;P5=769;P6=-9566;P7=-19920;D=012345454523232345454545634523454523234545452323234545454563452345452323454545232323454545456345234545232345454523232345454545634523454523234545452323234545454563452345452323454545232323454545457;CP=3;R=1;
+							# https://github.com/RFD-FHEM/RFFHEM/issues/842
+			{
+				name            => 'TR60C-1',
+				comment         => 'Remote control for example Westinghouse Bendan 77841B',
+				id              => '104',
+				knownFreqs      => '433.92',
+				one             => [-1,2],  #  -380,760
+				zero            => [-2,1],  #  -760,380
+				start           => [-25,1], # -9500,380
+				clockabs        => 380,
+				format          => 'twostate',
+				clientmodule    => 'SD_UT',
+				modulematch     => '^P104#',
+				preamble        => 'P104#',
+				length_min      => '16',
+				length_max      => '16',
 			},
 		########################################################################
 		#### ### old information from incomplete implemented protocols #### ####
