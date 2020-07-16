@@ -225,7 +225,7 @@ sub SD_WS09_Parse($$) {
 		Log3 $iohash, 5, "$name: SD_WS09_Parse_0 whid=$whid";
 
 		# A  Wettermeldungen
-		if(  $whid == "1010" ){
+		if(  $whid eq '1010' ){
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_1 msg=$sensdata length:".length($sensdata) ;
 			$model = "WH1080";
 			$id = SD_WS09_bin2dec(substr($sensdata,4,8));
@@ -244,7 +244,7 @@ sub SD_WS09_Parse($$) {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_5 ".$model." id:$id, bat:$bat, temp=$temp, hum=$hum, winddir=$windDirection:$windDirectionText wS=$windSpeed, wG=$windguest, rain=$rain";
 
 		# B  DCF-77 Zeitmeldungen vom Sensor
-		} elsif (  $whid == "1011" ) {
+		} elsif (  $whid eq '1011' ) {
 			my $hrs1 = substr($sensdata,16,8);
 			my $hrs;
 			my $mins; 
@@ -267,7 +267,7 @@ sub SD_WS09_Parse($$) {
 			return $name;
 
 		# 7  UV/Solar Meldungen vom Sensor
-		} elsif ( $whid == "0111" ) {
+		} elsif ( $whid eq '0111' ) {
 			# Fine Offset (Solar Data) message BYTE offsets (within receive buffer)
 			# Examples= FF 75 B0 55 00 97 8E 0E *CRC*OK*
 			# =FF 75 B0 55 00 8F BE 92 *CRC*OK*
@@ -289,9 +289,9 @@ sub SD_WS09_Parse($$) {
 		}
 	} else {
 		# es wird eine CTW600 angenommen 
-		$syncpos= index($bitData,"11111110");  #7x1 1x0 preamble
+		$syncpos= index($bitData,'11111110');  #7x1 1x0 preamble
 		$wh = substr($bitData,0,8);
-		if ( $wh == "11111110" && length($bitData) > $minL1 ) {
+		if ( $wh eq '11111110' && length($bitData) > $minL1 ) {
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_11 CTW600 EXIT: msg=$bitData wh:$wh length:".length($bitData) ; 
 			$sensdata = substr($bitData,$syncpos+8);
 			Log3 $iohash, 4, "$name: SD_WS09_Parse_12 CTW WH=$wh msg=$sensdata syncp=$syncpos length:".length($sensdata) ;
