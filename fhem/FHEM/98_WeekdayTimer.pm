@@ -1166,7 +1166,7 @@ sub WeekdayTimer_Switch_Device {
      'set $NAME '. $setModifier .' $EVENT' if (!defined $attr{$name}{commandTemplate});
 
   $command = AttrVal($hash->{NAME}, "commandTemplate", "commandTemplate not found");
-  $command = $hash->{COMMAND} if ($hash->{COMMAND} ne "");
+  $command = $hash->{COMMAND} if defined $hash->{COMMAND} && $hash->{COMMAND} ne "";
 
   my $activeTimer = 1;
 
@@ -1215,7 +1215,7 @@ sub WeekdayTimer_Condition {
   Log3( $hash, 4, "[$name] condition:$hash->{CONDITION} - Tage:".join(",",@$tage) );
 
   my $condition  = "( ";
-  $condition .= ($hash->{CONDITION} ne "") ? $hash->{CONDITION} : 1 ;
+  $condition .= (defined $hash->{CONDITION} && $hash->{CONDITION} ne "") ? $hash->{CONDITION} : 1 ;
   $condition .= " && " . WeekdayTimer_TageAsCondition($tage, $overrulewday);
   $condition .= ")";
 
