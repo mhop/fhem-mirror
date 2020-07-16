@@ -139,8 +139,8 @@ sub getAllSets($;$);
 sub getPawList($);
 sub getUniqueId();
 sub hashKeyRename($$$);
-sub json2nameValue($;$$);
-sub json2reading($$;$$$);
+sub json2nameValue($;$$$);
+sub json2reading($$;$$$$);
 sub latin1ToUtf8($);
 sub myrename($$$);
 sub notifyRegexpChanged($$);
@@ -5125,9 +5125,9 @@ toJSON($)
 # will return a hash of name:value pairs.  in is a json_string, prefix will be
 # prepended to each name, map is a hash for mapping the names
 sub
-json2nameValue($;$$)
+json2nameValue($;$$$)
 {
-  my ($in, $prefix, $map) = @_;
+  my ($in, $prefix, $map, $filter) = @_;
   $prefix = "" if(!defined($prefix));
   $map = eval $map if($map && !ref($map)); # passing hash through AnalyzeCommand
   $map = {} if(!$map);
@@ -5194,6 +5194,7 @@ json2nameValue($;$$)
       return if(!$map->{$name});
       $name = $map->{$name};
     }
+    return if($filter && $name !~ m/$filter/);
     $ret->{$name} = $val;
   };
 
@@ -5297,15 +5298,15 @@ hashKeyRename($$$)
 
 # generate readings from the json string (parsed by json2reading) for $hash
 sub
-json2reading($$;$$$)
+json2reading($$;$$$$)
 {
-  my ($hash, $json, $prefix, $map, $postProcess) = @_;
+  my ($hash, $json, $prefix, $map, $postProcess, $filter) = @_;
 
   $hash = $defs{$hash} if(ref($hash) ne "HASH");
   return "json2reading: first arg is not a FHEM device"
         if(!$hash || ref $hash ne "HASH" || !$hash->{TYPE});
 
-  my $ret = json2nameValue($json, $prefix, $map);
+  my $ret = json2nameValue($json, $prefix, $map, $filter);
   if($postProcess) {
     $ret = eval($postProcess);
     Log 1, $@ if($@);
