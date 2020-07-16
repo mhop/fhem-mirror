@@ -947,8 +947,8 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 order:A_01d1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
-#par:POWERCMD;needed command to be sent like in example dec '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
-#par:VOLUMEUPCMD;needed command to be sent like in example raw '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');{ undef }
+par:POWERCMD;sample command in dec notation, could be something like '{"protocol":"NEC","bits":32,"data":551489775}' (without '');{ undef }
+par:VOLUMEUPCMD;sample command in  raw notation, could be something like '0,926,844,958,832,1798,868,902,848,900,870,900,852,908,918,958,794,934,874,928,1738,934,856,1764' (without '');{ undef }
 #par:MULTIPLE1CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
 #par:MULTIPLE2CMD;needed command to be sent like in example hex '{"Protocol":"NEC","Bits":32,"Data":0x8166817E}' (without '');{ undef }
 attr DEVICE setList \
@@ -1590,6 +1590,52 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
 set IO_DEV publish CMNDTOPIC/SetOption26 0
 attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
+
+######
+#Tasmota zigbee2tasmota section
+
+name:tasmota_zigbee2tasmota_bridge
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:This template is meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details on zigbee2tasmota visit https://tasmota.github.io/docs/Zigbee/<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Needs still some changes!!!
+order:A_01u01
+farewell:template has been applied successfully. <br>Note: some changes have been applied to the mcu firmware settings. Incoming messages from zigbee devices now should be forwarded to different FHEM devices, make sure, you have a TYPE=autocreate device active. 
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:IO_DEV;Currently used IO;{ InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)) }
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SetOption89 1; SaveData 1
+par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
+attr DEVICE icon ICON
+attr DEVICE setList permit_join:0,1,99 cmnd/ZigBee2MQTT/ZbPermitJoin $EVTPART1
+attr DEVICE bridgeRegexp \
+  TELETOPIC/([^/]+)/SENSOR:.* "z2t_$1"
+attr DEVICE readingList 
+  TELETOPIC/LWT:.* LWT\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+set IO_DEV publish CMNDTOPIC/restart 1
+attr DEVICE model tasmota_zigbee2tasmota_bridge
+setreading DEVICE attrTemplateVersion 20200716
+
+
+name:tasmota_zigbee2tasmota_light_dimmer
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:This template is meant to configure a dimmable bulb device like Osram A 60.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Needs still some changes!!!
+order:A_01u02
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
+par:DEV_ID;BT short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR)?:, ? "$3" : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+attr DEVICE icon ICON
+attr DEVICE readingList 
+  TELETOPIC/SENSOR:.* { $EVENT =~ m,0xDEV_ID.:(.[^}]+.), ?  json2nameValue($1,'',$JSONMAP) : undef }
+attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
+  off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}
+attr DEVICE setStateList on off
+set DEVICE attrTemplate speechcontrol_type_light_255
+attr DEVICE model tasmota_zigbee2tasmota_light_dimmer
+setreading DEVICE attrTemplateVersion 20200716
+
+
 
 ###########################################
 # SHELLY
@@ -3003,7 +3049,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 #Atm there are no furter commands to be set to the esp itself
 name:OpenMQTTGateway_MCU
 filter:TYPE=MQTT2_DEVICE
-desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt
+desc:Use this with an OpenMQTTGateway. This template is meant to configure a bridge device showing some basic info about the microcontroller (mcu) itself. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Early user version, not yet fully tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt it to your needs!
 order:X_02
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
@@ -3019,17 +3065,16 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
-  homeassistant/[^/]*sensor/[^/]+/config:.* { $EVENT =~ m,DEVNAME, ? json2nameValue($EVENT,"HASS_") : return }
+  homeassistant/[^/]*sensor/[^/]+/config:.* { }
 attr DEVICE setList\
   restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
-
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
 LWT\
 </a>Version: version
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200716
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
@@ -3174,8 +3219,7 @@ par:BT_ID;Pls. enter your bluetooth device ID; {undef}
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 #par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
-defmod OMG_BT_ID MQTT2_\DEVICE oMQTTgw_BT
-#attr OMG_BT_ID readingList READINGLISTOLD
+defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
 deletereading -q OMG_BT_ID (?!associatedWith).*
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
@@ -3188,7 +3232,7 @@ attr OMG_BT_ID stateFormat T: temperature°C, H: humidity%rH
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_temp_hum_sensor
-setreading OMG_BT_ID attrTemplateVersion 20200522 or prior
+setreading OMG_BT_ID attrTemplateVersion 20200716
 
 
 ###############
