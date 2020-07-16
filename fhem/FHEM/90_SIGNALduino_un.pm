@@ -102,7 +102,7 @@ SIGNALduino_un_Parse($$)
 	my $bitData= unpack("B$blen", pack("H$hlen", $rawData)); 
 	Log3 $hash, 4, "$name converted to bits: $bitData";
 		
-	if ($protocol == "21" && length($bitData)>=32)  ##Einhell doorshutter
+	if ($protocol == 21 && length($bitData)>=32)  ##Einhell doorshutter
 	{
 		Log3 $hash, 4, "$name / Einhell doorshutter received";
 		
@@ -115,7 +115,7 @@ SIGNALduino_un_Parse($$)
 		
  	    
 		Log3 $hash, 4, "$name found doorshutter from Einhell. id=$id, channel=$channel, direction=$dir";
-	} elsif ($protocol == "23" && length($bitData)>=32)  ##Perl Sensor
+	} elsif ($protocol == 23 && length($bitData)>=32)  ##Perl Sensor
 	{
 		my $SensorTyp = "perl NC-7367?";
 		my $id = oct ("0b".substr($bitData,4,4));  
