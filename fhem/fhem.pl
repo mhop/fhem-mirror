@@ -5190,11 +5190,11 @@ json2nameValue($;$$$)
   {
     my ($ret,$map,$prefix,$name,$val) = @_;
     $name = "$prefix$name";
-    if(defined($map->{$name})) {
-      return if(!$map->{$name});
-      $name = $map->{$name};
+    if(defined($map->{map}{$name})) {
+      return if(!$map->{map}{$name});
+      $name = $map->{map}{$name};
     }
-    return if($filter && $name !~ m/$filter/);
+    return if($map->{filter} && $name !~ m/$map->{filter}/);
     $ret->{$name} = $val;
   };
 
@@ -5265,7 +5265,8 @@ json2nameValue($;$$$)
   $in =~ s/^\s+//;
   $in =~ s/\s+$//;
   my $err;
-  ($err,$in) = eObj(\%ret, $map, "", $in, "", $prefix, 1);
+  ($err,$in) = eObj(\%ret, { map=>$map, filter=>$filter },
+                    "", $in, "", $prefix, 1);
   if($err) {
     Log 4, $err;
     %ret = ();
