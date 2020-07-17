@@ -193,7 +193,7 @@ sub Define {
 
   $link = migrateFunc($hash,$link);
   
-  explodeDEF ($hash,$link);
+  explodeLinkData ($hash, $link, 1);
   
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
   $hash->{LINK}                    = $link;
@@ -231,8 +231,8 @@ sub Rename {
     my $old_name = shift;
     my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
-    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{DEF} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    explodeLinkData ($hash, $hash->{DEF}, 1);
 
 return;
 }
@@ -242,8 +242,8 @@ sub Copy {
     my $new_name = shift;
     my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
-    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{DEF} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    explodeLinkData ($hash, $hash->{DEF}, 1);
 
 return;
 }
@@ -265,7 +265,7 @@ sub Set {
                  "popupStream "
                  ;
   } else {
-      my $sd   = streamDevs();           
+      my $sd   = allStreamDevs();           
       $setlist = "Unknown argument $opt, choose one of ".
                  "adoptFrom:$sd ".
                  "reset:noArg "
@@ -275,8 +275,6 @@ sub Set {
   if ($opt eq "popupStream") {
       my $txt = FHEM::SSCam::getClHash($hash);
       return $txt if($txt);
-      
-      my $link = AnalyzePerlCommand(undef, $hash->{LINK});
       
       # OK-Dialogbox oder Autoclose
       my $temp    = AttrVal($name, "popupStreamTo", $todef);
@@ -319,9 +317,9 @@ sub Set {
           push @r, "$key:$val";        
       }
       
-      # Übernahme LINK
-      $hash->{LINK} = $defs{$strmd}{LINK};
-      readingsSingleUpdate($hash,"clientLink", $hash->{LINK}, 0); 
+      # Übernahme Link-Parameter
+      my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
+      readingsSingleUpdate($hash,"clientLink", $link, 0); 
       
       if(@r) {
           readingsBeginUpdate($hash);
@@ -409,11 +407,22 @@ sub FwFn {
   
   $hash->{HELPER}{FW} = $FW_wname;
   my $clink           = ReadingsVal($name, "clientLink", "");
-  $hash->{LINK}       = $clink if($clink);
   
-  my $link = $hash->{LINK};
-       
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
+  explodeLinkData ($hash, $clink, 0);
+  
+  # my $link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
+  
+  my $ftui   = 0;
+  my $linkfn = $hash->{LINKFN};
+  my %pars   = ( linkparent => $hash->{LINKPARENT},
+			     linkname   => $hash->{LINKNAME},
+                 linkmodel  => $hash->{LINKMODEL},
+				 ftui       => $ftui
+               );
+  
+  no strict "refs";                                      ## no critic 'NoStrict' 
+  my $html = &{$linkfn}(\%pars);
+  use strict "refs";  
   
   my $ret = "";
   
@@ -432,7 +441,7 @@ sub FwFn {
       } 
       
   } else {
-      $ret .= $link;
+      $ret .= $html;
       $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
   }
    
@@ -442,21 +451,37 @@ sub FwFn {
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
   
-  undef $link;
+  undef $html;
 
 return $ret;
 }
 
 #############################################################################################
-#                          Bestandteile des DEF auflösen  
+#            Bestandteile des DEF (oder Link) auflösen 
+#      $link = aufzulösender String
+#      $def  = 1 -> es ist ein Shash->{DEF} Inhalt, 0 -> eine andere Quelle 
 #############################################################################################
-sub explodeDEF {                    
+sub explodeLinkData {                    
   my $hash = shift;
   my $link = shift;
+  my $def  = shift;
   
-  my $arg = (split("[()]",$link))[1];
-  $arg    =~ s/'//xg;
-  ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
+  return if(!$link);
+  
+  my ($fn,$arg) = split("[()]",$link);
+  
+  $arg =~ s/'//xg;
+  $fn  =~ s/{//xg;
+  
+  if($def) {
+      ($hash->{PARENT},$hash->{LINKNAME},$hash->{MODEL}) = split(",",$arg);
+      $hash->{LINKMODEL}  = $hash->{MODEL};
+      $hash->{LINKPARENT} = $hash->{PARENT};
+  } else {
+      ($hash->{LINKPARENT},$hash->{LINKNAME},$hash->{LINKMODEL}) = split(",",$arg);     
+  }
+  
+  $hash->{LINKFN} = $fn;
   
 return;
 }
@@ -533,16 +558,33 @@ return;
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
 sub streamAsHtml { 
-  my ($hash,$ftui) = @_;
-  my $name         = $hash->{NAME};
-  my $link         = $hash->{LINK};
+  my $hash = shift;
+  my $ftui = shift;
+  my $name = $hash->{NAME};
   
-  if ($ftui && $ftui eq "ftui") {                 # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
-      my $s = substr($link,0,length($link)-2);
-      $link = $s.",'$ftui')}";
+  if($ftui && $ftui eq "ftui") {
+      $ftui = 1;
+  } else {
+      $ftui = 0; 
   }
   
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
+  my $clink = ReadingsVal($name, "clientLink", "");
+  
+  explodeLinkData ($hash, $clink, 0);
+  
+  #my $link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
+  #$link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}','$ftui')}" if($ftui && $ftui eq "ftui");   # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
+  
+  my $linkfn = $hash->{LINKFN};
+  my %pars   = ( linkparent => $hash->{LINKPARENT},
+			     linkname   => $hash->{LINKNAME},
+                 linkmodel  => $hash->{LINKMODEL},
+				 ftui       => $ftui
+               );
+  
+  no strict "refs";                                      ## no critic 'NoStrict' 
+  my $html = &{$linkfn}(\%pars);
+  use strict "refs"; 
   
   my $ret = "<html>";
   if(IsDisabled($name)) {  
@@ -553,11 +595,12 @@ sub streamAsHtml {
       }
 
   } else {
-      $ret .= $link;     
+      $ret .= $html;     
   }
   
   $ret .= "</html>";
-  undef $link;
+  
+  undef $html;
   
 return $ret;
 }
@@ -592,7 +635,7 @@ return;
 #  (es wird Alias (wenn gesetzt) oder Devicename verwendet,
 #   Leerzeichen werden durch "#" ersetzt)
 ################################################################
-sub streamDevs {
+sub allStreamDevs {
 
   my $sd = "";
   undef %sdevs;
@@ -623,7 +666,7 @@ sub sDevsWidget {
   my $Adopts;
   my $ret       = "";
   my $cmdAdopt  = "adoptFrom";
-  my $valAdopts = streamDevs();
+  my $valAdopts = allStreamDevs();
   
   for my $fn (sort keys %{$data{webCmdFn}}) {
       next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");

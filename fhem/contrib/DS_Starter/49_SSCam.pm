@@ -1439,7 +1439,11 @@ sub Set {
       } else {
           # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
           $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
-          my $htmlCode = composeGallery($name);
+          my %pars = ( linkparent => $name,
+                       linkname   => '',
+                       ftui       => 0
+                     );
+          my $htmlCode = composeGallery(\%pars);
           for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
               if ($hash->{HELPER}{CL}{$k}->{COMP}) {
                   # CL zusammengestellt (Auslösung durch Notify)
@@ -2006,7 +2010,11 @@ sub Get {
         } else {
             # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
             $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
-            my $htmlCode = composeGallery($name);
+            my %pars = ( linkparent => $name,
+                         linkname   => '',
+                         ftui       => 0
+                       );
+            my $htmlCode = composeGallery(\%pars);
             for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
                 if ($hash->{HELPER}{CL}{$k}->{COMP}) {
                     # CL zusammengestellt (Auslösung durch Notify)
@@ -2315,7 +2323,13 @@ sub FWdetailFn {
       $ret .= $hash->{".setup"};
   }
   
-  $hash->{".ptzhtml"} = ptzPanel($name,$name) if($hash->{".ptzhtml"} eq "");
+  my %pars = ( linkparent => $name,
+               linkname   => $name,
+               linkmodel  => '',
+               ftui       => 0
+             );
+             
+  $hash->{".ptzhtml"} = ptzPanel(\%pars) if($hash->{".ptzhtml"} eq "");
 
   if($hash->{".ptzhtml"} ne "" && AttrVal($name,"ptzPanel_use",1)) {
       $ret .= $hash->{".ptzhtml"};
@@ -6305,8 +6319,12 @@ sub camOp_Parse {
                         }
                         
                         # Direktausgabe Snaphash wenn nicht gepollt wird
-                        if(!AttrVal($name, "snapGalleryBoost",0)) {         
-                            my $htmlCode = composeGallery($name);
+                        if(!AttrVal($name, "snapGalleryBoost",0)) {  
+                            my %pars = ( linkparent => $name,
+                                         linkname   => '',
+                                         ftui       => 0
+                                       );
+                            my $htmlCode = composeGallery(\%pars);
                             
                             for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
                                 asyncOutput($hash->{HELPER}{CL}{$k},"$htmlCode");                       
@@ -7742,7 +7760,11 @@ return ($ret);
 #     das generierte Widget und das weblink-Device ptzPanel_$name
 ###############################################################################
 sub ptzPanel {
-  my ($name,$ptzcdev,$ptzcontrol,$ftui) = @_; 
+  my $paref       = shift;
+  my $name        = $paref->{linkparent}; 
+  my $ptzcdev     = $paref->{linkname}; 
+  my $ptzcontrol  = $paref->{linkmodel}; 
+  my $ftui        = $paref->{ftui};  
   my $hash        = $defs{$name};
   my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
   my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
@@ -8015,11 +8037,15 @@ return;
 #
 ######################################################################################
 sub streamDev {                                               ## no critic 'complexity'
-  my ($camname,$strmdev,$fmt,$ftui) = @_; 
+  my $paref   = shift;
+  my $camname = $paref->{linkparent}; 
+  my $strmdev = $paref->{linkname}; 
+  my $fmt     = $paref->{linkmodel}; 
+  my $ftui    = $paref->{ftui};
+  
   my $hash       = $defs{$camname};
   my $streamHash = $defs{$strmdev};                           # Hash des SSCamSTRM-Devices
   my $uuid       = $streamHash->{FUUID};                      # eindeutige UUID des Streamingdevices
-  $ftui          = ($ftui && $ftui eq "ftui") ? 1 : 0;
   my $hdrAlign   = "center";
   
   delete $streamHash->{HELPER}{STREAM};
@@ -8308,7 +8334,12 @@ sub _streamDevMJPEG {
   $ret .= "</td>"; 
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
-      my $ptz_ret = ptzPanel($camname,$strmdev,'',$ftui);
+      my %pars    = ( linkparent => $camname,
+                      linkname   => $strmdev,
+                      linkmodel  => '',
+                      ftui       => $ftui
+                    );
+      my $ptz_ret = ptzPanel(\%pars);
       if($ptz_ret) {         
           $ret .= "<td>$ptz_ret</td>";
       }
@@ -8473,7 +8504,12 @@ sub _streamDevGENERIC {
   $ret .= "</td>";
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
-      my $ptz_ret = ptzPanel($camname,$strmdev,'',$ftui);
+      my %pars    = ( linkparent => $camname,
+                      linkname   => $strmdev,
+                      linkmodel  => '',
+                      ftui       => $ftui
+                    );
+      my $ptz_ret = ptzPanel(\%pars);
       if($ptz_ret) { 
           $ret .= "<td>$ptz_ret</td>";
       }
@@ -8559,7 +8595,12 @@ sub _streamDevHLS {
   $ret .= "</td>";      
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
-      my $ptz_ret = ptzPanel($camname,$strmdev,'',$ftui);
+      my %pars    = ( linkparent => $camname,
+                      linkname   => $strmdev,
+                      linkmodel  => '',
+                      ftui       => $ftui
+                    );
+      my $ptz_ret = ptzPanel(\%pars);
       if($ptz_ret) { 
           $ret .= "<td>$ptz_ret</td>";
       }
@@ -8695,7 +8736,12 @@ sub __switchedIMAGE {
   $ret .= "</td>";
   
   if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {
-      my $ptz_ret = ptzPanel($camname,$strmdev,'',$ftui);
+      my %pars    = ( linkparent => $camname,
+                      linkname   => $strmdev,
+                      linkmodel  => '',
+                      ftui       => $ftui
+                    );
+      my $ptz_ret = ptzPanel(\%pars);
       if($ptz_ret) { 
           $ret .= "<td>$ptz_ret</td>";
       }
@@ -8964,7 +9010,12 @@ sub __switchedHLS {
   $ret .= "</td>";
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
-      my $ptz_ret = ptzPanel($camname,$strmdev,'',$ftui);
+      my %pars    = ( linkparent => $camname,
+                      linkname   => $strmdev,
+                      linkmodel  => '',
+                      ftui       => $ftui
+                    );
+      my $ptz_ret = ptzPanel(\%pars);
       if($ptz_ret) { 
           $ret .= "<td>$ptz_ret</td>";
       }
@@ -9024,7 +9075,10 @@ return $ret;
 #                   Verwendung durch SSCamSTRM-Devices
 ###############################################################################
 sub composeGallery { 
-  my ($name,$strmdev,$model,$ftui) = @_;
+  my $paref    = shift;
+  my $name     = $paref->{linkparent}; 
+  my $strmdev  = $paref->{linkname};  
+  my $ftui     = $paref->{ftui};
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};                                      
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
@@ -9033,7 +9087,6 @@ sub composeGallery {
   my $limit    = AttrVal($name,"snapGalleryNumber",3);                                        # abgerufene Anzahl Snaps
   my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale Anzahl Snaps
   $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
-  $ftui        = ($ftui && $ftui eq "ftui")?1:0;
   my $uuid     = "";
   my $hdrAlign = "center";
   my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
@@ -9122,7 +9175,7 @@ sub composeGallery {
   
   # Ausgabetabelle erstellen
   my $htmlCode;
-  # $htmlCode  = "<html>";
+  $htmlCode  = "<html>";
   $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= "<div class=\"makeTable wide\"; style=\"text-align:$hdrAlign\"> $header <br>";
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
@@ -9201,7 +9254,7 @@ sub composeGallery {
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
-  # $htmlCode .= "</html>";
+  $htmlCode .= "</html>";
   
   undef $imgdat;
   undef $imgTm;
