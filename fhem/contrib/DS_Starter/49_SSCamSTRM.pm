@@ -196,7 +196,7 @@ sub Define {
   explodeLinkData ($hash, $link, 1);
   
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
-  $hash->{LINK}                    = $link;
+  # $hash->{LINK}                    = $link;
   
   # Versionsinformationen setzen
   setVersionInfo($hash);
@@ -334,7 +334,8 @@ sub Set {
       
   } elsif ($opt eq "reset") {
       delReadings($hash);
-      $hash->{LINK} = $hash->{DEF};
+      # $hash->{LINK} = $hash->{DEF};
+      explodeLinkData ($hash, $hash->{DEF}, 1);
       
   } else {
       return "$setlist";
