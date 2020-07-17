@@ -410,7 +410,7 @@ sub FwFn {
   
   explodeLinkData ($hash, $clink, 0);
   
-  # my $link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
+  # Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
   
   my $ftui   = 0;
   my $linkfn = $hash->{LINKFN};
@@ -421,7 +421,7 @@ sub FwFn {
                );
   
   no strict "refs";                                      ## no critic 'NoStrict' 
-  my $html = &{$linkfn}(\%pars);
+  my $html = eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
   use strict "refs";  
   
   my $ret = "";
@@ -571,10 +571,7 @@ sub streamAsHtml {
   my $clink = ReadingsVal($name, "clientLink", "");
   
   explodeLinkData ($hash, $clink, 0);
-  
-  #my $link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
-  #$link = "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}','$ftui')}" if($ftui && $ftui eq "ftui");   # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
-  
+    
   my $linkfn = $hash->{LINKFN};
   my %pars   = ( linkparent => $hash->{LINKPARENT},
 			     linkname   => $hash->{LINKNAME},
@@ -583,7 +580,7 @@ sub streamAsHtml {
                );
   
   no strict "refs";                                      ## no critic 'NoStrict' 
-  my $html = &{$linkfn}(\%pars);
+  my $html = eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
   use strict "refs"; 
   
   my $ret = "<html>";

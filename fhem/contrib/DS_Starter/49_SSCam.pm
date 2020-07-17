@@ -2325,7 +2325,6 @@ sub FWdetailFn {
   
   my %pars = ( linkparent => $name,
                linkname   => $name,
-               linkmodel  => '',
                ftui       => 0
              );
              
@@ -7763,8 +7762,8 @@ sub ptzPanel {
   my $paref       = shift;
   my $name        = $paref->{linkparent}; 
   my $ptzcdev     = $paref->{linkname}; 
-  my $ptzcontrol  = $paref->{linkmodel}; 
   my $ftui        = $paref->{ftui};  
+  
   my $hash        = $defs{$name};
   my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
   my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
@@ -8027,9 +8026,7 @@ return;
 }
 
 ######################################################################################
-#      Funktion für SSCamSTRM-Devices - Kamera Liveview weblink device
-#      API: SYNO.SurveillanceStation.VideoStreaming
-#      Methode: GetLiveViewPath
+#      Funktion für SSCamSTRM-Devices
 #
 #      $camname = Name der Kamaera (Parent-Device)
 #      $strmdev = Name des Streaming-Devices
@@ -8336,7 +8333,6 @@ sub _streamDevMJPEG {
   if(AttrVal($camname,"ptzPanel_use",1)) {
       my %pars    = ( linkparent => $camname,
                       linkname   => $strmdev,
-                      linkmodel  => '',
                       ftui       => $ftui
                     );
       my $ptz_ret = ptzPanel(\%pars);
@@ -8506,7 +8502,6 @@ sub _streamDevGENERIC {
   if(AttrVal($camname,"ptzPanel_use",1)) {
       my %pars    = ( linkparent => $camname,
                       linkname   => $strmdev,
-                      linkmodel  => '',
                       ftui       => $ftui
                     );
       my $ptz_ret = ptzPanel(\%pars);
@@ -8597,7 +8592,6 @@ sub _streamDevHLS {
   if(AttrVal($camname,"ptzPanel_use",1)) {
       my %pars    = ( linkparent => $camname,
                       linkname   => $strmdev,
-                      linkmodel  => '',
                       ftui       => $ftui
                     );
       my $ptz_ret = ptzPanel(\%pars);
@@ -8738,7 +8732,6 @@ sub __switchedIMAGE {
   if(AttrVal($camname,"ptzPanel_use",1) && $hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {
       my %pars    = ( linkparent => $camname,
                       linkname   => $strmdev,
-                      linkmodel  => '',
                       ftui       => $ftui
                     );
       my $ptz_ret = ptzPanel(\%pars);
@@ -9012,7 +9005,6 @@ sub __switchedHLS {
   if(AttrVal($camname,"ptzPanel_use",1)) {
       my %pars    = ( linkparent => $camname,
                       linkname   => $strmdev,
-                      linkmodel  => '',
                       ftui       => $ftui
                     );
       my $ptz_ret = ptzPanel(\%pars);
@@ -9079,6 +9071,7 @@ sub composeGallery {
   my $name     = $paref->{linkparent}; 
   my $strmdev  = $paref->{linkname};  
   my $ftui     = $paref->{ftui};
+  
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};                                      
   my $sgc      = AttrVal($name,"snapGalleryColumns",3);                                       # Anzahl der Images in einer Tabellenzeile
