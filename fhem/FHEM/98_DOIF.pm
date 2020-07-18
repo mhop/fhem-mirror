@@ -2088,7 +2088,7 @@ sub DOIF_CheckCond($$) {
   my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($seconds);
   $month++;
   $year+=1900;
-  my $week=strftime ('%W', localtime($seconds));
+  my $week=strftime ('%V', localtime($seconds));
   my $hms = sprintf("%02d:%02d:%02d", $hour, $min, $sec);
   my $hm = sprintf("%02d:%02d", $hour, $min);
   my $ymd = sprintf("%02d-%02d-%02d", $year, $month,$mday);
