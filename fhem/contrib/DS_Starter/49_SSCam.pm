@@ -7477,12 +7477,12 @@ sub roomRefresh {
   my @spgs = devspec2array("TYPE=SSCamSTRM");
   my $room = "";
   
-  for(@spgs) {   
-      if($defs{$_}{PARENT} eq $name) {
-          next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
-          $fpr  = AttrVal($defs{$_}{NAME},"forcePageRefresh",0);
-          $room = AttrVal($defs{$_}{NAME},"room","");
-          Log3($name, 4, "$name - roomRefresh - pagerefresh: $defs{$_}{NAME}") if($fpr);
+  for my $sd (@spgs) {   
+      if($defs{$sd}{LINKPARENT} eq $name) {
+          next if(IsDisabled($defs{$sd}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sd}{FUUID});
+          $fpr  = AttrVal($defs{$sd}{NAME},"forcePageRefresh",0);
+          $room = AttrVal($defs{$sd}{NAME},"room","");
+          Log3($name, 4, "$name - roomRefresh - pagerefresh: $defs{$sd}{NAME}") if($fpr);
       }
   }
   
@@ -7491,8 +7491,7 @@ sub roomRefresh {
       if(!$fpr) {
           # nur Räume mit dem SSCamSTRM-Device reloaden
           my @rooms = split(",",$room);
-          for (@rooms) {
-              my $r = $_;
+          for my $r (@rooms) {
               { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
           }
       }
@@ -7511,19 +7510,19 @@ sub roomRefresh {
       readingsSingleUpdate($hash,"state", $st, 0);  
   }
   
-  # parentState des SSCamSTRM-Device updaten
+  # parentState des SSCamSTRM-Device updaten ($hash->{HELPER}{INFORM} des LINKPARENT Devices muss FUUID des Streaming Devices haben)
   if($lpoll_strm) {
       $st = ReadingsVal($name, "state", "initialized");  
-      for(@spgs) {   
-          if($defs{$_}{PARENT} eq $name) {
-              next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
+      for my $sp (@spgs) {   
+          if($defs{$sp}{LINKPARENT} eq $name) {
+              next if(IsDisabled($defs{$sp}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sp}{FUUID});
               
-              readingsBeginUpdate($defs{$_});
-              readingsBulkUpdate ($defs{$_},"parentState", $st);
-              readingsBulkUpdate ($defs{$_},"state", "updated");
-              readingsEndUpdate  ($defs{$_}, 1);
+              readingsBeginUpdate($defs{$sp});
+              readingsBulkUpdate ($defs{$sp},"parentState", $st);
+              readingsBulkUpdate ($defs{$sp},"state", "updated");
+              readingsEndUpdate  ($defs{$sp}, 1);
               
-              Log3($name, 4, "$name - roomRefresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
+              Log3($name, 4, "$name - roomRefresh - caller: $sp, FUUID: $hash->{HELPER}{INFORM}");
               delete $hash->{HELPER}{INFORM};
           }
       }

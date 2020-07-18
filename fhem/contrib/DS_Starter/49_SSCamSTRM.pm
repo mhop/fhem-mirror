@@ -314,7 +314,6 @@ sub Set {
       
       return qq{The command "$opt" needs a valid SSCamSTRM device as argument} if(!$valid);
       
-      
       # Übernahme der Readings
       my @r;
       delReadings($hash);
@@ -326,14 +325,16 @@ sub Set {
       
       # Übernahme Link-Parameter
       my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
-      # readingsSingleUpdate($hash,"clientLink", $link, 0); 
+      explodeLinkData ($hash, $link, 0);
       push @r, "clientLink:$link";
       
       if(@r) {
           setReadings($hash, \@r, 0);
       }
       
-      webRefresh($hash);
+      my $camname                     = $hash->{LINKPARENT};
+      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+      FHEM::SSCam::roomRefresh ("$camname,1,0,0");
       
   } elsif ($opt eq "reset") {
       delReadings($hash);
@@ -345,7 +346,9 @@ sub Set {
       
       setReadings($hash, \@r, 0);
       
-      webRefresh($hash);
+      my $camname                     = $hash->{LINKPARENT};
+      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+      FHEM::SSCam::roomRefresh ("$camname,1,0,0");
       
   } else {
       return "$setlist";
