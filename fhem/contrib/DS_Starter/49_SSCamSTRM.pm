@@ -326,17 +326,11 @@ sub Set {
       
       # Übernahme Link-Parameter
       my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
-      readingsSingleUpdate($hash,"clientLink", $link, 0); 
+      # readingsSingleUpdate($hash,"clientLink", $link, 0); 
+      push @r, "clientLink:$link";
       
       if(@r) {
-          readingsBeginUpdate($hash);
-          
-          for my $elem (@r) {
-              my ($rn,$rval) = split ":", $elem, 2;
-              readingsBulkUpdate($hash, $rn, $rval);      
-          }
-
-          readingsEndUpdate($hash, 0);
+          setReadings($hash, \@r, 0);
       }
       
       webRefresh($hash);
@@ -349,14 +343,7 @@ sub Set {
       push @r, "parentState:initialized";
       push @r, "state:initialized";
       
-      readingsBeginUpdate($hash);
-      
-      for my $elem (@r) {
-          my ($rn,$rval) = split ":", $elem, 2;
-          readingsBulkUpdate($hash, $rn, $rval);      
-      }
-
-      readingsEndUpdate($hash, 0);
+      setReadings($hash, \@r, 0);
       
       webRefresh($hash);
       
@@ -647,6 +634,31 @@ sub delReadings {
       # delete($hash->{READINGS}{$key}) if($key !~ /$bl/x);
       readingsDelete($hash, $key) if($key !~ /$bl/x);
   }
+
+return;
+}
+
+################################################################
+#                    set Readings
+#   $rref  = Referenz zum Array der zu setzenen Reading
+#            (Aufbau: <Reading>:<Wert>)
+#   $event = 1 wenn Event generiert werden soll
+################################################################
+sub setReadings {
+  my $hash  = shift;
+  my $rref  = shift;
+  my $event = shift;
+  
+  my $name  = $hash->{NAME};
+  
+  readingsBeginUpdate($hash);
+  
+  for my $elem (@$rref) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
+  readingsEndUpdate($hash, $event);
 
 return;
 }
