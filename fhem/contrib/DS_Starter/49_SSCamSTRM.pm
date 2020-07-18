@@ -715,7 +715,7 @@ sub sDevsWidget {
   }
   
   if($Adopts) {
-      $Adopts =~ s,^<td[^>]*>(.*)</td>$,$1,;
+      $Adopts =~ s,^<td[^>]*>(.*)</td>$,$1,x;
   } else {
       $Adopts = FW_pH "cmd.$name=set $name $cmdAdopt", $cmdAdopt, 0, "", 1, 1;
   }
