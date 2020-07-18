@@ -42,6 +42,7 @@ BEGIN {
       qw(
           AnalyzePerlCommand
           AttrVal
+          CommandSet
           data
           defs
           devspec2array
@@ -267,8 +268,7 @@ sub Set {
   } else {
       my $sd   = allStreamDevs();           
       $setlist = "Unknown argument $opt, choose one of ".
-                 "adoptFrom:$sd ".
-                 "reset:noArg "
+                 "adoptFrom:--reset--,$sd "
                  ;  
   }
   
@@ -303,10 +303,17 @@ sub Set {
   } elsif ($opt eq "adoptFrom") {
       shift @a; shift @a;
       $prop     = join "#", @a;
+      
+      if($prop eq "--reset--") {
+         CommandSet(undef, "$name reset"); 
+         return;
+      }
+      
       my $strmd = $sdevs{"$prop"};
       my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
       
       return qq{The command "$opt" needs a valid SSCamSTRM device as argument} if(!$valid);
+      
       
       # Übernahme der Readings
       my @r;
@@ -329,13 +336,29 @@ sub Set {
               readingsBulkUpdate($hash, $rn, $rval);      
           }
 
-          readingsEndUpdate($hash, 1);
+          readingsEndUpdate($hash, 0);
       }
+      
+      webRefresh($hash);
       
   } elsif ($opt eq "reset") {
       delReadings($hash);
-      # $hash->{LINK} = $hash->{DEF};
       explodeLinkData ($hash, $hash->{DEF}, 1);
+      
+      my @r;
+      push @r, "parentState:initialized";
+      push @r, "state:initialized";
+      
+      readingsBeginUpdate($hash);
+      
+      for my $elem (@r) {
+          my ($rn,$rval) = split ":", $elem, 2;
+          readingsBulkUpdate($hash, $rn, $rval);      
+      }
+
+      readingsEndUpdate($hash, 0);
+      
+      webRefresh($hash);
       
   } else {
       return "$setlist";
@@ -615,12 +638,14 @@ sub delReadings {
   my $bl   = "state|parentState";                                          # Blacklist
    
   if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
-      delete($hash->{READINGS}{$rd}) if($rd !~ /$bl/x);
+      # delete($hash->{READINGS}{$rd}) if($rd !~ /$bl/x);
+      readingsDelete($hash, $rd) if($rd !~ /$bl/x);
       return;
   } 
 
   for my $key (keys %{$hash->{READINGS}}) {
-      delete($hash->{READINGS}{$key}) if($key !~ /$bl/x);
+      # delete($hash->{READINGS}{$key}) if($key !~ /$bl/x);
+      readingsDelete($hash, $key) if($key !~ /$bl/x);
   }
 
 return;
@@ -664,7 +689,7 @@ sub sDevsWidget {
   my $Adopts;
   my $ret       = "";
   my $cmdAdopt  = "adoptFrom";
-  my $valAdopts = allStreamDevs();
+  my $valAdopts = "--reset--,".allStreamDevs();
   
   for my $fn (sort keys %{$data{webCmdFn}}) {
       next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");

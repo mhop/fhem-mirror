@@ -7463,18 +7463,20 @@ return ($hash,$success,$myjson);
 sub roomRefresh { 
   my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
   my ($name,$st);
-  if (ref $hash ne "HASH")
-  {
-    ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
-    $hash = $defs{$name};
+  
+  if (ref $hash ne "HASH") {
+      ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
+      $hash = $defs{$name};
   } else {
-    $name = $hash->{NAME};
+      $name = $hash->{NAME};
   }
+  
   my $fpr  = 0;
   
   # SSCamSTRM-Device mit hinterlegter FUUID ($hash->{HELPER}{INFORM}) selektieren
   my @spgs = devspec2array("TYPE=SSCamSTRM");
   my $room = "";
+  
   for(@spgs) {   
       if($defs{$_}{PARENT} eq $name) {
           next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
@@ -7494,6 +7496,7 @@ sub roomRefresh {
               { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
           }
       }
+  
   } elsif ($pload || $fpr) {
       # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
       # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
@@ -7509,18 +7512,20 @@ sub roomRefresh {
   }
   
   # parentState des SSCamSTRM-Device updaten
-  $st = ReadingsVal($name, "state", "initialized");  
-  for(@spgs) {   
-      if($defs{$_}{PARENT} eq $name) {
-          next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
-          
-          readingsBeginUpdate($defs{$_});
-          readingsBulkUpdate ($defs{$_},"parentState", $st);
-          readingsBulkUpdate ($defs{$_},"state", "updated");
-          readingsEndUpdate  ($defs{$_}, 1);
-          
-          Log3($name, 4, "$name - roomRefresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
-          delete $hash->{HELPER}{INFORM};
+  if($lpoll_strm) {
+      $st = ReadingsVal($name, "state", "initialized");  
+      for(@spgs) {   
+          if($defs{$_}{PARENT} eq $name) {
+              next if(IsDisabled($defs{$_}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$_}{FUUID});
+              
+              readingsBeginUpdate($defs{$_});
+              readingsBulkUpdate ($defs{$_},"parentState", $st);
+              readingsBulkUpdate ($defs{$_},"state", "updated");
+              readingsEndUpdate  ($defs{$_}, 1);
+              
+              Log3($name, 4, "$name - roomRefresh - caller: $_, FUUID: $hash->{HELPER}{INFORM}");
+              delete $hash->{HELPER}{INFORM};
+          }
       }
   }
         
@@ -9088,11 +9093,6 @@ sub composeGallery {
   $lupt =~ s/ / \/ /;
   my ($alias,$dlink,$hb) = ("","","");
   my ($cache,$imgdat,$imgTm);
-  
-  # Kontext des SSCamSTRM-Devices speichern für roomRefresh
-  #$hash->{HELPER}{STRMDEV}    = $strmdev;                                                     # Name des aufrufenden SSCamSTRM-Devices
-  #$hash->{HELPER}{STRMROOM}   = $FW_room?$FW_room:"";                                         # Raum aus dem das SSCamSTRM-Device die Funktion aufrief
-  #$hash->{HELPER}{STRMDETAIL} = $FW_detail?$FW_detail:"";                                     # Name des SSCamSTRM-Devices (wenn Detailansicht)
   
   if($strmdev) {
       my $streamHash = $defs{$strmdev};                                                       # Hash des SSCamSTRM-Devices
