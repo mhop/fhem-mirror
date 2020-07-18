@@ -1615,7 +1615,7 @@ attr DEVICE readingList
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
-setreading DEVICE attrTemplateVersion 20200718
+setreading DEVICE attrTemplateVersion 20200718_1
 
 
 name:tasmota_zigbee2tasmota_light_dimmer
@@ -1631,12 +1631,14 @@ attr DEVICE readingList
   TELETOPIC/SENSOR:.* { $EVENT =~ m,0xDEV_ID.:(.[^}]+.), ?  json2nameValue($1,'',$JSONMAP) : undef }
 attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
   off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}\
-  brightness:colorpicker,BRI,0,5,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Dimmer":$EVTPART1} }  
+  brightness:colorpicker,BRI,0,5,254 CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"Dimmer":$EVTPART1} }\
+  dimup:noArg CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"DimmerUp"} }\
+  dimdown:noArg CMNDTOPIC/ZbSend { "device":"0xDEV_ID", "send":{"DimmerDown"} }
 attr DEVICE setStateList on off
-attr DEVICE jsonMap Dimmer:brightness Power:state
+attr DEVICE jsonMap Dimmer:brightness Power:state Battery:batteryPercent
 set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model tasmota_zigbee2tasmota_light_dimmer
-setreading DEVICE attrTemplateVersion 20200718
+setreading DEVICE attrTemplateVersion 20200718_1
 
 
 
@@ -3603,8 +3605,8 @@ attr DEVICE setList\
   play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
   pause:noArg BASE_TOPIC/DEV_ID/control { "command": "pause" }\
   toggle:noArg BASE_TOPIC/DEV_ID/control { "command": "toggle" }\
-  volumeup:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
-  volumedown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
+  volumeUp:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
+  volumeDown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
   volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
   mute:on,off { my $value = $EVTPART1 eq "on" ? "mute" : "unmute"; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
   next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
@@ -3618,7 +3620,7 @@ attr DEVICE setList\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/control $payload)}
 attr DEVICE model sonos2mqtt_speaker
 attr DEVICE alias ALIAS
-setreading DEVICE attrTemplateVersion 20200717
+setreading DEVICE attrTemplateVersion 20200718
 
 
 ###########################################
