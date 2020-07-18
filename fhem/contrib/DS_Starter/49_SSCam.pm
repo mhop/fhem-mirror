@@ -7474,7 +7474,8 @@ sub roomRefresh {
   my $fpr  = 0;
   
   # SSCamSTRM-Device mit hinterlegter FUUID ($hash->{HELPER}{INFORM}) selektieren
-  my @spgs = devspec2array("TYPE=SSCamSTRM");
+  my @spgs = devspec2array("TYPE=SSCamSTRM");                                      # alle Streaming Devices !
+  my @mstd = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL=master");                  # alle Streaming MODEL=master Devices
   my $room = "";
   
   for my $sd (@spgs) {   
@@ -7513,7 +7514,7 @@ sub roomRefresh {
   # parentState des SSCamSTRM-Device updaten ($hash->{HELPER}{INFORM} des LINKPARENT Devices muss FUUID des Streaming Devices haben)
   if($lpoll_strm) {
       $st = ReadingsVal($name, "state", "initialized");  
-      for my $sp (@spgs) {   
+      for my $sp (@spgs) {                                           # $sp = ein Streaming Device aus allen Streaming Devices
           if($defs{$sp}{LINKPARENT} eq $name) {
               next if(IsDisabled($defs{$sp}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sp}{FUUID});
               
@@ -7521,6 +7522,15 @@ sub roomRefresh {
               readingsBulkUpdate ($defs{$sp},"parentState", $st);
               readingsBulkUpdate ($defs{$sp},"state", "updated");
               readingsEndUpdate  ($defs{$sp}, 1);
+              
+              for my $sm (@mstd) {                                   # Wenn Streaming Device von Streaming Master adoptiert wurde auch den Master updaten 
+                  next if($defs{$sm}{LINKNAME} ne $sp);
+                  
+                  readingsBeginUpdate($defs{$sm});
+                  readingsBulkUpdate ($defs{$sm},"parentState", $st);
+                  readingsBulkUpdate ($defs{$sm},"state", "updated");
+                  readingsEndUpdate  ($defs{$sm}, 1);
+              }
               
               Log3($name, 4, "$name - roomRefresh - caller: $sp, FUUID: $hash->{HELPER}{INFORM}");
               delete $hash->{HELPER}{INFORM};
