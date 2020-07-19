@@ -7477,24 +7477,22 @@ sub roomRefresh {
   my @spgs = devspec2array("TYPE=SSCamSTRM");                                      # alle Streaming Devices !
   my @mstd = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL=master");                  # alle Streaming MODEL=master Devices
   my $room = "";
-  
+ 
   for my $sd (@spgs) {   
       if($defs{$sd}{LINKPARENT} eq $name) {
           next if(IsDisabled($defs{$sd}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sd}{FUUID});
           $fpr  = AttrVal($defs{$sd}{NAME},"forcePageRefresh",0);
           $room = AttrVal($defs{$sd}{NAME},"room","");
-          Log3($name, 4, "$name - roomRefresh - pagerefresh: $defs{$sd}{NAME}") if($fpr);
+          Log3($name, 4, qq{$name - roomRefresh - pagerefresh forced by $defs{$sd}{NAME}}) if($fpr);
       }
   }
-  
+
   # Page-Reload
-  if($pload && $room) {
-      if(!$fpr) {
-          # nur Räume mit dem SSCamSTRM-Device reloaden
-          my @rooms = split(",",$room);
-          for my $r (@rooms) {
-              { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
-          }
+  if($pload && $room && !$fpr) {
+      # nur Räume mit dem SSCamSTRM-Device reloaden
+      my @rooms = split(",",$room);
+      for my $r (@rooms) {
+          { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
       }
   
   } elsif ($pload || $fpr) {
@@ -7530,6 +7528,8 @@ sub roomRefresh {
                   readingsBulkUpdate ($defs{$sm},"parentState", $st);
                   readingsBulkUpdate ($defs{$sm},"state", "updated");
                   readingsEndUpdate  ($defs{$sm}, 1);
+                  
+                  Log3($name, 4, "$name - roomRefresh - caller: $sp, Master: $sm updated");
               }
               
               Log3($name, 4, "$name - roomRefresh - caller: $sp, FUUID: $hash->{HELPER}{INFORM}");
@@ -7625,6 +7625,14 @@ sub IsCapPIR {                                                           # hat K
   my $cap = ReadingsVal($name, "CapPIR", "false") ne "false" ? 1 : 0;
   
 return $cap;
+}
+
+sub IsModelMaster {                                                     # ist des Streamdevices MODEL=master                                                          
+  my $model = shift;
+
+  my $mm = $model eq "master" ? 1 : 0;
+  
+return $mm;
 }
 
 ###############################################################################
@@ -8045,13 +8053,17 @@ return;
 #      $camname = Name der Kamaera (Parent-Device)
 #      $strmdev = Name des Streaming-Devices
 #      $fmt     = Streaming Format (Vergleich auf "eq" !)
+#      $omodel  = originäres MODEL des Streaming Devices (wg. master)
+#      $oname   = originäres NAME des Streaming Devices (wg. master)
 #
 ######################################################################################
 sub streamDev {                                               ## no critic 'complexity'
   my $paref   = shift;
   my $camname = $paref->{linkparent}; 
   my $strmdev = $paref->{linkname}; 
-  my $fmt     = $paref->{linkmodel}; 
+  my $fmt     = $paref->{linkmodel};
+  my $omodel  = $paref->{omodel};  
+  my $oname   = $paref->{oname}; 
   my $ftui    = $paref->{ftui};
   
   my $hash       = $defs{$camname};
@@ -8232,7 +8244,7 @@ sub streamDev {                                               ## no critic 'comp
   $ret .= '<tbody>';
   $ret .= '<tr class="odd">';  
    
-  my $ismm = FHEM::SSCamSTRM::IsModelMaster($streamHash);                     # prüfen ob Streaming Dev ist MODEL = master
+  my $ismm = IsModelMaster($omodel);                                          # prüfen ob Streaming Dev ist MODEL = master
   
   if(!$ismm && (!$StmKey || ReadingsVal($camname, "Availability", "") ne "enabled" || IsDisabled($camname))) {
       # Ausgabe bei Fehler

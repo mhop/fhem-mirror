@@ -266,9 +266,15 @@ sub Set {
                  "popupStream "
                  ;
   } else {
-      my $sd   = allStreamDevs();           
+      my $sd  = "--reset--,".allStreamDevs();    
+      my $rsd = $sd;
+      $rsd    =~ s/#/ /g;                                   ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+      
+      push my @ado, "adoptList:$rsd";
+      setReadings($hash, \@ado, 0);
+      
       $setlist = "Unknown argument $opt, choose one of ".
-                 "adoptFrom:--reset--,$sd "
+                 "adoptFrom:$sd "
                  ;  
   }
   
@@ -302,17 +308,17 @@ sub Set {
   
   } elsif ($opt eq "adoptFrom") {
       shift @a; shift @a;
-      $prop     = join "#", @a;
+      $prop = join "#", @a;
       
       if($prop eq "--reset--") {
          CommandSet(undef, "$name reset"); 
          return;
       }
       
-      my $strmd = $sdevs{"$prop"};
+      my $strmd = $sdevs{"$prop"} // "";
       my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
       
-      return qq{The command "$opt" needs a valid SSCamSTRM device as argument} if(!$valid);
+      return qq{The command "$opt" needs a valid SSCamSTRM device as argument instead of "$strmd"} if(!$valid);
       
       # Übernahme der Readings
       my @r;
@@ -329,12 +335,13 @@ sub Set {
       push @r, "clientLink:$link";
       
       if(@r) {
-          setReadings($hash, \@r, 0);
+          setReadings($hash, \@r, 1);
       }
       
       my $camname                     = $hash->{LINKPARENT};
       $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
-      FHEM::SSCam::roomRefresh ("$camname,1,0,0");
+      
+      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
       
   } elsif ($opt eq "reset") {
       delReadings($hash);
@@ -344,11 +351,12 @@ sub Set {
       push @r, "parentState:initialized";
       push @r, "state:initialized";
       
-      setReadings($hash, \@r, 0);
+      setReadings($hash, \@r, 1);
       
       my $camname                     = $hash->{LINKPARENT};
       $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
-      FHEM::SSCam::roomRefresh ("$camname,1,0,0");
+      
+      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
       
   } else {
       return "$setlist";
@@ -431,6 +439,8 @@ sub FwFn {
   my %pars   = ( linkparent => $hash->{LINKPARENT},
 			     linkname   => $hash->{LINKNAME},
                  linkmodel  => $hash->{LINKMODEL},
+                 omodel     => $hash->{MODEL},
+                 oname      => $hash->{NAME},
 				 ftui       => $ftui
                );
   
@@ -590,6 +600,8 @@ sub streamAsHtml {
   my %pars   = ( linkparent => $hash->{LINKPARENT},
 			     linkname   => $hash->{LINKNAME},
                  linkmodel  => $hash->{LINKMODEL},
+                 omodel     => $hash->{MODEL},
+                 oname      => $hash->{NAME},
 				 ftui       => $ftui
                );
   
@@ -679,16 +691,21 @@ sub allStreamDevs {
   undef %sdevs;
   
   my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL!=master");            # Liste Streaming devices außer MODEL = master
-  for my $d (@strmdevs) {
-      next if(!$defs{$d});
-      my $alias      = AttrVal($d, "alias", $d); 
+  for my $da (@strmdevs) {
+      next if(!$defs{$da});
+      my $alias      = AttrVal($da, "alias", $da); 
       $alias         =~ s/\s+/#/gx;
-      $sdevs{$alias} = "$d";        
+      $sdevs{$alias} = "$da";        
   }
   
   for my $a (sort keys %sdevs) {
       $sd .= "," if($sd);
       $sd .= $a;
+  }
+  
+  for my $d (@strmdevs) {                                                        # Devicenamen zusätzlich als Schlüssel speichern damit set <> adoptFrom ohne Widget funktioniert
+      next if(!$defs{$d});
+      $sdevs{$d} = "$d";        
   }
 
 return $sd;
@@ -726,7 +743,7 @@ sub sDevsWidget {
   
   if($valAdopts) {
       $ret .= "<tr>";
-      $ret .= "<td>Adopt: </td><td>$Adopts</td>";  
+      $ret .= "<td>Streaming Device: </td><td>$Adopts</td>";  
       $ret .= "</tr>"; 
   }
 
