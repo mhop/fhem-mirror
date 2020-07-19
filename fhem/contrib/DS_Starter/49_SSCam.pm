@@ -11520,7 +11520,7 @@ return;
    <b>Integration into FHEM TabletUI: </b> <br><br>
    There is a widget provided for integration of SSCam-Streaming devices (Type SSCamSTRM) into FTUI. For further information please be informed by the
    (german) FHEM Wiki article: <br>
-   <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
+   <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_SSCam_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
    <br><br><br>
   
   <b>Prerequisites </b> <br><br>
@@ -13445,7 +13445,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     <b>Integration in FHEM TabletUI: </b> <br><br>
     Zur Integration von SSCam Streaming Devices (Typ SSCamSTRM) wird ein Widget bereitgestellt. 
     Für weitere Information dazu bitte den Artikel im Wiki durchlesen: <br>
-    <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
+    <a href="https://wiki.fhem.de/wiki/FTUI_Widget_f%C3%BCr_SSCam_Streaming_Devices_(SSCamSTRM)">FTUI Widget für SSCam Streaming Devices (SSCamSTRM)</a>.
     <br><br><br>
     
     
