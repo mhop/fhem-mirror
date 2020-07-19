@@ -8329,6 +8329,8 @@ sub _streamDevMJPEG {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
       
+      return $ret if(!$link);
+      
       if($apiaudiostmmaxver) {                                   
           $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
@@ -11773,6 +11775,7 @@ return;
       <tr><td>lastsnap  </td><td>- the streaming device playback the newest snapshot </td></tr>
       <tr><td>mjpeg     </td><td>- the streaming device playback a permanent MJPEG video stream (Streamkey method) </td></tr>
       <tr><td>switched  </td><td>- playback of different streaming types. Buttons for mode control are provided. </td></tr>
+     <tr><td>master     </td><td>- with the master device another defined streaming device can be adopted and its content displayed </td></tr>
     </table>
     </ul>
     <br><br>  
@@ -11829,9 +11832,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   As default the snapshot is retrieved in a reduced resolution. In order to use the original resolution, the attribute 
   <b>"snapGallerySize = Full"</b> has to be set in the associated camera device (compare Internal PARENT).  
   There also the attribute "pollcaminfoall" should be set to retrieve the newest snapshot regularly.  
+  <br><br>  
+  
+  <b>Streaming Device "master"</b> <br><br>
+  
+  This type cannot play back streams itself. Switching the playback of the content of another defined 
+  Streaming Devices is done by the Set command <b>adopt</b> in the Master Streaming Device.
   <br>
-  </ul>
-  <br><br>   
+  <br><br>
+  </ul> 
   
   <ul>
   <li><b> createPTZcontrol </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for PTZ-CAM)</li> <br>
@@ -11841,6 +11850,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   With the "ptzPanel_.*"-<a href="#SSCamattr">attributes</a> or respectively the specific attributes of the SSCamSTRM-device
   the properties of the control panel can be affected. <br> 
   <br><br>
+  <br>
   </ul>
   
   <ul>
@@ -13698,6 +13708,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
       <tr><td>lastsnap  </td><td>- das Streaming-Device zeigt den neuesten Schnappschuß an </td></tr>
       <tr><td>mjpeg     </td><td>- das Streaming-Device gibt einen permanenten MJPEG Kamerastream wieder (Streamkey Methode) </td></tr>
       <tr><td>switched  </td><td>- Wiedergabe unterschiedlicher Streamtypen. Drucktasten zur Steuerung werden angeboten. </td></tr>
+      <tr><td>master    </td><td>- mit dem Master Device kann ein anderes definiertes Streaming Device adoptiert und dessen Content angezeigt werden </td></tr>
     </table>
     </ul>
     <br>
@@ -13753,6 +13764,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Auflösung abgerufen. Um die Originalauflösung zu verwenden, ist im zugehörigen Kameradevice (Internal PARENT) das Attribut 
   <b>"snapGallerySize = Full"</b> zu setzen.  
   Dort sollte ebenfalls das Attribut "pollcaminfoall" gesetzt sein, um regelmäßig die neuesten Schnappschußdaten abzurufen.
+  <br><br>
+  
+  <b>Streaming Device "master"</b> <br><br>
+  
+  Dieser Typ kann selbst keine Streams wiedergeben. Die Umschaltung der Wiedergabe des Contents eines anderen definierten 
+  Streaming Devices erfolgt durch den Set-Befehl <b>adopt</b> im Master Streaming Device.
   <br>
   <br><br>
   </ul>

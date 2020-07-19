@@ -768,7 +768,8 @@ return $ret;
   <ul>
   The module SSCamSTRM is a special device module synchronized to the SSCam module. It is used for definition of
   Streaming-Devices. <br>
-  Dependend of the Streaming-Device state, different buttons are provided to start actions:
+  Dependend of the Streaming-Device state, different buttons are provided to start actions: <br><br>
+  
     <ul>   
       <table>  
       <colgroup> <col width=25%> <col width=75%> </colgroup>
@@ -801,7 +802,12 @@ return $ret;
   <br><br>
   
   <ul>
-    A SSCam Streaming-device is defined by the SSCam "set &lt;name&gt; createStreamDev" command.
+    A SSCam Streaming-device is defined by the SSCam command: <br><br>
+    
+    <ul>
+      set &lt;name&gt; createStreamDev  &lt;Device Typ&gt; <br><br>
+    </ul>
+    
     Please refer to SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> command.  
     <br><br>
   </ul>
@@ -811,13 +817,21 @@ return $ret;
   <ul>
   
   <ul>
-  <li><b>popupStream</b>  <br>
+  <li><b>popupStream</b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL != master)<br>
   
   The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
   size of display can be adjusted. The attribute "popupStreamTo" determines the type of the popup window.
   If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
   time automatically (default 5 seconds). <br>
   Optionally you can append "OK" or &lt;seconds&gt; directly to override the adjustment by attribute "popupStreamTo".
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <li><b>adopt &lt;Streaming device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
+  
+  A Streaming Device of type <b>master</b> adopts the content of another defined Streaming Device.
   </li>
   </ul>
   <br>
@@ -1009,7 +1023,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 <ul>
   <br>
   Das Modul SSCamSTRM ist ein mit SSCam abgestimmtes Gerätemodul zur Definition von Streaming-Devices. <br>
-  Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unterschiedliche Drucktasten angeboten:
+  Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unterschiedliche Drucktasten angeboten: <br><br>
     <ul>   
       <table>  
       <colgroup> <col width=25%> <col width=75%> </colgroup>
@@ -1042,8 +1056,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-    Ein SSCam Streaming-Device wird durch den SSCam Befehl "set &lt;name&gt; createStreamDev" erstellt.
-    Siehe auch die Beschreibung zum SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> Befehl.  
+    Ein SSCam Streaming-Device wird durch den SSCam Befehl <br><br>
+    
+    <ul>
+      set &lt;name&gt; createStreamDev  &lt;Device Typ&gt; <br><br>
+    </ul>
+    
+    erstellt. Siehe auch die Beschreibung zum SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> Befehl.  
     <br><br>
   </ul>
 
@@ -1052,7 +1071,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   
   <ul>
-  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>  <br>
+  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL != master)<br>
   
   Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
   Darstellungsgröße eingestellt werden. Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest.
@@ -1060,6 +1079,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Zeit automatisch (default 5 Sekunden). <br>
   Durch die optionalen Angabe von "OK" oder &lt;Sekunden&gt; kann die Einstellung des Attributes "popupStreamTo" übersteuert 
   werden.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <li><b>adopt &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  
+  Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices.
   </li>
   </ul>
   <br>
