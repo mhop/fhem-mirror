@@ -331,8 +331,11 @@ sub Set {
       
       # Übernahme Link-Parameter
       my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
+      
       explodeLinkData ($hash, $link, 0);
+      
       push @r, "clientLink:$link";
+      push @r, "parentCam:$hash->{LINKPARENT}";
       
       if(@r) {
           setReadings($hash, \@r, 1);
