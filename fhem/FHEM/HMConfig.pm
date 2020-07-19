@@ -35,11 +35,17 @@ use vars qw(%culHmFunctSets);
 use vars qw(%culHmBits);
 use vars qw(@culHmCmdFlags);
 use vars qw(%culHmTpl);
+use vars qw(%culHmUpdate);
 use vars qw($K_actDetID);
 
 
 # ----------------modul globals-----------------------
 my $K_actDetID = '000000'; # id of actionDetector
+
+# potential updates for readings to guarantee best update performance
+%culHmUpdate=(version => 1
+             ,regValUpdt => {toggelDim =>"toggleDim"}
+             );
 
 #my %culHmDevProps=(
 #  "01" => { st => "AlarmControl",
@@ -385,7 +391,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   OffDly          =>{a=>  8.0,s=>1.0,l=>3,min=>"0.0"  ,max=>111600,c=>'fltCvT'   ,p=>'y',f=>''      ,u=>'s'   ,d=>0,t=>"off delay"},
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>"0.0"  ,max=>111600,c=>'fltCvT'   ,p=>'y',f=>''      ,u=>'s'   ,d=>0,t=>"off time"                             ,lit=>{unused=>111600}},
                                                                                  
-  ActionTypeDim   =>{a=> 10.0,s=>0.4,l=>3,min=>0      ,max=>8     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
+  ActionTypeDim   =>{a=> 10.0,s=>0.4,l=>3,min=>0      ,max=>8     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>1,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggleDim=>6,toggleDimToCnt=>7,toggleDimToCntInv=>8}},
   OffDlyBlink     =>{a=> 14.5,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>"blink when in off delay"              ,lit=>{off=>0,on=>1}},
   OnLvlPrio       =>{a=> 14.6,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{high=>0,low=>1}},
   OnDlyMode       =>{a=> 14.7,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{setToOff=>0,NoChange=>1}},
@@ -410,7 +416,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   OffDlyOldTime   =>{a=> 26.0,s=>1.0,l=>3,min=>0.1    ,max=>25.6  ,c=>''         ,p=>'y',f=>10      ,u=>'s'   ,d=>0,t=>"off delay blink time for high"},
   DimElsOffTimeMd =>{a=> 38.6,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{absolut=>0,minimal=>1}},
   DimElsOnTimeMd  =>{a=> 38.7,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{absolut=>0,minimal=>1}},
-  DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0      ,max=>8     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
+  DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0      ,max=>8     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggleDim=>6,toggleDimToCnt=>7,toggleDimToCntInv=>8}},
 #output Unit                                                                     
   ActTypeMp3      =>{a=> 36  ,s=>1  ,l=>3,min=>0      ,max=>255   ,c=>''         ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>"Tone or MP3 to be played"},
   ActTypeLed      =>{a=> 36  ,s=>1  ,l=>3,min=>0      ,max=>255   ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>"LED color"                            ,lit=>{no=>0x00,redS=>0x11,redL=>0x12,greenS=>0x21,greenL=>0x22,orangeS=>0x31,orangeL=>0x32}},
@@ -1853,6 +1859,7 @@ $culHmModelSets{"HM-ES-TX-WM"}           = $culHmModelSets{"HM-PB-4DIS-WM-2"};
 $culHmModelSets{"HM-OU-CM-PCB"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-SEN-WA-OD"}          = $culHmModelSets{"HM-SEC-SD"};
 $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### reference subtype sets
+
 
 %culHmChanSets = (
                       "HM-CC-TC00"           =>{ "desired-temp" =>"[on|off|6.0..30.0]"
