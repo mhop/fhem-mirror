@@ -8265,7 +8265,7 @@ sub streamDev {                                               ## no critic 'comp
       $ret .= &{$sdfn{$fmt}{fn}} (\%params); 
   } else {
       $cause = qq{Streaming of format "$fmt" is not supported};
-      $cause = qq{Select a Streaming client with the "adoptFrom" command.} if($ismm);
+      $cause = qq{Select a Streaming client with the "adopt" command.} if($ismm);
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";      
   }      
   use strict "refs";
