@@ -452,8 +452,11 @@ sub FwFn {
   
   if(IsModelMaster($hash) && $clink) {
       my $alias = AttrVal($name, "alias", $name);                                                         # Linktext als Aliasname oder Devicename setzen
-      my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> is Streaming master of device ";
-      $dlink    = "$alias is Streaming master of device "   if(AttrVal($name, "noLink", 0));              # keine Links im Stream-Dev generieren
+      my $lang  = AttrVal("global", "language", "EN");
+      my $txt   = "is Streaming master of";
+      $txt      = "ist Streaming Master von " if($lang eq "DE");
+      my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> $txt ";
+      $dlink    = "$alias $txt " if(AttrVal($name, "noLink", 0));                                         # keine Links im Stream-Dev generieren
       $ret     .= "<span align=\"center\">$dlink </span>"   if(!AttrVal($name,"hideDisplayName",0));
   }
   
