@@ -6714,9 +6714,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 sub CUL_HM_Ping($) {
   my($defN) = @_;
   return 0 if (($defs{$defN}{helper}{rxType} & 0xe3) == 0);     # no ping for config devices
-  return 1 if (1 == CUL_HM_Set($defs{$defN},$defN,"sysTime"));
+  my (undef, $nres) = CUL_HM_Set($defs{$defN},$defN,"sysTime"); # noansi: fix warnings
+  return 1 if (defined($nres) && 1 == $nres); 
   foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
-    return 1 if(1== CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"));
+    (undef, $nres) = CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"); # noansi: fix warnings
+    return 1 if (defined($nres) && 1 == $nres); 
   }
   return 0;
 }
@@ -8505,7 +8507,8 @@ sub CUL_HMTmplSetParam($){
 
 sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert 
   my $tHash = shift;
-  
+
+  delete $tHash->{helper}{expert};
   foreach my $expSet (split(",",CUL_HM_getAttr($tHash->{NAME},"expert","defReg"))){
     $tHash->{helper}{expert}{def} = ($expSet eq "defReg") ? 1 : 0;#default register on
     $tHash->{helper}{expert}{det} = ($expSet eq "allReg") ? 1 : 0;#detail register on
