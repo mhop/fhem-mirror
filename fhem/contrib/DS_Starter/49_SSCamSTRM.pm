@@ -202,8 +202,12 @@ sub Define {
   # Versionsinformationen setzen
   setVersionInfo($hash);
   
-  readingsSingleUpdate($hash,"state",       "initialized", 1);                     # Init für "state" 
-  readingsSingleUpdate($hash,"parentState", "initialized", 1);                     # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
+  my @r;
+  push @r, "parentState:initialized";                                              # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
+  push @r, "state:initialized";                                                    # Init für "state" 
+  push @r, "parentCam:initialized";                                                # Init für Elternkamera
+  
+  setReadings($hash, \@r, 1);
   
 return;
 }
@@ -353,6 +357,7 @@ sub Set {
       my @r;
       push @r, "parentState:initialized";
       push @r, "state:initialized";
+      push @r, "parentCam:initialized";
       
       setReadings($hash, \@r, 1);
       
