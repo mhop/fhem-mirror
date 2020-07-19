@@ -274,7 +274,7 @@ sub Set {
       setReadings($hash, \@ado, 0);
       
       $setlist = "Unknown argument $opt, choose one of ".
-                 "adoptFrom:$sd "
+                 "adopt:$sd "
                  ;  
   }
   
@@ -306,7 +306,7 @@ sub Set {
           } 
       }
   
-  } elsif ($opt eq "adoptFrom") {
+  } elsif ($opt eq "adopt") {
       shift @a; shift @a;
       $prop = join "#", @a;
       
@@ -706,7 +706,7 @@ sub allStreamDevs {
       $sd .= $a;
   }
   
-  for my $d (@strmdevs) {                                                        # Devicenamen zusätzlich als Schlüssel speichern damit set <> adoptFrom ohne Widget funktioniert
+  for my $d (@strmdevs) {                                                        # Devicenamen zusätzlich als Schlüssel speichern damit set <> adopt ohne Widget funktioniert
       next if(!$defs{$d});
       $sdevs{$d} = "$d";        
   }
@@ -723,7 +723,7 @@ sub sDevsWidget {
   
   my $Adopts;
   my $ret       = "";
-  my $cmdAdopt  = "adoptFrom";
+  my $cmdAdopt  = "adopt";
   my $valAdopts = "--reset--,".allStreamDevs();
   
   for my $fn (sort keys %{$data{webCmdFn}}) {
