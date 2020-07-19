@@ -208,8 +208,6 @@ sub HMinfo_Attr(@) {###########################################################
     }
   }
   elsif($attrName eq "autoLoadArchive"){
-    if ($cmd eq "set"){
-    }
   }
   return;
 }
@@ -230,8 +228,7 @@ sub HMinfo_Notify(@){##########################################################
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
   if (grep /INITIALIZED/,@{$events}){
-    HMinfo_SetFn($hash,$name,"loadConfig") if ( substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0);
-    
+    HMinfo_SetFn($hash,$name,"loadConfig") if ( substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0);    
   }
   return undef;
 }
@@ -2059,6 +2056,9 @@ sub HMinfo_loadConfig($@) {####################################################
         @tmplList = ();
       }
       else {
+        foreach my $read (keys %{$HMConfig::culHmUpdate{regValUpdt}}){# update wrong reg namings and options
+          ($line) = map{(my $foo = $_) =~ s/$read/$HMConfig::culHmUpdate{regValUpdt}{$read}/g; $foo;}($line);
+        }
         push @tmplList,$line;
       }
     }
