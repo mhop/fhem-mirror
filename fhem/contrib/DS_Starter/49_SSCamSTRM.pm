@@ -132,6 +132,7 @@ my %fupgrade = (                                                           # Fun
 );
 
 my %hvattr = (                                                             # Hash zur Validierung von Attributen
+    adoptSubset         => { master => 1, nomaster => 0 },
     autoRefresh         => { master => 1, nomaster => 1 },
     autoRefreshFW       => { master => 1, nomaster => 1 },
     disable             => { master => 1, nomaster => 1 },
@@ -160,11 +161,13 @@ sub Initialize {
   my $hash = shift;
 
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  my $sd  = "--reset--,".allStreamDevs();    
   
   $hash->{DefFn}              = \&Define;
   $hash->{SetFn}              = \&Set;
   $hash->{GetFn}              = \&Get;
-  $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
+  $hash->{AttrList}           = "adoptSubset:sortable-strict,$sd ".
+                                "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
                                 "forcePageRefresh:1,0 ".
@@ -218,6 +221,7 @@ sub Define {
   setVersionInfo($hash);
   
   my @r;
+  push @r, "adoptSubset:--reset--";                                                # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
   push @r, "parentState:initialized";                                              # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   push @r, "state:initialized";                                                    # Init für "state" 
   push @r, "parentCam:initialized";                                                # Init für Elternkamera
@@ -285,10 +289,12 @@ sub Set {
                  "popupStream "
                  ;
   } else {
-      my $sd  = "--reset--,".allStreamDevs();    
-      my $rsd = $sd;
-      $rsd    =~ s/#/ /g;                                   ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+      my $as  = "--reset--,".allStreamDevs();
+      my $sd  = AttrVal($name, "adoptSubset", $as);
+      $sd     =~ s/\s+/#/gx;      
       
+      my $rsd = $as;
+      $rsd    =~ s/#/ /g;                                   ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
       push my @ado, "adoptList:$rsd";
       setReadings($hash, \@ado, 0);
       
@@ -429,6 +435,10 @@ sub Attr {
         return qq{The attribute "$aName" is only valid if MODEL is "master" !};
     }
     
+    if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
+        return qq{This attribute is only valid if MODEL is "generic" !};
+    }
+    
     if($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
@@ -439,8 +449,12 @@ sub Attr {
         readingsSingleUpdate($hash, "state", $val, 1);
     }
     
-    if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
-        return "This attribute is only usable for devices of MODEL \"generic\" ";
+    if($aName eq "adoptSubset") {
+        if($cmd eq "set") {
+            readingsSingleUpdate($hash, "adoptSubset", $aVal, 1);
+        } else {
+            readingsSingleUpdate($hash, "adoptSubset", "--reset--", 1);
+        }
     }
     
     if ($cmd eq "set") {
@@ -674,7 +688,7 @@ sub delReadings {
   my $rd   = shift;
   my $name = $hash->{NAME};
   
-  my $bl   = "state|parentState";                                          # Blacklist
+  my $bl   = "state|parentState|adoptSubset";                              # Blacklist
    
   if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
       # delete($hash->{READINGS}{$rd}) if($rd !~ /$bl/x);
@@ -756,9 +770,11 @@ sub sDevsWidget {
   my $name = shift;
   
   my $Adopts;
-  my $ret       = "";
-  my $cmdAdopt  = "adopt";
-  my $valAdopts = "--reset--,".allStreamDevs();
+  my $ret        = "";
+  my $cmdAdopt   = "adopt";
+  my $as         = "--reset--,".allStreamDevs();
+  my $valAdopts  = AttrVal($name, "adoptSubset", $as);
+  $valAdopts     =~ s/\s+/#/gx;
   
   for my $fn (sort keys %{$data{webCmdFn}}) {
       next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
@@ -778,11 +794,9 @@ sub sDevsWidget {
   $ret .= "<style>.defsize { font-size:16px; } </style>";
   $ret .= '<table class="rc_body defsize">';
   
-  if($valAdopts) {
-      $ret .= "<tr>";
-      $ret .= "<td>Streaming Device: </td><td>$Adopts</td>";  
-      $ret .= "</tr>"; 
-  }
+  $ret .= "<tr>";
+  $ret .= "<td>Streaming Device: </td><td>$Adopts</td>";  
+  $ret .= "</tr>"; 
 
   $ret .= "</table>"; 
 
@@ -892,6 +906,14 @@ return $ret;
   
   <ul>
   <ul>
+  
+    <a name="adoptSubset"></a>
+    <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(only valid for MODEL "master") <br>
+      In a streaming <b>master</b> device a subset of the selectable streaming devices is selected and made available for 
+      the <b>adopt</b> command. <br>
+      For control in the FTUI, the selection is also stored in the Reading of the same name.
+    </li>
+    <br>
 
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
@@ -1148,6 +1170,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <ul>
+  
+    <a name="adoptSubset"></a>
+    <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(nur für MODEL "master") <br>
+      In einem Streaming <b>master</b> Device wird eine Teilmenge der selektierbaren Streaming Devices ausgewählt und für 
+      das  <b>adopt</b> Kommando bereitgestellt. <br>
+      Für die Steuerung im FTUI wird die Auswahl ebenfalls im gleichnamigen Reading gespeichert.
+    </li>
+    <br>
   
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
