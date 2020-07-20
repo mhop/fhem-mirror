@@ -221,7 +221,7 @@ sub Define {
   setVersionInfo($hash);
   
   my @r;
-  push @r, "adoptSubset:--reset--";                                                # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
+  push @r, "adoptSubset:--reset--" if(IsModelMaster($hash));                       # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
   push @r, "parentState:initialized";                                              # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   push @r, "state:initialized";                                                    # Init für "state" 
   push @r, "parentCam:initialized";                                                # Init für Elternkamera
@@ -693,13 +693,11 @@ sub delReadings {
   my $bl   = "state|parentState|adoptSubset";                              # Blacklist
    
   if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
-      # delete($hash->{READINGS}{$rd}) if($rd !~ /$bl/x);
       readingsDelete($hash, $rd) if($rd !~ /$bl/x);
       return;
   } 
 
   for my $key (keys %{$hash->{READINGS}}) {
-      # delete($hash->{READINGS}{$key}) if($key !~ /$bl/x);
       readingsDelete($hash, $key) if($key !~ /$bl/x);
   }
 
