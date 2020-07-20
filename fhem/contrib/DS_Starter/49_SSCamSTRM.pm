@@ -427,12 +427,14 @@ sub Attr {
     
     my ($do,$val);
     
-    if ($model eq "master" && !$hvattr{$aName}{master}) {            
-        return qq{The attribute "$aName" is only valid if MODEL is not "$model" !};
-    }
-    
-    if ($model ne "master" && !$hvattr{$aName}{nomaster}) {            
-        return qq{The attribute "$aName" is only valid if MODEL is "master" !};
+    if(defined $hvattr{$aName}) {
+        if ($model eq "master" && !$hvattr{$aName}{master}) {            
+            return qq{The attribute "$aName" is only valid if MODEL is not "$model" !};
+        }
+        
+        if ($model ne "master" && !$hvattr{$aName}{nomaster}) {            
+            return qq{The attribute "$aName" is only valid if MODEL is "master" !};
+        }
     }
     
     if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
@@ -909,8 +911,8 @@ return $ret;
   
     <a name="adoptSubset"></a>
     <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(only valid for MODEL "master") <br>
-      In a streaming <b>master</b> device a subset of the selectable streaming devices is selected and made available for 
-      the <b>adopt</b> command. <br>
+      In a Streaming <b>master</b> Device a subset of all defined Streaming Devices is selected and used for 
+      the <b>adopt</b> command is provided. <br>
       For control in the FTUI, the selection is also stored in the Reading of the same name.
     </li>
     <br>
@@ -1173,7 +1175,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
     <a name="adoptSubset"></a>
     <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(nur für MODEL "master") <br>
-      In einem Streaming <b>master</b> Device wird eine Teilmenge der selektierbaren Streaming Devices ausgewählt und für 
+      In einem Streaming <b>master</b> Device wird eine Teilmenge aller definierten Streaming Devices ausgewählt und für 
       das  <b>adopt</b> Kommando bereitgestellt. <br>
       Für die Steuerung im FTUI wird die Auswahl ebenfalls im gleichnamigen Reading gespeichert.
     </li>
