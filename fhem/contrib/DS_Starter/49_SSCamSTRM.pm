@@ -215,7 +215,6 @@ sub Define {
   explodeLinkData ($hash, $link, 1);
   
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
-  # $hash->{LINK}                    = $link;
   
   # Versionsinformationen setzen
   setVersionInfo($hash);
@@ -224,7 +223,6 @@ sub Define {
   push @r, "adoptSubset:--reset--" if(IsModelMaster($hash));                       # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
   push @r, "parentState:initialized";                                              # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
   push @r, "state:initialized";                                                    # Init für "state" 
-  push @r, "parentCam:initialized";                                                # Init für Elternkamera
   
   setReadings($hash, \@r, 1);
   

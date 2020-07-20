@@ -42,6 +42,8 @@ BEGIN {
       qw(
           AnalyzePerlCommand
           AttrVal
+          CommandSet
+          data
           defs
           devspec2array
           FmtDateTime
@@ -61,7 +63,9 @@ BEGIN {
           sortTopicNum
           FW_cmd
           FW_directNotify                                                              
-          FW_wname    
+          FW_wname   
+          FW_pH    
+          FW_widgetFallbackFn          
           FHEM::SSCam::ptzPanel 
           FHEM::SSCam::streamDev
           FHEM::SSCam::composeGallery
@@ -84,9 +88,9 @@ BEGIN {
   
 }
 
-
 # Versions History intern
 my %vNotesIntern = (
+  "2.13.0" => "14.07.2020  integrate streamDev master ",
   "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
   "2.11.0" => "24.06.2020  switch to packages, changes according to PBP ",
   "2.10.2" => "08.11.2019  undef \$link in FwFn / streamAsHtml to save memory ",
@@ -127,10 +131,28 @@ my %fupgrade = (                                                           # Fun
     3 => { of => "SSCam_StreamDev",      nf => "FHEM::SSCam::streamDev"      },      
 );
 
-my %SSCAM_imc = (                                                           # disbled String modellabhängig (SVS / CAM)
-    0 => { 0 => "initialized", 1 => "inactive" },
-    1 => { 0 => "off",         1 => "inactive" },              
+my %hvattr = (                                                             # Hash zur Validierung von Attributen
+    adoptSubset         => { master => 1, nomaster => 0 },
+    autoRefresh         => { master => 1, nomaster => 1 },
+    autoRefreshFW       => { master => 1, nomaster => 1 },
+    disable             => { master => 1, nomaster => 1 },
+    forcePageRefresh    => { master => 1, nomaster => 1 },
+    genericStrmHtmlTag  => { master => 0, nomaster => 1 },
+    htmlattr            => { master => 0, nomaster => 1 },
+    htmlattrFTUI        => { master => 0, nomaster => 1 },
+    hideAudio           => { master => 0, nomaster => 1 },
+    hideButtons         => { master => 0, nomaster => 1 },
+    hideDisplayName     => { master => 1, nomaster => 1 }, 
+    hideDisplayNameFTUI => { master => 1, nomaster => 1 },
+    noLink              => { master => 1, nomaster => 1 },
+    popupWindowSize     => { master => 0, nomaster => 1 },
+    popupStreamFW       => { master => 0, nomaster => 1 },
+    popupStreamTo       => { master => 0, nomaster => 1 },
+    ptzButtonSize       => { master => 0, nomaster => 1 }, 
+    ptzButtonSizeFTUI   => { master => 0, nomaster => 1 },     
 );
+
+my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
 
 my $todef = 5;                                                              # Default Popup Zeit für set <> popupStream
 
@@ -139,11 +161,13 @@ sub Initialize {
   my $hash = shift;
 
   my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  my $sd  = "--reset--,".allStreamDevs();    
   
   $hash->{DefFn}              = \&Define;
   $hash->{SetFn}              = \&Set;
   $hash->{GetFn}              = \&Get;
-  $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
+  $hash->{AttrList}           = "adoptSubset:sortable-strict,$sd ".
+                                "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
                                 "forcePageRefresh:1,0 ".
@@ -188,16 +212,19 @@ sub Define {
 
   $link = migrateFunc($hash,$link);
   
-  explodeDEF ($hash,$link);
+  explodeLinkData ($hash, $link, 1);
   
   $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
-  $hash->{LINK}                    = $link;
   
   # Versionsinformationen setzen
   setVersionInfo($hash);
   
-  readingsSingleUpdate($hash,"state",       "initialized", 1);                     # Init für "state" 
-  readingsSingleUpdate($hash,"parentState", "initialized", 1);                     # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
+  my @r;
+  push @r, "adoptSubset:--reset--" if(IsModelMaster($hash));                       # Init für FTUI Subset wenn benutzt (Attr adoptSubset)
+  push @r, "parentState:initialized";                                              # Init für "parentState" Forum: https://forum.fhem.de/index.php/topic,45671.msg985136.html#msg985136
+  push @r, "state:initialized";                                                    # Init für "state" 
+  
+  setReadings($hash, \@r, 1);
   
 return;
 }
@@ -226,8 +253,8 @@ sub Rename {
     my $old_name = shift;
     my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
-    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{DEF} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    explodeLinkData ($hash, $hash->{DEF}, 1);
 
 return;
 }
@@ -237,8 +264,8 @@ sub Copy {
     my $new_name = shift;
     my $hash     = $defs{$new_name} // return;
     
-    $hash->{DEF}  =~ s/\'$old_name\'/\'$new_name\'/xg;
-    $hash->{LINK} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    $hash->{DEF} =~ s/\'$old_name\'/\'$new_name\'/xg;
+    explodeLinkData ($hash, $hash->{DEF}, 1);
 
 return;
 }
@@ -253,15 +280,30 @@ sub Set {
   
   return if(IsDisabled($name) || $hash->{MODEL} =~ /ptzcontrol|snapgallery/x);
   
-  my $setlist = "Unknown argument $opt, choose one of ".
+  my $setlist;
+  
+  if(!IsModelMaster($hash)) {
+      $setlist = "Unknown argument $opt, choose one of ".
                  "popupStream "
                  ;
+  } else {
+      my $as  = "--reset--,".allStreamDevs();
+      my $sd  = AttrVal($name, "adoptSubset", $as);
+      $sd     =~ s/\s+/#/gx;      
+      
+      my $rsd = $as;
+      $rsd    =~ s/#/ /g;                                   ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+      push my @ado, "adoptList:$rsd";
+      setReadings($hash, \@ado, 0);
+      
+      $setlist = "Unknown argument $opt, choose one of ".
+                 "adopt:$sd "
+                 ;  
+  }
   
   if ($opt eq "popupStream") {
       my $txt = FHEM::SSCam::getClHash($hash);
       return $txt if($txt);
-      
-      my $link = AnalyzePerlCommand(undef, $hash->{LINK});
       
       # OK-Dialogbox oder Autoclose
       my $temp    = AttrVal($name, "popupStreamTo", $todef);
@@ -269,10 +311,8 @@ sub Set {
       unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
       $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
       
-      my $pd         = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
-      my $parent     = $hash->{PARENT};
-      my $parentHash = $defs{$parent};
-      my $htmlCode   = $hash->{HELPER}{STREAM};
+      my $pd       = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+      my $htmlCode = $hash->{HELPER}{STREAM};
       
       if ($hash->{HELPER}{STREAMACTIVE}) {
           my $out = "<html>";
@@ -289,6 +329,62 @@ sub Set {
           } 
       }
   
+  } elsif ($opt eq "adopt") {
+      shift @a; shift @a;
+      $prop = join "#", @a;
+      
+      if($prop eq "--reset--") {
+         CommandSet(undef, "$name reset"); 
+         return;
+      }
+      
+      my $strmd = $sdevs{"$prop"} // "";
+      my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
+      
+      return qq{The command "$opt" needs a valid SSCamSTRM device as argument instead of "$strmd"} if(!$valid);
+      
+      # Übernahme der Readings
+      my @r;
+      delReadings($hash);
+      for my $key (keys %{$defs{$strmd}{READINGS}}) {
+          my $val = ReadingsVal($strmd, $key, "");
+          next if(!$val);
+          push @r, "$key:$val";        
+      }
+      
+      # Übernahme Link-Parameter
+      my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
+      
+      explodeLinkData ($hash, $link, 0);
+      
+      push @r, "clientLink:$link";
+      push @r, "parentCam:$hash->{LINKPARENT}";
+      
+      if(@r) {
+          setReadings($hash, \@r, 1);
+      }
+      
+      my $camname                     = $hash->{LINKPARENT};
+      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+      
+      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
+      
+  } elsif ($opt eq "reset") {
+      delReadings($hash);
+      explodeLinkData ($hash, $hash->{DEF}, 1);
+      
+      my @r;
+      push @r, "parentState:initialized";
+      push @r, "state:initialized";
+      push @r, "parentCam:initialized";
+      
+      setReadings($hash, \@r, 1);
+      
+      my $camname                     = $hash->{LINKPARENT};
+      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+      
+      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
+      
   } else {
       return "$setlist";
   }
@@ -317,14 +413,31 @@ return;
 }
 
 ################################################################
+#                               Attr
+# $cmd can be "del" or "set"
+# $name is device name
+# aName and aVal are Attribute name and value
+################################################################
 sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $hash  = $defs{$name};
+    my $model = $hash->{MODEL};
+    
     my ($do,$val);
-      
-    # $cmd can be "del" or "set"
-    # $name is device name
-    # aName and aVal are Attribute name and value
+    
+    if(defined $hvattr{$aName}) {
+        if ($model eq "master" && !$hvattr{$aName}{master}) {            
+            return qq{The attribute "$aName" is only valid if MODEL is not "$model" !};
+        }
+        
+        if ($model ne "master" && !$hvattr{$aName}{nomaster}) {            
+            return qq{The attribute "$aName" is only valid if MODEL is "master" !};
+        }
+    }
+    
+    if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
+        return qq{This attribute is only valid if MODEL is "generic" !};
+    }
     
     if($aName eq "disable") {
         if($cmd eq "set") {
@@ -336,8 +449,12 @@ sub Attr {
         readingsSingleUpdate($hash, "state", $val, 1);
     }
     
-    if($aName eq "genericStrmHtmlTag" && $hash->{MODEL} ne "generic") {
-        return "This attribute is only usable for devices of MODEL \"generic\" ";
+    if($aName eq "adoptSubset") {
+        if($cmd eq "set") {
+            readingsSingleUpdate($hash, "adoptSubset", $aVal, 1);
+        } else {
+            readingsSingleUpdate($hash, "adoptSubset", "--reset--", 1);
+        }
     }
     
     if ($cmd eq "set") {
@@ -354,48 +471,105 @@ return;
 #############################################################################################
 sub FwFn {
   my ($FW_wname, $name, $room, $pageHash) = @_;               # pageHash is set for summaryFn.
-  my $hash   = $defs{$name};
-  my $link   = $hash->{LINK};
+  my $hash = $defs{$name};
   
   RemoveInternalTimer($hash);
+  
   $hash->{HELPER}{FW} = $FW_wname;
-       
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
+  my $clink           = ReadingsVal($name, "clientLink", "");
+  
+  explodeLinkData ($hash, $clink, 0);
+  
+  # Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
+  
+  my $ftui   = 0;
+  my $linkfn = $hash->{LINKFN};
+  my %pars   = ( linkparent => $hash->{LINKPARENT},
+			     linkname   => $hash->{LINKNAME},
+                 linkmodel  => $hash->{LINKMODEL},
+                 omodel     => $hash->{MODEL},
+                 oname      => $hash->{NAME},
+				 ftui       => $ftui
+               );
+  
+  no strict "refs";                                      ## no critic 'NoStrict' 
+  my $html = eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
+  use strict "refs";  
   
   my $ret = "";
+  
+  if(IsModelMaster($hash) && $clink) {
+      my $alias = AttrVal($name, "alias", $name);                                                         # Linktext als Aliasname oder Devicename setzen
+      my $lang  = AttrVal("global", "language", "EN");
+      my $txt   = "is Streaming master of";
+      $txt      = "ist Streaming Master von " if($lang eq "DE");
+      my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a> $txt ";
+      $dlink    = "$alias $txt " if(AttrVal($name, "noLink", 0));                                         # keine Links im Stream-Dev generieren
+      $ret     .= "<span align=\"center\">$dlink </span>"   if(!AttrVal($name,"hideDisplayName",0));
+  }
+  
   if(IsDisabled($name)) {
       if(AttrVal($name,"hideDisplayName",0)) {
           $ret .= "Stream-device <a href=\"/fhem?detail=$name\">$name</a> is disabled";
       } else {
           $ret .= "<html>Stream-device is disabled</html>";
-      }  
+      } 
+      
   } else {
-      $ret .= $link;  
+      $ret .= $html;
+      $ret .= sDevsWidget($name) if(IsModelMaster($hash)); 
   }
-  
-  my $al = AttrVal($name, "autoRefresh", 0);                           # Autorefresh nur des aufrufenden FHEMWEB-Devices
+   
+  my $al = AttrVal($name, "autoRefresh", 0);                                                             # Autorefresh nur des aufrufenden FHEMWEB-Devices
   if($al) {  
       InternalTimer(gettimeofday()+$al, "FHEM::SSCamSTRM::webRefresh", $hash, 0);
       Log3($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
   
-  undef $link;
+  undef $html;
 
 return $ret;
 }
 
 #############################################################################################
-#                          Bestandteile des DEF auflösen  
+#            Bestandteile des DEF (oder Link) auflösen 
+#      $link = aufzulösender String
+#      $def  = 1 -> es ist ein Shash->{DEF} Inhalt, 0 -> eine andere Quelle 
 #############################################################################################
-sub explodeDEF {                    
+sub explodeLinkData {                    
   my $hash = shift;
   my $link = shift;
+  my $def  = shift;
   
-  my $arg = (split("[()]",$link))[1];
-  $arg   =~ s/'//xg;
-  ($hash->{PARENT},undef,$hash->{MODEL}) = split(",",$arg);
+  return if(!$link);
+  
+  my ($fn,$arg) = split("[()]",$link);
+  
+  $arg =~ s/'//xg;
+  $fn  =~ s/{//xg;
+  
+  if($def) {
+      ($hash->{PARENT},$hash->{LINKNAME},$hash->{MODEL}) = split(",",$arg);
+      $hash->{LINKMODEL}  = $hash->{MODEL};
+      $hash->{LINKPARENT} = $hash->{PARENT};
+  } else {
+      ($hash->{LINKPARENT},$hash->{LINKNAME},$hash->{LINKMODEL}) = split(",",$arg);     
+  }
+  
+  $hash->{LINKFN} = $fn;
   
 return;
+}
+
+#############################################################################################
+#                       Ist das MODEL "master" ?
+#############################################################################################
+sub IsModelMaster {                                                          
+  my $hash = shift;
+
+  my $mm = $hash->{MODEL} eq "master" ? 1 : 0;
+  
+return $mm;
 }
 
 #############################################################################################
@@ -459,16 +633,32 @@ return;
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
 sub streamAsHtml { 
-  my ($hash,$ftui) = @_;
-  my $name         = $hash->{NAME};
-  my $link         = $hash->{LINK};
+  my $hash = shift;
+  my $ftui = shift;
+  my $name = $hash->{NAME};
   
-  if ($ftui && $ftui eq "ftui") {                 # Aufruf aus TabletUI -> FW_cmd ersetzen gemäß FTUI Syntax
-      my $s = substr($link,0,length($link)-2);
-      $link = $s.",'$ftui')}";
+  if($ftui && $ftui eq "ftui") {
+      $ftui = 1;
+  } else {
+      $ftui = 0; 
   }
   
-  $link = AnalyzePerlCommand(undef, $link) if($link =~ m/^{(.*)}$/xs); 
+  my $clink = ReadingsVal($name, "clientLink", "");
+  
+  explodeLinkData ($hash, $clink, 0);
+    
+  my $linkfn = $hash->{LINKFN};
+  my %pars   = ( linkparent => $hash->{LINKPARENT},
+			     linkname   => $hash->{LINKNAME},
+                 linkmodel  => $hash->{LINKMODEL},
+                 omodel     => $hash->{MODEL},
+                 oname      => $hash->{NAME},
+				 ftui       => $ftui
+               );
+  
+  no strict "refs";                                      ## no critic 'NoStrict' 
+  my $html = eval{ &{$linkfn}(\%pars) } or do { return qq{Error in Streaming function definition of <html><a href=\"/fhem?detail=$name\">$name</a></html>} };
+  use strict "refs"; 
   
   my $ret = "<html>";
   if(IsDisabled($name)) {  
@@ -479,12 +669,135 @@ sub streamAsHtml {
       }
 
   } else {
-      $ret .= $link;  
+      $ret .= $html;     
   }
   
   $ret .= "</html>";
-  undef $link;
   
+  undef $html;
+  
+return $ret;
+}
+
+################################################################
+#                    delete Readings
+#        $rd = angegebenes Reading löschen
+################################################################
+sub delReadings {
+  my $hash = shift;
+  my $rd   = shift;
+  my $name = $hash->{NAME};
+  
+  my $bl   = "state|parentState|adoptSubset";                              # Blacklist
+   
+  if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
+      readingsDelete($hash, $rd) if($rd !~ /$bl/x);
+      return;
+  } 
+
+  for my $key (keys %{$hash->{READINGS}}) {
+      readingsDelete($hash, $key) if($key !~ /$bl/x);
+  }
+
+return;
+}
+
+################################################################
+#                    set Readings
+#   $rref  = Referenz zum Array der zu setzenen Reading
+#            (Aufbau: <Reading>:<Wert>)
+#   $event = 1 wenn Event generiert werden soll
+################################################################
+sub setReadings {
+  my $hash  = shift;
+  my $rref  = shift;
+  my $event = shift;
+  
+  my $name  = $hash->{NAME};
+  
+  readingsBeginUpdate($hash);
+  
+  for my $elem (@$rref) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
+  readingsEndUpdate($hash, $event);
+
+return;
+}
+
+################################################################
+#  liefert String aller Streamingdevices außer MODEL = master
+#  und füllt Hash %sdevs{Alias} = Devicename zu Auflösung
+#
+#  (es wird Alias (wenn gesetzt) oder Devicename verwendet,
+#   Leerzeichen werden durch "#" ersetzt)
+################################################################
+sub allStreamDevs {
+
+  my $sd = "";
+  undef %sdevs;
+  
+  my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL!=master");            # Liste Streaming devices außer MODEL = master
+  for my $da (@strmdevs) {
+      next if(!$defs{$da});
+      my $alias      = AttrVal($da, "alias", $da); 
+      $alias         =~ s/\s+/#/gx;
+      $sdevs{$alias} = "$da";        
+  }
+  
+  for my $a (sort keys %sdevs) {
+      $sd .= "," if($sd);
+      $sd .= $a;
+  }
+  
+  for my $d (@strmdevs) {                                                        # Devicenamen zusätzlich als Schlüssel speichern damit set <> adopt ohne Widget funktioniert
+      next if(!$defs{$d});
+      $sdevs{$d} = "$d";        
+  }
+
+return $sd;
+}
+
+################################################################
+#   Streaming Devices Drop-Down Widget zur Auswahl 
+#   in einem Master Streaming Device
+################################################################
+sub sDevsWidget {
+  my $name = shift;
+  
+  my $Adopts;
+  my $ret        = "";
+  my $cmdAdopt   = "adopt";
+  my $as         = "--reset--,".allStreamDevs();
+  my $valAdopts  = AttrVal($name, "adoptSubset", $as);
+  $valAdopts     =~ s/\s+/#/gx;
+  
+  for my $fn (sort keys %{$data{webCmdFn}}) {
+      next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
+      no strict "refs";                                                                    ## no critic 'NoStrict'  
+      $Adopts = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdAdopt,$valAdopts);
+      use strict "refs";
+      last if(defined($Adopts));
+  }
+  
+  if($Adopts) {
+      $Adopts =~ s,^<td[^>]*>(.*)</td>$,$1,x;
+  } else {
+      $Adopts = FW_pH "cmd.$name=set $name $cmdAdopt", $cmdAdopt, 0, "", 1, 1;
+  }
+       
+  ## Tabellenerstellung
+  $ret .= "<style>.defsize { font-size:16px; } </style>";
+  $ret .= '<table class="rc_body defsize">';
+  
+  $ret .= "<tr>";
+  $ret .= "<td>Streaming Device: </td><td>$Adopts</td>";  
+  $ret .= "</tr>"; 
+
+  $ret .= "</table>"; 
+
 return $ret;
 }
 
@@ -501,7 +814,8 @@ return $ret;
   <ul>
   The module SSCamSTRM is a special device module synchronized to the SSCam module. It is used for definition of
   Streaming-Devices. <br>
-  Dependend of the Streaming-Device state, different buttons are provided to start actions:
+  Dependend of the Streaming-Device state, different buttons are provided to start actions: <br><br>
+  
     <ul>   
       <table>  
       <colgroup> <col width=25%> <col width=75%> </colgroup>
@@ -534,7 +848,12 @@ return $ret;
   <br><br>
   
   <ul>
-    A SSCam Streaming-device is defined by the SSCam "set &lt;name&gt; createStreamDev" command.
+    A SSCam Streaming-device is defined by the SSCam command: <br><br>
+    
+    <ul>
+      set &lt;name&gt; createStreamDev  &lt;Device Typ&gt; <br><br>
+    </ul>
+    
     Please refer to SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> command.  
     <br><br>
   </ul>
@@ -544,13 +863,21 @@ return $ret;
   <ul>
   
   <ul>
-  <li><b>popupStream</b>  <br>
+  <li><b>popupStream</b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL != master)<br>
   
   The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
   size of display can be adjusted. The attribute "popupStreamTo" determines the type of the popup window.
   If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
   time automatically (default 5 seconds). <br>
   Optionally you can append "OK" or &lt;seconds&gt; directly to override the adjustment by attribute "popupStreamTo".
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <li><b>adopt &lt;Streaming device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
+  
+  A Streaming Device of type <b>master</b> adopts the content of another defined Streaming Device.
   </li>
   </ul>
   <br>
@@ -577,6 +904,14 @@ return $ret;
   
   <ul>
   <ul>
+  
+    <a name="adoptSubset"></a>
+    <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(only valid for MODEL "master") <br>
+      In a Streaming <b>master</b> Device a subset of all defined Streaming Devices is selected and used for 
+      the <b>adopt</b> command is provided. <br>
+      For control in the FTUI, the selection is also stored in the Reading of the same name.
+    </li>
+    <br>
 
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
@@ -742,7 +1077,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
 <ul>
   <br>
   Das Modul SSCamSTRM ist ein mit SSCam abgestimmtes Gerätemodul zur Definition von Streaming-Devices. <br>
-  Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unterschiedliche Drucktasten angeboten:
+  Abhängig vom Zustand des Streaming-Devices werden zum Start von Aktionen unterschiedliche Drucktasten angeboten: <br><br>
     <ul>   
       <table>  
       <colgroup> <col width=25%> <col width=75%> </colgroup>
@@ -775,8 +1110,13 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-    Ein SSCam Streaming-Device wird durch den SSCam Befehl "set &lt;name&gt; createStreamDev" erstellt.
-    Siehe auch die Beschreibung zum SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> Befehl.  
+    Ein SSCam Streaming-Device wird durch den SSCam Befehl <br><br>
+    
+    <ul>
+      set &lt;name&gt; createStreamDev  &lt;Device Typ&gt; <br><br>
+    </ul>
+    
+    erstellt. Siehe auch die Beschreibung zum SSCam <a href="#SSCamcreateStreamDev">"createStreamDev"</a> Befehl.  
     <br><br>
   </ul>
 
@@ -785,7 +1125,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   
   <ul>
-  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>  <br>
+  <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL != master)<br>
   
   Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
   Darstellungsgröße eingestellt werden. Das Attribut "popupStreamTo" legt die Art des Popup-Fensters fest.
@@ -793,6 +1133,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Zeit automatisch (default 5 Sekunden). <br>
   Durch die optionalen Angabe von "OK" oder &lt;Sekunden&gt; kann die Einstellung des Attributes "popupStreamTo" übersteuert 
   werden.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <li><b>adopt &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  
+  Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices.
   </li>
   </ul>
   <br>
@@ -820,6 +1168,14 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <ul>
   <ul>
+  
+    <a name="adoptSubset"></a>
+    <li><b>adoptSubset</b> &nbsp;&nbsp;&nbsp;&nbsp;(nur für MODEL "master") <br>
+      In einem Streaming <b>master</b> Device wird eine Teilmenge aller definierten Streaming Devices ausgewählt und für 
+      das  <b>adopt</b> Kommando bereitgestellt. <br>
+      Für die Steuerung im FTUI wird die Auswahl ebenfalls im gleichnamigen Reading gespeichert.
+    </li>
+    <br>
   
     <a name="autoRefresh"></a>
     <li><b>autoRefresh</b><br>
