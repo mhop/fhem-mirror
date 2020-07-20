@@ -131,9 +131,24 @@ my %fupgrade = (                                                           # Fun
     3 => { of => "SSCam_StreamDev",      nf => "FHEM::SSCam::streamDev"      },      
 );
 
-my %SSCAM_imc = (                                                           # disbled String modellabhängig (SVS / CAM)
-    0 => { 0 => "initialized", 1 => "inactive" },
-    1 => { 0 => "off",         1 => "inactive" },              
+my %hvattr = (                                                             # Hash zur Validierung von Attributen
+    autoRefresh         => { master => 1, nomaster => 1 },
+    autoRefreshFW       => { master => 1, nomaster => 1 },
+    disable             => { master => 1, nomaster => 1 },
+    forcePageRefresh    => { master => 1, nomaster => 1 },
+    genericStrmHtmlTag  => { master => 0, nomaster => 1 },
+    htmlattr            => { master => 0, nomaster => 1 },
+    htmlattrFTUI        => { master => 0, nomaster => 1 },
+    hideAudio           => { master => 0, nomaster => 1 },
+    hideButtons         => { master => 0, nomaster => 1 },
+    hideDisplayName     => { master => 1, nomaster => 1 }, 
+    hideDisplayNameFTUI => { master => 1, nomaster => 1 },
+    noLink              => { master => 1, nomaster => 1 },
+    popupWindowSize     => { master => 0, nomaster => 1 },
+    popupStreamFW       => { master => 0, nomaster => 1 },
+    popupStreamTo       => { master => 0, nomaster => 1 },
+    ptzButtonSize       => { master => 0, nomaster => 1 }, 
+    ptzButtonSizeFTUI   => { master => 0, nomaster => 1 },     
 );
 
 my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
@@ -394,14 +409,25 @@ return;
 }
 
 ################################################################
+#                               Attr
+# $cmd can be "del" or "set"
+# $name is device name
+# aName and aVal are Attribute name and value
+################################################################
 sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $hash  = $defs{$name};
+    my $model = $hash->{MODEL};
+    
     my ($do,$val);
-      
-    # $cmd can be "del" or "set"
-    # $name is device name
-    # aName and aVal are Attribute name and value
+    
+    if ($model eq "master" && !$hvattr{$aName}{master}) {            
+        return qq{The attribute "$aName" is only valid if MODEL is not "$model" !};
+    }
+    
+    if ($model ne "master" && !$hvattr{$aName}{nomaster}) {            
+        return qq{The attribute "$aName" is only valid if MODEL is "master" !};
+    }
     
     if($aName eq "disable") {
         if($cmd eq "set") {
