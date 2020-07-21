@@ -3,7 +3,7 @@
 #
 # The file is part of the SIGNALduino project.
 # The purpose of this module is to support many wireless BELL devices.
-# 2018 / 2019 - HomeAuto_User & elektron-bbs
+# 2018 - 2020 - HomeAuto_User & elektron-bbs
 #
 ####################################################################################################################################
 # - wireless doorbell TCM_234759 Tchibo  [Protocol 15] length 12-20 (3-5)
@@ -24,6 +24,9 @@
 ####################################################################################################################################
 # - VTX-BELL_Funkklingel  [Protocol 79] length 12 (3)
 #     get sduino_dummy raw MU;;P0=656;;P1=-656;;P2=335;;P3=-326;;P4=-5024;;D=01230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303012423012301212301230303030124230123012123012303030301242301230121230123030303;;CP=2;;O;;
+####################################################################################################################################
+# - GEA-028DB  [Protocol 98] length 16 (4)
+#     get sduino_dummy raw MU;P0=1488;P1=-585;P2=520;P3=-1509;P4=1949;P5=-5468;CP=2;R=38;D=01232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501232301230123010101230123230101454501;O;
 ####################################################################################################################################
 # !!! ToDo´s !!!
 #     - KANGTAI doubleCode must CEHCK | only one Code? - MORE USER MSG needed
@@ -76,12 +79,16 @@ my %models = (
 															Protocol		=> "96",
 															doubleCode	=> "no"
 														},
+	"GEA-028DB" =>	{	hex_lengh		=> "4",
+										Protocol		=> "98",
+										doubleCode	=> "no"
+									},
 );
 
 
 sub SD_BELL_Initialize($) {
 	my ($hash) = @_;
-	$hash->{Match}			= "^P(?:15|32|41|42|57|79|96)#.*";
+	$hash->{Match}			= "^P(?:15|32|41|42|57|79|96|98)#.*";
 	$hash->{DefFn}			= "SD_BELL::Define";
 	$hash->{UndefFn}		= "SD_BELL::Undef";
 	$hash->{ParseFn}		= "SD_BELL::Parse";
@@ -137,7 +144,7 @@ sub Define($$) {
 	# Argument															0	   	1					2		    	3						4
 	return "SD_BELL: wrong syntax: define <name> SD_BELL <Protocol> <HEX-Value> <optional IODEV>" if(int(@a) < 3 || int(@a) > 5);
 	### checks - doubleCode yes ###
-	return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79|96)/s);
+	return "SD_BELL: wrong <protocol> $a[2]" if not($a[2] =~ /^(?:15|32|41|42|57|79|96|98)/s);
 	return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F)" if (($protocol != 41) && not $a[3] =~ /^[0-9a-fA-F]*$/s);
 	return "SD_BELL: wrong HEX-Value! Protocol $a[2] HEX-Value <$a[3]> not HEX (0-9 | a-f | A-F) or length wrong!" if (($protocol == 41) && not $a[3] =~ /^[0-9a-fA-F]{8}_[0-9a-fA-F]{8}$/s);
 
@@ -198,24 +205,24 @@ sub Set($$$@) {
 			$doubleCodeCheck = 1;
 			@splitCode = split("_", $rawDatasend);
 			$rawDatasend = $splitCode[0];
-		} else {
-			$doubleCodeCheck = 0;
-		}
+			} else {
+				$doubleCodeCheck = 0;
+			}
 
-		Log3 $name, 4, "$ioname: SD_BELL_Set_doubleCodeCheck doubleCodeCheck=$doubleCodeCheck splitCode[0]=$rawDatasend";
+			Log3 $name, 4, "$ioname: SD_BELL_Set_doubleCodeCheck doubleCodeCheck=$doubleCodeCheck splitCode[0]=$rawDatasend";
 		
-		my $hlen = length($rawDatasend);
-		my $blen = $hlen * 4;
-		my $bitData = unpack("B$blen", pack("H$hlen", $rawDatasend));
-		my $msg = "P$protocol#" . $bitData;
+			my $hlen = length($rawDatasend);
+			my $blen = $hlen * 4;
+			my $bitData = unpack("B$blen", pack("H$hlen", $rawDatasend));
+			my $msg = "P$protocol#" . $bitData;
 		
-		if ($model eq "Heidemann_|_Heidemann_HX_|_VTX-BELL") {
-			$msg .= "#R135";
-		} else {
-			$msg .= "#R$repeats";
-		}
+			if ($model eq "Heidemann_|_Heidemann_HX_|_VTX-BELL") {
+				$msg .= "#R135";
+			} else {
+				$msg .= "#R$repeats";
+			}
 
-			Log3 $name, 3, "$ioname: $name sendMsg=$msg";
+			Log3 $name, 4, "$ioname: $name sendMsg=$msg";
 			IOWrite($hash, 'sendMsg', $msg);
 		}
 	}
@@ -445,6 +452,7 @@ sub Attr(@) {
 	<li>m-e doorbell fuer FG- and Basic-Serie  [Protocol 57]</li>
 	<li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protocol 79]</li>
 	<li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protocol 96]</li>
+	<li>GEA-028DB [Protokoll 98]</li>
 	<br>
 	<u><i>Special feature Protocol 41, 2 different codes will be sent one after the other!</u></i>
 	</ul><br>
@@ -492,6 +500,7 @@ sub Attr(@) {
 	<li>m-e doorbell f&uuml;r FG- und Basic-Serie  [Protokoll 57]</li>
 	<li>Heidemann | Heidemann HX | VTX-BELL_Funkklingel  [Protokoll 79]</li>
 	<li>Grothe Mistral SE 01.1 (40 bit), 03.1 (48 bit) [Protokoll 96]</li>
+	<li>GEA-028DB [Protokoll 98]</li>
 	<br>
 	<u><i>Besonderheit Protokoll 41, es sendet 2 verschiedene Codes nacheinader!</u></i>
 	</ul><br>
