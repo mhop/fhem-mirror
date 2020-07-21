@@ -90,6 +90,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.13.1" => "21.07.2020  fix: set of values in attr adoptSubset is empty after restart, changes according level 3 PBP ",
   "2.13.0" => "14.07.2020  integrate streamDev master ",
   "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
   "2.11.0" => "24.06.2020  switch to packages, changes according to PBP ",
@@ -152,21 +153,30 @@ my %hvattr = (                                                             # Has
     ptzButtonSizeFTUI   => { master => 0, nomaster => 1 },     
 );
 
+my %hset = (                                                                # Hash für Set-Funktion
+    popupStream => { fn => "_setpopupStream" }, 
+    adopt       => { fn => "_setadopt"       },    
+    reset       => { fn => "_setreset"       },      
+);
+
 my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
 
 my $todef = 5;                                                              # Default Popup Zeit für set <> popupStream
 
 ################################################################
+#                       Initialize
+#   !! Werte von adoptSubset werden durch Funktion in
+#      sub FwFn überschrieben !!
+################################################################
 sub Initialize {
   my $hash = shift;
 
-  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
-  my $sd  = "--reset--,".allStreamDevs();    
+  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized"));     
   
   $hash->{DefFn}              = \&Define;
   $hash->{SetFn}              = \&Set;
   $hash->{GetFn}              = \&Get;
-  $hash->{AttrList}           = "adoptSubset:sortable-strict,$sd ".
+  $hash->{AttrList}           = "adoptSubset:sortable-strict,--reset-- ".
                                 "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "disable:1,0 ". 
@@ -271,6 +281,8 @@ return;
 }
 
 ################################################################
+#                Set und Subroutinen
+################################################################
 sub Set {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
@@ -301,95 +313,140 @@ sub Set {
                  ;  
   }
   
-  if ($opt eq "popupStream") {
-      my $txt = FHEM::SSCam::getClHash($hash);
-      return $txt if($txt);
-      
-      # OK-Dialogbox oder Autoclose
-      my $temp    = AttrVal($name, "popupStreamTo", $todef);
-      my $to      = $prop // $temp;
-      unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
-      $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
-      
-      my $pd       = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
-      my $htmlCode = $hash->{HELPER}{STREAM};
-      
-      if ($hash->{HELPER}{STREAMACTIVE}) {
-          my $out = "<html>";
-          $out .= $htmlCode;
-          $out .= "</html>";
-          
-          Log3($name, 4, "$name - Stream to display: $htmlCode");
-          Log3($name, 4, "$name - Stream display to webdevice: $pd");
-          
-          if($to =~ /\d+/x) {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd");  ## no critic 'void context';
-          } else {
-              map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");     ## no critic 'void context';
-          } 
-      }
+  my %params = (
+      hash => $hash,
+      name => $name,
+      opt  => $opt,
+      prop => $prop,
+      aref => \@a,
+  );
   
-  } elsif ($opt eq "adopt") {
-      shift @a; shift @a;
-      $prop = join "#", @a;
+  no strict "refs";                                                        ## no critic 'NoStrict'  
+  if($hset{$opt}) {
+      &{$hset{$opt}{fn}} (\%params) if(defined &{$hset{$opt}{fn}}); 
+      return;
+  }
+  use strict "refs";
+
+return "$setlist";
+}
+
+################################################################
+#                      Setter popupStream
+################################################################
+sub _setpopupStream {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  my $txt = FHEM::SSCam::getClHash($hash);
+  return $txt if($txt);
+  
+  # OK-Dialogbox oder Autoclose
+  my $temp    = AttrVal($name, "popupStreamTo", $todef);
+  my $to      = $prop // $temp;
+  unless ($to =~ /^\d+$/x || lc($to) eq "ok") { $to = $todef; }
+  $to         = ($to =~ /\d+/x) ? (1000 * $to) : $to;
+  
+  my $pd       = AttrVal($name, "popupStreamFW", "TYPE=FHEMWEB");
+  my $htmlCode = $hash->{HELPER}{STREAM};
+  
+  if ($hash->{HELPER}{STREAMACTIVE}) {
+      my $out = "<html>";
+      $out .= $htmlCode;
+      $out .= "</html>";
       
-      if($prop eq "--reset--") {
-         CommandSet(undef, "$name reset"); 
-         return;
-      }
+      Log3($name, 4, "$name - Stream to display: $htmlCode");
+      Log3($name, 4, "$name - Stream display to webdevice: $pd");
       
-      my $strmd = $sdevs{"$prop"} // "";
-      my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
-      
-      return qq{The command "$opt" needs a valid SSCamSTRM device as argument instead of "$strmd"} if(!$valid);
-      
-      # Übernahme der Readings
-      my @r;
-      delReadings($hash);
-      for my $key (keys %{$defs{$strmd}{READINGS}}) {
-          my $val = ReadingsVal($strmd, $key, "");
-          next if(!$val);
-          push @r, "$key:$val";        
-      }
-      
-      # Übernahme Link-Parameter
-      my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
-      
-      explodeLinkData ($hash, $link, 0);
-      
-      push @r, "clientLink:$link";
-      push @r, "parentCam:$hash->{LINKPARENT}";
-      
-      if(@r) {
-          setReadings($hash, \@r, 1);
-      }
-      
-      my $camname                     = $hash->{LINKPARENT};
-      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
-      
-      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
-      
-  } elsif ($opt eq "reset") {
-      delReadings($hash);
-      explodeLinkData ($hash, $hash->{DEF}, 1);
-      
-      my @r;
-      push @r, "parentState:initialized";
-      push @r, "state:initialized";
-      push @r, "parentCam:initialized";
-      
-      setReadings($hash, \@r, 1);
-      
-      my $camname                     = $hash->{LINKPARENT};
-      $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
-      
-      InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
-      
-  } else {
-      return "$setlist";
+      if($to =~ /\d+/x) {
+          map {FW_directNotify("#FHEMWEB:$_", "FW_errmsg('$out', $to)", "")} devspec2array("$pd");  ## no critic 'void context';
+      } else {
+          map {FW_directNotify("#FHEMWEB:$_", "FW_okDialog('$out')", "")} devspec2array("$pd");     ## no critic 'void context';
+      } 
+  }
+
+return;
+}
+
+################################################################
+#                      Setter adopt
+################################################################
+sub _setadopt {                          ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $aref  = $paref->{aref};
+  
+  shift @$aref; shift @$aref;
+  $prop = join "#", @$aref;
+  
+  if($prop eq "--reset--") {
+     CommandSet(undef, "$name reset"); 
+     return;
   }
   
-return;  
+  my $strmd = $sdevs{"$prop"} // "";
+  my $valid = ($strmd && $defs{$strmd} && $defs{$strmd}{TYPE} eq "SSCamSTRM");
+  
+  return qq{The command "$opt" needs a valid SSCamSTRM device as argument instead of "$strmd"} if(!$valid);
+  
+  # Übernahme der Readings
+  my @r;
+  delReadings($hash);
+  for my $key (keys %{$defs{$strmd}{READINGS}}) {
+      my $val = ReadingsVal($strmd, $key, "");
+      next if(!$val);
+      push @r, "$key:$val";        
+  }
+  
+  # Übernahme Link-Parameter
+  my $link = "{$defs{$strmd}{LINKFN}('$defs{$strmd}{LINKPARENT}','$defs{$strmd}{LINKNAME}','$defs{$strmd}{LINKMODEL}')}";
+  
+  explodeLinkData ($hash, $link, 0);
+  
+  push @r, "clientLink:$link";
+  push @r, "parentCam:$hash->{LINKPARENT}";
+  
+  if(@r) {
+      setReadings($hash, \@r, 1);
+  }
+  
+  my $camname                     = $hash->{LINKPARENT};
+  $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+  
+  InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
+
+return;
+}
+
+
+################################################################
+#                      Setter reset
+################################################################
+sub _setreset {                          ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  delReadings     ($hash);
+  explodeLinkData ($hash, $hash->{DEF}, 1);
+  
+  my @r;
+  push @r, "parentState:initialized";
+  push @r, "state:initialized";
+  push @r, "parentCam:initialized";
+  
+  setReadings($hash, \@r, 1);
+  
+  my $camname                     = $hash->{LINKPARENT};
+  $defs{$camname}{HELPER}{INFORM} = $hash->{FUUID};
+  
+  InternalTimer(gettimeofday()+1.5, "FHEM::SSCam::roomRefresh", "$camname,0,0,0", 0);
+
+return;
 }
 
 ###############################################################
@@ -423,8 +480,6 @@ sub Attr {
     my $hash  = $defs{$name};
     my $model = $hash->{MODEL};
     
-    my ($do,$val);
-    
     if(defined $hvattr{$aName}) {
         if ($model eq "master" && !$hvattr{$aName}{master}) {            
             return qq{The attribute "$aName" is only valid if MODEL is not "$model" !};
@@ -439,6 +494,7 @@ sub Attr {
         return qq{This attribute is only valid if MODEL is "generic" !};
     }
     
+    my ($do,$val);    
     if($aName eq "disable") {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
@@ -477,7 +533,8 @@ sub FwFn {
   
   $hash->{HELPER}{FW} = $FW_wname;
   my $clink           = ReadingsVal($name, "clientLink", "");
-  
+    
+  sofAdoptSubset  ($hash);
   explodeLinkData ($hash, $clink, 0);
   
   # Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
@@ -698,6 +755,28 @@ sub delReadings {
   for my $key (keys %{$hash->{READINGS}}) {
       readingsDelete($hash, $key) if($key !~ /$bl/x);
   }
+
+return;
+}
+
+################################################################
+#             Wertevorrat für adoptSubset generieren
+################################################################
+sub sofAdoptSubset {
+  my $hash = shift;
+
+  my @na;
+  my $ca  = $modules{$hash->{TYPE}}{AttrList};
+  my $sd  = "--reset--,".allStreamDevs();
+  my @dca = split(" ", $ca);
+    
+  for my $attr (@dca) {
+      push @na, $attr if($attr !~ /adoptSubset:/x);
+  }
+
+  push @na, "adoptSubset:sortable-strict,$sd ";
+    
+  $hash->{".AttrList"} = join " ", @na;              # Device spezifische AttrList, überschreibt Modul AttrList ! 
 
 return;
 }
