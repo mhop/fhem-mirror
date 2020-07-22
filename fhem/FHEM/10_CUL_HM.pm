@@ -562,12 +562,12 @@ sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $HMid = uc($a[2]);
-
   return "wrong syntax: define <name> CUL_HM 6-digit-hex-code [Raw-Message]"
         if(!(int(@a)==3 || int(@a)==4) || $HMid !~ m/^[A-F0-9]{6}([A-F0-9]{2})?$/i );
   return  "HMid DEF already used by " . CUL_HM_id2Name($HMid)
         if ($modules{CUL_HM}{defptr}{$HMid});
   my $name = $hash->{NAME};
+  
   if(length($HMid) == 8) {# define a channel
     my $devHmId = substr($HMid, 0, 6);
     my $chn = substr($HMid, 6, 2);
@@ -4225,7 +4225,7 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
               .":$roleD"
               .":$roleV"
               .":$fkt"
-              .":$defs{$devName}{helper}{mId}"
+              .($defs{$devName}{helper}{mId}?":$defs{$devName}{helper}{mId}":"")
               .":$chn"
               .InternalVal($name,"peerList","")
               ;
@@ -6681,6 +6681,23 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return $ret;
   }
 
+  elsif (eval "defined(&CUL_HM_Set${cmd})"){###################################
+    no strict "refs";
+    my ($re,$stat,@msgs) = &{"CUL_HM_Set${cmd}"}($name,$cmd,@a);
+    use strict "refs";
+    if ($re == 1){
+        return $stat;
+    }
+    elsif($re == 0){
+      $state = $stat;
+
+      CUL_HM_PushCmdStack($hash,"++${flag}$_") foreach (map {(my $foo = $_) =~ s/xADDRESSx/$id$dst/; $foo;}@msgs);
+    }
+    else{
+        return "unknown reply from CUL_HM_Set${cmd}";
+    }
+  }
+
   else{
     return "$cmd not implemented - contact sysop";
   }
@@ -6870,7 +6887,6 @@ sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite 
   # autocreate undefined channels
   my %chanExist;
   %chanExist = map { $_ => 0 } CUL_HM_getAssChnIds($name);
-  
   if ($attr{$name}{subType} eq "virtual"){# do not apply all possible channels for virtual
     $attr{CUL_HM_id2Name($_)}{model} = $model foreach(keys %chanExist);
   }
@@ -6922,11 +6938,13 @@ sub CUL_HM_getConfig($){
   my @chnIdList = CUL_HM_getAssChnIds($name);
   delete $hash->{READINGS}{$_}
         foreach (grep /^[\.]?(RegL_)/,keys %{$hash->{READINGS}});
+  CUL_HM_UpdtReadSingle($hash,"cfgState","updating",1);
   foreach my $channel (@chnIdList){
     my $cHash = CUL_HM_id2Hash($channel);
     my $chn = substr($channel,6,2);
     delete $cHash->{READINGS}{$_}
           foreach (grep /^[\.]?(RegL_)/,keys %{$cHash->{READINGS}});
+  CUL_HM_UpdtReadSingle($cHash,"cfgState","updating",1);
     my $lstAr = $culHmModel->{CUL_HM_getMId($cHash)}{lst};
     if($lstAr){ 
       my $pReq = 0; # Peer request not issued, do only once for channel
@@ -8633,9 +8651,26 @@ sub CUL_HM_updtRegDisp($$$) {
   }
   #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$name) if(defined $hm);
+  CUL_HM_cfgStateDelay($name);
 }
+sub CUL_HM_cfgStateDelay($) {#update cfgState timer 
+  my $name = shift;
+  my $name = CUL_HM_getDeviceName($name);
+  RemoveInternalTimer("cfgStateUpdate:$name");
+  if (InternalVal($name,"protCmdPend","none"   ) eq "none"){
+    CUL_HM_cfgStateUpdate("cfgStateUpdate:$name");
+  }
+  else{
+    InternalTimer(gettimeofday()+ 30,"CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0);     
+  }
+}
+sub CUL_HM_cfgStateUpdate($) {#update cfgState
+  my $tmrId = shift;
+  my (undef,$name) = split(':',$tmrId,2);
+  my ($hm) = devspec2array("TYPE=HMinfo");
+  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if(defined $hm);  
+}
+
 sub CUL_HM_rmOldRegs($$){ # remove register i outdated
   #will remove register for deleted peers
   my ($name,$readCont) = @_;
@@ -8654,9 +8689,8 @@ sub CUL_HM_rmOldRegs($$){ # remove register i outdated
     delete $hash->{READINGS}{$_} foreach (grep /^R-${peer}_chn-..-/,keys %{$hash->{READINGS}});
   }
   if($readCont){
-    my ($hm) = devspec2array("TYPE=HMinfo");
-    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$name) if(defined $hm);
-  }
+    CUL_HM_cfgStateDelay($name);
+ }
 }
 sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
   my $name = shift;
@@ -10013,11 +10047,7 @@ sub CUL_HM_qEntity($$){  # add to queue
                               "1":
                               $modules{CUL_HM}{hmAutoReadScan};
 
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  if(defined $hm && $q eq "qReqConf"){
-    my $chkCfg = "(".join("|",(map{$defs{$devN}{$_}}grep/channel_/,keys %{$defs{$devN}}),$devN).")";
-    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f",$chkCfg) ;
-  }
+  CUL_HM_cfgStateDelay($devN)  if($q eq "qReqConf");
 
   RemoveInternalTimer("CUL_HM_procQs");
   InternalTimer(gettimeofday()+ $wT,"CUL_HM_procQs","CUL_HM_procQs", 0);
