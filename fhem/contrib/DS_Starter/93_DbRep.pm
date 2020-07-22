@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $
+# $Id: 93_DbRep.pm 22287 2020-06-27 11:31:45Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -53,11 +53,14 @@ use Time::Local;
 use Encode;
 use IO::Compress::Gzip qw(gzip $GzipError);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
-# no if $] >= 5.018000, warnings => 'experimental';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.4"  => "22.07.2020  new aggregation value 'minute' ",
+  "8.40.3"  => "22.07.2020  delete prototypes ",
+  "8.40.2"  => "27.06.2020  improve versionNotes 2 ",
+  "8.40.1"  => "18.05.2020  improve 'restore' setlist, revised comRef, fix compare timesettings for delEntries,reduceLog ",
   "8.40.0"  => "30.03.2020  new attribute 'autoForward' ",
   "8.39.0"  => "28.03.2020  option 'writeToDBInTime' for function 'sumValue' and 'averageValue' ",
   "8.38.0"  => "21.03.2020  sqlSpecial readingsDifferenceByTimeDelta, fix FHEM crash if no time-attribute is set and time ".
@@ -125,72 +128,6 @@ our %DbRep_vNotesIntern = (
   "8.10.0"  => "19.01.2019  sqlCmd, dbValue may input SQL session variables, Forum:#96082 ",
   "8.9.10"  => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
   "8.9.9"   => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
-  "8.9.8"   => "27.11.2018  minor fix in deviceRename, commandref revised ",
-  "8.9.7"   => "21.11.2018  DbRep_firstconnect now uses attribute \"timeout\" ",
-  "8.9.6"   => "15.11.2018  fix PERL WARNING: Use of uninitialized value \$fref in pattern match (m//), sub DbRep_sec2hms for hms transforming",
-  "8.9.5"   => "09.11.2018  hash %dbrep_col substituted by get data from dblog device in func DbRep_firstconnect, fix importFromFile contains only SPACE ",
-  "8.9.0"   => "07.11.2018  command delDoublets added ",
-  "8.8.0"   => "06.11.2018  first connect routine switched to DbRep_Main, get COLSET from DBLOG-instance, attribute 'fastStart' added ",
-  "8.7.0"   => "04.11.2018  attribute valueFilter applied to functions based on 'SELECT', 'UPDATE', 'DELETE' and 'valueFilter' generally applied to field 'VALUE' ",
-  "8.6.0"   => "29.10.2018  reduceLog use attributes device/reading (can be overwritten by set-options) ",
-  "8.5.0"   => "27.10.2018  versionNotes revised, EXCLUDE of reading/device possible (DbRep_specsForSql changed) ",
-  "8.4.0"   => "22.10.2018  countEntries separately for every reading if attribute \"countEntriesDetail\" is set, ".
-                            "versionNotes changed to support en/de, get dbValue as textfield-long ",
-  "8.3.0"   => "17.10.2018  reduceLog from DbLog integrated into DbRep, textField-long as default for sqlCmd, both attributes timeOlderThan and timeDiffToNow can be set at same time",
-  "8.2.3"   => "07.10.2018  check availability of DbLog-device at definition time of DbRep-device ",  
-  "8.2.2"   => "07.10.2018  DbRep_getInitData changed, fix don't get the real min timestamp in rare cases ",  
-  "8.2.1"   => "07.10.2018  \$hash->{dbloghash}{HELPER}{REOPEN_RUNS_UNTIL} contains time until DB is closed ",
-  "8.2.0"   => "05.10.2018  direct help for attributes ",
-  "8.1.0"   => "02.10.2018  new get versionNotes command ",
-  "8.0.1"   => "20.09.2018  DbRep_getInitData improved",
-  "8.0.0"   => "11.09.2018  get filesize in DbRep_WriteToDumpFile corrected, restoreMySQL for clientSide dumps, minor fixes ",
-  "7.20.0"  => "04.09.2018  deviceRename can operate a Device name with blank, e.g. 'current balance' as old device name ",
-  "7.19.0"  => "25.08.2018  attribute 'valueFilter' to filter datasets in fetchrows ",
-  "7.18.2"  => "02.08.2018  fix in fetchrow function (forum:#89886), fix highlighting ",
-  "7.18.1"  => "03.06.2018  commandref revised ",
-  "7.18.0"  => "02.06.2018  possible use of y:(\\d) for timeDiffToNow, timeOlderThan , minor fixes of timeOlderThan, delEntries considers executeBeforeDump,executeAfterDump ",
-  "7.17.3"  => "30.04.2018  writeToDB - readingname can be replaced by the value of attribute 'readingNameMap' ",
-  "7.17.2"  => "22.04.2018  fix don't writeToDB if device name contain '.' only, minor fix in DbReadingsVal ",
-  "7.17.1"  => "20.04.2018  fix '§' is deleted by carfilter ",
-  "7.17.0"  => "17.04.2018  new function DbReadingsVal ",
-  "7.16.0"  => "13.04.2018  new function dbValue (blocking) ",
-  "7.15.2"  => "12.04.2018  fix in setting MODEL, prevent fhem from crash if wrong timestamp '0000-00-00' found in db ",
-  "7.15.1"  => "11.04.2018  sqlCmd accept widget textField-long, Internal MODEL is set ",
-  "7.15.0"  => "24.03.2018  new command sqlSpecial ",
-  "7.14.8"  => "21.03.2018  fix no save into database if value=0 (DbRep_OutputWriteToDB) ",
-  "7.14.7"  => "21.03.2018  exportToFile,importFromFile can use file as an argument and executeBeforeDump, executeAfterDump is considered ",
-  "7.14.6"  => "18.03.2018  attribute expimpfile can use some kinds of wildcards (exportToFile, importFromFile adapted) ",
-  "7.14.5"  => "17.03.2018  perl warnings of DbLog \$dn,\$dt,\$evt,\$rd in changeval_Push & complex ",
-  "7.14.4"  => "11.03.2018  increased timeout of BlockingCall in DbRep_firstconnect ",
-  "7.14.3"  => "07.03.2018  DbRep_firstconnect changed - get lowest timestamp in database, DbRep_Connect deleted ",
-  "7.14.2"  => "04.03.2018  fix perl warning ",
-  "7.14.1"  => "01.03.2018  currentfillup_Push bugfix for PostgreSQL ",
-  "7.14.0"  => "26.02.2018  syncStandby ",
-  "7.13.3"  => "25.02.2018  commandref revised (forum:#84953) ",
-  "7.13.2"  => "24.02.2018  DbRep_firstconnect changed, bug fix in DbRep_collaggstr for aggregation = month ",
-  "7.13.1"  => "20.02.2018  commandref revised ",
-  "7.13.0"  => "17.02.2018  changeValue can handle perl code {} as 'new string' ",
-  "7.12.0"  => "16.02.2018  compression of dumpfile, restore of compressed files possible ",
-  "7.11.0"  => "12.02.2018  new command 'repairSQLite' to repair a corrupted SQLite database ",
-  "7.10.0"  => "10.02.2018  bugfix delete attr timeYearPeriod if set other time attributes, new 'changeValue' command ",
-  "7.9.0"   => "09.02.2018  new attribute 'avgTimeWeightMean' (time weight mean calculation), code review of selection routines, maxValue handle negative values correctly, one security second for correct create TimeArray in DbRep_normRelTime ",
-  "7.8.1"   => "04.02.2018  bugfix if IsDisabled (again), code review, bugfix last dataset is not selected if timestamp is fully set ('date time'), fix '\$runtime_string_next' = '\$runtime_string_next.999';' if \$runtime_string_next is part of sql-execute place holder AND contains date+time ",
-  "7.8.0"   => "04.02.2018  new command 'eraseReadings' ", 
-  "7.7.1"   => "03.02.2018  minor fix in DbRep_firstconnect if IsDisabled ",
-  "7.7.0"   => "29.01.2018  attribute 'averageCalcForm', calculation sceme 'avgDailyMeanGWS', 'avgArithmeticMean' for averageValue ",
-  "7.6.1"   => "27.01.2018  new attribute 'sqlCmdHistoryLength' and 'fetchMarkDuplicates' for highlighting multiple datasets by fetchrows ",
-  "7.6.0"   => "26.01.2018  events containing '|' possible in fetchrows & delSeqDoublets, fetchrows displays multiple \$k entries with timestamp suffix \$k (as index), sqlCmdHistory (avaiable if sqlCmd was executed) ",
-  "7.5.5"   => "25.01.2018  minor change in delSeqDoublets ",
-  "7.5.4"   => "24.01.2018  delseqdoubl_DoParse reviewed to optimize memory usage, executeBeforeDump executeAfterDump now available for 'delSeqDoublets' ",
-  "7.5.3"   => "23.01.2018  new attribute 'ftpDumpFilesKeep', version management added to FTP-usage ",
-  "7.5.2"   => "23.01.2018  fix typo DumpRowsCurrrent, dumpFilesKeep can be set to '0', commandref revised ",
-  "7.5.1"   => "20.01.2018  DbRep_DumpDone changed to create background_processing_time before execute 'executeAfterProc' Commandref updated ",
-  "7.5.0"   => "16.01.2018  DbRep_OutputWriteToDB, set options display/writeToDB for (max|min|sum|average|diff)Value ",
-  "7.4.1"   => "14.01.2018  fix old dumpfiles not deleted by dumpMySQL clientSide ",
-  "7.4.0"   => "09.01.2018  dumpSQLite/restoreSQLite, backup/restore now available when DbLog-device has reopen xxxx running, executeBeforeDump executeAfterDump also available for optimizeTables, vacuum, restoreMySQL, restoreSQLite, attribute executeBeforeDump / executeAfterDump renamed to executeBeforeProc & executeAfterProc ",
-  "7.3.1"   => "08.01.2018  fix syntax error for perl < 5.20 ",
-  "7.3.0"   => "07.01.2018  DbRep-charfilter avoid control characters in datasets to export, impfile_Push errortext improved, expfile_DoParse changed to use aggregation for split selects in timeslices (avoid heavy memory consumption) ",
-  "7.2.1"   => "04.01.2018  bugfix month out of range that causes fhem crash ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -349,7 +286,15 @@ our %DbRep_vHintsExt_en = (
          ."MariaDB refer to <a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions "
          ."Overview</a>. ",
   "3" => "Features and restrictions of complex <a href=\"https://fhem.de/commandref.html#devspec\">device specifications (devspec) ",
-  "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Rules</a> of german weather service for calculation of average temperatures. ",
+  "2" => "With the set attribute <b>averageCalcForm = avgDailyMeanGWS</b> the average evaluation is calculated according to the specifications of the ".
+         "German weather service.<br> Since the 01.04.2001 the standard was determined as follows: <br>".
+         "<ul>".
+         "  <li> Calcuation of the daily average from 24 hour values </li> ".
+         "  <li>If more than 3 hourly values are missing -> calculation from the 4 main dates (00, 06, 12, 18 UTC) </li> ".
+         "  <li>reference time for a day usually 23:51 UTC of the previous day until 23:50 UTC </li> ".
+         "</ul>".
+         "If the requirements are not met, the message <b>insufficient values</b> appears in the evaluation. <br>".
+         "See also the information on <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>regulations</a> of the German weather service for the calculation of average temperatures. ",
   "1" => "Some helpful <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a> Entries."
 );
 
@@ -357,15 +302,22 @@ our %DbRep_vHintsExt_en = (
 our %DbRep_vHintsExt_de = (
   "4" => "Im Attribut 'valueFilter' können REGEXP zur erweiterten Feldselektion angegeben werden. Welche Felder berücksichtigt "
          ."werden, ist in der jeweiligen set-Funktion beschrieben. Für weitere Hilfe bitte die REGEXP-Dokumentation ihrer "
-         ."verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:\n"
+         ."verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:<br>"
          ."<a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions Overview</a>. ",
   "3" => "Merkmale und Restriktionen von komplexen <a href=\"https://fhem.de/commandref_DE.html#devspec\">Geräte-Spezifikationen (devspec) ",
-  "2" => "<a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
+  "2" => "Mit dem gesetzten Attribut <b>averageCalcForm = avgDailyMeanGWS</b> wird die Durchschnittsauswertung nach den Vorgaben des ".
+         "deutschen Wetterdienstes vorgenommen.<br> Seit dem 01.04.2001 wurde der Standard wie folgt festgelegt: <br>".
+         "<ul>".
+         "  <li>Berechnung der Tagesmittel aus 24 Stundenwerten </li> ".
+         "  <li>Wenn mehr als 3 Stundenwerte fehlen -> Berechnung aus den 4 Hauptterminen (00, 06, 12, 18 UTC) </li> ".
+         "  <li>Bezugszeit für einen Tag i.d.R. 23:51 UTC des Vortages bis 23:50 UTC </li> ".
+         "</ul>".
+         "Werden die Voraussetzungen nicht erfüllt, erscheint die Nachricht <b>insufficient values</b> in der Auswertung. <br>".
+         "Siehe dazu auch die Informationen zu <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
 
 # foreward declaration
-sub DbRep_Main($$;$);
 sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
 # Standard Feldbreiten falls noch nicht getInitData ausgeführt
@@ -376,7 +328,7 @@ my %dbrep_col = ("DEVICE"  => 64,
 ###################################################################################
 # DbRep_Initialize
 ###################################################################################
-sub DbRep_Initialize($) {
+sub DbRep_Initialize {
  my ($hash) = @_;
  $hash->{DefFn}        = "DbRep_Define";
  $hash->{UndefFn}      = "DbRep_Undef";
@@ -388,7 +340,8 @@ sub DbRep_Initialize($) {
  $hash->{AttrFn}       = "DbRep_Attr";
  $hash->{FW_deviceOverview} = 1;
  
- $hash->{AttrList} =   "disable:1,0 ".
+ $hash->{AttrList} =   "aggregation:minute,hour,day,week,month,year,no ".
+                       "disable:1,0 ".
                        "reading ".                       
                        "allowDeletion:1,0 ".
                        "autoForward:textField-long ".
@@ -420,7 +373,6 @@ sub DbRep_Initialize($) {
 					   "ftpUse:1,0 ".
 					   "ftpUser ".
 					   "ftpUseSSL:1,0 ".
-                       "aggregation:hour,day,week,month,year,no ".
 					   "diffAccept ".
 					   "limit ".
 					   "optimizeTablesBeforeDump:1,0 ".
@@ -471,7 +423,7 @@ return;
 ###################################################################################
 # DbRep_Define
 ###################################################################################
-sub DbRep_Define($@) {
+sub DbRep_Define {
   # define <name> DbRep <DbLog-Device> 
   #       ($hash)  [1]        [2]      
   #
@@ -518,9 +470,9 @@ return;
 }
 
 ###################################################################################
-# DbRep_Set
+#                                     Set
 ###################################################################################
-sub DbRep_Set($@) {
+sub DbRep_Set {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name           = $a[0];
@@ -541,12 +493,12 @@ sub DbRep_Set($@) {
   opendir(DIR,$dir);
   if ($dbmodel =~ /MYSQL/) {
       $dbname = $hash->{DATABASE};
-      $sd = $dbname.".*(csv|sql)"; 
+      $sd     = $dbname."_.*?(csv|sql)"; 
   } elsif ($dbmodel =~ /SQLITE/) {
       $dbname = $hash->{DATABASE};
       $dbname = (split /[\/]/, $dbname)[-1];
       $dbname = (split /\./, $dbname)[0];
-      $sd = $dbname."_.*.sqlitebkp";
+      $sd = $dbname."_.*?.sqlitebkp";
   }               
   while (my $file = readdir(DIR)) {
       next unless (-f "$dir/$file");
@@ -807,7 +759,9 @@ sub DbRep_Set($@) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
 	  delete $hash->{HELPER}{DELENTRIES};
-	  $hash->{HELPER}{DELENTRIES} = \@a;
+      shift @a;
+      shift @a;
+	  $hash->{HELPER}{DELENTRIES} = \@a if(@a);
       DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
       
@@ -983,9 +937,9 @@ return;
 }
 
 ###################################################################################
-# DbRep_Get
+#                                  Get
 ###################################################################################
-sub DbRep_Get($@) {
+sub DbRep_Get {
   my ($hash, @a) = @_;
   return "\"get X\" needs at least an argument" if ( @a < 2 );
   my $name        = $a[0];
@@ -1174,9 +1128,9 @@ return;
 }
 
 ###################################################################################
-# DbRep_Attr
+#                                       Attr
 ###################################################################################
-sub DbRep_Attr($$$$) {
+sub DbRep_Attr {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash      = $defs{$name};
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -1465,9 +1419,9 @@ return undef;
 }
 
 ###################################################################################
-# DbRep_Notify Eventverarbeitung
+#                                 Eventverarbeitung
 ###################################################################################
-sub DbRep_Notify($$) {
+sub DbRep_Notify {
  # Es werden nur die Events von Geräten verarbeitet die im Hash $hash->{NOTIFYDEV} gelistet sind (wenn definiert).
  # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben.
  # Beispiele:
@@ -1539,7 +1493,7 @@ return;
 ###################################################################################
 # DbRep_Undef
 ###################################################################################
-sub DbRep_Undef($$) {
+sub DbRep_Undef {
  my ($hash, $arg) = @_;
  
  RemoveInternalTimer($hash);
@@ -1569,7 +1523,7 @@ return undef;
 # FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 ###################################################################################
-sub DbRep_Delete($$) {
+sub DbRep_Delete {
     my ($hash, $arg) = @_;
     my $name = $hash->{NAME};
     
@@ -1583,7 +1537,7 @@ return undef;
 ###################################################################################
 # DbRep_Shutdown
 ###################################################################################
-sub DbRep_Shutdown($) {  
+sub DbRep_Shutdown {  
   my ($hash) = @_;
  
   my $dbh = $hash->{DBH}; 
@@ -1598,7 +1552,7 @@ return undef;
 #        First Init DB Connect 
 #        Verbindung zur DB aufbauen und Datenbankeigenschaften ermitteln 
 ###################################################################################
-sub DbRep_firstconnect(@) {
+sub DbRep_firstconnect {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
   my $hash      = $defs{$name};
@@ -1638,7 +1592,7 @@ return;
 ####################################################################################################
 #                             DatenDatenbankeigenschaften ermitteln  
 ####################################################################################################
-sub DbRep_getInitData($) {
+sub DbRep_getInitData {
   my ($string)     = @_;
   my ($name,$opt,$prop,$fret) = split("\\|", $string);
   my $hash       = $defs{$name};
@@ -1745,7 +1699,7 @@ return "$name|$mints|$rt|0|$opt|$prop|$fret|$idxstate|$grants";
 ####################################################################################################
 #                           Auswertungsroutine DbRep_getInitData
 ####################################################################################################
-sub DbRep_getInitDataDone($) {
+sub DbRep_getInitDataDone {
   my ($string)       = @_;
   my @a              = split("\\|",$string);
   my $hash           = $defs{$a[0]};
@@ -1794,7 +1748,7 @@ return &$fret($hash,$opt,$prop);
 ####################################################################################################
 #                                 Abbruchroutine DbRep_getInitData 
 ####################################################################################################
-sub DbRep_getInitDataAborted(@) {
+sub DbRep_getInitDataAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   
@@ -1814,7 +1768,7 @@ return;
 ######################################################################################
 #                       Connect zur Datenbank herstellen
 ######################################################################################
-sub DbRep_dbConnect($$) {
+sub DbRep_dbConnect {
   my ($name,$uac) = @_;
   my $hash        = $defs{$name};
   my $dbconn      = $defs{$defs{$name}->{HELPER}{DBLOGDEVICE}}->{dbconn};
@@ -1838,12 +1792,14 @@ sub DbRep_dbConnect($$) {
       }
   }
   
-  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, 
-                                                                    RaiseError => 1, 
-                                                                    AutoCommit => 1, 
+  eval { $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError          => 0, 
+                                                                    RaiseError          => 1, 
+                                                                    AutoCommit          => 1, 
                                                                     AutoInactiveDestroy => 1,
-                                                                    mysql_enable_utf8 => $utf8
-                                                                  } ); };
+                                                                    mysql_enable_utf8   => $utf8
+                                                                  } 
+                            ); 
+  };
   
   if ($@) {
       $err = $@;
@@ -1858,7 +1814,7 @@ return ($err,$dbh);
 ################################################################################################################
 #                                              Hauptroutine
 ################################################################################################################
-sub DbRep_Main($$;$) {
+sub DbRep_Main {
  my ($hash,$opt,$prop) = @_;
  my $name      = $hash->{NAME}; 
  my $to        = AttrVal($name, "timeout", "86400");
@@ -2037,10 +1993,10 @@ sub DbRep_Main($$;$) {
          
  } elsif ($opt eq "delEntries") {
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
      my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-     if($nthants >= $othants) {
+     if($nthants > $othants) {
 	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
          return;
 	 }  
@@ -2139,7 +2095,7 @@ sub DbRep_Main($$;$) {
      my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
      my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
      my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
-     if($nthants >= $othants) {
+     if($nthants > $othants) {
 	     ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
          return;
 	 } 
@@ -2156,7 +2112,7 @@ return;
 ################################################################################################################
 #                              Create zentrales Timsstamp-Array
 ################################################################################################################
-sub DbRep_createTimeArray($$$) {
+sub DbRep_createTimeArray {
  my ($hash,$aggregation,$opt) = @_;
  my $name = $hash->{NAME}; 
 
@@ -2476,10 +2432,10 @@ sub DbRep_createTimeArray($$$) {
  my $testr   = strftime "%H:%M:%S", localtime($epoch_seconds_end);      # für Berechnung Tagesverschieber / Stundenverschieber
  my $dsstr   = strftime "%Y-%m-%d", localtime($runtime);                # für Berechnung Tagesverschieber / Stundenverschieber
  my $destr   = strftime "%Y-%m-%d", localtime($epoch_seconds_end);      # für Berechnung Tagesverschieber / Stundenverschieber
- my $msstr   = strftime "%m", localtime($runtime);                      # Startmonat für Berechnung Monatsverschieber
- my $mestr   = strftime "%m", localtime($epoch_seconds_end);            # Endemonat für Berechnung Monatsverschieber
- my $ysstr   = strftime "%Y", localtime($runtime);                      # Startjahr für Berechnung Monatsverschieber
- my $yestr   = strftime "%Y", localtime($epoch_seconds_end);            # Endejahr für Berechnung Monatsverschieber
+ my $msstr   = strftime "%m",       localtime($runtime);                # Startmonat für Berechnung Monatsverschieber
+ my $mestr   = strftime "%m",       localtime($epoch_seconds_end);      # Endemonat für Berechnung Monatsverschieber
+ my $ysstr   = strftime "%Y",       localtime($runtime);                # Startjahr für Berechnung Monatsverschieber
+ my $yestr   = strftime "%Y",       localtime($epoch_seconds_end);      # Endejahr für Berechnung Monatsverschieber
  
  my $wd = strftime "%a", localtime($runtime);                           # Wochentag des aktuellen Startdatum/Zeit
  my $wdadd = 604800 if($wd eq "Mo");                                    # wenn Start am "Mo" dann nächste Grenze +7 Tage
@@ -2493,7 +2449,9 @@ sub DbRep_createTimeArray($$$) {
  Log3 ($name, 5, "DbRep $name - weekday start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
  
  my $aggsec;
- if ($aggregation eq "hour") {
+ if ($aggregation eq "minute") {
+     $aggsec = 60;
+ } elsif ($aggregation eq "hour") {
      $aggsec = 3600;
  } elsif ($aggregation eq "day") {
      $aggsec = 86400;
@@ -2538,9 +2496,12 @@ return ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_s
 }
 
 ####################################################################################################
+#  
 #  Zusammenstellung Aggregationszeiträume
+#  $runtime = Beginnzeit in Epochesekunden
+#
 ####################################################################################################
-sub DbRep_collaggstr($$$$) {
+sub DbRep_collaggstr {
  my ($hash,$runtime,$i,$runtime_string_next) = @_;
  my $name = $hash->{NAME};
  my $runtime_string;                                               # Datum/Zeit im SQL-Format für Readingname Teilstring
@@ -2623,9 +2584,10 @@ sub DbRep_collaggstr($$$$) {
      my $rm   = strftime "%m", localtime($runtime);                    # Monat des aktuell laufenden Startdatums d. SQL-Select
      my $ry   = strftime "%Y", localtime($runtime);                    # Jahr des aktuell laufenden Startdatums d. SQL-Select
      my $dim  = $rm-2?30+($rm*3%7<4):28+!($ry%4||$ry%400*!($ry%100));  # Anzahl Tage des aktuell laufenden Monats
-     Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
-     $aggsec = $dim * 86400;
      
+     Log3 ($name, 5, "DbRep $name - act year:  $ry, act month: $rm, days in month: $dim, endyear: $yestr, endmonth: $mestr"); 
+     
+     $aggsec  = $dim * 86400;
      $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);      # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                           
      $runtime_string = strftime "%Y-%m", localtime($runtime);          # für Readingname
@@ -2675,9 +2637,9 @@ sub DbRep_collaggstr($$$$) {
          
          # Korrektur $runtime_orig für Berechnung neue Beginnzeit für nächsten Durchlauf 
          my ($yyyy1, $mm1, $dd1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+)/);
-         $runtime = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
-         $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-         $runtime = $runtime+$wdadd;
+         $runtime      = timelocal("00", "00", "00", $dd1, $mm1-1, $yyyy1-1900);
+         $runtime      = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);           # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+         $runtime      = $runtime+$wdadd;
          $runtime_orig = $runtime-$aggsec;                             
          
          # die Woche Beginn ist gleich der Woche vom Ende Auswertung
@@ -2690,7 +2652,7 @@ sub DbRep_collaggstr($$$$) {
      } else {
          # weitere Durchläufe
          if(($runtime+$aggsec) > $epoch_seconds_end) {
-             $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime_orig);
+             $runtime_string_first = strftime "%Y-%m-%d",          localtime($runtime_orig);
              $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end); 
              $ll=1;
          } else {
@@ -2705,13 +2667,13 @@ sub DbRep_collaggstr($$$$) {
 
  # Tagesaggregation
  if ($aggregation eq "day") {  
-     $runtime_string       = strftime "%Y-%m-%d", localtime($runtime);                      # für Readingname
+     $runtime_string       = strftime "%Y-%m-%d",          localtime($runtime);                      # für Readingname
      $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-     $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime) if($i>1);
-     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+     $runtime_string_first = strftime "%Y-%m-%d",          localtime($runtime) if($i>1);
+     $runtime              = $runtime+3600                 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
                                        
      if((($tsstr gt $testr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-         $runtime_string_first = strftime "%Y-%m-%d", localtime($runtime);                    
+         $runtime_string_first = strftime "%Y-%m-%d",          localtime($runtime);                    
          $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
@@ -2727,25 +2689,52 @@ sub DbRep_collaggstr($$$$) {
 
  # Stundenaggregation
  if ($aggregation eq "hour") {
-     $runtime_string       = strftime "%Y-%m-%d_%H", localtime($runtime);                   # für Readingname
+     $runtime_string       = strftime "%Y-%m-%d_%H",       localtime($runtime);                   # für Readingname
      $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
-     $runtime = $runtime+3600 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
-     $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime) if($i>1);
+     $runtime              = $runtime+3600                 if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+     $runtime_string_first = strftime "%Y-%m-%d %H",       localtime($runtime) if($i>1);
      
-     my @a = split (":",$tsstr);
-     my $hs = $a[0];
+     my @a     = split (":",$tsstr);
+     my $hs    = $a[0];
      my $msstr = $a[1].":".$a[2];
-     @a = split (":",$testr);
-     my $he = $a[0];
+     @a        = split (":",$testr);
+     my $he    = $a[0];
      my $mestr = $a[1].":".$a[2];
      
      if((($msstr gt $mestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
-         $runtime_string_first = strftime "%Y-%m-%d %H", localtime($runtime);                 
+         $runtime_string_first = strftime "%Y-%m-%d %H",       localtime($runtime);                 
          $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if( $dsstr eq $destr && $hs eq $he);
          $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
          $ll=1;
      } else {
          $runtime_string_next  = strftime "%Y-%m-%d %H", localtime($runtime+$aggsec);   
+     }
+
+     # neue Beginnzeit in Epoche-Sekunden
+     $runtime = $runtime+$aggsec;         
+ }
+ 
+ # Minutenaggregation
+ if ($aggregation eq "minute") {
+     $runtime_string       = strftime "%Y-%m-%d_%H_%M",    localtime($runtime);                   # für Readingname
+     $runtime_string_first = strftime "%Y-%m-%d %H:%M:%S", localtime($runtime) if($i==1);
+     $runtime              = $runtime+60                   if(DbRep_dsttest($hash,$runtime,$aggsec) && (strftime "%m", localtime($runtime)) > 6);                          # Korrektur Winterzeitumstellung (Uhr wurde 1 Stunde zurück gestellt)
+     $runtime_string_first = strftime "%Y-%m-%d %H:%M",    localtime($runtime) if($i>1);
+     
+     my @a     = split (":",$tsstr);
+     my $ms    = $a[1];
+     my $ssstr = $a[2];
+     @a        = split (":",$testr);
+     my $me    = $a[1];
+     my $sestr = $a[2];
+     
+     if((($ssstr gt $sestr) ? $runtime : ($runtime+$aggsec)) > $epoch_seconds_end) {
+         $runtime_string_first = strftime "%Y-%m-%d %H:%M",    localtime($runtime);                 
+         # $runtime_string_first = strftime "%Y-%m-%d %H:%M", localtime($runtime) if( $dsstr eq $destr && $ms eq $me);
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+         $ll=1;
+     } else {
+         $runtime_string_next  = strftime "%Y-%m-%d %H:%M", localtime($runtime+$aggsec);   
      }
 
      # neue Beginnzeit in Epoche-Sekunden
@@ -2758,7 +2747,7 @@ return ($runtime,$runtime_string,$runtime_string_first,$runtime_string_next,$ll)
 ####################################################################################################
 # nichtblockierende DB-Abfrage averageValue
 ####################################################################################################
-sub averval_DoParse($) {
+sub averval_DoParse {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -2853,10 +2842,15 @@ sub averval_DoParse($) {
      
          Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);
          
-         if(AttrVal($name, "aggregation", "") eq "hour") {
+         my $aval = (DbRep_checktimeaggr($hash))[2];
+         if($aval eq "hour") {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
+         } elsif ($aval eq "minute") {
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
@@ -2911,13 +2905,18 @@ sub averval_DoParse($) {
          } elsif ($anz >= 4 && $t01 && $t07 && $t13 && $t19) {
              $sum = ($t01+$t07+$t13+$t19)/4;
          } else {
-             $sum = "insufficient values";
+             $sum = qq{<html>insufficient values - execute <b>get $name versionNotes 2</b> for further information</html>};
          }
 
-         if(AttrVal($name, "aggregation", "") eq "hour") {
+         my $aval = (DbRep_checktimeaggr($hash))[2];
+         if($aval eq "hour") {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+         } elsif ($aval eq "minute") {
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
@@ -2925,7 +2924,7 @@ sub averval_DoParse($) {
          }
          @wsf    = split(" ",$runtime_string_first);
          @wsn    = split(" ",$runtime_string_next);
-         $wrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB
+         $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
               
      } elsif ($acf eq "avgTimeWeightMean") {
          # zeitgewichteten Mittelwert berechnen
@@ -3003,10 +3002,16 @@ sub averval_DoParse($) {
                  Log3 ($name, 5, "DbRep $name - time sum: $tsum, delta time: $dt, value: $val1, twm: ".$val1*($dt/$tsum));                 
              }             
          }               
-         if(AttrVal($name, "aggregation", "") eq "hour") {
+         
+         my $aval = (DbRep_checktimeaggr($hash))[2];
+         if($aval eq "hour") {
              @rsf     = split(/[ :]/,$runtime_string_first);
              @rsn     = split(/[ :]/,$runtime_string_next);
              $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."|";
+         } elsif ($aval eq "minute") {
+             @rsf     = split(/[ :]/,$runtime_string_first);
+             @rsn     = split(/[ :]/,$runtime_string_next);
+             $arrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."-".$rsf[2]."|";
          } else {
              @rsf     = split(" ",$runtime_string_first);
              @rsn     = split(" ",$runtime_string_next);
@@ -3014,7 +3019,7 @@ sub averval_DoParse($) {
          }
          @wsf    = split(" ",$runtime_string_first);
          @wsn    = split(" ",$runtime_string_next);
-         $wrstr .= $runtime_string."#".$sum."#".$rsf[0]."_".$rsf[1]."#".$rsn[0]."_".$rsn[1]."|";    # Kombi zum Rückschreiben in die DB         
+         $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
      }
  }   
   
@@ -3051,7 +3056,7 @@ sub averval_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage averageValue
 ####################################################################################################
-sub averval_ParseDone($) {
+sub averval_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -3126,7 +3131,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage count
 ####################################################################################################
-sub count_DoParse($) {
+sub count_DoParse {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -3241,7 +3246,7 @@ sub count_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage count
 ####################################################################################################
-sub count_ParseDone($) {
+sub count_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -3305,7 +3310,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage maxValue
 ####################################################################################################
-sub maxval_DoParse($) {
+sub maxval_DoParse {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -3370,9 +3375,13 @@ sub maxval_DoParse($) {
      my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next } @{ $sth->fetchall_arrayref() };
          
      if(!@array) {
-         if(AttrVal($name, "aggregation", "") eq "hour") {
+         my $aval = AttrVal($name, "aggregation", "");
+         if($aval eq "hour") {
              my @rsf = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
+         } elsif($aval eq "minute") {
+             my @rsf = split(/[ :]/,$runtime_string_first);
+             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          } else {
              my @rsf = split(" ",$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
@@ -3481,7 +3490,7 @@ sub maxval_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage maxValue
 ####################################################################################################
-sub maxval_ParseDone($) {
+sub maxval_ParseDone {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash      = $defs{$a[0]};
@@ -3549,7 +3558,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage minValue
 ####################################################################################################
-sub minval_DoParse($) {
+sub minval_DoParse {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -3614,9 +3623,13 @@ sub minval_DoParse($) {
      my @array = map { $runtime_string." ".$_->[0]." ".$_->[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next } @{ $sth->fetchall_arrayref() };
          
      if(!@array) {
-         if(AttrVal($name, "aggregation", "") eq "hour") {
+         my $aval = AttrVal($name, "aggregation", "");
+         if($aval eq "hour") {
              my @rsf = split(/[ :]/,$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
+         } elsif($aval eq "minute") {
+             my @rsf = split(/[ :]/,$runtime_string_first);
+             @array = ($runtime_string." "."0"." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
          } else {
              my @rsf = split(" ",$runtime_string_first);
              @array = ($runtime_string." "."0"." ".$rsf[0]."!_ESC_!".$runtime_string_first."|".$runtime_string_next);
@@ -3725,7 +3738,7 @@ sub minval_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage minValue
 ####################################################################################################
-sub minval_ParseDone($) {
+sub minval_ParseDone {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
@@ -3793,7 +3806,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage diffValue
 ####################################################################################################
-sub diffval_DoParse($) {
+sub diffval_DoParse {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -3902,9 +3915,13 @@ sub diffval_DoParse($) {
 		 }
 		 
          if(!@array) {
-             if(AttrVal($name, "aggregation", "") eq "hour") {
+             my $aval = AttrVal($name, "aggregation", "");
+             if($aval eq "hour") {
                  my @rsf = split(/[ :]/,$runtime_string_first);
                  @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."\n");
+             } elsif($aval eq "minute") {
+                 my @rsf = split(/[ :]/,$runtime_string_first);
+                 @array  = ($runtime_string." ".$rsf[0]."_".$rsf[1]."-".$rsf[2]."\n");
              } else {
                  my @rsf = split(" ",$runtime_string_first);
                  @array  = ($runtime_string." ".$rsf[0]."\n");
@@ -4057,7 +4074,7 @@ sub diffval_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage diffValue
 ####################################################################################################
-sub diffval_ParseDone($) {
+sub diffval_ParseDone {
   my ($string) = @_;
   my @a = split("\\|",$string);
   my $hash = $defs{$a[0]};
@@ -4147,7 +4164,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage sumValue
 ####################################################################################################
-sub sumval_DoParse($) {
+sub sumval_DoParse {
  my ($string) = @_;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -4270,7 +4287,7 @@ sub sumval_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sumValue
 ####################################################################################################
-sub sumval_ParseDone($) {
+sub sumval_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -4333,7 +4350,7 @@ return;
 ####################################################################################################
 # nichtblockierendes DB delete
 ####################################################################################################
-sub del_DoParse($) {
+sub del_DoParse {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -4347,23 +4364,25 @@ sub del_DoParse($) {
  # Background-Startzeit
  my $bst = [gettimeofday];
  
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
- 
- if ($@) {
-     $err = encode_base64($@,"");
-     Log3 ($name, 2, "DbRep $name - $@");
-     return "$name|''|''|$err|''|''|''";
- }
- 
  # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
+ 
+ BlockingInformParent("DbRep_delHashValFromBlocking", [$name, "HELPER","DELENTRIES"], 1);
  
  # SQL zusammenstellen für DB-Operation
  if ($IsTimeSet || $IsAggrSet) {
      $sql = DbRep_createDeleteSql($hash,$table,$device,$reading,$runtime_string_first,$runtime_string_next,''); 
  } else {
      $sql = DbRep_createDeleteSql($hash,$table,$device,$reading,undef,undef,''); 
+ }
+ 
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
+ 
+ if ($@) {
+     $err = encode_base64($@,"");
+     Log3 ($name, 2, "DbRep $name - $@");
+     return "$name|''|''|$err|''|''|''";
  }
 
  $sth = $dbh->prepare($sql); 
@@ -4401,7 +4420,7 @@ sub del_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine DB delete
 ####################################################################################################
-sub del_ParseDone($) {
+sub del_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -4458,7 +4477,7 @@ return;
 ####################################################################################################
 # nichtblockierendes DB insert
 ####################################################################################################
-sub insert_Push($) {
+sub insert_Push {
  my ($name)     = @_;
  my $hash       = $defs{$name};
  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -4546,7 +4565,7 @@ sub insert_Push($) {
 ####################################################################################################
 # Auswertungsroutine DB insert
 ####################################################################################################
-sub insert_Done($) {
+sub insert_Done {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -4591,7 +4610,7 @@ return;
 ####################################################################################################
 #   Current-Tabelle mit Device,Reading Kombinationen aus history auffüllen
 ####################################################################################################
-sub currentfillup_Push($) {
+sub currentfillup_Push {
  my ($string)     = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -4700,7 +4719,7 @@ sub currentfillup_Push($) {
 ####################################################################################################
 #                      Auswertungsroutine Current-Tabelle auffüllen
 ####################################################################################################
-sub currentfillup_Done($) {
+sub currentfillup_Done {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -4745,7 +4764,7 @@ return;
 ####################################################################################################
 # nichtblockierendes DB deviceRename / readingRename
 ####################################################################################################
-sub change_Push($) {
+sub change_Push {
  my ($string) = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -4847,7 +4866,7 @@ sub change_Push($) {
 ####################################################################################################
 #                        nichtblockierendes DB changeValue (Field VALUE)
 ####################################################################################################
-sub changeval_Push($) {
+sub changeval_Push {
  my ($string) = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -5026,7 +5045,7 @@ sub changeval_Push($) {
 ####################################################################################################
 # Auswertungsroutine DB deviceRename/readingRename/changeValue
 ####################################################################################################
-sub change_Done($) {
+sub change_Done {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -5092,7 +5111,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage fetchrows
 ####################################################################################################
-sub fetchrows_DoParse($) {
+sub fetchrows_DoParse {
  my ($string) = @_;
  my ($name,$table,$device,$reading,$runtime_string_first,$runtime_string_next) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -5177,7 +5196,7 @@ sub fetchrows_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage fetchrows
 ####################################################################################################
-sub fetchrows_ParseDone($) {
+sub fetchrows_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -5292,7 +5311,7 @@ return;
 ####################################################################################################
 #                                 Doubletten finden und löschen
 ####################################################################################################
-sub deldoublets_DoParse($) {
+sub deldoublets_DoParse {
  my ($string) = @_;
  my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -5455,7 +5474,7 @@ return "$name|$rowlist|$rt|0|$retn|$opt";
 ####################################################################################################
 #                              sequentielle Doubletten löschen
 ####################################################################################################
-sub delseqdoubl_DoParse($) {
+sub delseqdoubl_DoParse {
  my ($string) = @_;
  my ($name,$opt,$device,$reading,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -5665,7 +5684,7 @@ return "$name|$rowlist|$rt|0|$retn|$opt";
 ####################################################################################################
 #                      Auswertungsroutine delSeqDoublets / delDoublets
 ####################################################################################################
-sub delseqdoubl_ParseDone($) {
+sub delseqdoubl_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -5737,7 +5756,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Funktion expfile
 ####################################################################################################
-sub expfile_DoParse($) {
+sub expfile_DoParse {
  my ($string) = @_;
  my ($name, $device, $reading, $rsf, $file, $ts) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -5880,7 +5899,7 @@ sub expfile_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Funktion expfile
 ####################################################################################################
-sub expfile_ParseDone($) {
+sub expfile_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -5926,7 +5945,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Funktion impfile
 ####################################################################################################
-sub impfile_Push($) {
+sub impfile_Push {
  my ($string) = @_;
  my ($name, $rsf, $file) = split("\\|", $string);
  my $hash       = $defs{$name};
@@ -6082,7 +6101,7 @@ sub impfile_Push($) {
 ####################################################################################################
 #             Auswertungsroutine der nichtblockierenden DB-Funktion impfile
 ####################################################################################################
-sub impfile_PushDone($) {
+sub impfile_PushDone {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -6126,7 +6145,7 @@ return;
 ####################################################################################################
 # set logdbrep sqlCmd select count(*) from history
 # set logdbrep sqlCmd select DEVICE,count(*) from history group by DEVICE HAVING count(*) > 10000
-sub sqlCmd_DoParse($) {
+sub sqlCmd_DoParse {
   my ($string) = @_;
   my ($name, $opt, $runtime_string_first, $runtime_string_next, $cmd) = split("\\|", $string);
   my $hash       = $defs{$name};
@@ -6294,7 +6313,7 @@ sub sqlCmd_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sqlCmd
 ####################################################################################################
-sub sqlCmd_ParseDone($) {
+sub sqlCmd_ParseDone {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -6415,7 +6434,7 @@ return;
 ####################################################################################################
 # nichtblockierende DB-Abfrage get db Metadaten
 ####################################################################################################
-sub dbmeta_DoParse($) {
+sub dbmeta_DoParse {
  my ($string)    = @_;
  my @a           = split("\\|",$string);
  my $name        = $a[0];
@@ -6621,7 +6640,7 @@ sub dbmeta_DoParse($) {
 ####################################################################################################
 # Auswertungsroutine der nichtblockierenden DB-Abfrage get db Metadaten
 ####################################################################################################
-sub dbmeta_ParseDone($) {
+sub dbmeta_ParseDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -6676,7 +6695,7 @@ return;
 #     drop_Report_Idx
 #
 ####################################################################################################
-sub DbRep_Index($) {
+sub DbRep_Index {
   my ($string)   = @_;
   my ($name,$cmdidx) = split("\\|", $string);
   my $hash       = $defs{$name};
@@ -6858,7 +6877,7 @@ return "$name|$ret|$rt|''";
 ####################################################################################################
 #                     Auswertungsroutine Index Operation
 ####################################################################################################
-sub DbRep_IndexDone($) {
+sub DbRep_IndexDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $name       = $a[0];
@@ -6896,7 +6915,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Index operation
 ####################################################################################################
-sub DbRep_IndexAborted(@) {
+sub DbRep_IndexAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
@@ -6923,7 +6942,7 @@ return;
 ####################################################################################################
 #                             optimize Tables alle Datenbanken 
 ####################################################################################################
-sub DbRep_optimizeTables($) {
+sub DbRep_optimizeTables {
  my ($name)        = @_;
  my $hash          = $defs{$name};
  my $dbloghash     = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -7106,7 +7125,7 @@ return "$name|$rt|''|$db_MB_start|$db_MB_end";
 ####################################################################################################
 #             Auswertungsroutine optimize tables
 ####################################################################################################
-sub DbRep_OptimizeDone($) {
+sub DbRep_OptimizeDone {
   my ($string)     = @_;
   my @a            = split("\\|",$string);
   my $hash         = $defs{$a[0]};
@@ -7150,7 +7169,7 @@ return;
 ####################################################################################################
 # nicht blockierende Dump-Routine für MySQL (clientSide)
 ####################################################################################################
-sub mysql_DoDumpClientSide($) {
+sub mysql_DoDumpClientSide {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
  my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -7624,7 +7643,7 @@ return "$name|$rt|''|$dump_path$backupfile|$drc|$drh|$fsize|$ftp|$bfd|$ffd";
 ####################################################################################################
 #                  nicht blockierende Dump-Routine für MySQL (serverSide)
 ####################################################################################################
-sub mysql_DoDumpServerSide($) {
+sub mysql_DoDumpServerSide {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
  my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -7799,7 +7818,7 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.|$drh|$fsize|$ftp|$bfd|$ffd";
 ####################################################################################################
 #                                      Dump-Routine SQLite
 ####################################################################################################
-sub DbRep_sqliteDoDump($) {
+sub DbRep_sqliteDoDump {
  my ($name)                     = @_;
  my $hash                       = $defs{$name};
  my $dbloghash                  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -7923,7 +7942,7 @@ return "$name|$rt|''|$dump_path$bfile|n.a.|n.a.|$fsize|$ftp|$bfd|$ffd";
 ####################################################################################################
 #             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
 ####################################################################################################
-sub DbRep_DumpDone($) {
+sub DbRep_DumpDone {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -7979,7 +7998,7 @@ return;
 ####################################################################################################
 #                                      Dump-Routine SQLite
 ####################################################################################################
-sub DbRep_sqliteRepair($) {
+sub DbRep_sqliteRepair {
  my ($name)       = @_;
  my $hash         = $defs{$name};
  my $dbloghash    = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -8046,7 +8065,7 @@ return "$name|$brt|0";
 ####################################################################################################
 #             Auswertungsroutine der nicht blockierenden DB-Funktion Dump
 ####################################################################################################
-sub DbRep_RepairDone($) {
+sub DbRep_RepairDone {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -8091,7 +8110,7 @@ return;
 ####################################################################################################
 #                                     Restore SQLite
 ####################################################################################################
-sub DbRep_sqliteRestore ($) {
+sub DbRep_sqliteRestore {
  my ($string) = @_;
  my ($name,$bfile) = split("\\|", $string);
  my $hash          = $defs{$name};
@@ -8169,7 +8188,7 @@ return "$name|$rt|''|$dump_path$bfile|n.a.";
 ####################################################################################################
 #                  Restore MySQL (serverSide)
 ####################################################################################################
-sub mysql_RestoreServerSide($) {
+sub mysql_RestoreServerSide {
  my ($string) = @_;
  my ($name, $bfile)      = split("\\|", $string);
  my $hash                = $defs{$name};
@@ -8243,7 +8262,7 @@ return "$name|$rt|''|$dump_path_rem$bfile|n.a.";
 ####################################################################################################
 #                  Restore MySQL (ClientSide)
 ####################################################################################################
-sub mysql_RestoreClientSide($) {
+sub mysql_RestoreClientSide {
  my ($string) = @_;
  my ($name, $bfile)      = split("\\|", $string);
  my $hash                = $defs{$name};
@@ -8263,7 +8282,7 @@ sub mysql_RestoreClientSide($) {
  my $bst = [gettimeofday];
  
  # Verbindung mit DB
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 1 });};
  if ($@) {
      $e = $@;
 	 $err = encode_base64($e,"");
@@ -8432,7 +8451,7 @@ return "$name|$rt|''|$dump_path$bfile|$nh|$nc";
 ####################################################################################################
 #                                  Auswertungsroutine Restore
 ####################################################################################################
-sub DbRep_restoreDone($) {
+sub DbRep_restoreDone {
   my ($string)   = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -8474,7 +8493,7 @@ return;
 ####################################################################################################
 #      Übertragung Datensätze in weitere DB
 ####################################################################################################
-sub DbRep_syncStandby($) {
+sub DbRep_syncStandby {
  my ($string) = @_;
  my ($name,$device,$reading,$runtime_string_first,$runtime_string_next,$ts,$stbyname) = split("\\§", $string);
  my $hash       = $defs{$name};
@@ -8498,7 +8517,7 @@ sub DbRep_syncStandby($) {
  my $bst = [gettimeofday];
  
  # Verbindung zur Quell-DB
- eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, mysql_enable_utf8 => $utf8 });};
+ eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  if ($@) {
      $err = encode_base64($@,"");
      Log3 ($name, 2, "DbRep $name - $@");
@@ -8591,7 +8610,7 @@ sub DbRep_syncStandby($) {
 ####################################################################################################
 #         Auswertungsroutine Übertragung Datensätze in weitere DB
 ####################################################################################################
-sub DbRep_syncStandbyDone($) {
+sub DbRep_syncStandbyDone {
   my ($string) = @_;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
@@ -8632,7 +8651,7 @@ return;
 #           $ots - reduce Logs älter als: Attribut "timeOlderThan" oder "timestamp_begin"
 #           $nts - reduce Logs neuer als: Attribut "timeDiffToNow" oder "timestamp_end"
 ####################################################################################################
-sub DbRep_reduceLog($) {
+sub DbRep_reduceLog {
     my ($string)   = @_;
     my ($name,$d,$r,$nts,$ots) = split("\\|", $string);
     my $hash       = $defs{$name};
@@ -8996,7 +9015,7 @@ return "$name|$ret|0|$brt";
 ####################################################################################################
 #                   reduceLog non-blocking Rückkehrfunktion
 ####################################################################################################
-sub DbRep_reduceLogDone($) {
+sub DbRep_reduceLogDone {
   my ($string)  = @_;
   my @a         = split("\\|",$string);
   my $name      = $a[0];
@@ -9039,7 +9058,7 @@ return;
 ####################################################################################################
 #                                Abbruchroutine Timeout reduceLog
 ####################################################################################################
-sub DbRep_reduceLogAborted(@) {
+sub DbRep_reduceLogAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -9067,7 +9086,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout Restore
 ####################################################################################################
-sub DbRep_restoreAborted(@) {
+sub DbRep_restoreAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -9095,7 +9114,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub DbRep_ParseAborted(@) {
+sub DbRep_ParseAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh = $hash->{DBH}; 
@@ -9123,7 +9142,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Dump
 ####################################################################################################
-sub DbRep_DumpAborted(@) {
+sub DbRep_DumpAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -9152,7 +9171,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Timeout DB-Abfrage
 ####################################################################################################
-sub DbRep_OptimizeAborted(@) {
+sub DbRep_OptimizeAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $dbh  = $hash->{DBH}; 
@@ -9179,7 +9198,7 @@ return;
 ####################################################################################################
 #                    Abbruchroutine Repair SQlite
 ####################################################################################################
-sub DbRep_RepairAborted(@) {
+sub DbRep_RepairAborted {
   my ($hash,$cause) = @_;
   my $name      = $hash->{NAME};
   my $dbh       = $hash->{DBH}; 
@@ -9208,7 +9227,7 @@ return;
 ####################################################################################################
 #               SQL-Statement zusammenstellen Common
 ####################################################################################################
-sub DbRep_createCommonSql ($$$$$$$) {
+sub DbRep_createCommonSql {
  my ($hash,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -9314,7 +9333,7 @@ return $sql;
 ####################################################################################################
 #               SQL-Statement zusammenstellen für DB-Abfrage Select
 ####################################################################################################
-sub DbRep_createSelectSql($$$$$$$$) {
+sub DbRep_createSelectSql {
  my ($hash,$table,$selspec,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -9420,7 +9439,7 @@ return $sql;
 ####################################################################################################
 #  SQL-Statement zusammenstellen für Löschvorgänge
 ####################################################################################################
-sub DbRep_createDeleteSql($$$$$$$) {
+sub DbRep_createDeleteSql {
  my ($hash,$table,$device,$reading,$tf,$tn,$addon) = @_;
  my $name      = $hash->{NAME};
  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -9530,7 +9549,7 @@ return $sql;
 ####################################################################################################
 #               Ableiten von Device, Reading-Spezifikationen 
 ####################################################################################################
-sub DbRep_specsForSql($$$) {
+sub DbRep_specsForSql {
  my ($hash,$device,$reading) = @_;
  my $name    = $hash->{NAME};
  my (@idvspcs,@edvspcs,@idvs,@edvs,@idvswc,@edvswc,@residevs,@residevswc);
@@ -9705,7 +9724,7 @@ return ($idevs,$idevswc,$idanz,$irdgs,$iranz,$irdswc,$edevs,$edevswc,$edanz,$erd
 ####################################################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 ####################################################################################################
-sub DbRep_trim ($) {
+sub DbRep_trim {
  my $str = shift;
  $str =~ s/^\s+|\s+$//g;
 return ($str);
@@ -9714,7 +9733,7 @@ return ($str);
 ####################################################################################################
 #                  Sekunden in Format hh:mm:ss umwandeln         
 ####################################################################################################
-sub DbRep_sec2hms ($) {
+sub DbRep_sec2hms {
  my $s = shift;
  my $hms;
  
@@ -9729,8 +9748,8 @@ return ("$hh:$mm:$ss");
 #    Check ob Zeitgrenzen bzw. Aggregation gesetzt sind, evtl. überseuern (je nach Funktion)
 #    Return "1" wenn Bedingung erfüllt, sonst "0"
 ####################################################################################################
-sub DbRep_checktimeaggr ($) {
- my ($hash)      = @_;
+sub DbRep_checktimeaggr {
+ my $hash        = shift // return;
  my $name        = $hash->{NAME};
  my $IsTimeSet   = 0;
  my $IsAggrSet   = 0;
@@ -9758,7 +9777,7 @@ sub DbRep_checktimeaggr ($) {
      $IsAggrSet = 1;
  }
  if($hash->{LASTCMD} =~ /delSeqDoublets|delDoublets/) {
-     $aggregation = ($aggregation eq "no")?"day":$aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
+     $aggregation = ($aggregation eq "no") ? "day" : $aggregation;       # wenn Aggregation "no", für delSeqDoublets immer "day" setzen
 	 $IsAggrSet   = 1;
  }
  if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name,"averageCalcForm","avgArithmeticMean") eq "avgDailyMeanGWS") {
@@ -9782,7 +9801,7 @@ sub DbRep_checktimeaggr ($) {
      }
  }  
  if($hash->{LASTCMD} =~ /syncStandby/ ) {
-     if($aggregation !~ /day|hour|week/) {
+     if($aggregation !~ /minute|hour|day|week/) {
          $aggregation = "day";
 	     $IsAggrSet   = 1;
      }
@@ -9794,7 +9813,7 @@ return ($IsTimeSet,$IsAggrSet,$aggregation);
 ####################################################################################################
 #    ReadingsSingleUpdate für Reading, Value, Event
 ####################################################################################################
-sub ReadingsSingleUpdateValue ($$$$) {
+sub ReadingsSingleUpdateValue {
  my ($hash,$reading,$val,$ev) = @_;
  my $name = $hash->{NAME};
  
@@ -9809,7 +9828,7 @@ return;
 #    Readingsbulkupdate für Reading, Value
 #    readingsBeginUpdate und readingsEndUpdate muss vor/nach Funktionsaufruf gesetzt werden
 ####################################################################################################
-sub ReadingsBulkUpdateValue ($$$) {
+sub ReadingsBulkUpdateValue {
  my ($hash,$reading,$val) = @_;
  my $name = $hash->{NAME};
  
@@ -9824,7 +9843,7 @@ return;
 #    Readingsbulkupdate für processing_time, state
 #    readingsBeginUpdate und readingsEndUpdate muss vor/nach Funktionsaufruf gesetzt werden
 ####################################################################################################
-sub ReadingsBulkUpdateTimeState ($$$$) {
+sub ReadingsBulkUpdateTimeState {
  my ($hash,$brt,$rt,$sval) = @_;
  my $name = $hash->{NAME};
  
@@ -9853,7 +9872,7 @@ return;
 #     ....
 #   }
 ####################################################################################################
-sub DbRep_autoForward ($$$) {
+sub DbRep_autoForward {
   my ($name,$reading,$value) = @_;
   my $hash = $defs{$name};
   my $av   = AttrVal($name, "autoForward", "");
@@ -9911,7 +9930,7 @@ return;
 ####################################################################################################
 #  Anzeige von laufenden Blocking Prozessen
 ####################################################################################################
-sub DbRep_getblockinginfo ($) {
+sub DbRep_getblockinginfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
@@ -9968,7 +9987,7 @@ return;
 #
 # liefert die Attribute timeOlderThan, timeDiffToNow als Sekunden normiert zurück
 ####################################################################################################
-sub DbRep_normRelTime($) {
+sub DbRep_normRelTime {
  my ($hash)   = @_;
  my $name     = $hash->{NAME};
  my $tdtn     = AttrVal($name, "timeDiffToNow", undef);
@@ -10068,7 +10087,7 @@ return ($toth,$tdtn,$fdopt);
 ####################################################################################################
 #   Korrektur Schaltjahr und Sommer/Winterzeit bei relativen Zeitangaben
 ####################################################################################################
-sub DbRep_corrRelTime($$$) {
+sub DbRep_corrRelTime {
  my ($name,$tim,$tdtn) = @_;
  my $hash = $defs{$name};
  
@@ -10139,7 +10158,7 @@ return $tim;
 #  - es ist durch 400 teilbar, dann ist es ein schaltjahr
 #
 ####################################################################################################
-sub DbRep_IsLeapYear($$) {
+sub DbRep_IsLeapYear {
   my ($name,$year) = @_;
   my $ily = 0;
   if ($year % 4 == 0 && $year % 100 != 0 || $year % 400 == 0) {    # $year modulo 4 -> muß 0 sein
@@ -10153,7 +10172,7 @@ return $ily;
 ###############################################################################
 #              Zeichencodierung für Fileexport filtern 
 ###############################################################################
-sub DbRep_charfilter($) { 
+sub DbRep_charfilter { 
   my ($txt) = @_;
   
   # nur erwünschte Zeichen, Filtern von Steuerzeichen
@@ -10168,7 +10187,7 @@ return($txt);
 ###################################################################################
 #                    Befehl vor Procedure ausführen
 ###################################################################################
-sub DbRep_beforeproc ($$) {
+sub DbRep_beforeproc {
   my ($hash, $txt) = @_;
   my $name         = $hash->{NAME};
   
@@ -10191,7 +10210,7 @@ return;
 ###################################################################################
 #                    Befehl nach Procedure ausführen
 ###################################################################################
-sub DbRep_afterproc ($$) {
+sub DbRep_afterproc {
   my ($hash, $txt) = @_;
   my $name         = $hash->{NAME};
   my $erread;
@@ -10216,7 +10235,7 @@ return $erread;
 #   timestamp_begin, timestamp_end bei Einsatz datetime-Picker entsprechend
 #   den Anforderungen formatieren     
 ##############################################################################################
-sub DbRep_formatpicker ($) {   
+sub DbRep_formatpicker {   
   my ($str) = @_;    
   if ($str =~ /^(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2})$/) {
       # Anpassung für datetime-Picker Widget
@@ -10236,7 +10255,7 @@ return $str;
 #
 #    Aufruf der <UserExitFn> mit $name,$reading,$value
 ####################################################################################################
-sub DbRep_userexit ($$$) {
+sub DbRep_userexit {
  my ($name,$reading,$value) = @_;
  my $hash = $defs{$name};
  
@@ -10262,7 +10281,7 @@ return;
 ####################################################################################################
 #                 delete Readings before new operation
 ####################################################################################################
-sub DbRep_delread($;$$) {
+sub DbRep_delread {
  # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
  my ($hash,$shutdown) = @_;
  my $name   = $hash->{NAME};
@@ -10314,7 +10333,7 @@ return undef;
 ####################################################################################################
 #                          erstellen neues SQL-File für Dumproutine
 ####################################################################################################
-sub DbRep_NewDumpFilename ($$$$$){
+sub DbRep_NewDumpFilename {
     my ($sql_text,$dump_path,$dbname,$time_stamp,$character_set) = @_;
 	my $part       = "";
     my $sql_file   = $dump_path.$dbname."_".$time_stamp.$part.".sql";
@@ -10337,7 +10356,7 @@ return ($sql_text,$first_insert,$sql_file,$backupfile,undef);
 ####################################################################################################
 #                          Schreiben DB-Dumps in SQL-File
 ####################################################################################################
-sub DbRep_WriteToDumpFile ($$) {
+sub DbRep_WriteToDumpFile {
     my ($inh,$sql_file) = @_;
     my $filesize;
 	my $err = 0;
@@ -10364,7 +10383,7 @@ return ($filesize,undef);
 ####################################################################################################
 #             Filesize (Byte) umwandeln in KB bzw. MB
 ####################################################################################################
-sub DbRep_byteOutput ($) {
+sub DbRep_byteOutput {
     my $bytes  = shift;
 	
 	return if(!defined($bytes));
@@ -10382,7 +10401,7 @@ return $ret;
 #                            Username / Paßwort speichern
 #   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
 ######################################################################################
-sub DbRep_setcredentials ($$@) {
+sub DbRep_setcredentials {
     my ($hash, $cre, @credentials) = @_;
     my $name                       = $hash->{NAME};
     my ($success, $credstr, $index, $retcode,$username,$passwd);
@@ -10414,7 +10433,7 @@ return ($success);
 #                             Username / Paßwort abrufen
 #   $cre = "adminCredentials"  -> Credentials für Datenbank root-Zugriff
 ######################################################################################
-sub DbRep_getcredentials ($$) {
+sub DbRep_getcredentials {
     my ($hash, $cre) = @_;
     my $name         = $hash->{NAME};
     my ($success, $username, $passwd, $index, $retcode, $credstr);
@@ -10453,7 +10472,7 @@ return ($success, $username, $passwd);
 ####################################################################################################
 #                      Schreibroutine in DbRep Keyvalue-File
 ####################################################################################################
-sub DbRep_setCmdFile($$$) {
+sub DbRep_setCmdFile {
   my ($key,$value,$hash) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
   
@@ -10483,7 +10502,7 @@ return FileWrite($param, @new);
 ####################################################################################################
 #                           anlegen Keyvalue-File für DbRep wenn nicht vorhanden
 ####################################################################################################
-sub DbRep_createCmdFile ($) {
+sub DbRep_createCmdFile {
   my ($hash) = @_;
   my $fName  = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
   
@@ -10502,7 +10521,7 @@ return FileWrite($param, @new);
 ####################################################################################################
 #                       Leseroutine aus DbRep Keyvalue-File
 ####################################################################################################
-sub DbRep_getCmdFile($) {
+sub DbRep_getCmdFile {
   my ($key) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheDbRep";
   my $param = {
@@ -10521,7 +10540,7 @@ return (undef, undef);
 ####################################################################################################
 #             Tabellenoptimierung MySQL
 ####################################################################################################
-sub DbRep_mysqlOptimizeTables ($$@) {
+sub DbRep_mysqlOptimizeTables {
   my ($hash,$dbh,@tablenames) = @_;
   my $name   = $hash->{NAME};
   my $dbname = $hash->{DATABASE};
@@ -10591,7 +10610,7 @@ return (undef,$db_MB_start,$db_MB_end);
 ####################################################################################################
 #             Dump-Files im dumpDirLocal löschen bis auf die letzten "n" 
 ####################################################################################################
-sub DbRep_deldumpfiles ($$) {
+sub DbRep_deldumpfiles {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dbloghash     = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -10640,7 +10659,7 @@ return @fd;
 ####################################################################################################
 #                                  Dumpfile  komprimieren  
 ####################################################################################################
-sub DbRep_dumpCompress ($$) {
+sub DbRep_dumpCompress {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dump_path_def = $attr{global}{modpath}."/log/";
@@ -10667,7 +10686,7 @@ return (undef,$bfile.".gzip");
 ####################################################################################################
 #                                  Dumpfile dekomprimieren  
 ####################################################################################################
-sub DbRep_dumpUnCompress ($$) {
+sub DbRep_dumpUnCompress {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dump_path_def = $attr{global}{modpath}."/log/";
@@ -10701,7 +10720,7 @@ return (undef,$outfile);
 ####################################################################################################
 #             erzeugtes Dump-File aus dumpDirLocal zum FTP-Server übertragen 
 ####################################################################################################
-sub DbRep_sendftp ($$) {
+sub DbRep_sendftp {
   my ($hash,$bfile) = @_; 
   my $name          = $hash->{NAME};
   my $dump_path_def = $attr{global}{modpath}."/log/";
@@ -10826,7 +10845,7 @@ return ($ftperr,$ftpmsg,@ftpfd);
 ####################################################################################################
 #                 Test auf Daylight saving time
 ####################################################################################################
-sub DbRep_dsttest ($$$) {
+sub DbRep_dsttest {
  my ($hash,$runtime,$aggsec) = @_;
  my $name = $hash->{NAME};
  my $dstchange = 0;
@@ -10854,10 +10873,10 @@ return $dstchange;
 #  Rückgabe eines ncp-hash (no calc in period) mit den Perioden für die keine Differenz berechnet
 #  werden konnte weil nur ein Datensatz in der Periode zur Verfügung stand
 ####################################################################################################
-sub DbRep_calcount ($$) {
+sub DbRep_calcount {
  my ($hash,$ch) = @_;
  my $name = $hash->{NAME};
- my %ncp = (); 
+ my %ncp  = (); 
  
  Log3 ($name, 4, "DbRep $name - count of values used for calc:");
  foreach my $key (sort(keys%{$ch})) {
@@ -10873,7 +10892,7 @@ return \%ncp;
 ####################################################################################################
 #                         Funktionsergebnisse in Datenbank schreiben
 ####################################################################################################
-sub DbRep_OutputWriteToDB($$$$$) {
+sub DbRep_OutputWriteToDB {
   my ($name,$device,$reading,$wrstr,$optxt) = @_;
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -10892,8 +10911,8 @@ sub DbRep_OutputWriteToDB($$$$$) {
   my $unit       = "";
   my $wrt        = 0;
   my $irowdone   = 0;
-  my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$timestamp,$value,$date,$time,$hour,$ndate,$ntime,$rsf,$rsn,$aggr,@row_array);
-  my ($year,$mon,$mday,$t1,$corr);
+  my ($dbh,$sth_ih,$sth_uh,$sth_ic,$sth_uc,$err,$value,$date,$time,$hour,$minute,$ndate,$ntime,$rsf,$rsn,@row_array);
+  my ($timestamp,$year,$mon,$mday,$t1,$corr);
   
   if(!$dbloghash->{HELPER}{COLSET}) {
       $err = "No result of \"$hash->{LASTCMD}\" to database written. Cause: column width in \"$hash->{DEF}\" isn't set";
@@ -10901,7 +10920,8 @@ sub DbRep_OutputWriteToDB($$$$$) {
   }
   
   no warnings 'uninitialized';
-  (undef,undef,$aggr) = DbRep_checktimeaggr($hash);
+
+  my $aggr = (DbRep_checktimeaggr($hash))[2];
   $reading = $optxt."_".$aggr."_".AttrVal($name, "readingNameMap", $reading);
   
   $type = $defs{$device}{TYPE} if($defs{$device});                # $type vom Device ableiten
@@ -10913,7 +10933,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       foreach my $row (@arr) {
           my @a              = split("#", $row);
           my $runtime_string = $a[0];                             # Aggregations-Alias (nicht benötigt)
-          $value             = defined($a[1])?((looks_like_number($a[1])?sprintf("%.4f",$a[1]):undef)):undef;                     # in Version 8.40.0 geändert
+          $value             = defined($a[1])?(looks_like_number($a[1])?sprintf("%.4f",$a[1]):undef):undef;                     # in Version 8.40.0 geändert
           $rsf               = $a[2];                             # Runtime String first - Datum / Zeit für DB-Speicherung
           ($date,$time)      = split("_",$rsf);
           $time              =~ s/-/:/g if($time);
@@ -10929,10 +10949,19 @@ sub DbRep_OutputWriteToDB($$$$$) {
               $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-$corr;
               ($ndate,undef)     = split(" ",FmtDateTime($t1));                  
           
-          } elsif ($aggr =~ /hour/) {
-              $hour  = (split(":", $time))[0];
-              $time  = "$hour:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
-              $ntime = "$hour:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+          } elsif ($aggr =~ /minute|hour/) {
+              ($hour,$minute) = split ":", $time;
+              
+              if($aggr eq "minute") {
+                  $time  = "$hour:$minute:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "$hour:$minute:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+              }
+              
+              if($aggr eq "hour") {
+                  $time  = "$hour:00:01" if($time  !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);                         # https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920
+                  $ntime = "$hour:59:59" if($ntime !~ /^(\d{2}):(\d{2}):(\d{2})$/ || $hash->{LASTCMD} =~ /\bwriteToDB(Single)*?\b/);
+              }
+              
               if ($ntime eq "23:59:59") {
                   ($year,$mon,$mday) = split("-", $ndate);
                   $t1                = fhemTimeLocal(59, 59, 23, $mday, $mon-1, $year-1900)-86400;
@@ -10973,12 +11002,14 @@ sub DbRep_OutputWriteToDB($$$$$) {
           
           ($date,$time) = split("_",$rsf);
           $time         =~ s/-/:/g if($time);
-      
+
           if($time !~ /^(\d{2}):(\d{2}):(\d{2})$/) {
               if($aggr =~ /no|day|week|month/) {
                   $time = "23:59:58";
               } elsif ($aggr =~ /hour/) {
                   $time = "$time:59:58";
+              } elsif ($aggr =~ /minute/) {
+                  $time = "$time:58";
               }
           }
           if ($value) {
@@ -11003,7 +11034,7 @@ sub DbRep_OutputWriteToDB($$$$$) {
       if (!$supk) {
           ($usepkh,$usepkc,$pkh,$pkc) = DbRep_checkUsePK($hash,$dbloghash,$dbh);
       } else {
-          Log3 $hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"";
+          Log3 ($hash->{NAME}, 5, "DbRep $name -> Primary Key usage suppressed by attribute noSupportPK in DbLog \"$dblogname\"");
       }
       
       if (lc($DbLogType) =~ m(history)) {
@@ -11068,8 +11099,10 @@ sub DbRep_OutputWriteToDB($$$$$) {
               if (lc($DbLogType) =~ m(history) ) {
                   my $rv_uh = $dbh->do("UPDATE history SET TIMESTAMP=\"$timestamp\", DEVICE=\"$device\", READING=\"$reading\", TYPE=\"$type\", EVENT=\"$event\", VALUE=\"$value\", UNIT=\"$unit\" WHERE TIMESTAMP=\"$timestamp\" AND DEVICE=\"$device\" AND READING=\"$reading\"");  
                   $uhs += $rv_uh if($rv_uh);
-                  Log3 $hash->{NAME}, 4, "DbRep $name - UPDATE history: $row, RESULT: $rv_uh";
-				  if ($rv_uh == 0) {
+                  
+                  Log3 ($hash->{NAME}, 4, "DbRep $name - UPDATE history: $row, RESULT: $rv_uh");
+				  
+                  if ($rv_uh == 0) {
 				      my $rv_ih = $sth_ih->execute($timestamp,$device,$type,$event,$reading,$value,$unit);
                       $ihs += $rv_ih if($rv_ih); 
                       Log3 $hash->{NAME}, 4, "DbRep $name - INSERT history: $row, RESULT: $rv_ih";
@@ -11097,8 +11130,8 @@ sub DbRep_OutputWriteToDB($$$$$) {
       
       $dbh->disconnect;
       
-	  Log3 $hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs"; 
-      Log3 $hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs"; 
+	  Log3 ($hash->{NAME}, 3, "DbRep $name - number of lines updated in \"$dblogname\": $uhs"); 
+      Log3 ($hash->{NAME}, 3, "DbRep $name - number of lines inserted into \"$dblogname\": $ihs"); 
       $irowdone = $ihs + $uhs; 
       
       # SQL-Laufzeit ermitteln
@@ -11116,7 +11149,7 @@ return ($wrt,$irowdone,$err);
 # $runtime_string."|".$max_value."|".$row_max_time."|".$runtime_string_first."|".$runtime_string_next
 #
 #######################################################################################################
-sub DbRep_deleteOtherFromDB($$$$) {
+sub DbRep_deleteOtherFromDB {
   my ($name,$device,$reading,$rows) = @_;
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -11134,7 +11167,7 @@ sub DbRep_deleteOtherFromDB($$$$) {
   foreach my $key (sort(keys(%rh))) {
       # Inhalt $rh{$key} -> $runtime_string."|".$max_value."|".$row_max_time."|".$runtime_string_first."|".$runtime_string_next
       my @k                 = split("\\|",$rh{$key});
-      $value                = defined($k[1])?$k[1]:undef;
+      $value                = $k[1] // undef;
 	  $row_extreme_time     = $k[2];
       $runtime_string_first = $k[3];  
       $runtime_string_next  = $k[4];        
@@ -11213,7 +11246,7 @@ return ($wrt,$irowdone,$err);
 # $histupd = 1 wenn history update, $histupd = 0 nur history insert
 #
 ####################################################################################################
-sub DbRep_WriteToDB($$$@) {
+sub DbRep_WriteToDB {
   my ($name,$dbh,$dbloghash,$histupd,@row_array) = @_;
   my $hash      = $defs{$name};
   my $dblogname = $dbloghash->{NAME};
@@ -11360,7 +11393,7 @@ return ($wrt,$irowdone,$err);
 ################################################################
 # check ob primary key genutzt wird
 ################################################################
-sub DbRep_checkUsePK ($$$){
+sub DbRep_checkUsePK {
   my ($hash,$dbloghash,$dbh) = @_;
   my $name   = $hash->{NAME};
   my $dbconn = $dbloghash->{dbconn};
@@ -11386,7 +11419,7 @@ return ($upkh,$upkc,$pkh,$pkc);
 ################################################################
 # extrahiert aus dem übergebenen Wert nur die Zahl
 ################################################################
-sub DbRep_numval ($){
+sub DbRep_numval {
   my ($val) = @_;
   return undef if(!defined($val));
   $val = ($val =~ /(-?\d+(\.\d+)?)/ ? $1 : "");
@@ -11397,7 +11430,7 @@ return $val;
 ####################################################################################################
 #       löscht einen Wert vom $hash  des Hauptprozesses aus einem BlockingCall heraus     
 ####################################################################################################
-sub DbRep_delHashValFromBlocking($$;$) {
+sub DbRep_delHashValFromBlocking {
   my ($name,$v1,$v2) = @_;
   my $hash        = $defs{$name};
 
@@ -11415,7 +11448,7 @@ return 1;
 # Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
 ################################################################
-sub DbRep_sortVersion (@){
+sub DbRep_sortVersion {
   my ($sseq,@versions) = @_;
 
   my @sorted = map {$_->[0]}
@@ -11437,7 +11470,7 @@ return @sorted;
 #               Versionierungen des Moduls setzen
 #  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 ################################################################
-sub DbRep_setVersionInfo($) {
+sub DbRep_setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
@@ -11449,12 +11482,12 @@ sub DbRep_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22287 2020-06-27 11:31:45Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 21473 2020-03-21 21:09:33Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22287 2020-06-27 11:31:45Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11472,7 +11505,7 @@ return;
 #     blockierende DB-Abfrage 
 #     liefert Ergebnis sofort zurück, setzt keine Readings
 ####################################################################################################
-sub DbRep_dbValue($$) {
+sub DbRep_dbValue {
   my ($name,$cmd) = @_;
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -11591,7 +11624,7 @@ return ($ret);
 # Aufruf als Funktion: DbReadingsVal("<dbrep-device>","<device:reading>","<timestamp>,"<default>")
 # Aufruf als FHEM-Cmd: DbReadingsVal <dbrep-device> <device:reading> <date_time> <default>
 ####################################################################################################
-sub CommandDbReadingsVal($$) {
+sub CommandDbReadingsVal {
   my ($cl, $param) = @_;
 
   my @a = split("[ \t][ \t]*", $param);
@@ -11668,7 +11701,7 @@ return $ret;
 ####################################################################################################
 # Browser Refresh nach DB-Abfrage
 ####################################################################################################
-sub browser_refresh($) { 
+sub browser_refresh { 
   my ($hash) = @_;                                                                     
   RemoveInternalTimer($hash, "browser_refresh");
   {FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "")};
@@ -11679,7 +11712,7 @@ return;
 ###################################################################################
 #                     Associated Devices setzen
 ###################################################################################
-sub DbRep_modAssociatedWith ($$$) {
+sub DbRep_modAssociatedWith {
   my ($hash,$cmd,$awdev) = @_;
   my $name = $hash->{NAME};
   my (@naw,@edvs,@edvspcs,$edevswc);
@@ -11732,7 +11765,7 @@ return;
 ####################################################################################################
 #                 Test-Sub zu Testzwecken
 ####################################################################################################
-sub testexit ($) {
+sub testexit {
 my ($hash) = @_;
 my $name = $hash->{NAME};
 
@@ -11975,8 +12008,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps 00:00:01 and 23:59:59 within the respective evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp 23:59:59 at the end of an evaluation period </td></tr>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period </td></tr>
                                       <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
   								   </table>
 	                               </ul>
@@ -12567,12 +12600,12 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: the local mounted directory dumpDirRemote </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep </td></tr>
+                                      <tr><td> dumpCompress             </td><td>: compress of dump files after creation                   </td></tr>
+                                      <tr><td> dumpDirLocal             </td><td>: Target directory of the dumpfiles                       </td></tr>
+	                                  <tr><td> dumpFilesKeep            </td><td>: number of dump files to keep                            </td></tr>
 	                                  <tr><td> executeBeforeProc        </td><td>: execution of FHEM command (or Perl-routine) before dump </td></tr>
-                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump </td></tr>
+                                      <tr><td> executeAfterProc         </td><td>: execution of FHEM command (or Perl-routine) after dump  </td></tr>
+	                                  <tr><td> optimizeTablesBeforeDump </td><td>: table optimization before dump                          </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 
@@ -13020,16 +13053,16 @@ return;
 								 <b>Usage of serverSide-Dumps </b> <br>
 								 The content of history-table will be restored from a serverSide-Dump.
                                  Therefore the remote directory "dumpDirRemote" of the MySQL-Server has to be mounted on the 
-								 Client and make it usable to the DbRep-device by setting <a href="#DbRepattr">attribute</a> 
-								 "dumpDirLocal" to the appropriate value. <br>
+								 Client and make it usable to the DbRep device by setting attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
+								 to the appropriate value. <br>
 								 All files with extension "csv[.gzip]" and if the filename is beginning with the name of the connected database 
 								 (see Internal DATABASE) are listed. 
 								 <br><br>
 								 
 								 <b>Usage of clientSide-Dumps </b> <br>
 								 All tables and views (if present) are restored.
-								 The directory which contains the dump files has to be set by <a href="#DbRepattr">attribute</a> 
-								 "dumpDirLocal" to make it usable by the DbRep device. <br>
+								 The directory which contains the dump files has to be set by attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
+								 to make it usable by the DbRep device. <br>
 								 All files with extension "sql[.gzip]" and if the filename is beginning with the name of the connected database 
 								 (see Internal DATABASE) are listed. <br> 
 								 The restore speed depends of the server variable "<b>max_allowed_packet</b>". You can change  
@@ -13211,8 +13244,8 @@ return;
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps 00:00:01 and 23:59:59 within the respective evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp 23:59:59 at the end of an evaluation period </td></tr>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period </td></tr>
                                       <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
   								   </table>
 	                               </ul>
@@ -13620,11 +13653,11 @@ return $ret;
   <li><b>dumpCompress </b>    - if set, the dump files are compressed after operation of "dumpMySQL" bzw. "dumpSQLite" </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide"
+  <li><b>dumpDirLocal </b>    - Target directory of database dumps by command "dumpMySQL clientSide" or "dumpSQLite"
                                 (default: "{global}{modpath}/log/" on the FHEM-Server). <br>
 								In this directory also the internal version administration searches for old backup-files 
 								and deletes them if the number exceeds attribute "dumpFilesKeep". 
-								The attribute is also relevant to publish a local mounted directory "dumpDirRemote" to
+								The attribute is also relevant to publish a local mounted directory "dumpDirRemote" (dumpMySQL serverSide) to
 								DbRep. </li> <br>
 
   <a name="dumpDirRemote"></a>								
@@ -14540,8 +14573,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln 00:00:01 und 23:59:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel 23:59:59 am Ende einer Auswertungsperiode</td></tr>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln XX:XX:01 und XX:XX:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel XX:XX:59 am Ende einer Auswertungsperiode</td></tr>
                                       <tr><td> <b>writeToDBInTime</b>   </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode </td></tr>
   								   </table>
 	                               </ul>
@@ -15136,12 +15169,12 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung </td></tr>
-                                      <tr><td> dumpDirLocal             </td><td>: Directory des lokal gemounteten dumpDirRemote-Verzeichnisses  </td></tr>
-	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles </td></tr>
-	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump </td></tr>
+                                      <tr><td> dumpCompress             </td><td>: Komprimierung des Dumpfiles nach der Erstellung           </td></tr>
+                                      <tr><td> dumpDirLocal             </td><td>: Zielverzeichnis der Dumpfiles                             </td></tr>
+	                                  <tr><td> dumpFilesKeep            </td><td>: Anzahl der aufzubwahrenden Dumpfiles                      </td></tr>
+	                                  <tr><td> executeBeforeProc        </td><td>: ausführen FHEM Kommando (oder Perl-Routine) vor dem Dump  </td></tr>
                                       <tr><td> executeAfterProc         </td><td>: ausführen FHEM Kommando (oder Perl-Routine) nach dem Dump </td></tr>
-	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen </td></tr>
+	                                  <tr><td> optimizeTablesBeforeDump </td><td>: Tabelloptimierung vor dem Dump ausführen                  </td></tr>
                                    </table>
 	                               </ul>
 	                               <br> 
@@ -15610,14 +15643,14 @@ sub bdump {
 								 <b>Verwendung eines serverSide-Dumps </b> <br>
 								 Es wird der Inhalt der history-Tabelle aus einem serverSide-Dump wiederhergestellt.
                                  Dazu ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
-								 und im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem DbRep-Device bekannt zu machen. <br>
+								 und im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
 								 Es werden alle Files mit der Endung "csv[.gzip]" und deren Name mit der 
 								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet. 
 								 <br><br>
 								 
 								 <b>Verwendung eines clientSide-Dumps </b> <br>
 								 Es werden alle Tabellen und eventuell vorhandenen Views wiederhergestellt.
-								 Das Verzeichnis, in dem sich die Dump-Files befinden, ist im <a href="#DbRepattr">Attribut</a> "dumpDirLocal" dem 
+								 Das Verzeichnis, in dem sich die Dump-Files befinden, ist im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem 
 								 DbRep-Device bekannt zu machen. <br>
 						         Es werden alle Files mit der Endung "sql[.gzip]" und deren Name mit der 
 								 verbundenen Datenbank beginnt (siehe Internal DATABASE), aufgelistet. <br> 
@@ -15806,8 +15839,8 @@ sub bdump {
 	                               <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln 00:00:01 und 23:59:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel 23:59:59 am Ende einer Auswertungsperiode</td></tr>
+           					          <tr><td> <b>writeToDB</b>         </td><td>: schreibt jeweils einen Wert mit den Zeitstempeln XX:XX:01 und XX:XX:59 innerhalb der jeweiligen Auswertungsperiode </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: schreibt nur einen Wert mit dem Zeitstempel XX:XX:59 am Ende einer Auswertungsperiode</td></tr>
                                       <tr><td> <b>writeToDBInTime</b>   </td><td>: schreibt jeweils einen Wert am Anfang und am Ende der Zeitgrenzen einer Auswertungsperiode </td></tr>
   								   </table>
 	                               </ul>
@@ -16224,11 +16257,11 @@ return $ret;
   <li><b>dumpCompress </b>    - wenn gesetzt, werden die Dumpfiles nach "dumpMySQL" bzw. "dumpSQLite" komprimiert </li> <br>
 
   <a name="dumpDirLocal"></a>  
-  <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide". 
+  <li><b>dumpDirLocal </b>    - Zielverzeichnis für die Erstellung von Dumps mit "dumpMySQL clientSide" oder "dumpSQLite". 
                                 default: "{global}{modpath}/log/" auf dem FHEM-Server. <br>
-								Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung von 
-								"dumpMySQL" gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
-								überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote"
+								Ebenfalls werden in diesem Verzeichnis alte Backup-Files durch die interne Versionsverwaltung 
+								gesucht und gelöscht wenn die gefundene Anzahl den Attributwert "dumpFilesKeep"
+								überschreitet. Das Attribut dient auch dazu ein lokal gemountetes Verzeichnis "dumpDirRemote" (bei dumpMySQL serverSide)
 								DbRep bekannt zu machen. </li> <br>
 
   <a name="dumpDirRemote"></a>								
