@@ -10,6 +10,7 @@ sub MQTT2_CLIENT_Read($@);
 sub MQTT2_CLIENT_Write($$$);
 sub MQTT2_CLIENT_Undef($@);
 sub MQTT2_CLIENT_doPublish($@);
+sub MQTT2_CLIENT_Disco($;$$);
 
 # See also:
 # http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
@@ -197,15 +198,17 @@ MQTT2_CLIENT_Undef($@)
 }
 
 sub
-MQTT2_CLIENT_Disco($;$)
+MQTT2_CLIENT_Disco($;$$)
 {
-  my ($hash, $isUndef) = @_;
+  my ($hash, $isUndef, $noMsg) = @_;
   RemoveInternalTimer($hash);
   $hash->{connecting} = 1 if(!$isUndef);
-  my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
-  MQTT2_CLIENT_doPublish($hash, $2, $3, $1, 1)
-        if($ond && $ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
-  MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
+  if(!$noMsg) {
+    my $ond = AttrVal($hash->{NAME}, "msgBeforeDisconnect", "");
+    MQTT2_CLIENT_doPublish($hash, $2, $3, $1, 1)
+          if($ond && $ond =~ m/^(-r\s)?([^\s]*)\s*(.*)$/);
+    MQTT2_CLIENT_send($hash, pack("C",0xE0).pack("C",0), 1); # DISCONNECT
+  }
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
   delete($hash->{BUF});
 }
@@ -335,7 +338,7 @@ MQTT2_CLIENT_Read($@)
   if(!$reread) {
     my $buf = DevIo_SimpleRead($hash);
     if(!defined($buf)) {
-      MQTT2_CLIENT_Disco($hash);
+      MQTT2_CLIENT_Disco($hash,0,1);
       return "";
     }
     $hash->{BUF} .= $buf;
@@ -344,7 +347,7 @@ MQTT2_CLIENT_Read($@)
   my ($tlen, $off) = MQTT2_CLIENT_getRemainingLength($hash);
   if($tlen < 0 || $tlen+$off<=0) {
     Log3 $name, 1, "Bogus data from $name, closing connection";
-    MQTT2_CLIENT_Disco($hash);
+    MQTT2_CLIENT_Disco($hash,0,1);
     return;
   }
   return if(length($hash->{BUF}) < $tlen+$off);
@@ -422,7 +425,10 @@ MQTT2_CLIENT_Read($@)
     Log 1, "M2: Unhandled packet $cpt, disconneting $name";
     MQTT2_CLIENT_Disco($hash);
   }
-  return MQTT2_CLIENT_Read($hash, 1);
+
+  # Allow some IO inbetween, for overloaded systems
+  InternalTimer(0, sub{ MQTT2_CLIENT_Read($_[0],1)}, $hash,0)
+        if(length($hash->{BUF}) > 0);
 }
 
 ######################################
