@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.40.4"  => "22.07.2020  new aggregation value 'minute' ",
+  "8.40.4"  => "23.07.2020  new aggregation value 'minute', some fixes ",
   "8.40.3"  => "22.07.2020  delete prototypes ",
   "8.40.2"  => "27.06.2020  improve versionNotes 2 ",
   "8.40.1"  => "18.05.2020  improve 'restore' setlist, revised comRef, fix compare timesettings for delEntries,reduceLog ",
@@ -551,7 +551,7 @@ sub DbRep_Set {
   if ($opt =~ /eraseReadings/) {
        $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
        DbRep_delread($hash);                             # Readings löschen die nicht in der Ausnahmeliste (Attr readingPreventFromDel) stehen
-       return undef;
+       return;
   }
   
   if ($opt eq "dumpMySQL" && $hash->{ROLE} ne "Agent") {
@@ -567,7 +567,7 @@ sub DbRep_Set {
 	   }
        DbRep_beforeproc($hash, "dump");
 	   DbRep_Main($hash,$opt,$prop);
-       return undef;
+       return;
   }
   
   if ($opt eq "dumpSQLite" && $hash->{ROLE} ne "Agent") {
@@ -577,7 +577,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
        DbRep_beforeproc($hash, "dump");
 	   DbRep_Main($hash,$opt,$prop);
-       return undef;
+       return;
   }
   
   if ($opt eq "repairSQLite" && $hash->{ROLE} ne "Agent") {
@@ -596,7 +596,7 @@ sub DbRep_Set {
        
        DbRep_beforeproc($hash, "repair");
 	   DbRep_Main($hash,$opt);
-       return undef;
+       return;
   }
   
   if ($opt =~ /restoreMySQL|restoreSQLite/ && $hash->{ROLE} ne "Agent") {
@@ -606,7 +606,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        DbRep_beforeproc($hash, "restore");
 	   DbRep_Main($hash,$opt,$prop);
-       return undef;
+       return;
   }
   
   if ($opt =~ /optimizeTables|vacuum/ && $hash->{ROLE} ne "Agent") {
@@ -616,7 +616,7 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        DbRep_beforeproc($hash, "optimize");	   
 	   DbRep_Main($hash,$opt);
-       return undef;
+       return;
   }
   
   if ($opt =~ m/delSeqDoublets|delDoublets/ && $hash->{ROLE} ne "Agent") {
@@ -626,7 +626,7 @@ sub DbRep_Set {
       } 
       DbRep_beforeproc($hash, "delDoublets");	  
       DbRep_Main($hash,$opt,$prop); 
-      return undef;      
+      return;      
   }
   
   if ($opt =~ m/reduceLog/ && $hash->{ROLE} ne "Agent") {
@@ -643,7 +643,7 @@ sub DbRep_Set {
           Log3 ($name, 3, "DbRep $name - ################################################################");
           DbRep_beforeproc($hash, "reduceLog");	   
           DbRep_Main($hash,$opt);
-          return undef;
+          return;
       }
   }
   
@@ -667,7 +667,7 @@ sub DbRep_Set {
       BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
 	  Log3 ($name, 3, "DbRep $name -> running Dump has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Dump canceled", 1);
-      return undef;
+      return;
   } 
   
   if ($opt eq "cancelRepair" && $hash->{ROLE} ne "Agent") {
@@ -675,7 +675,7 @@ sub DbRep_Set {
       BlockingKill($hash->{HELPER}{RUNNING_REPAIR});
 	  Log3 ($name, 3, "DbRep $name -> running Repair has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Repair canceled", 1);
-      return undef;
+      return;
   } 
   
   if ($opt eq "cancelRestore" && $hash->{ROLE} ne "Agent") {
@@ -683,13 +683,13 @@ sub DbRep_Set {
       BlockingKill($hash->{HELPER}{RUNNING_RESTORE});
 	  Log3 ($name, 3, "DbRep $name -> running Restore has been canceled");
 	  ReadingsSingleUpdateValue ($hash, "state", "Restore canceled", 1);
-      return undef;
+      return;
   }
   
   if ($opt =~ m/tableCurrentFillup/ && $hash->{ROLE} ne "Agent") {   
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       DbRep_Main($hash,$opt);
-      return undef;
+      return;
   }  
   
   if ($opt eq "index" && $hash->{ROLE} ne "Agent") {
@@ -697,10 +697,11 @@ sub DbRep_Set {
        Log3 ($name, 3, "DbRep $name - ################################################################");
        Log3 ($name, 3, "DbRep $name - ###                    New Index operation                   ###");
        Log3 ($name, 3, "DbRep $name - ################################################################"); 
-	   # Befehl vor Procedure ausführen
-       DbRep_beforeproc($hash, "index");
-	   DbRep_Main($hash,$opt,$prop);
-       return undef;
+	   
+       # Befehl vor Procedure ausführen
+       DbRep_beforeproc ($hash, "index");
+	   DbRep_Main       ($hash,$opt,$prop);
+       return;
   }
   
   if ($opt eq "adminCredentials" && $hash->{ROLE} ne "Agent") {
@@ -1414,8 +1415,9 @@ sub DbRep_Attr {
 				return "Length of \"$aName\" is too big. Maximum length for database type $dbmodel is $mlen" if(length($aVal) > $mlen);
             }
         }
-	}  
-return undef;
+	} 
+    
+return;
 }
 
 ###################################################################################
@@ -1510,7 +1512,7 @@ sub DbRep_Undef {
 
  DbRep_delread($hash,1);
     
-return undef;
+return;
 }
 
 ###################################################################################
@@ -1531,7 +1533,7 @@ sub DbRep_Delete {
     my $index = $hash->{TYPE}."_".$name."_adminCredentials";
     setKeyValue($index, undef);
     
-return undef;
+return;
 }
 
 ###################################################################################
@@ -1545,7 +1547,7 @@ sub DbRep_Shutdown {
   DbRep_delread($hash,1);
   RemoveInternalTimer($hash);
   
-return undef; 
+return; 
 }
 
 ###################################################################################
@@ -1945,12 +1947,13 @@ sub DbRep_Main {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
  } else {
      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
-     Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set") if($opt !~ /tableCurrentPurge/); 
+     Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set")   if($opt !~ /tableCurrentPurge/); 
  }
 
- Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries/); 
+ Log3 ($name, 4, "DbRep $name - Aggregation: $aggregation") if($opt !~ /tableCurrentPurge|tableCurrentFillup|fetchrows|insert|reduceLog|delEntries|^sql/x); 
  
- #####  Funktionsaufrufe ##### 
+ #####  Funktionsaufrufe #####
+ ############################# 
  if ($opt eq "sumValue") {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
 	 
@@ -2106,6 +2109,7 @@ sub DbRep_Main {
  }
                               
 $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
+
 return;
 }
 
@@ -9781,10 +9785,10 @@ sub DbRep_checktimeaggr {
 	 $IsAggrSet   = 1;
  }
  if($hash->{LASTCMD} =~ /averageValue/ && AttrVal($name,"averageCalcForm","avgArithmeticMean") eq "avgDailyMeanGWS") {
-     $aggregation = "day";       # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
+     $aggregation = "day";                                               # für Tagesmittelwertberechnung des deutschen Wetterdienstes immer "day"
 	 $IsAggrSet   = 1;
  }
- if($hash->{LASTCMD} =~ /delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
+ if($hash->{LASTCMD} =~ /^sql|delEntries|fetchrows|deviceRename|readingRename|tableCurrentFillup|reduceLog|\breadingsDifferenceByTimeDelta\b/) {
 	 $IsAggrSet   = 0;
 	 $aggregation = "no";
  }
@@ -13092,8 +13096,8 @@ return;
                                  If the session variable or PRAGMA has to be set every time before executing a SQL statement, the 
                                  attribute <a href="#sqlCmdVars">'sqlCmdVars'</a> can be set. <br>                                 
 								 If the attribute <a href="#timestamp_begin">'timestamp_begin'</a> respectively 'timestamp_end' 
-								 is assumed in the statement, it is possible to use placeholder "<b>§timestamp_begin§</b>" respectively
-								 "<b>§timestamp_end§</b>" on suitable place. <br><br>
+								 is assumed in the statement, it is possible to use placeholder <b>§timestamp_begin§</b> respectively
+								 <b>§timestamp_end§</b> on suitable place. <br><br>
 								 
 								 If you want update a dataset, you have to add "TIMESTAMP=TIMESTAMP" to the update-statement to avoid changing the 
 								 original timestamp. <br><br>
@@ -15672,19 +15676,19 @@ sub bdump {
 								 </li><br>
 								 
     <li><b> sqlCmd </b>        - führt ein beliebiges benutzerspezifisches Kommando aus. <br>
-                                 Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das 
-								 <a href="#DbRepattr">Attribut</a> "allowDeletion" gesetzt sein. <br>
+                                 Enthält dieses Kommando eine Delete-Operation, muss zur Sicherheit das Attribut
+								 <a href="#allowDeletion">allowDeletion</a> gesetzt sein. <br>
                                  Bei der Ausführung dieses Kommandos werden keine Einschränkungen durch gesetzte Attribute
                                  "device", "reading", "time.*" bzw. "aggregation" berücksichtigt. <br>
                                  Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
                                  "SET @open:=NULL, @closed:=NULL;" oder die Verwendung von SQLite PRAGMA vor der 
                                  Ausführung des SQL-Statements.
                                  Soll die Session Variable oder das PRAGMA vor jeder Ausführung eines SQL Statements 
-                                 gesetzt werden, kann dafür das <a href="#DbRepattr">Attribut</a> "sqlCmdVars" 
+                                 gesetzt werden, kann dafür das Attribut <a href="#sqlCmdVars">sqlCmdVars</a> 
                                  verwendet werden. <br>
-								 Sollen die im Modul gesetzten <a href="#DbRepattr">Attribute</a> "timestamp_begin" bzw. 
-								 "timestamp_end" im Statement berücksichtigt werden, können die Platzhalter 
-								 "<b>§timestamp_begin§</b>" bzw. "<b>§timestamp_end§</b>" dafür verwendet werden. <br><br>
+								 Sollen die im Modul gesetzten Attribute <a href="#timestamp_begin">timestamp_begin</a> bzw. 
+								 <a href="#timestamp_end">timestamp_end</a> im Statement berücksichtigt werden, können die Platzhalter 
+								 <b>§timestamp_begin§</b> bzw. <b>§timestamp_end§</b> dafür verwendet werden. <br><br>
 								 
 								 Soll ein Datensatz upgedated werden, ist dem Statement "TIMESTAMP=TIMESTAMP" hinzuzufügen um eine Änderung des
 								 originalen Timestamps zu verhindern. <br><br>
