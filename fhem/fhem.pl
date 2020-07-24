@@ -5398,13 +5398,16 @@ notifyRegexpCheck($)
 {
   join("\n", map {
     if($_ !~ m/^\(?([A-Za-z0-9\.\_]+(?:\.[\+\*])?)(?::.*)?\)?$/) {
-      "$_: nomatch (ignored)"
+      "$_: no match (ignored)"
     } elsif($defs{$1})               {
-      "$_: device (OK)";
-    } elsif(devspec2array($1) ne $1) { 
-      "$_: devspec (OK)";
+      "$_: device $1 (OK)";
     } else {
-      "$_: unknown (ignored)";
+      my @ds = devspec2array($1);
+      if(@ds > 1 || $ds[0] != $1) {
+        "$_: devspec ".join(",",@ds)." (OK)";
+      } else {
+        "$_: unknown (ignored)";
+      }
     }
   } split(/\|/, $_[0]));
 }
