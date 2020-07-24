@@ -1821,6 +1821,17 @@ CommandShutdown($$;$$$)
 
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
+
+  # Avoid restarts in overoptimized browser #105729
+  doShutdown({p=>$param, e=>$exitValue}) if(!$cl);
+  InternalTimer(time()+1, sub(){doShutdown(@_)}, {p=>$param,e=>$exitValue}, 0);
+}  
+  
+sub
+doShutdown($$)
+{
+  my ($param, $exitValue) = ($_[0]->{p}, $_[0]->{e});
+
   if($param && $param eq "restart") {
     if ($^O !~ m/Win/) {
       system("(sleep " . AttrVal("global", "restartDelay", 2) .
