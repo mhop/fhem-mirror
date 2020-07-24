@@ -735,12 +735,11 @@ sub CUL_HM_Attr(@) {#################################
           }
         }
         $attr{$name}{$attrName} = join(",",@expLst);
-        CUL_HM_chgExpLvl($hash) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
       }
       else{#delete
         delete $attr{$name}{$attrName};
       }
-      CUL_HM_chgExpLvl($hash) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
+      CUL_HM_chgExpLvl($_) foreach ((map{CUL_HM_id2Hash($_)} CUL_HM_getAssChnIds($name)),$defs{$name});
       return $attr{$name}{$attrName} if ($ret);
     }
   }
@@ -8401,6 +8400,7 @@ sub CUL_HM_getRegFromStore($$$$@) {#read a register from backup data
     return "invalid:regname or address" if($addr < 1 ||$addr > 255);
     $peerRq = hex($peerId) != 0 ? "y":"n";
   }
+
   return "invalid:no peer for this register" if((hex($peerId) != 0 && $peerRq eq "n" )
                                               ||(hex($peerId) == 0 && $peerRq eq "y"));
   my $dst = substr(CUL_HM_name2Id($name),0,6);
@@ -8560,40 +8560,39 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
     $tHash->{helper}{expert}{raw} = 1 if($expSet eq "rawReg");#raw register on
     $tHash->{helper}{expert}{tpl} = 1 if($expSet eq "templ") ;#template on
   }
-  
-  my ($nTag,$grp);
+  my ($det,$def,$raw) = ($tHash->{helper}{expert}{det}
+                        ,$tHash->{helper}{expert}{def}
+                        ,$tHash->{helper}{expert}{raw});
+  foreach my $rdEntry (grep /^(\.R|R)-/   ,keys %{$tHash->{READINGS}}){
+    my $rdEntryPure = $rdEntry;
+    $rdEntryPure =~ s/^\.//;
 
-  if ($tHash->{helper}{expert}{def}){($nTag,$grp) = ("",".R-")}
-  else{                              ($nTag,$grp) = (".","R-")}
-  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
-    my $reg = $rdEntry;
-    my $p = "";
-    $p = "-".$1 if($rdEntry =~ m/R-(.*)-(lg|sh)/);
-    $reg =~ s/^\.?R-(.*?-)?//;
-    next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '0');
-    $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
-    delete $tHash->{READINGS}{$rdEntry};
+    my $reg = $rdEntryPure;
+    $reg =~ s/-temp$/##temp/; # rescue ugly registernames prior  to replacement
+    $reg =~ s/^R.*-//;
+    $reg =~ s/##temp$/-temp/; # and revert
+    next if(!$culHmRegDefine->{$reg});
+    
+    my $nTag = (( $culHmRegDefine->{$reg}{d} && $def)
+            ||  (!$culHmRegDefine->{$reg}{d} && $det))
+               ? ""
+               : "."
+               ;
+    if ($nTag.$rdEntryPure ne $rdEntry){# have to change
+      $tHash->{READINGS}{$nTag.$rdEntryPure} = $tHash->{READINGS}{$rdEntry};
+      delete $tHash->{READINGS}{$rdEntry};
+    }
   }
 
-  if ($tHash->{helper}{expert}{det}){($nTag,$grp) = ("",".R-")}
-  else{                              ($nTag,$grp) = (".","R-")}
-  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
-    my $reg = $rdEntry;
-    my $p = "";
-    $p = "-".$1 if($rdEntry =~ m/R-(.*)-(lg|sh)/);
-    $reg =~ s/^\.?R-(.*-)?//;
-    next if(!$culHmRegDefine->{$reg} || $culHmRegDefine->{$reg}{d} eq '1');
-    $tHash->{READINGS}{$nTag."R$p-".$reg} = $tHash->{READINGS}{$rdEntry};
-    delete $tHash->{READINGS}{$rdEntry};
-  }
+  my $nTag = $raw ? "":".";
 
-  if ($tHash->{helper}{expert}{raw}){($nTag,$grp) = ("",".RegL_")}
-  else{                              ($nTag,$grp) = (".","RegL_")}
-  foreach my $rdEntry (grep /^$grp/   ,keys %{$tHash->{READINGS}}){
+  foreach my $rdEntry (grep /^(\.R|R)egL_/   ,keys %{$tHash->{READINGS}}){
     my $reg = $rdEntry;
     $reg =~ s/^\.//;
-    $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
-    delete $tHash->{READINGS}{$rdEntry};
+    if ($nTag.$reg ne $rdEntry){# have to change
+      $tHash->{READINGS}{$nTag.$reg} = $tHash->{READINGS}{$rdEntry};
+      delete $tHash->{READINGS}{$rdEntry};
+    }
   }
   CUL_HM_setTmplDisp($tHash);
 }
