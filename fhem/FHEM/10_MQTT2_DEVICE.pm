@@ -158,7 +158,6 @@ MQTT2_DEVICE_Parse($$)
                   "$cid:$topic:$value" =~ m/^$reRepl$/s));
         next if(IsDisabled($dev));
 
-        my @retData;
         Log3 $dev, 4, "MQTT2_DEVICE_Parse: $dev $topic => $code";
 
         if($code =~ m/^{.*}$/s) {
@@ -171,7 +170,6 @@ MQTT2_DEVICE_Parse($$)
             foreach my $k (keys %{$ret}) {
               readingsBulkUpdate($hash, makeReadingName($k), $ret->{$k});
               my $msg = ($ret->{$k} ? $ret->{$k} : "");
-              push(@retData, "$k $msg");
               checkForGet($hash, $k, $ret->{$k});
             }
             readingsEndUpdate($hash, 1);
@@ -179,7 +177,6 @@ MQTT2_DEVICE_Parse($$)
 
         } else {
           readingsSingleUpdate($hash, $code, $value, 1);
-          push(@retData, "$code $value");
           checkForGet($hash, $code, $value);
         }
 
