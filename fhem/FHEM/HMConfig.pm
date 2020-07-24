@@ -1670,10 +1670,10 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 #define gets - try use same names as for set
 %culHmGlobalGets    = (
                        param      => "-param-",
-                       reg        => "-addr- ... -list- -peer-",
-                       regVal     => "-addr- ... -list- -peer-",
+                       reg        => "-addr- ... -list- -peerChn-",
+                       regVal     => "-addr- ... -list- -peerChn-",
                        regList    => "",
-                       cmdList    => "",
+                       cmdList    => "[short|long]",
                        saveConfig => "-filename- ...",
                        deviceInfo => "[short|long]",
                        tplInfo    => ""
@@ -1696,7 +1696,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 
 ##############################---set---########################################
 %culHmGlobalSets       = (# all but virtuals
-                       regBulk       => "-list-.-peer- -addr1:data1- -addr2:data2- ..."
+                       regBulk       => "-list-.-peerChn- -addr1:data1- -addr2:data2- ..."
                       ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [-PeerChannel-]"
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
