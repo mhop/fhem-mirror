@@ -114,7 +114,7 @@ SVG_Define($$)
   $hash->{LOGFILE}   = ($3 ? $3 : "CURRENT");
   $hash->{STATE} = "initialized";
   $hash->{LOGDEVICE} =~ s/^fileplot //; # Autocreate bug.
-  notifyRegexpChanged($hash, "global");
+  # notifyRegexpChanged($hash, "global"); # ??
 
   return undef;
 }
