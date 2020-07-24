@@ -5129,8 +5129,6 @@ json2nameValue($;$$$)
 {
   my ($in, $prefix, $map, $filter) = @_;
   $prefix = "" if(!defined($prefix));
-  $map = eval $map if($map && !ref($map)); # passing hash through AnalyzeCommand
-  $map = {} if(!$map);
   my %ret;
 
   sub
@@ -5186,30 +5184,25 @@ json2nameValue($;$$$)
   }
 
   sub
-  setVal($$$$$)
+  setVal($$$$)
   {
-    my ($ret,$map,$prefix,$name,$val) = @_;
+    my ($ret,$prefix,$name,$val) = @_;
     $name = "$prefix$name";
-    if(defined($map->{map}{$name})) {
-      return if(!$map->{map}{$name});
-      $name = $map->{map}{$name};
-    }
-    return if($map->{filter} && $name !~ m/$map->{filter}/);
     $ret->{$name} = $val;
   };
 
-  sub eObj($$$$$$;$);
+  sub eObj($$$$$;$);
   sub
-  eObj($$$$$$;$)
+  eObj($$$$$;$)
   {
-    my ($ret,$map,$name,$val,$in,$prefix,$firstLevel) = @_;
+    my ($ret,$name,$val,$in,$prefix,$firstLevel) = @_;
     my $err; 
     $prefix="" if(!$firstLevel);
 
     if($val =~ m/^"/) {
       ($err, $val, $in) = lStr($val);
       return ($err,undef) if($err);
-      setVal($ret, $map, $prefix, $name, $val);
+      setVal($ret, $prefix, $name, $val);
 
     } elsif($val =~ m/^{/) { # }
       ($err, $val, $in) = lObj($val, '{', '}');
@@ -5220,12 +5213,12 @@ json2nameValue($;$$$)
       while($in2 =~ m/^\s*"([^"]+)"\s*:\s*(.*)$/s) {
         my ($name,$val) = ($1,$2);
         $name =~ s/[^a-z0-9._\-\/]/_/gsi;
-        ($err,$in2) = eObj(\%r2, $map, $name, $val, $in2, $prefix);
+        ($err,$in2) = eObj(\%r2, $name, $val, $in2, $prefix);
         return ($err,undef) if($err);
         $in2 =~ s/^\s*,\s*//;
       }
       foreach my $k (keys %r2) {
-        setVal($ret, $map, $prefix, $firstLevel ? $k : "${name}_$k", $r2{$k});
+        setVal($ret, $prefix, $firstLevel ? $k : "${name}_$k", $r2{$k});
       }
 
     } elsif($val =~ m/^\[/) {
@@ -5234,8 +5227,7 @@ json2nameValue($;$$$)
       my $idx = 1;
       $val =~ s/^\s*//;
       while(defined($val) && $val ne "") {
-        ($err,$val) = eObj($ret, $map, 
-                                $firstLevel ? "$prefix$idx" : $name."_$idx",
+        ($err,$val) = eObj($ret, $firstLevel ? "$prefix$idx" : $name."_$idx",
                                 $val, $val, $prefix);
         return ($err,undef) if($err);
         $val =~ s/^\s*,\s*//;
@@ -5244,15 +5236,15 @@ json2nameValue($;$$$)
       }
 
     } elsif($val =~ m/^([0-9.-]+)(.*)$/s) {
-      setVal($ret, $map, $prefix, $name, $1);
+      setVal($ret, $prefix, $name, $1);
       $in = $2;
 
     } elsif($val =~ m/^(true|false)(.*)$/s) {
-      setVal($ret, $map, $prefix, $name, $1);
+      setVal($ret, $prefix, $name, $1);
       $in = $2;
 
     } elsif($val =~ m/^(null)(.*)$/s) {
-      setVal($ret, $map, $prefix, $name, undef);
+      setVal($ret, $prefix, $name, undef);
       $in = $2;
 
     } else {
@@ -5265,15 +5257,26 @@ json2nameValue($;$$$)
   $in =~ s/^\s+//;
   $in =~ s/\s+$//;
   my $err;
-  ($err,$in) = eObj(\%ret, { map=>$map, filter=>$filter },
-                    "", $in, "", $prefix, 1);
+  ($err,$in) = eObj(\%ret, "", $in, "", $prefix, 1);
   if($err) {
     Log 4, $err;
     %ret = ();
     return \%ret;
   }
 
-  return \%ret;
+  return \%ret if(!defined($map) && !defined($filter));
+  $map = eval $map if($map && !ref($map)); # passing hash through AnalyzeCommand
+
+  my %ret2;
+  for my $name (keys %ret) {
+    next if($filter && $name !~ m/$filter/);
+    if(defined($map->{$name})) {
+      next if(!$map->{$name});
+      $name = $map->{$name};
+    }
+    $ret2{$name} = $ret{$name};
+  }
+  return \%ret2;
 }
 
 # add certain values to the key. Used to postprocess json2nameValue, where
