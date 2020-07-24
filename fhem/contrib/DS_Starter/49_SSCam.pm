@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 22382 2020-07-10 20:25:50Z DS_Starter $
+# $Id: 49_SSCam.pm 22446 2020-07-20 21:16:31Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.5.1"  => "24.07.2020  set compatibility to 8.2.8, some changes according PBP level 3 ",
   "9.5.0"  => "15.07.2020  streamDev master type added, comref revised ",
   "9.4.5"  => "15.07.2020  fix crash while autocreate CommandDelete, CommandSave is missing ",
   "9.4.4"  => "14.07.2020  fix crash while autocreate makeDeviceName is missing ",
@@ -500,7 +501,7 @@ my %sdswfn = (                                                             # Fun
 # Standardvariablen und Forward-Deklaration
 my $defSlim  = 3;                                         # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $defSnum  = "1,2,3,4,5,6,7,8,9,10";                    # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $compstat = "8.2.7";                                   # getestete SVS-Version
+my $compstat = "8.2.8";                                   # getestete SVS-Version
 my $valZoom  = ".++,+,stop,-,--.";                        # Inhalt des Setters "setZoom"
 
 #use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
@@ -1091,7 +1092,7 @@ sub Attr {
             return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
         }
         if($aName =~ m/cacheServerParam/x) {
-            return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /^(.*:\d+|unix:.+)$/);
+            return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /^(.*?:\d+|unix:.+)$/x);
             my $type = AttrVal($name, "cacheType", "internal");
             if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
                 cache($name, "c_destroy");
@@ -1616,23 +1617,23 @@ sub Set {
        
   } elsif ($opt eq "motdetsc" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop || $prop !~ /^(disable|camera|SVS)$/) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
+      if (!$prop || $prop !~ /^(disable|camera|SVS)$/x) { return " \"$opt\" needs one of those arguments: disable, camera, SVS !";}
             
       $hash->{HELPER}{MOTDETSC} = $prop;
             
       if ($prop1) {
           # check ob Zahl zwischen 1 und 99
-          return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^([1-9]|[1-9][0-9])*$/);
+          return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^([1-9]|[1-9][0-9])*$/x);
           $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
       }
       if ($prop2) {
           # check ob Zahl zwischen 1 und 99
-          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop2 !~ /^([1-9]|[1-9][0-9])*$/);
+          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop2 !~ /^([1-9]|[1-9][0-9])*$/x);
           $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
       }
       if ($prop3) {
           # check ob Zahl zwischen 1 und 99
-          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop3 !~ /^([1-9]|[1-9][0-9])*$/);
+          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop3 !~ /^([1-9]|[1-9][0-9])*$/x);
           $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
       }
       amMotDetSc($hash);
@@ -1701,7 +1702,7 @@ sub Set {
           return;
             
       } else {
-          if ($prop !~ /\d+/ || $prop1 !~ /\d+/ || abs($prop) > 640 || abs($prop1) > 480) {
+          if ($prop !~ /\d+/x || $prop1 !~ /\d+/x || abs($prop) > 640 || abs($prop1) > 480) {
               return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
           }
                 
@@ -1720,11 +1721,11 @@ sub Set {
       return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{APIPTZMAXVER});
       
       if($hash->{HELPER}{APIPTZMAXVER} <= 4) {
-          if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
+          if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/x)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
           $hash->{HELPER}{GOMOVEDIR} = $prop;
       
       } elsif ($hash->{HELPER}{APIPTZMAXVER} >= 5) {
-          if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/)) {return "Function \"move\" needs an argument like right, upright, up, upleft, left, downleft, down, downright ";}
+          if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/x)) {return "Function \"move\" needs an argument like right, upright, up, upleft, left, downleft, down, downright ";}
           my %dirs = (
                       right     => 0,
                       upright   => 4,
@@ -2120,7 +2121,7 @@ sub Get {
           $ret .= "<tr class=\"even\">";
           $i = 0;
           for my $key (sortVersion("desc",keys %vNotesExtern)) {
-              ($val0,$val1) = split(/\s/,$vNotesExtern{$key},2);
+              ($val0,$val1) = split(/\s/x,$vNotesExtern{$key},2);
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
               $i++;
@@ -2213,7 +2214,7 @@ sub FWsummaryFn {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   
   if($wltype eq "image") {
-    if(ReadingsVal($name, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/) {             
+    if(ReadingsVal($name, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
     } else {
       $ret .= "<img src=$link $attr><br>";
@@ -2231,7 +2232,7 @@ sub FWsummaryFn {
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
     }      
     $ret .= "<br>";
-    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
                  </audio>";
@@ -2243,7 +2244,7 @@ sub FWsummaryFn {
              </iframe>";
     $ret .= "<br>";
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
                  </audio>";
@@ -2251,7 +2252,7 @@ sub FWsummaryFn {
            
   } elsif($wltype eq "embed") {
     $ret .= "<embed src=$link $attr>";
-    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
                  </audio>";
@@ -2298,7 +2299,7 @@ sub FWsummaryFn {
     $ret .= "<br>";
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
     $ret .= "<br>";
-    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/) {
+    if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
                  Your browser does not support the audio element.      
                  </audio>";
@@ -2496,7 +2497,7 @@ sub myVersion {
   my $name  = $hash->{NAME};
   my $actvs = 0; 
 
-  my @vl = split (/-/,ReadingsVal($name, "SVSversion", ""),2);
+  my @vl = split (/-/x,ReadingsVal($name, "SVSversion", ""),2);
   if(@vl) {
       $actvs = $vl[0];
       $actvs =~ s/\.//gx;
@@ -2659,9 +2660,9 @@ sub wdpollcaminfo {
         my $lupd = ReadingsVal($name, "LastUpdateTime", "1970-01-01 / 01:00:00");
         my ($year,$month,$mday,$hour,$min,$sec);
         if ($lupd =~ /(\d+)\.(\d+)\.(\d+)/x) {
-            ($mday, $month, $year, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+) \/ (\d+):(\d+):(\d+)/);
+            ($mday, $month, $year, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+)\s\/\s(\d+):(\d+):(\d+)/x);
         } else {
-            ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)-(\d+)-(\d+) \/ (\d+):(\d+):(\d+)/);        
+            ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)-(\d+)-(\d+)\s\/\s(\d+):(\d+):(\d+)/x);        
         }
         $lupd = fhemTimeLocal($sec, $min, $hour, $mday, $month-=1, $year-=1900);
         if( gettimeofday() > ($lupd + $pcia + 20) ) {
@@ -4711,7 +4712,7 @@ sub getApiSites_Parse {
             Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
             if(AttrVal($name,"simu_SVSversion",0)) {
-                my @vl  = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
+                my @vl  = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
                 $actvs  = $vl[0];
                 $actvs .= $vl[1];
                 $actvs .= ($vl[2] =~ /\d/x) ? $vl[2]."xxxx" : $vl[2];
@@ -5420,7 +5421,7 @@ sub camOp {
       Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
       $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/) {
+   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
       $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
       $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;      
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
@@ -5572,7 +5573,7 @@ sub camOp_Parse {
    } elsif ($myjson ne "") {    
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        if($OpMode !~ /SaveRec|GetRec/) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
+        if($OpMode !~ /SaveRec|GetRec/x) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
             ($hash,$success,$myjson) = evaljson($hash,$myjson);        
             unless ($success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -6071,8 +6072,8 @@ sub camOp_Parse {
                             }
                         } else {
                             for(cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
-                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
-                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/x;
+                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/x;
                                 push @as,$_ if($_=~/^(\d+)$/x);
                             } 
                             my %seen;
@@ -6218,8 +6219,8 @@ sub camOp_Parse {
                             }
                         } else {
                             for(cache($name, "c_getkeys")) {              # relevant keys aus allen vorkommenden selektieren
-                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
-                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+                                next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/x;
+                                $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/x;
                                 push @as,$_ if($_=~/^(\d+)$/x);
                             }                            
                             my %seen;
@@ -6569,7 +6570,7 @@ sub camOp_Parse {
                 if (AttrVal($name, "simu_SVSversion", undef)) {
                     Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
                     #delete $version{"SMALL"} if ($version{"SMALL"});
-                    my @vl = split (/\.|-/,AttrVal($name, "simu_SVSversion", ""));
+                    my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
                     $major = $vl[0];
                     $minor = $vl[1];
                     $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
@@ -6638,19 +6639,19 @@ sub camOp_Parse {
                 if (AttrVal($name, "livestreamprefix", undef)) {
                     my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
                     $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;
-                    my @mjh    = split(/\//, $mjpegHttp, 4);
+                    my @mjh    = split(/\//x, $mjpegHttp, 4);
                     $mjpegHttp = $exturl."/".$mjh[3];
-                    my @mxh    = split(/\//, $mxpegHttp, 4);
+                    my @mxh    = split(/\//x, $mxpegHttp, 4);
                     $mxpegHttp = $exturl."/".$mxh[3];
                     if($unicastPath) {
-                        my @ucp      = split(/[@\|:]/, $unicastPath);
-                        my @lspf     = split(/[\/\/\|:]/, $exturl);
+                        my @ucp      = split(/[@\|:]/x, $unicastPath);
+                        my @lspf     = split(/[\/\/\|:]/x, $exturl);
                         $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
                     }
                 }
                 
                 # StmKey extrahieren
-                my @sk     = split(/&StmKey=/, $mjpegHttp);
+                my @sk     = split(/&StmKey=/x, $mjpegHttp);
                 my $stmkey = $sk[1];
                 
                 # Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
@@ -7037,7 +7038,7 @@ sub camOp_Parse {
                     # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
                     my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
-                    $presname    =~ s/\s+/_/g;                                           # Leerzeichen im Namen ersetzen falls vorhanden  
+                    $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
                     $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
                     my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
                     if ($ptype) {
@@ -7071,7 +7072,7 @@ sub camOp_Parse {
                 while ($cnt < $patrolcnt) {
                     $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
                     $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
-                    $patrolname =~ s/\s+/_/g;                                            # Leerzeichen im Namen ersetzen falls vorhanden
+                    $patrolname =~ s/\s+/_/gx;                                            # Leerzeichen im Namen ersetzen falls vorhanden
                     $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
                     $cnt += 1;
                 }
@@ -7436,7 +7437,7 @@ sub evaljson {
   
   eval {decode_json($myjson)} or do 
   {
-      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) || $OpMode =~ m/^.*_hls$/ ) {
+      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || $OpMode =~ m/^.*_hls$/x ) {
           # HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
           Log3($name, 5, "$name - HLS-activation data return: $myjson");
           if ($myjson =~ m/{"success":true}/x) {
@@ -7828,7 +7829,7 @@ sub ptzPanel {
           if ($btn[$btnnr] ne "") {
               my ($cmd,$img);
               
-              if ($btn[$btnnr] =~ /(.*?):(.*)/) {                                                            # enthält Komando -> <command>:<image>
+              if ($btn[$btnnr] =~ /(.*?):(.*)/x) {                                                           # enthält Komando -> <command>:<image>
                   $cmd = $1;
                   $img = $2;
               
@@ -7983,7 +7984,7 @@ sub addptzattr {
   my $hash = $defs{$name};
   my $actvs;
   
-  my @vl = split (/\.|-/,ReadingsVal($name, "SVSversion", ""));
+  my @vl = split (/\.|-/x,ReadingsVal($name, "SVSversion", ""));
   if(@vl) {
       $actvs = $vl[0];
       $actvs.= $vl[1];
@@ -8001,7 +8002,7 @@ sub addptzattr {
       my $arg = "ptzPanel_Home";
       my @ua  = split(" ", $attr{$name}{userattr});
       for (@ua) { 
-          push(@h,$_) if($_ !~ m/$arg.*/);
+          push(@h,$_) if($_ !~ m/$arg.*/x);
       }
          
       $attr{$name}{userattr} = join(' ',@h);
@@ -8318,7 +8319,7 @@ sub _streamDevMJPEG {
   my ($link,$audiolink);
   my $ret = "";
   
-  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {  
+  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot play back MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
       return $ret;
       
@@ -8369,7 +8370,7 @@ sub _streamDevMJPEG {
       }
   }
   
-  if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
+  if($audiolink && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
       $ret .= '</tr>';
       $ret .= '<tr class="odd">';
       $ret .= "<td><audio src=$audiolink preload='none' volume='0.5' controls>
@@ -8729,7 +8730,7 @@ sub __switchedIMAGE {
   my ($link,$ret)   = ("","");
   $link             = $hash->{HELPER}{LINK};
   
-  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/) {             
+  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
   } else {
       if(!$ftui) {
@@ -8768,7 +8769,7 @@ sub __switchedIMAGE {
       }
   }
   
-  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/ && !$hau) {
+  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x && !$hau) {
       $ret .= "</tr>";
       $ret .= '<tr class="odd">';
       $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -8826,7 +8827,7 @@ sub __switchedIFRAME {
   $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
   $ret .= "</td>";
   
-  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
+  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
       $ret .= '</tr>';
       $ret .= '<tr class="odd">';
       $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -8879,7 +8880,7 @@ sub __switchedVIDEO {
   $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
   $ret .= "</td>";
   
-  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/  && !$hau) {
+  if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
       $ret .= '</tr>';
       $ret .= '<tr class="odd">';
       $ret .= "<td><audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>
@@ -9225,8 +9226,8 @@ sub composeGallery {
   } else {
       my @as;
       for(cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-         next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/;
-         $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/;
+         next if $_ !~ /\{SNAPHASH\}\{(\d+)\}\{.*\}/x;
+         $_ =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/x;
          push @as,$_ if($_=~/^(\d+)$/x);
       }      
       my %seen;
@@ -9325,11 +9326,11 @@ sub sortVersion {
 
   my @sorted = map {$_->[0]}
                sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./]} @versions;
+               map {[$_, pack "C*", split /\./x]} @versions;
              
   @sorted = map {join ".", unpack "C*", $_}
             sort
-            map {pack "C*", split /\./} @versions;
+            map {pack "C*", split /\./x} @versions;
   
   if($sseq eq "desc") {
       @sorted = reverse @sorted;
@@ -9412,8 +9413,8 @@ sub prepareSendData {
                         # alle Serial Numbers "{$sn}" der Transaktion ermitteln
                         # Muster: {SENDSNAPS}{2222}{0}{imageData} 
                         for(cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-                            next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
-                            $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/;
+                            next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/x;
+                            $_ =~ s/\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/$1/x;
                             push @as,$_ if($_=~/^(\d+)$/x);
                         }      
                         my %seen;
@@ -9786,7 +9787,7 @@ sub sendChat {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
        }
 
-       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/);
+       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
        Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
@@ -9895,8 +9896,8 @@ sub sendChat {
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           # Muster: {SENDSNAPS}{2222}{0}{imageData}
           for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/x;
+              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/x;
               next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/x);
           }
@@ -9906,8 +9907,8 @@ sub sendChat {
       } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           # Muster: {SENDRECS}{305}{0}{imageData} 
           for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/x;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/x;
               next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/x);
           }
@@ -9919,7 +9920,7 @@ sub sendChat {
            ($subject,$fname) = extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
            
            # User aufsplitten und zu jedem die ID ermitteln
-           my @ua = split(/,/, $peers);
+           my @ua = split(/,/x, $peers);
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
@@ -10043,7 +10044,7 @@ sub sendTelegram {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
  
-       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/);
+       Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
        Log3($name, 4, "$name - param $key is set")                                                             if($key =~ /[sv]dat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
@@ -10125,8 +10126,8 @@ sub sendTelegram {
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           # Muster: {SENDSNAPS}{2222}{0}{imageData}
           for(cache($name, "c_getkeys")) {                                                   # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $_ !~ /\{SENDSNAPS\}\{.*\}\{(\d+)\}\{.*\}/x;
+              $_ =~ s/\{SENDSNAPS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/x;
               next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/x);
           }
@@ -10135,8 +10136,8 @@ sub sendTelegram {
       } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           # Muster: {SENDRECS}{305}{0}{imageData} 
           for(cache($name, "c_getkeys")) {                                             # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/x;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/x;
               next if $1 != $tac;
               push @as,$_ if($_=~/^(\d+)$/x);
           }
@@ -10311,8 +10312,8 @@ sub TBotSendIt {
 
           # add caption
           if (defined($addPar)) {
-              $addPar =~ s/(?<![\\])\\n/\x0A/g;
-              $addPar =~ s/(?<![\\])\\t/\x09/g;
+              $addPar =~ s/(?<![\\])\\n/\x0A/gx;
+              $addPar =~ s/(?<![\\])\\t/\x09/gx;
 
               $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if (!defined($ret));
               $addPar = undef;
@@ -10330,8 +10331,8 @@ sub TBotSendIt {
 
           # add caption
           if (defined( $addPar) ) {
-              $addPar =~ s/(?<![\\])\\n/\x0A/g;
-              $addPar =~ s/(?<![\\])\\t/\x09/g;
+              $addPar =~ s/(?<![\\])\\n/\x0A/gx;
+              $addPar =~ s/(?<![\\])\\t/\x09/gx;
 
               $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0) if(!defined($ret));
               $addPar = undef;
@@ -10376,8 +10377,8 @@ sub TBotSendIt {
               $hash->{sentMsgText} = $msg;
           }
         
-          $msg =~ s/(?<![\\])\\n/\x0A/g;
-          $msg =~ s/(?<![\\])\\t/\x09/g;
+          $msg =~ s/(?<![\\])\\n/\x0A/gx;
+          $msg =~ s/(?<![\\])\\t/\x09/gx;
 
           # add msg (no file)
           $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0) if(!defined($ret));
@@ -10461,7 +10462,7 @@ sub TBotAddMultipart {
   
   # ensure parheader is defined and add final header new lines
   $parheader  = "" if (!defined($parheader));
-  $parheader .= "\r\n" if ((length($parheader) > 0) && ($parheader !~ /\r\n$/));
+  $parheader .= "\r\n" if ((length($parheader) > 0) && ($parheader !~ /\r\n$/x));
 
   # add content 
   my $finalcontent;
@@ -10517,9 +10518,9 @@ sub TBotIdentifyStream {
   # signatures for media files are documented here --> https://en.wikipedia.org/wiki/List_of_file_signatures
   # seems sometimes more correct: https://wangrui.wordpress.com/2007/06/19/file-signatures-table/
   # Video Signatur aus: https://www.garykessler.net/library/file_sigs.html
-  return (-1,"png") if ( $msg =~ /^\x89PNG\r\n\x1a\n/ );                       # PNG
-  return (-1,"jpg") if ( $msg =~ /^\xFF\xD8\xFF/ );                            # JPG not necessarily complete, but should be fine here
-  return (-30,"mpg") if ( $msg =~ /^....\x66\x74\x79\x70\x69\x73\x6f\x6d/ );   # mp4     
+  return (-1,"png")  if ( $msg =~ /^\x89PNG\r\n\x1a\n/x );                       # PNG
+  return (-1,"jpg")  if ( $msg =~ /^\xFF\xD8\xFF/x );                            # JPG not necessarily complete, but should be fine here
+  return (-30,"mpg") if ( $msg =~ /^....\x66\x74\x79\x70\x69\x73\x6f\x6d/x );    # mp4     
 
 return (0,undef);
 }
@@ -10614,7 +10615,7 @@ sub sendEmail {
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $mailparams{$key}->{default} if (!$extparamref->{$key} && !$mailparams{$key}->{attr});    
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if (exists $extparamref->{$key});
        }
-       Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/);
+       Log3($name, 4, "$name - param $key is now \"".$data{SSCam}{$name}{PARAMS}{$tac}{$key}."\" ") if($key !~ /sdat/x);
        Log3($name, 4, "$name - param $key is set") if($key =~ /sdat/x && $data{SSCam}{$name}{PARAMS}{$tac}{$key} ne '');
    }
    
@@ -10739,10 +10740,10 @@ sub sendEmailblocking {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDSNAPS|RS}{2222|multiple_snapsend}{0|1572995404.125580}{imageData}  
           for(cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{.*\}\{.*\}/;
-              $_ =~ s/\{(SENDSNAPS|RS)\}\{(.*)\}\{(\d+|\d+.\d+)\}\{.*\}/$3/;
+              next if $_ !~ /\{(SENDSNAPS|RS)\}\{.*\}\{.*\}\{.*\}/x;
+              $_ =~ s/\{(SENDSNAPS|RS)\}\{(.*)\}\{(\d+|\d+.\d+)\}\{.*\}/$3/x;
               next if $2 ne $tac;
-              push @as,$_ if($_=~/^(\d+|\d+.\d+)$/);
+              push @as,$_ if($_ =~ /^(\d+|\d+.\d+)$/x);
           }           
           my %seen;
           my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
@@ -10790,10 +10791,10 @@ sub sendEmailblocking {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           # Muster: {SENDRECS}{305}{0}{imageData} 
           for(cache($name, "c_getkeys")) {                                                # relevant keys aus allen vorkommenden selektieren
-              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/;
-              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/;
+              next if $_ !~ /\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/x;
+              $_ =~ s/\{SENDRECS\}\{(\d+)\}\{(\d+)\}\{.*\}/$2/x;
               next if $1 != $tac;
-              push @as,$_ if($_=~/^(\d+)$/);
+              push @as,$_ if($_ =~ /^(\d+)$/x);
           }           
           my %seen;          
           my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
@@ -11105,7 +11106,7 @@ sub cleanData {
       my @as = cache($name, "c_getkeys");
       if($tac) {
           for my $k (@as) {
-              if ($k =~ /$tac/) {
+              if ($k =~ /$tac/x) {
                   cache($name, "c_remove", $k);
                   $del = 1;
               }
@@ -11151,7 +11152,7 @@ return;
 #############################################################################################
 sub trim {
   my $str = shift;
-  $str =~ s/^\s+|\s+$//g;
+  $str =~ s/^\s+|\s+$//gx;
 
 return ($str);
 }
@@ -11314,7 +11315,7 @@ sub cache {
                            );
       }
 
-      if ($cache && $cache =~ /CHI::Driver::Role::Universal/) {
+      if ($cache && $cache =~ /CHI::Driver::Role::Universal/x) {
           Log3($name, 3, "$name - Cache \"$type\" namespace \"$fuuid\" initialized");
           $hash->{HELPER}{CACHEKEY} = $cache;
           $brt = tv_interval($bst);
@@ -11440,17 +11441,17 @@ sub setVersionInfo {
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22382 2020-07-10 20:25:50Z DS_Starter $ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+      $modules{$type}{META}{version} = "v".$v;                                                  # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
+      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22446 2020-07-20 21:16:31Z DS_Starter $ im Kopf komplett! vorhanden )
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22382 2020-07-10 20:25:50Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22446 2020-07-20 21:16:31Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          ## no critic 'VERSION'                                      
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                 ## no critic 'VERSION'                                      
       }
   } else {
       # herkömmliche Modulstruktur
