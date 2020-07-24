@@ -2129,9 +2129,9 @@ sub HMinfo_loadConfig($@) {####################################################
       next if (!$list);
       my $pId = CUL_HM_name2Id($pN);# allow devices also as peer. Regfile is korrekt
       # my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));#old - removed
-      CUL_HM_updtRegDisp($defs{$eN},$list,$pId);
       push @el,"$eN reg list:$reg";    
     }
+    CUL_HM_refreshRegs($eN);
   }
   $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
