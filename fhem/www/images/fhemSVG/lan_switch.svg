@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Ebene_2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="7086.609px" height="7086.609px" viewBox="0 0 7086.609 7086.609" enable-background="new 0 0 7086.609 7086.609"
+	 xml:space="preserve">
+<g>
+	<path fill="#000000" d="M7087.457,4105.645c0,118.964-90.412,215.402-201.941,215.402H201.94C90.411,4321.047,0,4224.608,0,4105.645V2979.992
+		c0-118.963,90.411-215.403,201.94-215.403h6683.575c111.529,0,201.941,96.439,201.941,215.403V4105.645z"/>
+	<g>
+		<rect x="1650.957" y="3007.073" fill="#FFFFFF" width="468.929" height="468.927"/>
+		<rect x="2279.663" y="3007.073" fill="#FFFFFF" width="468.928" height="468.927"/>
+		<rect x="2914.462" y="3007.073" fill="#FFFFFF" width="468.927" height="468.927"/>
+		<rect x="3543.166" y="3007.073" fill="#FFFFFF" width="468.928" height="468.927"/>
+		<rect x="1650.957" y="3609.635" fill="#FFFFFF" width="468.929" height="468.931"/>
+		<rect x="2279.663" y="3609.635" fill="#FFFFFF" width="468.928" height="468.931"/>
+		<rect x="2914.462" y="3609.635" fill="#FFFFFF" width="468.927" height="468.931"/>
+		<rect x="3543.166" y="3609.635" fill="#FFFFFF" width="468.928" height="468.931"/>
+		<rect x="4419.602" y="3007.073" fill="#FFFFFF" width="468.928" height="468.927"/>
+		<rect x="5048.307" y="3007.073" fill="#FFFFFF" width="468.93" height="468.927"/>
+		<rect x="5683.105" y="3007.073" fill="#FFFFFF" width="468.928" height="468.927"/>
+		<rect x="6311.811" y="3007.073" fill="#FFFFFF" width="468.928" height="468.927"/>
+		<rect x="4419.602" y="3609.635" fill="#FFFFFF" width="468.928" height="468.931"/>
+		<rect x="5048.307" y="3609.635" fill="#FFFFFF" width="468.93" height="468.931"/>
+		<rect x="5683.105" y="3609.635" fill="#FFFFFF" width="468.928" height="468.931"/>
+		<rect x="6311.811" y="3609.635" fill="#FFFFFF" width="468.928" height="468.931"/>
+	</g>
+	<path fill="#FFFFFF" d="M1281.114,3873.876c0,97.165-78.768,175.933-175.933,175.933H443.066
+		c-97.166,0-175.934-78.768-175.934-175.933v-662.115c0-97.165,78.768-175.934,175.934-175.934h662.115
+		c97.166,0,175.933,78.769,175.933,175.934V3873.876z"/>
+</g>
+</svg>
