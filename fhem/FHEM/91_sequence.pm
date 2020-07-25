@@ -58,6 +58,7 @@ sequence_Define($$)
   $hash->{MAX} = int(@def);
   $hash->{STATE} = "active";
   $hash->{TS} = 0;
+  notifyRegexpChanged($hash, $hash->{RE});
   return undef;
 }
 

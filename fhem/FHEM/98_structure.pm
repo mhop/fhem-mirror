@@ -143,6 +143,7 @@ structure_setDevs($;$)
   $hash->{".memberHash"} = \%list;
   $hash->{".memberList"} = \@list;
   delete $hash->{".cachedHelp"};
+  notifyRegexpChanged($hash, 'global|'.join('|', @list));
 }
 
 #############################
