@@ -201,7 +201,7 @@ sub CUL_HM_Initialize($) {
                        ;
   $hash->{Attr}{glb} =  "do_not_notify:1,0 showtime:1,0 "
                        ."rawToReadable unit "#"KFM-Sensor" only
-                       ."expert:multiple,defReg,allReg,rawReg,templ "
+                       ."expert:multiple,defReg,allReg,rawReg,templ,none "
                        ."param "
                        ."readOnly:0,1 "                       
                        ."actAutoTry:0_off,1_on "
@@ -8555,7 +8555,8 @@ sub CUL_HM_chgExpLvl($){# update visibility and set internal values for expert
   $tHash->{helper}{expert}{raw} = 0;
   $tHash->{helper}{expert}{tpl} = 0;
   foreach my $expSet (split(",",CUL_HM_getAttr($tHash->{NAME},"expert","defReg"))){
-    $tHash->{helper}{expert}{def} = 1 if($expSet eq "defReg");#default register on
+    $tHash->{helper}{expert}{def} = 1 if($expSet eq "defReg"
+                                       ||$expSet eq "allReg");#default register on
     $tHash->{helper}{expert}{det} = 1 if($expSet eq "allReg");#detail register on
     $tHash->{helper}{expert}{raw} = 1 if($expSet eq "rawReg");#raw register on
     $tHash->{helper}{expert}{tpl} = 1 if($expSet eq "templ") ;#template on
@@ -8681,7 +8682,7 @@ sub CUL_HM_updtRegDisp($$$) {
 }
 sub CUL_HM_cfgStateDelay($) {#update cfgState timer 
   my $name = shift;
-  my $name = CUL_HM_getDeviceName($name);
+  $name = CUL_HM_getDeviceName($name);
   RemoveInternalTimer("cfgStateUpdate:$name");
   if (InternalVal($name,"protCmdPend","none"   ) eq "none"){
     CUL_HM_cfgStateUpdate("cfgStateUpdate:$name");
@@ -9515,8 +9516,8 @@ sub CUL_HM_ActCheck($) {# perform supervision
         if ($actHash->{helper}{$devId}{start} lt $tSince){  
           if($autoTry) { #try to send a statusRequest?
             my $try = $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0;
+            $actHash->{helper}{$devId}{try} = $try + 1;
             if ($try < 4 || !($try % 4)){#try 3 times, then reduce speed
-              $actHash->{helper}{$devId}{try} = $try + 1;
               if (CUL_HM_qStateUpdatIfEnab($devName,1)){
                 $state = $oldState eq "unset" ? "unknown" 
                                               : $oldState;
