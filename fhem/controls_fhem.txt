@@ -1,4 +1,4 @@
-REV 22467
+REV 22470
 DIR unused
 UPD 2020-07-25_07:45:02 346422 ./CHANGED
 UPD 2020-07-11_07:45:03 42447 ./MAINTAINER.txt
@@ -433,7 +433,7 @@ UPD 2020-07-17_07:45:03 15082 FHEM/90_SIGNALduino_un.pm
 UPD 2020-04-12_07:45:02 26121 FHEM/90_at.pm
 UPD 2017-08-14_07:45:02 6980 FHEM/91_eventTypes.pm
 UPD 2020-03-16_07:45:03 27967 FHEM/91_notify.pm
-UPD 2019-12-22_07:45:03 10210 FHEM/91_sequence.pm
+UPD 2020-07-26_07:45:02 10253 FHEM/91_sequence.pm
 UPD 2018-07-10_07:45:14 16502 FHEM/91_watchdog.pm
 UPD 2020-07-06_07:45:04 61770 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
@@ -539,7 +539,7 @@ UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
 UPD 2019-11-19_07:45:03 23610 FHEM/98_serviced.pm
 UPD 2019-12-24_07:45:11 60214 FHEM/98_statistics.pm
-UPD 2020-04-24_07:45:02 34160 FHEM/98_structure.pm
+UPD 2020-07-26_07:45:02 34218 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
 UPD 2020-04-13_07:45:02 20644 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
@@ -739,8 +739,8 @@ UPD 2020-07-24_07:45:06 4326795 docs/commandref.html
 UPD 2020-07-24_07:45:09 2682697 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-07-25_07:45:10 232466 docs/commandref_modular.html
-UPD 2020-07-25_07:45:11 243178 docs/commandref_modular_DE.html
+UPD 2020-07-26_07:45:10 232466 docs/commandref_modular.html
+UPD 2020-07-26_07:45:11 243178 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1297,10 +1297,13 @@ UPD 2017-11-14_07:45:02 2084 www/images/fhemSVG/ampel_gruen.svg
 UPD 2017-11-14_07:45:02 2097 www/images/fhemSVG/ampel_rot.svg
 UPD 2019-02-14_07:45:03 1139 www/images/fhemSVG/arch-linux.svg
 UPD 2019-02-14_07:45:03 3099 www/images/fhemSVG/arduino.svg
+UPD 2020-07-26_07:45:03 3664 www/images/fhemSVG/attic_ladder_closed.svg
+UPD 2020-07-26_07:45:03 3490 www/images/fhemSVG/attic_ladder_open.svg
 UPD 2017-11-26_07:45:02 696 www/images/fhemSVG/aurora.svg
 UPD 2015-08-11_07:45:11 1801 www/images/fhemSVG/awning.off.svg
 UPD 2015-08-11_07:45:11 1794 www/images/fhemSVG/awning.svg
 UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
+UPD 2020-07-26_07:45:03 15078 www/images/fhemSVG/balkon_icon.svg
 UPD 2015-07-28_14:05:32 2402 www/images/fhemSVG/batterie.svg
 UPD 2015-07-28_14:05:32 2379 www/images/fhemSVG/bluetooth.svg
 UPD 2017-11-14_07:45:02 5364 www/images/fhemSVG/building_carport.svg
@@ -1327,9 +1330,25 @@ UPD 2019-08-15_07:45:02 5368 www/images/fhemSVG/dead.svg
 UPD 2019-02-09_07:45:03 5320 www/images/fhemSVG/debian.svg
 UPD 2019-02-08_07:45:02 2305 www/images/fhemSVG/docker.svg
 UPD 2017-11-14_07:45:02 15434 www/images/fhemSVG/dog_silhouette.svg
+UPD 2020-07-26_07:45:03 1194 www/images/fhemSVG/door_shutter.svg
+UPD 2020-07-26_07:45:03 1386 www/images/fhemSVG/door_shutter_10.svg
+UPD 2020-07-26_07:45:03 3077 www/images/fhemSVG/door_shutter_100.svg
+UPD 2020-07-26_07:45:03 1582 www/images/fhemSVG/door_shutter_20.svg
+UPD 2020-07-26_07:45:03 1777 www/images/fhemSVG/door_shutter_30.svg
+UPD 2020-07-26_07:45:03 1972 www/images/fhemSVG/door_shutter_40.svg
+UPD 2020-07-26_07:45:03 2168 www/images/fhemSVG/door_shutter_50.svg
+UPD 2020-07-26_07:45:03 2363 www/images/fhemSVG/door_shutter_60.svg
+UPD 2020-07-26_07:45:03 2558 www/images/fhemSVG/door_shutter_70.svg
+UPD 2020-07-26_07:45:03 2753 www/images/fhemSVG/door_shutter_80.svg
+UPD 2020-07-26_07:45:03 2948 www/images/fhemSVG/door_shutter_90.svg
 UPD 2015-07-28_14:05:32 2935 www/images/fhemSVG/dreambox.svg
 UPD 2015-07-28_14:05:32 8477 www/images/fhemSVG/dustbin.svg
+UPD 2020-07-26_07:45:03 8857 www/images/fhemSVG/electric_car_icon.svg
 UPD 2015-08-14_07:45:11 1130 www/images/fhemSVG/euro.svg
+UPD 2020-07-26_07:45:03 4799 www/images/fhemSVG/feinstaub.svg
+UPD 2020-07-26_07:45:03 11634 www/images/fhemSVG/feinstaub_pm1.svg
+UPD 2020-07-26_07:45:03 13509 www/images/fhemSVG/feinstaub_pm10.svg
+UPD 2020-07-26_07:45:03 14834 www/images/fhemSVG/feinstaub_pm25.svg
 UPD 2019-02-14_07:45:03 1012 www/images/fhemSVG/file_image.svg
 UPD 2019-02-14_07:45:03 906 www/images/fhemSVG/file_json-1.svg
 UPD 2019-02-14_07:45:03 1523 www/images/fhemSVG/file_json-2.svg
@@ -1406,6 +1425,7 @@ UPD 2015-07-28_14:05:32 7258 www/images/fhemSVG/hm-tc-it-wm-w-eu.svg
 UPD 2017-11-26_07:45:02 8629 www/images/fhemSVG/hm_ccu.svg
 UPD 2017-11-14_07:45:02 2937 www/images/fhemSVG/hm_keymatic.svg
 UPD 2015-07-28_14:05:32 9868 www/images/fhemSVG/hm_lan.svg
+UPD 2020-07-26_07:45:03 1110 www/images/fhemSVG/homeConnect.svg
 UPD 2015-07-28_14:05:32 5946 www/images/fhemSVG/hourglass.svg
 UPD 2019-11-26_07:45:03 849 www/images/fhemSVG/hue2019_devicesMotionSensor.svg
 UPD 2017-11-14_07:45:02 10070 www/images/fhemSVG/hue_bridge.svg
@@ -1472,9 +1492,13 @@ UPD 2020-03-02_07:45:03 235113 www/images/fhemSVG/it_raspberry.svg
 UPD 2020-03-02_07:45:03 69515 www/images/fhemSVG/it_raspberry_logo.svg
 UPD 2017-11-14_07:45:02 6772 www/images/fhemSVG/it_remote_folder.svg
 UPD 2017-05-05_07:45:02 5178 www/images/fhemSVG/kindle.svg
+UPD 2020-07-26_07:45:03 4430 www/images/fhemSVG/kodi.svg
+UPD 2020-07-26_07:45:03 3135 www/images/fhemSVG/kodi_icon.svg
 UPD 2020-04-27_07:45:02 177096 www/images/fhemSVG/kuehlschrank_big.svg
 UPD 2020-04-27_07:45:02 270578 www/images/fhemSVG/kuehlschrank_small.svg
 UPD 2015-07-28_14:05:32 8487 www/images/fhemSVG/lan_rs485.svg
+UPD 2020-07-26_07:45:03 2301 www/images/fhemSVG/lan_switch.svg
+UPD 2020-07-26_07:45:03 1052 www/images/fhemSVG/laptop.svg
 UPD 2015-07-28_14:05:32 3820 www/images/fhemSVG/light_ceiling.svg
 UPD 2015-07-28_14:05:32 2126 www/images/fhemSVG/light_ceiling_off.svg
 UPD 2017-11-14_07:45:02 5905 www/images/fhemSVG/light_dim_down.svg
@@ -1499,6 +1523,7 @@ UPD 2015-07-28_14:05:32 3145 www/images/fhemSVG/message_socket_off.svg
 UPD 2015-07-28_14:05:32 5733 www/images/fhemSVG/message_socket_off2.svg
 UPD 2015-07-28_14:05:32 10647 www/images/fhemSVG/message_socket_on2.svg
 UPD 2015-07-28_14:05:32 4579 www/images/fhemSVG/message_socket_unknown.svg
+UPD 2020-07-26_07:45:03 5670 www/images/fhemSVG/mixer_icon.svg
 UPD 2015-07-28_14:05:32 2323 www/images/fhemSVG/motion_detector.svg
 UPD 2018-01-11_07:45:02 6168 www/images/fhemSVG/mqtt.svg
 UPD 2019-11-07_07:45:03 12089 www/images/fhemSVG/mqtt_bridge_1.svg
@@ -1627,10 +1652,15 @@ UPD 2015-07-28_14:05:32 13389 www/images/fhemSVG/scc_868.svg
 UPD 2015-07-28_14:05:32 2723 www/images/fhemSVG/sdcard.svg
 UPD 2015-07-28_14:05:32 2132 www/images/fhemSVG/security.svg
 UPD 2015-07-28_14:05:32 3640 www/images/fhemSVG/security_password.svg
+UPD 2020-07-26_07:45:03 10065 www/images/fhemSVG/senseo_icon.svg
 UPD 2019-02-14_07:45:03 1921 www/images/fhemSVG/sketchup-layout.svg
 UPD 2015-07-28_14:05:32 5746 www/images/fhemSVG/socket_timer.svg
+UPD 2020-07-26_07:45:03 234856 www/images/fhemSVG/solar_icon.svg
 UPD 2018-01-28_07:45:02 2742 www/images/fhemSVG/sonos_play1.svg
+UPD 2020-07-26_07:45:03 95779 www/images/fhemSVG/springbrunnen_icon.svg
+UPD 2020-07-26_07:45:03 423703 www/images/fhemSVG/sprinkler_icon.svg
 UPD 2019-02-14_07:45:03 2375 www/images/fhemSVG/sqlite.svg
+UPD 2020-07-26_07:45:03 37685 www/images/fhemSVG/stromzaehler_icon.svg
 UPD 2015-08-10_07:45:11 29827 www/images/fhemSVG/sunblind_0.svg
 UPD 2015-08-10_07:45:11 29803 www/images/fhemSVG/sunblind_10.svg
 UPD 2015-08-10_07:45:11 21498 www/images/fhemSVG/sunblind_100.svg
@@ -1643,6 +1673,7 @@ UPD 2015-08-10_07:45:11 29741 www/images/fhemSVG/sunblind_70.svg
 UPD 2015-08-10_07:45:11 30837 www/images/fhemSVG/sunblind_80.svg
 UPD 2015-08-10_07:45:11 29746 www/images/fhemSVG/sunblind_90.svg
 UPD 2019-02-14_07:45:03 827 www/images/fhemSVG/svn.svg
+UPD 2020-07-26_07:45:03 859 www/images/fhemSVG/symfonisk_remote.svg
 UPD 2015-07-28_14:05:32 5685 www/images/fhemSVG/system_backup.svg
 UPD 2015-07-28_14:05:32 3464 www/images/fhemSVG/system_fhem.svg
 UPD 2015-07-28_14:05:32 4479 www/images/fhemSVG/system_fhem_reboot.svg
@@ -1664,8 +1695,11 @@ UPD 2019-02-14_07:45:03 807 www/images/fhemSVG/telegram.svg
 UPD 2019-06-02_07:45:03 1591 www/images/fhemSVG/telescope.svg
 UPD 2015-07-28_14:05:32 3079 www/images/fhemSVG/temperature_humidity.svg
 UPD 2019-02-14_07:45:03 889 www/images/fhemSVG/terminal.svg
+UPD 2020-07-26_07:45:03 8617 www/images/fhemSVG/terrasse_icon.svg
+UPD 2020-07-26_07:45:03 1212 www/images/fhemSVG/tradfri_dimmerswitch.svg
 UPD 2020-01-09_07:45:02 600 www/images/fhemSVG/tradfri_filled_floalt.svg
 UPD 2019-09-08_07:45:03 2111 www/images/fhemSVG/tradfri_gateway.svg
+UPD 2020-07-26_07:45:03 1681 www/images/fhemSVG/tradfri_remote.svg
 UPD 2020-02-29_07:45:03 2705 www/images/fhemSVG/tuer_fenster_kontakt.svg
 UPD 2019-12-12_07:45:03 3216 www/images/fhemSVG/tuer_fenster_kontakt_closed.svg
 UPD 2019-12-12_07:45:03 3318 www/images/fhemSVG/tuer_fenster_kontakt_opened.svg
@@ -1683,6 +1717,8 @@ UPD 2020-03-02_07:45:03 7420 www/images/fhemSVG/vitrine.svg
 UPD 2020-03-02_07:45:03 11669 www/images/fhemSVG/vitrine1.svg
 UPD 2020-03-02_07:45:03 13363 www/images/fhemSVG/vitrine_door_transparent.svg
 UPD 2019-02-14_07:45:03 3164 www/images/fhemSVG/vmware.svg
+UPD 2020-07-26_07:45:03 3779 www/images/fhemSVG/wasserkocher_icon.svg
+UPD 2020-07-26_07:45:03 45633 www/images/fhemSVG/wasserzaehler_icon.svg
 UPD 2019-05-30_07:45:03 4934 www/images/fhemSVG/weather_fog.svg
 UPD 2019-05-30_07:45:03 2002 www/images/fhemSVG/weather_night.svg
 UPD 2019-05-30_07:45:03 4140 www/images/fhemSVG/weather_night_cloudy.svg
@@ -1706,6 +1742,7 @@ UPD 2019-05-30_07:45:03 5071 www/images/fhemSVG/weather_rain_snow.svg
 UPD 2019-05-30_07:45:03 8697 www/images/fhemSVG/weather_rain_snow_heavy.svg
 UPD 2019-05-30_07:45:03 4173 www/images/fhemSVG/weather_rain_snow_light.svg
 UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
+UPD 2020-07-26_07:45:03 187891 www/images/fhemSVG/wintergarten_icon.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2019-02-19_07:45:03 5808 www/images/fhemSVG/xiaomi_multi.svg
 UPD 2015-07-28_14:05:33 1269 www/images/openautomation/audio_audio.svg
