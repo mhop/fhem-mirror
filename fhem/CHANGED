@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: Fix Shading bug then shutters ClosedPos,
+                        Split in to new modul files Shading.pm and Helper.pm
  - change:  49_SSCam: set compatibility to 8.2.8, minor changes acc. PBP lvl 3
  - feature: 93_DbRep: new aggregation value 'minute', some fixes
  - feature: 14_SD_UT.pm 

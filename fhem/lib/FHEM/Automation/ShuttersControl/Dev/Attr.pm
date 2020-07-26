@@ -264,13 +264,19 @@ sub _getRainSensor {
     return $device if ( $device eq 'none' );
     $self->{ASC_rainSensor}->{device} = $device;
     $self->{ASC_rainSensor}->{reading} =
-      ( $reading ne 'none' ? $reading : 'state' );
-    $self->{ASC_rainSensor}->{triggermax} = ( $max ne 'none' ? $max : 1000 );
+      ( $reading ne 'none' ? $reading : 'rain' );
+    $self->{ASC_rainSensor}->{triggermax} = (
+         (   $max ne 'none'
+          && $max =~ m{\A(-?\d+(\.\d+)?)\z}xms )
+        ? $max
+        : 1000 );
+
     $self->{ASC_rainSensor}->{triggerhyst} = (
           $hyst ne 'none'
-        ? $max - $hyst
+        ? $self->{ASC_rainSensor}->{triggermax} - $hyst
         : ( $self->{ASC_rainSensor}->{triggermax} * 0 )
     );
+
     $self->{ASC_rainSensor}->{shuttersClosedPos} =
       (   $pos ne 'none'
         ? $pos
@@ -385,5 +391,8 @@ sub getBlockAscDrivesAfterManual {
 
     return AttrVal( $name, 'ASC_blockAscDrivesAfterManual', 0 );
 }
+
+
+
 
 1;

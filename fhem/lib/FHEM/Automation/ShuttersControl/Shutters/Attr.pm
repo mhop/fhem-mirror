@@ -44,6 +44,8 @@ use strict;
 use warnings;
 use utf8;
 
+use FHEM::Automation::ShuttersControl::Helper qw (IsAdv PerlCodeCheck);
+
 use GPUtils qw(GP_Import);
 
 ## Import der FHEM Funktionen
@@ -91,7 +93,7 @@ sub _getPosition {
         m{\A\{.+\}\z}xms
       )
     {
-        my $response = FHEM::Automation::ShuttersControl::_perlCodeCheck(
+        my $response = PerlCodeCheck(
             AttrVal(
                 $self->{shuttersDev},
                 $attr,
@@ -136,14 +138,14 @@ sub _getPosition {
 
     if (
         defined(
-            FHEM::Automation::ShuttersControl::_perlCodeCheck(
+            PerlCodeCheck(
                 $self->{ $self->{shuttersDev} }->{$attr}->{position}
             )
         )
       )
     {
         $self->{ $self->{shuttersDev} }->{$attr}->{position} =
-          FHEM::Automation::ShuttersControl::_perlCodeCheck(
+          PerlCodeCheck(
             $self->{ $self->{shuttersDev} }->{$attr}->{position} );
     }
 
@@ -543,7 +545,7 @@ sub getAdv {
 
     return (
         AttrVal( $self->{shuttersDev}, 'ASC_Adv', 'off' ) eq 'on'
-        ? ( \&FHEM::Automation::ShuttersControl::_IsAdv == 1 ? 1 : 0 )
+        ? ( IsAdv == 1 ? 1 : 0 )
         : 0
     );
 }
@@ -1779,6 +1781,21 @@ sub getDown {
     return AttrVal( $self->{shuttersDev}, 'ASC_Down', 'astro' );
 }
 
+sub setShadingBetweenTheTime {
+    my $self    = shift;
+    my $attrVal = shift;
+
+    _setAttributs( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime', $attrVal );
+
+    return;
+}
+
+sub getShadingBetweenTheTime {
+    my $self = shift;
+
+    return AttrVal( $self->{shuttersDev}, 'ASC_Shading_BetweenTheTime', '00:00-24:00' );
+}
+
 sub setTimeUpEarly {
     my $self    = shift;
     my $attrVal = shift;
@@ -1793,8 +1810,8 @@ sub getTimeUpEarly {
 
     my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Early', '05:00' );
 
-    if ( defined( FHEM::Automation::ShuttersControl::_perlCodeCheck($val) ) ) {
-        $val = FHEM::Automation::ShuttersControl::_perlCodeCheck($val);
+    if ( defined( PerlCodeCheck($val) ) ) {
+        $val = PerlCodeCheck($val);
     }
 
     return (
@@ -1818,8 +1835,8 @@ sub getTimeUpLate {
 
     my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_Late', '08:30' );
 
-    if ( defined( FHEM::Automation::ShuttersControl::_perlCodeCheck($val) ) ) {
-        $val = FHEM::Automation::ShuttersControl::_perlCodeCheck($val);
+    if ( defined( PerlCodeCheck($val) ) ) {
+        $val = PerlCodeCheck($val);
     }
 
     return (
@@ -1843,8 +1860,8 @@ sub getTimeDownEarly {
 
     my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Early', '16:00' );
 
-    if ( defined( FHEM::Automation::ShuttersControl::_perlCodeCheck($val) ) ) {
-        $val = FHEM::Automation::ShuttersControl::_perlCodeCheck($val);
+    if ( defined( PerlCodeCheck($val) ) ) {
+        $val = PerlCodeCheck($val);
     }
 
     return (
@@ -1868,8 +1885,8 @@ sub getTimeDownLate {
 
     my $val = AttrVal( $self->{shuttersDev}, 'ASC_Time_Down_Late', '22:00' );
 
-    if ( defined( FHEM::Automation::ShuttersControl::_perlCodeCheck($val) ) ) {
-        $val = FHEM::Automation::ShuttersControl::_perlCodeCheck($val);
+    if ( defined( PerlCodeCheck($val) ) ) {
+        $val = PerlCodeCheck($val);
     }
 
     return (
@@ -1894,8 +1911,8 @@ sub getTimeUpWeHoliday {
     my $val =
       AttrVal( $self->{shuttersDev}, 'ASC_Time_Up_WE_Holiday', '01:25' );
 
-    if ( defined( FHEM::Automation::ShuttersControl::_perlCodeCheck($val) ) ) {
-        $val = FHEM::Automation::ShuttersControl::_perlCodeCheck($val);
+    if ( defined( PerlCodeCheck($val) ) ) {
+        $val = PerlCodeCheck($val);
     }
 
     return (

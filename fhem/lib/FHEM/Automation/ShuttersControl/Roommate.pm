@@ -74,4 +74,7 @@ sub _getRoommateLastStatus {
     return ReadingsVal( $roommate, 'lastState', $default );
 }
 
+
+
+
 1;
