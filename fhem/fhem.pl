@@ -5281,11 +5281,12 @@ json2nameValue($;$$$)
   my %ret2;
   for my $name (keys %ret) {
     next if($filter && $name !~ m/$filter/);
+    my $oname = $name;
     if(defined($map->{$name})) {
       next if(!$map->{$name});
       $name = $map->{$name};
     }
-    $ret2{$name} = $ret{$name};
+    $ret2{$name} = $ret{$oname};
   }
   return \%ret2;
 }
