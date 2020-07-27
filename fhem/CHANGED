@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 49_SSCamSTRM: new commands adoptForTimer / adoptTime in master devs
  - feature: 74_XiaomiBTLESens: add Support for Mijia LYWSD03MMC
  - bugfix:  73_AutoShuttersControl: Fix Shading bug then shutters ClosedPos,
                         Split in to new modul files Shading.pm and Helper.pm

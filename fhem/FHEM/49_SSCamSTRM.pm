@@ -47,6 +47,7 @@ BEGIN {
           defs
           devspec2array
           FmtDateTime
+          init_done
           InternalTimer
           IsDisabled
           Log3    
@@ -90,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.0" => "27.07.2020  new commands adoptForTimer and control command adoptTime ",
   "2.13.1" => "21.07.2020  fix: set of values in attr adoptSubset is empty after restart, changes according level 3 PBP ",
   "2.13.0" => "14.07.2020  integrate streamDev master ",
   "2.12.0" => "28.06.2020  upgrade SSCam functions due to SSCam switch to packages ",
@@ -154,9 +156,11 @@ my %hvattr = (                                                             # Has
 );
 
 my %hset = (                                                                # Hash für Set-Funktion
-    popupStream => { fn => "_setpopupStream" }, 
-    adopt       => { fn => "_setadopt"       },    
-    reset       => { fn => "_setreset"       },      
+    popupStream   => { fn => "_setpopupStream"   }, 
+    adopt         => { fn => "_setadopt"         },
+    adoptForTimer => { fn => "_setadoptForTimer" },
+    adoptTime     => { fn => "_setAdoptTimer"    },    
+    reset         => { fn => "_setreset"         },      
 );
 
 my %sdevs = ();                                                             # Hash der vorhandenen Streaming Devices
@@ -304,12 +308,14 @@ sub Set {
       $sd     =~ s/\s+/#/gx;      
       
       my $rsd = $as;
-      $rsd    =~ s/#/ /g;                                   ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
+      $rsd    =~ s/#/ /g;                                                  ## no critic 'regular expression' # Regular expression without "/x" flag nicht anwenden !!!
       push my @ado, "adoptList:$rsd";
       setReadings($hash, \@ado, 0);
       
       $setlist = "Unknown argument $opt, choose one of ".
-                 "adopt:$sd "
+                 "adopt:$sd ".
+                 "adoptForTimer:$sd ".
+                 "adoptTime "
                  ;  
   }
   
@@ -323,8 +329,9 @@ sub Set {
   
   no strict "refs";                                                        ## no critic 'NoStrict'  
   if($hset{$opt}) {
-      &{$hset{$opt}{fn}} (\%params) if(defined &{$hset{$opt}{fn}}); 
-      return;
+      my $ret = "";
+      $ret = &{$hset{$opt}{fn}} (\%params) if(defined &{$hset{$opt}{fn}}); 
+      return $ret;
   }
   use strict "refs";
 
@@ -423,6 +430,85 @@ sub _setadopt {                          ## no critic "not used"
 return;
 }
 
+###############################################################
+#         setter adopt-for-timer
+# schaltet für eine bestimmte Zeit auf das ausgewählte 
+# Streaming Device und wieder auf das vorherige zurück
+###############################################################
+sub _setadoptForTimer {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $odev  = $paref->{odev};               # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
+  
+  my $atime = ReadingsVal($name, "adoptTimer", 10);
+
+  RemoveInternalTimer($hash, "FHEM::SSCamSTRM::_setadoptForTimer");
+
+  if ($init_done != 1) {
+      InternalTimer(gettimeofday()+3, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
+	  return;
+  }
+
+  return if(IsDisabled($name));
+  
+  my $sdev;
+  
+  if(!$odev) {                              # Step 1 -> erster Durchlauf ohne odef
+      $paref->{odev} = $hash->{LINKNAME};   # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
+  
+  } else {                                  # Step 2 -> zweiter Durchlauf mit odef gesetzt
+      my @a;
+      $sdev = $odev eq $name ? "--reset--" : $odev;
+      
+      push @a, $name;
+      push @a, $opt;
+      push @a, $sdev;
+      
+      $paref->{aref} = \@a;
+  }
+  
+  no strict "refs";                         ## no critic 'NoStrict'  
+  &{$hset{adopt}{fn}} ($paref); 
+  use strict "refs";
+  
+  if($odev) {
+      Log3($name, 4, qq{$name - Switched Stream Device back to "$sdev".});
+      return;
+  }
+  
+  Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds.});
+  InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
+  
+return;
+}
+
+################################################################
+#                      Setter adoptTimer
+#           setzt die Schaltzeit für setter adoptForTimer
+################################################################
+sub _setAdoptTimer {                     ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop} // 0;
+  
+  my $ret = "";
+  $ret    = qq{The command "$opt" needs an integer as argument.} if($prop !~ /[0-9]+/x);
+  return $ret if($ret);
+  
+  delReadings ($hash, "adoptTimer");
+  
+  if($prop) {                            # bei "0" wird das Reading nur gelöscht, nicht wieder gesetzt
+      my @r;
+      push @r, "adoptTimer:$prop";
+      
+      setReadings($hash, \@r, 0);
+  }
+
+return;
+}
 
 ################################################################
 #                      Setter reset
@@ -737,29 +823,6 @@ return $ret;
 }
 
 ################################################################
-#                    delete Readings
-#        $rd = angegebenes Reading löschen
-################################################################
-sub delReadings {
-  my $hash = shift;
-  my $rd   = shift;
-  my $name = $hash->{NAME};
-  
-  my $bl   = "state|parentState|adoptSubset";                              # Blacklist
-   
-  if($rd) {                                                                # angegebenes Reading löschen wenn nicht im providerLevel enthalten
-      readingsDelete($hash, $rd) if($rd !~ /$bl/x);
-      return;
-  } 
-
-  for my $key (keys %{$hash->{READINGS}}) {
-      readingsDelete($hash, $key) if($key !~ /$bl/x);
-  }
-
-return;
-}
-
-################################################################
 #             Wertevorrat für adoptSubset generieren
 ################################################################
 sub sofAdoptSubset {
@@ -802,6 +865,30 @@ sub setReadings {
   }
 
   readingsEndUpdate($hash, $event);
+
+return;
+}
+
+################################################################
+#                    delete Readings
+#        $rd = angegebenes Reading löschen unabhängig vom
+#              Inhalt der Blacklist
+################################################################
+sub delReadings {
+  my $hash = shift;
+  my $rd   = shift;
+  my $name = $hash->{NAME};
+  
+  my $bl   = "state|parentState|adoptSubset|adoptTimer";                   # Blacklist
+   
+  if($rd) {                                                                # angegebenes Reading löschen
+      readingsDelete($hash, $rd);
+      return;
+  } 
+
+  for my $key (keys %{$hash->{READINGS}}) {
+      readingsDelete($hash, $key) if($key !~ /$bl/x);
+  }
 
 return;
 }
@@ -942,6 +1029,38 @@ return $ret;
   <ul>
   
   <ul>
+  <a name="adopt"></a>
+  <li><b>adopt &lt;Streaming device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
+  
+  A Streaming Device of type <b>master</b> adopts the content of another defined Streaming Device.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <a name="adoptForTimer"></a>
+  <li><b>adoptForTimer &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
+  
+  A Streaming Device of type <b>master</b> adopts the content of another defined Streaming Device
+  for a certain time. <br>
+  The time is set with the command <b>set &lt;name&gt; adoptTime</b>. <br>
+  (default: 10 seconds)
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <a name="adoptTime"></a>
+  <li><b>adoptTime &lt;seconds&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
+  
+  Setting of the switching time when temporarily taking over the content of another Streaming Device. 
+  After the time has expired, playback is switched back to the first Streaming Device set. <br>
+  If no argument or "0" is given, the time specification is deleted and the default (10 seconds) is used.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
   <li><b>popupStream</b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL != master)<br>
   
   The current streaming content is depicted in a popup window. By setting attribute "popupWindowSize" the 
@@ -949,14 +1068,6 @@ return $ret;
   If "OK" is set, an OK-dialog window will be opened. A specified number in seconds closes the popup window after this 
   time automatically (default 5 seconds). <br>
   Optionally you can append "OK" or &lt;seconds&gt; directly to override the adjustment by attribute "popupStreamTo".
-  </li>
-  </ul>
-  <br>
-  
-  <ul>
-  <li><b>adopt &lt;Streaming device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
-  
-  A Streaming Device of type <b>master</b> adopts the content of another defined Streaming Device.
   </li>
   </ul>
   <br>
@@ -1204,6 +1315,38 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   
   <ul>
+  <a name="adopt"></a>
+  <li><b>adopt &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  
+  Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <a name="adoptForTimer"></a>
+  <li><b>adoptForTimer &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  
+  Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices
+  für eine bestimmte Zeit. <br>
+  Die Zeit wird mit dem Kommando <b>set &lt;name&gt; adoptTime</b> eingestellt. <br>
+  (default: 10 Sekunden)
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
+  <a name="adoptTime"></a>
+  <li><b>adoptTime &lt;Sekunden&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
+  
+  Einstellung der Schaltzeit bei temporärer Übernahme des Contents eines anderen Streaming Devices. 
+  Nach Ablauf der Zeit wird die Wiedergabe auf das zuerst eingestellte Streaming Device zurückgeschaltet. <br>
+  Wird kein Argument oder "0" angegeben, wird die Zeitvorgabe gelöscht und der Standard (10 Sekunden) verwendet.
+  </li>
+  </ul>
+  <br>
+  
+  <ul>
   <li><b>popupStream [OK | &lt;Sekunden&gt;]</b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL != master)<br>
   
   Der aktuelle Streaminhalt wird in einem Popup-Fenster dargestellt. Mit dem Attribut "popupWindowSize" kann die 
@@ -1212,14 +1355,6 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Zeit automatisch (default 5 Sekunden). <br>
   Durch die optionalen Angabe von "OK" oder &lt;Sekunden&gt; kann die Einstellung des Attributes "popupStreamTo" übersteuert 
   werden.
-  </li>
-  </ul>
-  <br>
-  
-  <ul>
-  <li><b>adopt &lt;Streaming Device&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
-  
-  Ein Streaming Device vom Type <b>master</b> übernimmt (adoptiert) den Content eines anderen definierten Streaming Devices.
   </li>
   </ul>
   <br>
