@@ -966,6 +966,39 @@ attr DEVICE event-on-change-reading .*
 attr DEVICE model tasmota_rf
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+
+name:tasmota_rf_keys_example
+desc:Demonstrates how to configure rf receiving tasmota device with a stored rf-key pair to act as a switch. <br>NOTE: this will create a new device!<br>See <a href=<br><a href="https://forum.fhem.de/index.php/topic,112680.0.html">Forum Thread</a> for further details...<br>To add further pairs of stored keys as seperate switches, just use a RAW copy of the new device and change references to the key pair accordingly.
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+order:A_01d1a
+farewell:New device hast been configured; to add further pairs of stored keys as seperate switches, just use a RAW copy of this device and change references to the key pair accordingly.
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
+par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
+defmod DEVICE_KEY1_2 MQTT2_\DEVICE tasmotaRF
+attr DEVICE_KEY1_2 devStateIcon Online:mqtt_bridge_2@#1de223 Offline:mqtt_bridge_2@red
+attr DEVICE_KEY1_2 icon ICON
+attr DEVICE_KEY1_2 readingList TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_KEY1_2 setList on:noArg CMNDTOPIC/RfKey1 6\
+  off:noArg CMNDTOPIC/RfKey2 6
+attr DEVICE_KEY1_2 stateFormat LWT\
+<a href="http://IPAddress" target="_blank">IPAddress</a>\
+state
+{ fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=DEVICE_KEY1_2'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+attr DEVICE_KEY1_2 room NEWDEVROOM
+attr DEVICE_KEY1_2 setStateList on off
+attr DEVICE_KEY1_2 userReadings state:RfKey[12].* { ReadingsAge($name,"RfKey2",10000) > ReadingsAge($name,"RfKey1",10000) ? "on" : "off" }
+attr DEVICE_KEY1_2 model tasmota_rf_keys_example
+setreading DEVICE_KEY1_2 attrTemplateVersion 20200727
+
+
 # forum: https://forum.fhem.de/index.php/topic,104475.0.html
 name:tasmota_use_DS18x20_id
 desc:Use this in case you have multiple DS18x20 sensors attached to your tasmota device. Adds a readingList entry to extract 1wire ID's from JSON to keep temparature values bound to the ID.<br><a href="https://forum.fhem.de/index.php/topic,104475.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Sensor-Configuration#single-wire-sensor">See tasmota-Wiki for how to configure for multiple DS18x20 sensors</a>
@@ -3585,6 +3618,30 @@ attr DEVICE readingList\
   BASE_TOPIC/status/[^/]+/renderingcontrol:.* {}
 attr DEVICE model sonos2mqtt_bridge
 setreading DEVICE attrTemplateVersion 20200603
+
+name:sonos2mqtt_bridge_comfort
+desc:The sonos2mqtt bridge including automated setup for speaker devices (adds 2 notify devices)
+filter:TYPE=MQTT2_DEVICE
+order:M_05c
+set DEVICE attrTemplate sonos2mqtt_bridge
+defmod n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;set $EVTPART1 attrTemplate sonos2mqtt_speaker;set $EVTPART1 x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
+defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
+  no warnings 'experimental::smartmatch';\
+  my @tv = ("S14","S11");\
+  my $url="http://$EVTPART1:1400";\
+  my $xmltext = GetFileFromURL("$url/xml/device_description.xml");\
+  my ($mn)=$xmltext =~ /<modelNumber>(S[0-9]+)/;\
+  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;\
+  my $icon="Sonos2mqtt_icon-$mn";\
+  my $setList=AttrVal($NAME,'setList','');\
+  fhem("setreading $NAME modelNumber $mn");\
+  fhem("\"wget -qO ./www/images/default/$icon.png $url$img\"");\
+  fhem("attr $NAME icon $icon;sleep 4 WI;set WEB rereadicons");\
+  if ($mn ~~ @tv) {$setList=~s/input:Queue \{/input:Queue,TV \{/};\
+  $setList=~s/;/;;/g;\
+  fhem("attr $NAME setList $setList")\
+}
+setreading DEVICE attrTemplateVersion 20200727
 
   
 name:sonos2mqtt_speaker
