@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
   "9.5.2"  => "26.07.2020  more changes according PBP level 3, minor fixes ",
   "9.5.1"  => "24.07.2020  set compatibility to 8.2.8, some changes according PBP level 3 ",
   "9.5.0"  => "15.07.2020  streamDev master type added, comref revised ",
@@ -8207,8 +8208,8 @@ sub streamDev {                                               ## no critic 'comp
   
   # Streaming ausführen
   no strict "refs";                                                        ## no critic 'NoStrict'  
-  if(defined &{$sdfn{$fmt}{fn}}) {
-      $ret .= &{$sdfn{$fmt}{fn}} (\%params); 
+  if($sdfn{$fmt}) {
+      $ret .= &{$sdfn{$fmt}{fn}} (\%params) if(defined &{$sdfn{$fmt}{fn}});  
   } else {
       $cause = qq{Streaming of format "$fmt" is not supported};
       $cause = qq{Select a Streaming client with the "adopt" command.} if($ismm);
@@ -8627,8 +8628,8 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
   
   # Streaming ausführen
   no strict "refs";                                                        ## no critic 'NoStrict'  
-  if(defined &{$sdswfn{$wltype}{fn}}) {
-      $ret .= &{$sdswfn{$wltype}{fn}} ($params); 
+  if($sdswfn{$wltype}) {
+      $ret .= &{$sdswfn{$wltype}{fn}} ($params) if(defined &{$sdswfn{$wltype}{fn}});  
   } else {
       $cause = qq{Streaming of format "$wltype" is not supported};
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";      
