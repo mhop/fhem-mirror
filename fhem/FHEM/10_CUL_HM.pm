@@ -617,9 +617,6 @@ sub CUL_HM_Define($$) {##############################
     CUL_HM_assignIO($hash)if (!$init_done && $HMid ne "000000");
   }
 
-  my @arr1 = ();
-  $hash->{helper}{cmds}{TmplCmds} = \@arr1;    
-  $hash->{helper}{cmds}{cmdList}  = \@arr1;    
   $hash->{helper}{cmds}{cmdKey}   = "";
   $hash->{helper}{cmds}{TmplKey}  = "";
   
@@ -720,6 +717,7 @@ sub CUL_HM_Attr(@) {#################################
           push @expLst, "allReg" if( ($1 & 0x01));#detail register on
           push @expLst, "rawReg" if( ($1 & 0x02));#raw register on
           push @expLst, "templ"  if( ($1 & 0x08));#template on
+          push @expLst, "none"   if( ($1 & 0x0F) == 0x04);#all off
           $ret = 1;
         }
         else{
@@ -4026,17 +4024,17 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     $info .= join("\n",sort @arr);
     $info .= "\n\n Sets ------\n";
     $hash->{helper}{cmds}{TmplTs}=gettimeofday();# force re-arrange of template commands
-    $hash->{helper}{cmds}{cmdKey}="";
-    $info .= join("\n",map{if($_ !~ m/]../){(my $foo = $_) =~ s/\|/\n\t/g; $foo;}else{$_}} sort (CUL_HM_SetList($name)));
+    $hash->{helper}{cmds}{cmdKey}="";   
+    $info .= join("\n",map{"$_:".$hash->{helper}{cmds}{cmdLst}{$_}} sort (CUL_HM_SetList($name)));
 
     if ($long){
       $info .= "\n Options:";
       foreach my $opt (sort keys %{$hash->{helper}{cmds}{lst}}){
         $info .= "\n -${opt}- : ";
-        my @vals = sort split ('\|',$hash->{helper}{cmds}{lst}{$opt});
+        my @vals = sort split (',',$hash->{helper}{cmds}{lst}{$opt});
         
         for (my $val=0; $val < scalar(@vals);$val++){
-          $info .= sprintf("\t%15s,",$vals[$val]);
+          $info .= sprintf("\t%-15s,",$vals[$val]);
           $info .= "\n         " if (($val + 1) % 5 == 0);
         }
       }
@@ -4244,7 +4242,7 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
     my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
     my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
     my @arr1 = ();
-   
+    delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep!/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
     if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
         next if (!defined $culHmReglSets->{$rl});
@@ -4264,10 +4262,9 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
     if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
     my $pl = CUL_HM_getPeerOption($name);
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
-    $hash->{helper}{cmds}{lst}{peerOpt} =~ s/,/|/g;
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
 
-    $hash->{helper}{cmds}{lst}{peer} = join"|",grep/./,split",",InternalVal($name,"peerList","");
+    $hash->{helper}{cmds}{lst}{peer} = join",",grep/./,split",",InternalVal($name,"peerList","");
     if ($peerLst ne ""){
       if (grep /^press:/,@arr1){
         push @arr1,"pressS:-peer-";
@@ -4278,35 +4275,42 @@ sub CUL_HM_SetList($) {#+++++++++++++++++ get command basic list+++++++++++++++
       @arr1 = grep !/(trg|)(press|event|Press|Event)[SL]\S*?/,@arr1;
     }
 
-    my @arr1cmd = CUL_HM_noDup(@arr1);
-
-    $hash->{helper}{cmds}{cmdList} = \@arr1cmd;
+    delete $hash->{helper}{cmds}{cmdList} ;
+    foreach(@arr1){
+      my ($cmdS,$val) = split(":",$_,2);
+      $hash->{helper}{cmds}{cmdLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
+    }
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
   }
 
   my $tmplStamp = CUL_HM_getTemplateModify();
   my $tmplAssTs = (defined $hash->{helper}{cmds}{TmplTs} ? $hash->{helper}{cmds}{TmplTs}:"noAssTs");# template assign timestamp
-  if( $hash->{helper}{cmds}{TmplKey} ne $peerLst.":$tmplStamp:$tmplAssTs"){
+  if($hash->{helper}{cmds}{TmplKey} ne $peerLst.":$tmplStamp:$tmplAssTs"){
     my @arr1 =  map{"$_:-value-"}split(" ",CUL_HMTmplSetParam($name));
+    delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
     
     CUL_HMTmplSetCmd($name);
     push @arr1, "tplSet_0:-tplChan-" if(defined $hash->{helper}{cmds}{lst}{tplChan});
     if(defined $hash->{helper}{cmds}{lst}{tplPeer}){
       push @arr1, "tplSet_$_:-tplPeer-" foreach(split(",",$peerLst));
     }
-    $hash->{helper}{cmds}{TmplCmds} = \@arr1;      
+
+    foreach(@arr1){
+      my ($cmdS,$val) = split(":",$_,2);
+      $hash->{helper}{cmds}{cmdLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
+    }
 
     $hash->{helper}{cmds}{TmplKey}  = $peerLst
                                      .":$tmplStamp"
                                      .":$tmplAssTs"
                                      ;   
   }
-  return (@{$hash->{helper}{cmds}{cmdList}},@{$hash->{helper}{cmds}{TmplCmds}});
+  return (keys%{$hash->{helper}{cmds}{cmdLst}});
  }
 sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++++
   my($name,$findCmd)=@_;
-  return 0 if(!defined $defs{$name}{helper}{cmds}{cmdList});
-  return scalar(grep/$findCmd:/,@{$defs{$name}{helper}{cmds}{cmdList}});
+  return (defined $defs{$name}{helper}{cmds}{cmdLst}
+       && defined $defs{$name}{helper}{cmds}{cmdLst}{$findCmd}) ?1:0;
  }
  
  
@@ -4335,16 +4339,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   
   my $oCmd = $cmd;# we extend press to press/L/S if press is defined
   $cmd = "press" if ($cmd =~ m/^press/);# substitude pressL/S with press for cmd search
-  my $h = undef;
 
-  my @cmdArr = CUL_HM_SetList($name);
-  if ($cmd ne '?'){
-    ($h) = map{(my $foo = $_) =~ s/.*://; $foo;}grep /^${cmd}:/,@cmdArr;
-  }
+  my $h = defined $hash->{helper}{cmds}{cmdLst}{$cmd} ? $cmd :undef;
   
   $cmd = $oCmd;# necessary for press/S/L - check better implementation
-  my @hArr;
-  @hArr = split(" ", $h) if($h);
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
 
   if   (!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
@@ -4353,37 +4351,45 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif(!defined($h)) { ### unknown - return the commandlist
 
     my $peers = join"|",grep/./,split",",InternalVal($name,"peerList","");
-    foreach(@cmdArr){
-      next if(!$_);
-      my ($cmdS,$val) = split(":",$_,2);
-      $val =~ s/\[*-$_-\]*/\[$hash->{helper}{cmds}{lst}{$_}\]/ foreach(keys %{$hash->{helper}{cmds}{lst}});
-      if (!$val){ # no agruments possible
-        $_ = "$cmdS:noArg";
+    my @cmdOpts = keys %{$hash->{helper}{cmds}{lst}};# create list - make it faster
+    my @cmdPrep = ();
+    foreach my $cmdS (CUL_HM_SetList($name)){
+      my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
+      
+      if($val eq "noArg"){
+          $val = ":$val";
       }
-      elsif($val !~ m/^\[.*\]$/ ||
-            $val =~ m/\[.*\[/   ||
-            $val =~ m/(\<|\>)]/
-            ){
-        $_ = $cmdS;
+      elsif($val =~ m/^-([a-zA-Z]*)-$/){
+        my $repl = $1;
+        foreach(@cmdOpts){
+          if($1 eq $_){
+            $val =~ s/-$repl-/:$hash->{helper}{cmds}{lst}{$_}/;
+            last;
+          }  
+        }
       }
-      else{
-        $val =~ s/(\[|\])//g;
-        my @vArr = split('\|',$val);
-        foreach (@vArr){
+      elsif($val =~ m/^\[([a-zA-Z0-9_-|\.]*)\]$/){
+        my @lst1;
+        foreach(split('\|',$1)){
           if ($_ =~ m/(.*)\.\.(.*)/ ){
             my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
             pop @list;
-            $_ = join(",",@list);
+            push @lst1,@list;
           }
+          else{
+            push @lst1,$_;
+          }     
         }
-        $_ = "$cmdS:".join(",",@vArr);
+        $val = ":".join(",",@lst1);
       }
-
+      else      {
+        $val = "";
+      }
+      push @cmdPrep,"$cmdS$val";
     }
-    @cmdArr = ("--") if (!scalar @cmdArr);
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdArr)." ";
-    $usg =~ s/ pct/ pct:slider,0,1,100/;
-    $usg =~ s/ pctSlat/ pctSlat:slider,0,1,100/;
+    @cmdPrep = ("--") if (!scalar @cmdPrep);
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdPrep)." ";
+    $usg =~ s/ (pct|pctSlat)/ $1:slider,0,1,100/;
     $usg =~ s/ virtual/ virtual:slider,1,1,50/;
     $usg =~ s/ color/ color:colorpicker,HUE,0,0.5,100/;
 	if ($usg =~ m/ tempTmplSet/){
@@ -4401,16 +4407,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     else{
       $usg =~ s/ tplDel//;#not an option
     }
-
-#    $usg =~ s/\[*-peer-\]*/$peers/g;
-
     return $usg;
   }
-  elsif($h eq "" && @a != 2) {
-    return "$cmd requires no parameters";
+  
+  my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
+  if($paraOpts eq "noArg"){ # no param allowed
+     return "$cmd no params required" if(@a != 2);
   }
-  elsif($h !~ m/\.\.\./ && @hArr != @a-2) {
-    return "$cmd requires parameter: $h";
+  elsif($paraOpts !~ m/\.\.\./){# param required
+     return "$cmd parameter required:$paraOpts" if(@a == 2);  
   }
 
   my $id; # define id of IO device for later usage
@@ -4460,8 +4465,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
       elsif($sect eq "oldRegs"){
         my @cN = ($name);
-        push @cN,$hash->{$_} foreach(grep /^channel/,keys %{$hash});      
-        CUL_HM_refreshRegs($_) foreach (@cN);
+        push @cN,$hash->{$_} foreach(grep /^channel/,keys %{$hash});     
+        foreach (@cN){
+          CUL_HM_refreshRegs($_);
+        }
       }
       elsif($sect eq "msgEvents"){
         CUL_HM_respPendRm($hash);
@@ -4503,6 +4510,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             foreach (grep /^sabotageAttack/,keys %{$hash->{READINGS}});
      }
     }
+
   }
   elsif($cmd eq "defIgnUnknown") { ############################################
     foreach (map {substr($_,8)} 
@@ -7836,10 +7844,6 @@ sub CUL_HM_eventP($$) {#handle protocol events
 }
 sub CUL_HM_protState($$){
   my ($hash,$state) = @_;
-  if (!$hash || !$hash->{NAME}){#General remove when fixed
-    Log 4,"CUL_HM protstate undeviced hash to set $state";
-    return;
-  }
   my $name = $hash->{NAME};
 
   my $sProcIn = $hash->{helper}{prt}{sProc};
@@ -8509,8 +8513,8 @@ sub CUL_HMTmplSetCmd($){
       }
     }
   };
-  $defs{$name}{helper}{cmds}{lst}{tplPeer} = join("|",keys%{$tpl{p}});
-  $defs{$name}{helper}{cmds}{lst}{tplChan} = join("|",keys%{$tpl{0}});
+  $defs{$name}{helper}{cmds}{lst}{tplPeer} = join(",",keys%{$tpl{p}});
+  $defs{$name}{helper}{cmds}{lst}{tplChan} = join(",",keys%{$tpl{0}});
   return (scalar keys %a ? " tplSet_".join(" tplSet_",map{"$_:".join(",",sort keys%{$a{$_}})} keys %a)
                          : "")#no template
          ;
