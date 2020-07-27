@@ -1688,10 +1688,10 @@ sub HMinfo_SetFn($@) {#########################################################
     elsif ($type ne "msgStat"){
       return "unknown parameter - use msgEvents, msgErrors, msgStat, readings, register, rssi, attack or all"
             if ($type !~ m/^(msgEvents|msgErrors|readings|register|oldRegs|rssi|all|attack|trigger)$/);
-      $opt .= "d" if ($type =~ m/(msgE|rssi)/);# readings apply to all, others device only
-      my @entities;
-      foreach my $dName (HMinfo_getEntities($opt,$filter)){
-        push @entities,$dName;
+      $opt .= "d" if ($type =~ m/(msgE|rssi|oldRegs)/);# readings apply to all, others device only
+      my @entities = (HMinfo_getEntities($opt,$filter));
+      
+      foreach my $dName (@entities){
         CUL_HM_Set($defs{$dName},$dName,"clear",$type);
       }
       $ret = $cmd.$type." done:" 
