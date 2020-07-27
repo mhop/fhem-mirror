@@ -474,11 +474,11 @@ sub _setadoptForTimer {                 ## no critic "not used"
   use strict "refs";
   
   if($odev) {
-      Log3($name, 4, qq{$name - Switched Stream Device back to "$sdev".});
+      Log3($name, 4, qq{$name - Switched Stream Device back to "$sdev"});
       return;
   }
   
-  Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds.});
+  Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
   InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
   
 return;
