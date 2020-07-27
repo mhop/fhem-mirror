@@ -1054,7 +1054,7 @@ return $ret;
   <li><b>adoptTime &lt;seconds&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(only valid if MODEL = master)<br>
   
   Setting of the switching time when temporarily taking over the content of another Streaming Device. 
-  After the time has expired, playback is switched back to the first Streaming Device set. <br>
+  After the time has expired, playback is switched back to the previously set Streaming Device. <br>
   If no argument or "0" is given, the time specification is deleted and the default (10 seconds) is used.
   </li>
   </ul>
@@ -1340,7 +1340,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>adoptTime &lt;Sekunden&gt; </b>   &nbsp;&nbsp;&nbsp;&nbsp;(nur wenn MODEL = master)<br>
   
   Einstellung der Schaltzeit bei temporärer Übernahme des Contents eines anderen Streaming Devices. 
-  Nach Ablauf der Zeit wird die Wiedergabe auf das zuerst eingestellte Streaming Device zurückgeschaltet. <br>
+  Nach Ablauf der Zeit wird die Wiedergabe auf das vorher eingestellte Streaming Device zurückgeschaltet. <br>
   Wird kein Argument oder "0" angegeben, wird die Zeitvorgabe gelöscht und der Standard (10 Sekunden) verwendet.
   </li>
   </ul>
