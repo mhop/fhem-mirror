@@ -456,13 +456,9 @@ sub _setadoptForTimer {                 ## no critic "not used"
   
   my $sdev;
   
-  if(!$odev) {                                                            # Step 1 -> erster Durchlauf ohne odef
-      if(!$hash->{HELPER}{SWITCHED}) {
-          $paref->{odev}            = $hash->{LINKNAME};                  # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
-          $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME};
-      } else {
-          $paref->{odev} = $hash->{HELPER}{SWITCHED};
-      }
+  if(!$odev) {                                                                       # Step 1 -> erster Durchlauf ohne odef
+      $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME} if(!$hash->{HELPER}{SWITCHED});
+      $paref->{odev}            = $hash->{HELPER}{SWITCHED};                         # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
   
   } else {                                                                # Step 2 -> zweiter Durchlauf mit odef gesetzt
       my @a;
