@@ -52,6 +52,7 @@
 # V 1.25 2017-04-23 - FIX: react only of global::INITIALIZED m/^INITIALIZED$/
 # V 1.26 2017-09-03 - FIX: heitech support
 # V 1.27 2018-01-28 - NEW: handle bh1750 illuminance sensor as weather station
+# V 1.28 2020-07-27 - NEW: support switch protocol relay
 ############################################## 
 package main;
 
@@ -431,9 +432,10 @@ sub pilight_ctrl_Write($@)
           case m/mumbi/         {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/brennenstuhl/  {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/pollin/        {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
-          case m/heitech/		    {$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
+          case m/heitech/		{$code .= "\"systemcode\":$id,\"unitcode\":$unit,";}
           case m/impuls/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
           case m/rsl366/        {$code .= "\"systemcode\":$id,\"programcode\":$unit,";}
+          case m/relay/         {$code .= "\"gpio\":$id,";}
           case m/daycom/        { if (!defined($syscode)) {
                                       Log3 $me, 1, "$me(Write): Error protocol daycom no systemcode defined";
                                       return;
@@ -803,6 +805,9 @@ sub pilight_ctrl_Parse($$)
   $id = $unit if ($id eq "" && $unit ne "");   
   $unit = "all" if ($unit eq "" && $all ne "");
   
+  # some protocols have no unit e.q. relay
+  $unit = "all" if ($unit eq "");
+  
   Log3 $me, 5, "$me(Parse): protocol:$proto,id:$id,unit:$unit";
         
   my @ignoreIDs = split(",",AttrVal($me, "ignoreProtocol","")); 
@@ -843,6 +848,7 @@ sub pilight_ctrl_Parse($$)
     case m/intertechno_old/ {$protoID = 1;}
     case m/quigg_gt/    {$protoID = 1;}
     case m/heitech/		{$protoID = 1;}
+    case m/relay/		{$protoID = 1;}
     
     case m/dimmer/      {$protoID = 2;}
     
