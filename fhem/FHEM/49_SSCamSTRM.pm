@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.1" => "28.07.2020  switching time increases with each adoptForTimer command ",
   "2.14.0" => "27.07.2020  new commands adoptForTimer and control command adoptTime ",
   "2.13.1" => "21.07.2020  fix: set of values in attr adoptSubset is empty after restart, changes according level 3 PBP ",
   "2.13.0" => "14.07.2020  integrate streamDev master ",
@@ -440,11 +441,11 @@ sub _setadoptForTimer {                 ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  my $odev  = $paref->{odev};               # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
+  my $odev  = $paref->{odev};                                             # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
   
   my $atime = ReadingsVal($name, "adoptTimer", 10);
 
-  RemoveInternalTimer($hash, "FHEM::SSCamSTRM::_setadoptForTimer");
+  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");          # $paref nicht checken ! da immer unikat
 
   if ($init_done != 1) {
       InternalTimer(gettimeofday()+3, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
@@ -455,11 +456,17 @@ sub _setadoptForTimer {                 ## no critic "not used"
   
   my $sdev;
   
-  if(!$odev) {                              # Step 1 -> erster Durchlauf ohne odef
-      $paref->{odev} = $hash->{LINKNAME};   # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
+  if(!$odev) {                                                            # Step 1 -> erster Durchlauf ohne odef
+      if(!$hash->{HELPER}{SWITCHED}) {
+          $paref->{odev}            = $hash->{LINKNAME};                  # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
+          $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME};
+      } else {
+          $paref->{odev} = $hash->{HELPER}{SWITCHED};
+      }
   
-  } else {                                  # Step 2 -> zweiter Durchlauf mit odef gesetzt
+  } else {                                                                # Step 2 -> zweiter Durchlauf mit odef gesetzt
       my @a;
+      delete $hash->{HELPER}{SWITCHED};
       $sdev = $odev eq $name ? "--reset--" : $odev;
       
       push @a, $name;
@@ -469,7 +476,7 @@ sub _setadoptForTimer {                 ## no critic "not used"
       $paref->{aref} = \@a;
   }
   
-  no strict "refs";                         ## no critic 'NoStrict'  
+  no strict "refs";                                                       ## no critic 'NoStrict'  
   &{$hset{adopt}{fn}} ($paref); 
   use strict "refs";
   
@@ -479,6 +486,7 @@ sub _setadoptForTimer {                 ## no critic "not used"
   }
   
   Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
+  
   InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
   
 return;
