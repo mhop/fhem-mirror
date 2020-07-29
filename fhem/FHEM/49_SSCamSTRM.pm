@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.2" => "29.07.2020  fix: adoptTime accept not only integer values ",
   "2.14.1" => "28.07.2020  switching time increases with each adoptForTimer command ",
   "2.14.0" => "27.07.2020  new commands adoptForTimer and control command adoptTime ",
   "2.13.1" => "21.07.2020  fix: set of values in attr adoptSubset is empty after restart, changes according level 3 PBP ",
@@ -441,11 +442,11 @@ sub _setadoptForTimer {                 ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  my $odev  = $paref->{odev};                                             # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
+  my $odev  = $paref->{odev};                                                        # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
   
   my $atime = ReadingsVal($name, "adoptTimer", 10);
 
-  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");          # $paref nicht checken ! da immer unikat
+  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
 
   if ($init_done != 1) {
       InternalTimer(gettimeofday()+3, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
@@ -460,7 +461,7 @@ sub _setadoptForTimer {                 ## no critic "not used"
       $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME} if(!$hash->{HELPER}{SWITCHED});
       $paref->{odev}            = $hash->{HELPER}{SWITCHED};                         # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
   
-  } else {                                                                # Step 2 -> zweiter Durchlauf mit odef gesetzt
+  } else {                                                                           # Step 2 -> zweiter Durchlauf mit odef gesetzt
       my @a;
       delete $hash->{HELPER}{SWITCHED};
       $sdev = $odev eq $name ? "--reset--" : $odev;
@@ -472,7 +473,7 @@ sub _setadoptForTimer {                 ## no critic "not used"
       $paref->{aref} = \@a;
   }
   
-  no strict "refs";                                                       ## no critic 'NoStrict'  
+  no strict "refs";                                                                  ## no critic 'NoStrict'  
   &{$hset{adopt}{fn}} ($paref); 
   use strict "refs";
   
@@ -499,7 +500,7 @@ sub _setAdoptTimer {                     ## no critic "not used"
   my $prop  = $paref->{prop} // 0;
   
   my $ret = "";
-  $ret    = qq{The command "$opt" needs an integer as argument.} if($prop !~ /[0-9]+/x);
+  $ret    = qq{The command "$opt" needs an integer as argument.} if($prop !~ /^[0-9]+?$/x);
   return $ret if($ret);
   
   delReadings ($hash, "adoptTimer");
