@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 20080 2019-09-22 22:00:00Z DS_Starter $
+# $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $
 #################################################################################################################
 #
 #  Copyright notice
@@ -32,6 +32,7 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
+  "2.14.1" => "29.07.2020  corrections for inverter type 9346, Forum: https://forum.fhem.de/index.php/topic,56080.msg1075088.html#msg1075088 ",
   "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
   "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
   "2.13.3" => "28.08.2019  commandref revised ",
@@ -696,6 +697,18 @@ sub SMAInverter_getstatusDoParse($) {
 
          # Inverter Laufzeit ermitteln
          $irt = tv_interval($ist);
+         
+         # modellabhängige Korrektur Forum: https://forum.fhem.de/index.php/topic,56080.msg1075088.html#msg1075088
+         if($inv_TYPE =~ /9346/x) {
+             Log3 $name, 4, "$name - Corrections for Inverter Type $inv_TYPE: ".SMAInverter_devtype($inv_TYPE);
+             Log3 $name, 4, "$name - Values got from inverter: iac1 -> $inv_SPOT_IAC1, iac2 -> $inv_SPOT_IAC2, iac3 -> $inv_SPOT_IAC3";
+             
+             $inv_SPOT_IAC1 = $inv_SPOT_IAC1 < 0 ? 0 : $inv_SPOT_IAC1/10;
+             $inv_SPOT_IAC2 = $inv_SPOT_IAC2 < 0 ? 0 : $inv_SPOT_IAC2/10;
+             $inv_SPOT_IAC3 = $inv_SPOT_IAC3 < 0 ? 0 : $inv_SPOT_IAC3/10;
+             
+             Log3 $name, 4, "$name - Values corrected to: iac1 -> $inv_SPOT_IAC1, iac2 -> $inv_SPOT_IAC2, iac3 -> $inv_SPOT_IAC3";
+         }
 
 	     # Aufbau Ergebnis-Array
 	     push(@row_array, "modulstate normal"."\n");
@@ -1632,12 +1645,12 @@ sub SMAInverter_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v;
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1697,12 +1710,12 @@ return sprintf("%d", $code);
 #                 identify inverter type
 ##########################################################################
 sub SMAInverter_devtype ($) {
-  my ($code) = @_;
+  my $code = shift;
 
   unless (exists($SMAInverter_devtypes{$code})) { return $code;}
   my $dev = $SMAInverter_devtypes{$code};
 
-return ($dev);
+return $dev;
 }
 
 ##########################################################################
