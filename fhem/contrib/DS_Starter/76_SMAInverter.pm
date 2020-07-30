@@ -703,9 +703,9 @@ sub SMAInverter_getstatusDoParse($) {
              Log3 $name, 4, "$name - Corrections for Inverter Type $inv_TYPE: ".SMAInverter_devtype($inv_TYPE);
              Log3 $name, 4, "$name - Values got from inverter: iac1 -> $inv_SPOT_IAC1, iac2 -> $inv_SPOT_IAC2, iac3 -> $inv_SPOT_IAC3";
              
-             $inv_SPOT_IAC1 = $inv_SPOT_IAC1 < 0 ? 0 : $inv_SPOT_IAC1/10;
-             $inv_SPOT_IAC2 = $inv_SPOT_IAC2 < 0 ? 0 : $inv_SPOT_IAC2/10;
-             $inv_SPOT_IAC3 = $inv_SPOT_IAC3 < 0 ? 0 : $inv_SPOT_IAC3/10;
+             $inv_SPOT_IAC1 = $inv_SPOT_IAC1 < 0 ? 0 : $inv_SPOT_IAC1/5;
+             $inv_SPOT_IAC2 = $inv_SPOT_IAC2 < 0 ? 0 : $inv_SPOT_IAC2/5;
+             $inv_SPOT_IAC3 = $inv_SPOT_IAC3 < 0 ? 0 : $inv_SPOT_IAC3/5;
              
              Log3 $name, 4, "$name - Values corrected to: iac1 -> $inv_SPOT_IAC1, iac2 -> $inv_SPOT_IAC2, iac3 -> $inv_SPOT_IAC3";
          }
