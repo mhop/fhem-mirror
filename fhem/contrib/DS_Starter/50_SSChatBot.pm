@@ -49,6 +49,7 @@ eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSC
 
 # Versions History intern
 my %SSChatBot_vNotesIntern = (
+  "1.9.0"  => "30.07.2020  restartSendqueue option 'force' added ",
   "1.8.0"  => "27.05.2020  send SVG Plots with options like svg='<SVG-Device>,<zoom>,<offset>' possible ",
   "1.7.0"  => "26.05.2020  send SVG Plots possible ",
   "1.6.1"  => "22.05.2020  changes according to PBP ",
@@ -306,7 +307,7 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
                  "botToken ".
                  "listSendqueue:noArg ".
                  ($idxlist?"purgeSendqueue:-all-,-permError-,$idxlist ":"purgeSendqueue:-all-,-permError- ").
-                 "restartSendqueue:noArg ".
+                 "restartSendqueue ".
                  "asyncSendItem:textField-long "
                  ;
   }
@@ -367,7 +368,8 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
       # text="<https://www.synology.com>" users="user1"
       # text="Check this!! <https://www.synology.com|Click here> for details!" users="user1,user2" 
       # text="a fun image" fileUrl="http://imgur.com/xxxxx" users="user1,user2" 
-      # text="aktuelles SVG-Plot" svg="<SVG-Device>,<zoom>,<offset>" users="user1,user2"      
+      # text="aktuelles SVG-Plot" svg="<SVG-Device>,<zoom>,<offset>" users="user1,user2"  
+      delete $hash->{HELPER}{RESENDFORCE};                                       # Option 'force' löschen (könnte durch restartSendqueue gesetzt sein)      
       return if(!$hash->{HELPER}{USERFETCHED});
       my ($text,$users,$svg);
       my ($fileUrl,$attachment) = ("","");
@@ -424,12 +426,14 @@ sub SSChatBot_Set {                    ## no critic 'complexity'
       SSChatBot_getapisites($name);
   
   } elsif ($opt eq "restartSendqueue") {
-      my $ret = SSChatBot_getapisites($name);
-      if($ret) {
-          return $ret;
+      if($prop && $prop eq "force") {
+          $hash->{HELPER}{RESENDFORCE} = 1;
       } else {
-          return qq{The SendQueue has been restarted.};
+          delete $hash->{HELPER}{RESENDFORCE};
       }
+      my $ret = SSChatBot_getapisites($name);
+      return $ret if($ret);
+      return qq{The SendQueue has been restarted.};
       
   } else {
       return "$setlist"; 
@@ -795,6 +799,7 @@ sub SSChatBot_getapisites ($) {
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###            start Chat operation Send            "); 
    Log3($name, 4, "$name - ####################################################");
+   Log3($name, 4, "$name - Send Queue force option is set, send also messages marked as 'forbidSend'") if($hash->{HELPER}{RESENDFORCE});
 
    if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
        $ret = "Sendqueue is empty. Nothing to do ...";
@@ -803,8 +808,8 @@ sub SSChatBot_getapisites ($) {
    }
    
    # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
-   foreach my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
-       if (!$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend}) {
+   for my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+       if (!$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} || $hash->{HELPER}{RESENDFORCE}) {
            $hash->{OPIDX}  = $idx;
            $hash->{OPMODE} = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{opmode};
            $idxset         = 1;
