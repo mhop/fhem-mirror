@@ -9146,14 +9146,14 @@ sub CUL_HM_TCtempReadings($) {# parse TC temperature readings
   { #update readings in device - oldfashioned style, copy from Readings
     my @histVals;
     foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
-      my $varV = ReadingsVal($name,"R-".$var,"???");
+      my $varV = ReadingsVal($name,"R-".$var,ReadingsVal($name,".R-".$var,"???"));
       
       foreach my $e( grep {${$_}[2] =~ m/$var/}# see if change is pending
                      grep {$hash eq ${$_}[0]}
                      grep {scalar(@{$_} == 3)}
                      @evtEt){
         $varV = ${$e}[2];
-        $varV =~ s/^R-$var:// ;
+        $varV =~ s/^\.?R-$var:// ;
       }
       push @histVals,"$var:$varV";
     }
@@ -9579,8 +9579,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
 
   $actHash->{helper}{actCycle} = AttrVal($actName,"actCycle",600);
   RemoveInternalTimer("ActionDetector");
-  InternalTimer(gettimeofday()+$actHash->{helper}{actCycle}
-                                      ,"CUL_HM_ActCheck", "ActionDetector", 0);
+  InternalTimer(gettimeofday()+$actHash->{helper}{actCycle},"CUL_HM_ActCheck", "ActionDetector", 0);
 }
 sub CUL_HM_ActInfo() {# print detailed status information
   my $actHash = CUL_HM_ActGetCreateHash();
@@ -10362,7 +10361,7 @@ sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
   if ($defs{$devN}{helper}{prt}{sProc} != 0){# we wait till device is idle. 
     CUL_HM_complConfigTest($name);           # requeue and wait patient
   }
-  elsif (CUL_HM_peerUsed($name) == 2){
+  elsif (CUL_HM_peerUsed($name) == 2){# 2: peer list incomplete
     CUL_HM_qAutoRead($name,0) if(!$dly);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
