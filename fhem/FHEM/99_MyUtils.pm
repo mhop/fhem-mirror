@@ -169,18 +169,6 @@ sub RollRunter($$$)
 
 #------------------------------------------
 
-sub getWeather($)
-{
-    my ($wett)=@_;
-    if($wett==30|| $wett==32 || $wett==34 || $wett==36) { # sonnig, heiter, heiss
-	    return(WEATHER_SUNNY);
-    }
-    # cloudy: 26, 27, 28 29
-    return(WEATHER_BAD);
-}
-
-#------------------------------------------
-
 sub IsSunny($)
 {
     my ($wett)=@_;
@@ -219,7 +207,7 @@ sub IsWetterSonneWait($)
 		        $blocktime[2]+=2; # +2Std
                 if($blocktime[2]>23) { $blocktime[2]=23; } # da nachts keine sonne scheint egal
                 $blocktimerRunning=1;
-		        #Dbg("son1");
+		        Dbg("Wechsel auf sonnig");
 	        }
 	    }
 	    $wettalt=$wett;
@@ -229,6 +217,7 @@ sub IsWetterSonneWait($)
 	        return(1);
 	    } else {
 	        $blocktimerRunning=0;
+            Dbg("Sonnigblockierung Ende");
         }
     }
     return(0);
@@ -288,9 +277,11 @@ sub checkSunIn($$$$$)
 #------------------------------------------
 
 # Offene Fenster nicht mit Rollaeden verschliessen
-sub checkSkip($$)
+sub checkSkip($)
 {
-    my ($r, $wach)=@_;
+    my ($r)=@_;
+
+    my $wach=Value("wach");
     my $winstate=Value($r->{win});
     my $typ=$r->{typ};
     my $skipRunter=SKIP_NO; my $skipHoch=SKIP_NO;
@@ -352,7 +343,7 @@ sub RollCheck()
         my($tempI, $tempO)=checkTemps($tempIn, $tempOut, $r->{tempSoll}); # Temperatur klassifizieren
         my $sunIn=checkSunIn($twil, $sr, $r->{dir}, $sonneblock, $sunny); # Sonne scheint ins Fenster ?
         # Offene Fenster nicht mit Rollaeden verschliessen, zur Schlafenszeit nicht öffnen
-        my ($skipRunter, $skipHoch)=checkSkip($r, $wach);
+        my ($skipRunter, $skipHoch)=checkSkip($r);
         if (!$tag) {
             $run=RollRunter($r, $skipRunter, $ndelay++);
         } elsif ($dawn) {
