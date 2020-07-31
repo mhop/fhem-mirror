@@ -50,7 +50,7 @@ BEGIN {
           readingsBeginUpdate
           readingsBulkUpdate
           readingsEndUpdate
-		  readingFnAttributes
+          readingFnAttributes
           readingsSingleUpdate   
           sortTopicNum          
         )
@@ -72,7 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.26.0" => "31.07.2020  add write into reading 'currtime' for stopwatch, add \$readingFnAttributes, set release_status to stable ",
+  "0.26.0" => "31.07.2020  add write into reading 'currtime' for stopwatch, add \$readingFnAttributes, set release_status to stable, attr timeAsReading ",
   "0.25.0" => "03.06.2020  set reading 'stoptime' in type 'stopwatch' ",                               
   "0.24.0" => "26.05.2020  entry of countDownInit can be in format <seconds> ",
   "0.23.2" => "20.05.2020  english commandref ",
@@ -147,13 +147,15 @@ sub Initialize {
                                 "stationHourHand:Bar,Pointed,Swiss,Vienna ".
                                 "stationStrokeDial:GermanHour,German,Austria,Swiss,Vienna,No ".
                                 "stationBody:Round,SmallWhite,RoundGreen,Square,Vienna,No ".
+                                "timeAsReading:1,0 ".
                                 "timeSource:server,client ".
                                 $readingFnAttributes;;
 
   $hash->{FW_hideDisplayName} = 1;                        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
   $hash->{FW_atPageEnd}       = 1;                        # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
-
+  # $hash->{FW_deviceOverview}  = 1;
+  
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };        ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
   
 return;
@@ -304,7 +306,7 @@ return;
 ##############################################################################
 #         Attributfunktion
 ##############################################################################
-sub Attr {                                                         ## no critic 'complexity'
+sub Attr {                                           ## no critic 'complexity'
     my ($cmd,$name,$aName,$aVal) = @_;
     my $hash                     = $defs{$name};
     my ($do,$val);
@@ -333,6 +335,17 @@ sub Attr {                                                         ## no critic 
         $val = ($do == 1 ? "disabled" : "initialized");
     
         readingsSingleUpdate($hash, "state", $val, 1);
+    }
+    
+    if ($aName eq "timeAsReading") {
+        if($cmd eq "set") {
+            $do = $aVal;
+        }
+        $do = 0 if($cmd eq "del");
+            
+        if(!$do) {
+            delReadings ($name, "currtime"); 
+        }
     }
     
     if ($aName eq "digitalDisplayPattern") {
@@ -440,6 +453,7 @@ sub digitalWatch {
   my $abdist   = AttrVal($d, "digitalBorderDistance",  8);
   my $hattr    = AttrVal($d, "htmlattr",               "width='150' height='50'");
   my $tsou     = AttrVal($d, "timeSource",             "client");
+  my $showct   = AttrVal($d, "timeAsReading",          0);
   
   my $deftxt   =  "    ";
   my $rdtt     =  ReadingsVal ($d, "displayTextTicker", "off");
@@ -493,11 +507,12 @@ sub digitalWatch {
     var minutes_$d;
     var seconds_$d;
     var startDate_$d;
-    var  ddt_$d;
+    var ddt_$d;
     var almtime0_$d        = '$alarm';                // Alarmzeit initialisieren
     var digitxt_$d         = '$deftxt';               // default Digitaltext initialisieren
     var tticker_$d         = '$rdtt';                 // Tickereinstellung initialisieren
     var zmodulo_$d         = 0;                       // Hilfszähler
+    var showCurrTime_$d    = '$showct';               // Reading currtime schreiben oder nicht
     var distBorderright_$d = '$bdist';                // Abstand zum rechten Rand
     var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand   
     var allowSetStopTime;                             // erlaube / verbiete Setzen Reading stoptime 
@@ -1098,6 +1113,16 @@ sub digitalWatch {
         localStorage.setItem('lastalmtime_'+dev, lastalmtime);
     }
     
+    // Reading currtime setzen
+    function setrcurrtime (h_$d, m_$d, s_$d) {
+        var time_$d = buildtime (h_$d, m_$d, s_$d);
+        if (modulo2_$d != zmodulo_$d && showCurrTime_$d != 0 && time_$d != 'NaN:NaN:NaN') {
+            command = '{ CommandSetReading(undef, "$d currtime '+time_$d+'") }';  
+            url_$d  = makeCommand(command);
+            \$.get(url_$d);
+        }   
+    }
+    
     // Check ob Alarm ausgelöst werden soll und ggf. Alarmevent triggern
     function checkAndDoAlm_$d (dev, acttime, almtime) {
         lastalmtime_$d = localStorage.getItem('lastalmtime_$d');                              // letzte Alarmzeit laden        
@@ -1155,10 +1180,10 @@ sub digitalWatch {
                 time_$d  = new Date(ct_$d);
               
             } else {
-                time_$d  = new Date();                   // Clientzeit
+                time_$d  = new Date();                                              // Clientzeit
             }
           
-            if (typeof ct_$d === 'undefined') {          // wenn Zeit noch undef mit lokaler Zeit initialisieren -> springen Zeiger verhindern
+            if (typeof ct_$d === 'undefined') {                                     // wenn Zeit noch undef mit lokaler Zeit initialisieren -> springen Zeiger verhindern
                 time_$d  = new Date();                   
             } else {
                 time_$d  = new Date(ct_$d);
@@ -1173,16 +1198,20 @@ sub digitalWatch {
                          ((seconds_$d < 10) ? '0' : '') + seconds_$d;
                          
             if (acttime_$d == '00:00:00') {
-                localStoreSetLastalm_$d ('$d', 'NaN');               // letzte Alarmzeit zurücksetzen zum Tageswechsel            
+                localStoreSetLastalm_$d ('$d', 'NaN');                              // letzte Alarmzeit zurücksetzen zum Tageswechsel            
             }
 
             checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);
+			
+			setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
         }
         
         if (watchkind_$d == 'staticwatch') {
             var hours_$d   = '$h';
             var minutes_$d = '$m';
             var seconds_$d = '$s';
+            
+            setrcurrtime (hours_$d, minutes_$d, seconds_$d);                         // Reading currtime mit angezeigter Zeit setzen
         }
         
         if (watchkind_$d == 'stopwatch') {           
@@ -1242,15 +1271,11 @@ sub digitalWatch {
                 
                 ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
                 
-                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                            // Alarm auslösen wenn zutreffend
+                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                           // Alarm auslösen wenn zutreffend
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
-				
-                if (modulo2_$d != zmodulo_$d && ddt_$d != 'NaN:NaN:NaN') {
-                    command = '{ CommandSetReading(undef, "$d currtime '+ddt_$d+'") }';  // Reading mit aktueller Zeit setzen
-                    url_$d  = makeCommand(command);
-                    \$.get(url_$d);
-                }
+                
+                setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
             }
             
             if (state_$d == 'stopped') {
@@ -1364,6 +1389,8 @@ sub digitalWatch {
                     checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                       // Alarm auslösen wenn zutreffend
                     localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
                 }
+				
+				setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
             }
             
             if (state_$d == 'stopped') {
@@ -1477,6 +1504,7 @@ sub stationWatch {
   my $sbody  = AttrVal ($d, "stationBody",               "Round").    "Body";
   my $hattr  = AttrVal ($d, "htmlattr",                  "width='150' height='150'");
   my $tsou   = AttrVal ($d, "timeSource",                "client"); 
+  my $showct = AttrVal ($d, "timeAsReading",             0);
   
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");
 
@@ -1489,9 +1517,10 @@ sub stationWatch {
       <script>  
       
       var ct_$d;
-      var almtime0_$d = '$alarm';
+      var almtime0_$d     = '$alarm';
       var time_$d;       
-      var zmodulo_$d  = 0;                              // Hilfszähler      
+      var zmodulo_$d      = 0;                       // Hilfszähler 
+      var showCurrTime_$d = '$showct';               // Reading currtime schreiben oder nicht      
       
       // clock body (Uhrgehäuse)
       StationClock_$d.NoBody         = 0;
@@ -1563,6 +1592,25 @@ sub stationWatch {
 
       function makeCommand (cmd) {
           return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
+      }
+      
+      // Template digital time display
+      function buildtime (hours, minutes, seconds) {
+          var ddt = ((hours   < 10) ? '0' : '') + hours   + ':' + 
+                    ((minutes < 10) ? '0' : '') + minutes + ':' + 
+                    ((seconds < 10) ? '0' : '') + seconds
+                    ;   
+          return ddt;
+      }
+      
+      // Reading currtime setzen
+      function setrcurrtime (h_$d, m_$d, s_$d) {
+          var time_$d = buildtime (h_$d, m_$d, s_$d);
+          if (modulo2_$d != zmodulo_$d && showCurrTime_$d != 0 && time_$d != 'NaN:NaN:NaN') {
+              command = '{ CommandSetReading(undef, "$d currtime '+time_$d+'") }';  
+              url_$d  = makeCommand(command);
+              \$.get(url_$d);
+          }   
       }
       
       // localStorage speichern letzte Alarmzeit
@@ -1762,10 +1810,10 @@ sub stationWatch {
                       context.restore();
                   }
                   
-                  var cycletime    = new Date();
-                  var cycleseconds = cycletime.getSeconds();
-                  modulo2_$d       = cycleseconds % 2;                                       // Taktung für Readingabruf (Serverauslastung reduzieren)
-
+                  var cycletime       = new Date();
+                  var cycleseconds    = cycletime.getSeconds();
+                  modulo2_$d          = cycleseconds % 2;                                    // Taktung für Readingabruf (Serverauslastung reduzieren)
+      
                   if (modulo2_$d != zmodulo_$d) {
                       command = '{ReadingsVal("$d","alarmTime","+almtime0_$d+")}';           // alarmTime Reading lesen
                       url_$d  = makeCommand(command);
@@ -1811,10 +1859,12 @@ sub stationWatch {
                                ((seconds_$d < 10) ? '0' : '') + seconds_$d;
                                
                   if (acttime_$d == '00:00:00') {
-                      localStoreSetLastalm_$d ('$d', 'NaN');               // letzte Alarmzeit zurücksetzen zum Tageswechsel            
+                      localStoreSetLastalm_$d ('$d', 'NaN');                   // letzte Alarmzeit zurücksetzen zum Tageswechsel            
                   }
 
-                  checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);                 
+                  checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);  
+
+                  setrcurrtime (hours_$d, minutes_$d, seconds_$d);             // Reading currtime mit angezeigter Zeit setzen                  
 
                   // draw hour hand
                   context.save();
@@ -2089,6 +2139,7 @@ sub modernWatch {
   my $fre    = AttrVal($d, "modernColorRingEdge",   "333");
   my $hattr  = AttrVal($d, "htmlattr",              "width='150' height='150'");
   my $tsou   = AttrVal($d, "timeSource",            "client");
+  my $showct = AttrVal($d, "timeAsReading",         0);
 
   my $alarm  = ReadingsVal($d, "alarmTime", "aa:bb:cc");  
 
@@ -2102,8 +2153,10 @@ sub modernWatch {
       <script>
       
       var ct_$d;
-      var almtime0_$d = '$alarm';
-      var zmodulo_$d  = 0;                              // Hilfszähler 
+      var almtime0_$d     = '$alarm';
+      var zmodulo_$d      = 0;                       // Hilfszähler 
+      var modulo2_$d      = 0;                       // Hilfszähler
+      var showCurrTime_$d = '$showct';               // Reading currtime schreiben oder nicht
       
       // CSRF-Token auslesen
       var body = document.querySelector("body");
@@ -2123,6 +2176,26 @@ sub modernWatch {
 
       function makeCommand (cmd) {
           return getBaseUrl()+"cmd="+encodeURIComponent(cmd)+"&XHR=1";
+      }
+      
+      // Template digital time display
+      function buildtime (hours, minutes, seconds) {
+          var ddt = ((hours   < 10) ? '0' : '') + hours   + ':' + 
+                    ((minutes < 10) ? '0' : '') + minutes + ':' + 
+                    ((seconds < 10) ? '0' : '') + seconds
+                    ;   
+          return ddt;
+      }
+    
+    
+      // Reading currtime setzen
+      function setrcurrtime (h_$d, m_$d, s_$d) {
+          var time_$d = buildtime (h_$d, m_$d, s_$d);
+          if (modulo2_$d != zmodulo_$d && showCurrTime_$d != 0 && time_$d != 'NaN:NaN:NaN') {
+              command = '{ CommandSetReading(undef, "$d currtime '+time_$d+'") }';  
+              url_$d  = makeCommand(command);
+              \$.get(url_$d);
+          }   
       }
       
       // localStorage speichern letzte Alarmzeit
@@ -2258,6 +2331,8 @@ sub modernWatch {
           }
 
           checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);
+          
+          setrcurrtime (hour_$d, minute_$d, second_$d);            // Reading currtime mit angezeigter Zeit setzen
           
           //hour_$d
           hour_$d = hour_$d%12;
