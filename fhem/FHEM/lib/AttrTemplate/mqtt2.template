@@ -668,6 +668,8 @@ attr DEVICE stateFormat Click: click
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 deletereading -q DEVICE (?!associatedWith).*
+#not yet tested, see https://forum.fhem.de/index.php/topic,113224.msg1075311.html#msg1075311
+#set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=StatelessProgrammableSwitch HOMEBRIDGEMAPPING= "ProgrammableSwitchEvent=click,values=single:SINGLE_PRESS;;double:DOUBLE_PRESS"
 attr DEVICE model zigbee2mqtt_wireless_button_old
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
@@ -3617,31 +3619,34 @@ attr DEVICE readingList\
   BASE_TOPIC/status/[^/]+/avtransport:.* {}\
   BASE_TOPIC/status/[^/]+/renderingcontrol:.* {}
 attr DEVICE model sonos2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20200603
+attr DEVICE devStateIcon 0:10px-kreis-rot 1:10px-kreis-gelb 2:10px-kreis-gruen
+attr DEVICE stateFormat connected
+setreading DEVICE attrTemplateVersion 20200729
 
 name:sonos2mqtt_bridge_comfort
 desc:The sonos2mqtt bridge including automated setup for speaker devices (adds 2 notify devices)
 filter:TYPE=MQTT2_DEVICE
 order:M_05c
 set DEVICE attrTemplate sonos2mqtt_bridge
-defmod n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;set $EVTPART1 attrTemplate sonos2mqtt_speaker;set $EVTPART1 x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
+defmod n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;;\
+set $EVTPART1 attrTemplate sonos2mqtt_speaker;;\
+set $EVTPART1 x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
 defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
-  no warnings 'experimental::smartmatch';\
-  my @tv = ("S14","S11");\
-  my $url="http://$EVTPART1:1400";\
-  my $xmltext = GetFileFromURL("$url/xml/device_description.xml");\
-  my ($mn)=$xmltext =~ /<modelNumber>(S[0-9]+)/;\
-  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;\
-  my $icon="Sonos2mqtt_icon-$mn";\
-  my $setList=AttrVal($NAME,'setList','');\
-  fhem("setreading $NAME modelNumber $mn");\
-  fhem("\"wget -qO ./www/images/default/$icon.png $url$img\"");\
-  fhem("attr $NAME icon $icon;sleep 4 WI;set WEB rereadicons");\
-  if ($mn ~~ @tv) {$setList=~s/input:Queue \{/input:Queue,TV \{/};\
-  $setList=~s/;/;;/g;\
+  my @tv = ("S14","S11","S9");;\
+  my $url="http://$EVTPART1:1400";;\
+  my $xmltext = GetFileFromURL("$url/xml/device_description.xml");;\
+  my ($mn)=$xmltext =~ /<modelNumber>(S[0-9]+)/;;\
+  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;;\
+  my $icon="Sonos2mqtt_icon-$mn";;\
+  my $setList=AttrVal($NAME,'setList','');;\
+  fhem("setreading $NAME modelNumber $mn");;\
+  fhem("\"wget -qO ./www/images/default/$icon.png $url$img\"");;\
+  fhem("attr $NAME icon $icon;;sleep 4 WI;;set WEB rereadicons");;\
+    if (grep(/$mn/, @tv)) {$setList=~s/input:Queue \{/input:Queue,TV \{/};;\
+  $setList=~s/;;/;;;;/g;;\
   fhem("attr $NAME setList $setList")\
 }
-setreading DEVICE attrTemplateVersion 20200727
+setreading DEVICE attrTemplateVersion 20200730
 
   
 name:sonos2mqtt_speaker
@@ -3665,7 +3670,7 @@ attr DEVICE setList\
   volumeUp:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
   volumeDown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
   volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
-  mute:on,off { my $value = $EVTPART1 eq "on" ? "mute" : "unmute"; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
+  mute:true,false { my $value = $EVTPART1 eq "true" ? "mute" : "unmute"; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
   next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
   previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }\
   joinGroup:textField BASE_TOPIC/DEV_ID/control { "command": "joingroup",  "input": "$EVTPART1"}\
@@ -3675,9 +3680,10 @@ attr DEVICE setList\
   input:Queue { my $value = $EVTPART1 eq "TV" ? "tv" : $EVTPART1 eq "Line_In" ? "line" : "queue"; qq(BASE_TOPIC/DEV_ID/control { "command": "switchto$value" } ) }\
   notify:textField BASE_TOPIC/DEV_ID/control { "command":"notify","input":{"trackUri":"$EVTPART2","onlyWhenPlaying":false,"timeout":10,"volume":$EVTPART1,"delayMs":700}}\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/control $payload)}
-attr DEVICE model sonos2mqtt_speaker
+attr DEVICE devStateIcon (STOPPED|PAUSED_PLAYBACK):rc_PLAY:toggle PLAYING:rc_PAUSE:pause .*:refresh:play
 attr DEVICE alias ALIAS
-setreading DEVICE attrTemplateVersion 20200718
+attr DEVICE model sonos2mqtt_speaker
+setreading DEVICE attrTemplateVersion 20200729
 
 
 ###########################################
