@@ -4347,6 +4347,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
   if   (!defined($h) && defined($culHmSubTypeSets->{$st}{pct}) && $cmd =~ m/^\d+/) {
     splice @a, 1, 0,"pct";#insert the actual command
+    $cmd = $oCmd = "pct";
   }
   elsif(!defined($h)) { ### unknown - return the commandlist
 
