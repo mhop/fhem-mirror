@@ -1,4 +1,6 @@
+
 package main;
+
 use strict;
 use warnings;
 use POSIX;
@@ -312,12 +314,39 @@ sub checkSkip($)
     return($skipRunter, $skipHoch);
 }
 
+sub getTempOutRepaired()
+{
+    state @temps = (0,0,0,0,0);
+    state  $i = 0;
+
+    my $cnt=scalar@ temps;
+    my $temp = ReadingsVal("myWH1080", "Temp-outside", 99);
+    my $n = 0;
+    my $result=$temp;
+    # Anzahl der zu grossen Abweichungen ermitteln
+    foreach my $t (@temps) {
+        if(abs($t-$temp)>5) {
+            $n+=1;
+        }
+    }
+    # zuviele Abweichungen->Ausreißer->letzten Wert ausgeben (besser Mittelwert ?)
+    if($n >= 2) {
+        $result=@temps[$i];
+    }
+    # aktuellen Wert merken
+    $i=($i+1) % $cnt;
+    @temps[$i]=$temp;
+
+    return($result);
+}
+
 #------------------------------------------
 
 sub RollCheck()
 {
     state $tagalt=0;
     state $wachalt=0;
+
     my $r;
     my $ndelay = 0;
     my $tempOut= ReadingsVal("myWH1080", "Temp-outside", 99);
