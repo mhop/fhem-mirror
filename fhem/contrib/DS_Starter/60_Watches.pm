@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 60_Watches.pm 22020 2020-05-24 07:39:02Z DS_Starter $
+# $Id: 60_Watches.pm 22109 2020-06-03 21:19:14Z DS_Starter $
 #########################################################################################################################
 #       60_Watches.pm
 #
@@ -50,6 +50,7 @@ BEGIN {
           readingsBeginUpdate
           readingsBulkUpdate
           readingsEndUpdate
+		  readingFnAttributes
           readingsSingleUpdate   
           sortTopicNum          
         )
@@ -71,6 +72,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.26.0" => "31.07.2020  add write into reading 'currtime' for stopwatch, add \$readingFnAttributes, set release_status to stable ",
   "0.25.0" => "03.06.2020  set reading 'stoptime' in type 'stopwatch' ",                               
   "0.24.0" => "26.05.2020  entry of countDownInit can be in format <seconds> ",
   "0.23.2" => "20.05.2020  english commandref ",
@@ -146,7 +148,7 @@ sub Initialize {
                                 "stationStrokeDial:GermanHour,German,Austria,Swiss,Vienna,No ".
                                 "stationBody:Round,SmallWhite,RoundGreen,Square,Vienna,No ".
                                 "timeSource:server,client ".
-                                "";
+                                $readingFnAttributes;;
 
   $hash->{FW_hideDisplayName} = 1;                        # Forum 88667
   # $hash->{FW_addDetailToSummary} = 1;
@@ -1125,7 +1127,7 @@ sub digitalWatch {
         var watchkind_$d = '$addp';
         var cycletime    = new Date();
         var cycleseconds = cycletime.getSeconds();
-        modulo2_$d       = cycleseconds % 2;                                           // Taktung für Readingabruf (Serverauslastung reduzieren)
+        modulo2_$d       = cycleseconds % 2;                                           // Taktung für Reading lesen/schreiben (Serverauslastung reduzieren)
 
         if (watchkind_$d == 'watch') {                  
             if (modulo2_$d != zmodulo_$d) {
@@ -1184,7 +1186,7 @@ sub digitalWatch {
         }
         
         if (watchkind_$d == 'stopwatch') {           
-            command = '{ReadingsVal("$d","state","")}';                          // state Reading lesen
+            command = '{ReadingsVal("$d","state","")}';                              // state Reading lesen
             url_$d  = makeCommand(command);
             \$.get( url_$d, function (data) {
                                 state_$d = data.replace(/\\n/g, '');                                
@@ -1240,9 +1242,15 @@ sub digitalWatch {
                 
                 ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
                 
-                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                           // Alarm auslösen wenn zutreffend
+                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                            // Alarm auslösen wenn zutreffend
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
+				
+                if (modulo2_$d != zmodulo_$d && ddt_$d != 'NaN:NaN:NaN') {
+                    command = '{ CommandSetReading(undef, "$d currtime '+ddt_$d+'") }';  // Reading mit aktueller Zeit setzen
+                    url_$d  = makeCommand(command);
+                    \$.get(url_$d);
+                }
             }
             
             if (state_$d == 'stopped') {
@@ -1408,7 +1416,7 @@ sub digitalWatch {
             }
             
             if (modulo2_$d != zmodulo_$d) {
-                command = '{ReadingsVal("$d","displayText", "$deftxt")}';     // Text dynamisch aus Reading lesen
+                command = '{ReadingsVal("$d","displayText", "$deftxt")}';           // Text dynamisch aus Reading lesen
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
                                     digitxt_$d = data.replace(/\\n/g, '');
@@ -3170,7 +3178,7 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
     "Digital display"
   ],
   "version": "v1.1.1",
-  "release_status": "testing",
+  "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>",
     null
