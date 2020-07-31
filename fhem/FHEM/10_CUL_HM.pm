@@ -4365,8 +4365,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           if($1 eq $_){
             $val =~ s/-$repl-/:$hash->{helper}{cmds}{lst}{$_}/;
             last;
-          }  
+          } 
         }
+        $val =~ s/-.*-//;
       }
       elsif($val =~ m/^\[([a-zA-Z0-9_-|\.]*)\]$/){
         my @lst1;
