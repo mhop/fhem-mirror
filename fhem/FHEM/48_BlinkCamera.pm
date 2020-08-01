@@ -55,9 +55,14 @@
 #   FIX: cam type not send for old homescreen
 #   FIX: remove also FUUID keyvalue on delete
 #   FIX: FUUID in undef corrected
-
 #   New default 1 for homescreenv3 - old apis deactivated
 #   Disclaimer for API changes
+
+#   Corrected handling of prefered network attribute
+
+# 
+# 
+# 
 # 
 # 
 ##############################################################################
@@ -1359,6 +1364,8 @@ sub BlinkCamera_ParseHomescreen($$$)
   my $resnet = $result->{networks};
   my $firstnetwork = undef;
   my $netlist = "";
+
+  my $prefnet = AttrVal($hash->{NAME},'network',undef); 
   
   $readUpdates->{networkName} = "";
   $readUpdates->{networkArmed} = "";
@@ -1372,33 +1379,38 @@ sub BlinkCamera_ParseHomescreen($$$)
 #      $ob = 1 if ( ( defined( $anet->{onboarded} ) ) && ( $anet->{onboarded}) );
       my $ns = $netid.":".$anet->{name};
 #      Log3 $name, 4, "BlinkCamera_Callback $name: onboarded  :".$anet->{onboarded}.":" ;
-      if ( $ob ) {
-        # Log3 $name, 4, "BlinkCamera_Callback $name: found onboarded network  ".$netkey ;
-        $firstnetwork = $netid;
-        $readUpdates->{networkName} = $anet->{name} if ( defined( $anet->{name} ) );
-        $readUpdates->{networkArmed} = ($anet->{armed}?"true":"false") if ( defined( $anet->{armed} ) );
-        
-        $ns .= "\n" if ( length( $netlist) > 0 );
-        $netlist = $ns.$netlist;
-      } else {
-        if ( length( $netlist) == 0 ) {
+
+      # check with prefered network
+      if ( defined( $prefnet )  ) {
+        # only check against pref net if this is set to avoid using first network
+        if ( $netid eq $prefnet)  {
           $firstnetwork = $netid;
           $readUpdates->{networkName} = $anet->{name} if ( defined( $anet->{name} ) );
           $readUpdates->{networkArmed} = ($anet->{armed}?"true":"false") if ( defined( $anet->{armed} ) );
-        } else {
-          $netlist .= "\n";
         }
+      } elsif ( ! defined( $firstnetwork ) ) {
+        $firstnetwork = $netid;
+        $readUpdates->{networkName} = $anet->{name} if ( defined( $anet->{name} ) );
+        $readUpdates->{networkArmed} = ($anet->{armed}?"true":"false") if ( defined( $anet->{armed} ) );
+      }
+      
+      # $ob currently always 0 - check with onboarded networks - currently only influencing sequence
+      if ( $ob ) {
+        $ns .= "\n" if ( length( $netlist) > 0 );
+        $netlist = $ns.$netlist;
+      } else {
+        $netlist .= "\n" if ( length( $netlist) > 0 );
         $netlist .= $ns;
       }
+      
     }
   }
   $readUpdates->{networks} = $netlist;
-
   
   my $network = $firstnetwork;
   
   if ( ! defined( $network ) ) {
-    Log3 $name, 2, "BlinkCamera_ParseHomescreen $name: Network ID not found - please set attribute ";
+    Log3 $name, 2, "BlinkCamera_ParseHomescreen $name: Network ID not found - please set attribute to existing network";
   } else {
     Log3 $name, 4, "BlinkCamera_ParseHomescreen $name: network  ".$network ;
   }
@@ -1435,6 +1447,8 @@ sub BlinkCamera_ParseHomescreen($$$)
   
   return $ret if ( ( ! defined( $camList ) ) &&  ( ! defined( $owlList ) ) ); 
   
+  Log3 $name, 4, "BlinkCamera_Callback $name: handle cams" ;
+
   my $cameraGets = "";
   my $cameras = "";
 
