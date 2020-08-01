@@ -835,7 +835,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:Applies to Sonoff POW devices and other Tasmota flashed devices with power meassuring abilities.<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
+desc:Applies to Sonoff POW devices and other Tasmota flashed devices with power measuring abilities.<br>NOTE: Power topic will be set to POWER1; the format the device is sending data will also be changed to lowercase!
 order:A_01c
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 set DEVICE attrTemplate tasmota_basic_state_power1 CALLSPEECHRECOGN=1
@@ -1729,10 +1729,10 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 #contributed by 87insane, https://forum.fhem.de/index.php/topic,94060.msg934614.html#msg934614
 # shelly1pm using original firmware.
-name:shelly1_w_energy_meassuring
+name:shelly1_w_energy_measuring
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 order:A_10b
-desc:Applies to single relay Shelly devices offering energy meassuring like Shelly 1PM or Shelly Plug S
+desc:Applies to single relay Shelly devices offering energy measuring like Shelly 1PM or Shelly Plug S
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
@@ -1765,7 +1765,7 @@ attr DEVICE comment To get appropriate loadState values: Change the default limi
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
-attr DEVICE model shelly1_w_energy_meassuring
+attr DEVICE model shelly1_w_energy_measuring
 setreading DEVICE attrTemplateVersion 20200801
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_switch
@@ -1773,16 +1773,16 @@ option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
 
-name:shelly1_w_energy_meassuring_washer_example
+name:shelly1_w_energy_measuring_washer_example
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 order:A_10b1
-desc:Example how to configure a single relay Shelly device offering energy meassuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off. 
+desc:Example how to configure a single relay Shelly device offering energy measuring like Shelly 1PM or Shelly Plug S to visualise state of a machine behind the plug. Icons will not allow to turn the machine off. 
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
-set DEVICE attrTemplate shelly1_w_energy_meassuring CALLSPEECHRECOGN=0
+set DEVICE attrTemplate shelly1_w_energy_measuring CALLSPEECHRECOGN=0
 attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $pic = ReadingsVal($name,"loadState","") eq "on"?'scene_laundry_room_fem@green':'scene_laundry_room_fem';; my $text = ReadingsVal($name,"loadState","") eq "on"?"Waschmaschine läuft - Aktuell: ".ReadingsVal($name,"relay_0_power","")." W":'Standby';; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>";; "<div> $show ".FW_makeImage($pic)." $text </div>" }
 attr DEVICE userReadings total_temp:loadState:.on { ReadingsNum("$name","relay_0_kWh",0) },wash:loadState:.off { ReadingsNum("$name","total",0) - ReadingsNum("$name","total_temp",0) },price:loadState:.off {sprintf("%.2f",ReadingsNum("$name","wash",1)*ReadingsNum("kWh_Price","state",0.30))},time:loadState:.off {strftime("%H:%M", localtime(ReadingsAge("$name","total_temp",0)-3600))}
 attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs; using a seperate device named kWh_Price indicating actual energy price in state will lead to realistic price results or change the refference/the value "0.30" in userReadings "price".
-attr DEVICE model shelly1_w_energy_meassuring_washer_example
+attr DEVICE model shelly1_w_energy_measuring_washer_example
 setreading DEVICE attrTemplateVersion 20200609
 
 
@@ -1794,7 +1794,7 @@ par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}';; my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
-set DEVICE attrTemplate shelly1_w_energy_meassuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
+set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
 set DEVICE attrTemplate shelly1
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
 attr DEVICE stateFormat { my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $state,\nP1: $cons1 W / Total P1: $total1 kWh\nP2: $cons2 W / Total P2: $total2 kWh\nP3: $cons3 W / Total P3: $total3 kWh) }
@@ -1988,7 +1988,7 @@ desc:shelly2.5 using original firmware. <br>NOTE: a second device will be create
 order:A_11a1
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
-set DEVICE attrTemplate shelly1_w_energy_meassuring \CALLSPEECHRECOGN=0
+set DEVICE attrTemplate shelly1_w_energy_measuring \CALLSPEECHRECOGN=0
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/relay/1:.* relay1\
