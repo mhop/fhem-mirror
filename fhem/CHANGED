@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 60_Watches: attr timeAsReading -> write displayed time to reading 
+                        currtime
  - feature: 48_BlinkCamera: Support for new API on login / new V3 as default
  - bugfix:  93_DbRep: crash if delEntries is startet without any 
                       time limits, Forum:#113202
