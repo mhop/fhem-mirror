@@ -203,8 +203,6 @@ sub I2C_HDC1008_GetTemp ($$)
 	
 	
 	$temperature = sprintf( '%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',	$temperature );
-
-	readingsSingleUpdate($hash, "temperature", $temperature, 0);
 }
 
 sub I2C_HDC1008_GetHum ($$) 
