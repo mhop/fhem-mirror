@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.3" => "01.08.2020  verbose 5 log in _setadoptForTimer sub ",
   "2.14.2" => "29.07.2020  fix: adoptTime accept not only integer values ",
   "2.14.1" => "28.07.2020  switching time increases with each adoptForTimer command ",
   "2.14.0" => "27.07.2020  new commands adoptForTimer and control command adoptTime ",
@@ -442,13 +443,12 @@ sub _setadoptForTimer {                 ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  my $odev  = $paref->{odev};                                                        # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
+  my $odev  = $paref->{odev};                                                            # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
   
   my $atime = ReadingsVal($name, "adoptTimer", 10);
 
-  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
-
   if ($init_done != 1) {
+      RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
       InternalTimer(gettimeofday()+3, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
 	  return;
   }
@@ -473,6 +473,8 @@ sub _setadoptForTimer {                 ## no critic "not used"
       $paref->{aref} = \@a;
   }
   
+  Log3($name, 5, "$name - Call Fn => $hset{adopt}{fn}, odev => ".($odev // "")." , sdev => ".($sdev // "")." ,Helper SWITCHED => ".($hash->{HELPER}{SWITCHED} // "").", switch time => $atime");
+  
   no strict "refs";                                                                  ## no critic 'NoStrict'  
   &{$hset{adopt}{fn}} ($paref); 
   use strict "refs";
@@ -484,6 +486,7 @@ sub _setadoptForTimer {                 ## no critic "not used"
   
   Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
   
+  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
   InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
   
 return;
