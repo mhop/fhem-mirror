@@ -318,6 +318,7 @@ FHEM/66_ECMD.pm              neubert              Sonstige Systeme
 FHEM/66_EseraAnalogInIout.pm pizmus               1Wire
 FHEM/66_EseraCount.pm        pizmus               1Wire
 FHEM/66_EseraDigitalInOut.pm pizmus               1Wire
+FHEM/66_EseraDimmer.pm       pizmus               1Wire
 FHEM/66_EseraIButton.pm      pizmus               1Wire
 FHEM/66_EseraMulti.pm        pizmus               1Wire
 FHEM/66_EseraOneWire.pm      pizmus               1Wire

@@ -125,7 +125,7 @@ EseraOneWire_Define($$)
   $hash->{DeviceName} = $dev;
 
   $hash->{KAL_PERIOD} = 60;
-  $hash->{RECOMMENDED_FW} = 12027;
+  $hash->{RECOMMENDED_FW} = 12029;
   $hash->{DEFAULT_POLLTIME} = 5;
   $hash->{DEFAULT_DATATIME} = 10;
 
@@ -2087,7 +2087,7 @@ EseraOneWire_processKalMessage($)
   supports serial connections as well, for controllers with serial/USB <br>
   interface. It is tested with EseraStation 200.<br>
   <br>
-  Tested with Esera controller firmware version 12027.<br>
+  Tested with Esera controller firmware version 12029.<br>
   <br>
   <a name="EseraOneWire_Define"></a>
   <b>Define</b>
