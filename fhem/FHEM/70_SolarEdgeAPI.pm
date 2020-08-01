@@ -156,12 +156,14 @@ eval "use JSON;1" or $solarEdgeAPI_missingModul .= "JSON ";
 #
 # 2.1.0     generate daily readings at ~23:59 instead of 22:00
 #
+# 2.2.0     allow smaller values for attributes intervalAtDayTime and intervalAtNightTime   
+#
 ###############################################################################
 
 sub SolarEdgeAPI_SetVersion($)
 {
   my ($hash) = @_;
-  $hash->{VERSION} = "2.1.0";
+  $hash->{VERSION} = "2.2.0";
 }
 
 ###############################################################################
@@ -349,7 +351,7 @@ sub SolarEdgeAPI_Attr(@)
   {
     if ($cmd eq "set")
     {
-      if (($attrVal eq "auto") || ($attrVal >= 120))
+      if (($attrVal eq "auto") || ($attrVal >= 1))
       {
         InternalTimer(gettimeofday() + 5, 'SolarEdgeAPI_RestartHttpRequestTimers', $hash);
         Log3 $name, 3, "SolarEdgeAPI ($name) - attribute intervalAtDayTime set to $attrVal";
@@ -372,7 +374,7 @@ sub SolarEdgeAPI_Attr(@)
   {
     if ($cmd eq "set")
     {
-      if (($attrVal < 120) or ($attrVal > 3600))
+      if (($attrVal < 1) or ($attrVal > 3600))
       {
         my $message = "intervalAtNightTime is out of range";
         Log3 $name, 3, "SolarEdgeAPI ($name) - ".$message;
