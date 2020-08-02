@@ -3514,7 +3514,7 @@ FW_log($$)
     h=>$c->{PEER},
     l=>"-",
     u=>$c->{AuthenticatedUser} ? $c->{AuthenticatedUser} : "-",
-    t=>strftime("%d/%b/%Y:%H:%M:%S %z",@t),
+    t=>"[".strftime("%d/%b/%Y:%H:%M:%S %z",@t)."]",
     r=>$arg,
     ">s"=>$rc,
     b=>$length
