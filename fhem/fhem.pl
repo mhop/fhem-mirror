@@ -5418,7 +5418,7 @@ notifyRegexpCheck($)
       "$_: device $1 (OK)";
     } else {
       my @ds = devspec2array($1);
-      if(@ds > 1 || $ds[0] != $1) {
+      if($ds[0] ne $1) {
         "$_: devspec ".join(",",@ds)." (OK)";
       } else {
         "$_: unknown (ignored)";
