@@ -44,6 +44,7 @@ sequence_Define($$)
     if(int(@def) % 2 == 0 || int(@def) < 3);
 
   # "Syntax" checking
+  my @reList;
   for(my $i = 0; $i < int(@def); $i += 2) {
     my $re = $def[$i];
     my $to = $def[$i+1];
@@ -51,6 +52,7 @@ sequence_Define($$)
     return "Bad regexp 1: $@" if($@);
     return "Bad timeout spec $to"       # timeout or delay:timeout
       if (defined($to) && $to !~ m/^(\d+(\.\d+)?:)?\d+(\.\d+)?$/);
+    push @reList,$re;
   }
 
   $hash->{RE} = $def[0];
@@ -58,7 +60,7 @@ sequence_Define($$)
   $hash->{MAX} = int(@def);
   $hash->{STATE} = "active";
   $hash->{TS} = 0;
-  notifyRegexpChanged($hash, $hash->{RE});
+  notifyRegexpChanged($hash, join("|",@reList));
   return undef;
 }
 
