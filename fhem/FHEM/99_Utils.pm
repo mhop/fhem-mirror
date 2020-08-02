@@ -282,8 +282,10 @@ Svn_GetFile($$;$)
       print FH $_[2];
       close(FH);
       Log 1, "SVN download of $from to $to finished";
-      &$finishFn if($finishFn);
-      Log 1, $@ if($@);
+      if($finishFn) {
+        eval { &$finishFn; };
+        Log 1, $@ if($@);
+      }
     }});
   return "Download started, check the FHEM-log";
 }
