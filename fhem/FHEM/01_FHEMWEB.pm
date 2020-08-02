@@ -3947,8 +3947,8 @@ FW_log($$)
     <a name="logDevice"></a>
     <li>logDevice fileLogName<br>
        Name of the FileLog instance, which is used to log each FHEMWEB access.
-       To avoid writing wrong lines to this file, the regexp should be set to
-       <WebName>:Log
+       To avoid writing wrong lines to this file, the FileLog regexp should be
+       set to &lt;WebName&gt;:Log
        </li><br>
 
     <a name="logFormat"></a>
@@ -4706,7 +4706,7 @@ FW_log($$)
     <li>logDevice fileLogName<br>
        Name einer FileLog Instanz, um Zugriffe zu protokollieren.
        Um das Protokollieren falscher Eintr&auml;ge zu vermeiden, sollte das
-       FileLog Regexp der Form <WebName>:Log sein.
+       FileLog Regexp der Form &lt;WebName&gt;:Log sein.
        </li><br>
 
     <a name="logFormat"></a>
