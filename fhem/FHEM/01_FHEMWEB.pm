@@ -181,6 +181,8 @@ FHEMWEB_Initialize($)
     iconPath
     longpoll:0,1,websocket
     longpollSVG:1,0
+    logDevice
+    logFormat
     menuEntries
     mainInputLength
     nameDisplay
@@ -622,6 +624,7 @@ FW_finishRead($$$)
   my $expires = ($cacheable ?
          "Expires: ".FmtDateTimeRFC1123($hash->{LASTACCESS}+900)."\r\n" : 
          "Cache-Control: no-cache, no-store, must-revalidate\r\n");
+  FW_log($arg, $length) if(AttrVal($FW_wname, "logDevice", undef));
   Log3 $FW_wname, 4,
         "$FW_wname: $arg / RL:$length / $FW_RETTYPE / $compressed / $expires";
   if( ! FW_addToWritebuffer($hash,
@@ -3495,6 +3498,36 @@ FW_show($$)
   return undef;
 }
 
+sub
+FW_log($$)
+{
+  my ($arg, $length) = @_;
+
+  my $c = $defs{$FW_cname};
+  my $fmt = AttrVal($FW_wname, "logFormat", '%h %l %u %t "%r" %>s %b');
+  my $rc = $FW_httpRetCode;
+  $rc =~ s/ .*//;
+  $arg = substr($arg,0,5000)."..." if(length($arg) > 5000);
+
+  my @t = localtime;
+  my %cp = (
+    h=>$c->{PEER},
+    l=>"-",
+    u=>$c->{AuthenticatedUser} ? $c->{AuthenticatedUser} : "-",
+    t=>strftime("%d/%b/%Y:%H:%M:%S %z",@t),
+    r=>$arg,
+    ">s"=>$rc,
+    b=>$length
+  );
+
+  $fmt =~ s/%([^" ]*)/defined($cp{$1}) ? $cp{$1} : "%$1"/ge;
+  $fmt =~ s/%{([^" ]*)}/defined($FW_httpheader{$1}) ?$FW_httpheader{$1}:"$1"/ge;
+
+  my $ld = AttrVal($FW_wname, "logDevice", undef);
+  CallFn($ld, "LogFn", $defs{$ld}, $fmt) if($defs{$ld});
+}
+
+
 1;
 
 =pod
@@ -3909,6 +3942,20 @@ FW_show($$)
          attr WEB JavaScripts codemirror/fhem_codemirror.js<br>
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
+       </li><br>
+
+    <a name="logDevice"></a>
+    <li>logDevice fileLogName<br>
+       Name of the FileLog instance, which is used to log each FHEMWEB access.
+       To avoid writing wrong lines to this file, the regexp should be set to
+       <WebName>:Log
+       </li><br>
+
+    <a name="logFormat"></a>
+    <li>logFormat ...<br>
+        Default is the Apache common Format (%h %l %u %t "%r" %>s %b).
+        Currently only these "short" place holders are replaced. Additionally,
+        each HTTP Header X can be accessed via %{X}.
        </li><br>
 
     <a name="longpoll"></a>
@@ -4654,6 +4701,21 @@ FW_show($$)
          attr WEB codemirrorParam { "theme":"blackboard", "lineNumbers":true }
        </code></ul>
        </li><br>
+
+    <a name="logDevice"></a>
+    <li>logDevice fileLogName<br>
+       Name einer FileLog Instanz, um Zugriffe zu protokollieren.
+       Um das Protokollieren falscher Eintr&auml;ge zu vermeiden, sollte das
+       FileLog Regexp der Form <WebName>:Log sein.
+       </li><br>
+
+    <a name="logFormat"></a>
+    <li>logFormat ...<br>
+        Voreinstellung ist das Apache common Format (%h %l %u %t "%r" %>s %b).
+        Z.Zt. werden nur diese "kurzen" Platzhalter ersetzt, weiterhin kann man
+        mit %{X} den HTTP-Header-Eintrag X spezifizieren.
+       </li><br>
+
 
     <a name="longpoll"></a>
     <li>longpoll [0|1|websocket]<br>

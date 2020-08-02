@@ -38,6 +38,7 @@ FileLog_Initialize($)
   #$hash->{DeleteFn} = "FileLog_Delete";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
+  $hash->{LogFn}    = "FileLog_DirectLog";
   # logtype is used by the frontend
   no warnings 'qw';
   my @attrList = qw(
@@ -252,6 +253,25 @@ FileLog_Switch($)
   return 0;
 }
 
+sub
+FileLog_LogTailWork($$$$)
+{
+  my ($log, $ln, $tn, $written) = @_;
+  my $fh = $log->{FH};
+  if($fh) {
+    $fh->flush;
+    # Skip sync, it costs too much HD strain, esp. on SSD
+    # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
+  }
+  my $owr = ReadingsVal($ln, "linesInTheFile", 0);
+  my $eot = AttrVal($ln, "eventOnThreshold", 0);
+  if($eot && ($owr+$written) % $eot == 0) {
+    readingsSingleUpdate($log, "linesInTheFile", $owr+$written, 1);
+  } else {
+    setReadingsVal($log, "linesInTheFile", $owr+$written, $tn);
+  }
+}
+
 #####################################
 sub
 FileLog_Log($$)
@@ -322,21 +342,19 @@ FileLog_Log($$)
     }
   }
   return "" if(!$written);
-
-  if($fh) {
-    $fh->flush;
-    # Skip sync, it costs too much HD strain, esp. on SSD
-    # $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
-  }
-  my $owr = ReadingsVal($ln, "linesInTheFile", 0);
-  my $eot = AttrVal($ln, "eventOnThreshold", 0);
-  if($eot && ($owr+$written) % $eot == 0) {
-    readingsSingleUpdate($log, "linesInTheFile", $owr+$written, 1);
-  } else {
-    setReadingsVal($log, "linesInTheFile", $owr+$written, $tn);
-  }
-
+  FileLog_LogTailWork($log, $ln, $tn, $written);
   return "";
+}
+
+#####################################
+sub
+FileLog_DirectLog($$)
+{
+  my ($log, $txt) = @_;
+  FileLog_Switch($log);
+  my $fh = $log->{FH};
+  print $fh $txt,"\n";
+  FileLog_LogTailWork($log, $log->{NAME}, TimeNow(), 1);
 }
 
 ###################################
