@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  48_BlinkCamera: Active/Enabled handling to new format
  - bugfix:  52_I2C_HDC1008: "temperature" reading now works correctly with
                             event-min-interval
  - bugfix:  48_BlinkCamera: Corrected handling of prefered network attribute

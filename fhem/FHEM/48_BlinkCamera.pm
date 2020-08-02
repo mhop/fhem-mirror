@@ -57,10 +57,11 @@
 #   FIX: FUUID in undef corrected
 #   New default 1 for homescreenv3 - old apis deactivated
 #   Disclaimer for API changes
-
 #   Corrected handling of prefered network attribute
 
-# 
+#   Adapt active handling to new format
+#   Add new reading Enabled per camera with doc - showing enabled value
+
 # 
 # 
 # 
@@ -1458,13 +1459,14 @@ sub BlinkCamera_ParseHomescreen($$$)
     foreach my $device ( @$camList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-#        $active = "armed" if ( $device->{enabled} eq "true" );
-        $active = "armed" if ( $device->{enabled} );
+        $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled} );
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
         $readUpdates->{"networkCamera".$device->{id}."Type"} = "camera";
         $readUpdates->{"networkCamera".$device->{id}."Active"} = $active;
+        $readUpdates->{"networkCamera".$device->{id}."Enabled"} = defined($device->{enabled})?$device->{enabled}:"undef";
         $cameraGets .= $device->{name}.",".$device->{id}.",";
         $cameras .= $device->{id}.":".$device->{name}."\n";
         
@@ -1505,13 +1507,14 @@ sub BlinkCamera_ParseHomescreen($$$)
     foreach my $device ( @$owlList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-#        $active = "armed" if ( $device->{enabled} eq "true" );
-        $active = "armed" if ( $device->{enabled}  );
+        $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled}  );
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
         $readUpdates->{"networkCamera".$device->{id}."Type"} = "owl";
         $readUpdates->{"networkCamera".$device->{id}."Active"} = $active;
+        $readUpdates->{"networkCamera".$device->{id}."Enabled"} = defined($device->{enabled})?$device->{enabled}:"undef";
         $cameraGets .= $device->{name}.",".$device->{id}.",";
         $cameras .= $device->{id}.":".$device->{name}."\n";
         
@@ -2734,7 +2737,8 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
     <br>
     
     <li><code>networkCamera... </code><br>Set of readings specific for each camera (identified by the cameraID in the reading name). Providing status and name of the camera / most recent thumbnail / url for the thumbnail to the proxy </li> 
-    
+    <li><code>networkCamera<cameraid>Enabled</code><br>Shows the enabled (active) status of the camera (known values: 0 / 1 / "undef" - last value will be given if this value is not contained in the camerainfo </li> 
+
     
   </ul> 
 
