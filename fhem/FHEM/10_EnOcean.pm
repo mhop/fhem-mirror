@@ -478,6 +478,9 @@ my %EnO_extendedRemoteFunctionCode = (
 my %EnO_models = (
   "Eltako_FAE14" => {attr => {manufID => "00D"}},
   "Eltako_FAH60" => {attr => {manufID => "00D"}},
+  "Eltako_FBH55SB" => {attr => {manufID => "00D"}},
+  "Eltako_FBH65SB" => {attr => {manufID => "00D"}},
+  "Eltako_FBHF65SB" => {attr => {manufID => "00D"}},
   "Eltako_FHK14" => {attr => {manufID => "00D"}},
   "Eltako_FHK61" => {attr => {manufID => "00D"}},
   "Eltako_FSA12" => {attr => {manufID => "00D"}},
@@ -768,7 +771,7 @@ EnOcean_Initialize($)
                       "calAtEndpoints:no,yes comMode:confirm,biDir,uniDir creator:autocreate,manual " .
                       "daylightSavingTime:supported,not_supported dataEnc:VAES,AES-CBC " .
                       "defaultChannel:" . join(",", @EnO_defaultChannel) . " " .
-                      "demandRespAction demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
+                      "demandRespAction:textField-long demandRespRefDev demandRespMax:A0,AI,B0,BI,C0,CI,D0,DI ".
                       "demandRespMin:A0,AI,B0,BI,C0,CI,D0,DI demandRespRandomTime " .
                       "demandRespThreshold:slider,0,1,15 demandRespTimeoutLevel:max,last destinationID " .
                       "devChannel devMode:master,slave devUpdate:off,auto,demand,polling,interrupt " .
@@ -779,12 +782,12 @@ EnOcean_Initialize($)
                       "keyRcv keySnd macAlgo:no,3,4 measurementCtrl:disable,enable measurementTypeSelect:feed,room " .
                       "manufID:" . join(",", sort keys %EnO_manuf) . " " .
                       "model:" . join(",", sort keys %EnO_models) . " " .
-                      "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction observeInterval observeLogic:and,or " .
+                      "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction:textField-long observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
                       "observeRefDev pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
                       "pidActorLimitLower pidActorLimitUpper pidActorTreshold pidCtrl:on,off pidDeltaTreshold pidFactor_D pidFactor_I " .
                       "pidFactor_P pidIPortionCallBeforeSetting pidSensorTimeout " .
-                      "pollInterval postmasterID productID rampTime rcvRespAction ".
+                      "pollInterval postmasterID productID rampTime rcvRespAction:textField-long ".
                       "releasedChannel:A,B,C,D,I,0,auto repeatingAllowed:yes,no remoteCode remoteEEP remoteID remoteManufID " .
                       "remoteManagement:client,manager,off rlcAlgo:no,2++,3++,4++ rlcRcv rlcSnd rlcTX:true,false " .
                       "reposition:directly,opens,closes rltRepeat:16,32,64,128,256 rltType:1BS,4BS " .
@@ -9856,14 +9859,15 @@ sub EnOcean_Parse($$)
         # Light, Temperatur and Occupancy Sensor (EEP A5-08-01)
         # [Eltako FABH63, FBH55, FBH63, FIBH63, TF-BHSB]
         if ($manufID eq "00D") {
-          if ( $model eq 'Eltako_TF') {
+          if ($model eq 'Eltako_TF') {
+            $lux = sprintf "%d", $db[2] * 2048 / 255;
+          } elsif ($model =~ m/^Eltako_FB.*SB$/) {
             $lux = $db[2] << 1;
-            push @event, "3:state:M: $motion E: $lux U: $voltage";
-            push @event, "3:voltage:$voltage";
           } else {
             $lux = sprintf "%d", $db[2] * 2048 / 255;
-            push @event, "3:state:M: $motion E: $lux";
           }
+          push @event, "3:state:M: $motion E: $lux U: $voltage";
+          push @event, "3:voltage:$voltage";
         } else {
           $lux = $db[2] << 1;
           $temp = sprintf "%0.1f", $db[1] * 0.2;
@@ -11091,7 +11095,7 @@ sub EnOcean_Parse($$)
 
     } elsif ($st eq "actuator.01") {
       # Electronic switches and dimmers with Energy Measurement and Local Control
-      # (D2-01-00 - D2-01-12)
+      # (D2-01-00 - D2-01-14)
       my $channel = (hex substr($data, 2, 2)) & 0x1F;
       if ($channel == 31) {$channel = "Input";}
       my $cmd = hex substr($data, 1, 1);
@@ -19135,8 +19139,8 @@ EnOcean_Delete($$)
     </li>
     <br><br>
 
-    <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-12)<br>
-        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx, NodOn in-wall module, smart plug]<br>
+    <li>Electronic switches and dimmers with Energy Measurement and Local Control (D2-01-00 - D2-01-14)<br>
+        [Telefunken Funktionsstecker, PEHA Easyclick, AWAG Elektrotechnik AG Omnio UPS 230/xx,UPD 230/xx, REGS12/08M, NodOn in-wall module, smart plug]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20904,7 +20908,7 @@ EnOcean_Delete($$)
      <br><br>
 
      <li>Light, Temperatur and Occupancy Sensor (EEP A5-08-01 ... A5-08-03)<br>
-         [Eltako FABH63, FBH55, FBH63, FIBH63, Thermokon SR-MDS, PEHA 482 FU-BM DE]<br>
+         [Eltako FABH63, FBx5B, FBH55, FBH63, FBH65x, FBHF65SB, FIBH63, Thermokon SR-MDS, PEHA 482 FU-BM DE]<br>
      <ul>
        <li>M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 510, 1020, 1530 or 2048 lx)</li>
@@ -20917,7 +20921,7 @@ EnOcean_Delete($$)
         Eltako and PEHA devices only support Brightness and Motion.<br>
         The attr subType must be lightTempOccupSensor.<01|02|03> and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
-        created by autocreate. Set model to Eltako_TF manually for Eltako TF Devices.
+        created by autocreate. Set model to Eltako_TF manually for Eltako TF devices or to FBH55SB, FBH65SB, FBHF65SB.
      </li>
      <br><br>
 
