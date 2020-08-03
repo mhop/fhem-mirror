@@ -375,7 +375,7 @@ my %EnO_eepConfig = (
   "D2.01.09" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "on:off:dim"}, GPLOT => "EnO_dim4:Dim,EnO_power4energy4:Power/Energie,"},
   "D2.01.0A" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.0B" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
-  "D2.01.0C" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
+  "D2.01.0C" => {attr => {subType => "actuator.01", defaultChannel => 0, webCmd => "roomCtrlMode"}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.0D" => {attr => {subType => "actuator.01", defaultChannel => 0}},
   "D2.01.0E" => {attr => {subType => "actuator.01", defaultChannel => 0}, GPLOT => "EnO_power4energy4:Power/Energie,"},
   "D2.01.0F" => {attr => {subType => "actuator.01", defaultChannel => 0}},
@@ -11099,7 +11099,6 @@ sub EnOcean_Parse($$)
       my $channel = (hex substr($data, 2, 2)) & 0x1F;
       if ($channel == 31) {$channel = "Input";}
       my $cmd = hex substr($data, 1, 1);
-
       if ($cmd == 4) {
         # actuator status response
         my $overCurrentOff;
@@ -11182,7 +11181,9 @@ sub EnOcean_Parse($$)
           4 => "comfort-1",
           5 => "comfort-2"
         );
-        push @event, "3:roomCtrlMode" . $roomCtrlMode{$roomCtrlMode} if (exists $roomCtrlMode{$roomCtrlMode});
+        $roomCtrlMode = $roomCtrlMode{$roomCtrlMode} if (exists $roomCtrlMode{$roomCtrlMode});
+        push @event, "3:roomCtrlMode:" . $roomCtrlMode;
+        push @event, "3:state:" . $roomCtrlMode;
 
       } elsif ($cmd == 13) {
         # external interface settings
