@@ -552,7 +552,7 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_setAssotiat($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  
+
   my ($hm) = devspec2array("TYPE=HMinfo");
   HMinfo_GetFn($defs{$hm},$hm,"configCheck") if(defined $hm && !$modules{CUL_HM}{helper}{hmManualOper});
 
@@ -7243,13 +7243,12 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   my (undef,$mNo,$mFlg,$mTp,$src,$dst,$chn,$sTp,$dat) = 
         unpack 'A4A2A2A2A6A6A2A2A*',$cmd;
   $mFlg = hex($mFlg);
-
   if (($mFlg & 0x20) && ($dst ne '000000')){#msg wants ack
     my $rss = $hash->{helper}{prt}{wuReSent}
                        ? $hash->{helper}{prt}{wuReSent}
                        :1;#resend counter start value - may need preloaded for WU device
 
-    if   ($mTp eq '01' && $sTp)        {
+    if   ($mTp =~ m/^(01|3E)$/ && $sTp)        {
       if   ($sTp eq "03"){ #PeerList-----------
         #--- remember request params in device level
         CUL_HM_respWaitSu ($hash,"Pending:=PeerList"
@@ -7814,8 +7813,10 @@ sub CUL_HM_eventP($$) {#handle protocol events
   my ($hash, $evntType) = @_;
   return if (!defined $hash);
   if ($evntType eq "Rcv"){
-    $hash->{"protLastRcv"} = TimeNow();
-    CUL_HM_UpdtReadSingle($hash,".protLastRcv",$hash->{"protLastRcv"},0);
+    my $t = TimeNow();
+    $hash->{"protLastRcv"} = $t;
+    $t =~ s/[\:\-\ ]//g;
+    CUL_HM_UpdtReadSingle($hash,".protLastRcv",$t,0);
 #    return;
   }
   my $evnt = $hash->{"prot".$evntType} ? $hash->{"prot".$evntType} : "0";
@@ -9457,6 +9458,12 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $attr{$devName}{actStatus}=""; # force trigger
   my $actHash = CUL_HM_ActGetCreateHash();
   $actHash->{helper}{$devId}{start} = TimeNow();
+  $actHash->{helper}{$devId}{start} =~ s/[\:\-\ ]//g;
+  
+  if(defined $devHash->{READINGS}{".protLastRcv"}){
+      $devHash->{READINGS}{".protLastRcv"}{VAL} =~ s/[\:\-\ ]//g;
+  }
+  
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
@@ -9464,7 +9471,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
       .$cycleString." time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
-  CUL_HM_ActCheck("add");
+  CUL_HM_ActCheck("add") if ($init_done);
   return;
 }
 sub CUL_HM_ActDel($) {# delete HMid for activity supervision
@@ -9515,12 +9522,11 @@ sub CUL_HM_ActCheck($) {# perform supervision
     else{
       my $tLast = ReadingsVal($devName,".protLastRcv",0);
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
-      my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+      my $tSince = sprintf("%04d%02d%02d%02d%02d%02d",
                              $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
-
       if (!$tLast                  #cannot determine time
           || $tSince gt $tLast){   #no message received in window
-        if ($actHash->{helper}{$devId}{start} lt $tSince){  
+        if ($actHash->{helper}{$devId}{start} < $tSince){  
           if($autoTry) { #try to send a statusRequest?
             my $try = $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0;
             $actHash->{helper}{$devId}{try} = $try + 1;
