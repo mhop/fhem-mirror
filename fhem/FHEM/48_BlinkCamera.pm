@@ -58,11 +58,10 @@
 #   New default 1 for homescreenv3 - old apis deactivated
 #   Disclaimer for API changes
 #   Corrected handling of prefered network attribute
-
 #   Adapt active handling to new format
 #   Add new reading Enabled per camera with doc - showing enabled value
 
-# 
+#   Correction for JSON values - true/false 1/0
 # 
 # 
 # 
@@ -1459,8 +1458,11 @@ sub BlinkCamera_ParseHomescreen($$$)
     foreach my $device ( @$camList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-        $active = "armed" if ( $device->{enabled} eq "true" );
+        if ( defined( $device->{enabled} ) ) {
+          $active = "armed" if ( $device->{enabled} == 1 );
+          $active = "armed" if ( $device->{enabled} eq "true" );
 #        $active = "armed" if ( $device->{enabled} );
+        }
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
@@ -1507,8 +1509,11 @@ sub BlinkCamera_ParseHomescreen($$$)
     foreach my $device ( @$owlList ) {
       if ( $device->{network_id} eq $network ) {
         my $active = "disabled";
-        $active = "armed" if ( $device->{enabled} eq "true" );
-#        $active = "armed" if ( $device->{enabled}  );
+        if ( defined( $device->{enabled} ) ) {
+          $active = "armed" if ( $device->{enabled} == 1 );
+          $active = "armed" if ( $device->{enabled} eq "true" );
+#        $active = "armed" if ( $device->{enabled} );
+        }
         
         $readUpdates->{"networkCamera".$device->{id}} = $device->{name}.":".$active;
         $readUpdates->{"networkCamera".$device->{id}."Name"} = $device->{name};
