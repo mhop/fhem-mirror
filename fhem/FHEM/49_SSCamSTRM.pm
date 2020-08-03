@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.4" => "03.08.2020  fix check of ARG in RemoveInternalTimer in _setadoptForTimer sub (sometimes no switch back done) ",             
   "2.14.3" => "01.08.2020  verbose 5 log in _setadoptForTimer sub ",
   "2.14.2" => "29.07.2020  fix: adoptTime accept not only integer values ",
   "2.14.1" => "28.07.2020  switching time increases with each adoptForTimer command ",
@@ -443,19 +444,12 @@ sub _setadoptForTimer {                 ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  my $odev  = $paref->{odev};                                                            # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
-  
-  my $atime = ReadingsVal($name, "adoptTimer", 10);
+  my $odev  = $paref->{odev};                                                        # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
 
-  if ($init_done != 1) {
-      RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
-      InternalTimer(gettimeofday()+3, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
-	  return;
-  }
-
-  return if(IsDisabled($name));
+  return if(IsDisabled($name) || $init_done != 1);
   
   my $sdev;
+  my $atime = ReadingsVal($name, "adoptTimer", 10);
   
   if(!$odev) {                                                                       # Step 1 -> erster Durchlauf ohne odef
       $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME} if(!$hash->{HELPER}{SWITCHED});
@@ -472,12 +466,12 @@ sub _setadoptForTimer {                 ## no critic "not used"
       
       $paref->{aref} = \@a;
   }
-  
-  Log3($name, 5, "$name - Call Fn => $hset{adopt}{fn}, odev => ".($odev // "")." , sdev => ".($sdev // "")." ,Helper SWITCHED => ".($hash->{HELPER}{SWITCHED} // "").", switch time => $atime");
-  
+    
   no strict "refs";                                                                  ## no critic 'NoStrict'  
   &{$hset{adopt}{fn}} ($paref); 
   use strict "refs";
+  
+  Log3($name, 5, "$name - new => $hash->{LINKNAME}, odev => ".($odev // "")." , sdev => ".($sdev // "")." ,Helper SWITCHED => ".($hash->{HELPER}{SWITCHED} // "").", switch time => $atime");
   
   if($odev) {
       Log3($name, 4, qq{$name - Switched Stream Device back to "$sdev"});
@@ -486,7 +480,8 @@ sub _setadoptForTimer {                 ## no critic "not used"
   
   Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
   
-  RemoveInternalTimer("", "FHEM::SSCamSTRM::_setadoptForTimer");                     # $paref nicht checken ! da immer unikat
+  RemoveInternalTimer($hash->{HELPER}{ARG}, "FHEM::SSCamSTRM::_setadoptForTimer");                   
+  $hash->{HELPER}{ARG} = $paref;                                                           # $paref ist Unikat !
   InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
   
 return;
