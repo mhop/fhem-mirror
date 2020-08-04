@@ -1652,6 +1652,7 @@ set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE attrTemplateVersion 20200804
+{ AttrTemplate_Initialize() }
 
 
 name:tasmota_zigbee2tasmota_light_dimmer
