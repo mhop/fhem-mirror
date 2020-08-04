@@ -73,6 +73,18 @@ sub WeekdayTimer_Define {
   $hash->{DEVICE}          = $device;
   my $language = WeekdayTimer_Language  ($hash, \@arr);
 
+  my $idx = 0;
+  
+  $hash->{'.dayNumber'}    = {map {$_ => $idx++}     @{$hash->{'.shortDays'}{$language}}};
+  $hash->{helper}{daysRegExp}        = '(' . join ("|",        @{$hash->{'.shortDays'}{$language}}) . ")";
+  $hash->{helper}{daysRegExpMessage} = $hash->{helper}{daysRegExp};
+
+  $hash->{helper}{daysRegExp}   =~ s{\$}{\\\$}gxms;
+  $hash->{helper}{daysRegExp}   =~ s{\!}{\\\!}gxms;
+
+  $hash->{CONDITION}  = ""; 
+  $hash->{COMMAND}    = "";
+
   addToDevAttrList($name, "weekprofile") if $def =~ m{weekprofile}xms;
   
   return InternalTimer(time(), "WeekdayTimer_Start",$hash,0);
@@ -103,17 +115,6 @@ sub WeekdayTimer_Start {
 
   my $language = WeekdayTimer_Language  ($hash, \@arr);
   
-  $hash->{CONDITION}  = ""; 
-  $hash->{COMMAND}    = "";
-
-  my $idx = 0;
-  $hash->{'.dayNumber'}    = {map {$_ => $idx++}     @{$hash->{'.shortDays'}{$language}}};
-  $hash->{helper}{daysRegExp}        = '(' . join ("|",        @{$hash->{'.shortDays'}{$language}}) . ")";
-  $hash->{helper}{daysRegExpMessage} = $hash->{helper}{daysRegExp};
-
-  $hash->{helper}{daysRegExp}   =~ s{\$}{\\\$}gxms;
-  $hash->{helper}{daysRegExp}   =~ s{\!}{\\\!}gxms;
-
   WeekdayTimer_GlobalDaylistSpec ($hash, \@arr);
 
   my @switchingtimes       = WeekdayTimer_gatherSwitchingTimes ($hash, \@arr);
