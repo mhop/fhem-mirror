@@ -332,6 +332,7 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'breathing_event_probability' => { name => "Breathing Event Probability", reading => "breathingEventProbability", unit => 0, },
                         'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
+                        'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },                        
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
 
                         # 'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
