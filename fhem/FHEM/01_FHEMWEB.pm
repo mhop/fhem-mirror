@@ -3520,7 +3520,7 @@ FW_log($$)
     b=>$length
   );
 
-  $fmt =~ s/%\{([^" ]*)\}/
+  $fmt =~ s/%\{([^" ]*)\}i/
         defined($FW_httpheader{$1}) ? $FW_httpheader{$1} : "-" /gex;
   $fmt =~ s/%([^" ]*)/defined($cp{$1}) ? $cp{$1} : "-"/ge;
 
@@ -3956,7 +3956,7 @@ FW_log($$)
     <li>logFormat ...<br>
         Default is the Apache common Format (%h %l %u %t "%r" %>s %b).
         Currently only these "short" place holders are replaced. Additionally,
-        each HTTP Header X can be accessed via %{X}.
+        each HTTP Header X can be accessed via %{X}i.
        </li><br>
 
     <a name="longpoll"></a>
