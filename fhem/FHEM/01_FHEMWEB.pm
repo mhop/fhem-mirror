@@ -3520,9 +3520,9 @@ FW_log($$)
     b=>$length
   );
 
-  $fmt =~ s/%([^" ]*)/defined($cp{$1}) ? $cp{$1} : "%$1"/ge;
   $fmt =~ s/%\{([^" ]*)\}/
-        defined($FW_httpheader{$1}) ? $FW_httpheader{$1} : "%{$1}" /gex;
+        defined($FW_httpheader{$1}) ? $FW_httpheader{$1} : "-" /gex;
+  $fmt =~ s/%([^" ]*)/defined($cp{$1}) ? $cp{$1} : "-"/ge;
 
   my $ld = AttrVal($FW_wname, "logDevice", undef);
   CallFn($ld, "LogFn", $defs{$ld}, $fmt) if($defs{$ld});

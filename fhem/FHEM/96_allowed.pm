@@ -191,7 +191,7 @@ allowed_Authenticate($$$$)
 
     return &$doReturn(1, 1) if($pwok);
 
-    my $msg = AttrVal($aName, "basicAuthMsg", "FHEM: login required");
+    my $msg = AttrVal($aName, "basicAuthMsg", "Login required");
     $cl->{".httpAuthHeader"} = "HTTP/1.1 401 Authorization Required\r\n".
                                "WWW-Authenticate: Basic realm=\"$msg\"\r\n";
     return &$doReturn(2, $secret);
