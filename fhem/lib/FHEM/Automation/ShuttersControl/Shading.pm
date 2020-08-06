@@ -513,6 +513,7 @@ sub ShadingProcessing {
 sub ShadingProcessingDriveCommand {
     my $hash        = shift;
     my $shuttersDev = shift;
+    my $marker      = shift // 0;
 
     my $name = $hash->{NAME};
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);
@@ -527,7 +528,11 @@ sub ShadingProcessingDriveCommand {
     if (   IsInTime($FHEM::Automation::ShuttersControl::shutters->getShadingBetweenTheTime)
         && $FHEM::Automation::ShuttersControl::shutters->getShadingStatus eq 'in'
         && $getShadingPos != $getStatus
-        && $getStatus != $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+        && ( $getStatus != $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+          || ( $getStatus == $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+            && $marker
+            )
+          )
         && (
             FHEM::Automation::ShuttersControl::CheckIfShuttersWindowRecOpen(
                 $shuttersDev) != 2
