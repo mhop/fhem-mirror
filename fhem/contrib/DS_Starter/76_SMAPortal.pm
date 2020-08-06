@@ -3869,7 +3869,7 @@ return;
    <br>
      <ul>
      <a name="createPortalGraphic"></a>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
+     <li><b> createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Creates graphical devices to show the SMA Sunny Portal forecast data in several layouts. 
      The attribute "providerLevel" must contain "forecastData". <br>
      With the <a href="#SMAPortalSPGattr">"attributes of the graphic device"</a> the appearance and coloration of the forecast 
@@ -3879,14 +3879,14 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Set Username / Password used for the login into the SMA Sunny Portal.   
      </ul> 
      <br>
      
      <ul>
      <a name="consumer"></a>
-     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
+     <li><b> &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
      Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
      that means the consumer are controlled by the Sunny Home Manager.    
      </li>      
@@ -3902,7 +3902,7 @@ return;
     
     <ul>
       <a name="data"></a>
-      <li><b> get &lt;name&gt; data </b> <br> 
+      <li><b> data </b> <br> 
       This command fetch the data from the SMA Sunny Portal manually. 
     </ul>
     </li> 
@@ -3910,7 +3910,7 @@ return;
     
     <ul>
       <a name="storedCredentials"></a>
-      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
+      <li><b> storedCredentials </b> <br>  
       The saved credentials are displayed in a popup window.
     </ul>
     </li>
@@ -4136,7 +4136,7 @@ return;
    <br>
      <ul>
      <a name="createPortalGraphic"></a>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
+     <li><b> createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Erstellt Devices zur grafischen Anzeige der SMA Sunny Portal Prognosedaten in verschiedenen Layouts. 
      Das Attribut "providerLevel" muss auf den Level "forecastData" enthalten. <br>
      Mit den <a href="#SMAPortalSPGattr">"Attributen des Grafikdevices"</a> können Erscheinungsbild und 
@@ -4147,7 +4147,7 @@ return;
      
      <ul>
      <a name="credentials"></a> 
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> <br> 
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
      </li>
@@ -4155,7 +4155,7 @@ return;
      
      <ul>
      <a name="Verbrauchername"></a>
-     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
+     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
      Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
      Modul erkannt wurden.
      Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
@@ -4173,7 +4173,7 @@ return;
     <ul>
     
       <a name="data"></a>
-      <li><b> get &lt;name&gt; data </b> <br>  
+      <li><b> data </b> <br>  
       Mit diesem Befehl werden die Daten aus dem SMA Sunny Portal manuell abgerufen. 
     </ul>
     </li>
@@ -4181,7 +4181,7 @@ return;
     
     <ul>
       <a name="storedCredentials"></a>
-      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
+      <li><b> storedCredentials </b> <br>  
       Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
     </ul>
     </li>
