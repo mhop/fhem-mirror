@@ -369,6 +369,25 @@ sub EventProcessingWindowRec {
                 }
             }
             elsif (
+                   !$FHEM::Automation::ShuttersControl::shutters->getIsDay
+                && $FHEM::Automation::ShuttersControl::shutters->getModeDown eq 'roommate'
+                && ( $FHEM::Automation::ShuttersControl::shutters->getRoommatesStatus eq 'home'
+                  || $FHEM::Automation::ShuttersControl::shutters->getRoommatesStatus eq 'awoken' )
+              )
+            {
+                $FHEM::Automation::ShuttersControl::shutters
+                          ->setDriveCmd(
+                            (
+                                $FHEM::Automation::ShuttersControl::shutters
+                                  ->getVentilatePosAfterDayClosed eq 'open'
+                                ? $FHEM::Automation::ShuttersControl::shutters
+                                  ->getOpenPos
+                                : $FHEM::Automation::ShuttersControl::shutters
+                                  ->getLastManPos
+                            )
+                          );
+            }
+            elsif (
                 $FHEM::Automation::ShuttersControl::shutters->getModeDown ne
                 'absent'
                 && $FHEM::Automation::ShuttersControl::shutters->getModeDown ne
@@ -618,7 +637,7 @@ sub EventProcessingRoommate {
                     ->getSelfDefenseState
                   )
                 {
-                    ShadingProcessingDriveCommand( $hash, $shuttersDev );
+                    ShadingProcessingDriveCommand( $hash, $shuttersDev, 1 );
                 }
                 elsif (
                        !$FHEM::Automation::ShuttersControl::shutters->getIsDay
@@ -943,7 +962,7 @@ sub EventProcessingResidents {
                     && $FHEM::Automation::ShuttersControl::shutters
                     ->getRoommatesStatus eq 'none' )
                 {
-                    ShadingProcessingDriveCommand( $hash, $shuttersDev );
+                    ShadingProcessingDriveCommand( $hash, $shuttersDev, 1 );
                 }
                 elsif (
                     $FHEM::Automation::ShuttersControl::shutters
@@ -1079,7 +1098,7 @@ sub EventProcessingResidents {
                 ->getSelfDefenseState
               )
             {
-                ShadingProcessingDriveCommand( $hash, $shuttersDev );
+                ShadingProcessingDriveCommand( $hash, $shuttersDev, 1 );
             }
             elsif (
                 $FHEM::Automation::ShuttersControl::shutters->getShadingMode eq
