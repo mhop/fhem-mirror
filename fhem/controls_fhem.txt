@@ -1,4 +1,4 @@
-REV 22541
+REV 22545
 DIR unused
 UPD 2020-08-05_07:45:03 347631 ./CHANGED
 UPD 2020-08-04_07:45:02 42503 ./MAINTAINER.txt
@@ -36,7 +36,7 @@ UPD 2020-05-06_07:45:02 145097 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2020-06-10_07:45:10 45337 FHEM/00_ZWDongle.pm
-UPD 2020-08-05_07:45:03 164071 FHEM/01_FHEMWEB.pm
+UPD 2020-08-06_07:45:02 164073 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2017-04-23_07:45:02 42910 FHEM/02_FTUISRV.pm
 UPD 2019-09-06_07:45:02 7946 FHEM/02_HTTPSRV.pm
@@ -638,7 +638,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-05-23_07:45:02 60312 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-08-05_07:45:03 262505 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-08-06_07:45:02 262711 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -735,12 +735,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-08-04_07:45:06 4329810 docs/commandref.html
+UPD 2020-08-06_07:45:06 4329811 docs/commandref.html
 UPD 2020-08-03_07:45:09 2685875 docs/commandref_DE.html
 UPD 2020-04-24_07:45:02 80616 docs/commandref_frame.html
 UPD 2020-04-24_07:45:02 90222 docs/commandref_frame_DE.html
-UPD 2020-08-05_07:45:11 232575 docs/commandref_modular.html
-UPD 2020-08-05_07:45:12 243287 docs/commandref_modular_DE.html
+UPD 2020-08-06_07:45:10 232575 docs/commandref_modular.html
+UPD 2020-08-06_07:45:11 243287 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
