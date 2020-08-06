@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22390 2020-07-12 06:31:29Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -136,7 +136,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.3.4"  => "12.07.2020  fix break in header if hourCount was reduced ",
+  "3.4.0"  => "05.08.2020  attr balanceDay, balanceMonth for data provider balanceDayData, balanceMonthData ",
+  "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
   "3.3.1"  => "03.07.2020  change retry repetition and new cycle wait time ",
@@ -241,13 +242,13 @@ my %stpl = (                                                                    
   consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
   consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
   plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
-  balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
   balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
   balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
   balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
   balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
-                                           # Tags der verfügbaren Datenquellen
+
+                                                                   # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
              balanceDayData
@@ -286,7 +287,10 @@ sub Initialize {
   $hash->{SetFn}         = \&Set;
   $hash->{GetFn}         = \&Get;
   $hash->{DbLog_splitFn} = \&DbLog_split;
-  $hash->{AttrList}      = "cookieLocation ".
+  $hash->{AttrList}      = "balanceDay ".
+                           "balanceMonth ".
+                           "balanceYear ".
+                           "cookieLocation ".
                            "disable:0,1 ".
                            "interval ".
                            "noHomeManager:1,0 ".
@@ -584,8 +588,7 @@ sub setcredentials {
     $len = scalar @key;  
     $i = 0;  
     $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+            map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
     # End Scramble-Routine    
        
     $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
@@ -635,9 +638,7 @@ sub getcredentials {
             $len = scalar @key;  
             $i = 0;  
             $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) - $key[$i] + 256) % 256) }  
-            split //, $credstr;   
+            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;   ## no critic 'Map blocks';
             # Ende Descramble-Routine
             
             ($username, $passwd) = split(":",decode_base64($credstr));
@@ -693,12 +694,23 @@ sub Attr {
     }
     
     if ($cmd eq "set") {
-        if ($aName =~ m/interval/x) {
-            unless ($aVal =~ /^\d+$/x) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
-        }
-        if($aName =~ m/interval/x) {
-            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 30);
+        if ($aName eq "interval") {
+            unless ($aVal =~ /^\d+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
+            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 120);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
+        }
+        if($aName eq "balanceDay") {
+            my ($y,$m,$d) = $aVal =~ /^(\d{4})-(\d{2})-(\d{2})$/x;
+            eval{ timelocal(0,0,0,$d,$m-1,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY-MM-DD" is needed !};
+        }    
+        if($aName eq "balanceMonth") {
+            my ($y,$m) = $aVal =~ /^(\d{4})-(\d{2})$/x;
+            eval{ timelocal(0,0,0,1,$m-1,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY-MM" is needed !};
+        } 
+        if($aName eq "balanceYear") {
+            my ($y) = $aVal =~ /^(\d{4})$/x;
+            return qq{The value for $aName is not valid. A valid date in form "YYYY" is needed !} if(!$y);
+            eval{ timelocal(0,0,0,1,0,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY" is needed !};
         }        
     }
 
@@ -713,7 +725,7 @@ return;
 #   $nr = 1 wenn Retry Zähler nicht zurückgesetzt werden soll
 #
 ################################################################
-sub CallInfo {
+sub CallInfo {                         ## no critic 'complexity'
   my ($hash,$nc,$nr) = @_;
   my $name           = $hash->{NAME};
   my $new;
@@ -827,7 +839,7 @@ return ($interval,$maxcycles,$timeoutdef);
 ##                  Datenabruf SMA-Portal
 ##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
-sub GetSetData {                                                       ## no critic 'complexity'
+sub GetSetData {                       ## no critic 'complexity'
   my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
@@ -1438,43 +1450,6 @@ return ($errstate,$state,$reread,$retry);
 #           Abruf Statistik Daten Day
 #            (anchorTime beachten !)
 ################################################################
-sub _getBalanceCurrentData {                       ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
- 
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 0;                                                            # Tab 0 -> Current, Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',                                       
-                                         tag      => "balanceCurrentData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "Current",
-                                         daref    => $daref
-                                      });                                     
-  
-return ($errstate,$state,$reread,$retry); 
-}
-
-################################################################
-#           Abruf Statistik Daten Day
-#            (anchorTime beachten !)
-################################################################
 sub _getBalanceDayData {                 ## no critic "not used"
   my $paref    = shift;
   my $name     = $paref->{name};
@@ -1482,10 +1457,18 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
- 
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my ($reread,$retry,$errstate) = (0,0,0); 
+
+  my $bd = AttrVal($name, "balanceDay", "");
+  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
+  
+  if($bd) {
+      ($y,$m,$d) = $bd =~ /(\d{4})-(\d{2})-(\d{2})/x;
+      $y        -= 1900;
+      $m        -= 1;
+  }
+   
+  my $cts      = fhemTimeLocal(0, 0, 0, $d, $m, $y);
   my $offset   = fhemTzOffset($cts);
   my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
    
@@ -1519,10 +1502,18 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
+  my ($reread,$retry,$errstate) = (0,0,0);   
+
+  my $bd = AttrVal($name, "balanceMonth", "");
+  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
+
+  if($bd) {
+      ($y,$m) = $bd =~ /^(\d{4})-(\d{2})$/x;
+      $y     -= 1900;
+      $m     -= 1;
+  }  
  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $cts      = fhemTimeLocal(0, 0, 0, 1, $m, $y);
   my $offset   = fhemTzOffset($cts);
   my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
    
@@ -1558,8 +1549,15 @@ sub _getBalanceYearData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $bd = AttrVal($name, "balanceYear", "");
+  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
+
+  if($bd) {
+      ($y) = $bd =~ /^(\d{4})$/x;
+      $y  -= 1900;
+  } 
+  
+  my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
   my $offset   = fhemTzOffset($cts);
   my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
    
@@ -2345,7 +2343,7 @@ return;
 
 ################################################################
 #          Auswertung Statistic Daten
-#          $period = Current | Day | Month | Year
+#          $period = Day | Month | Year | Total
 ################################################################
 sub extractStatisticData {
   my $hash      = shift;
@@ -2363,6 +2361,12 @@ sub extractStatisticData {
                                                    };
   my $lv = $stpl{$tag}{level};
   
+  my $balper = "";
+  if($period ne "Total") {
+      $balper = AttrVal($name, "balance".$period, "");
+      $balper = "_".$balper if($balper);
+  }
+  
   if(ref $statistic eq "HASH") {
       $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
   }
@@ -2371,7 +2375,7 @@ sub extractStatisticData {
       for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
           my $k = $a->{Key};
           my $v = $a->{Value};
-          push @$daref, "${lv}_${period}_${k}:$v" if(defined $statkeys{$k});                  
+          push @$daref, "${lv}_${period}${balper}_${k}:$v" if(defined $statkeys{$k});                  
       }
   } 
   
@@ -2780,12 +2784,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22390 2020-07-12 06:31:29Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22369 2020-07-07 19:30:51Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22390 2020-07-12 06:31:29Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -3746,15 +3750,15 @@ sub SPGRefresh {
       my @rooms = split(",",$hash->{HELPER}{SPGROOM});
       for (@rooms) {
           my $room = $_;
-          { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
+          { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }   ## no critic 'void context';
       }
   } elsif ($pload && (!$hash->{HELPER}{SPGROOM} || $hash->{HELPER}{SPGDETAIL})) {
       # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
       # SMAPortalSPG-Attribut "forcePageRefresh" erzwungen wird
-      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                            ## no critic 'void context';
   } else {
       if($fpr) {
-          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                        ## no critic 'void context';
       }
   }
   
@@ -3917,7 +3921,26 @@ return;
    <b>Attributes</b>
    <ul>
      <br>
-     <ul>       
+     <ul>
+
+       <a name="balanceDay"></a>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; </b><br>
+       Defines from which day the data provider "balanceDayData" delivers the data. <br>
+       (default: current day)
+       </li><br>
+       
+       <a name="balanceMonth"></a>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; </b><br>
+       Defines from which month the data provider "balanceMonthData" delivers the data. <br>
+       (default: current month)
+       </li><br>
+       
+       <a name="balanceYear"></a>
+       <li><b>balanceYear &lt;YYYY&gt; </b><br>
+       Defines from which year the data provider "balanceYearData" delivers the data. <br>
+       (default: current year)
+       </li><br>
+       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        The path and filename of received Cookies. <br>
@@ -3990,9 +4013,9 @@ return;
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
-          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved </td></tr>
-          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved (see attribute <a href="#balanceDay">balanceDay</a>) </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved (see attribute <a href="#balanceMonth">balanceMonth</a>) </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved (see attribute <a href="#balanceYear">balanceYear</a>) </td></tr>
           <tr><td> <b>balanceTotalData</b>    </td><td>- Total statistics data are retrieved </td></tr>
        </table>
        </ul>     
@@ -4170,7 +4193,26 @@ return;
    <b>Attribute</b>
    <ul>
      <br>
-     <ul>       
+     <ul>      
+
+       <a name="balanceDay"></a>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; </b><br>
+       Legt fest, von welchem Tag der Datenprovider "balanceDayData" die Daten liefert. <br>
+       (default: aktueller Tag)
+       </li><br>
+       
+       <a name="balanceMonth"></a>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; </b><br>
+       Legt fest, von welchem Monat der Datenprovider "balanceMonthData" die Daten liefert. <br>
+       (default: aktueller Monat)
+       </li><br>
+       
+       <a name="balanceYear"></a>
+       <li><b>balanceYear &lt;YYYY&gt; </b><br>
+       Legt fest, von welchem Jahr der Datenprovider "balanceYearData" die Daten liefert. <br>
+       (default: aktuelles Jahr)
+       </li><br>
+       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies. <br>
@@ -4244,9 +4286,9 @@ return;
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
-          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen </td></tr>
-          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen (siehe Attribut <a href="#balanceDay">balanceDay</a>) </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen (siehe Attribut <a href="#balanceMonth">balanceMonth</a>) </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen (siehe Attribut <a href="#balanceYear">balanceYear</a>) </td></tr>
           <tr><td> <b>balanceTotalData</b>    </td><td>-  Statistikdaten Gesamt werden abgerufen </td></tr>
        </table>
        </ul>     
