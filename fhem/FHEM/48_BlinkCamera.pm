@@ -60,9 +60,17 @@
 #   Corrected handling of prefered network attribute
 #   Adapt active handling to new format
 #   Add new reading Enabled per camera with doc - showing enabled value
-
 #   Correction for JSON values - true/false 1/0
-# 
+
+#   deprecation note for attr homescreenv3 (log and doc)
+#   handle new video delete - media delete
+
+#   get client id and verification information from login
+#   add set option verifyPin for pin verification - not verified
+#   add doc for verifyPin (experimental)
+#   
+#   
+#   
 # 
 # 
 ##############################################################################
@@ -71,11 +79,12 @@
 ##############################################################################
 # TASKS 
 #
+#
+#   remove old homescreen functonality
+#
 #   use fuuid of device for 
 #
-#
 #   Analyze more information and settings
-#
 #
 #   FIX: getThumbnail url failing sometimes
 #   FIX: imgOriginalFile not fully working
@@ -92,7 +101,6 @@
 #{"authtoken":{"authtoken":"sjkashajhdjkashd","message":"auth"},"networks":{"<n>":{"name":"<name>","onboarded":true}},"region":{"prde":"Europe"}}
 #{"message":"Unauthorized Access"}
 #
-# { "video_list": [ 1012458 ] }   - POST https://rest.prir.immedia-semi.com/api/v2/videos/delete
 #
 ##############################################################################
 
@@ -155,11 +163,14 @@ my $BlinkCamera_header = "agent: TelegramBot/1.0\r\nUser-Agent: TelegramBot/1.0"
 my $BlinkCamera_loginjson = "{ \"password\" : \"q_password_q\", \"client_specifier\" : \"FHEM blinkCameraModule 1 - q_name_q\", \"email\" : \"q_email_q\" }";
 my $BlinkCamera_loginjsonV4 = "{ \"app_version\": \"6.0.10 (8280) #881c8812\", \"client_name\": \"fhem q_name_q\",  \"client_type\": \"ios\", \"device_identifier\": \"fhem q_fuuid_q\", \"email\": \"q_email_q\", \"os_version\": \"13\", \"password\": \"q_password_q\", \"reauth\": q_reauth_q, \"unique_id\": \"q_uniqueid_q\" }";
 
+my $BlinkCamera_verifyPinjson = "{ \"pin\" : q_pin_q }";
+
 my $BlinkCamera_configCamAlertjson = "{ \"camera\" : \"q_id_q\", \"id\" : \"q_id_q\", \"network\" : \"q_network_q\", \"motion_alert\" : \"q_alert_q\" }";
 
 my $BlinkCamera_configOwljson = "{ \"enabled\" : q_value_q }";
 
-my $BlinkCamera_deleteVideojson = "{ \"video_list\" : [ q_id_q ] }";
+# OLD my $BlinkCamera_deleteVideojson = "{ \"video_list\" : [ q_id_q ] }";
+my $BlinkCamera_deleteVideojson = "{ \"media_list\" : [ q_id_q ] }";
 
 my $BlinkCamera_cameraThumbnailjson = "{ \"id\" : \"q_id_q\", \"network\" : \"q_network_q\" }";
 
@@ -344,6 +355,9 @@ sub BlinkCamera_Set($@)
   } elsif ($cmd eq 'login') {
     $ret = BlinkCamera_DoCmd( $hash, $cmd );
   
+  } elsif ($cmd eq 'verifyPin') {
+    $ret = BlinkCamera_DoCmd( $hash, $cmd, $addArg  );
+  
   } elsif( ($cmd eq 'camEnable') || ($cmd eq 'camDisable') ) {
       $ret = BlinkCamera_CameraDoCmd( $hash, $cmd, $addArg )
       
@@ -466,6 +480,9 @@ sub BlinkCamera_Attr(@) {
     } elsif ($aName eq 'pollingVerbose') {
       return "\"BlinkCamera_Attr: \" Incorrect value given for pollingVerbose" if ( $aVal !~ /^((1_Digest)|(2_Log)|(0_None))$/ );
 
+    } elsif ($aName eq 'homeScreenV3') {
+      Log3 $name, 1, "BlinkCamera_Attr $name: Attribute homeScreenV3 is deprecated and can be removed - old API has been switched off";
+
     }
 
     $_[3] = $aVal;
@@ -551,7 +568,7 @@ sub BlinkCamera_DoCmd($$;$$$)
 
     #######################
     # check networks if not existing queue current cmd and get homescreen first
-    if ( ($cmd ne "login") && ($cmd ne "homescreen") && ( ! defined( $net ) ) ) {
+    if ( ($cmd ne "login") && ($cmd ne "homescreen") && ($cmd ne "verifyPin") && ( ! defined( $net ) ) ) {
       # add to queue
       Log3 $name, 4, "BlinkCamera_DoCmd $name: add send to queue cmd ".$cmdString;
       push( @{ $hash->{cmdQueue} }, \@args );
@@ -564,7 +581,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     
     #######################
     # Check for invalid auth token and just remove cmds
-    if ( ($cmd ne "login") && ($cmd ne "homescreen") && ( $net eq "INVALID" ) ) {
+    if ( ($cmd ne "login") && ($cmd ne "homescreen") && ($cmd ne "verifyPin") && ( $net eq "INVALID" ) ) {
       # add to queue
       Log3 $name, 2, "BlinkCamera_DoCmd $name: failed due to invalid networks list (set attribute network) ".$cmdString;
       return;
@@ -576,7 +593,7 @@ sub BlinkCamera_DoCmd($$;$$$)
 
     #######################
     # check networks if not existing queue current cmd and get networks first
-    if ( ($cmd ne "login") && ($cmd ne "networks") && ( ! defined( $net ) ) ) {
+    if ( ($cmd ne "login") && ($cmd ne "networks") && ($cmd ne "verifyPin") && ( ! defined( $net ) ) ) {
       # add to queue
       Log3 $name, 4, "BlinkCamera_DoCmd $name: add send to queue cmd ".$cmdString;
       push( @{ $hash->{cmdQueue} }, \@args );
@@ -589,7 +606,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     
     #######################
     # Check for invalid auth token and just remove cmds
-    if ( ($cmd ne "login") && ($cmd ne "networks") && ( $net eq "INVALID" ) ) {
+    if ( ($cmd ne "login") && ($cmd ne "networks") && ($cmd ne "verifyPin") && ( $net eq "INVALID" ) ) {
       # add to queue
       Log3 $name, 2, "BlinkCamera_DoCmd $name: failed due to invalid networks list (set attribute network) ".$cmdString;
       return;
@@ -709,6 +726,18 @@ sub BlinkCamera_DoCmd($$;$$$)
 
       }
         
+    #######################
+    } elsif ( $cmd eq "verifyPin" ) {
+    
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+
+      #   /api/v4/account/<accountid>/client/<clientid>/pin/verify
+      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v4/account/".$hash->{account}."/client/".$hash->{clientid}."/pin/verify";
+    
+      $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_verifyPinjson;
+      $hash->{HU_DO_PARAMS}->{data} =~ s/q_pin_q/$par1/g;
+      Log3 $name, 4, "BlinkCamera_DoCmd $name:   verify pin : ".$par1.":  - data :".$hash->{HU_DO_PARAMS}->{data}.":";
+
     #######################
     } elsif ( ($cmd eq "camEnable") || ($cmd eq "camDisable" ) ) {
     
@@ -940,12 +969,32 @@ sub BlinkCamera_DoCmd($$;$$$)
       }
         
       if ( defined( $vid ) ) {
+        ## NEW API
+        # https://rest-prde.immedia-semi.com/api/v1/accounts/<id>/media/delete
+        # request
+          # {
+              # "media_list": [
+                  # 742450103
+              # ]
+          # }
+        # response
+        # {
+            # "code": 711,
+            # "message": "Successfully deleted videos"
+        # } 
+
+        ## OLD
+        # $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+
+        # $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v3/videos/delete";
+        # $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_deleteVideojson;
+        # $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$vid/g;
+
         $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
-        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v3/videos/delete";
+        $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/media/delete";
         $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_deleteVideojson;
         $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$vid/g;
-
         Log3 $name, 4, "BlinkCamera_DoCmd $name:   data :".$hash->{HU_DO_PARAMS}->{data}.":";
 
       } else {
@@ -1118,6 +1167,14 @@ sub BlinkCamera_ParseLogin($$$)
     }
   }
 
+  if ( defined( $result->{client} ) ) {
+    my $clt = $result->{client};
+    if ( defined( $clt->{id} ) ) {
+      $hash->{clientid} = $clt->{id};
+      $hash->{clientverreq} = $clt->{verification_required};
+    }
+  }
+    
   my $resreg = $result->{region};
   if ( defined( $resreg ) ) {
     $readUpdates->{region} = $resreg->{tier};
@@ -1729,8 +1786,13 @@ sub BlinkCamera_Callback($$$)
         $ret = "Callback returned error:".$jo->{message}.":";
         
         $ret = "SUCCESS" if ( $jo->{message} =~ /^Successfully / );
+        
+        # special case for pin verification: Client has been successfully verified
+        $ret = "SUCCESS" if ( $jo->{message} =~ /^Client has been successfully / );
+        
         # reset authtoken if {"message":"Unauthorized Access"} --> will be re checked on next call
         delete( $hash->{AuthToken} ) if ( $jo->{message} eq "Unauthorized Access" );
+        
       } else {
         $result = $jo;
       }
@@ -2090,6 +2152,7 @@ sub BlinkCamera_Setup($) {
   
   my %sets = (
     "login" => undef,
+    "verifyPin" => undef,
 
     "arm" => undef,
     "disarm" => undef,
@@ -2163,7 +2226,10 @@ sub BlinkCamera_Setup($) {
   delete( $hash->{alertSkipped} );
   delete( $hash->{alertUpdate} );
   delete( $hash->{alertResults} );
-  
+
+  delete( $hash->{clientid} );
+  delete( $hash->{clientverreq} );
+
   delete( $hash->{URL} );
   
   # remove timer for retry
@@ -2641,6 +2707,8 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
   <br><br>
     <li><code>login</code><br>Initiate a login to the blink servers. This is usually done automatically when needed or when the login is expired
     </li>
+    <li><code>verifyPin</code><br>can be used to verify the pin send from blink via email (experimental currently)
+    </li>
     <li><code>arm</code> or <code>disarm</code><br>All enabled cameras in the system will be armed (i.e. they will be set to a mode where alarms/videos are automatically created based on the current settings) / disarmed (set to inactive mode where no video is recorded.
     </li>
     <li><code>camEnable &lt;camera name or number or "all"&gt;</code> or <code>camDisable &lt;camera name or number&gt;</code><br>The specified camera will be enabled (i.e. so that it is included in the arm / disarm commands) / disabled (excluded from arm/disarm).
@@ -2703,11 +2771,6 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
     </li> 
 
 
-    <li><code>homeScreenV3 &lt;1 or 0&gt;</code><br>If set to 1 (default) the new version 3 of the blink API will be used. Unfortunately this includes different readings and settings <br>
-    NOTE: old APIs of Blink have been deactivated so new default 1 has been set in July 2020
-    </li> 
-
-
     <li><code>imgOriginalFile &lt;1 or 0&gt;</code><br>If set to 1 it will keep the original filename of the thumbnail when storing ti. With setting this new thumbnails will not overwrite existing ones. <br>
     NOTE: No cleanup of thumbnails is done, so over time more and more thumbnails will be stored in the proxydir. 
     </li> 
@@ -2717,6 +2780,11 @@ sub BlinkCamera_AnalyzeAlertResults( $$$ ) {
 
     <li><code>webname &lt;path to fhem web&gt;</code><br>can be set if fhem is not accessible through the standard url of FHEMWeb <code>/fhem/... </code> (Default value is fhem). 
     </li> 
+
+    <li><code>homeScreenV3 &lt;1 or 0&gt;</code><br>If set to 1 (default) the new version 3 of the blink API will be used. Unfortunately this includes different readings and settings <br>
+    NOTE: This attribute is deprecated and not needed anymore, since the old API has been switched off by Blink (default is on = 1)
+    </li> 
+
 
   </ul>
 
