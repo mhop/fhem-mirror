@@ -1642,7 +1642,9 @@ set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 t
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
 attr DEVICE setList permit_join:0,1,99 CMNDTOPIC/ZbPermitJoin $EVTPART1\
-  x_ZbSend:textField CMNDTOPIC/zbsend {"device":"0x$EVTPART1","send":{"$EVTPART2":"$EVTPART3"}}
+  x_ZbSend:textField CMNDTOPIC/ZbSend {"device":"0x$EVTPART1","send":{"$EVTPART2":"$EVTPART3"}}\
+  z_ZbBind_single:textField CMNDTOPIC/ZbBind {"Device":"$EVTPART1","ToDevice":"0x$EVTPART2","Endpoint":$EVTPART3,"ToEndpoint":$EVTPART4,"Cluster":$EVTPART5}\
+  z_ZbBind_group:textField CMNDTOPIC/ZbBind {"Device":"$EVTPART1","ToGroup":"0x$EVTPART2","Endpoint":$EVTPART3,"Cluster":$EVTPART4}
 attr DEVICE bridgeRegexp \
   TELETOPIC/([^/]+)/SENSOR:.* "z2t_$1"
 attr DEVICE readingList \
@@ -1653,7 +1655,7 @@ attr DEVICE readingList \
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20200804_1
+setreading DEVICE attrTemplateVersion 20200807
 { AttrTemplate_Initialize() }
 
 
@@ -1724,11 +1726,36 @@ attr DEVICE model tasmota_zigbee2tasmota_light_cct_hue
 setreading DEVICE attrTemplateVersion 20200805
 
 
+name:tasmota_zigbee2tasmota_single_switch
+prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+desc:This template is meant to configure a simple on/off relay switch device like Osram Müller Licht Tint smart switch (on/off).<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
+order:A_01u03
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/[^/]+/SENSOR:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+attr DEVICE icon ICON
+attr DEVICE readingList \
+  TELETOPIC:.* { $EVENT =~ s/"Power":1/"Power":"on"/g; $EVENT =~ s/"Power":0/"Power":"off"/g; $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef  }
+attr DEVICE setList on CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"On"}}\
+  off CMNDTOPIC/ZbSend {"device":"0xDEV_ID","send":{"Power":"Off"}}
+attr DEVICE setStateList on off
+attr DEVICE setExtensionsEvent 1
+attr DEVICE jsonMap Power:state Device:0
+deletereading -q DEVICE (?!associatedWith).*
+option:{ CALLSPEECHRECOGN }  
+set DEVICE attrTemplate speechcontrol_type_switch
+attr DEVICE model tasmota_zigbee2tasmota_single_switch
+setreading DEVICE attrTemplateVersion 20200806
+
+
 name:tasmota_zigbee2tasmota_generic_battery_sensor
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
 desc:This template is meant to configure an arbitrary battery powered ZigBee sensor.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
-order:A_01u03
+order:A_01u04
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
 par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
@@ -1742,6 +1769,22 @@ option:{ CALLSPEECHRECOGN }
 attr DEVICE model tasmota_zigbee2tasmota_generic_battery_sensor
 setreading DEVICE attrTemplateVersion 20200805_1
 
+
+name:tasmota_zigbee2tasmota_remote_control
+prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+desc:This template is meant to configure an arbitrary zigbee remote control unit.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
+order:A_01u04a
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","tradfri_remote") }
+attr DEVICE icon ICON
+attr DEVICE readingList \
+  TELETOPIC:.* { $EVENT =~ m,([0-9]{4}![0-9]{2}), ? { 'state'=>$1 } ? : $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
+attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0 
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE model tasmota_zigbee2tasmota_remote_control
+setreading DEVICE attrTemplateVersion 20200807
 
 
 ###########################################
