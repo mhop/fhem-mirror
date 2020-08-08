@@ -23,7 +23,11 @@ use constant {
   TEMP_LOW => 1,
   TEMP_OK => 2,
   TEMP_HIGH => 3,
+  TEMP_HOT => 4,
 };
+my $tempIn_offset=0;
+my $tempOut_offset=+5;
+my $tempOutForecastLimit=28;
 
 # CheckSkip
 use constant {
@@ -62,10 +66,6 @@ my $blocktimerRunning=0;
 #my @schlitzblocktime=localtime;
 #my $schlitzBlocktimerRunning=0;
 my $delaySec=11;
-
-my $tempIn_offset=0;
-my $tempOut_offset=+5;
-my $tempOutForecastLimit=28;
 
 #------------------------------------------
 
@@ -293,7 +293,8 @@ sub checkTemps($$$)
 
     if ($temp    > $tempSoll+$tempIn_offset+0.5)  { $tempI=TEMP_HIGH; }
     if ($temp    < $tempSoll+$tempIn_offset-0.5)  { $tempI=TEMP_LOW; }
-    if ($tempOut > $tempSoll+$tempOut_offset+1.5) { $tempO=TEMP_HIGH; }
+    if ($tempOut > $tempSoll+$tempOut_offset+4.0) { $tempO=TEMP_HOT; }
+    if ($tempOut > $tempSoll+$tempOut_offset+1.0) { $tempO=TEMP_HIGH; }
     if ($tempOut < $tempSoll+$tempOut_offset-1.0) { $tempO=TEMP_LOW; }
     if ($tempOut < $tempSoll+$tempOut_offset-1.5) { $tempO=TEMP_COLD; }
     return($tempI, $tempO);
@@ -380,7 +381,7 @@ sub RollCheck()
     # Nach wechsel von sonne auf !sonne blockert ?
     my $sonneblock=IsWetterSonneWait($wett);
     if($twil>=7) { # ss-weather
-      $dawn=1;
+        $dawn=1;
     }
     for $r ( @rolls ) {
         #Dbg("--------r:g ".$r->{roll}." / ".$r->{temp});
@@ -391,25 +392,25 @@ sub RollCheck()
         # Offene Fenster nicht mit Rollaeden verschliessen, zur Schlafenszeit nicht öffnen
         my ($skipRunter, $skipHoch)=checkSkip($r);
 
-	my $Hot            =           $tempO>=TEMP_HIGH;
-	my $WarmSun        = $sunIn && $tempO>=TEMP_OK;
+        my $Hot            =           $tempO>=TEMP_HOT;
+        my $WarmSun        = $sunIn && $tempO>=TEMP_HIGH;
         my $ForecastHotSun = $sunIn && $tempOutMaxForecast>=$tempOutForecastLimit;
-	my $Cold        =             $tempO<=TEMP_COLD;
-	my $NoSunNotHot = !$sunIn &&  $tempO<=TEMP_LOW;
+        my $Cold        =             $tempO<=TEMP_COLD;
+        my $NoSunNotHot = !$sunIn &&  $tempO<=TEMP_LOW;
 
-	if (!$tag) {
+        if (!$tag) {
             $run=RollRunter($r, $skipRunter, $ndelay++);
         } elsif ($dawn) { # Abenddämmerung
             $run=RollHoch($r, $skipHoch, $ndelay++);
         } elsif ($Hot || $WarmSun || $ForecastHotSun) {
             $run=RollRunterSchlitz($r, $skipRunter, $ndelay++);
         } elsif ( $Cold || $NoSunNotHot ) {
-	    if(!SchlitzBlockCheck($r)) { $run=RollHoch($r, $skipHoch, $ndelay++); }
+            if(!SchlitzBlockCheck($r)) { $run=RollHoch($r, $skipHoch, $ndelay++); }
         } elsif ( ($tag && !$tagalt) || ($wach && !$wachalt) ) { # bei Tagesbeginn hoch
             $run=RollHoch($r, $skipHoch, $ndelay++);
         }
         if ($run) {
-	    Dbg("Hot: $Hot WarmSun:$WarmSun ForHotSun:$ForecastHotSun Cold:$Cold NoSunNotHot:$NoSunNotHot\n");
+            Dbg("Hot: $Hot WarmSun:$WarmSun ForHotSun:$ForecastHotSun Cold:$Cold NoSunNotHot:$NoSunNotHot\n");
             Dbg("RollCheck to:$tempOut twil:$twil light:$light wett:$wett sr:$sr block:$sonneblock tomax:$tempOutMaxForecast\n");
             Dbg("RollCheck:$r->{roll}-tempLevI,O:$tempI,$tempO tempI,O:$tempIn,$tempOut so:$sunIn wett:$wett sr:$sr "
                 . "twil:$twil tag:$tag wach:$wach skipR,H:$skipRunter,$skipHoch st:$r->{state}");
