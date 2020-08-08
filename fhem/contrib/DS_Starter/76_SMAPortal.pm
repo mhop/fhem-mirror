@@ -136,7 +136,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.4.0"  => "05.08.2020  attr balanceDay, balanceMonth for data provider balanceDayData, balanceMonthData ",
+  "3.4.0"  => "08.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
@@ -698,20 +698,7 @@ sub Attr {
             unless ($aVal =~ /^\d+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
             return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 120);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
-        }
-        if($aName eq "balanceDay") {
-            my ($y,$m,$d) = $aVal =~ /^(\d{4})-(\d{2})-(\d{2})$/x;
-            eval{ timelocal(0,0,0,$d,$m-1,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY-MM-DD" is needed !};
-        }    
-        if($aName eq "balanceMonth") {
-            my ($y,$m) = $aVal =~ /^(\d{4})-(\d{2})$/x;
-            eval{ timelocal(0,0,0,1,$m-1,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY-MM" is needed !};
-        } 
-        if($aName eq "balanceYear") {
-            my ($y) = $aVal =~ /^(\d{4})$/x;
-            return qq{The value for $aName is not valid. A valid date in form "YYYY" is needed !} if(!$y);
-            eval{ timelocal(0,0,0,1,0,$y-1900) } or return qq{The value for $aName is not valid. A valid date in form "YYYY" is needed !};
-        }        
+        }          
     }
 
 return;
@@ -1458,38 +1445,56 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0); 
+  
+  my @bd = split /\s+/x ,AttrVal($name, "balanceDay", "current");
 
-  my $addon = "Day";
-  my $bd    = AttrVal($name, "balanceDay", "");
-  
-  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
-  
-  if($bd) {
-      $addon    .= "_".$bd;
-      ($y,$m,$d) = $bd =~ /(\d{4})-(\d{2})-(\d{2})/x;
-      $y        -= 1900;
-      $m        -= 1;
-  }
+  for my $bal (@bd) {
+      my ($y,$m,$d);
+      my $addon = "Day";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y,$m,$d) = $bal =~ /(\d{4})-(\d{2})-(\d{2})/x;
+          
+          if(!$y || !$m || !$d) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceDay" value "$bal" is ignored. A valid date with form "YYYY-MM-DD" is needed});
+              next;
+          }
+          
+          $y -= 1900;
+          $m -= 1;
+      
+      } else {
+          (undef,undef,undef,$d,$m,$y) = localtime(time);
+      }  
+ 
+      eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                      $errstate = 1;
+                                                      Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceDay' detected: $state");
+                                                      return ($errstate,$state,$reread,$retry);
+                                                   };
    
-  my $cts      = fhemTimeLocal(0, 0, 0, $d, $m, $y);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceDayData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => $addon,
-                                         daref    => $daref
-                                      });                                     
+      my $cts      = fhemTimeLocal(0, 0, 0, $d, $m, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceDayData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+      
+      }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1507,37 +1512,56 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
-  my $addon = "Month";
-  my $bd    = AttrVal($name, "balanceMonth", "");
-  
-  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
+  my @bd = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
 
-  if($bd) {
-      $addon .= "_".$bd;
-      ($y,$m) = $bd =~ /^(\d{4})-(\d{2})$/x;
-      $y     -= 1900;
-      $m     -= 1;
-  }  
+  for my $bal (@bd) {
+      my ($y,$m);
+      my $addon = "Month";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y,$m) = $bal =~ /^(\d{4})-(\d{2})$/x;
+          
+          if(!$y || !$m) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceMonth" value "$bal" is ignored. A valid date with form "YYYY-MM" is needed});
+              next;
+          }
+          
+          $y -= 1900;
+          $m -= 1;
+      
+      } else {
+          $m = (localtime(time))[4];
+          $y = (localtime(time))[5];
+      }  
  
-  my $cts      = fhemTimeLocal(0, 0, 0, 1, $m, $y);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceMonthData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => $addon,
-                                         daref    => $daref
-                                      });                                     
+      eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                     $errstate = 1;
+                                                     Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
+                                                     return ($errstate,$state,$reread,$retry);
+                                                   };
+                                                   
+      my $cts      = fhemTimeLocal(0, 0, 0, 1, $m, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceMonthData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+      
+  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1555,36 +1579,52 @@ sub _getBalanceYearData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
-  my $addon = "Year";
-  my $bd    = AttrVal($name, "balanceYear", "");
-  
-  my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
+  my @bd = split /\s+/x ,AttrVal($name, "balanceYear", "current");
 
-  if($bd) {
-      $addon .= "_".$bd;
-      ($y)    = $bd =~ /^(\d{4})$/x;
-      $y     -= 1900;
-  } 
-  
-  my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceYearData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => $addon,
-                                         daref    => $daref
-                                      });                                     
+  for my $bal (@bd) {
+      my $y;
+      my $addon = "Year";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y) = $bal =~ /^(\d{4})$/x;
+          
+          if(!$y) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceYear" value "$bal" is ignored. A valid date with form "YYYY" is needed});
+              next;
+          }
+          
+          $y  -= 1900;
+      } else {
+          $y = (localtime(time))[5];
+      }
+      
+      eval { timelocal(0, 0, 0, 1, 1, $y) } or do { $state    = (split(" at", $@))[0];
+                                                    $errstate = 1;
+                                                    Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceYear' detected: $state");
+                                                    return ($errstate,$state,$reread,$retry);
+                                                  };
+                                                   
+      my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceYearData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1738,10 +1778,10 @@ sub __dispatchPost {
                                                   });
                                                               
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
-                                                       errstate => $errstate,
-                                                       state    => $state,
-                                                       data     => $data
-                                                    });
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state) if($errstate);
   
@@ -1861,9 +1901,16 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
   my $em1d = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
   my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
-  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration};
+  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
 
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
+  
+  my $jsonerror = $ad->header('Jsonerror') // "";                # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  if($jsonerror) {
+      $errstate = 1;
+      $state    = "SMA Portal failure: "."Message -> ".$data->{Message}.",\nStackTrace -> ".$data->{StackTrace}.",\nExceptionType -> ".$data->{ExceptionType};
+      return ($reread,$retry,$errstate,$state);
+  }
   
   if(ref $data eq "HASH") {
       for my $k (keys %{$data}) {
@@ -2001,12 +2048,6 @@ sub ParseData {                                                    ## no critic 
   my $fi   = ReadingsNum($name, "${ldlv}_FeedIn"         , 0);
   my $gc   = ReadingsNum($name, "${ldlv}_GridConsumption", 0);
   my $sum  = $fi-$gc;
-  
-#  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
-      # keine Anlagendaten vorhanden
-#      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
-#      Log3 ($name, 2, "$name - $state");
-#  }
   
   my $ts = strftime('%Y-%m-%d %H:%M:%S', localtime);
   if(AttrVal("global", "language", "EN") eq "DE") {
@@ -3930,21 +3971,39 @@ return;
      <ul>
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; </b><br>
-       Defines from which day the data provider "balanceDayData" delivers the data. <br>
-       (default: current day)
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Defines the days from which the data provider "balanceDayData" delivers the data. The day specifications are separated by 
+       spaces, current = current day. <br>
+       (default: current day) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+        </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; </b><br>
-       Defines from which month the data provider "balanceMonthData" delivers the data. <br>
-       (default: current month)
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Defines from which months the data provider "balanceMonthData" delivers the data. The month specifications are separated by 
+       spaces, current = current month. <br>
+       (default: current month) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+        </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; </b><br>
-       Defines from which year the data provider "balanceYearData" delivers the data. <br>
-       (default: current year)
+       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Defines the years from which the data provider "balanceYearData" delivers the data. The year specifications are separated by 
+       spaces, current = current year. <br>
+       (default: current year) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+        </ul> 
        </li><br>
        
        <a name="cookieLocation"></a>
@@ -4202,21 +4261,39 @@ return;
      <ul>      
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; </b><br>
-       Legt fest, von welchem Tag der Datenprovider "balanceDayData" die Daten liefert. <br>
-       (default: aktueller Tag)
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert. Die Tagesangaben werden durch Leerzeichen 
+       getrennt, current = aktueller Tag. <br>
+       (default: aktueller Tag) <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+        </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; </b><br>
-       Legt fest, von welchem Monat der Datenprovider "balanceMonthData" die Daten liefert. <br>
-       (default: aktueller Monat)
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. Die Monatsangaben werden durch Leerzeichen 
+       getrennt, current = aktueller Monat. <br>
+       (default: aktueller Monat) <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+        </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; </b><br>
-       Legt fest, von welchem Jahr der Datenprovider "balanceYearData" die Daten liefert. <br>
-       (default: aktuelles Jahr)
+       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. Die Jahresangaben werden durch Leerzeichen 
+       getrennt, current = aktuelles Jahr. <br>
+       (default: aktuelles Jahr)  <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+        </ul> 
        </li><br>
        
        <a name="cookieLocation"></a>
