@@ -1459,10 +1459,13 @@ sub _getBalanceDayData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0); 
 
-  my $bd = AttrVal($name, "balanceDay", "");
+  my $addon = "Day";
+  my $bd    = AttrVal($name, "balanceDay", "");
+  
   my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
   
   if($bd) {
+      $addon    .= "_".$bd;
       ($y,$m,$d) = $bd =~ /(\d{4})-(\d{2})-(\d{2})/x;
       $y        -= 1900;
       $m        -= 1;
@@ -1484,7 +1487,7 @@ sub _getBalanceDayData {                 ## no critic "not used"
                                          fnaref   => [ qw( extractStatisticData ) ],
                                          fields   => \%fields,
                                          content  => $cont,
-                                         addon    => "Day",
+                                         addon    => $addon,
                                          daref    => $daref
                                       });                                     
   
@@ -1504,10 +1507,13 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
-  my $bd = AttrVal($name, "balanceMonth", "");
+  my $addon = "Month";
+  my $bd    = AttrVal($name, "balanceMonth", "");
+  
   my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
 
   if($bd) {
+      $addon .= "_".$bd;
       ($y,$m) = $bd =~ /^(\d{4})-(\d{2})$/x;
       $y     -= 1900;
       $m     -= 1;
@@ -1529,7 +1535,7 @@ sub _getBalanceMonthData {                 ## no critic "not used"
                                          fnaref   => [ qw( extractStatisticData ) ],
                                          fields   => \%fields,
                                          content  => $cont,
-                                         addon    => "Month",
+                                         addon    => $addon,
                                          daref    => $daref
                                       });                                     
   
@@ -1549,12 +1555,15 @@ sub _getBalanceYearData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
-  my $bd = AttrVal($name, "balanceYear", "");
+  my $addon = "Year";
+  my $bd    = AttrVal($name, "balanceYear", "");
+  
   my ($sec,$min,$hour,$d,$m,$y,$wday,$yday,$isdst) = localtime(time);
 
   if($bd) {
-      ($y) = $bd =~ /^(\d{4})$/x;
-      $y  -= 1900;
+      $addon .= "_".$bd;
+      ($y)    = $bd =~ /^(\d{4})$/x;
+      $y     -= 1900;
   } 
   
   my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
@@ -1573,7 +1582,7 @@ sub _getBalanceYearData {                 ## no critic "not used"
                                          fnaref   => [ qw( extractStatisticData ) ],
                                          fields   => \%fields,
                                          content  => $cont,
-                                         addon    => "Year",
+                                         addon    => $addon,
                                          daref    => $daref
                                       });                                     
   
@@ -2343,7 +2352,10 @@ return;
 
 ################################################################
 #          Auswertung Statistic Daten
-#          $period = Day | Month | Year | Total
+#          $period = Day[_<date>]   | 
+#                    Month[_<date>] | 
+#                    Year[_<date>]  | 
+#                    Total
 ################################################################
 sub extractStatisticData {
   my $hash      = shift;
@@ -2361,12 +2373,6 @@ sub extractStatisticData {
                                                    };
   my $lv = $stpl{$tag}{level};
   
-  my $balper = "";
-  if($period ne "Total") {
-      $balper = AttrVal($name, "balance".$period, "");
-      $balper = "_".$balper if($balper);
-  }
-  
   if(ref $statistic eq "HASH") {
       $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
   }
@@ -2375,7 +2381,7 @@ sub extractStatisticData {
       for my $a (@$sd) {                                              # jedes ARRAY-Element ist ein HASH
           my $k = $a->{Key};
           my $v = $a->{Value};
-          push @$daref, "${lv}_${period}${balper}_${k}:$v" if(defined $statkeys{$k});                  
+          push @$daref, "${lv}_${period}_${k}:$v" if(defined $statkeys{$k});                  
       }
   } 
   
