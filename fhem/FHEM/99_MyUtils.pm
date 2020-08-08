@@ -19,9 +19,9 @@ use constant {
 };
 
 use constant {
-  TEMP_IDLE => 0,
-  TEMP_COLD => 1,
-  TEMP_LOW => 2,
+  TEMP_COLD => 0,
+  TEMP_LOW => 1,
+  TEMP_OK => 2,
   TEMP_HIGH => 3,
 };
 
@@ -55,7 +55,7 @@ my @rolls = (
     { roll => "schlaf.rollStr", dir=>"O", typ=>"so", temp=>"tempSchlaf", tempSoll=>18, win=>"",             block=>"",          state=>STATE_IDLE, },
 );
 
-^w
+
 my $tc=0;
 my @blocktime=localtime;
 my $blocktimerRunning=0;
@@ -289,7 +289,7 @@ sub getTempMaxForecast()
 sub checkTemps($$$)
 {
     my($temp, $tempOut, $tempSoll)=@_;
-    my $tempI=TEMP_IDLE; my $tempO=TEMP_IDLE;
+    my $tempI=TEMP_OK; my $tempO=TEMP_OK;
 
     if ($temp    > $tempSoll+$tempIn_offset+0.5)  { $tempI=TEMP_HIGH; }
     if ($temp    < $tempSoll+$tempIn_offset-0.5)  { $tempI=TEMP_LOW; }
@@ -391,25 +391,19 @@ sub RollCheck()
         # Offene Fenster nicht mit Rollaeden verschliessen, zur Schlafenszeit nicht öffnen
         my ($skipRunter, $skipHoch)=checkSkip($r);
 
-	my $Hot            =$tempI==TEMP_HIGH          && $tempO==TEMP_HIGH;
-	my $WarmSun        =$tempI==TEMP_HIGH && sunIn && $tempO>TEMP_COLD;
-        my $ForecastHotSun =                     sunIn && $tempOutMaxForecast>=$tempOutForecastLimit;
-	my $Cold        = $tempI==TEMP_LOW && $tempO==TEMP_LOW;
-	my $NoSunNotHot = !$sunIn && ($tempO!=TEMP_IDLE && $tempO<TEMP_HIGH);
+	my $Hot            =           $tempO>=TEMP_HIGH;
+	my $WarmSun        = $sunIn && $tempO>=TEMP_OK;
+        my $ForecastHotSun = $sunIn && $tempOutMaxForecast>=$tempOutForecastLimit;
+	my $Cold        =             $tempO<=TEMP_COLD;
+	my $NoSunNotHot = !$sunIn &&  $tempO<=TEMP_LOW;
 
 	if (!$tag) {
             $run=RollRunter($r, $skipRunter, $ndelay++);
         } elsif ($dawn) { # Abenddämmerung
             $run=RollHoch($r, $skipHoch, $ndelay++);
         } elsif ($Hot || $WarmSun || $ForecastHotSun) {
-#	    ($tempI==TEMP_HIGH
-#                    && (    ( $sunIn && ($tempO>TEMP_COLD))
-#                        || $tempO==TEMP_HIGH) )
-#                 || ($sunIn && ($tempOutMaxForecast>=28)) ) {
             $run=RollRunterSchlitz($r, $skipRunter, $ndelay++);
         } elsif ( $Cold || $NoSunNotHot ) {
-#	    ($tempI==TEMP_LOW && $tempO==TEMP_LOW)
-#		     || (!$sunIn && ($tempO!=TEMP_IDLE && $tempO<TEMP_HIGH))) {
 	    if(!SchlitzBlockCheck($r)) { $run=RollHoch($r, $skipHoch, $ndelay++); }
         } elsif ( ($tag && !$tagalt) || ($wach && !$wachalt) ) { # bei Tagesbeginn hoch
             $run=RollHoch($r, $skipHoch, $ndelay++);
