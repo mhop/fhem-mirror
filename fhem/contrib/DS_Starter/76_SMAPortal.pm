@@ -71,6 +71,7 @@ BEGIN {
           CommandDeleteAttr
           CommandDeleteReading
           CommandSet
+          CommandGet
           defs
           delFromDevAttrList
           delFromAttrList
@@ -136,7 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.4.0"  => "08.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ",
+  "3.4.0"  => "08.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
+                           "set getData command",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
@@ -378,7 +380,8 @@ sub Set {                             ## no critic 'complexity'
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
-                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
+                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
+                 "getData:noArg "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           my $lfd = 0;
@@ -484,6 +487,9 @@ sub Set {                             ## no critic 'complexity'
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
+        
+  } elsif ($opt eq "getData") {                              # identisch zu "get gata", Workaround um mit webCmd  
+      CommandGet(undef, "$name data"); 
         
   } else {
       return "$setlist";
@@ -3938,6 +3944,14 @@ return;
      that means the consumer are controlled by the Sunny Home Manager.    
      </li>      
      </ul>
+     <br>
+     
+     <ul>
+     <a name="getData"></a> 
+     <li><b> getData </b> <br> 
+     Identical to the "get data" command. Simplifies the use of the attribute "webCmd" in the FHEMWEB.  
+     </ul> 
+     </li>
    
    </ul>
    <br><br>
@@ -4214,6 +4228,14 @@ return;
      <a name="credentials"></a> 
      <li><b> credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
+     </ul> 
+     </li>
+     <br>
+     
+     <ul>
+     <a name="getData"></a> 
+     <li><b> getData </b> <br> 
+     Identisch zum "get data" Befehl. Vereinfacht die Benutzung des Attributs "webCmd" im FHEMWEB.   
      </ul> 
      </li>
      <br>
