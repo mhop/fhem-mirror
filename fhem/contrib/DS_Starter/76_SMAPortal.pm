@@ -138,7 +138,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "3.4.0"  => "08.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
-                           "set getData command",
+                           "set getData command, update button in header of PortalAsHtml",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
@@ -3182,8 +3182,8 @@ sub PortalAsHtml {                                                              
   
   # Headerzeile generieren                                                                                                             
   if ($header) {
-      my $lang    = AttrVal("global","language","EN");
-      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                                            # Linktext als Aliasname oder "SMA Sunny Portal"
+      my $lang    = AttrVal("global", "language", "EN");
+      my $alias   = AttrVal($name,    "alias",    "SMA Sunny Portal");                                      # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, "${fmin}_ForecastToday_Consumption", "0000-00-00 00:00:00");   # letzter Forecast Update  
       
@@ -3203,11 +3203,29 @@ sub PortalAsHtml {                                                              
 
       $header  = "<table align=\"$hdrAlign\">"; 
       
-      # Header Link + Status 
+      # Header Link + Status + Update Button 
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
           my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
-          $lup     = "$3.$2.$1 $4";
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
+          $lup     = "$3.$2.$1 $4"; 
+
+          my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name getData')\"";    # Update Button generieren        
+
+          if ($ftui && $ftui eq "ftui") {
+              $cmdupdate = "\"ftui.setFhemStatus('set $name getData')\"";     
+          }
+          
+          my $upstate  = ReadingsVal($name,"state", "undef");
+          my $upicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
+          
+          if ($upstate =~ /ok/ix) {
+              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+          } elsif ($upstate =~ /running/ix) {
+              $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+          } else {
+              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
+          }
+  
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"right\">(".$lupt."&nbsp;".$lup."&nbsp;&nbsp;&nbsp;".$upicon.")</td></tr>";
       }
       
       # Header Information pv 
