@@ -289,8 +289,8 @@ $(document).ready(function(){
         height:"auto",
         maxHeight:900,
         modal: false,
-        position: { at: "right"},
-        collusion: "fit fit",
+        position: { my: "bottom", at: "right"},
+        collision: "fit fit",
         buttons: [
           {
             text: "Ok",
