@@ -600,37 +600,10 @@ return;
 ###############################################################
 sub DbLog_split {
   my ($event, $device) = @_;
-  my $devhash = $defs{$device};
   my ($reading, $value, $unit);
-
-  if($event =~ m/[_\-fd]Consumption|Quote/x) {
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }
-  if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Energy|Hour:|Hour(\d\d):/x) {                        
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }   
-  if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption|Battery/x) {
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }   
-  if($event =~ m/summary/x && $event =~ /(.*):\s(.*)\s(.*)/x) {
-      $reading = $1;
-      $value   = $2;
-      $unit    = $3;
+  
+  if($event =~ /\s(Wh|W|kWh|%|h)$/xms) {
+      ($reading, $value, $unit) = $event =~ /(.*):\s(.*)\s(.*)/x;
   } 
   
 return ($reading, $value, $unit);
