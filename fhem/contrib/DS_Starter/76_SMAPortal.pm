@@ -137,8 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.4.0"  => "08.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
-                           "set getData command, update button in header of PortalAsHtml",
+  "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
+                           "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
@@ -230,6 +230,12 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   DirectConsumptionRate => 1,
   AutarkyRate           => 1,
 );  
+
+my %hset = (                                                                # Hash der Set-Funktion
+    credentials         => { fn => "_setCredentials"         }, 
+    getData             => { fn => "_setGetData"             },
+    createPortalGraphic => { fn => "_setCreatePortalGraphic" },     
+);
 
 my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
 my %subs;                                                                                              # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
@@ -366,7 +372,7 @@ sub Set {                             ## no critic 'complexity'
   my $opt     = $a[1];
   my $prop    = $a[2];
   my $prop1   = $a[3];
-  my ($setlist,$success);
+  my $setlist;
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -398,104 +404,156 @@ sub Set {                             ## no critic 'complexity'
           }
       } 
   }  
-
-  if ($opt eq "credentials") {
-      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);    
-      ($success) = setcredentials($hash,$prop,$prop1); 
-      
-      if($success) {
-          delcookiefile ($hash);
-          CallInfo($hash);
-          return "Username and Password saved successfully";
-      } else {
-           return "Error while saving Username / Password - see logfile for details";
-      }
             
-  } elsif ($opt eq "createPortalGraphic") {
-      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      my ($htmldev,$ret,$c,$type,$color2);
-      
-      if ($prop eq "Generation") {                                                      ## no critic "Cascading"
-          $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
-          $type    = 'pv';        
-          $c       = "SMA Sunny Portal Graphics - Forecast Generation";
-          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
-      } elsif ($prop eq "Consumption") {
-          $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
-          $type    = 'co';    
-          $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
-          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
-      } elsif ($prop eq "Generation_Consumption") {
-          $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
-          $type    = 'pvco'; 
-          $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
-          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
-      } elsif ($prop eq "Differential") {
-          $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
-          $type    = 'diff';   
-          $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
-          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
-      } else {
-          return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
-      }
-
-      $ret = CommandDefine($hash->{CL},"$htmldev SMAPortalSPG {FHEM::SMAPortal::PortalAsHtml ('$name','$htmldev')}");
-      return $ret if($ret);
-      
-      CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
-      
-      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
-           qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are privided by SMA!\n}.      
-           qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
-           qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
-      
-      CommandAttr($hash->{CL},"$htmldev comment $c");     
-
-      # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
-      # bzw muß überhaupt hier etwas vorbesetzt werden ?
-      # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
-      
-      CommandAttr($hash->{CL},"$htmldev hourCount 24");
-      CommandAttr($hash->{CL},"$htmldev consumerAdviceIcon on");
-      CommandAttr($hash->{CL},"$htmldev showHeader 1");
-      CommandAttr($hash->{CL},"$htmldev showLink 1");
-      CommandAttr($hash->{CL},"$htmldev spaceSize 24");
-      CommandAttr($hash->{CL},"$htmldev showWeather 1");
-      CommandAttr($hash->{CL},"$htmldev layoutType $type");                             # Anzeigetyp setzen
-
-      # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
-      # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
-      my $color;
-      my $jh = json2nameValue(AttrVal('WEB','styleData',''));
-      if($jh && ref $jh eq "HASH") {
-          $color = $jh->{'f18_cols.header'};
-      }
-      if (defined($color)) {
-          CommandAttr($hash->{CL},"$htmldev beamColor $color");
-      }
-      
-      # zweite Farbe setzen
-      CommandAttr($hash->{CL},"$htmldev beamColor2 $color2");
-
-      my $room = AttrVal($name,"room","SMAPortal");
-      CommandAttr($hash->{CL},"$htmldev room $room");
-      
-      return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
-  
-  } elsif ($opt && $ad && $opt =~ /$ad/x) {
+  if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
         
-  } elsif ($opt eq "getData") {                              # identisch zu "get gata", Workaround um mit webCmd arbeiten zu können
-      CommandGet(undef, "$name data"); 
-        
   } else {
+      my $params = {
+          hash  => $hash,
+          name  => $name,
+          opt   => $opt,
+          prop  => $prop,
+          prop1 => $prop1,
+          aref  => \@a,
+      };
+      
+      no strict "refs";                                                        ## no critic 'NoStrict'  
+      if($hset{$opt}) {
+          my $ret = "";
+          $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+          return $ret;
+      }
+      use strict "refs";
+
       return "$setlist";
   } 
   
 return;
+}
+
+################################################################
+#                      Setter credentials
+#                    credentials speichern
+################################################################
+sub _setCredentials {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+
+  return qq{Credentials are incomplete, use "set $name credentials <username> <password>"} if (!$prop || !$prop1);    
+  my ($success) = setcredentials($hash,$prop,$prop1); 
+  
+  if($success) {
+      delcookiefile ($hash);
+      CallInfo($hash);
+      return "Username and Password saved successfully";
+  
+  } else {
+       return "Error while saving Username / Password - see logfile for details";
+  }
+
+return;
+}
+
+################################################################
+#                      Setter getData
+#       identisch zu "get gata", Workaround um mit webCmd 
+#       arbeiten zu können
+################################################################
+sub _setGetData {                        ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  CommandGet(undef, "$name data");
+
+return;
+}
+
+################################################################
+#                      Setter createPortalGraphic
+#                 create createPortalGraphic devices
+################################################################
+sub _setCreatePortalGraphic {            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+
+  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+  my ($htmldev,$ret,$c,$type,$color2);
+  
+  if ($prop eq "Generation") {                                                      ## no critic "Cascading"
+      $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
+      $type    = 'pv';        
+      $c       = "SMA Sunny Portal Graphics - Forecast Generation";
+      $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
+  } elsif ($prop eq "Consumption") {
+      $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
+      $type    = 'co';    
+      $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
+      $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
+  } elsif ($prop eq "Generation_Consumption") {
+      $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
+      $type    = 'pvco'; 
+      $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
+      $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
+  } elsif ($prop eq "Differential") {
+      $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
+      $type    = 'diff';   
+      $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
+      $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
+  } else {
+      return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
+  }
+
+  $ret = CommandDefine($hash->{CL},"$htmldev SMAPortalSPG {FHEM::SMAPortal::PortalAsHtml ('$name','$htmldev')}");
+  return $ret if($ret);
+  
+  CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
+  
+  $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
+       qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are provided by SMA!\n}.      
+       qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
+       qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
+  
+  CommandAttr($hash->{CL},"$htmldev comment $c");     
+
+  # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
+  # bzw muß überhaupt hier etwas vorbesetzt werden ?
+  # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
+  
+  CommandAttr($hash->{CL},"$htmldev hourCount 24");
+  CommandAttr($hash->{CL},"$htmldev consumerAdviceIcon on");
+  CommandAttr($hash->{CL},"$htmldev showHeader 1");
+  CommandAttr($hash->{CL},"$htmldev showLink 1");
+  CommandAttr($hash->{CL},"$htmldev spaceSize 24");
+  CommandAttr($hash->{CL},"$htmldev showWeather 1");
+  CommandAttr($hash->{CL},"$htmldev layoutType $type");                             # Anzeigetyp setzen
+
+  # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
+  # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
+  my $color;
+  my $jh = json2nameValue(AttrVal('WEB','styleData',''));
+  if($jh && ref $jh eq "HASH") {
+      $color = $jh->{'f18_cols.header'};
+  }
+  if (defined($color)) {
+      CommandAttr($hash->{CL},"$htmldev beamColor $color");
+  }
+  
+  # zweite Farbe setzen
+  CommandAttr($hash->{CL},"$htmldev beamColor2 $color2");
+
+  my $room = AttrVal($name,"room","SMAPortal");
+  CommandAttr($hash->{CL},"$htmldev room $room");
+  
+return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
 }
 
 ###############################################################
@@ -3205,8 +3263,13 @@ sub PortalAsHtml {                                                              
       
       # Header Link + Status + Update Button 
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-          my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
-          $lup     = "$3.$2.$1 $4"; 
+          my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+          
+          if(AttrVal("global","language","EN") eq "DE") {
+             $lup = "$day.$month.$year&nbsp;$time"; 
+          } else {
+             $lup = "$year-$month-$day&nbsp;$time"; 
+          }
 
           my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name getData')\"";    # Update Button generieren        
 
