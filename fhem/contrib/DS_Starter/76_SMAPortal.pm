@@ -488,7 +488,7 @@ sub Set {                             ## no critic 'complexity'
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
         
-  } elsif ($opt eq "getData") {                              # identisch zu "get gata", Workaround um mit webCmd  
+  } elsif ($opt eq "getData") {                              # identisch zu "get gata", Workaround um mit webCmd arbeiten zu können
       CommandGet(undef, "$name data"); 
         
   } else {
@@ -3225,7 +3225,7 @@ sub PortalAsHtml {                                                              
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
           }
   
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"right\">(".$lupt."&nbsp;".$lup."&nbsp;&nbsp;&nbsp;".$upicon.")</td></tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"right\">(".$lupt."&nbsp;".$lup.")&nbsp;".$upicon."</td></tr>";
       }
       
       # Header Information pv 
