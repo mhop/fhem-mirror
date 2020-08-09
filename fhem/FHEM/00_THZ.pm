@@ -1663,12 +1663,13 @@ sub THZ_Val($;$$){
      defined($defs{$d}{READINGS}{$n}{VAL})) {
         my $tmp=$defs{$d}{READINGS}{$n}{VAL};
         if (defined($col)) {
+            #Log3 "Mythz", 3, "EXCEPTION in THZ_Val: $col";
             if  (($col =~ (/^\d+$/) ) && (defined((split ' ',$tmp)[$col])))    {return((split ' ',$tmp)[$col]);}
             if  ($tmp =~ m/$col\w*: ((-|\w|\d)+\.?\d*)/)                       {return($1);}
         }
         return $tmp;
     }
-  #if (!defined($default)) { return 0};
+  if (!defined($default)) { return 0};
   return $default;
 }
 
