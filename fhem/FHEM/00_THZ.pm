@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 05/2020
-my $thzversion = "0.184";
+# by immi 08/2020
+my $thzversion = "0.186";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -29,7 +29,6 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use feature ":5.10";
 use SetExtensions;
 use Blocking;
 use DevIo;
@@ -56,6 +55,7 @@ sub THZ_RemoveInternalTimer($);
 sub THZ_Set($@);
 sub function_heatSetTemp($$);
 sub THZ_Get($@);
+sub THZ_Val($;$$);
 
 ########################################################################################
 #
@@ -1641,6 +1641,38 @@ sub THZ_overwritechecksum($) {
     return($checksumadded);
 }
 
+
+####################################
+#
+## usage {THZ_Val("sGlobal",3,0)} register, position or subregistername, defaultval
+## adding an optional parameter to ReadingsVal which selects the column in the reading
+##{THZ_Val("sGlobal",5)} is equivalent to {THZ_Val("sGlobal","returnTemp")}
+## 
+#
+########################################################################################
+sub THZ_Val($;$$){
+  my ($n,$col,$default) = @_;
+  my $d; #normally Mythz but could be defined differently
+  foreach (keys %defs) { 
+        $d=$_;
+        last if(($defs{$_}{TYPE}) =~ "THZ");
+  }
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{READINGS}) &&
+     defined($defs{$d}{READINGS}{$n}) &&
+     defined($defs{$d}{READINGS}{$n}{VAL})) {
+        my $tmp=$defs{$d}{READINGS}{$n}{VAL};
+        if (defined($col)) {
+            if  (($col =~ (/^\d+$/) ) && (defined((split ' ',$tmp)[$col])))    {return((split ' ',$tmp)[$col]);}
+            if  ($tmp =~ m/$col\w*: ((-|\w|\d)+\.?\d*)/)                       {return($1);}
+        }
+        return $tmp;
+    }
+  #if (!defined($default)) { return 0};
+  return $default;
+}
+
+
 ####################################
 #
 # THZ_encodecommand - creates a telegram for the heatpump with a given command 
@@ -1811,7 +1843,7 @@ sub THZ_Parse1($$) {
             }
         }
     }
-    return (undef, $ParsedMsg);
+    return($ParsedMsg);
 }
 
 ########################################################################################
@@ -2214,6 +2246,7 @@ sub THZ_backup_readings($){
       attr Mythz interval_sHeatRecoveredTotal 43200		<br>
       attr Mythz interval_sHistory 86400			<br>
       attr Mythz interval_sLast10errors 86400			<br>
+      attr Mythz userReadings insideSetTemp:sHC1.* {THZ_Val("sHC1",21)}, insideTemp:sHC1.* {THZ_Val("sHC1",27)}, AussenTemp:sGlobal.* {THZ_Val("sGlobal",1)} 	<br>
       attr Mythz room pompa					<br>
       attr FileLog_Mythz  room pompa				<br>
       </code></ul>
@@ -2290,6 +2323,7 @@ sub THZ_backup_readings($){
       attr Mythz interval_sHeatRecoveredTotal 43200		<br>
       attr Mythz interval_sHistory 86400			<br>
       attr Mythz interval_sLast10errors 86400			<br>
+      attr Mythz userReadings insideSetTemp:sHC1.* {THZ_Val("sHC1",21)}, insideTemp:sHC1.* {THZ_Val("sHC1",27)}, AussenTemp:sGlobal.* {THZ_Val("sGlobal",1)} 	<br>
       attr Mythz room pompa					<br>
       attr FileLog_Mythz  room pompa				<br>
       </code></ul>
