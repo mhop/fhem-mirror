@@ -804,8 +804,9 @@ sub CallInfo {                         ## no critic 'complexity'
           Log3 ($name, 3, "$name - ################################################################");
           Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
           Log3 ($name, 3, "$name - ################################################################"); 
-          Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
-          Log3 ($name, 4, "$name - calculated timeout:             $timeout");
+          Log3 ($name, 5, "$name - SMAPortal version:          $hash->{HELPER}{VERSION}");
+          Log3 ($name, 4, "$name - calculated maximum cycles:  $maxcycles");
+          Log3 ($name, 4, "$name - calculated timeout:         $timeout");
       }
       
       if(AttrVal($name, "noHomeManager", 0)) {                                 # wenn kein Home Manager installiert ist keine mandatories ausführen
