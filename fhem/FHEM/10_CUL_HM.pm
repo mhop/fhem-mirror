@@ -177,9 +177,7 @@ sub CUL_HM_Initialize($) {
 
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
                        ."IODev IOList IOgrp "        
-                       ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."actCycle "            # also for action detector    
-                       ."hmKey hmKey2 hmKey3 "  
                        ."readingOnDead:multiple,noChange,state,periodValues,periodString,channels "
                        ."subType:"   .join(",",CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}))." "
                        ."modelForce:".join(",", sort @modellist)." "
@@ -188,6 +186,8 @@ sub CUL_HM_Initialize($) {
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
                        ."actStatus "
+                       ."hmKey hmKey2 hmKey3 "  
+                       ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
                        ."msgRepeat "                      
@@ -298,6 +298,7 @@ sub CUL_HM_updateConfig($){##########################
             foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
+      $hash->{helper}{role}{dev} = 1;
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
@@ -557,7 +558,6 @@ sub CUL_HM_updateConfig($){##########################
   HMinfo_GetFn($defs{$hm},$hm,"configCheck") if(defined $hm && !$modules{CUL_HM}{helper}{hmManualOper});
 
 }
-
 
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -2989,7 +2989,7 @@ sub CUL_HM_Parse($$) {#########################################################
   if(   AttrVal($mh{dstN}, "subType", "none") eq "virtual"
      && AttrVal($mh{dstN}, "model", "none") =~ m/^(virtual_|VIRTUAL)/){# see if need for answer
     my $sendAck = 0;
-    if($mh{mTp} =~ m/^4/ && @mI > 1) { #Push Button event
+    if   ($mh{mTp} =~ m/^4/ && @mI > 1) { #Push Button event
       my ($recChn,$trigNo) = (hex($mI[0]),hex($mI[1]));# button number/event count
       my $longPress = ($recChn & 0x40)?"long":"short";
       my $recId = $mh{src}.sprintf("%02X",($recChn&0x3f));
@@ -4236,6 +4236,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
   my($name,$cmdKey)=@_;
   my $hash = $defs{$name};
   
+  my $changes = 0;
   if($hash->{helper}{cmds}{cmdKey} ne $cmdKey){
     my ($roleC,$roleD,$roleV,$fkt,$devName,$mId,$chn,$peerLst) = split(":", $cmdKey);
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
@@ -4280,6 +4281,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
       $hash->{helper}{cmds}{cmdLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
     }
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
+    $changes = 1;
   }
 
   my $tmplStamp = CUL_HM_getTemplateModify();
@@ -4305,7 +4307,19 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
                                      .":$tmplStamp"
                                      .":$tmplAssTs"
                                      ;   
+    $changes = 1;
   }
+  if ($changes){
+#    delete $hash->{helper}{cmds}{cmdParams};
+#    foreach my $cmd (keys %{$hash->{helper}{cmds}{cmdLst}}){
+#      my $val = $hash->{helper}{cmds}{cmdLst}{$cmd};
+#      $val =~ s/(\.\.\.|noArg)//;
+#      $hash->{helper}{cmds}{cmdParams}{$cmd}{max} = scalar(split(" ",$val));
+#      $val =~ s/(\[.*?\])//g;
+#      $hash->{helper}{cmds}{cmdParams}{$cmd}{min} = scalar(split(" ",$val));
+#    }
+  }
+
   return;
  }
 sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++++
@@ -4336,7 +4350,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
-  
+ 
   CUL_HM_SetList($name               # refresh command options
                  ,  "$roleC"
                   .":$roleD"
@@ -4355,7 +4369,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
 
   if(!defined $hash->{helper}{cmds}{cmdLst}{$cmd}) { ### unknown - return the commandlist
-
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
       my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
@@ -4363,14 +4376,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if($val eq "noArg"){
           $val = ":$val";
       }
-      elsif($val =~ m/^-([a-zA-Z]*)-$/){
-        my $repl = $1;
+      elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){
+        my ($null,$repl) = ($1,$2);
         if (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $val =~ s/-$repl-/:$hash->{helper}{cmds}{lst}{$repl}/; 
+          $null = defined $null ?"noArg,":"";
+          $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
           next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
         }
         else{
-          $val = "";            
+          $val = defined $null ?":noArg":"";
         }
       }
       elsif($val =~ m/^\[([a-zA-Z0-9_-|\.]*)\]$/){
@@ -4413,11 +4427,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   }
   
   my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
-  if($paraOpts eq "noArg"){ # no param allowed
+  if($paraOpts eq "noArg"){ # no argument allowed
      return "$cmd no params required" if(@a != 2);
   }
-  elsif($paraOpts !~ m/\.\.\./){# param required
-     return "$cmd parameter required:$paraOpts" if(@a == 2);  
+  elsif(@a == 2){# no arguments - is this ok?
+    if($paraOpts !~ m/\.\.\./ && $paraOpts !~ m/^\[.*?\] *$/ ){# argument required
+      return "$cmd parameter required:$paraOpts";  
+    }
+    else{
+      push @a,"noArg";
+    }
   }
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
@@ -5993,57 +6012,78 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
    }
   }
 
-  elsif($cmd =~ m/^(press|event)(S|L)/) { #####################################
+  elsif($cmd =~ m/^(press|event)/) { #####################################
     #press          =>"-peer-        [-repCount(long only)-] [-repDelay-] ..."
     #event          =>"-peer- -cond- [-repCount(long only)-] [-repDelay-] ..."
-    my ($trig,$type,$peer) = ($1,$2,$a[2]);
-    my ($cond,$repCnt,$repDly,$modeCode,$mode) = (0,0,0);
-   if ($st ne 'virtual'){
-      return "no peer defined" if (!defined $a[2]);
-      return "$peer not peered to $name" if (InternalVal($name,"peerList","--") !~ m/$peer/);
+
+    my ($trig,$type,$peer      ,$cond,$mode,$modeCode,$repCnt,$repDly) = 
+       ($1   ,"S"  ,"self".$chn,""   ,0    ,"40"     ,0      ,0.25)          ;#defaults
+    
+    if ($cmd =~ m/^(press|event)(L|S)/){# set short/long and remove from Params
+      $type = $2;
     }
     else{
-      splice @a, 2, 0,"";# shift the array, similate a peer for virtuals
+      if (defined $a[2]){
+        if   ($a[2] eq "long") {$type = "L"}
+        elsif($a[2] eq "short"){$type = "S"}
+        else                   {return "use either short or long"}
+        splice @a,2,1; # remove long/short
+      } 
     }
-    if ($trig eq "event"){
-      return "condition missing" if (!defined $a[3]);
-      ($cond,$repCnt,$repDly,$modeCode) = ($a[3],$a[4],$a[5],"41");
-      return "condition $cond out of range. Chooose 0...255" if ($cond < 0 || $cond > 255);
-      $cond = sprintf("%02X",$cond);
+
+    if (defined $a[2] && $a[2] ne "noArg"){ # set peer and remove from Param list
+      $peer = $a[2];
+      splice @a,2,1; # remove long/short
     }
-    else{
-      ($cond,$repCnt,$repDly,$modeCode) = ("",$a[3],$a[4],"40");
+    
+    if ($type eq "event"){# set condition for event (blank for press)
+      $modeCode = "41";
+      if (defined $a[2] && ($a[2] < 0 || $a[2] > 255)){
+        $cond = sprintf("%02X",$a[2]);
+      }
+      else{
+        return "event requires a condition between 0 and 255";
+      }
     }
-    if ($type eq "L"){
+
+    if($type eq "L"){# set timing if releated
       $mode = 64;
-      $repCnt      = 1    if (!defined $repCnt     );
-      $repDly      = 0.25 if (!defined $repDly     );
-      return "repeatCount $repCnt invalid. use value 1 - 255"     if ($repCnt < 1    || $repCnt>255 );
-      return "repDelay $repDly invalid. use value 0.25 - 1.00"    if ($repDly < 0.25 || $repDly>1 );
-    }
-    else{#short
-      ($repCnt,$repDly,$mode) = (0,0,0);
+      if (defined $a[2]){# set $repCnt
+        return "repeat count must be numeric:$a[2] is illegal" if ($a[2] !~ m/^\d*$/);
+        $repCnt = $a[2];
+        splice @a,2,1; # remove repeat count
+      }
+      else{
+        $repCnt = 1;
+      }
+      if (defined $a[2]){# set $repDly
+        return "repeatDelay count must be numeric e.g. 0.25:$a[2] is illegal" if ($a[2] !~ m/^\d*\.?\d+$/);
+        $repDly = $a[2];
+        splice @a,2,1; # remove repeat count
+      }
+      else{
+        $repDly = 0.25;
+      }
     }
 
     $hash->{helper}{count} = (!$hash->{helper}{count} ? 1 
                                                       : $hash->{helper}{count}+1)%256;
-    if ($st eq 'virtual'){#serve all peers of virtual button
+    if ($roleV){#serve all peers of virtual button
       my @peerLchn = split(',',AttrVal($name,"peerIDs",""));
-      my @peerList = map{substr($_,0,6)} @peerLchn;
-      @peerList = grep !/000000/,grep !/^$/,CUL_HM_noDup(@peerList);
+      my @peerList = map{substr($_,0,6)} @peerLchn;                  # peer device IDs
+      @peerList = grep !/000000/,grep !/^$/,CUL_HM_noDup(@peerList); # peer device IDs - clean
       my $pc =  sprintf("%02X%02X",hex($chn)+$mode,$hash->{helper}{count});# msg end
       my $snd = 0;
-      foreach my $peer (sort @peerList){
-        my ($pHash,$peerFlag,$rxt);
-        $pHash = CUL_HM_id2Hash($peer);
+      foreach my $peerDev (@peerList){# send once to each device (not each channel)
+        my $pHash = CUL_HM_id2Hash($peerDev);
         next if (   !$pHash 
                  || !$pHash->{helper}{role}
                  || !$pHash->{helper}{role}{prs});
-        $rxt = CUL_HM_getRxType($pHash);
-        $peerFlag = ($rxt & 0x02) ? "B4" : "A4"; #burst
-        CUL_HM_PushCmdStack($pHash,"++${peerFlag}$modeCode$dst$peer$pc");
+        my $rxt = CUL_HM_getRxType($pHash);
+        my $peerFlag = ($rxt & 0x02) ? "B4" : "A4"; #burst
+        CUL_HM_PushCmdStack($pHash,"++${peerFlag}$modeCode$dst$peerDev$pc");
         $snd = 1;
-        foreach my $pCh(grep /$peer/,@peerLchn){
+        foreach my $pCh(grep /$peerDev/,@peerLchn){
           my $n = CUL_HM_id2Name($pCh);
           next if (!$n);
           $n =~ s/_chn-\d\d$//;
@@ -6051,7 +6091,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           CUL_HM_stateUpdatDly($n,10);
         }
         if ($rxt & 0x80){#burstConditional
-          CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6));
+          CUL_HM_SndCmd($pHash, "++B112$id".$peerDev);
         }
         else{
           CUL_HM_ProcessCmdStack($pHash);
@@ -6075,177 +6115,39 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         select(undef, undef, undef, $repDly);
       }
       CUL_HM_PushCmdStack($hash, "++${flag}$msg"); # send thru commandstack
-      CUL_HM_stateUpdatDly($name,10);#check status after 10 sec
+      CUL_HM_stateUpdatDly($name,10);#check status after 10 sec latest
    }
-  }
-  elsif($cmd =~ m/^press(.*)/) { ##############################################
-    # [long|short] [<peer>] [<repCount(long only)>] [<repDelay>] [<forceTiming[0|1]>] ...
-    my ($repCnt,$repDly,$forceTiming,$mode) = (0,0,0,0);
-    if($cmd eq "pressL"){
-      splice @a,2,0, ("long");
-    }
-    elsif($cmd eq "pressS"){
-      splice @a,2,0, ("short");
-    }
-    
-    if ($a[2]){
-      ##############################
-      if ($a[2] eq "long"){
-        $mode = 64;
-        splice @a,2,1;
-        (undef,undef,undef,$repCnt,$repDly,$forceTiming) = @a;
-        
-        $repCnt      = 1    if (!defined $repCnt     );
-        $repDly      = 0.25 if (!defined $repDly     );
-        $forceTiming = 1    if (!defined $forceTiming);
-        return "repeatCount $repCnt invalid. use value 1 - 255"     if ($repCnt < 1    || $repCnt>255 );
-        return "repDelay $repDly invalid. use value 0.25 - 1.00"    if ($repDly < 0.25 || $repDly>1 );
-        return "forceTiming $forceTiming invalid. use value 0 or 1" if ($forceTiming ne "0" && $forceTiming ne "1" );
-      }
-      elsif($a[2] eq "short"){
-        splice @a,2,1;
-      }
-    }
-    my $vChn = $a[2]?$a[2]:"";
-    
-    my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
-    $hash->{helper}{count}=$pressCnt;# remember for next round
-    if ($st eq 'virtual'){#serve all peers of virtual button
-      my @peerLchn = split(',',AttrVal($name,"peerIDs",""));
-      my @peerList = map{substr($_,0,6)} @peerLchn;
-      @peerList = grep !/000000/,grep !/^$/,CUL_HM_noDup(@peerList);
-      my $pc =  sprintf("%02X%02X",hex($chn)+$mode,$pressCnt);# msg end
-      my $snd = 0;
-      foreach my $peer (sort @peerList){
-        my ($pHash,$peerFlag,$rxt);
-        $pHash = CUL_HM_id2Hash($peer);
-        next if (   !$pHash 
-                 || !$pHash->{helper}{role}
-                 || !$pHash->{helper}{role}{prs});
-        $rxt = CUL_HM_getRxType($pHash);
-        $peerFlag = ($rxt & 0x02)?"B4":"A4" if($vChn ne "noBurst");#burst
-        CUL_HM_PushCmdStack($pHash,"++${peerFlag}40$dst$peer$pc");
-        $snd = 1;
-        foreach my $pCh(grep /$peer/,@peerLchn){
-          my $n = CUL_HM_id2Name($pCh);
-          next if (!$n);
-          $n =~ s/_chn-\d\d$//;
-          delete $defs{$n}{helper}{dlvl};#stop desiredLevel supervision
-          CUL_HM_stateUpdatDly($n,10);
-        }
-        if ($rxt & 0x80){#burstConditional
-          CUL_HM_SndCmd($pHash, "++B112$id".substr($peer,0,6))
-                if($vChn ne "noBurst");
-        }
-        else{
-          CUL_HM_ProcessCmdStack($pHash);
-        }
-      }
-      if(!$snd){# send 2 broadcast if no relevant peers 
-        CUL_HM_SndCmd($hash,"++8440${dst}000000$pc");
-      }
-    }
-    else{#serve internal channels for actor
-      #which button shall be simulated? We offer
-      # on/off: self button - on is even/off odd number. Obey channel
-      # name of peer
-      my $pId;
-      if ($vChn =~ m/^(on|off)$/ && $st =~ m/^(blindActuator|dimmer)$/){
-        $pId = $dst.sprintf("%02X",(($vChn eq "off")?-1:0) + $chn*2);
-      }
-      elsif($vChn){
-        $pId = CUL_HM_name2Id($vChn,$devHash)."01";#01 is default for devices
-      }
-      else{
-        $pId = $dst.sprintf("%02X",$chn);
-      }
-      my ($pDev,$pCh) = unpack 'A6A2',$pId;
-      return "button cannot be identified" if (!$pCh);
-      delete $hash->{helper}{dlvl};#stop desiredLevel supervision
-
-      my $msg = sprintf("3E%s%s%s40%02X%02X",
-                                     $id,$dst,$pDev,
-                                     hex($pCh)+$mode,
-                                     $pressCnt);
-      for (my $cnt = 1;$cnt < $repCnt; $cnt++ ){
-        CUL_HM_SndCmd($hash, "++80$msg"); # send direct Wont work for burst!
-        select(undef, undef, undef, $repDly);
-      }
-      CUL_HM_PushCmdStack($hash, "++${flag}$msg"); # send thru commandstack
-    }
   }
   elsif($cmd =~ m/^trg(Press|Event)(.)/) { ####################################
     $state = "";
     my ($trig,$type) = ($1,$2);
     my $peer = $a[2];
-    return "$peer not defined" if(!defined$defs{$peer} && $peer ne "all" );
-    my @peers;
-    if ($peer eq "all"){
-      @peers  = grep/./,split",",InternalVal($name,"peerList","");
-    }
-    else{
-      push @peers,$a[2];
-    }
-
+    $peer = "." if ($peer =~ m/(noArg|all)/);
     if($trig eq "Event"){
       return "no condition level defined" if (!defined $a[3]);
       return "condition $a[3] out of range. limit to 0..255" if ($a[3]<0 || $a[3]>255);
     }
-    foreach my $peerSet(@peers){
-      next if (!defined($peerSet) || !defined($defs{$peerSet}) );
-      if($trig eq "Event"){CUL_HM_Set($defs{$peerSet},$peerSet,"event$type",$name,$a[3]);}
-      else                {CUL_HM_Set($defs{$peerSet},$peerSet,"press$type",$name);}
-    }
-  }
-  elsif($cmd eq "fwUpdate") { #################################################
-    if ($a[2] eq "onlyEnterBootLoader") {
-      Log3 $name,2,"CUL_HM entering bootloader for $name";
-      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
-                                  ."3011$id${dst}CA");
-      return ("",1);
-    }
-    return "no filename given" if (!$a[2]);
-#    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
-#                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
-    # todo add version checks of CUL
-    my ($fName,$pos,$enterBL) = ($a[2],0,($a[3] ? $a[3]+0 : 10));
-    my @imA; # image array: image[block][msg]
-
-    return "Illegal waitTime $enterBL - enter a value between 10 and 300" 
-         if ($enterBL < 10 || $enterBL>300);    
-
-    open(aUpdtF, $fName) || return("Can't open $fName: $!");
-    while(<aUpdtF>){
-      my $line = $_;
-      my $fs = length($line);
-      while ($fs>$pos){
-        my $bs = hex(substr($line,$pos,4))*2+4;	  
-        return "file corrupt. length:$fs expected:".($pos+$bs) 
-              if ($fs<$pos+$bs);
-        my @msg = grep !/^$/,unpack '(A60)*',substr($line,$pos,$bs);
-        push @imA,\@msg; # image[block][msg]
-        $pos += $bs;
+    my @peers = ();
+    foreach my $peer (grep/$peer/,split",",InternalVal($name,"peerList","")){
+      if($defs{$peer}{helper}{role}{vrt}){
+      }
+      elsif($defs{$peer}{helper}{role}{chn}){
+        push @peers,$peer;  
+      }
+      elsif($defs{$peer}{helper}{role}{dev}){
+        push @peers,CUL_HM_getAssChnNames($peer);  
       }
     }
-    close(aUpdtF);
-    # --- we are prepared start update---
-    CUL_HM_protState($hash,"CMDs_FWupdate");
-    $modules{CUL_HM}{helper}{updating} = 1;
-    $modules{CUL_HM}{helper}{updatingName} = $name;
-    $modules{CUL_HM}{helper}{updateData} = \@imA;
-    $modules{CUL_HM}{helper}{updateStep} = 0;
-    $modules{CUL_HM}{helper}{updateDst} = $dst;
-    $modules{CUL_HM}{helper}{updateId} = $id;
-    $modules{CUL_HM}{helper}{updateNbr} = 10;
-    Log3 $name,2,"CUL_HM fwUpdate started for $name";
-    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
-                        ."3011$id${dst}CA");
-                        
-    $hash->{helper}{io}{newChnFwUpdate} = $hash->{helper}{io}{newChn};#temporary hide init message
-    $hash->{helper}{io}{newChn} = "";
+    my $peerCnt = 0;
+    foreach my $peerSet(@peers){
+      next if (!defined($peerSet) || !defined($defs{$peerSet}) );
+      next if (!defined $defs{$peer}{helper}{cmds}{cmdLst}{press});
+      if($trig eq "Event"){CUL_HM_Set($defs{$peerSet},$peerSet,"event$type",$name,$a[3]);}
+      else                {CUL_HM_Set($defs{$peerSet},$peerSet,"press$type",$name);}
+      $peerCnt++;
+    }
+    return "no target peer found" if(!$peerCnt);
 
-    InternalTimer(gettimeofday()+$enterBL,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
-    #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
   elsif($cmd eq "postEvent") { ################################################
     my (undef,undef,$cond) = @a;
@@ -6313,6 +6215,56 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                             ,"trig_$name:$cond"
                             ,"trigLast:$name:$cond");
     }
+  }
+  elsif($cmd eq "fwUpdate") { #################################################
+    if ($a[2] eq "onlyEnterBootLoader") {
+      Log3 $name,2,"CUL_HM entering bootloader for $name";
+      CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                                  ."3011$id${dst}CA");
+      return ("",1);
+    }
+    return "no filename given" if (!$a[2]);
+#    return "only thru CUL " if (!$hash->{IODev}->{TYPE}
+#                                 ||($hash->{IODev}->{TYPE} ne "CUL"));
+    # todo add version checks of CUL
+    my ($fName,$pos,$enterBL) = ($a[2],0,($a[3] ? $a[3]+0 : 10));
+    my @imA; # image array: image[block][msg]
+
+    return "Illegal waitTime $enterBL - enter a value between 10 and 300" 
+         if ($enterBL < 10 || $enterBL>300);    
+
+    open(aUpdtF, $fName) || return("Can't open $fName: $!");
+    while(<aUpdtF>){
+      my $line = $_;
+      my $fs = length($line);
+      while ($fs>$pos){
+        my $bs = hex(substr($line,$pos,4))*2+4;	  
+        return "file corrupt. length:$fs expected:".($pos+$bs) 
+              if ($fs<$pos+$bs);
+        my @msg = grep !/^$/,unpack '(A60)*',substr($line,$pos,$bs);
+        push @imA,\@msg; # image[block][msg]
+        $pos += $bs;
+      }
+    }
+    close(aUpdtF);
+    # --- we are prepared start update---
+    CUL_HM_protState($hash,"CMDs_FWupdate");
+    $modules{CUL_HM}{helper}{updating} = 1;
+    $modules{CUL_HM}{helper}{updatingName} = $name;
+    $modules{CUL_HM}{helper}{updateData} = \@imA;
+    $modules{CUL_HM}{helper}{updateStep} = 0;
+    $modules{CUL_HM}{helper}{updateDst} = $dst;
+    $modules{CUL_HM}{helper}{updateId} = $id;
+    $modules{CUL_HM}{helper}{updateNbr} = 10;
+    Log3 $name,2,"CUL_HM fwUpdate started for $name";
+    CUL_HM_SndCmd($hash, sprintf("%02X",$modules{CUL_HM}{helper}{updateNbr})
+                        ."3011$id${dst}CA");
+                        
+    $hash->{helper}{io}{newChnFwUpdate} = $hash->{helper}{io}{newChn};#temporary hide init message
+    $hash->{helper}{io}{newChn} = "";
+
+    InternalTimer(gettimeofday()+$enterBL,"CUL_HM_FWupdateEnd","fail:notInBootLoader",0);
+    #InternalTimer(gettimeofday()+0.3,"CUL_HM_FWupdateSim",$dst."00000000",0);
   }
 
   elsif($cmd eq "peerIODev") { ################################################
@@ -9501,6 +9453,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
   my @event;
   my ($cntUnkn,$cntAliv,$cntDead,$cnt_Off) =(0,0,0,0);
   my $autoTry = CUL_HM_getAttrInt($actName,"actAutoTry",0);
+  
   foreach my $devId (split(",",$peerIDs)){
     next if (!$devId);
     my $devName = CUL_HM_id2Name($devId);
