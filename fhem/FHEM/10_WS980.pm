@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.1.1";
+my $version = "1.2.0";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -138,7 +138,7 @@ use constant UNIT_CONVERSIONS => {
 		"fnc"  => {
 			"lux"   => sub { my ($c) = @_; return $c },
 			"fc"    => sub { my ($c) = @_; return $c * 0.09290304000008},
-			"w/m^2" => sub { my ($c) = @_; return $c * 0.001464128843338},
+			"w/m^2" => sub { my ($c) = @_; return $c * 0.0079},  # 0.001464128843338 @ 555nm
 		},
 	},
 };
