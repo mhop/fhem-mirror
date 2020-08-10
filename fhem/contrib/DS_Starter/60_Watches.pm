@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 60_Watches.pm 22109 2020-06-03 21:19:14Z DS_Starter $
+# $Id: 60_Watches.pm 22507 2020-08-01 07:54:26Z DS_Starter $
 #########################################################################################################################
 #       60_Watches.pm
 #
@@ -42,6 +42,9 @@ BEGIN {
       qw(
           AttrVal
           defs
+          FW_makeImage
+          FW_ME
+          FW_subdir
           IsDisabled
           Log3 
           modules          
@@ -72,7 +75,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.26.0" => "31.07.2020  add write into reading 'currtime' for stopwatch, add \$readingFnAttributes, set release_status to stable, attr timeAsReading ",
+  "0.27.0" => "10.08.2020  control buttons, new attr hideButtons, controlButtonSize ",
+  "0.26.0" => "01.08.2020  add attr timeAsReading -> write into reading 'currtime' if time is displayed, ".
+                           "add \$readingFnAttributes, set release_status to stable ",
   "0.25.0" => "03.06.2020  set reading 'stoptime' in type 'stopwatch' ",                               
   "0.24.0" => "26.05.2020  entry of countDownInit can be in format <seconds> ",
   "0.23.2" => "20.05.2020  english commandref ",
@@ -107,6 +112,13 @@ my %vNotesIntern = (
   "0.1.0"  => "13.11.2018  initial Version with modern analog clock"
 );
 
+my %hcb = (                                                                  # Hash der Steuertastendefinition
+  1  => {cmd => "start",  img => "default/remotecontrol/black_btn_GREEN.png",     },
+  2  => {cmd => "stop",   img => "default/remotecontrol/black_btn_RED.png",       },
+  3  => {cmd => "resume", img => "default/remotecontrol/black_btn_YELLOW.png", },
+  4  => {cmd => "reset",  img => "default/remotecontrol/black_btn_STOP.png",      },
+);
+
 ##############################################################################
 #         Initialize Funktion
 ##############################################################################
@@ -118,7 +130,8 @@ sub Initialize {
   $hash->{FW_summaryFn}       = \&FWebFn;
   $hash->{FW_detailFn}        = \&FWebFn;
   $hash->{AttrFn}             = \&Attr;
-  $hash->{AttrList}           = "digitalBorderDistance:slider,0,1,40 ".
+  $hash->{AttrList}           = "controlButtonSize:selectnumbers,50,5,150,0,lin ".
+                                "digitalBorderDistance:slider,0,1,40 ".
                                 "digitalColorBackground:colorpicker ".
                                 "digitalColorDigits:colorpicker ".
                                 "digitalDisplayPattern:countdownwatch,staticwatch,stopwatch,text,watch ".
@@ -131,6 +144,7 @@ sub Initialize {
                                 "digitalSegmentWidth:slider,0.3,0.1,3.5,1 ".
                                 "digitalTextDigitNumber ".
                                 "disable:1,0 ".
+                                "hideButtons:1,0 ".
                                 "hideDisplayName:1,0 ".
                                 "htmlattr ".
                                 "modernColorBackground:colorpicker ".
@@ -400,7 +414,57 @@ sub FWebFn {
       $ret .= stationWatch($d) if($hash->{MODEL} =~ /station/ix);
       $ret .= digitalWatch($d) if($hash->{MODEL} =~ /digital/ix);
   }
+  
+  my $ddp = AttrVal($d, "digitalDisplayPattern", "");              # Steuertastenpaneel 
+  my $hb  = AttrVal($d, "hideButtons", 0);
+  if($ddp =~ /countdownwatch|stopwatch/x && !$hb) {
+      $ret .= controlPanel ($d);
+  }
     
+return $ret;
+}
+
+###############################################################################
+#                    Paneel für Stoppuhr Steuertasten
+###############################################################################
+sub controlPanel {
+  my $name     = shift;
+  my $pbs      = AttrVal($name,"controlButtonSize", 100);                                       # Größe der Druckbuttons in %
+  my $iconpath = "www/images";
+  my $ttjs     = "/fhem/pgm2/sscam_tooltip.js"; 
+  my $ret      = "";
+  
+  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>"; 
+  $ret .= "<style>TD.controlv1 { padding: 3px 3px; } </style>";
+  $ret .= "<style>TD.controlv2 { padding: 8px 8px; } </style>";
+  $ret .= "<style>.defsize { font-size:16px; } </style>";
+  
+  $ret .= '<table class="defsize">';
+  $ret .= "<tr>";
+ 
+  for my $btn (sort keys %hcb) {                 
+      my $cmd = $hcb{$btn}{cmd};
+      my $img = $hcb{$btn}{img}; 
+      next if(!$cmd || !$img);
+      
+      $ret .= "<td class='controlv1'>" if($pbs <= 100);
+      $ret .= "<td class='controlv2'>" if($pbs >= 105);
+      
+      if ($img =~ m/\.svg/x) {                                                                               # Verwendung für SVG's
+          $img = FW_makeImage($img, $cmd, "rc-button");   
+      } else {                                                                                               # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
+          $img = "<img src=\"$FW_ME/$iconpath/$img\" height=\"$pbs%\" width=\"$pbs%\">";  
+      }
+
+      my $cmd1 = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                                      # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink 
+      $ret    .= "<a onClick=\"$cmd1\" onmouseover=\"Tip('$cmd')\" onmouseout=\"UnTip()\">$img</a>";  
+
+      $ret .= "</td>";    
+  }
+  
+  $ret .= "</tr>";  
+  $ret .= "</table>";
+  
 return $ret;
 }
 
@@ -2419,7 +2483,9 @@ return;
 <h3>Watches</h3>
 
 <br>
-The module Watches provides watches in different styles as Device. 
+The module Watches provides watches in different styles as Device. The module is a JavaScript application that runs on a 
+client (browser) and not on the FHEM server. Attributes and readings are read asynchronously from the server and possibly 
+also written, but only if the application is currently running in the browser. <br>
 The user can influence the design of the watches via attributes. <br>
 The clocks are based on scripts of these pages: <br>
 
@@ -2580,15 +2646,27 @@ As time source the client (browser time) as well as the FHEM server can be set
   <br>
 
   <a name="WatchesAttr"></a>
-  <b>Attribute</b>
+  <b>Attributes</b>
   <br><br>
   
   <ul>
   <ul>
   
+    <a name="controlButtonSize"></a>
+    <li><b>controlButtonSize</b><br>
+      Changes the size of the control buttons if the clock type has control buttons.
+    </li>
+    <br>
+  
     <a name="disable"></a>
     <li><b>disable</b><br>
       Activates/deactivates the Device.
+    </li>
+    <br>
+    
+    <a name="hideButtons"></a>
+    <li><b>hideButtons</b><br>
+      Hides the control buttons if the watch type has control buttons. 
     </li>
     <br>
     
@@ -2605,6 +2683,12 @@ As time source the client (browser time) as well as the FHEM server can be set
         <b>Example: </b><br>
         attr &lt;name&gt; htmlattr width="125" height="125" <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="timeAsReading"></a>
+    <li><b>timeAsReading</b><br>
+      If set, a displayed time is written to the reading currtime.
     </li>
     <br>
     
@@ -2830,7 +2914,9 @@ As time source the client (browser time) as well as the FHEM server can be set
 <h3>Watches</h3>
 
 <br>
-Das Modul Watches stellt Uhren in unterschiedlichen Stilen als Device zur Verfügung. 
+Das Modul Watches stellt Uhren in unterschiedlichen Stilen als Device zur Verfügung. Das Modul ist eine JavaScript Anwendung 
+die auf einem Client (Browser) ausgeführt wird und nicht auf dem FHEM Server. Attribute und Readings werden asynchron vom 
+Server gelesen und evtl. auch geschrieben, allerdings nur dann wenn die Anwendung aktuell im Browser ausgeführt wird. <br> 
 Der Nutzer kann das Design der Uhren über Attribute beeinflussen. <br>
 Die Uhren basieren auf Skripten dieser Seiten: <br>
 
@@ -2998,9 +3084,21 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
   <ul>
   <ul>
   
+    <a name="controlButtonSize"></a>
+    <li><b>controlButtonSize</b><br>
+      Ändert die Größe der Steuerdrucktasten sofern der Uhrentyp über Steuerdrucktasten verfügt.
+    </li>
+    <br>
+    
     <a name="disable"></a>
     <li><b>disable</b><br>
       Aktiviert/deaktiviert das Device.
+    </li>
+    <br>
+    
+    <a name="hideButtons"></a>
+    <li><b>hideButtons</b><br>
+      Verbirgt die Steuerdrucktasten sofern der Uhrentyp über Steuerdrucktasten verfügt. 
     </li>
     <br>
     
@@ -3017,6 +3115,12 @@ Als Zeitquelle können sowohl der Client (Browserzeit) als auch der FHEM-Server 
         <b>Beispiel: </b><br>
         attr &lt;name&gt; htmlattr width="125" height="125" <br>
       </ul>
+    </li>
+    <br>
+    
+    <a name="timeAsReading"></a>
+    <li><b>timeAsReading</b><br>
+      Wenn gesetzt, wird eine angezeigte Uhrzeit in das Reading currtime geschrieben.
     </li>
     <br>
     
