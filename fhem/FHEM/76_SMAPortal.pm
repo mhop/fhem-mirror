@@ -71,6 +71,7 @@ BEGIN {
           CommandDeleteAttr
           CommandDeleteReading
           CommandSet
+          CommandGet
           defs
           delFromDevAttrList
           delFromAttrList
@@ -136,6 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
+                           "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
   "3.3.3"  => "07.07.2020  change extractLiveData, minor fixes ",
   "3.3.2"  => "05.07.2020  change timeout calc, new reading lastSuccessTime ",
@@ -228,6 +231,12 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
+my %hset = (                                                                # Hash der Set-Funktion
+    credentials         => { fn => "_setCredentials"         }, 
+    getData             => { fn => "_setGetData"             },
+    createPortalGraphic => { fn => "_setCreatePortalGraphic" },     
+);
+
 my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
 my %subs;                                                                                              # Arbeitskopie von %stpl -> Festlegung abzurufenden Datenprovider
 my %stpl = (                                                                                           # Ausgangstemplate Subfunktionen der Datenprovider
@@ -241,13 +250,13 @@ my %stpl = (                                                                    
   consumerMonthData   => { doit => 0, nohm => 1, level => 'L07', func => '_getConsumerMonthData'   },
   consumerYearData    => { doit => 0, nohm => 1, level => 'L08', func => '_getConsumerYearData'    },
   plantLogbook        => { doit => 0, nohm => 0, level => 'L09', func => '_getPlantLogbook'        },
-  balanceCurrentData  => { doit => 0, nohm => 0, level => 'L10', func => '_getBalanceCurrentData'  },
   balanceDayData      => { doit => 0, nohm => 0, level => 'L11', func => '_getBalanceDayData'      },
   balanceMonthData    => { doit => 0, nohm => 0, level => 'L12', func => '_getBalanceMonthData'    },
   balanceYearData     => { doit => 0, nohm => 0, level => 'L13', func => '_getBalanceYearData'     },
   balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
-                                           # Tags der verfügbaren Datenquellen
+
+                                                                   # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
              balanceDayData
@@ -286,7 +295,10 @@ sub Initialize {
   $hash->{SetFn}         = \&Set;
   $hash->{GetFn}         = \&Get;
   $hash->{DbLog_splitFn} = \&DbLog_split;
-  $hash->{AttrList}      = "cookieLocation ".
+  $hash->{AttrList}      = "balanceDay ".
+                           "balanceMonth ".
+                           "balanceYear ".
+                           "cookieLocation ".
                            "disable:0,1 ".
                            "interval ".
                            "noHomeManager:1,0 ".
@@ -360,7 +372,7 @@ sub Set {                             ## no critic 'complexity'
   my $opt     = $a[1];
   my $prop    = $a[2];
   my $prop1   = $a[3];
-  my ($setlist,$success);
+  my $setlist;
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -374,7 +386,8 @@ sub Set {                             ## no critic 'complexity'
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
-                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential "
+                 "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
+                 "getData:noArg "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           my $lfd = 0;
@@ -391,101 +404,156 @@ sub Set {                             ## no critic 'complexity'
           }
       } 
   }  
-
-  if ($opt eq "credentials") {
-      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);    
-      ($success) = setcredentials($hash,$prop,$prop1); 
-      
-      if($success) {
-          delcookiefile ($hash);
-          CallInfo($hash);
-          return "Username and Password saved successfully";
-      } else {
-           return "Error while saving Username / Password - see logfile for details";
-      }
             
-  } elsif ($opt eq "createPortalGraphic") {
-      if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-      my ($htmldev,$ret,$c,$type,$color2);
-      
-      if ($prop eq "Generation") {                                                      ## no critic "Cascading"
-          $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
-          $type    = 'pv';        
-          $c       = "SMA Sunny Portal Graphics - Forecast Generation";
-          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
-      } elsif ($prop eq "Consumption") {
-          $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
-          $type    = 'co';    
-          $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
-          $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
-      } elsif ($prop eq "Generation_Consumption") {
-          $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
-          $type    = 'pvco'; 
-          $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
-          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
-      } elsif ($prop eq "Differential") {
-          $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
-          $type    = 'diff';   
-          $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
-          $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
-      } else {
-          return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
-      }
-
-      $ret = CommandDefine($hash->{CL},"$htmldev SMAPortalSPG {FHEM::SMAPortal::PortalAsHtml ('$name','$htmldev')}");
-      return $ret if($ret);
-      
-      CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
-      
-      $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
-           qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are privided by SMA!\n}.      
-           qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
-           qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
-      
-      CommandAttr($hash->{CL},"$htmldev comment $c");     
-
-      # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
-      # bzw muß überhaupt hier etwas vorbesetzt werden ?
-      # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
-      
-      CommandAttr($hash->{CL},"$htmldev hourCount 24");
-      CommandAttr($hash->{CL},"$htmldev consumerAdviceIcon on");
-      CommandAttr($hash->{CL},"$htmldev showHeader 1");
-      CommandAttr($hash->{CL},"$htmldev showLink 1");
-      CommandAttr($hash->{CL},"$htmldev spaceSize 24");
-      CommandAttr($hash->{CL},"$htmldev showWeather 1");
-      CommandAttr($hash->{CL},"$htmldev layoutType $type");                             # Anzeigetyp setzen
-
-      # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
-      # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
-      my $color;
-      my $jh = json2nameValue(AttrVal('WEB','styleData',''));
-      if($jh && ref $jh eq "HASH") {
-          $color = $jh->{'f18_cols.header'};
-      }
-      if (defined($color)) {
-          CommandAttr($hash->{CL},"$htmldev beamColor $color");
-      }
-      
-      # zweite Farbe setzen
-      CommandAttr($hash->{CL},"$htmldev beamColor2 $color2");
-
-      my $room = AttrVal($name,"room","SMAPortal");
-      CommandAttr($hash->{CL},"$htmldev room $room");
-      
-      return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
-  
-  } elsif ($opt && $ad && $opt =~ /$ad/x) {
+  if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);
         
   } else {
+      my $params = {
+          hash  => $hash,
+          name  => $name,
+          opt   => $opt,
+          prop  => $prop,
+          prop1 => $prop1,
+          aref  => \@a,
+      };
+      
+      no strict "refs";                                                        ## no critic 'NoStrict'  
+      if($hset{$opt}) {
+          my $ret = "";
+          $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+          return $ret;
+      }
+      use strict "refs";
+
       return "$setlist";
   } 
   
 return;
+}
+
+################################################################
+#                      Setter credentials
+#                    credentials speichern
+################################################################
+sub _setCredentials {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+
+  return qq{Credentials are incomplete, use "set $name credentials <username> <password>"} if (!$prop || !$prop1);    
+  my ($success) = setcredentials($hash,$prop,$prop1); 
+  
+  if($success) {
+      delcookiefile ($hash);
+      CallInfo($hash);
+      return "Username and Password saved successfully";
+  
+  } else {
+       return "Error while saving Username / Password - see logfile for details";
+  }
+
+return;
+}
+
+################################################################
+#                      Setter getData
+#       identisch zu "get gata", Workaround um mit webCmd 
+#       arbeiten zu können
+################################################################
+sub _setGetData {                        ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  CommandGet(undef, "$name data");
+
+return;
+}
+
+################################################################
+#                      Setter createPortalGraphic
+#                 create createPortalGraphic devices
+################################################################
+sub _setCreatePortalGraphic {            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+
+  if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
+  my ($htmldev,$ret,$c,$type,$color2);
+  
+  if ($prop eq "Generation") {                                                      ## no critic "Cascading"
+      $htmldev = "SPG1.$name";                                                      # Grafiktyp Generation (Erzeugung)
+      $type    = 'pv';        
+      $c       = "SMA Sunny Portal Graphics - Forecast Generation";
+      $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
+  } elsif ($prop eq "Consumption") {
+      $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
+      $type    = 'co';    
+      $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
+      $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
+  } elsif ($prop eq "Generation_Consumption") {
+      $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
+      $type    = 'pvco'; 
+      $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
+      $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
+  } elsif ($prop eq "Differential") {
+      $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
+      $type    = 'diff';   
+      $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
+      $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
+  } else {
+      return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
+  }
+
+  $ret = CommandDefine($hash->{CL},"$htmldev SMAPortalSPG {FHEM::SMAPortal::PortalAsHtml ('$name','$htmldev')}");
+  return $ret if($ret);
+  
+  CommandAttr($hash->{CL},"$htmldev alias $c");                                     # Alias setzen
+  
+  $c = qq{This device provides a praphical output of SMA Sunny Portal values.\n}.
+       qq{It is important that a SMA Home Manager is installed. Otherwise no forecast data are provided by SMA!\n}.      
+       qq{The device "$name" needs to contain "forecastData" in attribute "providerLevel".\n}.
+       qq{The attribute "providerLevel" must also contain "consumerCurrentdata" if you want switch your consumer connectet to the SMA Home Manager.};
+  
+  CommandAttr($hash->{CL},"$htmldev comment $c");     
+
+  # es muß nicht unbedingt jedes der möglichen userattr unbedingt vorbesetzt werden
+  # bzw muß überhaupt hier etwas vorbesetzt werden ?
+  # alle Werte enstprechen eh den AttrVal/ AttrNum default Werten
+  
+  CommandAttr($hash->{CL},"$htmldev hourCount 24");
+  CommandAttr($hash->{CL},"$htmldev consumerAdviceIcon on");
+  CommandAttr($hash->{CL},"$htmldev showHeader 1");
+  CommandAttr($hash->{CL},"$htmldev showLink 1");
+  CommandAttr($hash->{CL},"$htmldev spaceSize 24");
+  CommandAttr($hash->{CL},"$htmldev showWeather 1");
+  CommandAttr($hash->{CL},"$htmldev layoutType $type");                             # Anzeigetyp setzen
+
+  # eine mögliche Startfarbe steht beim installiertem f18 Style direkt zur Verfügung
+  # ohne vorhanden f18 Style bestimmt später tr.odd aus der Style css die Anfangsfarbe
+  my $color;
+  my $jh = json2nameValue(AttrVal('WEB','styleData',''));
+  if($jh && ref $jh eq "HASH") {
+      $color = $jh->{'f18_cols.header'};
+  }
+  if (defined($color)) {
+      CommandAttr($hash->{CL},"$htmldev beamColor $color");
+  }
+  
+  # zweite Farbe setzen
+  CommandAttr($hash->{CL},"$htmldev beamColor2 $color2");
+
+  my $room = AttrVal($name,"room","SMAPortal");
+  CommandAttr($hash->{CL},"$htmldev room $room");
+  
+return "SMA Portal Graphics device \"$htmldev\" created and assigned to room \"$room\".";
 }
 
 ###############################################################
@@ -532,37 +600,10 @@ return;
 ###############################################################
 sub DbLog_split {
   my ($event, $device) = @_;
-  my $devhash = $defs{$device};
   my ($reading, $value, $unit);
-
-  if($event =~ m/[_\-fd]Consumption|Quote/x) {
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }
-  if($event =~ m/Power|PV|FeedIn|SelfSupply|Temperature|Total|Energy|Hour:|Hour(\d\d):/x) {                        
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }   
-  if($event =~ m/Next04Hours-IsConsumption|RestOfDay-IsConsumption|Tomorrow-IsConsumption|Battery/x) {
-      $event =~ /^L(.*):\s(.*)\s(.*)/x;
-      if($1) {
-          $reading = "L".$1;
-          $value   = $2;
-          $unit    = $3;
-      }
-  }   
-  if($event =~ m/summary/x && $event =~ /(.*):\s(.*)\s(.*)/x) {
-      $reading = $1;
-      $value   = $2;
-      $unit    = $3;
+  
+  if($event =~ /\s(Wh|W|kWh|%|h)$/xms) {
+      ($reading, $value, $unit) = $event =~ /(.*):\s(.*)\s(.*)/x;
   } 
   
 return ($reading, $value, $unit);
@@ -584,8 +625,7 @@ sub setcredentials {
     $len = scalar @key;  
     $i = 0;  
     $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) + $key[$i]) % 256) } split //, $credstr; 
+            map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
     # End Scramble-Routine    
        
     $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
@@ -635,9 +675,7 @@ sub getcredentials {
             $len = scalar @key;  
             $i = 0;  
             $credstr = join "",  
-            map { $i = ($i + 1) % $len;  
-            chr((ord($_) - $key[$i] + 256) % 256) }  
-            split //, $credstr;   
+            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;   ## no critic 'Map blocks';
             # Ende Descramble-Routine
             
             ($username, $passwd) = split(":",decode_base64($credstr));
@@ -693,13 +731,11 @@ sub Attr {
     }
     
     if ($cmd eq "set") {
-        if ($aName =~ m/interval/x) {
-            unless ($aVal =~ /^\d+$/x) {return " The Value for $aName is not valid. Use only figures 0-9 !";}
-        }
-        if($aName =~ m/interval/x) {
-            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 30);
+        if ($aName eq "interval") {
+            unless ($aVal =~ /^\d+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
+            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 120);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
-        }        
+        }          
     }
 
 return;
@@ -713,7 +749,7 @@ return;
 #   $nr = 1 wenn Retry Zähler nicht zurückgesetzt werden soll
 #
 ################################################################
-sub CallInfo {
+sub CallInfo {                         ## no critic 'complexity'
   my ($hash,$nc,$nr) = @_;
   my $name           = $hash->{NAME};
   my $new;
@@ -768,8 +804,9 @@ sub CallInfo {
           Log3 ($name, 3, "$name - ################################################################");
           Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
           Log3 ($name, 3, "$name - ################################################################"); 
-          Log3 ($name, 4, "$name - calculated maximum cycles:      $maxcycles");
-          Log3 ($name, 4, "$name - calculated timeout:             $timeout");
+          Log3 ($name, 5, "$name - SMAPortal version:          $hash->{HELPER}{VERSION}");
+          Log3 ($name, 4, "$name - calculated maximum cycles:  $maxcycles");
+          Log3 ($name, 4, "$name - calculated timeout:         $timeout");
       }
       
       if(AttrVal($name, "noHomeManager", 0)) {                                 # wenn kein Home Manager installiert ist keine mandatories ausführen
@@ -827,7 +864,7 @@ return ($interval,$maxcycles,$timeoutdef);
 ##                  Datenabruf SMA-Portal
 ##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
-sub GetSetData {                                                       ## no critic 'complexity'
+sub GetSetData {                       ## no critic 'complexity'
   my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
@@ -1438,43 +1475,6 @@ return ($errstate,$state,$reread,$retry);
 #           Abruf Statistik Daten Day
 #            (anchorTime beachten !)
 ################################################################
-sub _getBalanceCurrentData {                       ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
- 
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 0;                                                            # Tab 0 -> Current, Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',                                       
-                                         tag      => "balanceCurrentData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "Current",
-                                         daref    => $daref
-                                      });                                     
-  
-return ($errstate,$state,$reread,$retry); 
-}
-
-################################################################
-#           Abruf Statistik Daten Day
-#            (anchorTime beachten !)
-################################################################
 sub _getBalanceDayData {                 ## no critic "not used"
   my $paref    = shift;
   my $name     = $paref->{name};
@@ -1482,28 +1482,57 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
- 
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+  my ($reread,$retry,$errstate) = (0,0,0); 
   
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceDayData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "Day",
-                                         daref    => $daref
-                                      });                                     
+  my @bd = split /\s+/x ,AttrVal($name, "balanceDay", "current");
+
+  for my $bal (@bd) {
+      my ($y,$m,$d);
+      my $addon = "Day";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y,$m,$d) = $bal =~ /(\d{4})-(\d{2})-(\d{2})/x;
+          
+          if(!$y || !$m || !$d) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceDay" value "$bal" is ignored. A valid date with form "YYYY-MM-DD" is needed});
+              next;
+          }
+          
+          $y -= 1900;
+          $m -= 1;
+      
+      } else {
+          (undef,undef,undef,$d,$m,$y) = localtime(time);
+      }  
+ 
+      eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                      $errstate = 1;
+                                                      Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceDay' detected: $state");
+                                                      return ($errstate,$state,$reread,$retry);
+                                                   };
+   
+      my $cts      = fhemTimeLocal(0, 0, 0, $d, $m, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceDayData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+      
+      }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1519,28 +1548,58 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   
-  my ($reread,$retry,$errstate) = (0,0,0);                                 
+  my ($reread,$retry,$errstate) = (0,0,0);   
+
+  my @bd = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
+
+  for my $bal (@bd) {
+      my ($y,$m);
+      my $addon = "Month";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y,$m) = $bal =~ /^(\d{4})-(\d{2})$/x;
+          
+          if(!$y || !$m) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceMonth" value "$bal" is ignored. A valid date with form "YYYY-MM" is needed});
+              next;
+          }
+          
+          $y -= 1900;
+          $m -= 1;
+      
+      } else {
+          $m = (localtime(time))[4];
+          $y = (localtime(time))[5];
+      }  
  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceMonthData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "Month",
-                                         daref    => $daref
-                                      });                                     
+      eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                     $errstate = 1;
+                                                     Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
+                                                     return ($errstate,$state,$reread,$retry);
+                                                   };
+                                                   
+      my $cts      = fhemTimeLocal(0, 0, 0, 1, $m, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceMonthData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+      
+  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1558,26 +1617,52 @@ sub _getBalanceYearData {                 ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
-   
-  my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
-  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                         tag      => "balanceYearData",
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractStatisticData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "Year",
-                                         daref    => $daref
-                                      });                                     
+  my @bd = split /\s+/x ,AttrVal($name, "balanceYear", "current");
+
+  for my $bal (@bd) {
+      my $y;
+      my $addon = "Year";
+      $addon   .= "_".$bal;
+      
+      if($bal ne "current") {
+          ($y) = $bal =~ /^(\d{4})$/x;
+          
+          if(!$y) {
+              Log3 ($name, 2, qq{$name - The attribute "balanceYear" value "$bal" is ignored. A valid date with form "YYYY" is needed});
+              next;
+          }
+          
+          $y  -= 1900;
+      } else {
+          $y = (localtime(time))[5];
+      }
+      
+      eval { timelocal(0, 0, 0, 1, 1, $y) } or do { $state    = (split(" at", $@))[0];
+                                                    $errstate = 1;
+                                                    Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceYear' detected: $state");
+                                                    return ($errstate,$state,$reread,$retry);
+                                                  };
+                                                   
+      my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
+      my $offset   = fhemTzOffset($cts);
+      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+       
+      my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $cont    = qq{{"tabNumber":$tab,"anchorTime":$anchort}};
+      
+      ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                             ua       => $ua,
+                                             call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
+                                             tag      => "balanceYearData",
+                                             state    => $state, 
+                                             fnaref   => [ qw( extractStatisticData ) ],
+                                             fields   => \%fields,
+                                             content  => $cont,
+                                             addon    => $addon,
+                                             daref    => $daref
+                                          });                                     
+  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1731,10 +1816,10 @@ sub __dispatchPost {
                                                   });
                                                               
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
-                                                       errstate => $errstate,
-                                                       state    => $state,
-                                                       data     => $data
-                                                    });
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state) if($errstate);
   
@@ -1854,9 +1939,16 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
   my $em1d = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
   my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
-  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration};
+  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
 
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
+  
+  my $jsonerror = $ad->header('Jsonerror') // "";                # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  if($jsonerror) {
+      $errstate = 1;
+      $state    = "SMA Portal failure: "."Message -> ".$data->{Message}.",\nStackTrace -> ".$data->{StackTrace}.",\nExceptionType -> ".$data->{ExceptionType};
+      return ($reread,$retry,$errstate,$state);
+  }
   
   if(ref $data eq "HASH") {
       for my $k (keys %{$data}) {
@@ -1994,12 +2086,6 @@ sub ParseData {                                                    ## no critic 
   my $fi   = ReadingsNum($name, "${ldlv}_FeedIn"         , 0);
   my $gc   = ReadingsNum($name, "${ldlv}_GridConsumption", 0);
   my $sum  = $fi-$gc;
-  
-#  if(!$errstate && $lddo && !$pv && !$fi && !$gc) {
-      # keine Anlagendaten vorhanden
-#      $state = "Data can't be retrieved from SMA-Portal. Reread at next scheduled cycle.";
-#      Log3 ($name, 2, "$name - $state");
-#  }
   
   my $ts = strftime('%Y-%m-%d %H:%M:%S', localtime);
   if(AttrVal("global", "language", "EN") eq "DE") {
@@ -2345,7 +2431,10 @@ return;
 
 ################################################################
 #          Auswertung Statistic Daten
-#          $period = Current | Day | Month | Year
+#          $period = Day[_<date>]   | 
+#                    Month[_<date>] | 
+#                    Year[_<date>]  | 
+#                    Total
 ################################################################
 sub extractStatisticData {
   my $hash      = shift;
@@ -3125,8 +3214,8 @@ sub PortalAsHtml {                                                              
   
   # Headerzeile generieren                                                                                                             
   if ($header) {
-      my $lang    = AttrVal("global","language","EN");
-      my $alias   = AttrVal($name, "alias", "SMA Sunny Portal");                                            # Linktext als Aliasname oder "SMA Sunny Portal"
+      my $lang    = AttrVal("global", "language", "EN");
+      my $alias   = AttrVal($name,    "alias",    "SMA Sunny Portal");                                      # Linktext als Aliasname oder "SMA Sunny Portal"
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, "${fmin}_ForecastToday_Consumption", "0000-00-00 00:00:00");   # letzter Forecast Update  
       
@@ -3146,11 +3235,34 @@ sub PortalAsHtml {                                                              
 
       $header  = "<table align=\"$hdrAlign\">"; 
       
-      # Header Link + Status 
+      # Header Link + Status + Update Button 
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-          my ($year, $month, $day, $hour, $min, $sec) = $lup =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
-          $lup     = "$3.$2.$1 $4";
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"4\" align=\"right\">(".$lupt."&nbsp;".$lup.")</td></tr>";
+          my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+          
+          if(AttrVal("global","language","EN") eq "DE") {
+             $lup = "$day.$month.$year&nbsp;$time"; 
+          } else {
+             $lup = "$year-$month-$day&nbsp;$time"; 
+          }
+
+          my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name getData')\"";    # Update Button generieren        
+
+          if ($ftui && $ftui eq "ftui") {
+              $cmdupdate = "\"ftui.setFhemStatus('set $name getData')\"";     
+          }
+          
+          my $upstate  = ReadingsVal($name,"state", "undef");
+          my $upicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
+          
+          if ($upstate =~ /ok/ix) {
+              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+          } elsif ($upstate =~ /running/ix) {
+              $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+          } else {
+              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
+          }
+  
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"right\">(".$lupt."&nbsp;".$lup.")&nbsp;".$upicon."</td></tr>";
       }
       
       # Header Information pv 
@@ -3746,15 +3858,15 @@ sub SPGRefresh {
       my @rooms = split(",",$hash->{HELPER}{SPGROOM});
       for (@rooms) {
           my $room = $_;
-          { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") } 
+          { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }   ## no critic 'void context';
       }
   } elsif ($pload && (!$hash->{HELPER}{SPGROOM} || $hash->{HELPER}{SPGDETAIL})) {
       # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
       # SMAPortalSPG-Attribut "forcePageRefresh" erzwungen wird
-      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                            ## no critic 'void context';
   } else {
       if($fpr) {
-          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }
+          { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                        ## no critic 'void context';
       }
   }
   
@@ -3865,7 +3977,7 @@ return;
    <br>
      <ul>
      <a name="createPortalGraphic"></a>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
+     <li><b> createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Creates graphical devices to show the SMA Sunny Portal forecast data in several layouts. 
      The attribute "providerLevel" must contain "forecastData". <br>
      With the <a href="#SMAPortalSPGattr">"attributes of the graphic device"</a> the appearance and coloration of the forecast 
@@ -3875,18 +3987,26 @@ return;
      <br>
      
      <ul>
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Set Username / Password used for the login into the SMA Sunny Portal.   
      </ul> 
      <br>
      
      <ul>
      <a name="consumer"></a>
-     <li><b> set &lt;name&gt; &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
+     <li><b> &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
      Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
      that means the consumer are controlled by the Sunny Home Manager.    
      </li>      
      </ul>
+     <br>
+     
+     <ul>
+     <a name="getData"></a> 
+     <li><b> getData </b> <br> 
+     Identical to the "get data" command. Simplifies the use of the attribute "webCmd" in the FHEMWEB.  
+     </ul> 
+     </li>
    
    </ul>
    <br><br>
@@ -3898,7 +4018,7 @@ return;
     
     <ul>
       <a name="data"></a>
-      <li><b> get &lt;name&gt; data </b> <br> 
+      <li><b> data </b> <br> 
       This command fetch the data from the SMA Sunny Portal manually. 
     </ul>
     </li> 
@@ -3906,7 +4026,7 @@ return;
     
     <ul>
       <a name="storedCredentials"></a>
-      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
+      <li><b> storedCredentials </b> <br>  
       The saved credentials are displayed in a popup window.
     </ul>
     </li>
@@ -3917,7 +4037,44 @@ return;
    <b>Attributes</b>
    <ul>
      <br>
-     <ul>       
+     <ul>
+
+       <a name="balanceDay"></a>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Defines the days from which the data provider "balanceDayData" delivers the data. The day specifications are separated by 
+       spaces, current = current day. <br>
+       (default: current day) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+        </ul> 
+       </li><br>
+       
+       <a name="balanceMonth"></a>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Defines from which months the data provider "balanceMonthData" delivers the data. The month specifications are separated by 
+       spaces, current = current month. <br>
+       (default: current month) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+        </ul> 
+       </li><br>
+       
+       <a name="balanceYear"></a>
+       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Defines the years from which the data provider "balanceYearData" delivers the data. The year specifications are separated by 
+       spaces, current = current year. <br>
+       (default: current year) <br><br>
+       
+        <ul>
+         <b>Example:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+        </ul> 
+       </li><br>
+       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        The path and filename of received Cookies. <br>
@@ -3990,9 +4147,9 @@ return;
           <tr><td> <b>consumerMonthData</b>   </td><td>- consumer data month are generated </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>- consumer data year are generated </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>- the maximum of 25 most recent entries of the plant logbook are retrieved </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved </td></tr>
-          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved </td></tr>
-          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>- Statistics data of the day are retrieved (see attribute <a href="#balanceDay">balanceDay</a>) </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>- Statistics data of the month are retrieved (see attribute <a href="#balanceMonth">balanceMonth</a>) </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>- Statistical data of the year are retrieved (see attribute <a href="#balanceYear">balanceYear</a>) </td></tr>
           <tr><td> <b>balanceTotalData</b>    </td><td>- Total statistics data are retrieved </td></tr>
        </table>
        </ul>     
@@ -4113,7 +4270,7 @@ return;
    <br>
      <ul>
      <a name="createPortalGraphic"></a>
-     <li><b> set &lt;name&gt; createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
+     <li><b> createPortalGraphic &lt;Generation | Consumption | Generation_Consumption | Differential&gt; </b> <br>  
      Erstellt Devices zur grafischen Anzeige der SMA Sunny Portal Prognosedaten in verschiedenen Layouts. 
      Das Attribut "providerLevel" muss auf den Level "forecastData" enthalten. <br>
      Mit den <a href="#SMAPortalSPGattr">"Attributen des Grafikdevices"</a> können Erscheinungsbild und 
@@ -4124,15 +4281,23 @@ return;
      
      <ul>
      <a name="credentials"></a> 
-     <li><b> set &lt;name&gt; credentials &lt;username&gt; &lt;password&gt; </b> <br> 
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Setzt Username / Passwort zum Login in das SMA Sunny Portal.   
      </ul> 
      </li>
      <br>
      
      <ul>
+     <a name="getData"></a> 
+     <li><b> getData </b> <br> 
+     Identisch zum "get data" Befehl. Vereinfacht die Benutzung des Attributs "webCmd" im FHEMWEB.   
+     </ul> 
+     </li>
+     <br>
+     
+     <ul>
      <a name="Verbrauchername"></a>
-     <li><b> set &lt;name&gt; &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
+     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
      Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
      Modul erkannt wurden.
      Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
@@ -4150,7 +4315,7 @@ return;
     <ul>
     
       <a name="data"></a>
-      <li><b> get &lt;name&gt; data </b> <br>  
+      <li><b> data </b> <br>  
       Mit diesem Befehl werden die Daten aus dem SMA Sunny Portal manuell abgerufen. 
     </ul>
     </li>
@@ -4158,7 +4323,7 @@ return;
     
     <ul>
       <a name="storedCredentials"></a>
-      <li><b> get &lt;name&gt; storedCredentials </b> <br>  
+      <li><b> storedCredentials </b> <br>  
       Die gespeicherten Anmeldeinformationen (Credentials) werden in einem Popup als Klartext angezeigt.
     </ul>
     </li>
@@ -4170,7 +4335,44 @@ return;
    <b>Attribute</b>
    <ul>
      <br>
-     <ul>       
+     <ul>      
+
+       <a name="balanceDay"></a>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert. Die Tagesangaben werden durch Leerzeichen 
+       getrennt, current = aktueller Tag. <br>
+       (default: aktueller Tag) <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+        </ul> 
+       </li><br>
+       
+       <a name="balanceMonth"></a>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. Die Monatsangaben werden durch Leerzeichen 
+       getrennt, current = aktueller Monat. <br>
+       (default: aktueller Monat) <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+        </ul> 
+       </li><br>
+       
+       <a name="balanceYear"></a>
+       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. Die Jahresangaben werden durch Leerzeichen 
+       getrennt, current = aktuelles Jahr. <br>
+       (default: aktuelles Jahr)  <br><br>
+       
+        <ul>
+         <b>Beispiel:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+        </ul> 
+       </li><br>
+       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        Angabe von Pfad und Datei zur Abspeicherung des empfangenen Cookies. <br>
@@ -4244,9 +4446,9 @@ return;
           <tr><td> <b>consumerMonthData</b>   </td><td>-  Verbraucherdaten Monat werden erzeugt </td></tr>
           <tr><td> <b>consumerYearData</b>    </td><td>-  Verbraucherdaten Jahr werden erzeugt </td></tr>
           <tr><td> <b>plantLogbook</b>        </td><td>-  die maximal 25 aktuellsten Einträge des Anlagenlogbuchs werden abgerufen </td></tr>
-          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen </td></tr>
-          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen </td></tr>
-          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen </td></tr>
+          <tr><td> <b>balanceDayData</b>      </td><td>-  Statistikdaten des Tages werden abgerufen (siehe Attribut <a href="#balanceDay">balanceDay</a>) </td></tr>
+          <tr><td> <b>balanceMonthData</b>    </td><td>-  Statistikdaten des Monats werden abgerufen (siehe Attribut <a href="#balanceMonth">balanceMonth</a>) </td></tr>
+          <tr><td> <b>balanceYearData</b>     </td><td>-  Statistikdaten des Jahres werden abgerufen (siehe Attribut <a href="#balanceYear">balanceYear</a>) </td></tr>
           <tr><td> <b>balanceTotalData</b>    </td><td>-  Statistikdaten Gesamt werden abgerufen </td></tr>
        </table>
        </ul>     

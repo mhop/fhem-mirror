@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SMAPortal: new attr balanceDay, balanceMonth, balanceYear for 
+                          statistics dataprovider, new set getData command, 
+                          update button in header of Portal Graphics, minor 
+                          code changes according PBP
  - change:  10_WS980: change conversion ration of w/m2 to 0.0079
 .- bugfix:  98_DOIFtools: improve popup position (Forum #113404)
  - bugfix:  48_BlinkCamera: videoDelete on new API and first TFA pin verify
