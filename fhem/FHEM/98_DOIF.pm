@@ -2119,6 +2119,7 @@ sub DOIF_CheckCond($$) {
   }
   $cmdFromAnalyze="$hash->{NAME}: ".sprintf("warning in condition c%02d",($condition+1));
   $lastWarningMsg="";
+  my $cur_hs=$hs;
   $hs=$hash;
   my $ret=$hash->{MODEL} eq "Perl" ? eval("package DOIF; $command"):eval ($command);  
   if($@){
@@ -2134,7 +2135,7 @@ sub DOIF_CheckCond($$) {
   }
   $lastWarningMsg="";
   $cmdFromAnalyze = undef;
-
+  $hs=$cur_hs;
   return ($ret,$err);
 }
 
@@ -3210,6 +3211,7 @@ CmdDoIfPerl($$)
   my $ret;
   my $err="";
   my $i=0;
+  my $cur_hs=$hs;
   $hs=$hash;
   my $msg;
   
@@ -3234,9 +3236,11 @@ CmdDoIfPerl($$)
 
   $hash->{helper}{last_timer}=0;
   $hash->{helper}{sleeptimer}=-1;
-
-  return("","") if ($tail =~ /^ *$/);
-  
+ 
+  if ($tail =~ /^ *$/) {
+    $hs=$cur_hs;
+    return("","");
+  }
   $tail =~ s/\$VAR/\$hash->{var}/g;
   $tail =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
   $tail =~ s/\$SELF/$hash->{NAME}/g;
@@ -3245,16 +3249,27 @@ CmdDoIfPerl($$)
   return ($msg,$err) if ($err);
 
   ($err,$tail)=DOIF_DEF_TPL($hash,"defs",$tail);
-  return ($tail,$err) if ($err);
- 
+  if ($err) {
+    $hs=$cur_hs;
+    return ($tail,$err);
+  }
   ($err,$tail)=DOIF_FOR($hash,"defs",$tail);
-  return($tail,$err) if ($err);    
+  if ($err) {
+    $hs=$cur_hs;
+    return ($tail,$err);
+  }
  
   ($err,$tail)=DOIF_TPL($hash,"defs",$tail);
-  return ($tail,$err) if ($err);
+  if ($err) {
+    $hs=$cur_hs;
+    return ($tail,$err);
+  }
 
   ($err,$msg)=DOIF_Perlblock($hash,"defs",$tail);
-  return ($tail,$msg) if ($err);
+  if ($err) {
+    $hs=$cur_hs;
+    return ($tail,$err);
+  }
 
 #  while ($tail ne "") {
 #    ($beginning,$perlblock,$err,$tail)=GetBlockDoIf($tail,'[\{\}]');
@@ -3300,6 +3315,7 @@ CmdDoIfPerl($$)
       }
     }
   }
+  $hs=$cur_hs;
   return("","")
 }
 
@@ -3435,6 +3451,7 @@ DOIF_Define($$$)
   return undef if (AttrVal($hash->{NAME},"disable",""));
   my $err;
   my $msg;
+  my $cur_hs=$hs;
   $hs=$hash;
   if (AnalyzeCommandChain(undef,"version 98_DOIF.pm noheader") =~ "^98_DOIF.pm (.*)Z") {
     $hash->{VERSION}=$1;
@@ -3462,9 +3479,11 @@ DOIF_Define($$$)
   if ($err ne "") {
     $msg=$cmd if (!$msg);
     my $errmsg="$name $type: $err: $msg";
+    $hs=$cur_hs;
     return $errmsg;
   } else {
     DOIF_Set_Filter ($hash);
+    $hs=$cur_hs;
     return undef;
   }
 }
@@ -3478,6 +3497,7 @@ DOIF_Attr(@)
   my $hash = $defs{$a[1]};
   my $pn=$hash->{NAME};
   my $ret="";
+  my $cur_hs=$hs;
   $hs=$hash;
   
   if (($a[0] eq "set" and $a[2] eq "disable" and ($a[3] eq "0")) or (($a[0] eq "del" and $a[2] eq "disable")))
@@ -3504,6 +3524,7 @@ DOIF_Attr(@)
 
     if ($err ne "") {
       $msg=$cmd if (!$msg);
+      $hs=$cur_hs;
       return ("$err: $msg");
     }
   } elsif($a[0] eq "set" and $a[2] eq "disable" and $a[3] eq "1") {
@@ -3518,6 +3539,7 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" && $a[2] eq "state") {
       delete $hash->{Regex}{"STATE"};
       my ($block,$err)=ReplaceAllReadingsDoIf($hash,$a[3],-2,0);
+      $hs=$cur_hs;
       return $err if ($err);
   } elsif($a[0] eq "del" && $a[2] eq "state") {
       delete $hash->{Regex}{"STATE"};
@@ -3562,6 +3584,7 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" && ($a[2] eq "DOIF_Readings" or $a[2] eq "event_Readings")) {
     my ($def,$err)=addDOIF_Readings($hash,$a[3],$a[2]);
     if ($err) {
+      $hs=$cur_hs;
       return ("error in $a[2] $def, $err");
     } else {
       if ($init_done) {
@@ -3576,6 +3599,7 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" && ($a[2] eq "uiTable" || $a[2] eq "uiState")) {
     if ($init_done) {
       my $err=DOIF_uiTable_def($hash,$a[3],$a[2]);
+      $hs=$cur_hs;
       return $err if ($err);
       DOIF_reloadFW;
     }
@@ -3585,10 +3609,12 @@ DOIF_Attr(@)
   } elsif($a[0] eq "set" && $a[2] eq "startup") {
     my ($cmd,$err)=ParseCommandsDoIf($hash,$a[3],0);
     if ($err) {
+     $hs=$cur_hs;
      return ("error in startup $a[3], $err");
     }
   }
   DOIF_Set_Filter($hash);
+  $hs=$cur_hs;
   return undef;
 }
 
@@ -3617,10 +3643,12 @@ DOIF_Set($@)
   my $arg = $a[1];
   my $value = (defined $a[2]) ? $a[2] : "";
   my $ret="";
+  my $cur_hs=$hs;
   $hs=$hash;
 
   if ($arg eq "disable" or  $arg eq "initialize" or  $arg eq "enable") {
     if (AttrVal($hash->{NAME},"disable","")) {
+      $hs=$cur_hs;
       return ("modul ist deactivated by disable attribut, delete disable attribut first");
     }
   }
@@ -3681,6 +3709,7 @@ DOIF_Set($@)
          $cmdList.=$hash->{perlblock}{$i}.":noArg ";
 	     }
     }
+    $hs=$cur_hs;
 	  return "unknown argument ? for $pn, choose one of disable:noArg enable:noArg $initialize $checkall $cmdList $setList";
   } else {
     my @rl = split(" ", AttrVal($pn, "readingList", ""));
@@ -3693,7 +3722,10 @@ DOIF_Set($@)
         $doRet = 1;
       }
     };
-    return if($doRet);
+    if($doRet) {
+      $hs=$cur_hs;
+      return;
+    }
     if (ReadingsVal($pn,"mode","") ne "disabled") {
       if ($hash->{MODEL} ne "Perl") {
         foreach my $i (keys %{$hash->{attr}{cmdState}}) {
@@ -3718,6 +3750,7 @@ DOIF_Set($@)
       #return "unknown argument $arg for $pn, choose one of disable:noArg initialize:noArg enable:noArg cmd $setList";
     }
   }
+  $hs=$cur_hs;
   return $ret;
 }
 
@@ -3748,6 +3781,7 @@ sub DOIF_ExecTimer
   my $name=$hash->{NAME};
   my $subname=${$timer}->{subname};
   my $param=${$timer}->{param} if (defined ${$timer}->{param});
+  my $cur_hs=$hs;
   $hs=$hash;
   delete ($::defs{$name}{READINGS}{"timer_$timername"});
   if (!defined ($param)) {
@@ -3760,6 +3794,7 @@ sub DOIF_ExecTimer
     ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
     ::readingsSingleUpdate ($hash, "error", "in $subname: $@",1);
   }
+  $hs=$cur_hs;
 }
 
 sub set_Exec
