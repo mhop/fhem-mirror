@@ -1207,6 +1207,7 @@ sub CUL_HM_setupHMLAN(@){#################################
                 , txt08_2=>15,txt09_1=>16,txt09_2=>17,txt10_1=>18,txt10_2=>19
                 );
 
+
 sub CUL_HM_Parse($$) {#########################################################
   my ($iohash, $msgIn) = @_;
   
@@ -4263,6 +4264,13 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
 
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
+    
+    my @cond = ();
+    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}} if (defined $lvlStr{md}{$md});
+    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{$md}} if (defined $lvlStr{mdCh}{"$md$chn"});
+    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{md}{$st}} if (defined $lvlStr{st}{$st}{$_});
+    push @cond,"slider,0,1,100" if (!scalar @cond);
+    $hash->{helper}{cmds}{lst}{condition} = join(",",grep /./,@cond);
 
     $hash->{helper}{cmds}{lst}{peer} = join",",grep/./,split",",InternalVal($name,"peerList","");
     if ($peerLst ne ""){
@@ -4372,14 +4380,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
       my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
-      
       if($val eq "noArg"){
           $val = ":$val";
       }
       elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){
         my ($null,$repl) = ($1,$2);
-        if (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $null = defined $null ?"noArg,":"";
+        if ($repl =~ m/^(ontime|sec|time)$/){
+          $val = ""; # nothing 
+        }
+        elsif (defined $hash->{helper}{cmds}{lst}{$repl}){
+          $null = defined $null && $null eq "[" ? "noArg," : "";
           $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
           next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
         }
@@ -8772,10 +8782,9 @@ sub CUL_HM_secSince2000() {#####################
 }
 sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
   my $name = shift;
-  my $curVal = ReadingsVal($name,"level",undef);
-  $curVal = ReadingsVal($name,".level",0)if (!defined $curVal);
-  $curVal =~ s/set_//;
-  $curVal =~ s/ .*//;#strip unit
+  my $curVal = ReadingsVal($name,"level",ReadingsVal($name,".level",0));
+  $curVal =~ s/.*?(\d+\.?\d*).*/$1/;
+  $curVal = 0 if ($curVal eq "" || $curVal <0 || $curVal >100 );
   return $curVal;
 }
 
@@ -9413,6 +9422,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{$devId}{start} =~ s/[\:\-\ ]//g;
   
   if(defined $devHash->{READINGS}{".protLastRcv"}){
+      my $x = $devHash->{READINGS}{".protLastRcv"}{VAL};
       $devHash->{READINGS}{".protLastRcv"}{VAL} =~ s/[\:\-\ ]//g;
   }
   
@@ -9559,7 +9569,7 @@ sub CUL_HM_ActInfo() {# print detailed status information
     my $state;
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec != 0){
-      my $tLast = ReadingsVal($devName,".protLastRcv",0);
+      my $tLast = ReadingsVal($devName,".protLastRcv","0-0-0 0:0:0");
       $tLast =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
       my $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
