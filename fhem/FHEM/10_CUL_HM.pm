@@ -9569,9 +9569,17 @@ sub CUL_HM_ActInfo() {# print detailed status information
     my $state;
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec != 0){
-      my $tLast = ReadingsVal($devName,".protLastRcv","0-0-0 0:0:0");
-      $tLast =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/;
-      my $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;
+      my $tLast = ReadingsVal($devName,".protLastRcv","00000000000000");
+      my $x;
+      if($tLast =~ m/(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/){
+        $tLast =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/ ;
+        $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;
+      }
+      else{
+        $tLast =~ /(....)(..)(..)(..)(..)(..)/ ;
+        $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;          
+      }
+      
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
 
       my $y =  $x -
