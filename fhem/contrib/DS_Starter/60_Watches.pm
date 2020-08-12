@@ -129,6 +129,9 @@ my %hset = (                                                                  # 
   time           => {fn  => "_setTime"                                                                              }, 
   reset          => {fn  => "_setReset"                                                                             }, 
   textTicker     => {fn  => "_setTextTicker"                                                                        },
+  displayTextDel => {fn  => "_setDisplayTextDel"                                                                    },
+  displayTextSet => {fn  => "_setDisplayTextSet"                                                                    },
+  stop           => {fn  => "_setStop"                                                                              },
 );
 
 ##############################################################################
@@ -306,22 +309,52 @@ sub Set {                                                    ## no critic 'compl
       readingsSingleUpdate($hash, "starttime", $ms,       0);
       readingsSingleUpdate($hash, "state",     "resumed", 1);
       
-  } elsif ($opt eq "stop") {
-      readingsSingleUpdate($hash, "state", "stopped",  1);
-      
-  } elsif ($opt eq "displayTextSet") {
-      shift @a; shift @a;
-      
-      my $txt = join (" ", @a);
-      $txt    =~ s/[\r\n]//gx;
-      readingsSingleUpdate($hash, "displayText", $txt, 1);
-      
-  } elsif ($opt eq "displayTextDel") {      
-      delReadings ($name, "displayText");
-      
   } else {
       return "$setlist";
   }
+
+return;
+}
+
+################################################################
+#                      Setter stop
+################################################################
+sub _setStop {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  readingsSingleUpdate($hash, "state", "stopped",  1);
+
+return;
+}
+
+################################################################
+#                      Setter displayTextSet
+################################################################
+sub _setDisplayTextSet {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  my @a = @$aref;
+  
+  shift @a; shift @a;
+  
+  my $txt = join (" ", @a);
+  $txt    =~ s/[\r\n]//gx;
+  readingsSingleUpdate($hash, "displayText", $txt, 1);
+
+return;
+}
+
+################################################################
+#                      Setter displayTextDel
+################################################################
+sub _setDisplayTextDel {                 ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  delReadings ($name, "displayText");
 
 return;
 }
@@ -346,7 +379,7 @@ return;
 ################################################################
 #                      Setter reset
 ################################################################
-sub _setReset {                           ## no critic "not used"
+sub _setReset {                          ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
