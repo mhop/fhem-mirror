@@ -75,7 +75,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.27.0" => "10.08.2020  control buttons, new attr hideButtons, controlButtonSize ",
+  "0.27.0" => "12.08.2020  control buttons, new attr hideButtons, controlButtonSize, ".
+                           "fix Random triggering of alarm or random time display at start / resume ",
   "0.26.0" => "01.08.2020  add attr timeAsReading -> write into reading 'currtime' if time is displayed, ".
                            "add \$readingFnAttributes, set release_status to stable ",
   "0.25.0" => "03.06.2020  set reading 'stoptime' in type 'stopwatch' ",                               
@@ -264,18 +265,17 @@ sub Set {                                                    ## no critic 'compl
       delReadings         ($name, "countInitVal");
       
       readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "countInitVal", $ct); 
-      readingsBulkUpdate  ($hash, "state", "initialized");
+      readingsBulkUpdate  ($hash, "countInitVal", $ct          ); 
+      readingsBulkUpdate  ($hash, "state",        "initialized");
       readingsEndUpdate   ($hash, 1);
       
   } elsif ($opt eq "resume") {
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
+      return if(ReadingsVal($name, "state", "") eq "started");
       
       my $ms = int(time*1000);
-      readingsSingleUpdate($hash, "starttime", $ms, 0);
-      
-      return if(ReadingsVal($name, "state", "") eq "started");
-      readingsSingleUpdate($hash, "state", "resumed",  1);
+      readingsSingleUpdate($hash, "starttime", $ms,       0);
+      readingsSingleUpdate($hash, "state",     "resumed", 1);
       
   } elsif ($opt eq "stop") {
       readingsSingleUpdate($hash, "state", "stopped",  1);
@@ -420,7 +420,7 @@ sub FWebFn {
   if($ddp =~ /countdownwatch|stopwatch/x && !$hb) {
       $ret .= controlPanel ($d);
   }
-    
+  
 return $ret;
 }
 
@@ -578,7 +578,9 @@ sub digitalWatch {
     var zmodulo_$d         = 0;                       // Hilfszähler
     var showCurrTime_$d    = '$showct';               // Reading currtime schreiben oder nicht
     var distBorderright_$d = '$bdist';                // Abstand zum rechten Rand
-    var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand   
+    var distBorderleft_$d  = '$bdist';                // Abstand zum linken Rand 
+    var asydone1_$d        = 0;                       // Statusbit dass asynchrone Datenkommunikation stattgefunden hat
+    var asydone2_$d        = 0;                       // Statusbit dass asynchrone Datenkommunikation stattgefunden hat
     var allowSetStopTime;                             // erlaube / verbiete Setzen Reading stoptime 
 
     function SegmentDisplay_$d(displayId_$d) {
@@ -1295,19 +1297,20 @@ sub digitalWatch {
                     url_$d  = makeCommand(command);
                     \$.get( url_$d, function (data) {
                                         almtime0_$d = data.replace(/\\n/g, '');
-                                        zmodulo_$d = modulo2_$d;
+                                        zmodulo_$d  = modulo2_$d;
                                         return (almtime0_$d, zmodulo_$d);
                                     } 
                           );
                 }
                 
-                // == Startzeit für CountDown ==            
+                // == Startzeit ==            
                 command   = '{ReadingsNum("$d","starttime", 0)}';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
-                                    data  = data.replace(/\\n/g, ''); 
-                                    st_$d = parseInt(data); 
-                                    return st_$d;
+                                    data        = data.replace(/\\n/g, ''); 
+                                    st_$d       = parseInt(data); 
+									asydone1_$d = 1;
+                                    return (st_$d, asydone1_$d);
                                 } 
                       );
                 
@@ -1335,11 +1338,19 @@ sub digitalWatch {
                 
                 ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
                 
-                checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                           // Alarm auslösen wenn zutreffend
+				if(asydone1_$d == 1) {                                                  // vermeidet zufällige Alarmierung bei start / resume
+                    checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                       // Alarm auslösen wenn zutreffend
+				}
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
                 
                 setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
+				
+                if(asydone1_$d == 0) {                                                  // vermeidet zufällige Zeitanzeige bei start / resume
+                    hours_$d   = 'NaN';
+                    minutes_$d = 'NaN';
+                    seconds_$d = 'NaN';                 
+                }
             }
             
             if (state_$d == 'stopped') {
@@ -1359,6 +1370,8 @@ sub digitalWatch {
                     \$.get(url_$d);
                 }
                 localStoreSet_$d        (NaN, NaN, NaN, NaN, 0);                      // set Reading stoptime verbieten
+				
+				asydone1_$d = 0;
             }
 
             if (state_$d == 'initialized') {
@@ -1367,7 +1380,9 @@ sub digitalWatch {
                 seconds_$d = 0;
 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
-                localStoreSetLastalm_$d ('$d', 'NaN');                                  // letzte Alarmzeit zurücksetzen                 
+                localStoreSetLastalm_$d ('$d', 'NaN');                                  // letzte Alarmzeit zurücksetzen 
+
+                asydone1_$d = 0;                
             }
         }
         
@@ -1414,25 +1429,26 @@ sub digitalWatch {
                 command = '{ReadingsNum("$d","starttime", 0)}';
                 url_$d  = makeCommand(command);
                 \$.get( url_$d, function (data) {
-                                    data  = data.replace(/\\n/g, ''); 
-                                    st_$d = parseInt(data); 
-                                    return st_$d;
+                                    data        = data.replace(/\\n/g, ''); 
+                                    st_$d       = parseInt(data);
+                                    asydone1_$d = 1;                                    
+                                    return (st_$d, asydone1_$d);
                                 } 
-                      );
-                      
+                      );                     
                 startDate_$d = new Date(st_$d);
                 
                 // aktueller Timestamp in Millisekunden 
                 command   = '{ int(time*1000) }';
                 url_$d    = makeCommand(command);
                 \$.get( url_$d, function (data) {
-                                    data  = data.replace(/\\n/g, ''); 
-                                    ct_$d = parseInt(data);                               
-                                    return ct_$d;
+                                    data        = data.replace(/\\n/g, ''); 
+                                    ct_$d       = parseInt(data);
+                                    asydone2_$d = 1;                                    
+                                    return (ct_$d, asydone2_$d);
                                 } 
-                      );
-     
+                      );   
                 currDate_$d  = new Date(ct_$d);
+                
                 elapsesec_$d = (currDate_$d.getTime() - startDate_$d.getTime())/1000;    // vergangene Millisekunden in Sekunden umrechnen
                 
                 if (state_$d == 'started' && elapsesec_$d <= 5) {
@@ -1441,7 +1457,7 @@ sub digitalWatch {
                 
                 // == Countdown errechnen ==
                 countcurr_$d = parseInt(countInitVal_$d) - parseInt(elapsesec_$d);
-                //log("countcurr_$d: "+countcurr_$d);
+                //log("countInitVal_$d: "+countInitVal_$d+", elapsesec_$d"+elapsesec_$d+", countcurr_$d: "+countcurr_$d);
                 
                 hours_$d       = parseInt(countcurr_$d / 3600);
                 countcurr_$d  -= hours_$d * 3600;
@@ -1450,11 +1466,23 @@ sub digitalWatch {
      
                 if (countcurr_$d >= 0) {
                     ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
-                    checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                       // Alarm auslösen wenn zutreffend
+                    if(asydone1_$d == 1 && asydone2_$d == 1) {                          // vermeidet zufällige Alarmierung bei start / resume
+                        checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                   // Alarm auslösen wenn zutreffend
+                    }
                     localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
+                } else {
+                    hours_$d   = 0;
+                    minutes_$d = 0;
+                    seconds_$d = 0;
                 }
 				
 				setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
+            
+                if(asydone1_$d == 0 && asydone2_$d == 0) {                              // vermeidet zufällige Zeitanzeige bei start / resume
+                    hours_$d   = 'NaN';
+                    minutes_$d = 'NaN';
+                    seconds_$d = 'NaN';                 
+                }
             }
             
             if (state_$d == 'stopped') {
@@ -1464,6 +1492,9 @@ sub digitalWatch {
                 
                 pastsumsec_$d = parseInt(hours_$d*3600) + parseInt(minutes_$d*60) + parseInt(seconds_$d);
                 localStoreSet_$d (NaN, NaN, NaN, pastsumsec_$d);
+                
+                asydone1_$d = 0;
+                asydone2_$d = 0;
             }
 
             if (state_$d == 'initialized') {
@@ -1473,11 +1504,14 @@ sub digitalWatch {
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
                 localStoreSetLastalm_$d ('$d', 'NaN');                                 // letzte Alarmzeit zurücksetzen
+				
+                asydone1_$d = 0;
+                asydone2_$d = 0;
             }
         }
         
         if (watchkind_$d == 'text') {  
-            tlength_$d = digitxt_$d.length;                                   // Länge des Textes
+            tlength_$d = digitxt_$d.length;                                            // Länge des Textes
             if($adtdn > 0) {
                 tlength_$d = $adtdn;
             }  
