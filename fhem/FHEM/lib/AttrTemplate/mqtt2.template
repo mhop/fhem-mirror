@@ -2354,7 +2354,7 @@ attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE userReadings state:(doorWindow|tilt).* { ReadingsVal($name,"doorWindow","") eq "close" ? 'closed' : ReadingsNum($name,"tilt",1) > 0 ? 'tilted' :'open' }
 attr DEVICE model shellydw
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200812
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
