@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
   "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
   "9.5.2"  => "26.07.2020  more changes according PBP level 3, minor fixes ",
   "9.5.1"  => "24.07.2020  set compatibility to 8.2.8, some changes according PBP level 3 ",
@@ -211,11 +212,13 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpfull if your PTZ camera doesn't have the capability ".
+                           "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
-               "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
-               "other defined streaming devices. ".
-               "More information about the possibilities is described in this ".
-               "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Das_Streaming_Master_Device_-_Typ_.22master.22\">Wiki article</a>. ",
+                           "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
+                           "other defined streaming devices. ".
+                           "More information about the possibilities is described in this ".
+                           "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Das_Streaming_Master_Device_-_Typ_.22master.22\">Wiki article</a>. ",
   "9.3.0"   => "25.06.2020 Cameras with zoom function can also be controlled by FHEM. With the setter \"setZoom\", the zoom in/out ".
                            "can be triggered in two steps. In the PTZ streaming device or FTUI, pushbuttons are provided for this purpose.",
   "9.1.0"   => "10.12.2019 With the new attribute \"snapChatTxt\" it is possible to send snapshots by the Synology Chat server. ".
@@ -233,7 +236,7 @@ my %vNotesExtern = (
   "8.14.0"  => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0"  => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0"  => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
-               "support for \"genericStrmHtmlTag\" in streaming devices ",
+                           "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.0"  => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
   "8.9.0"   => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
                            "This streaming device shows the newest snapshot which was taken. ",
@@ -631,6 +634,7 @@ sub Initialize {
                      "livestreamprefix ".
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ".
                      "pollcaminfoall ".
+                     "ptzNoCapPrePat:1,0 ".
                      "recChatTxt ".
                      "recEmailTxt ".
                      "recTelegramTxt ".
@@ -1126,7 +1130,7 @@ sub Set {
                  (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
                  (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
                  (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 (IsCapPTZPan($hash)      ? "createPTZcontrol:noArg " : "").
+                 (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
                  (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
                  (IsCapPTZDir($hash)      ? "move"." " : "").
                  (IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
@@ -1852,7 +1856,7 @@ sub Get {
                    "caminfo:noArg ".
                    ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
                        ? "snapGallery:noArg " : "snapGallery:$defSnum ").
-                   ((ReadingsVal("$name", "CapPTZPresetNumber", 0) != 0) ? "listPresets:noArg " : "").
+                   (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
                    "snapinfo:noArg ".
                    "svsinfo:noArg ".
                    "saveRecording ".
@@ -3176,9 +3180,9 @@ sub getPresets {
         $error = expErrors($hash,$errorcode);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
+        readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+        readingsBulkUpdate ($hash, "Error",     $error);
+        readingsEndUpdate  ($hash, 1);
     
         Log3($name, 2, "$name - ERROR - Preset list of Camera $camname can't be get - $error");
         
@@ -6953,35 +6957,33 @@ sub camOp_Parse {
                 
                 # Setreading 
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
-                readingsBulkUpdate($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
-                readingsBulkUpdate($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
-                readingsBulkUpdate($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
-                readingsBulkUpdate($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
-                readingsBulkUpdate($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
-                readingsBulkUpdate($hash,"CapPTZFocus",        $ptzfocus                            );
-                readingsBulkUpdate($hash,"CapPTZIris",         $ptziris                             );
-                readingsBulkUpdate($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
-                readingsBulkUpdate($hash,"CapPTZPan",          $ptzpan                              );
-                readingsBulkUpdate($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
-                readingsBulkUpdate($hash,"CapPTZTilt",         $ptztilt                             );
-                readingsBulkUpdate($hash,"CapPTZZoom",         $ptzzoom                             );
-                readingsBulkUpdate($hash,"Errorcode",          "none"                               );
-                readingsBulkUpdate($hash,"Error",              "none"                               );
-                readingsEndUpdate($hash, 1);
+                readingsBulkUpdate ($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
+                readingsBulkUpdate ($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
+                readingsBulkUpdate ($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
+                readingsBulkUpdate ($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
+                readingsBulkUpdate ($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
+                readingsBulkUpdate ($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
+                readingsBulkUpdate ($hash,"CapPTZFocus",        $ptzfocus                            );
+                readingsBulkUpdate ($hash,"CapPTZIris",         $ptziris                             );
+                readingsBulkUpdate ($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
+                readingsBulkUpdate ($hash,"CapPTZPan",          $ptzpan                              );
+                readingsBulkUpdate ($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
+                readingsBulkUpdate ($hash,"CapPTZTilt",         $ptztilt                             );
+                readingsBulkUpdate ($hash,"CapPTZZoom",         $ptzzoom                             );
+                readingsBulkUpdate ($hash,"Errorcode",          "none"                               );
+                readingsBulkUpdate ($hash,"Error",              "none"                               );
+                readingsEndUpdate  ($hash, 1);
                   
                 Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
             
-            } elsif ($OpMode eq "Getptzlistpreset") {
-                # Parse PTZ-ListPresets
+            } elsif ($OpMode eq "Getptzlistpreset") {                                    # Parse PTZ-ListPresets
                 my $presetcnt = $data->{'data'}->{'total'};
-                my $cnt = 0;
+                my $cnt       = 0;
          
                 # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
                 delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
                 my $home = "not set";
                 while ($cnt < $presetcnt) {
-                    # my $presid = $data->{'data'}->{'presets'}->[$cnt]->{'id'};
                     my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
                     my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
                     $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
@@ -6993,30 +6995,29 @@ sub camOp_Parse {
                     $cnt += 1;
                 }
 
-                my @preskeys = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
+                my @preskeys   = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
                 my $presetlist = join(",",@preskeys);
 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Presets",$presetlist);
-                readingsBulkUpdate($hash,"PresetHome",$home);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Presets",    $presetlist);
+                readingsBulkUpdate  ($hash, "PresetHome", $home      );
+                readingsBulkUpdate  ($hash, "Errorcode",  "none"     );
+                readingsBulkUpdate  ($hash, "Error",      "none"     );
+                readingsEndUpdate   ($hash, 1);
                 
                 # spezifische Attribute für PTZ-Cams verfügbar machen
                 addptzattr($name);
                              
                 Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
             
-            } elsif ($OpMode eq "Getptzlistpatrol") {
-                # Parse PTZ-ListPatrols
+            } elsif ($OpMode eq "Getptzlistpatrol") {                                     # Parse PTZ-ListPatrols
                 $patrolcnt = $data->{'data'}->{'total'};
-                my $cnt = 0;
+                my $cnt    = 0;
          
                 # alle Patrols der Kamera mit Id's in Assoziatives Array einlesen
                 delete $hash->{HELPER}{ALLPATROLS};
                 while ($cnt < $patrolcnt) {
-                    $patrolid = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
+                    $patrolid   = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
                     $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
                     $patrolname =~ s/\s+/_/gx;                                            # Leerzeichen im Namen ersetzen falls vorhanden
                     $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
@@ -7026,18 +7027,16 @@ sub camOp_Parse {
                 @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
                 $patrollist = join(",",@patrolkeys);
 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Patrols",$patrollist);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Patrols",   $patrollist);
+                readingsBulkUpdate  ($hash, "Errorcode", "none"     );
+                readingsBulkUpdate  ($hash, "Error",     "none"     );
+                readingsEndUpdate   ($hash, 1);
                      
                 Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
-                
             }
             
-       } else {
-            # die API-Operation war fehlerhaft
+       } else {                                                               # die API-Operation war fehlerhaft
             # Errorcode aus JSON ermitteln
             $errorcode = $data->{'error'}->{'code'};
 
@@ -7068,7 +7067,6 @@ sub camOp_Parse {
 
 return;
 }
-
 
 #############################################################################################################################
 #########                                               Hilfsroutinen                                           #############
@@ -7515,7 +7513,16 @@ sub IsCapZoom {                                                           # PTZ 
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  my $cap = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPTZZoom", "false") ne "false" ? 1 : 0;
+  
+return $cap;
+}
+
+sub IsCapPTZ {                                                            # PTZ Directions möglich Eigenschaft
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my $cap  = ReadingsVal($name, "DeviceType", "Camera") eq "PTZ" ? 1 : 0;
   
 return $cap;
 }
@@ -7524,7 +7531,7 @@ sub IsCapPTZPan {                                                         # PTZ 
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPTZPan", "false") ne "false" ? 1 : 0;
+  my $cap  = (ReadingsVal($name, "CapPTZPan", "false") ne "false" && !AttrVal($name, "ptzNoCapPrePat", 0)) ? 1 : 0;
   
 return $cap;
 }
@@ -7533,7 +7540,7 @@ sub IsCapPTZTilt {                                                        # PTZ 
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPTZTilt", "false") ne "false" ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPTZTilt", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
@@ -7542,7 +7549,7 @@ sub IsCapPTZObjTrack {                                                    # PTZ 
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPTZObjTracking", "false") ne "false" ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPTZObjTracking", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
@@ -7551,7 +7558,7 @@ sub IsCapPTZAbs {                                                        # PTZ g
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPTZAbs", "false") ne "false" ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPTZAbs", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
@@ -7560,7 +7567,7 @@ sub IsCapPTZDir {                                                        # PTZ D
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPTZDirections", 0) > 0 ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPTZDirections", 0) > 0 ? 1 : 0;
   
 return $cap;
 }
@@ -7569,7 +7576,7 @@ sub IsCapPIR {                                                           # hat K
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  my $cap = ReadingsVal($name, "CapPIR", "false") ne "false" ? 1 : 0;
+  my $cap  = ReadingsVal($name, "CapPIR", "false") ne "false" ? 1 : 0;
   
 return $cap;
 }
@@ -12902,21 +12909,32 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <li><b>noQuotesForSID</b><br>
     This attribute delete the quotes for SID and for StmKeys.  
     The attribute may be helpful in some cases to avoid errormessages "402 - permission denied" or "105 - 
-    Insufficient user privilege" and makes login possible.  </li><br>
+    Insufficient user privilege" and makes login possible.  
+  </li><br>
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
-    Interval of automatic polling the Camera properties (if <= 10: no polling, if &gt; 10: polling with interval) </li><br>
+    Interval of automatic polling the Camera properties (if <= 10: no polling, if &gt; 10: polling with interval) 
+  </li><br>
 
-   <a name="pollnologging"></a>
+  <a name="pollnologging"></a>
   <li><b>pollnologging</b><br>
-    "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive</li><br>
+    "0" resp. not set = Logging device polling active (default), "1" = Logging device polling inactive
+  </li><br>
+    
+  <a name="ptzNoCapPrePat"></a>  
+  <li><b>ptzNoCapPrePat</b><br>
+    Some PTZ cameras cannot store presets and patrols despite their PTZ capabilities. 
+    To avoid errors and corresponding log messages, the attribute ptzNoCapPrePat can be set in these cases. 
+    The system will be notified of a missing preset / patrol capability.
+  </li><br> 
    
   <a name="ptzPanel_Home"></a>
   <li><b>ptzPanel_Home</b><br>
     In the PTZ-control panel the Home-Icon (in attribute "ptzPanel_row02") is automatically assigned to the value of 
     Reading "PresetHome".
-    With "ptzPanel_Home" you can change the assignment to another preset from the available Preset list. </li><br> 
+    With "ptzPanel_Home" you can change the assignment to another preset from the available Preset list. 
+  </li><br> 
   
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
@@ -14888,11 +14906,19 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     "0" bzw. nicht gesetzt = Logging Gerätepolling aktiv (default), "1" = Logging 
     Gerätepolling inaktiv </li><br>
   
+  <a name="ptzNoCapPrePat"></a>  
+  <li><b>ptzNoCapPrePat</b><br>
+    Manche PTZ-Kameras können trotz ihrer PTZ-Fähigkeiten keine Presets und Patrols speichern. 
+    Um Fehler und entsprechende Logmeldungen zu vermeiden, kann in diesen Fällen das Attribut ptzNoCapPrePat gesetzt 
+    werden. Dem System wird eine fehlende Preset / Patrol Fähigkeit mitgeteilt. 
+  </li><br>  
+  
   <a name="ptzPanel_Home"></a>  
   <li><b>ptzPanel_Home</b><br>
     Im PTZ-Steuerungspaneel wird dem Home-Icon (im Attribut "ptzPanel_row02") automatisch der Wert des Readings 
     "PresetHome" zugewiesen.
-    Mit "ptzPanel_Home" kann diese Zuweisung mit einem Preset aus der verfügbaren Preset-Liste geändert werden. </li><br> 
+    Mit "ptzPanel_Home" kann diese Zuweisung mit einem Preset aus der verfügbaren Preset-Liste geändert werden. 
+  </li><br> 
   
   <a name="ptzPanel_iconPath"></a>  
   <li><b>ptzPanel_iconPath</b><br>
