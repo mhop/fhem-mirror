@@ -126,6 +126,7 @@ my %hset = (                                                                  # 
   countdownwatch => {set => "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg countDownInit" },
   watch          => {set => "alarmSet alarmDel:noArg"                                                               },
   text           => {set => "displayTextSet displayTextDel:noArg textTicker:on,off"                                 },
+  time           => {fn  => "_setTime"                                                                              },
 );
 
 ##############################################################################
@@ -217,7 +218,6 @@ sub Set {                                                    ## no critic 'compl
   my $prop  = $a[2];
   my $prop1 = $a[3];
   my $prop2 = $a[4];
-  my $prop3 = $a[5];
     
   return if(IsDisabled($name));
   
@@ -310,19 +310,50 @@ sub Set {                                                    ## no critic 'compl
       delReadings         ($name);
       readingsSingleUpdate($hash, "state", "initialized", 1);
       
-  } elsif ($opt eq "time") {
-      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>23 || $prop1>59 || $prop2>59);
-  
-      readingsBeginUpdate ($hash); 
-      readingsBulkUpdate  ($hash, "hour",   $prop);
-      readingsBulkUpdate  ($hash, "minute", $prop1);
-      readingsBulkUpdate  ($hash, "second", $prop2);                    
-      readingsEndUpdate   ($hash, 1);
-      
-  } else {
-      return "$setlist"; 
   }
   
+  my $params = {
+      hash  => $hash,
+      name  => $name,
+      opt   => $opt,
+      prop  => $prop,
+      prop1 => $prop1,
+      prop2 => $prop2,
+      aref  => \@a,
+  };
+  
+  no strict "refs";                                                        ## no critic 'NoStrict'  
+  if($hset{$opt}) {
+      my $ret = "";
+      $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+      return $ret;
+  }
+  use strict "refs";
+
+return "$setlist";
+}
+
+################################################################
+#                      Setter time
+################################################################
+sub _setTime {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = sprintf("%0d", $paref->{prop}  // 0);
+  my $prop1 = sprintf("%0d", $paref->{prop1} // 0);
+  my $prop2 = sprintf("%0d", $paref->{prop2} // 0);
+  
+  my $msg   = qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13"};
+  
+  return $msg if($prop>23 || $prop1>59 || $prop2>59);
+
+  readingsBeginUpdate ($hash); 
+  readingsBulkUpdate  ($hash, "hour",   $prop);
+  readingsBulkUpdate  ($hash, "minute", $prop1);
+  readingsBulkUpdate  ($hash, "second", $prop2);                    
+  readingsEndUpdate   ($hash, 1);
+
 return;
 }
 
