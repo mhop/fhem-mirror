@@ -135,6 +135,8 @@ my %hset = (                                                                  # 
   resume         => {fn  => "_setResume"                                                                            },
   countDownInit  => {fn  => "_setCountDownInit"                                                                     },
   alarmDel       => {fn  => "_setAlarmDel"                                                                          },
+  alarmSet       => {fn  => "_setAlarmSet"                                                                          },
+  start          => {fn  => "_setStart"                                                                             },
 );
 
 ##############################################################################
@@ -216,9 +218,9 @@ return;
 }
 
 ##############################################################################
-#         Set Funktion
+#                                 Set Funktion
 ##############################################################################
-sub Set {                                                    ## no critic 'complexity'   
+sub Set {
   my ($hash, @a) = @_;
   return qq{"set X" needs at least an argument} if ( @a < 2 );
   my $name  = $a[0];
@@ -255,33 +257,53 @@ sub Set {                                                    ## no critic 'compl
       $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
       return $ret;
   }
-  use strict "refs";  
+  use strict "refs";
 
-  if ($opt eq "start") {                                    ## no critic 'Cascading'
-      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
+return $setlist;
+}
+
+################################################################
+#                      Setter start
+################################################################
+sub _setStart {                          ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $addp  = $paref->{addp};
+  
+  return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
+  
+  my $ms = int(time*1000);
       
-      my $ms = int(time*1000);
-      
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "alarmed", 0)      if($addp =~ /stopwatch|countdownwatch/x); 
-      readingsBulkUpdate  ($hash, "starttime", $ms);
-      readingsBulkUpdate  ($hash, "state", "started");
-      readingsEndUpdate   ($hash, 1);
-      
-  } elsif ($opt eq "alarmSet") {
-      $prop  = ($prop  ne "") ? $prop  : 70;                               # Stunden
-      $prop1 = ($prop1 ne "") ? $prop1 : 70;                               # Minuten
-      $prop2 = ($prop2 ne "") ? $prop2 : 70;                               # Sekunden
-      return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".} if($prop>23 || $prop1>59 || $prop2>59);
-      
-      my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
-            
-      readingsSingleUpdate($hash, "alarmed",     0, 0);
-      readingsSingleUpdate($hash, "alarmTime", $at, 1);
-      
-  } else {
-      return "$setlist";
-  }
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "alarmed", 0)      if($addp =~ /stopwatch|countdownwatch/x); 
+  readingsBulkUpdate  ($hash, "starttime", $ms);
+  readingsBulkUpdate  ($hash, "state", "started");
+  readingsEndUpdate   ($hash, 1);
+
+return;
+}
+
+################################################################
+#                      Setter alarmSet
+################################################################
+sub _setAlarmSet {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop}  // 70;
+  my $prop1 = $paref->{prop1} // 70;
+  my $prop2 = $paref->{prop2} // 70;
+  
+  my $msg = qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13".}; 
+  
+  return $msg if($prop>23 || $prop1>59 || $prop2>59);
+  
+  my $at = sprintf("%02d",$prop).":".sprintf("%02d",$prop1).":".sprintf("%02d",$prop2);
+        
+  readingsSingleUpdate($hash, "alarmed",     0, 0);
+  readingsSingleUpdate($hash, "alarmTime", $at, 1);
 
 return;
 }
