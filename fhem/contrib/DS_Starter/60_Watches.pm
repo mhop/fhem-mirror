@@ -126,7 +126,9 @@ my %hset = (                                                                  # 
   countdownwatch => {set => "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg countDownInit" },
   watch          => {set => "alarmSet alarmDel:noArg"                                                               },
   text           => {set => "displayTextSet displayTextDel:noArg textTicker:on,off"                                 },
-  time           => {fn  => "_setTime"                                                                              },
+  time           => {fn  => "_setTime"                                                                              }, 
+  reset          => {fn  => "_setReset"                                                                             }, 
+  textTicker     => {fn  => "_setTextTicker"                                                                        },
 );
 
 ##############################################################################
@@ -228,7 +230,25 @@ sub Set {                                                    ## no critic 'compl
   }
                                                            
   my $setlist = "Unknown argument $opt, choose one of "; 
-  $setlist   .= "$hset{$addp}{set} "; 
+  $setlist   .= "$hset{$addp}{set} ";
+
+  my $params = {
+      hash  => $hash,
+      name  => $name,
+      opt   => $opt,
+      prop  => $prop,
+      prop1 => $prop1,
+      prop2 => $prop2,
+      aref  => \@a,
+  };
+  
+  no strict "refs";                                                        ## no critic 'NoStrict'  
+  if($hset{$opt}) {
+      my $ret = "";
+      $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+      return $ret;
+  }
+  use strict "refs";  
 
   if ($opt eq "start") {                                    ## no critic 'Cascading'
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
@@ -299,38 +319,42 @@ sub Set {                                                    ## no critic 'compl
   } elsif ($opt eq "displayTextDel") {      
       delReadings ($name, "displayText");
       
-  } elsif ($opt eq "textTicker") {
-      if($prop eq "on") {
-          readingsSingleUpdate($hash, "displayTextTicker", "on", 1); 
-      } else {
-          readingsSingleUpdate($hash, "displayTextTicker", "off", 1); 
-      }
-      
-  } elsif ($opt eq "reset") {
-      delReadings         ($name);
-      readingsSingleUpdate($hash, "state", "initialized", 1);
-      
+  } else {
+      return "$setlist";
   }
-  
-  my $params = {
-      hash  => $hash,
-      name  => $name,
-      opt   => $opt,
-      prop  => $prop,
-      prop1 => $prop1,
-      prop2 => $prop2,
-      aref  => \@a,
-  };
-  
-  no strict "refs";                                                        ## no critic 'NoStrict'  
-  if($hset{$opt}) {
-      my $ret = "";
-      $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
-      return $ret;
-  }
-  use strict "refs";
 
-return "$setlist";
+return;
+}
+
+################################################################
+#                      Setter textTicker
+################################################################
+sub _setTextTicker {                     ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $prop  = $paref->{prop};
+  
+  if($prop eq "on") {
+      readingsSingleUpdate($hash, "displayTextTicker", "on", 1); 
+  } else {
+      readingsSingleUpdate($hash, "displayTextTicker", "off", 1); 
+  }
+
+return;
+}
+
+################################################################
+#                      Setter reset
+################################################################
+sub _setReset {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  delReadings         ($name);
+  readingsSingleUpdate($hash, "state", "initialized", 1);
+
+return;
 }
 
 ################################################################
@@ -1308,8 +1332,8 @@ sub digitalWatch {
             }
 
             checkAndDoAlm_$d ('$d', acttime_$d, almtime0_$d);
-			
-			setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
+            
+            setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
         }
         
         if (watchkind_$d == 'staticwatch') {
@@ -1349,7 +1373,7 @@ sub digitalWatch {
                 \$.get( url_$d, function (data) {
                                     data        = data.replace(/\\n/g, ''); 
                                     st_$d       = parseInt(data); 
-									asydone1_$d = 1;
+                                    asydone1_$d = 1;
                                     return (st_$d, asydone1_$d);
                                 } 
                       );
@@ -1378,14 +1402,14 @@ sub digitalWatch {
                 
                 ddt_$d = buildtime (hours_$d, minutes_$d, seconds_$d);
                 
-				if(asydone1_$d == 1) {                                                  // vermeidet zufällige Alarmierung bei start / resume
+                if(asydone1_$d == 1) {                                                  // vermeidet zufällige Alarmierung bei start / resume
                     checkAndDoAlm_$d ('$d', ddt_$d, almtime0_$d);                       // Alarm auslösen wenn zutreffend
-				}
+                }
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d, NaN);
                 
                 setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
-				
+                
                 if(asydone1_$d == 0) {                                                  // vermeidet zufällige Zeitanzeige bei start / resume
                     hours_$d   = 'NaN';
                     minutes_$d = 'NaN';
@@ -1410,8 +1434,8 @@ sub digitalWatch {
                     \$.get(url_$d);
                 }
                 localStoreSet_$d        (NaN, NaN, NaN, NaN, 0);                      // set Reading stoptime verbieten
-				
-				asydone1_$d = 0;
+                
+                asydone1_$d = 0;
             }
 
             if (state_$d == 'initialized') {
@@ -1515,8 +1539,8 @@ sub digitalWatch {
                     minutes_$d = 0;
                     seconds_$d = 0;
                 }
-				
-				setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
+                
+                setrcurrtime (hours_$d, minutes_$d, seconds_$d);                        // Reading currtime mit angezeigter Zeit setzen
             
                 if(asydone1_$d == 0 && asydone2_$d == 0) {                              // vermeidet zufällige Zeitanzeige bei start / resume
                     hours_$d   = 'NaN';
@@ -1544,7 +1568,7 @@ sub digitalWatch {
                 
                 localStoreSet_$d (hours_$d, minutes_$d, seconds_$d);
                 localStoreSetLastalm_$d ('$d', 'NaN');                                 // letzte Alarmzeit zurücksetzen
-				
+                
                 asydone1_$d = 0;
                 asydone2_$d = 0;
             }
