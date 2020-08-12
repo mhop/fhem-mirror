@@ -75,7 +75,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.27.0" => "12.08.2020  control buttons, new attr hideButtons, controlButtonSize, ".
+  "0.27.0" => "12.08.2020  control buttons, new attr hideButtons, controlButtonSize, some more changes according PBP".
                            "fix Random triggering of alarm or random time display at start / resume ",
   "0.26.0" => "01.08.2020  add attr timeAsReading -> write into reading 'currtime' if time is displayed, ".
                            "add \$readingFnAttributes, set release_status to stable ",
@@ -132,6 +132,9 @@ my %hset = (                                                                  # 
   displayTextDel => {fn  => "_setDisplayTextDel"                                                                    },
   displayTextSet => {fn  => "_setDisplayTextSet"                                                                    },
   stop           => {fn  => "_setStop"                                                                              },
+  resume         => {fn  => "_setResume"                                                                            },
+  countDownInit  => {fn  => "_setCountDownInit"                                                                     },
+  alarmDel       => {fn  => "_setAlarmDel"                                                                          },
 );
 
 ##############################################################################
@@ -242,6 +245,7 @@ sub Set {                                                    ## no critic 'compl
       prop  => $prop,
       prop1 => $prop1,
       prop2 => $prop2,
+      addp  => $addp,
       aref  => \@a,
   };
   
@@ -275,43 +279,79 @@ sub Set {                                                    ## no critic 'compl
       readingsSingleUpdate($hash, "alarmed",     0, 0);
       readingsSingleUpdate($hash, "alarmTime", $at, 1);
       
-  } elsif ($opt eq "alarmDel") {      
-      delReadings ($name, "alarmTime");
-      delReadings ($name, "alarmed");
-      
-  } elsif ($opt eq "countDownInit") {
-      my $ct;
-      if($prop && $prop1) {                                                # Format: hh mm ss
-          $prop2 = ($prop2 ne "") ? $prop2 : 70;                           # Sekunden
-          return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13" \nor alternatively only one entry in seconds.} if($prop>23 || $prop1>59 || $prop2>59);
-          $ct = $prop*3600 + $prop1*60 + $prop2;                           # in Sekunden umgewandelt !
-          
-      } elsif ($prop && !$prop1) {                                         # Format: Sekundenangabe
-          $ct = $prop;
-          
-      } else {
-         return qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13" \nor alternatively only one entry in seconds.};   
-      
-      }
-      
-      delReadings         ($name, "countInitVal");
-      
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "countInitVal", $ct          ); 
-      readingsBulkUpdate  ($hash, "state",        "initialized");
-      readingsEndUpdate   ($hash, 1);
-      
-  } elsif ($opt eq "resume") {
-      return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
-      return if(ReadingsVal($name, "state", "") eq "started");
-      
-      my $ms = int(time*1000);
-      readingsSingleUpdate($hash, "starttime", $ms,       0);
-      readingsSingleUpdate($hash, "state",     "resumed", 1);
-      
   } else {
       return "$setlist";
   }
+
+return;
+}
+
+################################################################
+#                      Setter alarmDel
+################################################################
+sub _setAlarmDel {                       ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  delReadings ($name, "alarmTime");
+  delReadings ($name, "alarmed");
+
+return;
+}
+
+################################################################
+#                      Setter countDownInit
+################################################################
+sub _setCountDownInit {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  my $prop2 = $paref->{prop2};
+  
+  my $ct;
+  my $msg = qq{The value for "$opt" is invalid. Use parameter "hh mm ss" like "19 45 13" \nor alternatively only one entry in seconds.};
+  
+  if($prop && $prop1) {                                                # Format: hh mm ss
+      $prop2 = defined $prop2 ? $prop2 : 70;                           # Sekunden
+      return $msg if($prop>23 || $prop1>59 || $prop2>59);
+      $ct = $prop*3600 + $prop1*60 + $prop2;                           # in Sekunden umgewandelt !
+      
+  } elsif ($prop && !$prop1) {                                         # Format: Sekundenangabe
+      $ct = $prop;
+      
+  } else {
+     return $msg;   
+  
+  }
+  
+  delReadings         ($name, "countInitVal");
+  
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "countInitVal", $ct          ); 
+  readingsBulkUpdate  ($hash, "state",        "initialized");
+  readingsEndUpdate   ($hash, 1);
+
+return;
+}
+
+################################################################
+#                      Setter resume
+################################################################
+sub _setResume {                         ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $addp  = $paref->{addp};
+  
+  return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
+  return if(ReadingsVal($name, "state", "") eq "started");
+  
+  my $ms = int(time*1000);
+  readingsSingleUpdate($hash, "starttime", $ms,       0);
+  readingsSingleUpdate($hash, "state",     "resumed", 1);
 
 return;
 }
