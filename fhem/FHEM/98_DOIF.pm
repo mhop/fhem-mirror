@@ -1487,7 +1487,7 @@ sub ReplaceReadingDoIf($)
         $param=",'$default','$regExp','$output'";
       } elsif ($regExp) {
         $param=",'$default','$regExp'";
-      } elsif ($default) {
+      } elsif ($default ne "") {
         $param=",'$default'";
       }
       if ($internal) {
@@ -1496,7 +1496,7 @@ sub ReplaceReadingDoIf($)
         return("::ReadingValDoIf(".'$hash'.",'$name','$reading'".$param.")","",$name,$reading,undef);
       }
     } else {
-      if ($default) {
+      if ($default ne "") {
         $param=",'$default'";
       }
       return("::InternalDoIf(".'$hash'.",'$name','STATE'".$param.")","",$name,undef,'STATE');
