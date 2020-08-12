@@ -114,10 +114,18 @@ my %vNotesIntern = (
 );
 
 my %hcb = (                                                                  # Hash der Steuertastendefinition
-  1  => {cmd => "start",  img => "default/remotecontrol/black_btn_GREEN.png",     },
-  2  => {cmd => "stop",   img => "default/remotecontrol/black_btn_RED.png",       },
+  1  => {cmd => "start",  img => "default/remotecontrol/black_btn_GREEN.png",  },
+  2  => {cmd => "stop",   img => "default/remotecontrol/black_btn_RED.png",    },
   3  => {cmd => "resume", img => "default/remotecontrol/black_btn_YELLOW.png", },
-  4  => {cmd => "reset",  img => "default/remotecontrol/black_btn_STOP.png",      },
+  4  => {cmd => "reset",  img => "default/remotecontrol/black_btn_STOP.png",   },
+);
+                
+my %hset = (                                                                  # Hash der Set-Werte
+  staticwatch    => {set => "time"                                                                                  },
+  stopwatch      => {set => "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg"               },
+  countdownwatch => {set => "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg countDownInit" },
+  watch          => {set => "alarmSet alarmDel:noArg"                                                               },
+  text           => {set => "displayTextSet displayTextDel:noArg textTicker:on,off"                                 },
 );
 
 ##############################################################################
@@ -210,16 +218,17 @@ sub Set {                                                    ## no critic 'compl
   my $prop1 = $a[3];
   my $prop2 = $a[4];
   my $prop3 = $a[5];
-  my $addp  = AttrVal($name, "digitalDisplayPattern", "watch");
     
   return if(IsDisabled($name));
+  
+  my $addp = AttrVal($name, "digitalDisplayPattern", "watch");
+  if (!$hset{$addp}) {
+      Log3($name, 1, "$name - ERROR - The attribute 'digitalDisplayPattern' value '$addp' is not known by module '$hash->{TYPE}'");
+      return;
+  }
                                                            
-  my $setlist = "Unknown argument $opt, choose one of ";
-  $setlist .= "time "                                                                     if($addp =~ /staticwatch/x);               
-  $setlist .= "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg "  if($addp =~ /stopwatch|countdownwatch/x); 
-  $setlist .= "countDownInit "                                                            if($addp =~ /countdownwatch/x);
-  $setlist .= "alarmSet alarmDel:noArg "                                                  if($addp =~ /\bwatch\b/x);
-  $setlist .= "displayTextSet displayTextDel:noArg textTicker:on,off "                    if($addp eq "text");    
+  my $setlist = "Unknown argument $opt, choose one of "; 
+  $setlist   .= "$hset{$addp}{set} "; 
 
   if ($opt eq "start") {                                    ## no critic 'Cascading'
       return qq{Please set "countDownInit" before !} if($addp =~ /countdownwatch/x && !ReadingsVal($name, "countInitVal", ""));
