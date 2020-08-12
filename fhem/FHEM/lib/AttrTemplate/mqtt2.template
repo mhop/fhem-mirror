@@ -2348,7 +2348,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/sensor/vibration:.* vibration\
   shellies/DEVNAME/sensor/lux:.* lux\
   shellies/DEVNAME/sensor/battery:.* batteryPercent\
-  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
