@@ -619,7 +619,7 @@ sub ShadingProcessingDriveCommand {
           . $FHEM::Automation::ShuttersControl::shutters->getShadingStatus
           . ', Beschattungsstatus Zeitstempel: '
           . strftime(
-            "%Y.%m.%e %T",
+            "%Y.%m.%d %T",
             localtime(
                 $FHEM::Automation::ShuttersControl::shutters
                   ->getShadingStatusTimestamp

@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: change from %k to %H for better compability
+                                  with Strawberry Perl on Windows
+                          fix Github #82
+                          fix Github #79
+                          fix Github #77
  - feature: 76_SMAPortal: new attr balanceDay, balanceMonth, balanceYear for 
                           statistics dataprovider, new set getData command, 
                           update button in header of Portal Graphics, minor 

@@ -562,7 +562,7 @@ sub getAntiFreezeStatus {
     $daytime = (
         defined($daytime) && $daytime
         ? $daytime
-        : ( strftime( "%k", localtime() ) < 12 ? 'am' : 'pm' )
+        : ( strftime( "%H", localtime() ) < 12 ? 'am' : 'pm' )
     );
     my $outTemp = $FHEM::Automation::ShuttersControl::ascDev->getOutTemp;
 

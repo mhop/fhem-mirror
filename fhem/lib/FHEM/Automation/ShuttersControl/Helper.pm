@@ -382,6 +382,19 @@ sub _IsDay {
               . $FHEM::Automation::ShuttersControl::shutters->getSunrise );
     }
 
+    
+    $respIsDay == 1
+      if (
+           (  $FHEM::Automation::ShuttersControl::shutters->getDown eq 'roommate'
+             and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'asleep'
+                or $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'gotosleep' )
+           ) 
+        or (  $FHEM::Automation::ShuttersControl::shutters->getUp eq 'roommate'
+             and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'asleep'
+                or $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'gotosleep' )
+           )
+      );
+    
     return $respIsDay;
 }
 
