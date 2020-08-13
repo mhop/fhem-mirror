@@ -178,14 +178,13 @@ sub I2C_HDC1008_I2CRec ($$) {
 			if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) 
 			{
 				Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  received: $clientmsg->{type} $clientmsg->{received}";
-				I2C_HDC1008_GetTemp  ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
-				I2C_HDC1008_GetHum ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
+				I2C_HDC1008_UpdateTempHum  ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
 			}
 		}
 	}
 }
 
-sub I2C_HDC1008_GetTemp ($$) 
+sub I2C_HDC1008_UpdateTempHum ($$) 
 {
 	my ($hash, $rawdata) = @_;
 	my $name = $hash->{NAME};
@@ -196,33 +195,20 @@ sub I2C_HDC1008_GetTemp ($$)
 		Log3 $hash, 4, "[$name] I2C_HDC1008_I2CRec  invalid temperature raw value: $tempWord";
 		return undef;
 	}
-	
 	my $temperature = (($tempWord /65536.0)*165.0)-40.0;
 
-	Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  calced Temperatur: $temperature";
-	
-	
-	$temperature = sprintf( '%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f',	$temperature );
-}
-
-sub I2C_HDC1008_GetHum ($$) 
-{
-	my ($hash, $rawdata) = @_;
-	my $name = $hash->{NAME};
-	
-	my @raw = split(" ",$rawdata);
 	my $humWord  = ($raw[2] << 8 | $raw[3]);	
 	if ( ($humWord & 0x3) != 0) {
 		Log3 $hash, 4, "[$name] I2C_HDC1008_I2CRec  invalid humidity raw value: $humWord";
 		return undef;
 	}
-
 	my $humidity  = ($humWord /65536.0)*100.0;
 
-	Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  calced humidity: $humidity";
+	Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  calced temp/hum: $temperature $humidity";
 	
-	my $temperature = ReadingsVal($hash->{NAME} ,"temperature","0");
-	$humidity = sprintf( '%.' . AttrVal($hash->{NAME}, 'roundHumidityDecimal', 1) . 'f', $humidity 	);	
+	$temperature = sprintf( '%.' . AttrVal($hash->{NAME}, 'roundTemperatureDecimal', 1) . 'f', $temperature );
+	$humidity = sprintf( '%.' . AttrVal($hash->{NAME}, 'roundHumidityDecimal', 1) . 'f', $humidity );
+
 	readingsBeginUpdate($hash);
 	readingsBulkUpdate($hash, 'humidity', $humidity);
 	readingsBulkUpdate($hash, 'temperature', $temperature);
@@ -231,11 +217,7 @@ sub I2C_HDC1008_GetHum ($$)
 		'state',
 		'T: ' . $temperature . ' H: ' . $humidity
 	);
-	
-	
 	readingsEndUpdate($hash, 1);	
-	
-	
 }
 
 sub I2C_HDC1008_Undef($$) 
