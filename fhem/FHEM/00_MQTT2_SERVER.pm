@@ -424,7 +424,7 @@ MQTT2_SERVER_Read($@)
   }
 
   # Allow some IO inbetween, for overloaded systems
-  InternalTimer(0, sub{ MQTT2_SERVER_Read($_[0],1)}, $hash,0)
+  InternalTimer(0, sub{ MQTT2_SERVER_Read($hash,1)}, $hash, 0)
         if(length($hash->{BUF}) > 0);
 }
 
