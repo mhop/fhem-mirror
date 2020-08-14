@@ -177,6 +177,7 @@ sub CUL_HM_Initialize($) {
 
   $hash->{Attr}{dev} =  "ignore:1,0 dummy:1,0 "  # -- device only attributes
                        ."IODev IOList IOgrp "        
+                       ."hmKey hmKey2 hmKey3 "  # required for VCCU
                        ."actCycle "            # also for action detector    
                        ."readingOnDead:multiple,noChange,state,periodValues,periodString,channels "
                        ."subType:"   .join(",",CUL_HM_noDup(map { $culHmModel->{$_}{st} } keys %{$culHmModel}))." "
@@ -186,7 +187,6 @@ sub CUL_HM_Initialize($) {
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
                        ."actStatus "
-                       ."hmKey hmKey2 hmKey3 "  
                        ."rssiLog:1,0 "         # enable writing RSSI to Readings (device only)
                        ."autoReadReg:0_off,1_restart,2_pon-restart,3_onChange,4_reqStatus,5_readMissing,8_stateOnly "
                        ."burstAccess:0_off,1_auto "
@@ -4268,8 +4268,8 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     my @cond = ();
     push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}} if (defined $lvlStr{md}{$md});
     push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{$md}} if (defined $lvlStr{mdCh}{"$md$chn"});
-    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{md}{$st}} if (defined $lvlStr{st}{$st}{$_});
-    push @cond,"slider,0,1,100" if (!scalar @cond);
+    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{md}{$st}} if (defined $lvlStr{st}{$st});
+    push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",grep /./,@cond);
 
     $hash->{helper}{cmds}{lst}{peer} = join",",grep/./,split",",InternalVal($name,"peerList","");
@@ -4385,16 +4385,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
       elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){
         my ($null,$repl) = ($1,$2);
-        if ($repl =~ m/^(ontime|sec|time)$/){
-          $val = ""; # nothing 
-        }
-        elsif (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $null = defined $null && $null eq "[" ? "noArg," : "";
+        if (defined $hash->{helper}{cmds}{lst}{$repl}){
+          $null = $null ? "noArg," : "";
           $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
           next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
         }
         else{
-          $val = defined $null ?":noArg":"";
+          $val = "";
         }
       }
       elsif($val =~ m/^\[([a-zA-Z0-9_-|\.]*)\]$/){
@@ -6719,12 +6716,19 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 sub CUL_HM_Ping($) {
   my($defN) = @_;
   return 0 if (($defs{$defN}{helper}{rxType} & 0xe3) == 0);     # no ping for config devices
-  my (undef, $nres) = CUL_HM_Set($defs{$defN},$defN,"sysTime"); # noansi: fix warnings
+  my (undef, $nres) = CUL_HM_Set($defs{$defN},$defN,"sysTime"); 
   return 1 if (defined($nres) && 1 == $nres); 
+
   foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
-    (undef, $nres) = CUL_HM_Set($defs{$chnN},$chnN,"statusRequest"); # noansi: fix warnings
+    (undef, $nres) = CUL_HM_Set($defs{$chnN},$chnN,"statusRequest");
     return 1 if (defined($nres) && 1 == $nres); 
   }
+
+  if (CUL_HM_SearchCmd($defN,"getSerial")){
+    CUL_HM_Set($defs{$defN},$defN,"getSerial");
+    return 1;
+  }
+
   return 0;
 }
 
@@ -9422,10 +9426,9 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{$devId}{start} =~ s/[\:\-\ ]//g;
   
   if(defined $devHash->{READINGS}{".protLastRcv"}){
-      my $x = $devHash->{READINGS}{".protLastRcv"}{VAL};
       $devHash->{READINGS}{".protLastRcv"}{VAL} =~ s/[\:\-\ ]//g;
   }
-  
+
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
@@ -9492,19 +9495,15 @@ sub CUL_HM_ActCheck($) {# perform supervision
         if ($actHash->{helper}{$devId}{start} < $tSince){  
           if($autoTry) { #try to send a statusRequest?
             my $try = $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0;
+            
             $actHash->{helper}{$devId}{try} = $try + 1;
             if ($try < 4 || !($try % 4)){#try 3 times, then reduce speed
-              if (CUL_HM_qStateUpdatIfEnab($devName,1)){
+              if (CUL_HM_Ping($devName)){
                 $state = $oldState eq "unset" ? "unknown" 
-                                              : $oldState;
-              }
-              elsif (CUL_HM_SearchCmd($devName,"getSerial")){
-                CUL_HM_Set($defs{$devName},$devName,"getSerial");
-                $state = $oldState eq "unset" ? "unknown" 
-                                              : $oldState;
+                                              : $oldState;                
               }
               else{
-                $actHash->{helper}{$devId}{try} = 99;
+                $actHash->{helper}{$devId}{try} = 98;
                 $state = "dead";
               }
             }
@@ -9570,19 +9569,11 @@ sub CUL_HM_ActInfo() {# print detailed status information
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec != 0){
       my $tLast = ReadingsVal($devName,".protLastRcv","00000000000000");
-      my $x;
-      if($tLast =~ m/(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/){
-        $tLast =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/ ;
-        $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;
-      }
-      else{
-        $tLast =~ /(....)(..)(..)(..)(..)(..)/ ;
-        $x =  $2*30*24*3600 + $3*24*3600 + $4*3600 + $5*60 +$6;          
-      }
+      my ($Y,$M,$D,$H,$M,$S) =  unpack 'A4A2A2A2A2A2',$tLast;
       
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
 
-      my $y =  $x -
+      my $y =  $M*30*24*3600 + $D*24*3600 + $H*3600 + $M*60 +$S -
                ((  $t[4]+1)*30*24*3600
                  + $t[3]*24*3600 
                  + $t[2]*3600 
@@ -10092,7 +10083,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
           last;
         }
       }
-      next  if(!defined $devN);# no device found
+      next  if(!defined $devN);# no device found for this queue
   
       my $dq = $devH->{helper}{q};
       my @chns = split(",",$dq->{$q});
@@ -10109,9 +10100,11 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         CUL_HM_Set($defs{$eN},$eN,"getConfig");
       }
       else{
-         CUL_HM_Set($defs{$eN},$eN,"statusRequest");
+         if (!CUL_HM_getAttrInt($eN,"ignore")){
+           CUL_HM_Set($defs{$eN},$eN,"statusRequest");
+           InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
+         }
          CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
-         InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
       }
       $Qexec = $q;
       last; # execute only one!
