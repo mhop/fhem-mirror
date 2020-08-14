@@ -213,7 +213,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
-  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpfull if your PTZ camera doesn't have the capability ".
+  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
                            "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
