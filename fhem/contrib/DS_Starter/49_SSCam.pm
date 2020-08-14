@@ -213,7 +213,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
-  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpfull if your PTZ camera doesn't have the capability ".
+  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
                            "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
@@ -463,10 +463,11 @@ my %sdswfn = (                                                             # Fun
 );
 
 # Standardvariablen und Forward-Deklaration
-my $defSlim  = 3;                                         # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $defSnum  = "1,2,3,4,5,6,7,8,9,10";                    # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
-my $compstat = "8.2.8";                                   # getestete SVS-Version
-my $valZoom  = ".++,+,stop,-,--.";                        # Inhalt des Setters "setZoom"
+my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $compstat          = "8.2.8";                           # getestete SVS-Version
+my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
+my $shutdownInProcess = 0;                                 # Statusbit shutdown
 
 #use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 #use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -793,6 +794,8 @@ return;
 sub delayedShutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
+  
+  $shutdownInProcess = 1;                                       # Statusbit shutdown setzen -> getApiSites wird nicht mehr ausgeführt
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
 
@@ -4109,14 +4112,14 @@ sub sessionOff {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::sessionOff");
+    RemoveInternalTimer ($hash, "FHEM::SSCam::sessionOff");
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE} = "logout";
         
         setActiveToken($hash);
-        logout($hash);
+        logout        ($hash);
         
     } else {
         InternalTimer(gettimeofday()+1.1, "FHEM::SSCam::sessionOff", $hash, 0);
@@ -4355,29 +4358,29 @@ return;
 #######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
 #############################################################################################################################
 sub getApiSites {
-   my ($hash) = @_;
-   my $serveraddr  = $hash->{SERVERADDR};
-   my $serverport  = $hash->{SERVERPORT};
-   my $name        = $hash->{NAME};
-   my $apiinfo     = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite !
-   my $apiauth     = $hash->{HELPER}{APIAUTH};            
-   my $apiextrec   = $hash->{HELPER}{APIEXTREC};            
-   my $apiextevt   = $hash->{HELPER}{APIEXTEVT};             
-   my $apicam      = $hash->{HELPER}{APICAM};                          
-   my $apitakesnap = $hash->{HELPER}{APISNAPSHOT};
-   my $apiptz      = $hash->{HELPER}{APIPTZ};
-   my $apipreset   = $hash->{HELPER}{APIPRESET};
-   my $apisvsinfo  = $hash->{HELPER}{APISVSINFO};
-   my $apicamevent = $hash->{HELPER}{APICAMEVENT};
-   my $apievent    = $hash->{HELPER}{APIEVENT};
-   my $apivideostm = $hash->{HELPER}{APIVIDEOSTM};
-   my $apiaudiostm = $hash->{HELPER}{APIAUDIOSTM};
+   my $hash         = shift;
+   my $serveraddr   = $hash->{SERVERADDR};
+   my $serverport   = $hash->{SERVERPORT};
+   my $name         = $hash->{NAME};
+   my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite !
+   my $apiauth      = $hash->{HELPER}{APIAUTH};            
+   my $apiextrec    = $hash->{HELPER}{APIEXTREC};            
+   my $apiextevt    = $hash->{HELPER}{APIEXTEVT};             
+   my $apicam       = $hash->{HELPER}{APICAM};                          
+   my $apitakesnap  = $hash->{HELPER}{APISNAPSHOT};
+   my $apiptz       = $hash->{HELPER}{APIPTZ};
+   my $apipreset    = $hash->{HELPER}{APIPRESET};
+   my $apisvsinfo   = $hash->{HELPER}{APISVSINFO};
+   my $apicamevent  = $hash->{HELPER}{APICAMEVENT};
+   my $apievent     = $hash->{HELPER}{APIEVENT};
+   my $apivideostm  = $hash->{HELPER}{APIVIDEOSTM};
+   my $apiaudiostm  = $hash->{HELPER}{APIAUDIOSTM};
    my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apistm      = $hash->{HELPER}{APISTM};
-   my $apihm       = $hash->{HELPER}{APIHM};
-   my $apilog      = $hash->{HELPER}{APILOG};
-   my $apirec      = $hash->{HELPER}{APIREC};
-   my $proto       = $hash->{PROTOCOL};   
+   my $apistm       = $hash->{HELPER}{APISTM};
+   my $apihm        = $hash->{HELPER}{APIHM};
+   my $apilog       = $hash->{HELPER}{APILOG};
+   my $apirec       = $hash->{HELPER}{APIREC};
+   my $proto        = $hash->{PROTOCOL};   
    my $url;
    my $param;
   
@@ -4387,8 +4390,12 @@ sub getApiSites {
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - --- Begin Function getApiSites nonblocking ---");
    
-   if ($hash->{HELPER}{APIPARSET}) {
-       # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+   if ($shutdownInProcess) {                                                           # shutdown in Proces -> keine weiteren Aktionen
+       Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
+       return;       
+   }
+   
+   if ($hash->{HELPER}{APIPARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
        return checkSid($hash);
    }
