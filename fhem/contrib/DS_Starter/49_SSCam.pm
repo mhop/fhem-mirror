@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 22481 2020-07-27 21:56:22Z DS_Starter $
+# $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -159,7 +159,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.6.0"  => "11.08.2020  new attribute ptzNoCapPrePat ",
+  "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
+  "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
   "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
   "9.5.2"  => "26.07.2020  more changes according PBP level 3, minor fixes ",
   "9.5.1"  => "24.07.2020  set compatibility to 8.2.8, some changes according PBP level 3 ",
@@ -212,11 +213,13 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpfull if your PTZ camera doesn't have the capability ".
+                           "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
-               "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
-               "other defined streaming devices. ".
-               "More information about the possibilities is described in this ".
-               "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Das_Streaming_Master_Device_-_Typ_.22master.22\">Wiki article</a>. ",
+                           "'master' cannot play back streams itself, but opens up new possibilities by flexibly accepting streams from ".
+                           "other defined streaming devices. ".
+                           "More information about the possibilities is described in this ".
+                           "<a href=\"https://wiki.fhem.de/wiki/SSCAM_-_Steuerung_von_Kameras_in_Synology_Surveillance_Station#Das_Streaming_Master_Device_-_Typ_.22master.22\">Wiki article</a>. ",
   "9.3.0"   => "25.06.2020 Cameras with zoom function can also be controlled by FHEM. With the setter \"setZoom\", the zoom in/out ".
                            "can be triggered in two steps. In the PTZ streaming device or FTUI, pushbuttons are provided for this purpose.",
   "9.1.0"   => "10.12.2019 With the new attribute \"snapChatTxt\" it is possible to send snapshots by the Synology Chat server. ".
@@ -234,7 +237,7 @@ my %vNotesExtern = (
   "8.14.0"  => "01.06.2019 In detailview are buttons provided to open the camera native setup screen or Synology Surveillance Station and the Synology Surveillance Station online help. ",
   "8.12.0"  => "25.03.2019 Delay FHEM shutdown as long as sessions are not terminated, but not longer than global attribute \"maxShutdownDelay\". ",
   "8.11.0"  => "25.02.2019 compatibility set to SVS version 8.2.3, Popup possible for streaming devices of type \"generic\", ".
-               "support for \"genericStrmHtmlTag\" in streaming devices ",
+                           "support for \"genericStrmHtmlTag\" in streaming devices ",
   "8.10.0"  => "15.02.2019 Possibility of send recordings by telegram is integrated as well as sending snapshots ",
   "8.9.0"   => "05.02.2019 A new streaming device type \"lastsnap\" was implemented. You can create such device with \"set ... createStreamDev lastsnap\". ".
                            "This streaming device shows the newest snapshot which was taken. ",
@@ -470,11 +473,6 @@ my $valZoom  = ".++,+,stop,-,--.";                        # Inhalt des Setters "
 #use vars qw($FW_room);                                    # currently selected room
 #use vars qw($FW_detail);                                  # currently selected device for detail view
 #use vars qw($FW_wname);                                   # Web instance
-# sub FW_pH(@);                                            # add href
-
-#sub SSChatBot_formString; 
-#sub SSChatBot_addQueue($$$$$$$$); 
-#sub SSChatBot_getapisites($);
 
 #############################################################################################
 #                                       Hint Hash EN           
@@ -797,14 +795,12 @@ sub delayedShutdown {
   my $name = $hash->{NAME};
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
-  $hash->{HELPER}{ACTIVE} = "on";                                      # keine weiteren Aktionen erlauben
-  logout($hash);
+
+  sessionOff($hash);
   
   if($hash->{HELPER}{CACHEKEY}) {
       cache($name, "c_destroy"); 
-  } 
-  
-  delete $data{SSCam}{$name};                                          # internen cache löschen
+  }
 
 return 1;
 }
@@ -831,6 +827,8 @@ sub Delete {
     CommandDelete($hash->{CL},"$sgdev");
     
     CommandDelete($hash->{CL},"TYPE=SSCamSTRM:FILTER=PARENT=$name");   # alle zugeordneten Streaming-Devices löschen falls vorhanden
+	
+	delete $data{SSCam}{$name};                                        # internen Cache löschen
     
 return;
 }
@@ -920,7 +918,7 @@ sub Attr {
                 if($hash->{HELPER}{CACHEKEY}) {
                     cache($name, "c_destroy");                               # CHI-Cache löschen/entfernen    
                 } else {
-                    delete $data{SSCam}{$name};                                    # internen Cache löschen
+                    delete $data{SSCam}{$name};                              # internen Cache löschen
                 }              
             }        
         } else {
@@ -4107,9 +4105,9 @@ return;
 #                           Session logout
 ###########################################################################
 sub sessionOff {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::sessionOff");
     return if(IsDisabled($name));
@@ -8010,13 +8008,13 @@ return;
 #
 ######################################################################################
 sub streamDev {                                               ## no critic 'complexity'
-  my $paref   = shift;
-  my $camname = $paref->{linkparent}; 
-  my $strmdev = $paref->{linkname}; 
-  my $fmt     = $paref->{linkmodel};
-  my $omodel  = $paref->{omodel};  
-  my $oname   = $paref->{oname}; 
-  my $ftui    = $paref->{ftui};
+  my $paref      = shift;
+  my $camname    = $paref->{linkparent}; 
+  my $strmdev    = $paref->{linkname}; 
+  my $fmt        = $paref->{linkmodel};
+  my $omodel     = $paref->{omodel};  
+  my $oname      = $paref->{oname}; 
+  my $ftui       = $paref->{ftui};
   
   my $hash       = $defs{$camname};
   my $streamHash = $defs{$strmdev};                           # Hash des SSCamSTRM-Devices
@@ -8233,16 +8231,15 @@ return $ret;
 #                    Streaming Device Typ: mjpeg
 sub _streamDevMJPEG {                               ## no critic 'complexity not used'                                               
   my $params             = shift;
-  
   my $camname            = $params->{camname};
   my $strmdev            = $params->{strmdev};
   
   my $hash               = $defs{$camname};
   my $streamHash         = $defs{$strmdev};
+  my $camid              = $params->{camid} // return "";
+  my $sid                = $params->{sid}   // return "";
   my $ftui               = $params->{ftui};
-  my $camid              = $params->{camid};
   my $proto              = $params->{proto};
-  my $sid                = $params->{sid};
   my $pws                = $params->{pws};
   my $ha                 = $params->{ha};
   my $hb                 = $params->{hb};
@@ -11437,12 +11434,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                                  # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22481 2020-07-27 21:56:22Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22481 2020-07-27 21:56:22Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden

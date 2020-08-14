@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  49_SSCam(STRM): avoid possible warnings during shutdown/restart
  - bugfix:  52_I2C_HDC1008: fix "temperature" (broken by change from Aug, 1st)
  - feature: 49_SSCam: new attribute ptzNoCapPrePat
  - feature: 60_Watches: control buttons,new attr hideButtons, controlButtonSize

@@ -91,6 +91,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.14.5" => "12.08.2020  avoid loose of adoption after restart ",
   "2.14.4" => "03.08.2020  fix check of ARG in RemoveInternalTimer in _setadoptForTimer sub (sometimes no switch back done) ",             
   "2.14.3" => "01.08.2020  verbose 5 log in _setadoptForTimer sub ",
   "2.14.2" => "29.07.2020  fix: adoptTime accept not only integer values ",
@@ -232,7 +233,7 @@ sub Define {
   
   explodeLinkData ($hash, $link, 1);
   
-  $hash->{HELPER}{MODMETAABSENT}   = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   
   # Versionsinformationen setzen
   setVersionInfo($hash);
@@ -624,7 +625,7 @@ sub FwFn {
   my $clink           = ReadingsVal($name, "clientLink", "");
     
   sofAdoptSubset  ($hash);
-  explodeLinkData ($hash, $clink, 0);
+  explodeLinkData ($hash, $clink, 0) if($init_done == 1);
   
   # Beispielsyntax: "{$hash->{LINKFN}('$hash->{LINKPARENT}','$hash->{LINKNAME}','$hash->{LINKMODEL}')}";
   

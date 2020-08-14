@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
   "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
   "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
   "9.5.2"  => "26.07.2020  more changes according PBP level 3, minor fixes ",
@@ -472,11 +473,6 @@ my $valZoom  = ".++,+,stop,-,--.";                        # Inhalt des Setters "
 #use vars qw($FW_room);                                    # currently selected room
 #use vars qw($FW_detail);                                  # currently selected device for detail view
 #use vars qw($FW_wname);                                   # Web instance
-# sub FW_pH(@);                                            # add href
-
-#sub SSChatBot_formString; 
-#sub SSChatBot_addQueue($$$$$$$$); 
-#sub SSChatBot_getapisites($);
 
 #############################################################################################
 #                                       Hint Hash EN           
@@ -799,14 +795,12 @@ sub delayedShutdown {
   my $name = $hash->{NAME};
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
-  $hash->{HELPER}{ACTIVE} = "on";                                      # keine weiteren Aktionen erlauben
-  logout($hash);
+
+  sessionOff($hash);
   
   if($hash->{HELPER}{CACHEKEY}) {
       cache($name, "c_destroy"); 
-  } 
-  
-  delete $data{SSCam}{$name};                                          # internen cache löschen
+  }
 
 return 1;
 }
@@ -833,6 +827,8 @@ sub Delete {
     CommandDelete($hash->{CL},"$sgdev");
     
     CommandDelete($hash->{CL},"TYPE=SSCamSTRM:FILTER=PARENT=$name");   # alle zugeordneten Streaming-Devices löschen falls vorhanden
+	
+	delete $data{SSCam}{$name};                                        # internen Cache löschen
     
 return;
 }
@@ -922,7 +918,7 @@ sub Attr {
                 if($hash->{HELPER}{CACHEKEY}) {
                     cache($name, "c_destroy");                               # CHI-Cache löschen/entfernen    
                 } else {
-                    delete $data{SSCam}{$name};                                    # internen Cache löschen
+                    delete $data{SSCam}{$name};                              # internen Cache löschen
                 }              
             }        
         } else {
@@ -4109,9 +4105,9 @@ return;
 #                           Session logout
 ###########################################################################
 sub sessionOff {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::sessionOff");
     return if(IsDisabled($name));
@@ -8012,13 +8008,13 @@ return;
 #
 ######################################################################################
 sub streamDev {                                               ## no critic 'complexity'
-  my $paref   = shift;
-  my $camname = $paref->{linkparent}; 
-  my $strmdev = $paref->{linkname}; 
-  my $fmt     = $paref->{linkmodel};
-  my $omodel  = $paref->{omodel};  
-  my $oname   = $paref->{oname}; 
-  my $ftui    = $paref->{ftui};
+  my $paref      = shift;
+  my $camname    = $paref->{linkparent}; 
+  my $strmdev    = $paref->{linkname}; 
+  my $fmt        = $paref->{linkmodel};
+  my $omodel     = $paref->{omodel};  
+  my $oname      = $paref->{oname}; 
+  my $ftui       = $paref->{ftui};
   
   my $hash       = $defs{$camname};
   my $streamHash = $defs{$strmdev};                           # Hash des SSCamSTRM-Devices
@@ -8235,16 +8231,15 @@ return $ret;
 #                    Streaming Device Typ: mjpeg
 sub _streamDevMJPEG {                               ## no critic 'complexity not used'                                               
   my $params             = shift;
-  
   my $camname            = $params->{camname};
   my $strmdev            = $params->{strmdev};
   
   my $hash               = $defs{$camname};
   my $streamHash         = $defs{$strmdev};
+  my $camid              = $params->{camid} // return "";
+  my $sid                = $params->{sid}   // return "";
   my $ftui               = $params->{ftui};
-  my $camid              = $params->{camid};
   my $proto              = $params->{proto};
-  my $sid                = $params->{sid};
   my $pws                = $params->{pws};
   my $ha                 = $params->{ha};
   my $hb                 = $params->{hb};
