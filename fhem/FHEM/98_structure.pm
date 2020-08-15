@@ -177,8 +177,9 @@ structure_Notify($$)
   my ($hash, $dev) = @_;
   my $me = $hash->{NAME};
   my $devmap = $hash->{ATTR}."_map";
+  my $devName = $dev->{NAME};
 
-  if($dev->{NAME} eq "global") {
+  if($devName eq "global") {
     my $max = int(@{$dev->{CHANGED}});
     for (my $i = 0; $i < $max; $i++) {
       my $s = $dev->{CHANGED}[$i];
@@ -208,7 +209,7 @@ structure_Notify($$)
 
   return "" if(IsDisabled($me));
 
-  return "" if (! exists $hash->{".memberHash"}->{$dev->{NAME}});
+  return "" if (! exists $hash->{".memberHash"}->{$devName});
 
   my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
   my %clientstate;
@@ -234,10 +235,9 @@ structure_Notify($$)
         $priority[$i+1]=$foo[0];
       }
   }
-  
   my $minprio = 99999;
   my $devstate;
-
+  my $stateCause="";
   my $cdm = AttrVal($me, "considerDisabledMembers", undef);
   foreach my $d (sort keys %{ $hash->{".memberHash"} }) {
     next if(!$defs{$d} || (!$cdm && IsDisabled($d)));
@@ -274,8 +274,10 @@ structure_Notify($$)
             delete($hash->{INNTFY});
             return "";
           }
-          $minprio = $priority{$devstate}
-                if($priority{$devstate} && $priority{$devstate} < $minprio);
+          if($priority{$devstate} && $priority{$devstate} < $minprio) {
+            $minprio = $priority{$devstate};
+            $stateCause = $d;
+          }
           $clientstate{$devstate} = 1;
         }
       }
@@ -288,8 +290,10 @@ structure_Notify($$)
           delete($hash->{INNTFY});
           return "";
         }
-        $minprio = $priority{$devstate}
-              if($priority{$devstate} && $priority{$devstate} < $minprio);
+        if($priority{$devstate} && $priority{$devstate} < $minprio) {
+          $minprio = $priority{$devstate};
+          $stateCause = $d;
+        }
         $clientstate{$devstate} = 1;
       }
     }
@@ -297,27 +301,32 @@ structure_Notify($$)
     $hash->{".memberHash"}{$d} = $devstate;
   }
 
+  $devstate = ReadingsVal($devName, AttrVal($devName,$devmap,"state"),undef);
+  $devstate = $defs{$devName}{STATE} if(!defined($devstate));
+  $devstate = "undefined" if(!defined($devstate));
+
   my $newState = "undefined";
   if($behavior eq "absolute"){
     my @cKeys = keys %clientstate;
     $newState = (@cKeys == 1 ? $cKeys[0] : "undefined");
+    $stateCause = "different states: ".join(",", @cKeys);
 
   } elsif($behavior =~ "^relative" && $minprio < 99999) {
     $newState = $priority[$minprio];
 
   } elsif($behavior eq "last"){
-    my $readingName = AttrVal($dev->{NAME}, $devmap, "state");
-    $newState = ReadingsVal($dev->{NAME}, $readingName, undef);
-    $newState = "undefined" if(!defined($newState));
+    $newState = $devstate;
 
   }
 
-  Log3 $me, 5, "Update structure '$me' to $newState" .
-              " because device $dev->{NAME} has changed";
+  my $dStr = "structure $me: event from $devName: setting state to $newState";
+  $dStr .= ", cause $stateCause" if($newState ne $devstate);
+  Log3 $me, 5, $dStr;
+
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "LastDevice", $dev->{NAME}, 0);
+  readingsBulkUpdate($hash, "LastDevice", $devName, 0);
   readingsBulkUpdate($hash, "LastDevice_Abs",
-                                structure_getChangedDevice($dev->{NAME}), 0);
+                                structure_getChangedDevice($devName), 0);
   readingsBulkUpdate($hash, "state", $newState);
   readingsEndUpdate($hash, 1);
   $hash->{CHANGEDCNT}++;
