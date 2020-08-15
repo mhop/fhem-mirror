@@ -1680,7 +1680,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       );
 %culHmVrtGets       = (
                        param      => "-param-",
-                       cmdList    => "",
+                       cmdList    => "[short|long]",
                       );
 %culHmSubTypeGets   = (
                        none4Type  =>{ "test"=>"" }
@@ -1701,7 +1701,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                       ,getConfig     => ""
                       ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
                       ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|msgErrors|attack|all]"
-                      ,tplDel        => "tmplt"
+                      ,tplDel        => "-tplDel-"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        virtual       => "-noButtons-"
@@ -1725,23 +1725,24 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                                           ,eventL         => "-peer- -cond-"
                                           ,eventS         => "-peer- -cond-"
                                          }
-                     ,"4p"             =>{ trgPressS      => "[-peer-]"
-                                          ,trgPressL      => "[-peer-]"
-                                          ,trgEventS      => "[-peer-] -condition-"
-                                          ,trgEventL      => "[-peer-] -condition-"
+                     ,"4p"             =>{ trgPressS      =>"[-peer-]"
+                                          ,trgPressL      =>"[-peer-]"
+                                          ,trgEventS      =>"[-peer-] -condition-"
+                                          ,trgEventL      =>"[-peer-] -condition-"
                                          }
 );
 
 %culHmSubTypeDevSets   = (# device of this subtype
-                      switch           =>{ getSerial      => ""
-                                          ,pair           => ""
+                      switch           =>{ 
+                                           pair           => ""
                                           ,getVersion     => ""
+#                                          ,getSerial      => ""
 #                                          ,getDevInfo     => ""
                                          }        
 #                     ,winMatic         =>{ statusRequest => ""} not working at least for FW 1.6
                      ,keyMatic         =>{ statusRequest  => ""}
                      ,repeater         =>{ statusRequest  => ""
-                                          ,getSerial      => ""
+#                                          ,getSerial      => ""
                                          }
 );
 $culHmSubTypeDevSets{dimmer}            = 
@@ -1817,8 +1818,8 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
 %culHmModelSets = (# channels of this subtype-------------
                       "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"}
                      ,"HM-RC-19"         =>{ service        =>"-count-"
-                                            ,alarm          => "-count-"
-                                            ,display        => "-text- [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] -symbol-"
+                                            ,alarm          =>"-count-"
+                                            ,display        =>"-text- [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] -symbol-"
                                            }
                      ,"HM-PB-4DIS-WM-2"  =>{ text           =>"-txt1- -txt2-..."  }
                      ,"HM-OU-LED16"      =>{ led            =>"[off|red|green|orange]"
@@ -1840,7 +1841,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                             ,pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
                                            }
                      ,"ACTIONDETECTOR"   =>{ clear          =>"[readings|all]"
-                                            ,update         => ""
+                                            ,update         =>""
                                            }
 );
 
@@ -1865,7 +1866,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                       "HM-CC-TC00"           =>{ "desired-temp" =>"[on|off|6.0..30.0]"
                                                 ,statusRequest  =>""
                                                 ,sysTime        =>""
-                                                ,getSerial      => ""
+#                                                ,getSerial      =>""
                                                }
                      ,"HM-DIS-EP-WM5501"     =>{ text           =>"-txt1- -txt2-..."  
                                                 ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
@@ -1907,7 +1908,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,sysTime        =>""
                                                }
                      ,"HM-TC-IT-WM-W-EU00"   =>{ sysTime        =>""
-                                                ,getSerial      => ""
+#                                                ,getSerial      => ""
                                                }
                      ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
                      ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"[auto|manual|boost|day|night]"
@@ -1940,9 +1941,9 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,inhibit        =>"[on|off]"
                                                 ,statusRequest  =>""
                                                }
-                     ,"HM-ES-PMSW1-PL00"     =>{ getSerial      => ""
+#                     ,"HM-ES-PMSW1-PL00"     =>{ getSerial      => ""
 #                                                ,getDevInfo     => ""
-                                               }
+#                                               }
                      ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
                                                 ,"on-till"      =>"-time- [-ramptime-]..."
                                                 ,on             =>""
