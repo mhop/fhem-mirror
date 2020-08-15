@@ -1711,9 +1711,24 @@ Example specifications:<br>
     $ret .= "</table><pre>";
     
     return $ret;
+  } elsif ($arg eq "subsInPackageDOIF") {
+    no strict 'refs';
+    my $byd="OldReadingsNum AttrVal OldValue Value ReadingsAge Log set_Event ReadingsTimestamp fhem_set DOIF_ExecTimer set_Reading_Begin set_Exec get_Reading OldReadingsVal Dumper OldReadingsTimestamp get_State fhem ReadingsNum set_Reading gettimeofday ReadingsVal set_State AttrNum mkIcon InternalVal OldTimestamp set_Reading_End set_Reading_Update get_Exec del_Exec InternalNum Log3 ";
+    my $ftn="";
+    my $txt = "<html><table><b>".($DE ? " Vom Benutzer im Package DOIF deklarierte Subs " : " Subs in package DOIF declared by user ")."</b><br>&emsp;\n";
+    $txt .= "<tr><td><b> Sub &emsp; </b></td><td><b> Device </b></td></tr>\n";
+    foreach my $k (sort keys %DOIF::) {
+      if (defined &{"DOIF::$k"} and $byd !~ "$k ") {
+        my @d  = devspec2array("TYPE=DOIF:FILTER=MODEL=Perl:FILTER=DEF=.*subs.*sub.*?$k.*?{.*");
+        $ftn = ($DE ? "<br><sup>*</sup> in keinem DOIF-Gerät deklariert, vielleicht an einer Stelle wie 99_myUtils.pm" : "<br><sup>*</sup> not declared in a DOIF-device, but maybe in a place like 99_myUtils.pm") if (!$d[0] and !$ftn);
+        $txt .= "<tr><td><code> $k </code>&emsp;</td><td>".($d[0] ? " $d[0] ":" n/a <sup>*</sup>")."</td></tr>\n";
+      }
+    }
+    $txt .="</table>$ftn</html>";
+    return $txt;
   } else {
       my $hardcoded = "checkDOIF:noArg statisticsReport:noArg runningTimerInDOIF:noArg";
-      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField modelColorGradient:textField hsvColorGradient:textField";
+      return "unknown argument $arg for $pn, choose one of readingsGroup_for:multiple-strict,$dL DOIF_to_Log:multiple-strict,$dL SetAttrIconForDOIF:multiple-strict,$dL userReading_nextTimer_for:multiple-strict,$ntL ".(AttrVal($pn,"DOIFtoolsHideGetSet",0) ? $hardcoded :"")." linearColorGradient:textField modelColorGradient:textField hsvColorGradient:textField subsInPackageDOIF:noArg";
   } 
 
   return $ret;
@@ -1754,6 +1769,7 @@ DOIFtools contains tools to support DOIF.<br>
     <li>optionally create a menu entry</li>
     <li>show a list of running wait timer</li>
     <li>scale values to color numbers and RGB values for coloration</li>
+    <li>list subs declared by user in package DOIF</li>
   </ul>
 <br>
 Just one definition per FHEM-installation is allowed. <a href="https://fhem.de/commandref_DE.html#DOIFtools">More in the german section.</a>
@@ -1793,6 +1809,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
     <li>optionalen Menüeintrag erstellen</li>
     <li>Liste der laufenden Wait-Timer anzeigen</li>
     <li>skaliert Werte zu Farbnummern und RGB Werten zum Einfärben, z.B. von Icons.</li>
+    <li>Auflistung der Subs, die vom User im Package DOIF deklariert wurden.</li>
   </ul>
 <br>
 <b>Inhalt</b><br>
@@ -1846,7 +1863,7 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <code>set &lt;name&gt; targetDOIF &lt;target name&gt;</code><br>
         <b>targetDOIF</b> vor dem Löschen der Readings muss das Ziel-DOIF gesetzt werden.<br>
 
-        <br>
+<br>
 </li><li><a name="deleteReadingInTargetDevice"></a>
         <code>set &lt;name&gt; deleteReadingInTargetDevice &lt;readings to delete name&gt;</code><br>
         <b>deleteReadingInTargetDevice</b> löscht sichtbare Readings, ausser <i>state</i> im Ziel-Gerät. Bitte den Gefahrenhinweis zum Befehl <i>deletereading</i> beachten ! <a href="https://fhem.de/commandref_DE.html#deletereading">Commandref#deletereading</a><br>
@@ -1958,6 +1975,10 @@ DOIFtools stellt Funktionen zur Unterstützung von DOIF-Geräten bereit.<br>
         <br>
         Beispiele:<br>
         <code>get DOIFtools hsvColorGradient 240,360,7,30,1,80,80</code><br>
+        <br>
+</li><li><a name="subsInPackageDOIF"></a>
+        <code>get &lt;name&gt; subsInPackageDOIF</code><br>
+        <b>subsInPackageDOIF</b> erzeugt eine Liste der Subs, die vom User im Package DOIF deklariert wurden.<br>
         <br>
         
 </li>    </ul>

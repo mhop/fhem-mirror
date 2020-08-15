@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_DOIFtools: get subsInPackageDOIF for MODEL Perl (Forum #63938)
  - bugfix:  49_SSCam(STRM): avoid possible warnings during shutdown/restart
  - bugfix:  52_I2C_HDC1008: fix "temperature" (broken by change from Aug, 1st)
  - feature: 49_SSCam: new attribute ptzNoCapPrePat
@@ -15,7 +16,7 @@
                           update button in header of Portal Graphics, minor 
                           code changes according PBP
  - change:  10_WS980: change conversion ration of w/m2 to 0.0079
-.- bugfix:  98_DOIFtools: improve popup position (Forum #113404)
+ - bugfix:  98_DOIFtools: improve popup position (Forum #113404)
  - bugfix:  48_BlinkCamera: videoDelete on new API and first TFA pin verify
  - bugfix:  73_AutoShuttersControl: fix shading in drive then shutter is closed
  - change:  32_withings: added sleep apnea index reading
