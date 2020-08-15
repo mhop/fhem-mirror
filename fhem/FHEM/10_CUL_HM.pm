@@ -6044,10 +6044,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     }
     else{
       if (defined $a[2]){
-        if   ($a[2] eq "long") {$type = "L"}
-        elsif($a[2] eq "short"){$type = "S"}
-        else                   {return "use either short or long"}
-        splice @a,2,1; # remove long/short
+        if   ($a[2] eq "long") {$type = "L";splice @a,2,1;}
+        elsif($a[2] eq "short"){$type = "S";splice @a,2,1;}
+         # remove long/short
       } 
     }
 
