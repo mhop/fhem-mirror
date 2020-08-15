@@ -260,7 +260,7 @@ sub CUL_HM_updateConfig($){##########################
       if ($attr{$_}{subType} && $attr{$_}{subType} eq "virtual"){
         $attr{$_}{model} = "VIRTUAL" if (!$attr{$_}{model} || $attr{$_}{model} =~ m/virtual_/);
       }
-      if ($attr{$_}{".mId"} && $culHmModel->{$attr{$_}{".mId"}}){ #if mId is  available set model to its original value -at least temporarliy
+      if ($attr{$_}{".mId"} && $culHmModel->{$attr{$_}{".mId"}}){ #if mId is available set model to its original value -at least temporarliy
         $attr{$_}{model} = $culHmModel->{$attr{$_}{".mId"}}{name};
       }
       else{#if mId is not available use attr model and assign it. 
@@ -268,9 +268,10 @@ sub CUL_HM_updateConfig($){##########################
           $attr{$_}{".mId"} = CUL_HM_getmIdFromModel($attr{$_}{model});
         }
       }
-      CUL_HM_updtDeviceModel($_,AttrVal($_,"modelForce",AttrVal($_,"model",""))) if($attr{$_}{".mId"});
+      CUL_HM_updtDeviceModel($_,AttrVal($_,"modelForce",AttrVal($_,"model","")),1) if($attr{$_}{".mId"});
     }
   }
+  
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
@@ -319,6 +320,7 @@ sub CUL_HM_updateConfig($){##########################
       CUL_HM_UpdtReadSingle($hash,$rName,$aVal,0)
            if (!defined ReadingsVal($name,$rName,undef));
     }
+
     if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
       $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
     }
@@ -461,12 +463,13 @@ sub CUL_HM_updateConfig($){##########################
         $md =~ /(-TC|ROTO_ZEL-STG-RM-FWT|HM-CC-RT-DN)/){
       $attr{$name}{stateFormat} = "last:trigLast";
     }
+    #remove invalid attributes
     foreach(keys %{$attr{$name}}){
-      delete $attr{$name}{$_} if(CUL_HM_AttrCheck($name,$_));
+      delete $attr{$name}{$_} if (CUL_HM_AttrCheck($name,$_));  
     }
     # -+-+-+-+-+ add default web-commands
     my $webCmd;
-    $webCmd  = AttrVal($name,"webCmd",undef);
+    $webCmd = AttrVal($name,"webCmd",undef);
     if(!defined $webCmd){
       if    ($st eq "virtual"      ){
         if   ($hash->{helper}{fkt} && $hash->{helper}{fkt} eq "sdLead1")   {$webCmd="teamCall:alarmOn:alarmOff";}
@@ -516,7 +519,8 @@ sub CUL_HM_updateConfig($){##########################
     }
     $attr{$name}{webCmd} = $webCmd if ($webCmd);
 
-    CUL_HM_qStateUpdatIfEnab($name);
+    CUL_HM_SetList($name,"") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
+    CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
     if(CUL_HM_peerUsed($name) == 2){
       CUL_HM_qAutoRead($name,1);
@@ -530,25 +534,7 @@ sub CUL_HM_updateConfig($){##########################
         }
       }
     }
-    #remove invalid attributes
-    if (!$hash->{helper}{role}{dev}){
-      my @l = split(" ",$modules{CUL_HM}{Attr}{dev});
-      map {$_ =~ s/\:.*//} @l; 
-      foreach (@l){
-        delete $attr{$name}{$_} if (defined $attr{$name}{$_});
-      }
-    }
-    else{# force new calculation for of rxType and mId
-      delete $hash->{helper}{rxType};
-      CUL_HM_getRxType($hash); 
-    }
-    if (!$hash->{helper}{role}{chn}){
-      my @l = split(" ",$modules{CUL_HM}{Attr}{chn});
-      map {$_ =~ s/\:.*//} @l; 
-      foreach (@l){
-        delete $attr{$name}{$_} if (defined $attr{$name}{$_});
-      }
-    }
+    
     CUL_HM_complConfig($name);
     CUL_HM_setAssotiat($name);
   }
@@ -760,8 +746,17 @@ sub CUL_HM_Attr(@) {#################################
         return "attribut not allowed for channels"
                       if (!$hash->{helper}{role}{dev});
         return if (!$init_done); # will do at updateConfig
-        CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrVal);
-      }
+        my($h,$m) = split(":",$attrVal);
+        $h = int($h);
+        $m = int($m);
+        return "format hhh:mm required. $attrVal incorrect" if( $h >= 999 && $h <= 0
+                                                             && $m >= 59  && $m <= 0
+                                                             && $h + $m > 0);
+        my $attrValNew  = sprintf("%03d:%02d",$h,$m); 
+        CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrValNew);
+        $attr{$name}{$attrName} = $attrValNew;
+        return "reformated input:$attrValNew" if($attrValNew ne $attrVal);
+        }
     }
     $updtReq = 1;
   }
@@ -4242,6 +4237,20 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
   
   my $changes = 0;
   if($hash->{helper}{cmds}{cmdKey} ne $cmdKey){
+    if(!$cmdKey){
+      my $devName = InternalVal($name,"device",$name);
+      my (undef,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
+      $cmdKey =        ($hash->{helper}{role}{chn}?1:0)
+                  .":".($hash->{helper}{role}{dev}?1:0)
+                  .":".($hash->{helper}{role}{vrt}?1:0)
+                  .":".($hash->{helper}{fkt}?$hash->{helper}{fkt}:"")
+                  .":".$devName
+                  .":".($defs{$devName}{helper}{mId} ? $defs{$devName}{helper}{mId}:"")
+                  .":".$chn
+                  .":".InternalVal($name,"peerList","")
+                 ;# update cmds entry in case
+    }
+      
     my ($roleC,$roleD,$roleV,$fkt,$devName,$mId,$chn,$peerLst) = split(":", $cmdKey);
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
@@ -4332,12 +4341,13 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
   }
 
   return;
- }
+}
 sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++++
   my($name,$findCmd)=@_;
-  return (defined $defs{$name}{helper}{cmds}{cmdLst}
-       && defined $defs{$name}{helper}{cmds}{cmdLst}{$findCmd}) ?1:0;
- }
+  CUL_HM_SetList($name,"") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
+#  CUL_HM_Set($defs{$name},$name,"?") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
+  return defined $defs{$name}{helper}{cmds}{cmdLst}{$findCmd} ? 1 : 0;
+}
  
  
 
@@ -6718,14 +6728,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 }
 sub CUL_HM_Ping($) {
   my($defN) = @_;
-  return 0 if (($defs{$defN}{helper}{rxType} & 0xe3) == 0);     # no ping for config devices
+  return 0 if (CUL_HM_getRxType($defs{$defN}) & 0xe3 == 0);     # no ping for config devices
   return 1 if (defined $defs{$defN}{protCmdPend});              # cmds are already pending - that is ping enough
-  my (undef, $nres) = CUL_HM_Set($defs{$defN},$defN,"sysTime"); 
-  return 1 if (defined($nres) && 1 == $nres); 
+  if(CUL_HM_SearchCmd($defN,"sysTime")){
+    CUL_HM_Set($defs{$defN},$defN,"sysTime"); 
+    return 1; 
+  }
 
   foreach my $chnN($defN,map{$defs{$defN}{$_}}grep(/^channel_/,keys %{$defs{$defN}})){
-    (undef, $nres) = CUL_HM_Set($defs{$chnN},$chnN,"statusRequest");
-    return 1 if (defined($nres) && 1 == $nres); 
+    next if (!CUL_HM_SearchCmd($chnN,"statusRequest"));
+    my (undef, $nres) = CUL_HM_Set($defs{$chnN},$chnN,"statusRequest");
+    return 1; 
   }
 
   if (CUL_HM_SearchCmd($defN,"getSerial")){
@@ -6872,8 +6885,8 @@ sub CUL_HM_infoUpdtDevData($$$) {#autoread config
                               ".D-devInfo:$devInfo",
                               ".D-stc:$stc");
 }
-sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite modelForce
-  my($name,$model) = @_;
+sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite modelForce
+  my($name,$model,$fromUpdate) = @_;
   my $hash = $defs{$name};
   $attr{$name}{model} = $model;
   delete $hash->{helper}{rxType};
@@ -6917,7 +6930,7 @@ sub CUL_HM_updtDeviceModel($$) {#change the model for a device - obey overwrite 
     }
     my $CycTime = AttrVal($name,"actCycle", $culHmModel->{$mId}{cyc});
     CUL_HM_ActAdd($hash->{DEF},$CycTime)if ($CycTime);
-    CUL_HM_queueUpdtCfg($name);
+    CUL_HM_queueUpdtCfg($name) if(!$fromUpdate);
   }
 }
 
@@ -9422,9 +9435,8 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
        if (length($devId) != 6);
   my $devName = CUL_HM_id2Name($devId);
   my $devHash = $defs{$devName};
-  return "not for virtuals" if( $devHash->{helper}{role}{vrt});
- 
-  my ($cycleString,undef)=CUL_HM_time2sec($timeout);
+  return "not for virtuals" if($timeout !~ m/^\d\d\d:\d\d/);
+  my ($cycleString,undef) = CUL_HM_time2sec($timeout);
   $attr{$devName}{actCycle} = $cycleString;
   $attr{$devName}{actStatus}=""; # force trigger
   my $actHash = CUL_HM_ActGetCreateHash();
@@ -9441,7 +9453,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with $cycleString time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
-  CUL_HM_ActCheck("add") if ($init_done);
+#  CUL_HM_ActCheck("add") if ($init_done);
   return;
 }
 sub CUL_HM_ActDel($) {# delete HMid for activity supervision
@@ -9558,7 +9570,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
   CUL_HM_UpdtReadBulk($actHash,1,@event);
 
   $actHash->{helper}{actCycle} = AttrVal($actName,"actCycle",600);
-  Log3 $actHash,5,"check again in $actHash->{helper}{actCycle} sec";
+  Log3 $actHash,5,"next ActionDetector check in $actHash->{helper}{actCycle} sec";
   RemoveInternalTimer("ActionDetector");
   InternalTimer(gettimeofday()+$actHash->{helper}{actCycle},"CUL_HM_ActCheck", "ActionDetector", 0);
 }
@@ -9605,7 +9617,7 @@ sub CUL_HM_ActInfo() {# print detailed status information
       $c[1] = int($y/3600)     ;$y -= $c[1] * 3600;
       $c[0] = int($y/60)       ;$y -= $c[0] * 60;
  
-      $state .= sprintf("%-8s %6s %3d-%02d:%02d:%02d : %04d.%02d.%02d %02d:%02d:%02d  %6s %3d %4s %s"
+      $state .= sprintf("%-8s %6s %3d-%02d:%02d:%02d : %04d.%02d.%02d %02d:%02d:%02d  %6s %3s %4s %s"
                               ,ReadingsVal($devName,"Activity","")
                               ,$sign,$c[2],$c[1],$c[0],$y
                               ,$Y,$Mth,$D,$H,$Min,$S
@@ -9624,20 +9636,20 @@ sub CUL_HM_ActInfo() {# print detailed status information
   }
   return sprintf ("%-8s %-6s %12s : %-19s  %-6s %3s %4s %s\n"
                                            ,"state"
-                                           ,"next/","latest"
+                                           ,"next/","latest in "
                                            ,"last message"
                                            ,"cycle"
                                            ,"try"
                                            ,"ping"
-                                           ,"dev")
+                                           ,"dev name")
         .sprintf ("%-8s %-6s %12s : %-19s  %-6s %3s %4s %s\n"
                                            ,""
                                            ,"late","d-hh:mm:ss"
-                                           ,""
+                                           ,"received"
                                            ,"set"
-                                           ,""
+                                           ,"cnt"
                                            ,"next"
-                                           ,"name")
+                                           ,"")
         .join("\n", sort @info);
 }
 sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
