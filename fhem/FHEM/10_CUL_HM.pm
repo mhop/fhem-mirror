@@ -289,13 +289,13 @@ sub CUL_HM_updateConfig($){##########################
       $attr{$name}{"event-on-change-reading"} = 
                 AttrVal($name, "event-on-change-reading", ".*")
                 if(!$nAttr);
-      $attr{$name}{".mId"}  = CUL_HM_getmIdFromModel("0000");
+      $attr{$name}{".mId"}  = CUL_HM_getmIdFromModel("ACTIONDETECTOR");
       $attr{$name}{model}   = $culHmModel->{"0000"}{name};
       $attr{$name}{subType} = $culHmModel->{"0000"}{st};
       delete $hash->{IODev};
       delete $hash->{helper}{role};
       delete $attr{$name}{$_}
-            foreach ( "autoReadReg","actCycle","actStatus","burstAccess","serialNr"
+            foreach ( "autoReadReg","actStatus","burstAccess","serialNr"
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
       $hash->{helper}{role}{dev} = 1;
@@ -751,7 +751,10 @@ sub CUL_HM_Attr(@) {#################################
     if ($cmd eq "set"){
       if (CUL_HM_name2Id($name) eq $K_actDetID){
         return "$attrName must be higher then 30, $attrVal not allowed"
-              if ($attrVal < 30);
+              if ($attrVal < 10);
+        #update and sync to new timing
+        RemoveInternalTimer("ActionDetector");
+        InternalTimer(gettimeofday()+5,"CUL_HM_ActCheck", "ActionDetector", 0);
       }
       else{
         return "attribut not allowed for channels"
@@ -6716,6 +6719,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 sub CUL_HM_Ping($) {
   my($defN) = @_;
   return 0 if (($defs{$defN}{helper}{rxType} & 0xe3) == 0);     # no ping for config devices
+  return 1 if (defined $defs{$defN}{protCmdPend});              # cmds are already pending - that is ping enough
   my (undef, $nres) = CUL_HM_Set($defs{$defN},$defN,"sysTime"); 
   return 1 if (defined($nres) && 1 == $nres); 
 
@@ -9416,9 +9420,11 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $timeout = 0 if (!$timeout);
   return $devId." is not an HM device - action detection cannot be added"
        if (length($devId) != 6);
-  my ($cycleString,undef)=CUL_HM_time2sec($timeout);
   my $devName = CUL_HM_id2Name($devId);
   my $devHash = $defs{$devName};
+  return "not for virtuals" if( $devHash->{helper}{role}{vrt});
+ 
+  my ($cycleString,undef)=CUL_HM_time2sec($timeout);
   $attr{$devName}{actCycle} = $cycleString;
   $attr{$devName}{actStatus}=""; # force trigger
   my $actHash = CUL_HM_ActGetCreateHash();
@@ -9426,14 +9432,13 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{$devId}{start} =~ s/[\:\-\ ]//g;
   
   if(defined $devHash->{READINGS}{".protLastRcv"}){
-      $devHash->{READINGS}{".protLastRcv"}{VAL} =~ s/[\:\-\ ]//g;
+    $devHash->{READINGS}{".protLastRcv"}{VAL} =~ s/[\:\-\ ]//g;
   }
 
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
-  Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with "
-      .$cycleString." time";
+  Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with $cycleString time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
   CUL_HM_ActCheck("add") if ($init_done);
@@ -9497,13 +9502,13 @@ sub CUL_HM_ActCheck($) {# perform supervision
             my $try = $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0;
             
             $actHash->{helper}{$devId}{try} = $try + 1;
-            if ($try < 4 || !($try % 4)){#try 3 times, then reduce speed
+            if ($try < 3 || !($try % 4)){#try 3 times, then reduce speed
               if (CUL_HM_Ping($devName)){
-                $state = $oldState eq "unset" ? "unknown" 
-                                              : $oldState;                
+                $state = $oldState;
+                Log3 $actHash,4,"$devName uncertain. state:$state. Send pings $actHash->{helper}{$devId}{try}";
               }
               else{
-                $actHash->{helper}{$devId}{try} = 98;
+                $actHash->{helper}{$devId}{try} = 999;
                 $state = "dead";
               }
             }
@@ -9516,7 +9521,11 @@ sub CUL_HM_ActCheck($) {# perform supervision
           }
         }
         else{
-          $state = "unknown";
+          if(!$actHash->{helper}{$devId}{try}){# try once
+            CUL_HM_Ping($devName);
+            $actHash->{helper}{$devId}{try} = 901;
+          }
+        $state = "unknown";
         }
       }
       else{                         #message in time
@@ -9526,7 +9535,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
     }
     if ($oldState ne $state){
       CUL_HM_ActDepRead($devName,$state,$oldState);
-      Log3 $actHash,4,"Device ".$devName." is ".$state;
+      Log3 $actHash,4,"Device: $devName changed from:$oldState to-> $state";
     }
     if    ($state eq "unknown")    {$cntUnkn++;} 
     elsif ($state eq "alive")      {$cntAliv++;} 
@@ -9549,6 +9558,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
   CUL_HM_UpdtReadBulk($actHash,1,@event);
 
   $actHash->{helper}{actCycle} = AttrVal($actName,"actCycle",600);
+  Log3 $actHash,5,"check again in $actHash->{helper}{actCycle} sec";
   RemoveInternalTimer("ActionDetector");
   InternalTimer(gettimeofday()+$actHash->{helper}{actCycle},"CUL_HM_ActCheck", "ActionDetector", 0);
 }
@@ -9568,12 +9578,11 @@ sub CUL_HM_ActInfo() {# print detailed status information
     my $state;
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
     if ($tSec != 0){
-      my $tLast = ReadingsVal($devName,".protLastRcv","00000000000000");
-      my ($Y,$M,$D,$H,$M,$S) =  unpack 'A4A2A2A2A2A2',$tLast;
-      
+      my ($Y,$Mth,$D,$H,$Min,$S) =  unpack 'A4A2A2A2A2A2',ReadingsVal($devName,".protLastRcv","00000000000000");
+
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
 
-      my $y =  $M*30*24*3600 + $D*24*3600 + $H*3600 + $M*60 +$S -
+      my $y =  $Mth*30*24*3600 + $D*24*3600 + $H*3600 + $Min*60 +$S -
                ((  $t[4]+1)*30*24*3600
                  + $t[3]*24*3600 
                  + $t[2]*3600 
@@ -9583,17 +9592,29 @@ sub CUL_HM_ActInfo() {# print detailed status information
       if ($y < 0){
         $sign = "late -";
         $y *= -1;
+        $y = 0 if($Y == 0);
       }
-      
+      my $try = (defined $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : 0);
+      my $pingNext = "";
+      if    ($try == 0 || $try == 901){$pingNext = "";}
+      elsif ($try < 4 ){               $pingNext = 1;}
+      else{                            $pingNext = 4 - $try % 4;}
+
       my @c;      
-      $c[1] = int($y/3600);$y -= $c[1] * 3600;
-      $c[0] = int($y/60)  ;$y -= $c[0] * 60;
-      
-      $state .= sprintf("%-8s %s %s %3d:%02d:%02d %s"
+      $c[2] = int($y/(3600*24));$y -= $c[2] * 3600 * 24;
+      $c[1] = int($y/3600)     ;$y -= $c[1] * 3600;
+      $c[0] = int($y/60)       ;$y -= $c[0] * 60;
+ 
+      $state .= sprintf("%-8s %6s %3d-%02d:%02d:%02d : %04d.%02d.%02d %02d:%02d:%02d  %6s %3d %4s %s"
                               ,ReadingsVal($devName,"Activity","")
-                              ,$tLast,$sign,$c[1],$c[0],$y
-                              ,$devName);
-   }
+                              ,$sign,$c[2],$c[1],$c[0],$y
+                              ,$Y,$Mth,$D,$H,$Min,$S
+                              ,AttrVal($devName,"actCycle","")
+                              ,(defined $actHash->{helper}{$devId}{try} ? $actHash->{helper}{$devId}{try} : "")
+                              ,$pingNext
+                              ,$devName
+                              );
+    }
     else{
       $state = sprintf ("%-8s :%30s : "
                                       ,ReadingsVal($devName,"Activity","")
@@ -9601,11 +9622,23 @@ sub CUL_HM_ActInfo() {# print detailed status information
     }
     push @info,$state;
   }
-  return sprintf ("%-8s %-19s %s %s\n\n","state"
-                                              ,"last"
-                                              ,"next     h:mm:ss"
-                                              ,"name").
-         join("\n", sort @info);
+  return sprintf ("%-8s %-6s %12s : %-19s  %-6s %3s %4s %s\n"
+                                           ,"state"
+                                           ,"next/","latest"
+                                           ,"last message"
+                                           ,"cycle"
+                                           ,"try"
+                                           ,"ping"
+                                           ,"dev")
+        .sprintf ("%-8s %-6s %12s : %-19s  %-6s %3s %4s %s\n"
+                                           ,""
+                                           ,"late","d-hh:mm:ss"
+                                           ,""
+                                           ,"set"
+                                           ,""
+                                           ,"next"
+                                           ,"name")
+        .join("\n", sort @info);
 }
 sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
   #readings may be changed if the device is dead. This is controlled by an 
