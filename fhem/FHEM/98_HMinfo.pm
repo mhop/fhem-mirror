@@ -2646,13 +2646,15 @@ sub HMinfo_bpPost($) {#bp finished ############################################
     my $chn = InternalVal($e,"chanNo","00");
     if(0 < scalar(grep/(00|$chn)/,split(",",$defs{CUL_HM_getDeviceName($e)}{helper}{q}{qReqConf}))){
       $state = "updating";
+      CUL_HM_complConfigTest($e);
     }
     elsif(!defined $defs{$e}{helper}{cfgChk}){
       $state = "ok";
     }
     else{
       $state = join(",",map{$chkIds{$_}{shtxt}} keys%{$defs{$e}{helper}{cfgChk}});
-    }
+       CUL_HM_complConfigTest($e);
+   }
     CUL_HM_UpdtReadSingle($defs{$e},"cfgState",$state,1);  
   }
   
