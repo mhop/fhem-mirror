@@ -6,12 +6,8 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday usleep);
-if( $^O =~ /Win/ ) {
-  require Win32::SerialPort;
-} else {
-  require Device::SerialPort;
-}
 
 sub ElsnerWS_Checksum($$);
 sub ElsnerWS_Define($$$);
@@ -20,10 +16,26 @@ sub ElsnerWS_Initialize($);
 sub ElsnerWS_Read($);
 sub ElsnerWS_Ready($);
 
+# trigger values for down and up commands
+my %customCmdTrigger = ('dayNight' => ['night', 'day'],
+                        'isRaining' => ['no', 'yes'],
+                        'isStormy' => ['no', 'yes'],
+                        'isSunny' => ['yes', 'no'],
+                        'isSunnyEast' => ['yes', 'no'],
+                        'isSunnySouth' => ['yes', 'no'],
+                        'isSunnyWest' => ['yes', 'no'],
+                        'isWindy' => ['no', 'yes']);
+my %customCmdPeriod =(once => -1,
+                      threeTimes => -3,
+                      3 => 3,
+                      10 => 10,
+                      180 => 180,
+                      600 => 600);
+my %specials;
+
 # Init
 sub ElsnerWS_Initialize($) {
   my ($hash) = @_;
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "ElsnerWS_Read";
@@ -35,10 +47,16 @@ sub ElsnerWS_Initialize($) {
   $hash->{DeleteFn} = "ElsnerWS_Delete";
   $hash->{NotifyFn} = "ElsnerWS_Notify";
   $hash->{AttrFn}   = "ElsnerWS_Attr";
-  $hash->{AttrList} = "brightnessDayNight brightnessDayNightCtrl brightnessDayNightDelay " .
+  $hash->{AttrList} = "brightnessDayNight brightnessDayNightCtrl:select,custom,sensor brightnessDayNightDelay " .
                       "brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast " .
                       "brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay " .
-                      "timeEvent:no,yes updateGlobalAttr:no,yes " .
+                      "customCmdAlarmOff:textField-long customCmdAlarmOn:textField-long " .
+                      "customCmdDown:textField-long customCmdDownPeriod:select," . join(",", sort keys %customCmdPeriod) . " " .
+                      "customCmdDownTrigger:multiple-strict," . join(",", sort keys %customCmdTrigger) . " " .
+                      "customCmdPriority:select,down,up " .
+                      "customCmdUp:textField-long customCmdUpPeriod:select," . join(",", sort keys %customCmdPeriod) . " " .
+                      "customCmdUpTrigger:multiple-strict," . join(",", sort keys %customCmdTrigger) . " " .
+                      "signOfLife:select,off,on signOfLifeInterval:slider,1,1,15 timeEvent:select,no,yes updateGlobalAttr:select,no,yes " .
                       "windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay " .
                       $readingFnAttributes;
   $hash->{parseParams} = 1;
@@ -213,6 +231,10 @@ sub ElsnerWS_Read($) {
     $hash->{helper}{wind}{windGustNumArrayElements} = ElsnerWS_updateArrayElement($hash, 'windGust', $windGust20s, 'wind', 600);
     my ($windGustAvg10min, $windGustMin10min, $windGustMax10min) = ElsnerWS_SMA($hash, 'windGust', $windGust20s, 'windGustAvg10min', 'windGustMax10min', 'windGustMin10min', 'wind', 600);
     my $windGust10min = $windGustMax10min >= 5.144 ? $windGustMax10min : $windAvg2min;
+    $windAvg2min = sprintf("%0.1f", $windAvg2min);
+    $windGust10min = sprintf("%0.1f", $windGust10min);
+    $windGustCurrent = sprintf("%0.1f", $windGustCurrent);
+    $windPeak10min =  sprintf("%0.1f", $windPeak10min);
     my @sunlight = ($sunSouth, $sunWest, $sunEast);
     my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
     $sunSouth = $sunSouth == 0 ? $brightness : $sunSouth;
@@ -237,40 +259,57 @@ sub ElsnerWS_Read($) {
     while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
       $windStrength ++;
     }
+    my $isSunny = ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes');
+    my $isSunnySouth = ElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes');
+    my $isSunnyWest = ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes');
+    my $isSunnyEast = ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes');
+    my $isStormy = ElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes');
+    my $isWindy = ElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes');
+
     if (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60) {
       # update every 60 sec
-      readingsBulkUpdateIfChanged($hash, "windGustCurrent", sprintf("%0.1f", $windGustCurrent));
-      readingsBulkUpdateIfChanged($hash, "windAvg2min", sprintf("%0.1f", $windAvg2min));
-      readingsBulkUpdateIfChanged($hash, "windGust10min", sprintf("%0.1f", $windGust10min));
-      readingsBulkUpdateIfChanged($hash, "windPeak10min", sprintf("%0.1f", $windPeak10min));
+      readingsBulkUpdateIfChanged($hash, "windAvg2min", $windAvg2min);
+      readingsBulkUpdateIfChanged($hash, "windGust10min", $windGust10min);
+      readingsBulkUpdateIfChanged($hash, "windGustCurrent", $windGustCurrent);
+      readingsBulkUpdateIfChanged($hash, "windPeak10min", $windPeak10min);
       $hash->{helper}{timer}{lastUpdate} = gettimeofday();
     }
     if (exists $hash->{helper}{timer}{heartbeat}) {
       readingsBulkUpdateIfChanged($hash, "dayNight", $twilightFlag);
       readingsBulkUpdateIfChanged($hash, "isRaining", $isRaining);
       readingsBulkUpdateIfChanged($hash, "windStrength", $windStrength);
-      readingsBulkUpdateIfChanged($hash, "isSunny", ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isSunnySouth", ElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isStormy", ElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
-      readingsBulkUpdateIfChanged($hash, "isWindy", ElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
+      readingsBulkUpdateIfChanged($hash, "isSunny", $isSunny);
+      readingsBulkUpdateIfChanged($hash, "isSunnySouth", $isSunnySouth);
+      readingsBulkUpdateIfChanged($hash, "isSunnyWest", $isSunnyWest);
+      readingsBulkUpdateIfChanged($hash, "isSunnyEast", $isSunnyEast);
+      readingsBulkUpdateIfChanged($hash, "isStormy", $isStormy);
+      readingsBulkUpdateIfChanged($hash, "isWindy", $isWindy);
     } else {
       readingsBulkUpdate($hash, "dayNight", $twilightFlag);
       readingsBulkUpdate($hash, "isRaining", $isRaining);
       readingsBulkUpdate($hash, "windStrength", $windStrength);
-      readingsBulkUpdate($hash, "isSunny", ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isSunnySouth", ElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isSunnyWest", ElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isSunnyEast", ElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isStormy", ElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
-      readingsBulkUpdate($hash, "isWindy", ElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
+      readingsBulkUpdate($hash, "isSunny", $isSunny);
+      readingsBulkUpdate($hash, "isSunnySouth", $isSunnySouth);
+      readingsBulkUpdate($hash, "isSunnyWest", $isSunnyWest);
+      readingsBulkUpdate($hash, "isSunnyEast", $isSunnyEast);
+      readingsBulkUpdate($hash, "isStormy", $isStormy);
+      readingsBulkUpdate($hash, "isWindy", $isWindy);
     }
     readingsBulkUpdateIfChanged($hash, "state", "T: " . $temperature .
                                                " B: " . $brightness .
                                                " W: " . $windSpeed .
                                               " IR: " . $isRaining);
 
+    my $weekday = '';
+    my $date = '';
+    my $timeZone = '';
+    my $time = '';
+    my $hemisphere = '';
+    my $latitude = '';
+    my $longitude = '';
+    my $sunAzimuth = '';
+    my $sunElevation = '';
+    my $twilight = '';
     if (defined $zdata) {
       if ($packetType eq '47') {
         # packet type GPS
@@ -294,11 +333,14 @@ sub ElsnerWS_Read($) {
           readingsDelete($hash, 'time');
           delete $hash->{GPS_TIME};
         } else {
-          readingsBulkUpdateIfChanged($hash, "weekday", $weekday{$weekday});
-          readingsBulkUpdateIfChanged($hash, "date", '20' . pack('H*', $year) . '-' . pack('H*', $month) . '-' . pack('H*', $day));
-          readingsBulkUpdateIfChanged($hash, "timeZone", 'UTC');
-          #readingsBulkUpdateIfChanged($hash, "time", pack('H*', $hour) . ':' . pack('H*', $minute) . ':' . pack('H*', $second));
-          $hash->{GPS_TIME} = pack('H*', $hour) . ':' . pack('H*', $minute) . ':' . pack('H*', $second);
+          $weekday = $weekday{$weekday};
+	  $date = '20' . pack('H*', $year) . '-' . pack('H*', $month) . '-' . pack('H*', $day);
+	  $timeZone = 'UTC';
+	  $time = pack('H*', $hour) . ':' . pack('H*', $minute) . ':' . pack('H*', $second);
+          readingsBulkUpdateIfChanged($hash, "weekday", $weekday);
+          readingsBulkUpdateIfChanged($hash, "date", $date);
+          readingsBulkUpdateIfChanged($hash, "timeZone", $timeZone);
+          $hash->{GPS_TIME} = $time;
         }
         if ($gpsStatus eq '30') {
           # GPS error
@@ -309,26 +351,33 @@ sub ElsnerWS_Read($) {
           readingsDelete($hash, 'sunElevation');
           readingsDelete($hash, 'twilight');
         } else {
-          readingsBulkUpdateIfChanged($hash, "sunAzimuth", sprintf("%0.1f", pack('H*', $sunAzimuth)));
+          $hemisphere = $latitudeSign eq '4E' ? "north" : "south";
+          $latitude = sprintf("%0.1f", ($latitudeSign eq '4E' ? '' : '-') . pack('H*', $latitude));
+          $longitude = sprintf("%0.1f", ($longitudeSign eq '4F' ? '' : '-') . pack('H*', $longitude));
+          $sunAzimuth = sprintf("%0.1f", pack('H*', $sunAzimuth));
           $sunElevation = ($sunElevationSign eq '2B' ? '' : '-') . pack('H*', $sunElevation);
-          my $twilight = ($sunElevation + 12) / 18 * 100;
+          $twilight = ($sunElevation + 12) / 18 * 100;
           $twilight = 0 if ($twilight < 0);
           $twilight = 100 if ($twilight > 100);
-          readingsBulkUpdateIfChanged($hash, "sunElevation", sprintf("%0.1f", $sunElevation));
-          readingsBulkUpdateIfChanged($hash, "twilight", int($twilight));
-          readingsBulkUpdateIfChanged($hash, "longitude", sprintf("%0.1f", ($longitudeSign eq '4F' ? '' : '-') . pack('H*', $longitude)));
+          $twilight = int($twilight);
+          $sunElevation = sprintf("%0.1f", $sunElevation);
+          readingsBulkUpdateIfChanged($hash, "sunAzimuth", $sunAzimuth);
+          readingsBulkUpdateIfChanged($hash, "sunElevation", $sunElevation);
+          readingsBulkUpdateIfChanged($hash, "twilight", $twilight);
+          readingsBulkUpdateIfChanged($hash, "longitude", $longitude);
           if (AttrVal($name, "updateGlobalAttr", 'no') eq 'yes') {
-            $attr{global}{longitude} = sprintf("%0.1f", ($longitudeSign eq '4F' ? '' : '-') . pack('H*', $longitude));
+            $attr{global}{longitude} = $longitude;
           }
-          readingsBulkUpdateIfChanged($hash, "latitude", sprintf("%0.1f", ($latitudeSign eq '4E' ? '' : '-') . pack('H*', $latitude)));
+          readingsBulkUpdateIfChanged($hash, "latitude", $latitude);
           if (AttrVal($name, "updateGlobalAttr", 'no') eq 'yes') {
-            $attr{global}{latitude} = sprintf("%0.1f", ($latitudeSign eq '4E' ? '' : '-') . pack('H*', $latitude));
+            $attr{global}{latitude} = $latitude;
           }
-          readingsBulkUpdateIfChanged($hash, "hemisphere", ($latitudeSign eq '4E' ? "north" : "south"));
+          readingsBulkUpdateIfChanged($hash, "hemisphere", $hemisphere);
         }
       } elsif ($packetType eq '57') {
         # packet type CET
         $hash->{MODEL} = 'CET';
+        my ($weekday, $day, $month, $year, $hour, $minute, $second);
         my %weekday = ('3F' => 'UTC_error',
                        '31' => 'Monday',
                        '32' => 'Tuesday',
@@ -338,7 +387,7 @@ sub ElsnerWS_Read($) {
                        '36' => 'Saturday',
                        '37' => 'Sunday');
         $zdata =~ m/^(..)(....)(....)(....)(....)(....)(....)(..)/;
-        my ($weekday, $day, $month, $year, $hour, $minute, $second, $timeZone) = ($1, $2, $3, $4, $5, $6, $7, $8);
+        ($weekday, $day, $month, $year, $hour, $minute, $second, $timeZone) = ($1, $2, $3, $4, $5, $6, $7, $8);
         if ($weekday eq '3F') {
           # UTC error
           readingsDelete($hash, 'weekday');
@@ -347,10 +396,14 @@ sub ElsnerWS_Read($) {
           readingsDelete($hash, 'time');
           delete $hash->{GPS_TIME};
         } else {
-          readingsBulkUpdateIfChanged($hash, "weekday", $weekday{$weekday});
-          readingsBulkUpdateIfChanged($hash, "date", '20' . pack('H*', $year) . '-' . pack('H*', $month) . '-' . pack('H*', $day));
-          readingsBulkUpdateIfChanged($hash, "timeZone", $timeZone eq '4E' ? 'CET' : 'CEST');
-          $hash->{GPS_TIME} = pack('H*', $hour) . ':' . pack('H*', $minute) . ':' . pack('H*', $second);
+          $weekday = $weekday{$weekday};
+	  $date = '20' . pack('H*', $year) . '-' . pack('H*', $month) . '-' . pack('H*', $day);
+	  $timeZone = $timeZone eq '4E' ? 'CET' : 'CEST';
+	  $time = pack('H*', $hour) . ':' . pack('H*', $minute) . ':' . pack('H*', $second);
+          readingsBulkUpdateIfChanged($hash, "weekday", $weekday);
+          readingsBulkUpdateIfChanged($hash, "date", $date);
+          readingsBulkUpdateIfChanged($hash, "timeZone", $timeZone);
+          $hash->{GPS_TIME} = $time;
         }
       }
     } else {
@@ -359,15 +412,87 @@ sub ElsnerWS_Read($) {
     readingsEndUpdate($hash, 1);
     readingsSingleUpdate($hash, 'time', $hash->{GPS_TIME}, AttrVal($name, 'timeEvent', 'no') eq 'yes' ? 1 : 0) if (exists $hash->{GPS_TIME});
     $data = $rest;
-    readingsDelete($hash, 'alarm');
-    RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
-    @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, 0);
-    InternalTimer(gettimeofday() + 1.5, 'ElsnerWS_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+
+    # custom command exec
+    %specials = ("%NAME"  => $name,
+                 "%TYPE"  => $hash->{TYPE},
+                 "%BRIGHTNESS"  => $brightness,
+                 "%DATE"  => $date,
+                 "%DAYNIGHT"  => $twilightFlag,
+                 "%HEMISPHERE"  => $hemisphere,
+                 "%ISRAINING"  => $isRaining,
+                 "%ISSTORMY"  => $isStormy,
+                 "%ISSUNNY"  => $isSunny,
+                 "%ISSUNNYEAST"  => $isSunnyEast,
+                 "%ISSUNNYSOUTH"  => $isSunnySouth,
+                 "%ISSUNNYWEST"  => $isSunnyWest,
+                 "%ISWINDY"  => $isWindy,
+                 "%LATITUDE"  => $latitude,
+                 "%LONGITUDE"  => $longitude,
+                 "%SUNAZIMUTH"  => $sunAzimuth,
+                 "%SUNEAST"  => $sunEast,
+                 "%SUNELAVATION"  => $sunElevation,
+                 "%SUNSOUTH"  => $sunSouth,
+                 "%SUNWEST"  => $sunWest,
+                 "%TEMPERATURE"  => $temperature,
+                 "%TIME"  => $time,
+                 "%TIMEZONE"  => $timeZone,
+                 "%TWILIGHT"  => $twilight,
+                 "%WEEKDAY"  => $weekday,
+                 "%WINDAVG2MIN"  => $windAvg2min,
+                 "%WINDGUST10MIN"  => $windGust10min,
+                 "%WINDGUSTCURRNT"  => $windGustCurrent,
+                 "%WINDPEAK10MIN"  => $windPeak10min,
+                 "%WINDSPEED"  => $windSpeed,
+                 "%WINDSTENGTH"  => $windStrength);
+
+    my $customCmdDown = AttrVal($name, "customCmdDown", undef);
+    my $customCmdDownPeriod = AttrVal($name, "customCmdDownPeriod", 'once');
+    my $customCmdDownTrigger = AttrVal($name, 'customCmdDownTrigger', undef);
+    my $customCmdUp = AttrVal($name, "customCmdUp", undef);
+    my $customCmdUpPeriod = AttrVal($name, "customCmdUpPeriod", 'once');
+    my $customCmdUpTrigger = AttrVal($name, 'customCmdUpTrigger', undef);
+    #delete $hash->{helper}{customCmdDown}{do};
+    #delete $hash->{helper}{customCmdUp}{do};
+
+    if (defined ReadingsVal($name, 'alarm', undef)) {
+      my $customCmdAlarmOff = AttrVal($name, 'customCmdAlarmOff', undef);
+      if (defined $customCmdAlarmOff) {
+        $hash->{helper}{customCmdAlarmOff}{do} = 1;
+        ElsnerWS_CustomCmdDo($hash, 'customCmdAlarmOff', $customCmdAlarmOff, 'once');
+      }
+      readingsDelete($hash, 'alarm');
+    }
+    delete $hash->{helper}{customCmdAlarmOff};
+
+    if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+      RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+      @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, 0);
+      InternalTimer(gettimeofday() + AttrVal($name, 'signOfLifeInterval', 3) + 0.5, 'ElsnerWS_AlarmOn', $hash->{helper}{timer}{alarm}, 0);
+    }
+
     if (!exists $hash->{helper}{timer}{heartbeat}) {
       @{$hash->{helper}{timer}{heartbeat}} = ($hash, 'heartbeat');
       RemoveInternalTimer($hash->{helper}{timer}{heartbeat});
       InternalTimer(gettimeofday() + 600, 'ElsnerWS_cdmClearTimer', $hash->{helper}{timer}{heartbeat}, 0);
       #Log3 $hash->{NAME}, 3, "ElsnerWS $hash->{NAME} ElsnerWS_readingsBulkUpdate heartbeat executed.";
+    }
+
+    if (defined($customCmdDown) || defined($customCmdUp)) {
+      ElsnerWS_CustomCmdDoTrigger($hash, 'customCmdDown', $customCmdDown, AttrVal($name, 'customCmdDownTrigger', undef), 0);
+      ElsnerWS_CustomCmdDoTrigger($hash, 'customCmdUp', $customCmdUp, AttrVal($name, 'customCmdUpTrigger', undef), 1);
+
+      if (exists($hash->{helper}{customCmdDown}{do}) && exists($hash->{helper}{customCmdUp}{do})) {
+        if (AttrVal($name, 'customCmdPriority', 'up') eq 'up') {
+          # up command has prority
+          delete $hash->{helper}{customCmdDown} if (defined $customCmdDownTrigger);
+        } else {
+          # down command has prority
+          delete $hash->{helper}{customCmdUp} if (defined $customCmdUpTrigger);
+        }
+      }
+      ElsnerWS_CustomCmdDo($hash, 'customCmdDown', $customCmdDown, $customCmdDownPeriod);
+      ElsnerWS_CustomCmdDo($hash, 'customCmdUp', $customCmdUp, $customCmdUpPeriod);
     }
   }
   if(length($data) >= 4) {
@@ -379,7 +504,97 @@ sub ElsnerWS_Read($) {
   return;
 }
 
-#####
+sub ElsnerWS_CustomCmdDoTrigger($$$$$) {
+  # set do trigger
+  my ($hash, $customCmdName, $customCmdVal, $customCmdTrigger, $element) = @_;
+  my $readingName;
+  if (defined($customCmdVal)) {
+    if (defined $customCmdTrigger) {
+      for (split(',', $customCmdTrigger)) {
+        $readingName = "%" . uc($_);
+        #Log3 $hash->{NAME}, 3, "ElsnerWS $hash->{NAME} $customCmdName Reading: $_ = " . $specials{$readingName} . " <=> " . $customCmdTrigger{$_}[$element];
+        if ($customCmdTrigger{$_}[$element] eq $specials{$readingName}) {
+          $hash->{helper}{$customCmdName}{do} = 1;
+          last;
+        } else {
+          delete $hash->{helper}{$customCmdName}{do};
+        }
+      }
+      # reset trigger
+      if (!exists $hash->{helper}{$customCmdName}{do}) {
+        delete $hash->{helper}{$customCmdName}{Count};
+        delete $hash->{helper}{$customCmdName}{Period};
+        delete $hash->{helper}{$customCmdName};
+      }
+    } else {
+      # custom command always executed
+      $hash->{helper}{$customCmdName}{Count} = -1;
+      $hash->{helper}{$customCmdName}{Period} = -1;
+      $hash->{helper}{$customCmdName}{do} = 1;
+    }
+  } else {
+    # no custom command
+    delete $hash->{helper}{$customCmdName}{Count};
+    delete $hash->{helper}{$customCmdName}{do};
+    delete $hash->{helper}{$customCmdName}{Period};
+    delete $hash->{helper}{$customCmdName};
+  }
+  return;
+}
+
+sub ElsnerWS_CustomCmdDo($$$$) {
+  my ($hash, $customCmdName, $customCmd, $customCmdPeriod) = @_;
+  my $name = $hash->{NAME};
+  #Log3 $name, 3, "ElsnerWS $name $customCmdName do: $hash->{helper}{$customCmdName}{do} Count: $hash->{helper}{$customCmdName}{Count}";
+  #Log3 $name, 3, "ElsnerWS $name $customCmdName Count: $hash->{helper}{$customCmdName}{Count} Period: $hash->{helper}{$customCmdName}{Period} <> $customCmdPeriod{$customCmdPeriod}";
+  if (exists $hash->{helper}{$customCmdName}{do}) {
+    if (!exists($hash->{helper}{$customCmdName}{Period}) || $hash->{helper}{$customCmdName}{Period} != $customCmdPeriod{$customCmdPeriod}) {
+      $hash->{helper}{$customCmdName}{Period} = $customCmdPeriod{$customCmdPeriod};
+      $hash->{helper}{$customCmdName}{Count} = $customCmdPeriod{$customCmdPeriod};
+    }
+    #Log3 $name, 3, "ElsnerWS $name $customCmdName Count: $hash->{helper}{$customCmdName}{Count}";
+    if ($hash->{helper}{$customCmdName}{Count} < -1) {
+      $hash->{helper}{$customCmdName}{Count} ++;
+    } elsif ($hash->{helper}{$customCmdName}{Count} == -1) {
+      $hash->{helper}{$customCmdName}{Count} = 0;
+    } elsif ($hash->{helper}{$customCmdName}{Count} == 0) {
+      delete $hash->{helper}{$customCmdName}{do};
+    } elsif ($hash->{helper}{$customCmdName}{Count} == $customCmdPeriod{$customCmdPeriod}) {
+      $hash->{helper}{$customCmdName}{Count} --;
+    } elsif ($hash->{helper}{$customCmdName}{Count} > 1) {
+      $hash->{helper}{$customCmdName}{Count} --;
+      delete $hash->{helper}{$customCmdName}{do};
+    } elsif ($hash->{helper}{$customCmdName}{Count} == 1) {
+      $hash->{helper}{$customCmdName}{Count} = $customCmdPeriod{$customCmdPeriod};
+      delete $hash->{helper}{$customCmdName}{do};
+    } else {
+      delete $hash->{helper}{$customCmdName}{do};
+    }
+    if (exists $hash->{helper}{$customCmdName}{do}) {
+      $customCmd = EvalSpecials($customCmd, %specials);
+      my $ret = AnalyzeCommandChain(undef, $customCmd);
+      Log3 $name, 2, "ElsnerWS $name $customCmdName ERROR: $ret" if($ret);
+    }
+  }
+  return;
+}
+
+sub ElsnerWS_AlarmOn($) {
+  my ($readingParam) = @_;
+  my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
+  if (defined $hash) {
+    my $customCmdAlarmOn = AttrVal($hash->{NAME}, 'customCmdAlarmOn', undef);
+    if (defined $customCmdAlarmOn) {
+      $hash->{helper}{customCmdAlarmOn}{do} = 1;
+      ElsnerWS_CustomCmdDo($hash, 'customCmdAlarmOn', $customCmdAlarmOn, 'once');
+      delete $hash->{helper}{customCmdAlarmOn};
+    }
+    readingsSingleUpdate($hash, $readingName, $readingVal, $ctrl) ;
+    Log3 $hash->{NAME}, $log, " ElsnerWS " . $hash->{NAME} . " EVENT $readingName: $readingVal" if ($log);
+  }
+  return;
+}
+
 sub ElsnerWS_updateArrayElement($$$$$) {
   # read und update values to array
   my ($hash, $readingName, $readingVal, $arrayName, $numArrayElementsMax) = @_;
@@ -597,6 +812,26 @@ sub ElsnerWS_Attr(@) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
+  } elsif ($attrName =~ m/^.*Delay$/) {
+    my ($attrVal0, $attrVal1) = split(':', $attrVal);
+    if (!defined $attrVal1) {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+$/ || $attrVal0 + 0 > 3600) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    } elsif ($attrVal1 !~ m/^[+]?\d+$/ || $attrVal1 + 0 > 3600) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    } else {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+$/ || $attrVal0 + 0 > 3600) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    }
   } elsif ($attrName =~ m/^brightness(DayNight|Sunny).*$/) {
     if (!defined $attrVal) {
 
@@ -618,6 +853,39 @@ sub ElsnerWS_Attr(@) {
           CommandDeleteAttr(undef, "$name $attrName");
         }
       }
+    }
+  } elsif ($attrName =~ m/^customCmd(Down|Up)Period$/) {
+    my $attrValStr = join("|", keys %customCmdPeriod);
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^($attrValStr)$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+  } elsif ($attrName =~ m/^customCmd(Down|Up)Trigger$/) {
+    my $attrValStr = join("|", keys %customCmdTrigger);
+    if (defined $attrVal) {
+      for (split(',', $attrVal)) {
+        if ($_ !~ m/^($attrValStr)$/) {
+          $err = "attribute-value [$attrName] = $attrVal wrong";
+          CommandDeleteAttr(undef, "$name $attrName");
+          last;
+        }
+      }
+    }
+  } elsif ($attrName eq "signOfLife") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^off|on$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+  } elsif ($attrName eq "signOfLifeInterval") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^\d+$/ || $attrVal + 0 < 1 || $attrVal + 0 > 15) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
     }
   } elsif ($attrName eq "timeEvent") {
     if (!defined $attrVal) {
@@ -740,6 +1008,11 @@ sub ElsnerWS_Delete($$) {
       <li>Adjustable switching thresholds and delay times</li>
       <li>Day/night signal</li>
       <li>Display of date, time, sun azimuth, sun elevation, longitude and latitude</li>
+      <li>Execution of custom alarm commands, see <a href="#ElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> and
+      <a href="#ElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a></li>
+      <li>Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
+      isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#ElsnerWS_customCmdDown">customCmdDown</a> and
+      <a href="#ElsnerWS_customCmdUp">customCmdUp</a></li>
     </ul><br>
 
     <b>Prerequisites</b>
@@ -758,7 +1031,7 @@ sub ElsnerWS_Delete($$) {
         More information about the sensors, see for example
         <a href="https://www.elsner-elektronik.de/shop/de/fileuploader/download/download/?d=1&file=custom%2Fupload%2F30145_P033-RS485-GPS_Datenblatt_13Sep18_DBEEA6042.pdf">P03/3-RS485-GPS User Guide</a>.<br>
         The USB adapters
-        <a href="https://www.digitus.info/produkte/computer-zubehoer-und-komponenten/computer-zubehoer/seriell-und-parallel-adapter/da-70157/">Digitus DA-70157</a>,
+        <a href="https://www.digitus.info/produkte/computer-und-office-zubehoer/computer-zubehoer/usb-komponenten-und-zubehoer/schnittstellen-adapter/da-70157/">Digitus DA-70157</a>,
         <a href="https://shop.in-circuit.de/product_info.php?cPath=33&products_id=81">In-Circuit USB-RS485-Bridge</a>
         and <a href="http://www.dsdtech-global.com/2018/01/sh-u10-spp.html">DSD TECH SH-U10 USB to RS485 converter</a>
         are successfully tested at a Raspberry PI in conjunction with the weather sensor.
@@ -793,7 +1066,7 @@ sub ElsnerWS_Delete($$) {
           Control the dayNight reading through the device-specific or custom threshold and delay.
         </li>
         <li><a name="ElsnerWS_brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
-          [brightnessDayNightDelay] = 0...99000:0...99000, 600:600 is default.<br>
+          [brightnessDayNightDelay] = 0...3600:0...3600, 600:600 is default.<br>
           Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
@@ -802,7 +1075,7 @@ sub ElsnerWS_Delete($$) {
           Set switching thresholds for reading isSunny based on the reading brightness.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunny based on the reading brightness. The reading isSunny is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
@@ -811,7 +1084,7 @@ sub ElsnerWS_Delete($$) {
           Set switching thresholds for reading isSunnyEast based on the reading sunEast.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
@@ -820,7 +1093,7 @@ sub ElsnerWS_Delete($$) {
           Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
         </li>
         <li><a name="ElsnerWS_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
@@ -829,36 +1102,110 @@ sub ElsnerWS_Delete($$) {
           Set switching thresholds for reading isSunnyWest based on the reading sunWest.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
+        <li><a name="ElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
+          <a name="ElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
+          Command being executed if an alarm is set (on) or deleted (off).  If &lt;command&gt; is enclosed in {},
+          then it is a perl expression, if it is enclosed in "", then it is a shell command,
+          else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
+          and the current readings<br>
+          $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
+          is available as a local variable in perl, as environment variable for shell
+          scripts, and will be textually replaced for Fhem commands.<br>
+          The alarm commands have a higher priority than the up and down commands.
+        </li>
+        <li><a name="ElsnerWS_customCmdDown">customCmdDown</a> &lt;command&gt;<br>
+          <a name="ElsnerWS_customCmdUp">customCmdUp</a> &lt;command&gt;<br>
+          The command is executed if the Up or Down command is triggered, see <a href="#ElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> or
+          <a href="#ElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
+          then it is a perl expression, if it is enclosed in "", then it is a shell command,
+          else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
+          and the current readings<br>
+          $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
+          is available as a local variable in perl, as environment variable for shell
+          scripts, and will be textually replaced for Fhem commands.<br>
+          The alarm commands have a higher priority than the up and down commands.
+        </li>
+        <li><a name="ElsnerWS_customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
+          <a name="ElsnerWS_customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
+          [customCmdDownPeriod] = once|threeTimes|3|10|180|600, once is default.<br>
+          Number or period of custom command to be executed.
+        </li>
+        <li><a name="ElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ElsnerWS_customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
+          <ul>
+            <li>[dayNight] = night</li>
+            <li>[isRaining] = no</li>
+            <li>[isStormy] = no</li>
+            <li>[isSunny] = yes</li>
+            <li>[isSunnyEast] = yes</li>
+            <li>[isSunnySouth] = yes</li>
+            <li>[isSunnyWest] = yes</li>
+            <li>[isWindy] = no</li>
+           </ul>
+          The commands in the attribute <a href="#ElsnerWS_customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
+        </li>
+        <li><a name="ElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ElsnerWS_customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
+          <ul>
+             <li>[dayNight] = day</li>
+              <li>[isRaining] = yes</li>
+              <li>[isStormy] = yes</li>
+              <li>[isSunny] = no</li>
+              <li>[isSunnyEast] = no</li>
+              <li>[isSunnySouth] = no</li>
+              <li>[isSunnyWest] = no</li>
+              <li>[isWindy] = yes</li>
+           </ul>
+          The commands in the attribute <a href="#ElsnerWS_customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
+        </li>
+        <li><a name="ElsnerWS_customCmdPriority">customCmdPriority</a> down|up,
+          [customCmdPriority] = down|up, up is default.<br>
+          Priority of custom commands. If both the up and down command are triggered, only the prioritized command is executed.
+        </li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <li><a name="ElsnerWS_signOfLife">signOfLife</a> off|on<br>
+          [signOfLife] = off|on, on is default.<br>
+          Monitoring of the periodic telegrams from sensor.
+        </li>
+        <li><a name="ElsnerWS_signOfLifeInterval">signOfLifeInterval</a> 1...15<br>
+          [signOfLifeInterval] = 1 ... 15 1/s, 3 is default.<br>
+          Monitoring period in seconds of the periodic telegrams from sensor.
+        </li>
         <li><a name="ElsnerWS_timeEvent">timeEvent</a> no|yes,
           [timeEvent] = no|yes, no is default.<br>
           Update the reading time periodically.
         </li>
+        <li><a name="ElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
+          [timeEvent] = no|yes, no is default.<br>
+          Update the global attributes latitude and longitude with the received GPS coordinates.
+        </li>
         <li><a name="ElsnerWS_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
-          [windSpeedStormy] = 0...35:0...35, 13.9:17.2 is default.<br>
+          [windSpeedStormy] = 0...35:0...35, 13.9:17.2 (windStrength = 7 B - 8 B) is default.<br>
           Set switching thresholds for reading isStormy based on the reading windSpeed.
         </li>
         <li><a name="ElsnerWS_windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
-          [windSpeedStormyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+          [windSpeedStormyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isStormy based on the reading windSpeed. The reading isStormy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ElsnerWS_windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
-          [windSpeedWindy] = 0...35:0...35, 1.6:3.4 is default.<br>
+          [windSpeedWindy] = 0...35:0...35, 1.6:3.4 (windStrength = 2 B - 3 B) is default.<br>
           Set switching thresholds for reading isWindy based on the reading windSpeed.
         </li>
         <li><a name="ElsnerWS_windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
-          [windSpeedWindyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+          [windSpeedWindyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isWindy based on the reading windSpeed. The reading isWindy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
-        </li>
-        <li><a name="ElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
-          [timeEvent] = no|yes, no is default.<br>
-          Update the global attributes latitude and longitude with the received GPS coordinates.
         </li>
       </ul>
     </ul><br>
@@ -868,6 +1215,7 @@ sub ElsnerWS_Delete($$) {
   <ul>
     <ul>
       <li>T: t/&#176C B: E/lx W: v/m/s IR: no|yes</li>
+      <li>alarm: dead_sensor</li>
       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 99000 lx)</li>
       <li>date: JJJJ-MM-TT</li>
       <li>dayNight: day|night</li>
@@ -892,8 +1240,8 @@ sub ElsnerWS_Delete($$) {
       <li>weekday: Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday</li>
       <li>twilight: T/% (Sensor Range: T = 0 % ... 100 %)</li>
       <li>windAvg2min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
-      <li>windGustCurrent: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windGust10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
+      <li>windGustCurrent: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windPeak10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windSpeed: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windStrength: B (Sensor Range: B = 0 Beaufort ... 12 Beaufort)</li>
