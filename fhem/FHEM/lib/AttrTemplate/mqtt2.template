@@ -1757,20 +1757,21 @@ setreading DEVICE attrTemplateVersion 20200806
 name:tasmota_zigbee2tasmota_generic_battery_sensor
 prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
-desc:This template is meant to configure an arbitrary battery powered ZigBee sensor.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
+desc:This template is meant to configure an arbitrary battery powered ZigBee sensor.<br>NOTE: jsonMap also is ok for Xiaomi Temp/Humi Sensor
 order:A_01u04
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
 par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 attr DEVICE icon ICON
+attr DEVICE comment For forther configuration use e.g. stateFormat attribtue like T: temperature°C | H: humidity% | B: batteryPercent%
 attr DEVICE readingList \
-  TELETOPIC:.* { $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
-attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0
+TELETOPIC:.* { $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
+attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0 Temperature:temperature Humidity:humidity
 deletereading -q DEVICE (?!associatedWith).*
-option:{ CALLSPEECHRECOGN }  
+option:{ CALLSPEECHRECOGN }
 attr DEVICE model tasmota_zigbee2tasmota_generic_battery_sensor
-setreading DEVICE attrTemplateVersion 20200805_1
+setreading DEVICE attrTemplateVersion 20200814
 
 
 name:tasmota_zigbee2tasmota_remote_control
@@ -1783,12 +1784,31 @@ par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","rea
 par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","tradfri_remote") }
 attr DEVICE icon ICON
 attr DEVICE readingList \
-  TELETOPIC:.* { $EVENT =~ m,([0-9]{3}([0-9])![0-9]([0-9])), ? { 'state'=>"${2}00$3" } : $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
-attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0 
+TELETOPIC:.* { $EVENT =~ m,(([0-9])([0-9])([0-9])([0-9])!([0-9][0-9])), ? { 'state'=>"${5}${4}${3}${2}$6" } : $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
+attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model tasmota_zigbee2tasmota_remote_control
-setreading DEVICE attrTemplateVersion 20200807_1
+setreading DEVICE attrTemplateVersion 20200814
 
+
+name:tasmota_zigbee2tasmota_window_contact
+prereq:{my @devices=devspec2array("model=tasmota_zigbee2tasmota_bridge");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*tele.*/..../SENSOR:.*
+desc:This template is meant to configure a window contact, e.g. like Xiaomi MCCGQ01LM.<br>NOTE: Early testing version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,112253.0.html<br>Might still need some changes!
+order:A_01u04b
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*/[^/]+/SENSOR)?:, ? "${1}tele$3" : undef }
+par:DEV_ID;ZigBee short ID, hex value without leading 0x;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)/.*/([^/]+)/SENSOR?:, ? "$3" : undef }
+par:ICON;ICON as set, defaults to light_control;{ AttrVal("DEVICE","icon","light_control") }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+attr DEVICE icon ICON
+attr DEVICE readingList \
+TELETOPIC:.* { $EVENT =~ s/"Power":1/"state":"open"/g; $EVENT =~ s/"Power":0/"state":"closed"/g; $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef  }
+attr DEVICE jsonMap Battery:batteryPercent Device:0 BatteryPercentage:0
+deletereading -q DEVICE (?!associatedWith).*
+option:{ CALLSPEECHRECOGN }
+set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+attr DEVICE model tasmota_zigbee2tasmota_window_contact
+setreading DEVICE attrTemplateVersion 20200814
 
 ###########################################
 # SHELLY
