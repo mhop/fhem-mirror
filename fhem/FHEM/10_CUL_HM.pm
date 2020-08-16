@@ -271,7 +271,6 @@ sub CUL_HM_updateConfig($){##########################
       CUL_HM_updtDeviceModel($_,AttrVal($_,"modelForce",AttrVal($_,"model","")),1) if($attr{$_}{".mId"});
     }
   }
-  
   foreach my $name (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $hash = $defs{$name};
     next if (!$hash->{DEF}); # likely renamed
@@ -4236,21 +4235,20 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
   my $hash = $defs{$name};
   
   my $changes = 0;
-  if($hash->{helper}{cmds}{cmdKey} ne $cmdKey){
-    if(!$cmdKey){
-      my $devName = InternalVal($name,"device",$name);
-      my (undef,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
-      $cmdKey =        ($hash->{helper}{role}{chn}?1:0)
-                  .":".($hash->{helper}{role}{dev}?1:0)
-                  .":".($hash->{helper}{role}{vrt}?1:0)
-                  .":".($hash->{helper}{fkt}?$hash->{helper}{fkt}:"")
-                  .":".$devName
-                  .":".($defs{$devName}{helper}{mId} ? $defs{$devName}{helper}{mId}:"")
-                  .":".$chn
-                  .":".InternalVal($name,"peerList","")
-                 ;# update cmds entry in case
-    }
-      
+  if(!$cmdKey){
+    my $devName = InternalVal($name,"device",$name);
+    my (undef,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
+    $cmdKey =        ($hash->{helper}{role}{chn}?1:0)
+                .":".($hash->{helper}{role}{dev}?1:0)
+                .":".($hash->{helper}{role}{vrt}?1:0)
+                .":".($hash->{helper}{fkt}?$hash->{helper}{fkt}:"")
+                .":".$devName
+                .":".($defs{$devName}{helper}{mId} ? $defs{$devName}{helper}{mId}:"")
+                .":".$chn
+                .":".InternalVal($name,"peerList","")
+               ;# update cmds entry in case
+  }
+  if( $hash->{helper}{cmds}{cmdKey} ne $cmdKey){
     my ($roleC,$roleD,$roleV,$fkt,$devName,$mId,$chn,$peerLst) = split(":", $cmdKey);
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
@@ -4344,8 +4342,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
 }
 sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?+++++++++++++++
   my($name,$findCmd)=@_;
-  CUL_HM_SetList($name,"") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
-#  CUL_HM_Set($defs{$name},$name,"?") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
+  CUL_HM_SetList($name,"") if ($defs{$name}{helper}{cmds}{cmdKey} eq "");
   return defined $defs{$name}{helper}{cmds}{cmdLst}{$findCmd} ? 1 : 0;
 }
  
