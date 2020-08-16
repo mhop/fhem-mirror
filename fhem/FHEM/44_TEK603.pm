@@ -31,15 +31,6 @@ use DevIo;
 
 use Digest::CRC; # libdigest-crc-perl
 
-sub TEK603_Initialize($);
-sub TEK603_define($$);
-sub TEK603_doInit($);
-sub TEK603_undef($$);
-sub TEK603_ready($);
-sub TEK603_read($);
-sub TEK603_reconnect($);
-
-
 sub TEK603_Initialize($) {
 	my ($hash) = @_;
 
