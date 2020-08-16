@@ -4328,6 +4328,13 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     $changes = 1;
   }
   if ($changes){
+#    param description: 
+#       [optioal]          - optional parameter
+#       (opt|opt2|opt2)    - mandatory to select one of 
+#       [(opt|{opt2}|opt2)]- optional parameter. Opt2 is defaults 
+#       -type-             - 'type' is to be replaced by a value
+#       (opt|opt2|-type-)  - mandatory to enter one of opt/opt2 or type
+
 #    delete $hash->{helper}{cmds}{cmdParams};
 #    foreach my $cmd (keys %{$hash->{helper}{cmds}{cmdLst}}){
 #      my $val = $hash->{helper}{cmds}{cmdLst}{$cmd};
@@ -6902,15 +6909,17 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
       my $chnNoTyp = 1;
       for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
         my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
-        if (!$modules{CUL_HM}{defptr}{$chnId}){# not existing by now - create
+        if (!$modules{CUL_HM}{defptr}{$chnId} && !$fromUpdate){# not existing by now - create if not init phase
           my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?''
                                                                     :'_'.sprintf("%02d",$chnNoTyp));
                                   
           CommandDefine(undef,$chnName.' CUL_HM '.$chnId);
           Log3 $name,3,"CUL_HM_update: $name add channel ID: $chnId name: $chnName";
         }
-        $attr{CUL_HM_id2Name($chnId)}{model} = $model;
-        $chanExist{$chnId} = 1; # mark this channel as required
+        if(defined $modules{CUL_HM}{defptr}{$chnId}){
+          $attr{CUL_HM_id2Name($chnId)}{model} = $model ;
+          $chanExist{$chnId} = 1; # mark this channel as required
+        }
         $chnNoTyp++;
       }
     }
