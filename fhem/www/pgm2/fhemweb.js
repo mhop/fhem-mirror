@@ -1420,7 +1420,7 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
     $(inp).unbind("blur");
     $('body').append(
       '<div id="editdlg" style="display:none">'+
-        '<textarea id="td_longText" rows="25" cols="60" style="width:99%"/>'+
+        '<textarea id="td_longText" style="width:100%;height:100%;"/>'+
       '</div>');
 
     var txt = $(inp).val();
@@ -2035,7 +2035,7 @@ FW_getSVG(emb)
       Example: attr WEB widgetOverride room:textField</li>
   <li>textFieldNL - show the input field and hide the label.</li>
   <li>textField-long[,sizePct] - show an input-field, but upon
-      clicking on the input field open a textArea (60x25).
+      clicking on the input field open a textArea.
       sizePct specifies the size of the dialog relative to the screen, in
       percent. Default is 75</li>
   <li>textFieldNL-long[,sizePct] - the behaviour is the same
@@ -2070,7 +2070,7 @@ FW_getSVG(emb)
       Beispiel: attr WEB widgetOverride room:textField</li>
   <li>textFieldNL - Eingabefeld ohne Label.</li>
   <li>textField-long[,sizePct] - ist wie textField, aber beim Click im
-      Eingabefeld wird ein Dialog mit einer HTML textarea (60x25) wird
+      Eingabefeld wird ein Dialog mit einer HTML textarea wird
       ge&ouml;ffnet.  sizePct ist die relative Gr&ouml;&szlig;e des Dialogs,
       die Voreinstellung ist 75.</li>
   <li>textFieldNL-long[,sizePct] - wi textField-long, aber kein Label wir
