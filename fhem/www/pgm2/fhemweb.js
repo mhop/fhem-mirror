@@ -36,6 +36,7 @@ var FW_widgets = {
   textField:         { createFn:FW_createTextField },
   textFieldNL:       { createFn:FW_createTextField, second:true },
   "textField-long":  { createFn:FW_createTextField, second:true },
+  "textFieldNL-long":{ createFn:FW_createTextField, second:true },
   bitfield:          { createFn:FW_createBitfield },
 };
 
@@ -1389,7 +1390,7 @@ FW_queryValue(cmd, el)
 function
 FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
 {
-  if(vArr.length != 1 ||
+  if(vArr.length > 2 ||
      (vArr[0] != "textField" && 
       vArr[0] != "textFieldNL" &&
       vArr[0] != "textField-long" &&
@@ -1431,9 +1432,11 @@ FW_createTextField(elName, devName, vArr, currVal, set, params, cmd)
       AddCodeMirror($("#td_longText"), function(pcm) {cm = pcm;});
     }
 
+    var sz = vArr[1] ? parseInt(vArr[1]) : 75;
     $('#editdlg').dialog(
-      { modal:true, closeOnEscape:true, width:$(window).width()*3/4,
-        height:$(window).height()*3/4,
+      { modal:true, closeOnEscape:true, 
+        width:$(window).width()*(sz/100),
+        height:$(window).height()*(sz/100),
         close:function(){ $('#editdlg').remove(); },
         buttons:[
         { text:"Cancel", click:function(){
@@ -2031,9 +2034,11 @@ FW_getSVG(emb)
   <li>textField - show an input field.<br>
       Example: attr WEB widgetOverride room:textField</li>
   <li>textFieldNL - show the input field and hide the label.</li>
-  <li>textField-long - show an input-field, but upon
-      clicking on the input field open a textArea (60x25).</li>
-  <li>textFieldNL-long - the behaviour is the same
+  <li>textField-long[,sizePct] - show an input-field, but upon
+      clicking on the input field open a textArea (60x25).
+      sizePct specifies the size of the dialog relative to the screen, in
+      percent. Default is 75</li>
+  <li>textFieldNL-long[,sizePct] - the behaviour is the same
       as :textField-long, but no label is displayed.</li>
   <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - show
       a JavaScript driven slider. The optional ,1 at the end
@@ -2063,8 +2068,13 @@ FW_getSVG(emb)
       Beispiel: attr FS20dev widgetOverride on-till:time</li>
   <li>textField - zeigt ein Eingabefeld.<br>
       Beispiel: attr WEB widgetOverride room:textField</li>
-  <li>textField-long - ist wie textField, aber beim Click im Eingabefeld wird
-      ein Dialog mit einer HTML textarea (60x25) wird ge&ouml;ffnet.</li>
+  <li>textFieldNL - Eingabefeld ohne Label.</li>
+  <li>textField-long[,sizePct] - ist wie textField, aber beim Click im
+      Eingabefeld wird ein Dialog mit einer HTML textarea (60x25) wird
+      ge&ouml;ffnet.  sizePct ist die relative Gr&ouml;&szlig;e des Dialogs,
+      die Voreinstellung ist 75.</li>
+  <li>textFieldNL-long[,sizePct] - wi textField-long, aber kein Label wir
+      angezeigt.</li>
   <li>slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;[,1] - zeigt einen
       Schieberegler. Das optionale 1 (isFloat) vermeidet eine Rundung der
       Fliesskommazahlen.</li>
