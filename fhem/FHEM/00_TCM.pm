@@ -11,12 +11,8 @@
 package main;
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday usleep);
-if( $^O =~ /Win/ ) {
-  require Win32::SerialPort;
-} else {
-  require Device::SerialPort;
-}
 sub TCM_Read($);
 sub TCM_ReadAnswer($$);
 sub TCM_Ready($);
@@ -28,7 +24,6 @@ sub TCM_CSUM($);
 
 sub TCM_Initialize($) {
   my ($hash) = @_;
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "TCM_Read";
@@ -237,7 +232,7 @@ sub TCM_Fingerprint($$) {
 sub TCM_Write($$$$) {
   # Input is header and data (HEX), without CRC
   my ($hash, $shash, $header, $msg) = @_;
-  return if (!exists($hash->{helper}{init_done}) && $hash != $shash);
+  #return if (!exists($hash->{helper}{init_done}) && $hash != $shash);
   # return if (!defined($header));
   my $name = $hash->{NAME};
   my $bstring;
