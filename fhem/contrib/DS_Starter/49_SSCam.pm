@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $
+# $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
@@ -136,9 +136,9 @@ BEGIN {
           TelegramBot_AttrNum     
           TelegramBot_Callback     
           TelegramBot_BinaryFileRead  
-          SSChatBot_formString          
-          SSChatBot_addQueue
-          SSChatBot_getapisites
+          FHEM::SSChatBot::formString          
+          FHEM::SSChatBot::addQueue
+          FHEM::SSChatBot::getApiSites
         )
   );
   
@@ -159,6 +159,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
   "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
   "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
   "9.5.3"  => "27.07.2020  fix warning: Use of uninitialized value in subroutine dereference at ... ",
@@ -684,7 +685,7 @@ sub Define {
   
  return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
   
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split m{\s+}x, $def;
   
   if(int(@a) < 4) {
       return "You need to specify more parameters.\n". "Format: define <name> SSCAM <Cameraname> <ServerAddress> [Port]";
@@ -9720,7 +9721,7 @@ sub sendChat {
    my $name  = $hash->{NAME};
    my $type  = AttrVal($name,"cacheType","internal");
    my $mtype = "";
-   my ($ret,$cache);
+   my ($params,$ret,$cache);
    
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###      start send Snap or Video by SSChatBot      "); 
@@ -9835,8 +9836,19 @@ sub sendChat {
                # Eintrag zur SendQueue hinzufügen
                # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
                $fileUrl = $rootUrl."/".$mtype."/".$fname;
-               $subject = SSChatBot_formString ($subject, "text"); 
-               $ret     = SSChatBot_addQueue   ($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", ""); 
+               $subject = FHEM::SSChatBot::formString ($subject, "text"); 
+               
+               $params = { 
+                   name       => $chatbot,
+                   opmode     => "sendItem",
+                   method     => "chatbot",
+                   userid     => $uid,
+                   text       => $subject,
+                   fileUrl    => $fileUrl,
+                   channel    => "",
+                   attachment => ""
+               };
+               $ret = FHEM::SSChatBot::addQueue ($params); 
 
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
@@ -9895,8 +9907,19 @@ sub sendChat {
                # Eintrag zur SendQueue hinzufügen
                # Werte: (name,opmode,method,userid,text,fileUrl,channel,attachment)
                $fileUrl = $rootUrl."/".$mtype."/".$fname;
-               $subject = SSChatBot_formString ($subject, "text"); 
-               $ret     = SSChatBot_addQueue   ($chatbot, "sendItem", "chatbot", $uid, $subject, $fileUrl, "", "");  
+               $subject = FHEM::SSChatBot::formString ($subject, "text"); 
+               
+               $params = { 
+                   name       => $chatbot,
+                   opmode     => "sendItem",
+                   method     => "chatbot",
+                   userid     => $uid,
+                   text       => $subject,
+                   fileUrl    => $fileUrl,
+                   channel    => "",
+                   attachment => ""
+               };
+               $ret = FHEM::SSChatBot::addQueue ($params);
            
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
@@ -9913,7 +9936,7 @@ sub sendChat {
       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
   }
   
-  SSChatBot_getapisites($chatbot);                                    # Übertragung Sendqueue starten
+  FHEM::SSChatBot::getApiSites ($chatbot);                           # Übertragung Sendqueue starten
   
   # use strict "refs";
   undef %chatparams;
@@ -11441,12 +11464,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                                  # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22592 2020-08-12 21:28:56Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden

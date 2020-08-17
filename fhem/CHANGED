@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     50_SSChatBot.pm: module to integrate Synology Chat Server
+                             (SSCam is also updated due to compatibility)
  - feature: 14_FLAMINGO.pm: fix some perlcritic 5 warnings
  - feature: 98_DOIFtools: get subsInPackageDOIF for MODEL Perl (Forum #63938)
  - bugfix:  49_SSCam(STRM): avoid possible warnings during shutdown/restart
