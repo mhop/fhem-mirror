@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2020
-my $thzversion = "0.186";
+my $thzversion = "0.187";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -971,7 +971,13 @@ sub THZ_GetRefresh($) {
 	my $hash=$par->{hash};
 	my $command=$par->{command};    
     my $name =$hash->{NAME};
-	my $interval = AttrVal($name, ("interval_".$command), 0); 
+    
+    if (ReadingsAge($name ,'z_Last_fhem_err', 100) < 100) {
+            Log3 $hash, 5, "[$name] THZ_GetRefresh($command) rescheduled (stop 100s after one error)";
+            InternalTimer(gettimeofday() + 200, "THZ_GetRefresh", $par, 1);
+            return;
+    }
+    
 	if (AttrVal($name, "nonblocking" , "0")  =~ /1/ ) {
         if (!(exists($hash->{helper}{RUNNING_PID}))) {
             DevIo_CloseDev($hash);          #close device in parent process
@@ -987,18 +993,20 @@ sub THZ_GetRefresh($) {
         }
         else {
             Log3 $hash, 3, "[$name] THZ_GetRefresh($command) rescheduled (Blocking Call is still running)";
-            InternalTimer(gettimeofday() + 2, "THZ_GetRefresh", $par, 1);
+            InternalTimer(gettimeofday() + 4, "THZ_GetRefresh", $par, 1);
             return;
         }
     }
-    else {
-      THZ_Get($hash, $hash->{NAME}, $command) if ($hash->{STATE} ne "disconnected");
+    elsif ($hash->{STATE} ne "disconnected")  {
+        THZ_Get($hash, $hash->{NAME}, $command);        
     }
     
-    if (($interval) and ($hash->{STATE} ne "disconnected")) {
-			  $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
-			  InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
-	}
+    my $interval = AttrVal($name, ("interval_".$command), 0);
+    if (($interval) and ($hash->{STATE} ne "disconnected"))   {
+            $interval = 60 if ($interval < 60); #do not allow intervall <60 sec 
+			InternalTimer(gettimeofday()+ $interval, "THZ_GetRefresh", $par, 1) ;
+    }
+	
     if ($command =~ "sFirmware") {  # model summary for statistics
         my $sFirmwareId = join('', (split(/ |:/, ReadingsVal($name,"sFirmware-Id"," : : : ")))[0..6]);
         my $sFirmware= (split(/ /, ReadingsVal($name,"sFirmware","  ")))[1];
@@ -1196,7 +1204,7 @@ sub THZ_Set($@){
         if (defined($err))     {
             $err="THZ_Set: error reading register: '$err'";
             Log3 $hash->{NAME}, 3, $err;
-            eadingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
+            readingsSingleUpdate($hash, "z_Last_fhem_err", $err, 0);
             return ($msg ."\n msg " . $err);
         }
         substr($msg, 0, 2, ""); 		#remove the checksum from the head of the payload
@@ -1461,28 +1469,27 @@ sub THZ_Get_Comunication($$) {
     my ($hash, $cmdHex) = @_;
     my ($err, $msg) =("", " ");
     Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
-    if (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
-    select(undef, undef, undef, 0.001);
-    THZ_Write($hash,  "02"); 			# step0 --> STX start of text 	
+    if  (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
+    THZ_Write($hash,  "02"); 			# step0 --> STX start of text
     ($err, $msg) = THZ_ReadAnswer($hash);
     #Expectedanswer0    is  "10"  DLE data link escape
-    if ($msg ne "10")    {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    if  ($msg ne "10")       {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
     else  {
         THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
         ($err, $msg) = THZ_ReadAnswer($hash);
     }
-    if ((defined($err)))  { $err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    if  (defined($err))     {$err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
     # Expectedanswer1     is "1002",		DLE data link escape -- STX start of text    
-    if ($msg eq "10") 	{ ($err, $msg) = THZ_ReadAnswer($hash);}
-    elsif ($msg eq "15") 	{ $err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
-    if ($msg eq "1002" || $msg eq "02") {
+    if  ($msg eq "10") 	    {($err, $msg) = THZ_ReadAnswer($hash);}
+    elsif ($msg eq "15") 	{$err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
+    if  ($msg eq "1002" || $msg eq "02") {
         THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape  
         ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer2 // read from the heatpump
         THZ_Write($hash,  "10");  
     }
-    if ((defined($err)))  { $err .= " THZ_Get_Com: error found at step2"; select(undef, undef, undef, 0.1);} 
+    if  (defined($err))     {$err .= " THZ_Get_Com: error found at step2"; select(undef, undef, undef, 0.1);} 
     else  {($err, $msg) = THZ_decode($msg);} 	#clean up and remove footer and header
-    return($err, $msg) ;
+    return($err, $msg);
 }
 
 #####################################
@@ -1496,11 +1503,14 @@ sub THZ_ReadAnswer($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
-	select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-	my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would like to have 8/2 second.
-    $rtimeout = 0.5 if (AttrVal($name, "nonblocking", "0") eq 0); # set to 0.5s is nonblocking disabled
-    my $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
-    $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout) if(!defined($buf)) ; #added for karl msg468515
+    select(undef, undef, undef, 0.001);
+	my $buf = DevIo_SimpleRead($hash);
+    if(!defined($buf)) {
+        select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
+        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would like to have 8/2 second.
+        $rtimeout = 0.5 if (AttrVal($name, "nonblocking", "0") eq 0); # set to 0.5s if nonblocking disabled
+        $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
+    }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
 	my $data =  uc(unpack('H*', $buf));
 	my $count =1;
@@ -1795,7 +1805,7 @@ sub THZ_Parse1($$) {
     my $ParsedMsg = $message;
     if(defined($parsingrule)) {
         $ParsedMsg = "";
-        for  $parsingelement  (@$parsingrule) {
+        for  my $parsingelement  (@$parsingrule) {
             my $parsingtitle = $parsingelement->[0];
             my $positionInMsg = $parsingelement->[1];
             my $lengthInMsg = $parsingelement->[2];
@@ -1865,7 +1875,7 @@ sub THZ_debugread($){
     my $indice= "FF";
     unlink("data.txt"); #delete  debuglog
     #my $i=0;
-    foreach $indice(@numbers) {
+    foreach my $indice(@numbers) {
         # $i=$i+1;
         #my $cmd = sprintf("%02X", $indice);
         #my $cmd = sprintf("%04X", $indice);
@@ -1902,9 +1912,10 @@ sub THZ_debugread($){
                 } 
             my $activatetrigger =1;
             # readingsSingleUpdate($hash, $cmd, $msg, $activatetrigger);
-            open (MYFILE, '>>data.txt');
-            print MYFILE ($cmdHex2 ."-". $cmd . "-" . $msg . "\n");
-            close (MYFILE);
+            my $MYFILE;
+            open ($MYFILE, '>>', 'data.txt');
+            print $MYFILE ($cmdHex2 ."-". $cmd . "-" . $msg . "\n");
+            close ($MYFILE);
             #Log3 $hash->{NAME}, 3, "$cmd  -  $msg";
         }
         select(undef, undef, undef, 0.2); 
@@ -2173,12 +2184,13 @@ sub THZ_backup_readings($){
     #$year+=1900 - 2000;
     my $replacestr= "$hash->{NAME}-$year-$month-$mday.backup"; 
     $backupfile=~ s/fhem.save/$replacestr/g;  #saving to statefile path
-    if(!open(BAFH, ">$backupfile")) {
+    my $BAFH;
+    if (!open($BAFH, '>', $backupfile)) {
         my $msg = "WriteStateFile: Cannot open $backupfile: $!";
         Log3 $hash->{NAME},3, $msg;
         return $msg;
     }
-    print BAFH "#$t\n";
+    print $BAFH "#$t\n";
     my $r = $hash->{READINGS};
     foreach my $c (sort keys %{$r}) {
         my $rd = $r->{$c};
@@ -2186,10 +2198,10 @@ sub THZ_backup_readings($){
             my $val = $rd->{VAL};
             $val =~ s/;/;;/g;
             $val =~ s/\n/\\\n/g;
-            print BAFH "set $hash->{NAME}  $c $val\n";
+            print $BAFH "set $hash->{NAME}  $c $val\n";
         }
     }
-    return "$backupfile: $!" if(!close(BAFH));
+    return "$backupfile: $!" if(!close($BAFH));
     return "saved Readings in $backupfile";
 }
 
