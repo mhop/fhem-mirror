@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.1" => "18.08.2020  more code changes according PBP ",
   "1.10.0" => "17.08.2020  switch to packages, finalise for repo checkin ",
   "1.9.0"  => "30.07.2020  restartSendqueue option 'force' added ",
   "1.8.0"  => "27.05.2020  send SVG Plots with options like svg='<SVG-Device>,<zoom>,<offset>' possible ",
@@ -1891,13 +1892,10 @@ sub botCGI {
   }
       
   if ($request =~ /^\/outchat(\?|&)/x) {                  # POST- oder GET-Methode empfangen
-      # data received
       return _botCGIdata ($request);  
-  
-  } else {
-      # no data received
-      return ("text/plain; charset=utf-8", "Missing data");
   }
+  
+return ("text/plain; charset=utf-8", "Missing data");
 }
 
 #############################################################################################
@@ -2091,8 +2089,9 @@ sub _botCGIdata {                                                   ## no critic
           ($uc,$arg) = split(/\s+/x, $uc, 2);
           
           if($uc && $text =~ /^$uc\s*?$/x) {                                      # User eigener Slash-Befehl, z.B.: /Wetter 
-              $command = $arg;
               $do      = 1;
+              
+              $command = $arg;
               $au      = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
               @aul     = split(",",$au);
               
@@ -2170,19 +2169,15 @@ sub __botCGIrecSet {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";
+  my $cr       = q{};
   my $command  = "set ".$p2;
   my $au       = AttrVal($name,"allowedUserForSet", "all");
-  my @aul      = split(",",$au);
-  
-  if($au eq "all" || $username ~~ @aul) {
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$command);
-      $cr = CommandSet(undef, $p2);                                  
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  }
+
+  $paref->{au}    = $au;
+  $paref->{order} = "Set";
+  $paref->{cmd}   = $command;
+   
+  ($cr, $state)   = ___botCGIorder ($paref); 
                     
 return ($command, $cr, $state);
 }
@@ -2198,19 +2193,15 @@ sub __botCGIrecGet {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";
+  my $cr       = q{};
   my $command  = "get ".$p2;              
   my $au       = AttrVal($name,"allowedUserForGet", "all");
-  my @aul      = split(",",$au);
-  
-  if($au eq "all" || $username ~~ @aul) {
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$command);
-      $cr = CommandGet(undef, $p2); 
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  }
+
+  $paref->{au}    = $au;
+  $paref->{order} = "Get";
+  $paref->{cmd}   = $command;
+   
+  ($cr, $state)   = ___botCGIorder ($paref);  
                     
 return ($command, $cr, $state);
 }
@@ -2226,27 +2217,61 @@ sub __botCGIrecCod {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";  
+  my $cr       = q{};  
   my $command  = $p2;
   my $au       = AttrVal($name,"allowedUserForCode", "all");
-  my @aul      = split(",",$au);
   
-  if($au eq "all" || $username ~~ @aul) {
-      my $code = $p2;
-      if($p2 =~ m/^\s*(\{.*\})\s*$/xs) {
-          $p2 = $1;
-      } else {
-          $p2 = '';
-      } 
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$p2);
-      $cr = AnalyzePerlCommand(undef, $p2) if($p2);                    
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  } 
+  $paref->{au}    = $au;
+  $paref->{order} = "Code";
+  $paref->{cmd}   = $command;
+  
+  ($cr, $state)   = ___botCGIorder ($paref);
                     
 return ($command, $cr, $state);
+}
+
+################################################################
+#            Order ausführen und Ergebnis zurückliefern         
+################################################################
+sub ___botCGIorder {                     
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $state    = $paref->{state};
+  my $p2       = $paref->{p2};            # Kommandoargument, z.B. "get <argument>" oder "code <argument>"
+  my $au       = $paref->{au};
+  my $order    = $paref->{order};         # Kommandotyp, z.B. "set"
+  my $cmd      = $paref->{cmd};           # komplettes Kommando
+  
+  my @aul      = split(",",$au);
+  my $cr       = q{}; 
+  
+  if($au eq "all" || $username ~~ @aul) {      
+      if ($order =~ /^[GS]et$/x) {
+          Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$cmd);
+          no strict "refs";                                          ## no critic 'NoStrict' 
+          $cr = &{"Command".$order} (undef, $p2);
+          use strict "refs";   
+      }
+
+      if ($order eq "Code") {
+          my ($arg) = $p2 =~ m/^\s*(\{.*\})\s*$/xs;
+
+          if($arg) {
+              Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$arg);
+              $cr = AnalyzePerlCommand(undef, $arg);
+          } else {
+              $cr = qq{function format error: may be you didn't use the format {...}};    
+          }     
+      }      
+ 
+  } else {
+      $cr    = qq{User "$username" is not allowed execute "$cmd" command};
+      $state = qq{command execution denied};
+      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$cmd" command. Execution denied !});
+  }
+                    
+return ($cr, $state);
 }
 
 1;
