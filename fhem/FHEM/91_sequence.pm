@@ -52,7 +52,7 @@ sequence_Define($$)
     return "Bad regexp 1: $@" if($@);
     return "Bad timeout spec $to"       # timeout or delay:timeout
       if (defined($to) && $to !~ m/^(\d+(\.\d+)?:)?\d+(\.\d+)?$/);
-    push @reList,$re;
+    push @reList,$re if($re !~ m/^:/); # Respect feature: use last dev
   }
 
   $hash->{RE} = $def[0];
@@ -60,7 +60,7 @@ sequence_Define($$)
   $hash->{MAX} = int(@def);
   $hash->{STATE} = "active";
   $hash->{TS} = 0;
-  notifyRegexpChanged($hash, join("|",@reList));
+  InternalTimer(0, sub { notifyRegexpChanged($hash, join("|",@reList)) }, 0);
   return undef;
 }
 
