@@ -383,7 +383,7 @@ sub _IsDay {
     }
 
     
-    $respIsDay == 1
+    $respIsDay = 1
       if (
            (  $FHEM::Automation::ShuttersControl::shutters->getDown eq 'roommate'
              and ( $FHEM::Automation::ShuttersControl::shutters->getRoommates ne 'asleep'
