@@ -1279,12 +1279,14 @@ The following local attributes are used by a wider range of devices:
 <a name="setreading"></a>
 <h3>setreading</h3>
 <ul>
-  <code>setreading &lt;devspec&gt; &lt;reading&gt; &lt;value&gt;</code>
+  <code>setreading &lt;devspec&gt; [YYYY-MM-DD HH:MM:SS] &lt;reading&gt;
+        &lt;value&gt;</code>
   <br><br>
   Set the reading &lt;reading&gt; for the device <code>&lt;name&gt;</code> to
   &lt;value&gt; without sending out commands to the device, but triggering
   events and eventMap/stateFormat transformations as usual. See the set
-  command documentation for replacement description.
+  command documentation for replacement description.<br>
+  If the timespec is omitted (default) the current time will be used.
   <br><br>
   Examples:
   <ul>

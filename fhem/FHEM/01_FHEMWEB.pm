@@ -3112,6 +3112,7 @@ FW_Notify($$)
     #Add READINGS
     if($events) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
+      my $ct = $dev->{CHANGETIME};
       my $max = int(@{$events});
       for(my $i = 0; $i < $max; $i++) {
         if($events->[$i] !~ /: /) {
@@ -3127,7 +3128,8 @@ FW_Notify($$)
         next if($readingName !~ m/^[A-Za-z\d_\.\-\/:]+$/); # Forum #70608,70844
         push @data, FW_longpollInfo($h->{fmt},
                                 "$dn-$readingName", $readingVal,$readingVal);
-        push @data, FW_longpollInfo($h->{fmt}, "$dn-$readingName-ts", $tn, $tn);
+        my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
+        push @data, FW_longpollInfo($h->{fmt}, "$dn-$readingName-ts", $t, $t);
       }
     }
   }

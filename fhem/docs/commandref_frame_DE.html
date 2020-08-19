@@ -1361,12 +1361,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="setreading"></a>
 <h3>setreading</h3>
 <ul>
-  <code>setreading &lt;devspec&gt; &lt;reading&gt; &lt;value&gt;</code>
+  <code>setreading &lt;devspec&gt; [YYYY-MM-DD HH:MM:SS] &lt;reading&gt;
+        &lt;value&gt;</code>
   <br><br>
   Der Befehl setzt das Reading &lt;reading&gt; auf den Wert &lt;value&gt; ohne
   Signale an das betroffene Ger&auml;t zu senden, generiert aber Ereignisse und
   die &uuml;bliche eventMap und stateFormat Umwandlung wird auch
-  durchgef&uuml;hrt.
+  durchgef&uuml;hrt.<br>
+  Falls keine Zeit spezifiziert wurde, wird die aktuelle Uhrzeit verwendet.
   <br>
   Siehe den Abschnitt &uuml;ber <a href="#devspec">Ger&auml;te-Spezifikation</a>
   f&uuml;r Details der &lt;devspec&gt; und die Beschreibung des set Befehls

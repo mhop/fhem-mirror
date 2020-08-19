@@ -111,7 +111,7 @@ sub TimeNow();
 sub Value($);
 sub WriteStatefile();
 sub XmlEscape($);
-sub addEvent($$);
+sub addEvent($$;$);
 sub addToDevAttrList($$);
 sub applyGlobalAttrFromEnv();
 sub delFromDevAttrList($$);
@@ -150,7 +150,7 @@ sub perlSyntaxCheck($%);
 sub readingsBeginUpdate($);
 sub readingsBulkUpdate($$$@);
 sub readingsEndUpdate($$);
-sub readingsSingleUpdate($$$$);
+sub readingsSingleUpdate($$$$;$);
 sub readingsDelete($$);
 sub redirectStdinStdErr();
 sub rejectDuplicate($$$);
@@ -457,7 +457,8 @@ my %ra = (
   "set"     => { Fn=>"CommandSet",
             Hlp=>"<devspec> <type-specific>,transmit code for <devspec>" },
   "setreading" => { Fn=>"CommandSetReading",
-            Hlp=>"<devspec> <reading> <value>,set reading for <devspec>" },
+            Hlp=>"<devspec> [YYYY-MM-DD HH:MM:SS] <reading> <value>,".
+                 "set reading for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate",
             Hlp=>"<devspec> <state>,set the state shown in the command list" },
   "setuuid" => { Fn=>"CommandSetuuid", Hlp=>"" },
@@ -2416,9 +2417,16 @@ sub
 CommandSetReading($$)
 {
   my ($cl, $def) = @_;
+  my $timestamp;
+
+  if($def =~ m/^([^ ]+) +(\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d) +([^ ]+) +(.*)$/) {
+    $def = "$1 $3 $4";
+    $timestamp = $2;
+  }
 
   my @a = split(" ", $def, 3);
-  return "Usage: setreading <name> <reading> <value>\n$namedef" if(@a != 3);
+  return "Usage: setreading <name> [YYYY-MM-DD HH:MM:SS] <reading> <value>\n".
+                $namedef if(@a != 3);
 
   my $err;
   my @b = @a;
@@ -2443,7 +2451,7 @@ CommandSetReading($$)
       Log 1, "'setreading $def' called form userReadings is prohibited";
       return;
     } else {
-      readingsSingleUpdate($hash, $b1, $b[2], 1);
+      readingsSingleUpdate($hash, $b1, $b[2], 1, $timestamp);
     }
   }
   return join("\n", @rets);
@@ -3732,6 +3740,12 @@ DoTrigger($$@)
     ################
     # Inform
     if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
+      my $tn = $now;
+      if($attr{global}{mseclog}) {
+        my ($seconds, $microseconds) = gettimeofday();
+        $tn .= sprintf(".%03d", $microseconds/1000);
+      }
+      my $ct = $hash->{CHANGETIME};
       foreach my $c (keys %inform) {
         my $dc = $defs{$c};
         if(!$dc || $dc->{NR} != $inform{$c}{NR}) {
@@ -3739,18 +3753,14 @@ DoTrigger($$@)
           next;
         }
         next if($inform{$c}{type} eq "raw");
-        my $tn = $now;
-        if($attr{global}{mseclog}) {
-          my ($seconds, $microseconds) = gettimeofday();
-          $tn .= sprintf(".%03d", $microseconds/1000);
-        }
         my $re = $inform{$c}{regexp};
         my $events = deviceEvents($hash, $inform{$c}{type} =~ m/WithState/);
         $max = int(@{$events});
         for(my $i = 0; $i < $max; $i++) {
           my $event = $events->[$i];
+          my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
           next if($re && !($dev =~ m/$re/ || "$dev:$event" =~ m/$re/));
-          addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$tn " : "").
+          addToWritebuffer($dc,($inform{$c}{type} eq "timer" ? "$t " : "").
                                 "$hash->{TYPE} $dev $event\n");
         }
       }
@@ -4612,10 +4622,14 @@ setReadingsVal($$$$)
 }
 
 sub
-addEvent($$)
+addEvent($$;$)
 {
-  my ($hash,$event) = @_;
+  my ($hash,$event,$timestamp) = @_;
   push(@{$hash->{CHANGED}}, $event);
+  if($timestamp) {
+    $hash->{CHANGETIME} = [] if(!defined($hash->{CHANGETIME}));
+    $hash->{CHANGETIME}->[@{$hash->{CHANGED}}-1] = $timestamp;
+  }
 }
 
 sub 
@@ -4817,7 +4831,7 @@ readingsBulkUpdateIfChanged($$$@) # Forum #58797
 sub
 readingsBulkUpdate($$$@)
 {
-  my ($hash,$reading,$value,$changed)= @_;
+  my ($hash,$reading,$value,$changed,$timestamp)= @_;
   my $name= $hash->{NAME};
 
   return if(!defined($reading) || !defined($value));
@@ -4947,7 +4961,8 @@ readingsBulkUpdate($$$@)
   }
   
   
-  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"})
+  setReadingsVal($hash, $reading, $value, 
+                 $timestamp ? $timestamp : $hash->{".updateTimestamp"})
         if($update_timestamp); 
   
   my $rv = "$reading: $value";
@@ -4956,7 +4971,7 @@ readingsBulkUpdate($$$@)
       $rv = $value;
       $hash->{CHANGEDWITHSTATE} = [];
     }
-    addEvent($hash, $rv);
+    addEvent($hash, $rv, $timestamp);
   }
   return $rv;
 }
@@ -4965,11 +4980,11 @@ readingsBulkUpdate($$$@)
 # this is a shorthand call
 #
 sub
-readingsSingleUpdate($$$$)
+readingsSingleUpdate($$$$;$)
 {
-  my ($hash,$reading,$value,$dotrigger)= @_;
+  my ($hash,$reading,$value,$dotrigger,$timestamp)= @_;
   readingsBeginUpdate($hash);
-  my $rv = readingsBulkUpdate($hash,$reading,$value);
+  my $rv = readingsBulkUpdate($hash, $reading, $value, undef, $timestamp);
   readingsEndUpdate($hash,$dotrigger);
   return $rv;
 }
