@@ -3141,10 +3141,12 @@ FW_Notify($$)
         my ($seconds, $microseconds) = gettimeofday();
         $tn .= sprintf(".%03d", $microseconds/1000);
       }
+      my $ct = $dev->{CHANGETIME};
       my $max = int(@{$events});
       my $dt = $dev->{TYPE};
       for(my $i = 0; $i < $max; $i++) {
-        my $line = "$tn $dt $dn ".$events->[$i]."<br>";
+        my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
+        my $line = "$t $dt $dn ".$events->[$i]."<br>";
         eval { 
           my $ok;
           if($h->{filterType} && $h->{filterType} eq "notify") {
