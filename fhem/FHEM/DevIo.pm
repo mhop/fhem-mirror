@@ -233,6 +233,11 @@ DevIo_DecodeWS($$)
 
   }
 
+  if(length($hash->{".WSBUF"})) { # There is more data to digest
+    my $nd = DevIo_DecodeWS($hash, "");
+    $data .= $nd if(defined($nd));
+  }
+
   return $data;
 }
 
