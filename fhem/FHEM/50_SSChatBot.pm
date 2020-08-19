@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.2" => "19.08.2020  more code refactoring and little improvements ",
   "1.10.1" => "18.08.2020  more code changes according PBP ",
   "1.10.0" => "17.08.2020  switch to packages, finalise for repo checkin ",
   "1.9.0"  => "30.07.2020  restartSendqueue option 'force' added ",
@@ -950,6 +951,20 @@ sub addQueue {
 return;
 }
 
+################################################################
+#                asynchrone Queue starten
+#                $rst = resend Timer
+################################################################
+sub startQueue {                   
+  my $name = shift // return;
+  my $rst  = shift // return;
+  my $hash = $defs{$name};
+
+  RemoveInternalTimer ($hash, "FHEM::SSChatBot::getApiSites");
+  InternalTimer       ($rst,  "FHEM::SSChatBot::getApiSites", "$name", 0);   
+                    
+return;
+}
 
 #############################################################################################
 #              Erfolg einer Rückkehrroutine checken und ggf. Send-Retry ausführen
@@ -974,7 +989,7 @@ sub checkRetry {
   if(!$retry) {                                                     # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
-      Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
+      Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
       updQLength ($hash);
       return getApiSites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
@@ -999,21 +1014,19 @@ sub checkRetry {
       
       if(!$forbidSend) {
           my $rs = 0;
-		  $rs = $rc <= 1 ? 5 
-		      : $rc <  3 ? 20
-			  : $rc <  5 ? 60
-			  : $rc <  7 ? 1800
-			  : $rc < 30 ? 3600
-			  : 86400
-			  ;
+          $rs = $rc <= 1 ? 5 
+              : $rc <  3 ? 20
+              : $rc <  5 ? 60
+              : $rc <  7 ? 1800
+              : $rc < 30 ? 3600
+              : 86400
+              ;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
           
           my $rst = gettimeofday()+$rs;                        # resend Timer 
           updQLength ($hash,$rst);                             # updaten Länge der Sendequeue mit resend Timer
-          
-          RemoveInternalTimer($hash, "FHEM::SSChatBot::getApiSites");
-          InternalTimer($rst, "FHEM::SSChatBot::getApiSites", "$name", 0);
+          startQueue ($name,$rst);
       }
   }
 
@@ -1902,105 +1915,43 @@ return ("text/plain; charset=utf-8", "Missing data");
 #                         Common Gateway data receive         
 #                 parsen von outgoing Messages Chat -> FHEM 
 #############################################################################################
-sub _botCGIdata {                                                   ## no critic 'complexity'
+sub _botCGIdata {                                                  
   my $request = shift;
   
-  my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au,$arg,$callbackid,$actions,$actval,$avToExec)                    = ("","","","","","","","");
-  my $state = "active";
-  my $do    = 0;  
-  my $ret   = "success";
-  my $success;
-  my @aul;
+  my ($text,$triggerword,$command,$cr) = ("","","","");
+  my ($actions,$actval,$avToExec)      = ("","","");
 
-  my $args = (split(/outchat\?/x, $request))[1];        # GET-Methode empfangen 
+  my ($mime, $err, $dat) = __botCGIcheckData ($request);
+  return ($mime, $err) if($err);
   
-  if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
-      $args = (split(/outchat&/x, $request))[1];
-      if(!$args) {
-          Log 1, "TYPE SSChatBot - ERROR - no expected data received";
-          return ("text/plain; charset=utf-8", "no expected data received");
-      }
-  }
+  my $name = $dat->{name};
+  my $args = $dat->{args};
+  my $h    = $dat->{h};
   
-  $args =~ s/&/" /gx;
-  $args =~ s/=/="/gx;
-  $args .= "\"";
-  
-  $args     = urlDecode($args);
-  my($a,$h) = parseParams($args);
-  
-  if (!defined($h->{botname})) {
-      Log 1, "TYPE SSChatBot - ERROR - no Botname received";
-      return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
-  }
-  
-  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
-  my $name = $h->{botname};                                # das SSChatBot Device
-  if(!IsDevice($name, 'SSChatBot')) {
-      Log 1, qq{ERROR - No SSChatBot device "$name" of Type "SSChatBot" exists};
-      return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" );
-  }
-  
-  my $hash = $defs{$name};                                 # hash des SSChatBot Devices
   Log3($name, 4, "$name - ####################################################"); 
   Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
   Log3($name, 4, "$name - ####################################################");
   Log3($name, 5, "$name - raw data received (urlDecoded):\n".Dumper($args));
+
+  my $hash  = $defs{$name};                                                            # hash des SSChatBot Devices  
+  my $rst   = gettimeofday()+1;                                                        # Standardwert resend Timer
+  my $state = "active";                                                                # Standardwert state 
+  my $ret   = "success";
   
-  # eine Antwort auf ein interaktives Objekt
-  if (defined($h->{payload})) {
-      # ein Benutzer hat ein interaktives Objekt ausgelöst (Button). Die Datenfelder sind nachfolgend beschrieben:
-      #   "actions":     Array des Aktionsobjekts, das sich auf die vom Benutzer ausgelöste Aktion bezieht
-      #   "callback_id": Zeichenkette, die sich auf die Callback_id des Anhangs bezieht, in dem sich die vom Benutzer ausgelöste Aktion befindet
-      #   "post_id"
-      #   "token"
-      #   "user": { "user_id","username" }
-      my $pldata        = $h->{payload};
-      (undef, $success) = evalJSON($hash,$pldata);
-      
-      if (!$success) {
-          Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
-          return ("text/plain; charset=utf-8", "invalid JSON data received");
-      }
-      
-      my $data = decode_json ($pldata);
-      Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
-      
-      $h->{token}       = $data->{token};
-      $h->{post_id}     = $data->{post_id};
-      $h->{user_id}     = $data->{user}{user_id};
-      $h->{username}    = $data->{user}{username};
-      $h->{callback_id} = $data->{callback_id};
-      $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
-                          "name: ".$data->{actions}[0]{name}.", ". 
-                          "value: ".$data->{actions}[0]{value}.", ". 
-                          "text: ".$data->{actions}[0]{text}.", ". 
-                          "style: ".$data->{actions}[0]{style};
+  if (defined($h->{payload})) {                                                        # Antwort auf ein interaktives Objekt 
+      ($mime, $err) = __botCGIcheckPayload ($hash, $h);
+      return ($mime, $err) if($err);
   }   
   
   if (!defined($h->{token})) {
-      Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
+      Log3   ($name, 5, "$name - received insufficient data:\n".Dumper($args));
       return ("text/plain; charset=utf-8", "Insufficient data");
   }
   
-  # CSRF Token check
-  my $FWdev    = $hash->{FW};                           # das FHEMWEB Device für SSChatBot Device -> ist das empfangene Device
-  my $FWhash   = $defs{$FWdev};
-  my $want     = $FWhash->{CSRFTOKEN};
-  $want        = $want?$want:"none";
-  my $supplied = $h->{fwcsrf};
- 
-  if($want eq "none" || $want ne $supplied) {           # $FW_wname enthält ebenfalls das aufgerufenen FHEMWEB-Device
-      Log3 ($FW_wname, 2, "$FW_wname - WARNING - FHEMWEB CSRF error for client \"$FWdev\": ".
-                          "received $supplied token is not $want. ".
-                          "For details see the csrfToken FHEMWEB attribute. ".
-                          "The csrfToken must be identical to the token in OUTDEF of $name device.");
-      return ("text/plain; charset=utf-8", "400 Bad Request");          
-  }
+  my $neg = __botCGIcheckToken ($name, $h, $rst);                                      # CSRF Token check
+  return $neg if($neg);
   
-  # Timestamp dekodieren
-  if ($h->{timestamp}) {
+  if ($h->{timestamp}) {                                                               # Timestamp dekodieren
       $h->{timestamp} = FmtDateTime(($h->{timestamp})/1000);
   }
    
@@ -2021,114 +1972,36 @@ sub _botCGIdata {                                                   ## no critic
   # trigger_word: which trigger word is matched 
   #
 
-  $channelid   = $h->{channel_id}   if($h->{channel_id});                      
-  $channelname = $h->{channel_name} if($h->{channel_name});
-  $userid      = $h->{user_id}      if($h->{user_id});
-  $username    = $h->{username}     if($h->{username});
-  $postid      = $h->{post_id}      if($h->{post_id});
-  $callbackid  = $h->{callback_id}  if($h->{callback_id});
-  $timestamp   = $h->{timestamp}    if($h->{timestamp});
+  my $channelid   = $h->{channel_id}   // q{};                      
+  my $channelname = $h->{channel_name} // q{};  
+  my $userid      = $h->{user_id}      // q{};
+  my $username    = $h->{username}     // q{};
+  my $postid      = $h->{post_id}      // q{};
+  my $callbackid  = $h->{callback_id}  // q{};
+  my $timestamp   = $h->{timestamp}    // q{};
   
-  # interaktive Schaltflächen (Aktionen) auswerten 
-  if ($h->{actions}) {
+  if ($h->{actions}) {                                                   # interaktive Schaltflächen (Aktionen) auswerten 
       $actions  = $h->{actions};        
       ($actval) = $actions =~ m/^type:\s+button.*?value:\s+(.*?),\s+text:/x;
 
       if($actval =~ /^\//x) {
-          Log3($name, 4, "$name - slash command \"$actval\" got from interactive data and execute it with priority");
+          Log3 ($name, 4, "$name - slash command \"$actval\" got from interactive data and execute it with priority");
           $avToExec = $actval;        
       }
   }
   
-  if ($h->{text} || $avToExec) {
-      $text    = $h->{text};
-      $text    = $avToExec if($avToExec);                                # Vorrang für empfangene interaktive Data (Schaltflächenwerte) die Slash-Befehle enthalten        
-      if($text =~ /^\/(set.*?|get.*?|code.*?)\s+(.*)$/ix) {              # vordefinierte Befehle in FHEM ausführen
-          my $p1 = substr lc $1, 0, 3;
-          my $p2 = $2;
-          
-          my $pars = {
-              name     => $name,
-              username => $username,
-              state    => $state,
-              p2       => $p2,
-          };
-
-          if($hrecbot{$p1} && defined &{$hrecbot{$p1}{fn}}) {
-              $do = 1;
-              no strict "refs";                                          ## no critic 'NoStrict'  
-              ($command, $cr, $state) = &{$hrecbot{$p1}{fn}} ($pars); 
-              use strict "refs";
-          } 
-              
-          $cr = $cr ne q{} ? $cr : qq{command '$command' executed};
-          Log3($name, 4, "$name - FHEM command return: ".$cr);
-          
-          $cr = formString($cr, "command");   
-
-          my $params = { 
-              name       => $name,
-              opmode     => "sendItem",
-              method     => "chatbot",
-              userid     => $userid,
-              text       => $cr,
-              fileUrl    => "",
-              channel    => "",
-              attachment => ""
-          };
-          addQueue ($params);                                 
-      }
-                              
-      my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommandxx zusammenstellen
-      $ua    = "" if(!$ua);
-      my %hc = map { ($_ => 1) } grep { "$_" =~ m/ownCommand(\d+)/x } split(" ","ownCommand1 $ua");
-   
-      for my $ca (sort keys %hc) {
-          my $uc = AttrVal($name, $ca, "");
-          next if (!$uc);
-          ($uc,$arg) = split(/\s+/x, $uc, 2);
-          
-          if($uc && $text =~ /^$uc\s*?$/x) {                                      # User eigener Slash-Befehl, z.B.: /Wetter 
-              $do      = 1;
-              
-              $command = $arg;
-              $au      = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
-              @aul     = split(",",$au);
-              
-              if($au eq "all" || $username ~~ @aul) { 
-                  Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$arg);  
-                  $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
-              
-              } else {
-                  $cr    = qq{User "$username" is not allowed execute "$arg" command};
-                  $state = qq{command execution denied};
-                  Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$arg" command. Execution denied !});
-              }                 
-                                
-              $cr = $cr ne q{} ? $cr : qq{command '$arg' executed};
-              Log3($name, 4, "$name - FHEM command return: ".$cr);
-              
-              $cr = formString($cr, "command");
-
-              my $params = { 
-                  name       => $name,
-                  opmode     => "sendItem",
-                  method     => "chatbot",
-                  userid     => $userid,
-                  text       => $cr,
-                  fileUrl    => "",
-                  channel    => "",
-                  attachment => ""
-              };
-              addQueue ($params);                                                 
-          }
-      }
+  if ($h->{text} || $avToExec) {                                         # Interpretation empfangener Daten als auszuführende Kommandos 
+      my $params = { 
+          name     => $name,
+          username => $username,
+          userid   => $userid,
+          rst      => $rst,
+          state    => $state,
+          h        => $h,
+          avToExec => $avToExec
+      };
       
-      # Wenn Kommando ausgeführt wurde Ergebnisse aus Queue übertragen
-      if($do) {
-          RemoveInternalTimer ($hash, "FHEM::SSChatBot::getApiSites");
-          InternalTimer       (gettimeofday()+1, "FHEM::SSChatBot::getApiSites", "$name", 0); 
-      }       
+      ($command, $cr, $text) = __botCGIdataInterprete ($params);       
   }
   
   if ($h->{trigger_word}) {
@@ -2155,7 +2028,247 @@ sub _botCGIdata {                                                   ## no critic
   readingsBulkUpdate  ($hash, "state",             $state       );        
   readingsEndUpdate   ($hash,1);
   
-  return ("text/plain; charset=utf-8", $ret);
+return ("text/plain; charset=utf-8", $ret);
+}
+
+################################################################
+#                      botCGI 
+#            Daten auf Validität checken
+################################################################
+sub __botCGIcheckData { 
+  my $request = shift;
+
+  my $args = (split(/outchat\?/x, $request))[1];        # GET-Methode empfangen 
+  
+  if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
+      $args = (split(/outchat&/x, $request))[1];
+      if(!$args) {
+          Log 1, "TYPE SSChatBot - ERROR - no expected data received";
+          return ("text/plain; charset=utf-8", "no expected data received");
+      }
+  }
+  
+  $args =~ s/&/" /gx;
+  $args =~ s/=/="/gx;
+  $args .= "\"";
+  
+  $args     = urlDecode($args);
+  my($a,$h) = parseParams($args);
+  
+  if (!defined($h->{botname})) {
+      Log 1, "TYPE SSChatBot - ERROR - no Botname received";
+      return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
+  }
+  
+  # check ob angegebenes SSChatBot Device definiert
+  # wenn ja, Kontext auf botname setzen
+  my $name = $h->{botname};                                                            # das SSChatBot Device
+  if(!IsDevice($name, 'SSChatBot')) {
+      Log 1, qq{ERROR - No SSChatBot device "$name" of Type "SSChatBot" exists};
+      return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" );
+  } 
+  
+  my $dat = {
+      name       => $name,
+      args       => $args,
+      h          => $h,
+  };
+                    
+return ('','',$dat);
+}
+
+################################################################
+#                      botCGI 
+#                check CSRF Token 
+################################################################
+sub __botCGIcheckToken {                   
+  my $name     = shift;
+  my $h        = shift;
+  my $rst      = shift;
+  my $hash     = $defs{$name};
+
+  my $FWdev    = $hash->{FW};                           # das FHEMWEB Device für SSChatBot Device -> ist das empfangene Device
+  my $FWhash   = $defs{$FWdev};
+  my $want     = $FWhash->{CSRFTOKEN} // "none";
+  my $supplied = $h->{fwcsrf};
+ 
+  if($want eq "none" || $want ne $supplied) {           # $FW_wname enthält ebenfalls das aufgerufenen FHEMWEB-Device
+      Log3 ($FW_wname, 2, "$FW_wname - ERROR - FHEMWEB CSRF error for client $FWdev: ".
+                          "received $supplied token is not $want. ".
+                          "For details see the FHEMWEB csrfToken attribute. ".
+                          "The csrfToken must be identical to the token in OUTDEF of the $name device.");
+                          
+      my $cr     = formString("CSRF error in client '$FWdev' - see logfile", "text");   
+      my $userid = $h->{user_id} // q{};
+      
+      my $params = { 
+          name       => $name,
+          opmode     => "sendItem",
+          method     => "chatbot",
+          userid     => $userid,
+          text       => $cr,
+          fileUrl    => "",
+          channel    => "",
+          attachment => ""
+      };
+      addQueue   ($params);
+      startQueue ($name, $rst);
+          
+      return ("text/plain; charset=utf-8", "400 Bad Request");          
+  }  
+                    
+return;
+}
+
+################################################################
+#                      botCGI 
+#     Payload checken (interaktives Element ausgelöst ?)
+#
+# ein Benutzer hat ein interaktives Objekt ausgelöst (Button). 
+# Die Datenfelder sind nachfolgend beschrieben:
+#   "actions":     Array des Aktionsobjekts, das sich auf die 
+#                  vom Benutzer ausgelöste Aktion bezieht
+#   "callback_id": Zeichenkette, die sich auf die Callback_id 
+#                  des Anhangs bezieht, in dem sich die vom 
+#                  Benutzer ausgelöste Aktion befindet
+#   "post_id"
+#   "token"
+#   "user":        { "user_id","username" }
+################################################################
+sub __botCGIcheckPayload { 
+  my $hash = shift;
+  my $h    = shift;
+  my $name = $hash->{NAME};
+
+      my $pldata           = $h->{payload};
+      my (undef, $success) = evalJSON($hash,$pldata);
+      
+      if (!$success) {
+          Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
+          return ("text/plain; charset=utf-8", "invalid JSON data received");
+      }
+      
+      my $data = decode_json ($pldata);
+      Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
+      
+      $h->{token}       = $data->{token};
+      $h->{post_id}     = $data->{post_id};
+      $h->{user_id}     = $data->{user}{user_id};
+      $h->{username}    = $data->{user}{username};
+      $h->{callback_id} = $data->{callback_id};
+      $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
+                          "name: ".$data->{actions}[0]{name}.", ". 
+                          "value: ".$data->{actions}[0]{value}.", ". 
+                          "text: ".$data->{actions}[0]{text}.", ". 
+                          "style: ".$data->{actions}[0]{style};
+           
+return;
+}
+
+################################################################
+#                      botCGI 
+#     Interpretiere empfangene Daten als Kommandos
+################################################################
+sub __botCGIdataInterprete { 
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $userid   = $paref->{userid};
+  my $rst      = $paref->{rst};
+  my $state    = $paref->{state};
+  my $h        = $paref->{h};
+  my $avToExec = $paref->{avToExec};
+  
+  my $do       = 0; 
+  my $cr       = q{};
+  my $command  = q{};
+  my $text     = $h->{text};
+  $text        = $avToExec if($avToExec);                            # Vorrang für empfangene interaktive Data (Schaltflächenwerte) die Slash-Befehle enthalten        
+  
+  if($text =~ /^\/(set.*?|get.*?|code.*?)\s+(.*)$/ix) {              # vordefinierte Befehle in FHEM ausführen
+      my $p1 = substr lc $1, 0, 3;
+      my $p2 = $2;
+      
+      my $pars = {
+          name     => $name,
+          username => $username,
+          state    => $state,
+          p2       => $p2,
+      };
+
+      if($hrecbot{$p1} && defined &{$hrecbot{$p1}{fn}}) {
+          $do = 1;
+          no strict "refs";                                          ## no critic 'NoStrict'  
+          ($command, $cr, $state) = &{$hrecbot{$p1}{fn}} ($pars); 
+          use strict "refs";
+      } 
+          
+      $cr = $cr ne q{} ? $cr : qq{command '$command' executed};
+      Log3($name, 4, "$name - FHEM command return: ".$cr);
+      
+      $cr = formString($cr, "command");   
+
+      my $params = { 
+          name       => $name,
+          opmode     => "sendItem",
+          method     => "chatbot",
+          userid     => $userid,
+          text       => $cr,
+          fileUrl    => "",
+          channel    => "",
+          attachment => ""
+      };
+      addQueue ($params);                                 
+  }
+                          
+  my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommandxx zusammenstellen
+  $ua    = "" if(!$ua);
+  my %hc = map { ($_ => 1) } grep { "$_" =~ m/ownCommand(\d+)/x } split(" ","ownCommand1 $ua");
+
+  for my $ca (sort keys %hc) {
+      my $uc = AttrVal($name, $ca, "");
+      next if (!$uc);
+      
+      my $arg = q{};
+      ($uc,$arg) = split(/\s+/x, $uc, 2);
+      
+      if($uc && $text =~ /^$uc\s*?$/x) {                                      # User eigener Slash-Befehl, z.B.: /Wetter 
+          $do      = 1;
+          
+          my $pars = {
+              name     => $name,
+              username => $username,
+              state    => $state,
+              arg      => $arg,
+              uc       => $uc,
+          };
+
+          ($cr, $state) = __botCGIownCommand ($pars);             
+                            
+          $cr = $cr ne q{} ? $cr : qq{command '$arg' executed};
+          Log3($name, 4, "$name - FHEM command return: ".$cr);
+          
+          $cr = formString($cr, "command");
+
+          my $params = { 
+              name       => $name,
+              opmode     => "sendItem",
+              method     => "chatbot",
+              userid     => $userid,
+              text       => $cr,
+              fileUrl    => "",
+              channel    => "",
+              attachment => ""
+          };
+          addQueue ($params);                                                 
+      }
+  }
+  
+  if($do) {                                                                  # Wenn Kommando ausgeführt wurde -> Queue übertragen
+      startQueue ($name, $rst);       
+  }  
+   
+return ($command, $cr, $text);
 }
 
 ################################################################
@@ -2231,6 +2344,36 @@ return ($command, $cr, $state);
 }
 
 ################################################################
+#                      botCGI 
+#            User ownCommand in FHEM ausführen
+################################################################
+sub __botCGIownCommand { 
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $state    = $paref->{state};
+  my $arg      = $paref->{arg};
+  my $uc       = $paref->{uc};
+  
+  my $cr       = q{};
+
+  if(!$arg) {
+      $cr = qq{format error: your own command '$uc' doesn't have a mandatory argument};
+      return ($cr, $state);
+  }
+  
+  my $au       = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
+  
+  $paref->{au}    = $au;
+  $paref->{order} = "Own";
+  $paref->{cmd}   = $arg;
+  
+  ($cr, $state)   = ___botCGIorder ($paref);
+                    
+return ($cr, $state);
+}
+
+################################################################
 #            Order ausführen und Ergebnis zurückliefern         
 ################################################################
 sub ___botCGIorder {                     
@@ -2243,7 +2386,7 @@ sub ___botCGIorder {
   my $order    = $paref->{order};         # Kommandotyp, z.B. "set"
   my $cmd      = $paref->{cmd};           # komplettes Kommando
   
-  my @aul      = split(",",$au);
+  my @aul      = split ",", $au;
   my $cr       = q{}; 
   
   if($au eq "all" || $username ~~ @aul) {      
@@ -2263,7 +2406,12 @@ sub ___botCGIorder {
           } else {
               $cr = qq{function format error: may be you didn't use the format {...}};    
           }     
-      }      
+      }   
+
+      if ($order eq "Own") {                                                                         # FHEM ownCommand Befehlsketten ausführen
+          Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$cmd);  
+          $cr = AnalyzeCommandChain(undef, $cmd);                         
+      }          
  
   } else {
       $cr    = qq{User "$username" is not allowed execute "$cmd" command};
