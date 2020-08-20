@@ -219,7 +219,7 @@ sub ShadingProcessing {
           . $azimuthRight
           . ', Ist es nach der Zeitblockadezeit: '
           . (
-            FHEM::Automation::ShuttersControl::IsAfterShuttersTimeBlocking(
+            FHEM::Automation::ShuttersControl::Helper::IsAfterShuttersTimeBlocking(
                 $shuttersDev) ? 'JA' : 'NEIN'
           )
           . ', Das Rollo ist in der Beschattung und wurde manuell gefahren: '
@@ -419,7 +419,7 @@ sub ShadingProcessing {
 
     ShadingProcessingDriveCommand( $hash, $shuttersDev )
       if (
-        FHEM::Automation::ShuttersControl::IsAfterShuttersTimeBlocking(
+        FHEM::Automation::ShuttersControl::Helper::IsAfterShuttersTimeBlocking(
             $shuttersDev)
         && !$FHEM::Automation::ShuttersControl::shutters
         ->getShadingManualDriveStatus
