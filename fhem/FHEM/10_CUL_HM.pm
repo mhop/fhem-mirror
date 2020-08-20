@@ -738,6 +738,7 @@ sub CUL_HM_Attr(@) {#################################
         return "$attrName must be higher then 30, $attrVal not allowed"
               if ($attrVal < 10);
         #update and sync to new timing
+
         RemoveInternalTimer("ActionDetector");
         InternalTimer(gettimeofday()+5,"CUL_HM_ActCheck", "ActionDetector", 0);
       }
@@ -748,9 +749,9 @@ sub CUL_HM_Attr(@) {#################################
         my($h,$m) = split(":",$attrVal);
         $h = int($h);
         $m = int($m);
-        return "format hhh:mm required. $attrVal incorrect" if( $h >= 999 && $h <= 0
-                                                             && $m >= 59  && $m <= 0
-                                                             && $h + $m > 0);
+        return "format hhh:mm required. $attrVal incorrect" if( $h >= 999 || $h <= 0
+                                                             || $m >= 59  || $m <= 0
+                                                             || $h + $m <= 0);
         my $attrValNew  = sprintf("%03d:%02d",$h,$m); 
         CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrValNew);
         $attr{$name}{$attrName} = $attrValNew;
@@ -9456,9 +9457,6 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
   Log3 $actHash, 3,"Device ".$devName." added to ActionDetector with $cycleString time";
-  #run ActionDetector
-  RemoveInternalTimer("ActionDetector");
-#  CUL_HM_ActCheck("add") if ($init_done);
   return;
 }
 sub CUL_HM_ActDel($) {# delete HMid for activity supervision
