@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.3" => "20.08.2020  more code refactoring according PBP ",
   "1.10.2" => "19.08.2020  more code refactoring and little improvements ",
   "1.10.1" => "18.08.2020  more code changes according PBP ",
   "1.10.0" => "17.08.2020  switch to packages, finalise for repo checkin ",
@@ -163,6 +164,11 @@ my %errList = (
   900 => "malformed JSON string received from Synology Chat Server",
 );
 
+my %hapi = (                                                                # Hash Template der API's
+    INFO     => { NAME => "SYNO.API.Info",     VER => 1, }, 
+    EXTERNAL => { NAME => "SYNO.Chat.External"           },
+);
+
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => "_setbotToken"         }, 
     listSendqueue    => { fn => "_setlistSendqueue"    },   
@@ -176,6 +182,12 @@ my %hget = (                                                                # Ha
     chatUserlist    => { fn => "_getchatUserlist"    },   
     chatChannellist => { fn => "_getchatChannellist" },
     versionNotes    => { fn => "_getversionNotes"    },
+);
+
+my %hmodep = (                                                              # Hash für Opmode Parse
+    chatUserlist    => { fn => "_parseUsers"    }, 
+    chatChannellist => { fn => "_parseChannels" },   
+    sendItem        => { fn => "_parseSendItem" },
 );
 
 my %hrecbot = (                                                             # Hash für botCGI receice Slash-commands (/set, /get, /code)
@@ -231,7 +243,7 @@ sub Define {
   }
         
   my $inaddr = $a[2];
-  my $inport = $a[3] ? $a[3] : 5000;
+  my $inport = $a[3] ? $a[3]     : 5000;
   my $inprot = $a[4] ? lc($a[4]) : "http";
   
   $hash->{INADDR}                = $inaddr;
@@ -244,26 +256,17 @@ sub Define {
   
   CommandAttr(undef,"$name room Chat");
   
-  # benötigte API's in $hash einfügen
-  $hash->{HELPER}{APIINFO}       = "SYNO.API.Info";                              # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{CHATEXTERNAL}  = "SYNO.Chat.External"; 
-    
-  # Versionsinformationen setzen
-  setVersionInfo($hash);
-  
-  # Token lesen
-  getToken($hash,1,"botToken");
-  
-  # Index der Sendequeue initialisieren
-  $data{SSChatBot}{$name}{sendqueue}{index} = 0;
+  $hash->{HELPER}{API}           = \%hapi;                                       # API Template in HELPER kopieren 
+  setVersionInfo($hash);                                                         # Versionsinformationen setzen
+  getToken($hash,1,"botToken");                                                  # Token lesen
+  $data{SSChatBot}{$name}{sendqueue}{index} = 0;                                 # Index der Sendequeue initialisieren
     
   readingsBeginUpdate         ($hash);                                             
   readingsBulkUpdateIfChanged ($hash, "QueueLenth", 0);                          # Länge Sendqueue initialisieren  
   readingsBulkUpdate          ($hash, "state", "Initialized");                   # Init state
   readingsEndUpdate           ($hash,1);              
 
-  # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
-  initOnBoot($hash);
+  initOnBoot($hash);                                                             # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
 
 return;
 }
@@ -1033,14 +1036,15 @@ sub checkRetry {
 return
 }
 
+################################################################
+#              API Versionen und Pfade ermitteln
+################################################################
 sub getApiSites {
-   my ($name)       = @_;
-   my $hash         = $defs{$name};
-   my $inaddr       = $hash->{INADDR};
-   my $inport       = $hash->{INPORT};
-   my $inprot       = $hash->{INPROT}; 
-   my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite ! 
-   my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
+   my $name     = shift;
+   my $hash     = $defs{$name};
+   my $inaddr   = $hash->{INADDR};
+   my $inport   = $hash->{INPORT};
+   my $inprot   = $hash->{INPROT};  
    
    my ($url,$param,$idxset,$ret);
   
@@ -1072,7 +1076,7 @@ sub getApiSites {
        return $ret; 
    }
    
-   if ($hash->{HELPER}{APIPARSET}) {                     # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+   if ($hash->{HELPER}{API}{PARSET}) {                     # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
        return chatOp($name);
    }
@@ -1081,18 +1085,21 @@ sub getApiSites {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$chatexternal";
+   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$hash->{HELPER}{API}{INFO}{NAME}".
+                                                    "&method=Query".
+                                                    "&version=$hash->{HELPER}{API}{INFO}{VER}".
+                                                    "&query=$hash->{HELPER}{API}{EXTERNAL}{NAME}";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
    $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getApiSites_parse
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getApiSites_parse
+   };
    
    HttpUtils_NonblockingGet ($param);  
 
@@ -1103,12 +1110,14 @@ return;
 #      Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_parse {
-   my ($param, $err, $myjson) = @_;
-   my $hash         = $param->{hash};
-   my $name         = $hash->{NAME};
-   my $inaddr       = $hash->{INADDR};
-   my $inport       = $hash->{INPORT};
-   my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
+   my $param    = shift;
+   my $err      = shift;
+   my $myjson   = shift;
+   my $hash     = $param->{hash};
+   my $name     = $hash->{NAME};
+   my $inaddr   = $hash->{INADDR};
+   my $inport   = $hash->{INPORT};
+   my $external = $hash->{HELPER}{API}{EXTERNAL}{NAME};   
 
    my ($error,$errorcode,$success);
   
@@ -1141,27 +1150,26 @@ sub getApiSites_parse {
             my $logstr;
                         
           # Pfad und Maxversion von "SYNO.Chat.External" ermitteln
-            my $chatexternalpath   = $data->{'data'}->{$chatexternal}->{'path'};
-            $chatexternalpath      =~ tr/_//d if (defined($chatexternalpath));
-            my $chatexternalmaxver = $data->{'data'}->{$chatexternal}->{'maxVersion'}; 
+            my $externalpath = $data->{'data'}->{$external}->{'path'};
+            $externalpath    =~ tr/_//d if (defined($externalpath));
+            my $externalver  = $data->{'data'}->{$external}->{'maxVersion'}; 
        
-            $logstr = defined($chatexternalpath) ? "Path of $chatexternal selected: $chatexternalpath" : "Path of $chatexternal undefined - Synology Chat Server may be stopped";
+            $logstr = defined($externalpath) ? "Path of $external selected: $externalpath" : "Path of $external undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($chatexternalmaxver) ? "MaxVersion of $chatexternal selected: $chatexternalmaxver" : "MaxVersion of $chatexternal undefined - Synology Chat Server may be stopped";
+            $logstr = defined($externalver) ? "MaxVersion of $external selected: $externalver" : "MaxVersion of $external undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
                    
             # ermittelte Werte in $hash einfügen
-            if(defined($chatexternalpath) && defined($chatexternalmaxver)) {
-                $hash->{HELPER}{CHATEXTERNALPATH}   = $chatexternalpath;
-                $hash->{HELPER}{CHATEXTERNALMAXVER} = $chatexternalmaxver;            
+            if(defined($externalpath) && defined($externalver)) {
+                $hash->{HELPER}{API}{EXTERNAL}{PATH} = $externalpath;
+                $hash->{HELPER}{API}{EXTERNAL}{VER}  = $externalver;
+
+                $hash->{HELPER}{API}{PARSET}         = 1;               # Webhook Hash values sind gesetzt               
        
                 readingsBeginUpdate         ($hash);
                 readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
                 readingsBulkUpdateIfChanged ($hash,"Error",    "none");
-                readingsEndUpdate           ($hash,1);
-            
-                # Webhook Hash values sind gesetzt
-                $hash->{HELPER}{APIPARSET} = 1;
+                readingsEndUpdate           ($hash,1);                
             
             } else {
                 $errorcode = "805";
@@ -1191,14 +1199,14 @@ return chatOp ($name);
 #                                     Ausführung Operation
 #############################################################################################
 sub chatOp {  
-   my ($name) = @_;
-   my $hash               = $defs{$name};
-   my $inprot             = $hash->{INPROT};
-   my $inaddr             = $hash->{INADDR};
-   my $inport             = $hash->{INPORT};
-   my $chatexternal       = $hash->{HELPER}{CHATEXTERNAL}; 
-   my $chatexternalpath   = $hash->{HELPER}{CHATEXTERNALPATH};
-   my $chatexternalmaxver = $hash->{HELPER}{CHATEXTERNALMAXVER};
+   my $name         = shift;
+   my $hash         = $defs{$name};
+   my $inprot       = $hash->{INPROT};
+   my $inaddr       = $hash->{INADDR};
+   my $inport       = $hash->{INPORT};
+   my $external     = $hash->{HELPER}{API}{EXTERNAL}{NAME}; 
+   my $externalpath = $hash->{HELPER}{API}{EXTERNAL}{PATH};
+   my $externalver  = $hash->{HELPER}{API}{EXTERNAL}{VER};
    my ($url,$httptimeout,$param,$error,$errorcode);
    
    # Token abrufen
@@ -1230,7 +1238,7 @@ sub chatOp {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    if ($opmode =~ /^chatUserlist$|^chatChannellist$/x) {
-      $url = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url = "$inprot://$inaddr:$inport/webapi/$externalpath?api=$external&version=$externalver&method=$method&token=\"$token\"";
    }
    
    if ($opmode eq "sendItem") {
@@ -1238,7 +1246,7 @@ sub chatOp {
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
       
-      $url  = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url  = "$inprot://$inaddr:$inport/webapi/$externalpath?api=$external&version=$externalver&method=$method&token=\"$token\"";
       $url .= "&payload={";
       $url .= "\"text\": \"$text\","          if($text);
       $url .= "\"file_url\": \"$fileUrl\","   if($fileUrl);
@@ -1273,7 +1281,7 @@ return;
 #############################################################################################
 #                                Callback from chatOp
 #############################################################################################
-sub chatOp_parse {                                                  ## no critic 'complexity'                                
+sub chatOp_parse {                                                                           
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1286,173 +1294,208 @@ sub chatOp_parse {                                                  ## no critic
    my $lang = AttrVal("global","language","EN");
    
    if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-        Log3($name, 2, "$name - ERROR message: $err");
+       # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+       Log3($name, 2, "$name - ERROR message: $err");
         
-        $errorcode = "none";
-        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
+       $errorcode = "none";
+       $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
-        setErrorState ($hash, $err, $errorcode);
-        checkRetry    ($name,1);        
-        return;
+       setErrorState ($hash, $err, $errorcode);
+       checkRetry    ($name,1);        
+       return;
    
    } elsif ($myjson ne "") {    
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-        # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        ($hash,$success) = evalJSON ($hash,$myjson);        
-        unless ($success) {
-            Log3($name, 4, "$name - Data returned: ".$myjson);
-            checkRetry ($name,1);       
-            return;
-        }
+       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+       # Evaluiere ob Daten im JSON-Format empfangen wurden 
+       ($hash,$success) = evalJSON ($hash,$myjson);        
+       unless ($success) {
+           Log3($name, 4, "$name - Data returned: ".$myjson);
+           checkRetry ($name,1);       
+           return;
+       }
         
-        $data = decode_json($myjson);
+       $data = decode_json($myjson);
         
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+       # Logausgabe decodierte JSON Daten
+       Log3($name, 5, "$name - JSON returned: ". Dumper $data);
    
-        $success = $data->{'success'};
+       $success = $data->{'success'};
 
-        if ($success) {       
+       if ($success) {  
 
-            if ($opmode eq "chatUserlist") {    
-                my %users = ();   
-                my ($un,$ui,$st,$nn,$em,$uids);           
-                my $i   = 0;
-                
-                my $out = "<html>";
-                $out   .= "<b>Synology Chat Server visible Users</b> <br><br>";
-                $out   .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-                $out   .= "<tr><td> <b>Username</b> </td><td> <b>ID</b> </td><td> <b>state</b> </td><td> <b>Nickname</b> </td><td> <b>Email</b> </td><td></tr>";
-                $out   .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
-                
-                while ($data->{'data'}->{'users'}->[$i]) {
-                    my $deleted = jBoolMap($data->{'data'}->{'users'}->[$i]->{'deleted'});
-                    my $isdis   = jBoolMap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
-                    if($deleted ne "true" && $isdis ne "true") {
-                        $un                   = $data->{'data'}->{'users'}->[$i]->{'username'};
-                        $ui                   = $data->{'data'}->{'users'}->[$i]->{'user_id'};
-                        $st                   = $data->{'data'}->{'users'}->[$i]->{'status'};
-                        $nn                   = $data->{'data'}->{'users'}->[$i]->{'nickname'};
-                        $em                   = $data->{'data'}->{'users'}->[$i]->{'user_props'}->{'email'};
-                        $users{$un}{id}       = $ui;
-                        $users{$un}{status}   = $st;
-                        $users{$un}{nickname} = $nn;
-                        $users{$un}{email}    = $em;
-                        $uids                .= "," if($uids);
-                        $uids                .= $un;
-                        $out                 .= "<tr><td> $un </td><td> $ui </td><td> $st </td><td>  $nn </td><td> $em </td><td></tr>";
-                    }
-                    $i++;
-                }
-                
-                $hash->{HELPER}{USERS}       = \%users if(%users);
-                $hash->{HELPER}{USERFETCHED} = 1;
-               
-                my @newa;
-                my $list = $modules{$hash->{TYPE}}{AttrList};
-                my @deva = split(" ", $list);
+           no strict "refs";                                                        ## no critic 'NoStrict'  
+           if($hmodep{$opmode} && defined &{$hmodep{$opmode}{fn}}) {
+               &{$hmodep{$opmode}{fn}} ($hash, $data); 
+           }
+           use strict "refs";                  
 
-                for my $da (@deva) {
-                     push @newa, $da if($da !~ /defaultPeer:|allowedUserFor(?:Set|Get|Code|Own):/x);
-                }
-                
-                push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForSet:multiple-strict,$uids ":"allowedUserForSet:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForGet:multiple-strict,$uids ":"allowedUserForGet:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForCode:multiple-strict,$uids ":"allowedUserForCode:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForOwn:multiple-strict,$uids ":"allowedUserForOwn:--no#userlist#selectable--");
-                
-                $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
-               
-                $out .= "</table>";
-                $out .= "</html>";
+           checkRetry ($name,0);
 
-                # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$out");
-                InternalTimer(gettimeofday()+10.0, "FHEM::SSChatBot::delClhash", $name, 0);              
-            
-            } elsif ($opmode eq "chatChannellist") {    
-                my %channels = ();   
-                my ($ci,$cr,$mb,$ty,$cids);             
-                my $i    = 0;
-                
-                my $out  = "<html>";
-                $out    .= "<b>Synology Chat Server visible Channels</b> <br><br>";
-                $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-                $out    .= "<tr><td> <b>Channelname</b> </td><td> <b>ID</b> </td><td> <b>Creator</b> </td><td> <b>Members</b> </td><td> <b>Type</b> </td><td></tr>";
-                $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
-                
-                while ($data->{'data'}->{'channels'}->[$i]) {
-                    my $cn = jBoolMap($data->{'data'}->{'channels'}->[$i]->{'name'});
-                    if($cn) {
-                        $ci                     = $data->{'data'}->{'channels'}->[$i]->{'channel_id'};
-                        $cr                     = $data->{'data'}->{'channels'}->[$i]->{'creator_id'};
-                        $mb                     = $data->{'data'}->{'channels'}->[$i]->{'members'};
-                        $ty                     = $data->{'data'}->{'channels'}->[$i]->{'type'};
-                        $channels{$cn}{id}      = $ci;
-                        $channels{$cn}{creator} = $cr;
-                        $channels{$cn}{members} = $mb;
-                        $channels{$cn}{type}    = $ty;
-                        $cids                  .= "," if($cids);
-                        $cids                  .= $cn;
-                        $out                   .= "<tr><td> $cn </td><td> $ci </td><td> $cr </td><td>  $mb </td><td> $ty </td><td></tr>";
-                    }
-                    $i++;
-                }
-                $hash->{HELPER}{CHANNELS} = \%channels if(%channels);
-                
-                $out .= "</table>";
-                $out .= "</html>";  
-
-                # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput  ($hash->{HELPER}{CL}{1},"$out");
-                InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClhash", $name, 0);                
-            
-            } elsif ($opmode eq "sendItem" && $hash->{OPIDX}) {
-                my $postid = "";
-                my $idx    = $hash->{OPIDX};
-                my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
-                if($data->{data}{succ}{user_id_post_map}{$uid}) {
-                    $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
-                }                
-                     
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "sendPostId", $postid); 
-                readingsBulkUpdate  ($hash, "sendUserId", $uid   );                    
-                readingsEndUpdate   ($hash,1); 
-            }            
-
-            checkRetry ($name,0);
-
-            readingsBeginUpdate         ($hash);
-            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
-            readingsBulkUpdateIfChanged ($hash, "Error",     "none"  );            
-            readingsBulkUpdate          ($hash, "state",     "active");                    
-            readingsEndUpdate           ($hash,1); 
+           readingsBeginUpdate         ($hash);
+           readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
+           readingsBulkUpdateIfChanged ($hash, "Error",     "none"  );            
+           readingsBulkUpdate          ($hash, "state",     "active");                    
+           readingsEndUpdate           ($hash,1); 
            
-        } else {
-            # die API-Operation war fehlerhaft
-            # Errorcode aus JSON ermitteln
-            $errorcode = $data->{'error'}->{'code'};
-            $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
-            $error     = expError($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
-            if ($error =~ /not\sfound/x) {
-                $error .= " New error: ".($cherror // "");
-            }
+       } else {
+           # die API-Operation war fehlerhaft
+           # Errorcode aus JSON ermitteln
+           $errorcode = $data->{'error'}->{'code'};
+           $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
+           $error     = expError($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
+           if ($error =~ /not\sfound/x) {
+               $error .= " New error: ".($cherror // "");
+           }
             
-            setErrorState ($hash, $error, $errorcode);       
-            Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
+           setErrorState ($hash, $error, $errorcode);       
+           Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
-            checkRetry ($name,1);
-        }
-                
+           checkRetry ($name,1);
+       }
+            
        undef $data;
        undef $myjson;
    }
 
+return;
+}
+
+################################################################
+#                  parse Opmode chatUserlist
+################################################################
+sub _parseUsers {                        ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+     
+  my ($un,$ui,$st,$nn,$em,$uids);     
+  my %users = ();                
+  my $i     = 0;
+
+  my $out = "<html>";
+  $out   .= "<b>Synology Chat Server visible Users</b> <br><br>";
+  $out   .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+  $out   .= "<tr><td> <b>Username</b> </td><td> <b>ID</b> </td><td> <b>state</b> </td><td> <b>Nickname</b> </td><td> <b>Email</b> </td><td></tr>";
+  $out   .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
+
+  while ($data->{'data'}->{'users'}->[$i]) {
+      my $deleted = jBoolMap($data->{'data'}->{'users'}->[$i]->{'deleted'});
+      my $isdis   = jBoolMap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
+      if($deleted ne "true" && $isdis ne "true") {
+          $un                   = $data->{'data'}->{'users'}->[$i]->{'username'};
+          $ui                   = $data->{'data'}->{'users'}->[$i]->{'user_id'};
+          $st                   = $data->{'data'}->{'users'}->[$i]->{'status'};
+          $nn                   = $data->{'data'}->{'users'}->[$i]->{'nickname'};
+          $em                   = $data->{'data'}->{'users'}->[$i]->{'user_props'}->{'email'};
+          $users{$un}{id}       = $ui;
+          $users{$un}{status}   = $st;
+          $users{$un}{nickname} = $nn;
+          $users{$un}{email}    = $em;
+          $uids                .= "," if($uids);
+          $uids                .= $un;
+          $out                 .= "<tr><td> $un </td><td> $ui </td><td> $st </td><td>  $nn </td><td> $em </td><td></tr>";
+      }
+      $i++;
+  }
+
+  $hash->{HELPER}{USERS}       = \%users if(%users);
+  $hash->{HELPER}{USERFETCHED} = 1;
+
+  my @newa;
+  my $list = $modules{$hash->{TYPE}}{AttrList};
+  my @deva = split(" ", $list);
+
+  for my $da (@deva) {
+      push @newa, $da if($da !~ /defaultPeer:|allowedUserFor(?:Set|Get|Code|Own):/x);
+  }
+
+  push @newa, ($uids ? "defaultPeer:multiple-strict,$uids "       : "defaultPeer:--no#userlist#selectable--"       );
+  push @newa, ($uids ? "allowedUserForSet:multiple-strict,$uids " : "allowedUserForSet:--no#userlist#selectable--" );
+  push @newa, ($uids ? "allowedUserForGet:multiple-strict,$uids " : "allowedUserForGet:--no#userlist#selectable--" );
+  push @newa, ($uids ? "allowedUserForCode:multiple-strict,$uids ": "allowedUserForCode:--no#userlist#selectable--");
+  push @newa, ($uids ? "allowedUserForOwn:multiple-strict,$uids " : "allowedUserForOwn:--no#userlist#selectable--" );
+
+  $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
+
+  $out .= "</table>";
+  $out .= "</html>";
+
+  # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput   ($hash->{HELPER}{CL}{1},"$out");
+  InternalTimer (gettimeofday()+10.0, "FHEM::SSChatBot::delClhash", $name, 0); 
+      
+return;
+}
+
+################################################################
+#                  parse Opmode chatChannellist
+################################################################
+sub _parseChannels {                     ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+                 
+  my ($ci,$cr,$mb,$ty,$cids);  
+  my %channels = ();                
+  my $i        = 0;
+    
+  my $out  = "<html>";
+  $out    .= "<b>Synology Chat Server visible Channels</b> <br><br>";
+  $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+  $out    .= "<tr><td> <b>Channelname</b> </td><td> <b>ID</b> </td><td> <b>Creator</b> </td><td> <b>Members</b> </td><td> <b>Type</b> </td><td></tr>";
+  $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
+    
+  while ($data->{'data'}->{'channels'}->[$i]) {
+      my $cn = jBoolMap($data->{'data'}->{'channels'}->[$i]->{'name'});
+      if($cn) {
+          $ci                     = $data->{'data'}->{'channels'}->[$i]->{'channel_id'};
+          $cr                     = $data->{'data'}->{'channels'}->[$i]->{'creator_id'};
+          $mb                     = $data->{'data'}->{'channels'}->[$i]->{'members'};
+          $ty                     = $data->{'data'}->{'channels'}->[$i]->{'type'};
+          $channels{$cn}{id}      = $ci;
+          $channels{$cn}{creator} = $cr;
+          $channels{$cn}{members} = $mb;
+          $channels{$cn}{type}    = $ty;
+          $cids                  .= "," if($cids);
+          $cids                  .= $cn;
+          $out                   .= "<tr><td> $cn </td><td> $ci </td><td> $cr </td><td>  $mb </td><td> $ty </td><td></tr>";
+      }
+      $i++;
+  }
+  $hash->{HELPER}{CHANNELS} = \%channels if(%channels);
+    
+  $out .= "</table>";
+  $out .= "</html>";  
+
+  # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput  ($hash->{HELPER}{CL}{1},"$out");
+  InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClhash", $name, 0);
+      
+return;
+}
+
+################################################################
+#                  parse Opmode sendItem
+################################################################
+sub _parseSendItem {                     ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+                 
+  my $postid = "";
+  my $idx    = $hash->{OPIDX};
+  my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
+  if($data->{data}{succ}{user_id_post_map}{$uid}) {
+      $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
+  }                
+        
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "sendPostId", $postid); 
+  readingsBulkUpdate  ($hash, "sendUserId", $uid   );                    
+  readingsEndUpdate   ($hash,1); 
+      
 return;
 }
 

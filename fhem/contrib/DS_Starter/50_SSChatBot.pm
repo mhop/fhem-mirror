@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: $
+# $Id: 50_SSChatBot.pm 22633 2020-08-19 20:02:19Z DS_Starter $
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
@@ -106,6 +106,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.3" => "20.08.2020  more code refactoring according PBP ",
+  "1.10.2" => "19.08.2020  more code refactoring and little improvements ",
+  "1.10.1" => "18.08.2020  more code changes according PBP ",
   "1.10.0" => "17.08.2020  switch to packages, finalise for repo checkin ",
   "1.9.0"  => "30.07.2020  restartSendqueue option 'force' added ",
   "1.8.0"  => "27.05.2020  send SVG Plots with options like svg='<SVG-Device>,<zoom>,<offset>' possible ",
@@ -161,6 +164,11 @@ my %errList = (
   900 => "malformed JSON string received from Synology Chat Server",
 );
 
+my %hapi = (                                                                # Hash Template der API's
+    INFO     => { NAME => "SYNO.API.Info",     VER => 1, }, 
+    EXTERNAL => { NAME => "SYNO.Chat.External"           },
+);
+
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => "_setbotToken"         }, 
     listSendqueue    => { fn => "_setlistSendqueue"    },   
@@ -174,6 +182,12 @@ my %hget = (                                                                # Ha
     chatUserlist    => { fn => "_getchatUserlist"    },   
     chatChannellist => { fn => "_getchatChannellist" },
     versionNotes    => { fn => "_getversionNotes"    },
+);
+
+my %hmodep = (                                                              # Hash für Opmode Parse
+    chatUserlist    => { fn => "_parseUsers"    }, 
+    chatChannellist => { fn => "_parseChannels" },   
+    sendItem        => { fn => "_parseSendItem" },
 );
 
 my %hrecbot = (                                                             # Hash für botCGI receice Slash-commands (/set, /get, /code)
@@ -229,7 +243,7 @@ sub Define {
   }
         
   my $inaddr = $a[2];
-  my $inport = $a[3] ? $a[3] : 5000;
+  my $inport = $a[3] ? $a[3]     : 5000;
   my $inprot = $a[4] ? lc($a[4]) : "http";
   
   $hash->{INADDR}                = $inaddr;
@@ -242,26 +256,17 @@ sub Define {
   
   CommandAttr(undef,"$name room Chat");
   
-  # benötigte API's in $hash einfügen
-  $hash->{HELPER}{APIINFO}       = "SYNO.API.Info";                              # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{CHATEXTERNAL}  = "SYNO.Chat.External"; 
-    
-  # Versionsinformationen setzen
-  setVersionInfo($hash);
-  
-  # Token lesen
-  getToken($hash,1,"botToken");
-  
-  # Index der Sendequeue initialisieren
-  $data{SSChatBot}{$name}{sendqueue}{index} = 0;
+  $hash->{HELPER}{API}           = \%hapi;                                       # API Template in HELPER kopieren 
+  setVersionInfo($hash);                                                         # Versionsinformationen setzen
+  getToken($hash,1,"botToken");                                                  # Token lesen
+  $data{SSChatBot}{$name}{sendqueue}{index} = 0;                                 # Index der Sendequeue initialisieren
     
   readingsBeginUpdate         ($hash);                                             
   readingsBulkUpdateIfChanged ($hash, "QueueLenth", 0);                          # Länge Sendqueue initialisieren  
   readingsBulkUpdate          ($hash, "state", "Initialized");                   # Init state
   readingsEndUpdate           ($hash,1);              
 
-  # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
-  initOnBoot($hash);
+  initOnBoot($hash);                                                             # initiale Routinen nach Start ausführen , verzögerter zufälliger Start
 
 return;
 }
@@ -949,6 +954,20 @@ sub addQueue {
 return;
 }
 
+################################################################
+#                asynchrone Queue starten
+#                $rst = resend Timer
+################################################################
+sub startQueue {                   
+  my $name = shift // return;
+  my $rst  = shift // return;
+  my $hash = $defs{$name};
+
+  RemoveInternalTimer ($hash, "FHEM::SSChatBot::getApiSites");
+  InternalTimer       ($rst,  "FHEM::SSChatBot::getApiSites", "$name", 0);   
+                    
+return;
+}
 
 #############################################################################################
 #              Erfolg einer Rückkehrroutine checken und ggf. Send-Retry ausführen
@@ -973,7 +992,7 @@ sub checkRetry {
   if(!$retry) {                                                     # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
-      Log3($name, 4, "$name - Opmode \"$hash->{OPMODE}\" finished successfully, Sendqueue index \"$idx\" deleted.");
+      Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
       updQLength ($hash);
       return getApiSites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
@@ -998,35 +1017,34 @@ sub checkRetry {
       
       if(!$forbidSend) {
           my $rs = 0;
-		  $rs = $rc <= 1 ? 5 
-		      : $rc <  3 ? 20
-			  : $rc <  5 ? 60
-			  : $rc <  7 ? 1800
-			  : $rc < 30 ? 3600
-			  : 86400
-			  ;
+          $rs = $rc <= 1 ? 5 
+              : $rc <  3 ? 20
+              : $rc <  5 ? 60
+              : $rc <  7 ? 1800
+              : $rc < 30 ? 3600
+              : 86400
+              ;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
           
           my $rst = gettimeofday()+$rs;                        # resend Timer 
           updQLength ($hash,$rst);                             # updaten Länge der Sendequeue mit resend Timer
-          
-          RemoveInternalTimer($hash, "FHEM::SSChatBot::getApiSites");
-          InternalTimer($rst, "FHEM::SSChatBot::getApiSites", "$name", 0);
+          startQueue ($name,$rst);
       }
   }
 
 return
 }
 
+################################################################
+#              API Versionen und Pfade ermitteln
+################################################################
 sub getApiSites {
-   my ($name)       = @_;
-   my $hash         = $defs{$name};
-   my $inaddr       = $hash->{INADDR};
-   my $inport       = $hash->{INPORT};
-   my $inprot       = $hash->{INPROT}; 
-   my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite ! 
-   my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
+   my $name     = shift;
+   my $hash     = $defs{$name};
+   my $inaddr   = $hash->{INADDR};
+   my $inport   = $hash->{INPORT};
+   my $inprot   = $hash->{INPROT};  
    
    my ($url,$param,$idxset,$ret);
   
@@ -1058,7 +1076,7 @@ sub getApiSites {
        return $ret; 
    }
    
-   if ($hash->{HELPER}{APIPARSET}) {                     # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+   if ($hash->{HELPER}{API}{PARSET}) {                     # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
        return chatOp($name);
    }
@@ -1067,18 +1085,21 @@ sub getApiSites {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$chatexternal";
+   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$hash->{HELPER}{API}{INFO}{NAME}".
+                                                    "&method=Query".
+                                                    "&version=$hash->{HELPER}{API}{INFO}{VER}".
+                                                    "&query=$hash->{HELPER}{API}{EXTERNAL}{NAME}";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
    $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getApiSites_parse
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getApiSites_parse
+   };
    
    HttpUtils_NonblockingGet ($param);  
 
@@ -1089,12 +1110,14 @@ return;
 #      Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_parse {
-   my ($param, $err, $myjson) = @_;
-   my $hash         = $param->{hash};
-   my $name         = $hash->{NAME};
-   my $inaddr       = $hash->{INADDR};
-   my $inport       = $hash->{INPORT};
-   my $chatexternal = $hash->{HELPER}{CHATEXTERNAL};   
+   my $param    = shift;
+   my $err      = shift;
+   my $myjson   = shift;
+   my $hash     = $param->{hash};
+   my $name     = $hash->{NAME};
+   my $inaddr   = $hash->{INADDR};
+   my $inport   = $hash->{INPORT};
+   my $external = $hash->{HELPER}{API}{EXTERNAL}{NAME};   
 
    my ($error,$errorcode,$success);
   
@@ -1127,27 +1150,26 @@ sub getApiSites_parse {
             my $logstr;
                         
           # Pfad und Maxversion von "SYNO.Chat.External" ermitteln
-            my $chatexternalpath   = $data->{'data'}->{$chatexternal}->{'path'};
-            $chatexternalpath      =~ tr/_//d if (defined($chatexternalpath));
-            my $chatexternalmaxver = $data->{'data'}->{$chatexternal}->{'maxVersion'}; 
+            my $externalpath = $data->{'data'}->{$external}->{'path'};
+            $externalpath    =~ tr/_//d if (defined($externalpath));
+            my $externalver  = $data->{'data'}->{$external}->{'maxVersion'}; 
        
-            $logstr = defined($chatexternalpath) ? "Path of $chatexternal selected: $chatexternalpath" : "Path of $chatexternal undefined - Synology Chat Server may be stopped";
+            $logstr = defined($externalpath) ? "Path of $external selected: $externalpath" : "Path of $external undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
-            $logstr = defined($chatexternalmaxver) ? "MaxVersion of $chatexternal selected: $chatexternalmaxver" : "MaxVersion of $chatexternal undefined - Synology Chat Server may be stopped";
+            $logstr = defined($externalver) ? "MaxVersion of $external selected: $externalver" : "MaxVersion of $external undefined - Synology Chat Server may be stopped";
             Log3($name, 4, "$name - $logstr");
                    
             # ermittelte Werte in $hash einfügen
-            if(defined($chatexternalpath) && defined($chatexternalmaxver)) {
-                $hash->{HELPER}{CHATEXTERNALPATH}   = $chatexternalpath;
-                $hash->{HELPER}{CHATEXTERNALMAXVER} = $chatexternalmaxver;            
+            if(defined($externalpath) && defined($externalver)) {
+                $hash->{HELPER}{API}{EXTERNAL}{PATH} = $externalpath;
+                $hash->{HELPER}{API}{EXTERNAL}{VER}  = $externalver;
+
+                $hash->{HELPER}{API}{PARSET}         = 1;               # Webhook Hash values sind gesetzt               
        
                 readingsBeginUpdate         ($hash);
                 readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
                 readingsBulkUpdateIfChanged ($hash,"Error",    "none");
-                readingsEndUpdate           ($hash,1);
-            
-                # Webhook Hash values sind gesetzt
-                $hash->{HELPER}{APIPARSET} = 1;
+                readingsEndUpdate           ($hash,1);                
             
             } else {
                 $errorcode = "805";
@@ -1177,14 +1199,14 @@ return chatOp ($name);
 #                                     Ausführung Operation
 #############################################################################################
 sub chatOp {  
-   my ($name) = @_;
-   my $hash               = $defs{$name};
-   my $inprot             = $hash->{INPROT};
-   my $inaddr             = $hash->{INADDR};
-   my $inport             = $hash->{INPORT};
-   my $chatexternal       = $hash->{HELPER}{CHATEXTERNAL}; 
-   my $chatexternalpath   = $hash->{HELPER}{CHATEXTERNALPATH};
-   my $chatexternalmaxver = $hash->{HELPER}{CHATEXTERNALMAXVER};
+   my $name         = shift;
+   my $hash         = $defs{$name};
+   my $inprot       = $hash->{INPROT};
+   my $inaddr       = $hash->{INADDR};
+   my $inport       = $hash->{INPORT};
+   my $external     = $hash->{HELPER}{API}{EXTERNAL}{NAME}; 
+   my $externalpath = $hash->{HELPER}{API}{EXTERNAL}{PATH};
+   my $externalver  = $hash->{HELPER}{API}{EXTERNAL}{VER};
    my ($url,$httptimeout,$param,$error,$errorcode);
    
    # Token abrufen
@@ -1216,7 +1238,7 @@ sub chatOp {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    if ($opmode =~ /^chatUserlist$|^chatChannellist$/x) {
-      $url = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url = "$inprot://$inaddr:$inport/webapi/$externalpath?api=$external&version=$externalver&method=$method&token=\"$token\"";
    }
    
    if ($opmode eq "sendItem") {
@@ -1224,7 +1246,7 @@ sub chatOp {
       #       payload={"text": "First line of message to post in the channel" "user_ids": [5]}
       #       payload={"text": "Check this!! <https://www.synology.com|Click here> for details!" "user_ids": [5]}
       
-      $url  = "$inprot://$inaddr:$inport/webapi/$chatexternalpath?api=$chatexternal&version=$chatexternalmaxver&method=$method&token=\"$token\"";
+      $url  = "$inprot://$inaddr:$inport/webapi/$externalpath?api=$external&version=$externalver&method=$method&token=\"$token\"";
       $url .= "&payload={";
       $url .= "\"text\": \"$text\","          if($text);
       $url .= "\"file_url\": \"$fileUrl\","   if($fileUrl);
@@ -1259,7 +1281,7 @@ return;
 #############################################################################################
 #                                Callback from chatOp
 #############################################################################################
-sub chatOp_parse {                                                  ## no critic 'complexity'                                
+sub chatOp_parse {                                                                           
    my ($param, $err, $myjson) = @_;
    my $hash   = $param->{hash};
    my $name   = $hash->{NAME};
@@ -1272,173 +1294,208 @@ sub chatOp_parse {                                                  ## no critic
    my $lang = AttrVal("global","language","EN");
    
    if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-        Log3($name, 2, "$name - ERROR message: $err");
+       # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+       Log3($name, 2, "$name - ERROR message: $err");
         
-        $errorcode = "none";
-        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
+       $errorcode = "none";
+       $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
-        setErrorState ($hash, $err, $errorcode);
-        checkRetry    ($name,1);        
-        return;
+       setErrorState ($hash, $err, $errorcode);
+       checkRetry    ($name,1);        
+       return;
    
    } elsif ($myjson ne "") {    
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-        # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        ($hash,$success) = evalJSON ($hash,$myjson);        
-        unless ($success) {
-            Log3($name, 4, "$name - Data returned: ".$myjson);
-            checkRetry ($name,1);       
-            return;
-        }
+       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+       # Evaluiere ob Daten im JSON-Format empfangen wurden 
+       ($hash,$success) = evalJSON ($hash,$myjson);        
+       unless ($success) {
+           Log3($name, 4, "$name - Data returned: ".$myjson);
+           checkRetry ($name,1);       
+           return;
+       }
         
-        $data = decode_json($myjson);
+       $data = decode_json($myjson);
         
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+       # Logausgabe decodierte JSON Daten
+       Log3($name, 5, "$name - JSON returned: ". Dumper $data);
    
-        $success = $data->{'success'};
+       $success = $data->{'success'};
 
-        if ($success) {       
+       if ($success) {  
 
-            if ($opmode eq "chatUserlist") {    
-                my %users = ();   
-                my ($un,$ui,$st,$nn,$em,$uids);           
-                my $i   = 0;
-                
-                my $out = "<html>";
-                $out   .= "<b>Synology Chat Server visible Users</b> <br><br>";
-                $out   .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-                $out   .= "<tr><td> <b>Username</b> </td><td> <b>ID</b> </td><td> <b>state</b> </td><td> <b>Nickname</b> </td><td> <b>Email</b> </td><td></tr>";
-                $out   .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
-                
-                while ($data->{'data'}->{'users'}->[$i]) {
-                    my $deleted = jBoolMap($data->{'data'}->{'users'}->[$i]->{'deleted'});
-                    my $isdis   = jBoolMap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
-                    if($deleted ne "true" && $isdis ne "true") {
-                        $un                   = $data->{'data'}->{'users'}->[$i]->{'username'};
-                        $ui                   = $data->{'data'}->{'users'}->[$i]->{'user_id'};
-                        $st                   = $data->{'data'}->{'users'}->[$i]->{'status'};
-                        $nn                   = $data->{'data'}->{'users'}->[$i]->{'nickname'};
-                        $em                   = $data->{'data'}->{'users'}->[$i]->{'user_props'}->{'email'};
-                        $users{$un}{id}       = $ui;
-                        $users{$un}{status}   = $st;
-                        $users{$un}{nickname} = $nn;
-                        $users{$un}{email}    = $em;
-                        $uids                .= "," if($uids);
-                        $uids                .= $un;
-                        $out                 .= "<tr><td> $un </td><td> $ui </td><td> $st </td><td>  $nn </td><td> $em </td><td></tr>";
-                    }
-                    $i++;
-                }
-                
-                $hash->{HELPER}{USERS}       = \%users if(%users);
-                $hash->{HELPER}{USERFETCHED} = 1;
-               
-                my @newa;
-                my $list = $modules{$hash->{TYPE}}{AttrList};
-                my @deva = split(" ", $list);
+           no strict "refs";                                                        ## no critic 'NoStrict'  
+           if($hmodep{$opmode} && defined &{$hmodep{$opmode}{fn}}) {
+               &{$hmodep{$opmode}{fn}} ($hash, $data); 
+           }
+           use strict "refs";                  
 
-                for my $da (@deva) {
-                     push @newa, $da if($da !~ /defaultPeer:|allowedUserFor(?:Set|Get|Code|Own):/x);
-                }
-                
-                push @newa, ($uids?"defaultPeer:multiple-strict,$uids ":"defaultPeer:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForSet:multiple-strict,$uids ":"allowedUserForSet:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForGet:multiple-strict,$uids ":"allowedUserForGet:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForCode:multiple-strict,$uids ":"allowedUserForCode:--no#userlist#selectable--");
-                push @newa, ($uids?"allowedUserForOwn:multiple-strict,$uids ":"allowedUserForOwn:--no#userlist#selectable--");
-                
-                $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
-               
-                $out .= "</table>";
-                $out .= "</html>";
+           checkRetry ($name,0);
 
-                # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$out");
-                InternalTimer(gettimeofday()+10.0, "FHEM::SSChatBot::delClhash", $name, 0);              
-            
-            } elsif ($opmode eq "chatChannellist") {    
-                my %channels = ();   
-                my ($ci,$cr,$mb,$ty,$cids);             
-                my $i    = 0;
-                
-                my $out  = "<html>";
-                $out    .= "<b>Synology Chat Server visible Channels</b> <br><br>";
-                $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-                $out    .= "<tr><td> <b>Channelname</b> </td><td> <b>ID</b> </td><td> <b>Creator</b> </td><td> <b>Members</b> </td><td> <b>Type</b> </td><td></tr>";
-                $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
-                
-                while ($data->{'data'}->{'channels'}->[$i]) {
-                    my $cn = jBoolMap($data->{'data'}->{'channels'}->[$i]->{'name'});
-                    if($cn) {
-                        $ci                     = $data->{'data'}->{'channels'}->[$i]->{'channel_id'};
-                        $cr                     = $data->{'data'}->{'channels'}->[$i]->{'creator_id'};
-                        $mb                     = $data->{'data'}->{'channels'}->[$i]->{'members'};
-                        $ty                     = $data->{'data'}->{'channels'}->[$i]->{'type'};
-                        $channels{$cn}{id}      = $ci;
-                        $channels{$cn}{creator} = $cr;
-                        $channels{$cn}{members} = $mb;
-                        $channels{$cn}{type}    = $ty;
-                        $cids                  .= "," if($cids);
-                        $cids                  .= $cn;
-                        $out                   .= "<tr><td> $cn </td><td> $ci </td><td> $cr </td><td>  $mb </td><td> $ty </td><td></tr>";
-                    }
-                    $i++;
-                }
-                $hash->{HELPER}{CHANNELS} = \%channels if(%channels);
-                
-                $out .= "</table>";
-                $out .= "</html>";  
-
-                # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput  ($hash->{HELPER}{CL}{1},"$out");
-                InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClhash", $name, 0);                
-            
-            } elsif ($opmode eq "sendItem" && $hash->{OPIDX}) {
-                my $postid = "";
-                my $idx    = $hash->{OPIDX};
-                my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
-                if($data->{data}{succ}{user_id_post_map}{$uid}) {
-                    $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
-                }                
-                     
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "sendPostId", $postid); 
-                readingsBulkUpdate  ($hash, "sendUserId", $uid   );                    
-                readingsEndUpdate   ($hash,1); 
-            }            
-
-            checkRetry ($name,0);
-
-            readingsBeginUpdate         ($hash);
-            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
-            readingsBulkUpdateIfChanged ($hash, "Error",     "none"  );            
-            readingsBulkUpdate          ($hash, "state",     "active");                    
-            readingsEndUpdate           ($hash,1); 
+           readingsBeginUpdate         ($hash);
+           readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
+           readingsBulkUpdateIfChanged ($hash, "Error",     "none"  );            
+           readingsBulkUpdate          ($hash, "state",     "active");                    
+           readingsEndUpdate           ($hash,1); 
            
-        } else {
-            # die API-Operation war fehlerhaft
-            # Errorcode aus JSON ermitteln
-            $errorcode = $data->{'error'}->{'code'};
-            $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
-            $error     = expError($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
-            if ($error =~ /not\sfound/x) {
-                $error .= " New error: ".($cherror // "");
-            }
+       } else {
+           # die API-Operation war fehlerhaft
+           # Errorcode aus JSON ermitteln
+           $errorcode = $data->{'error'}->{'code'};
+           $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
+           $error     = expError($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
+           if ($error =~ /not\sfound/x) {
+               $error .= " New error: ".($cherror // "");
+           }
             
-            setErrorState ($hash, $error, $errorcode);       
-            Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
+           setErrorState ($hash, $error, $errorcode);       
+           Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
-            checkRetry ($name,1);
-        }
-                
+           checkRetry ($name,1);
+       }
+            
        undef $data;
        undef $myjson;
    }
 
+return;
+}
+
+################################################################
+#                  parse Opmode chatUserlist
+################################################################
+sub _parseUsers {                        ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+     
+  my ($un,$ui,$st,$nn,$em,$uids);     
+  my %users = ();                
+  my $i     = 0;
+
+  my $out = "<html>";
+  $out   .= "<b>Synology Chat Server visible Users</b> <br><br>";
+  $out   .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+  $out   .= "<tr><td> <b>Username</b> </td><td> <b>ID</b> </td><td> <b>state</b> </td><td> <b>Nickname</b> </td><td> <b>Email</b> </td><td></tr>";
+  $out   .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
+
+  while ($data->{'data'}->{'users'}->[$i]) {
+      my $deleted = jBoolMap($data->{'data'}->{'users'}->[$i]->{'deleted'});
+      my $isdis   = jBoolMap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
+      if($deleted ne "true" && $isdis ne "true") {
+          $un                   = $data->{'data'}->{'users'}->[$i]->{'username'};
+          $ui                   = $data->{'data'}->{'users'}->[$i]->{'user_id'};
+          $st                   = $data->{'data'}->{'users'}->[$i]->{'status'};
+          $nn                   = $data->{'data'}->{'users'}->[$i]->{'nickname'};
+          $em                   = $data->{'data'}->{'users'}->[$i]->{'user_props'}->{'email'};
+          $users{$un}{id}       = $ui;
+          $users{$un}{status}   = $st;
+          $users{$un}{nickname} = $nn;
+          $users{$un}{email}    = $em;
+          $uids                .= "," if($uids);
+          $uids                .= $un;
+          $out                 .= "<tr><td> $un </td><td> $ui </td><td> $st </td><td>  $nn </td><td> $em </td><td></tr>";
+      }
+      $i++;
+  }
+
+  $hash->{HELPER}{USERS}       = \%users if(%users);
+  $hash->{HELPER}{USERFETCHED} = 1;
+
+  my @newa;
+  my $list = $modules{$hash->{TYPE}}{AttrList};
+  my @deva = split(" ", $list);
+
+  for my $da (@deva) {
+      push @newa, $da if($da !~ /defaultPeer:|allowedUserFor(?:Set|Get|Code|Own):/x);
+  }
+
+  push @newa, ($uids ? "defaultPeer:multiple-strict,$uids "       : "defaultPeer:--no#userlist#selectable--"       );
+  push @newa, ($uids ? "allowedUserForSet:multiple-strict,$uids " : "allowedUserForSet:--no#userlist#selectable--" );
+  push @newa, ($uids ? "allowedUserForGet:multiple-strict,$uids " : "allowedUserForGet:--no#userlist#selectable--" );
+  push @newa, ($uids ? "allowedUserForCode:multiple-strict,$uids ": "allowedUserForCode:--no#userlist#selectable--");
+  push @newa, ($uids ? "allowedUserForOwn:multiple-strict,$uids " : "allowedUserForOwn:--no#userlist#selectable--" );
+
+  $hash->{".AttrList"} = join(" ", @newa);              # Device spezifische AttrList, überschreibt Modul AttrList !      
+
+  $out .= "</table>";
+  $out .= "</html>";
+
+  # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput   ($hash->{HELPER}{CL}{1},"$out");
+  InternalTimer (gettimeofday()+10.0, "FHEM::SSChatBot::delClhash", $name, 0); 
+      
+return;
+}
+
+################################################################
+#                  parse Opmode chatChannellist
+################################################################
+sub _parseChannels {                     ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+                 
+  my ($ci,$cr,$mb,$ty,$cids);  
+  my %channels = ();                
+  my $i        = 0;
+    
+  my $out  = "<html>";
+  $out    .= "<b>Synology Chat Server visible Channels</b> <br><br>";
+  $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+  $out    .= "<tr><td> <b>Channelname</b> </td><td> <b>ID</b> </td><td> <b>Creator</b> </td><td> <b>Members</b> </td><td> <b>Type</b> </td><td></tr>";
+  $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
+    
+  while ($data->{'data'}->{'channels'}->[$i]) {
+      my $cn = jBoolMap($data->{'data'}->{'channels'}->[$i]->{'name'});
+      if($cn) {
+          $ci                     = $data->{'data'}->{'channels'}->[$i]->{'channel_id'};
+          $cr                     = $data->{'data'}->{'channels'}->[$i]->{'creator_id'};
+          $mb                     = $data->{'data'}->{'channels'}->[$i]->{'members'};
+          $ty                     = $data->{'data'}->{'channels'}->[$i]->{'type'};
+          $channels{$cn}{id}      = $ci;
+          $channels{$cn}{creator} = $cr;
+          $channels{$cn}{members} = $mb;
+          $channels{$cn}{type}    = $ty;
+          $cids                  .= "," if($cids);
+          $cids                  .= $cn;
+          $out                   .= "<tr><td> $cn </td><td> $ci </td><td> $cr </td><td>  $mb </td><td> $ty </td><td></tr>";
+      }
+      $i++;
+  }
+  $hash->{HELPER}{CHANNELS} = \%channels if(%channels);
+    
+  $out .= "</table>";
+  $out .= "</html>";  
+
+  # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput  ($hash->{HELPER}{CL}{1},"$out");
+  InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClhash", $name, 0);
+      
+return;
+}
+
+################################################################
+#                  parse Opmode sendItem
+################################################################
+sub _parseSendItem {                     ## no critic "not used"
+  my $hash = shift;
+  my $data = shift;
+  my $name = $hash->{NAME};
+                 
+  my $postid = "";
+  my $idx    = $hash->{OPIDX};
+  my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
+  if($data->{data}{succ}{user_id_post_map}{$uid}) {
+      $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
+  }                
+        
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "sendPostId", $postid); 
+  readingsBulkUpdate  ($hash, "sendUserId", $uid   );                    
+  readingsEndUpdate   ($hash,1); 
+      
 return;
 }
 
@@ -1861,12 +1918,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSChatBot}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 50_SSChatBot.pm 20534 2019-11-18 17:50:17Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 50_SSChatBot.pm 22633 2020-08-19 20:02:19Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 50_SSChatBot.pm 20534 2019-11-18 17:50:17Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 50_SSChatBot.pm 22633 2020-08-19 20:02:19Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1891,118 +1948,53 @@ sub botCGI {
   }
       
   if ($request =~ /^\/outchat(\?|&)/x) {                  # POST- oder GET-Methode empfangen
-      # data received
       return _botCGIdata ($request);  
-  
-  } else {
-      # no data received
-      return ("text/plain; charset=utf-8", "Missing data");
   }
+  
+return ("text/plain; charset=utf-8", "Missing data");
 }
 
 #############################################################################################
 #                         Common Gateway data receive         
 #                 parsen von outgoing Messages Chat -> FHEM 
 #############################################################################################
-sub _botCGIdata {                                                   ## no critic 'complexity'
+sub _botCGIdata {                                                  
   my $request = shift;
   
-  my ($text,$timestamp,$channelid,$channelname,$userid,$username,$postid,$triggerword) = ("","","","","","","","");
-  my ($command,$cr,$au,$arg,$callbackid,$actions,$actval,$avToExec)                    = ("","","","","","","","");
-  my $state = "active";
-  my $do    = 0;  
-  my $ret   = "success";
-  my $success;
-  my @aul;
+  my ($text,$triggerword,$command,$cr) = ("","","","");
+  my ($actions,$actval,$avToExec)      = ("","","");
 
-  my $args = (split(/outchat\?/x, $request))[1];        # GET-Methode empfangen 
+  my ($mime, $err, $dat) = __botCGIcheckData ($request);
+  return ($mime, $err) if($err);
   
-  if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
-      $args = (split(/outchat&/x, $request))[1];
-      if(!$args) {
-          Log 1, "TYPE SSChatBot - ERROR - no expected data received";
-          return ("text/plain; charset=utf-8", "no expected data received");
-      }
-  }
+  my $name = $dat->{name};
+  my $args = $dat->{args};
+  my $h    = $dat->{h};
   
-  $args =~ s/&/" /gx;
-  $args =~ s/=/="/gx;
-  $args .= "\"";
-  
-  $args     = urlDecode($args);
-  my($a,$h) = parseParams($args);
-  
-  if (!defined($h->{botname})) {
-      Log 1, "TYPE SSChatBot - ERROR - no Botname received";
-      return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
-  }
-  
-  # check ob angegebenes SSChatBot Device definiert, wenn ja Kontext auf botname setzen
-  my $name = $h->{botname};                                # das SSChatBot Device
-  if(!IsDevice($name, 'SSChatBot')) {
-      Log 1, qq{ERROR - No SSChatBot device "$name" of Type "SSChatBot" exists};
-      return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" );
-  }
-  
-  my $hash = $defs{$name};                                 # hash des SSChatBot Devices
   Log3($name, 4, "$name - ####################################################"); 
   Log3($name, 4, "$name - ###          start Chat operation Receive           "); 
   Log3($name, 4, "$name - ####################################################");
   Log3($name, 5, "$name - raw data received (urlDecoded):\n".Dumper($args));
+
+  my $hash  = $defs{$name};                                                            # hash des SSChatBot Devices  
+  my $rst   = gettimeofday()+1;                                                        # Standardwert resend Timer
+  my $state = "active";                                                                # Standardwert state 
+  my $ret   = "success";
   
-  # eine Antwort auf ein interaktives Objekt
-  if (defined($h->{payload})) {
-      # ein Benutzer hat ein interaktives Objekt ausgelöst (Button). Die Datenfelder sind nachfolgend beschrieben:
-      #   "actions":     Array des Aktionsobjekts, das sich auf die vom Benutzer ausgelöste Aktion bezieht
-      #   "callback_id": Zeichenkette, die sich auf die Callback_id des Anhangs bezieht, in dem sich die vom Benutzer ausgelöste Aktion befindet
-      #   "post_id"
-      #   "token"
-      #   "user": { "user_id","username" }
-      my $pldata        = $h->{payload};
-      (undef, $success) = evalJSON($hash,$pldata);
-      
-      if (!$success) {
-          Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
-          return ("text/plain; charset=utf-8", "invalid JSON data received");
-      }
-      
-      my $data = decode_json ($pldata);
-      Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
-      
-      $h->{token}       = $data->{token};
-      $h->{post_id}     = $data->{post_id};
-      $h->{user_id}     = $data->{user}{user_id};
-      $h->{username}    = $data->{user}{username};
-      $h->{callback_id} = $data->{callback_id};
-      $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
-                          "name: ".$data->{actions}[0]{name}.", ". 
-                          "value: ".$data->{actions}[0]{value}.", ". 
-                          "text: ".$data->{actions}[0]{text}.", ". 
-                          "style: ".$data->{actions}[0]{style};
+  if (defined($h->{payload})) {                                                        # Antwort auf ein interaktives Objekt 
+      ($mime, $err) = __botCGIcheckPayload ($hash, $h);
+      return ($mime, $err) if($err);
   }   
   
   if (!defined($h->{token})) {
-      Log3($name, 5, "$name - received insufficient data:\n".Dumper($args));
+      Log3   ($name, 5, "$name - received insufficient data:\n".Dumper($args));
       return ("text/plain; charset=utf-8", "Insufficient data");
   }
   
-  # CSRF Token check
-  my $FWdev    = $hash->{FW};                           # das FHEMWEB Device für SSChatBot Device -> ist das empfangene Device
-  my $FWhash   = $defs{$FWdev};
-  my $want     = $FWhash->{CSRFTOKEN};
-  $want        = $want?$want:"none";
-  my $supplied = $h->{fwcsrf};
- 
-  if($want eq "none" || $want ne $supplied) {           # $FW_wname enthält ebenfalls das aufgerufenen FHEMWEB-Device
-      Log3 ($FW_wname, 2, "$FW_wname - WARNING - FHEMWEB CSRF error for client \"$FWdev\": ".
-                          "received $supplied token is not $want. ".
-                          "For details see the csrfToken FHEMWEB attribute. ".
-                          "The csrfToken must be identical to the token in OUTDEF of $name device.");
-      return ("text/plain; charset=utf-8", "400 Bad Request");          
-  }
+  my $neg = __botCGIcheckToken ($name, $h, $rst);                                      # CSRF Token check
+  return $neg if($neg);
   
-  # Timestamp dekodieren
-  if ($h->{timestamp}) {
+  if ($h->{timestamp}) {                                                               # Timestamp dekodieren
       $h->{timestamp} = FmtDateTime(($h->{timestamp})/1000);
   }
    
@@ -2023,113 +2015,36 @@ sub _botCGIdata {                                                   ## no critic
   # trigger_word: which trigger word is matched 
   #
 
-  $channelid   = $h->{channel_id}   if($h->{channel_id});                      
-  $channelname = $h->{channel_name} if($h->{channel_name});
-  $userid      = $h->{user_id}      if($h->{user_id});
-  $username    = $h->{username}     if($h->{username});
-  $postid      = $h->{post_id}      if($h->{post_id});
-  $callbackid  = $h->{callback_id}  if($h->{callback_id});
-  $timestamp   = $h->{timestamp}    if($h->{timestamp});
+  my $channelid   = $h->{channel_id}   // q{};                      
+  my $channelname = $h->{channel_name} // q{};  
+  my $userid      = $h->{user_id}      // q{};
+  my $username    = $h->{username}     // q{};
+  my $postid      = $h->{post_id}      // q{};
+  my $callbackid  = $h->{callback_id}  // q{};
+  my $timestamp   = $h->{timestamp}    // q{};
   
-  # interaktive Schaltflächen (Aktionen) auswerten 
-  if ($h->{actions}) {
+  if ($h->{actions}) {                                                   # interaktive Schaltflächen (Aktionen) auswerten 
       $actions  = $h->{actions};        
       ($actval) = $actions =~ m/^type:\s+button.*?value:\s+(.*?),\s+text:/x;
 
       if($actval =~ /^\//x) {
-          Log3($name, 4, "$name - slash command \"$actval\" got from interactive data and execute it with priority");
+          Log3 ($name, 4, "$name - slash command \"$actval\" got from interactive data and execute it with priority");
           $avToExec = $actval;        
       }
   }
   
-  if ($h->{text} || $avToExec) {
-      $text    = $h->{text};
-      $text    = $avToExec if($avToExec);                                # Vorrang für empfangene interaktive Data (Schaltflächenwerte) die Slash-Befehle enthalten        
-      if($text =~ /^\/(set.*?|get.*?|code.*?)\s+(.*)$/ix) {              # vordefinierte Befehle in FHEM ausführen
-          my $p1 = substr lc $1, 0, 3;
-          my $p2 = $2;
-          
-          my $pars = {
-              name     => $name,
-              username => $username,
-              state    => $state,
-              p2       => $p2,
-          };
-
-          if($hrecbot{$p1} && defined &{$hrecbot{$p1}{fn}}) {
-              $do = 1;
-              no strict "refs";                                          ## no critic 'NoStrict'  
-              ($command, $cr, $state) = &{$hrecbot{$p1}{fn}} ($pars); 
-              use strict "refs";
-          } 
-              
-          $cr = $cr ne q{} ? $cr : qq{command '$command' executed};
-          Log3($name, 4, "$name - FHEM command return: ".$cr);
-          
-          $cr = formString($cr, "command");   
-
-          my $params = { 
-              name       => $name,
-              opmode     => "sendItem",
-              method     => "chatbot",
-              userid     => $userid,
-              text       => $cr,
-              fileUrl    => "",
-              channel    => "",
-              attachment => ""
-          };
-          addQueue ($params);                                 
-      }
-                              
-      my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommandxx zusammenstellen
-      $ua    = "" if(!$ua);
-      my %hc = map { ($_ => 1) } grep { "$_" =~ m/ownCommand(\d+)/x } split(" ","ownCommand1 $ua");
-   
-      for my $ca (sort keys %hc) {
-          my $uc = AttrVal($name, $ca, "");
-          next if (!$uc);
-          ($uc,$arg) = split(/\s+/x, $uc, 2);
-          
-          if($uc && $text =~ /^$uc\s*?$/x) {                                      # User eigener Slash-Befehl, z.B.: /Wetter 
-              $command = $arg;
-              $do      = 1;
-              $au      = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
-              @aul     = split(",",$au);
-              
-              if($au eq "all" || $username ~~ @aul) { 
-                  Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$arg);  
-                  $cr = AnalyzeCommandChain(undef, $arg);                         # FHEM Befehlsketten ausführen  
-              
-              } else {
-                  $cr    = qq{User "$username" is not allowed execute "$arg" command};
-                  $state = qq{command execution denied};
-                  Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$arg" command. Execution denied !});
-              }                 
-                                
-              $cr = $cr ne q{} ? $cr : qq{command '$arg' executed};
-              Log3($name, 4, "$name - FHEM command return: ".$cr);
-              
-              $cr = formString($cr, "command");
-
-              my $params = { 
-                  name       => $name,
-                  opmode     => "sendItem",
-                  method     => "chatbot",
-                  userid     => $userid,
-                  text       => $cr,
-                  fileUrl    => "",
-                  channel    => "",
-                  attachment => ""
-              };
-              addQueue ($params);                                                 
-          }
-      }
+  if ($h->{text} || $avToExec) {                                         # Interpretation empfangener Daten als auszuführende Kommandos 
+      my $params = { 
+          name     => $name,
+          username => $username,
+          userid   => $userid,
+          rst      => $rst,
+          state    => $state,
+          h        => $h,
+          avToExec => $avToExec
+      };
       
-      # Wenn Kommando ausgeführt wurde Ergebnisse aus Queue übertragen
-      if($do) {
-          RemoveInternalTimer ($hash, "FHEM::SSChatBot::getApiSites");
-          InternalTimer       (gettimeofday()+1, "FHEM::SSChatBot::getApiSites", "$name", 0); 
-      }       
+      ($command, $cr, $text) = __botCGIdataInterprete ($params);       
   }
   
   if ($h->{trigger_word}) {
@@ -2156,7 +2071,247 @@ sub _botCGIdata {                                                   ## no critic
   readingsBulkUpdate  ($hash, "state",             $state       );        
   readingsEndUpdate   ($hash,1);
   
-  return ("text/plain; charset=utf-8", $ret);
+return ("text/plain; charset=utf-8", $ret);
+}
+
+################################################################
+#                      botCGI 
+#            Daten auf Validität checken
+################################################################
+sub __botCGIcheckData { 
+  my $request = shift;
+
+  my $args = (split(/outchat\?/x, $request))[1];        # GET-Methode empfangen 
+  
+  if(!$args) {                                          # POST-Methode empfangen wenn keine GET_Methode ?
+      $args = (split(/outchat&/x, $request))[1];
+      if(!$args) {
+          Log 1, "TYPE SSChatBot - ERROR - no expected data received";
+          return ("text/plain; charset=utf-8", "no expected data received");
+      }
+  }
+  
+  $args =~ s/&/" /gx;
+  $args =~ s/=/="/gx;
+  $args .= "\"";
+  
+  $args     = urlDecode($args);
+  my($a,$h) = parseParams($args);
+  
+  if (!defined($h->{botname})) {
+      Log 1, "TYPE SSChatBot - ERROR - no Botname received";
+      return ("text/plain; charset=utf-8", "no FHEM SSChatBot name in message");
+  }
+  
+  # check ob angegebenes SSChatBot Device definiert
+  # wenn ja, Kontext auf botname setzen
+  my $name = $h->{botname};                                                            # das SSChatBot Device
+  if(!IsDevice($name, 'SSChatBot')) {
+      Log 1, qq{ERROR - No SSChatBot device "$name" of Type "SSChatBot" exists};
+      return ( "text/plain; charset=utf-8", "No SSChatBot device for webhook \"/outchat\" exists" );
+  } 
+  
+  my $dat = {
+      name       => $name,
+      args       => $args,
+      h          => $h,
+  };
+                    
+return ('','',$dat);
+}
+
+################################################################
+#                      botCGI 
+#                check CSRF Token 
+################################################################
+sub __botCGIcheckToken {                   
+  my $name     = shift;
+  my $h        = shift;
+  my $rst      = shift;
+  my $hash     = $defs{$name};
+
+  my $FWdev    = $hash->{FW};                           # das FHEMWEB Device für SSChatBot Device -> ist das empfangene Device
+  my $FWhash   = $defs{$FWdev};
+  my $want     = $FWhash->{CSRFTOKEN} // "none";
+  my $supplied = $h->{fwcsrf};
+ 
+  if($want eq "none" || $want ne $supplied) {           # $FW_wname enthält ebenfalls das aufgerufenen FHEMWEB-Device
+      Log3 ($FW_wname, 2, "$FW_wname - ERROR - FHEMWEB CSRF error for client $FWdev: ".
+                          "received $supplied token is not $want. ".
+                          "For details see the FHEMWEB csrfToken attribute. ".
+                          "The csrfToken must be identical to the token in OUTDEF of the $name device.");
+                          
+      my $cr     = formString("CSRF error in client '$FWdev' - see logfile", "text");   
+      my $userid = $h->{user_id} // q{};
+      
+      my $params = { 
+          name       => $name,
+          opmode     => "sendItem",
+          method     => "chatbot",
+          userid     => $userid,
+          text       => $cr,
+          fileUrl    => "",
+          channel    => "",
+          attachment => ""
+      };
+      addQueue   ($params);
+      startQueue ($name, $rst);
+          
+      return ("text/plain; charset=utf-8", "400 Bad Request");          
+  }  
+                    
+return;
+}
+
+################################################################
+#                      botCGI 
+#     Payload checken (interaktives Element ausgelöst ?)
+#
+# ein Benutzer hat ein interaktives Objekt ausgelöst (Button). 
+# Die Datenfelder sind nachfolgend beschrieben:
+#   "actions":     Array des Aktionsobjekts, das sich auf die 
+#                  vom Benutzer ausgelöste Aktion bezieht
+#   "callback_id": Zeichenkette, die sich auf die Callback_id 
+#                  des Anhangs bezieht, in dem sich die vom 
+#                  Benutzer ausgelöste Aktion befindet
+#   "post_id"
+#   "token"
+#   "user":        { "user_id","username" }
+################################################################
+sub __botCGIcheckPayload { 
+  my $hash = shift;
+  my $h    = shift;
+  my $name = $hash->{NAME};
+
+      my $pldata           = $h->{payload};
+      my (undef, $success) = evalJSON($hash,$pldata);
+      
+      if (!$success) {
+          Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
+          return ("text/plain; charset=utf-8", "invalid JSON data received");
+      }
+      
+      my $data = decode_json ($pldata);
+      Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
+      
+      $h->{token}       = $data->{token};
+      $h->{post_id}     = $data->{post_id};
+      $h->{user_id}     = $data->{user}{user_id};
+      $h->{username}    = $data->{user}{username};
+      $h->{callback_id} = $data->{callback_id};
+      $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
+                          "name: ".$data->{actions}[0]{name}.", ". 
+                          "value: ".$data->{actions}[0]{value}.", ". 
+                          "text: ".$data->{actions}[0]{text}.", ". 
+                          "style: ".$data->{actions}[0]{style};
+           
+return;
+}
+
+################################################################
+#                      botCGI 
+#     Interpretiere empfangene Daten als Kommandos
+################################################################
+sub __botCGIdataInterprete { 
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $userid   = $paref->{userid};
+  my $rst      = $paref->{rst};
+  my $state    = $paref->{state};
+  my $h        = $paref->{h};
+  my $avToExec = $paref->{avToExec};
+  
+  my $do       = 0; 
+  my $cr       = q{};
+  my $command  = q{};
+  my $text     = $h->{text};
+  $text        = $avToExec if($avToExec);                            # Vorrang für empfangene interaktive Data (Schaltflächenwerte) die Slash-Befehle enthalten        
+  
+  if($text =~ /^\/(set.*?|get.*?|code.*?)\s+(.*)$/ix) {              # vordefinierte Befehle in FHEM ausführen
+      my $p1 = substr lc $1, 0, 3;
+      my $p2 = $2;
+      
+      my $pars = {
+          name     => $name,
+          username => $username,
+          state    => $state,
+          p2       => $p2,
+      };
+
+      if($hrecbot{$p1} && defined &{$hrecbot{$p1}{fn}}) {
+          $do = 1;
+          no strict "refs";                                          ## no critic 'NoStrict'  
+          ($command, $cr, $state) = &{$hrecbot{$p1}{fn}} ($pars); 
+          use strict "refs";
+      } 
+          
+      $cr = $cr ne q{} ? $cr : qq{command '$command' executed};
+      Log3($name, 4, "$name - FHEM command return: ".$cr);
+      
+      $cr = formString($cr, "command");   
+
+      my $params = { 
+          name       => $name,
+          opmode     => "sendItem",
+          method     => "chatbot",
+          userid     => $userid,
+          text       => $cr,
+          fileUrl    => "",
+          channel    => "",
+          attachment => ""
+      };
+      addQueue ($params);                                 
+  }
+                          
+  my $ua = $attr{$name}{userattr};                                            # Liste aller ownCommandxx zusammenstellen
+  $ua    = "" if(!$ua);
+  my %hc = map { ($_ => 1) } grep { "$_" =~ m/ownCommand(\d+)/x } split(" ","ownCommand1 $ua");
+
+  for my $ca (sort keys %hc) {
+      my $uc = AttrVal($name, $ca, "");
+      next if (!$uc);
+      
+      my $arg = q{};
+      ($uc,$arg) = split(/\s+/x, $uc, 2);
+      
+      if($uc && $text =~ /^$uc\s*?$/x) {                                      # User eigener Slash-Befehl, z.B.: /Wetter 
+          $do      = 1;
+          
+          my $pars = {
+              name     => $name,
+              username => $username,
+              state    => $state,
+              arg      => $arg,
+              uc       => $uc,
+          };
+
+          ($cr, $state) = __botCGIownCommand ($pars);             
+                            
+          $cr = $cr ne q{} ? $cr : qq{command '$arg' executed};
+          Log3($name, 4, "$name - FHEM command return: ".$cr);
+          
+          $cr = formString($cr, "command");
+
+          my $params = { 
+              name       => $name,
+              opmode     => "sendItem",
+              method     => "chatbot",
+              userid     => $userid,
+              text       => $cr,
+              fileUrl    => "",
+              channel    => "",
+              attachment => ""
+          };
+          addQueue ($params);                                                 
+      }
+  }
+  
+  if($do) {                                                                  # Wenn Kommando ausgeführt wurde -> Queue übertragen
+      startQueue ($name, $rst);       
+  }  
+   
+return ($command, $cr, $text);
 }
 
 ################################################################
@@ -2170,19 +2325,15 @@ sub __botCGIrecSet {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";
+  my $cr       = q{};
   my $command  = "set ".$p2;
   my $au       = AttrVal($name,"allowedUserForSet", "all");
-  my @aul      = split(",",$au);
-  
-  if($au eq "all" || $username ~~ @aul) {
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$command);
-      $cr = CommandSet(undef, $p2);                                  
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  }
+
+  $paref->{au}    = $au;
+  $paref->{order} = "Set";
+  $paref->{cmd}   = $command;
+   
+  ($cr, $state)   = ___botCGIorder ($paref); 
                     
 return ($command, $cr, $state);
 }
@@ -2198,19 +2349,15 @@ sub __botCGIrecGet {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";
+  my $cr       = q{};
   my $command  = "get ".$p2;              
   my $au       = AttrVal($name,"allowedUserForGet", "all");
-  my @aul      = split(",",$au);
-  
-  if($au eq "all" || $username ~~ @aul) {
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$command);
-      $cr = CommandGet(undef, $p2); 
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  }
+
+  $paref->{au}    = $au;
+  $paref->{order} = "Get";
+  $paref->{cmd}   = $command;
+   
+  ($cr, $state)   = ___botCGIorder ($paref);  
                     
 return ($command, $cr, $state);
 }
@@ -2226,27 +2373,96 @@ sub __botCGIrecCod {                     ## no critic "not used"
   my $state    = $paref->{state};
   my $p2       = $paref->{p2};
   
-  my $cr       = "";  
+  my $cr       = q{};  
   my $command  = $p2;
   my $au       = AttrVal($name,"allowedUserForCode", "all");
-  my @aul      = split(",",$au);
   
-  if($au eq "all" || $username ~~ @aul) {
-      my $code = $p2;
-      if($p2 =~ m/^\s*(\{.*\})\s*$/xs) {
-          $p2 = $1;
-      } else {
-          $p2 = '';
-      } 
-      Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$p2);
-      $cr = AnalyzePerlCommand(undef, $p2) if($p2);                    
-  } else {
-      $cr    = qq{User "$username" is not allowed execute "$command" command};
-      $state = qq{command execution denied};
-      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$command" command. Execution denied !});
-  } 
+  $paref->{au}    = $au;
+  $paref->{order} = "Code";
+  $paref->{cmd}   = $command;
+  
+  ($cr, $state)   = ___botCGIorder ($paref);
                     
 return ($command, $cr, $state);
+}
+
+################################################################
+#                      botCGI 
+#            User ownCommand in FHEM ausführen
+################################################################
+sub __botCGIownCommand { 
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $state    = $paref->{state};
+  my $arg      = $paref->{arg};
+  my $uc       = $paref->{uc};
+  
+  my $cr       = q{};
+
+  if(!$arg) {
+      $cr = qq{format error: your own command '$uc' doesn't have a mandatory argument};
+      return ($cr, $state);
+  }
+  
+  my $au       = AttrVal($name,"allowedUserForOwn", "all");               # Berechtgung des Chat-Users checken
+  
+  $paref->{au}    = $au;
+  $paref->{order} = "Own";
+  $paref->{cmd}   = $arg;
+  
+  ($cr, $state)   = ___botCGIorder ($paref);
+                    
+return ($cr, $state);
+}
+
+################################################################
+#            Order ausführen und Ergebnis zurückliefern         
+################################################################
+sub ___botCGIorder {                     
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $username = $paref->{username};
+  my $state    = $paref->{state};
+  my $p2       = $paref->{p2};            # Kommandoargument, z.B. "get <argument>" oder "code <argument>"
+  my $au       = $paref->{au};
+  my $order    = $paref->{order};         # Kommandotyp, z.B. "set"
+  my $cmd      = $paref->{cmd};           # komplettes Kommando
+  
+  my @aul      = split ",", $au;
+  my $cr       = q{}; 
+  
+  if($au eq "all" || $username ~~ @aul) {      
+      if ($order =~ /^[GS]et$/x) {
+          Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$cmd);
+          no strict "refs";                                          ## no critic 'NoStrict' 
+          $cr = &{"Command".$order} (undef, $p2);
+          use strict "refs";   
+      }
+
+      if ($order eq "Code") {
+          my ($arg) = $p2 =~ m/^\s*(\{.*\})\s*$/xs;
+
+          if($arg) {
+              Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$arg);
+              $cr = AnalyzePerlCommand(undef, $arg);
+          } else {
+              $cr = qq{function format error: may be you didn't use the format {...}};    
+          }     
+      }   
+
+      if ($order eq "Own") {                                                                         # FHEM ownCommand Befehlsketten ausführen
+          Log3($name, 4, qq{$name - Synology Chat user "$username" execute FHEM command: }.$cmd);  
+          $cr = AnalyzeCommandChain(undef, $cmd);                         
+      }          
+ 
+  } else {
+      $cr    = qq{User "$username" is not allowed execute "$cmd" command};
+      $state = qq{command execution denied};
+      Log3($name, 2, qq{$name - WARNING - Chat user "$username" is not authorized for "$cmd" command. Execution denied !});
+  }
+                    
+return ($cr, $state);
 }
 
 1;
