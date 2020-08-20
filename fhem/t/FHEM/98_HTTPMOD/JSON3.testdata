@@ -1,0 +1,17 @@
+{"settings":{"currentpreset":255,"effect":"Off"},
+ "device":"testdevice",
+  "heap":1122,
+  "power":"0",
+  "modes":["Off","Step2","RainbowChase","session 55","Blobs","CuriousCat","Adalight","UDP","DMX"],
+  "currentpresets":[],
+  "code1":3,
+  "code2":4,
+  "pixels":118,
+  "MQTT":
+  	{"enable":true,
+  	 "ip":[192,168,1,24],
+  	 "port":1883
+  	},
+  "timer":{"running":false}
+ }
+
