@@ -749,8 +749,8 @@ sub CUL_HM_Attr(@) {#################################
         my($h,$m) = split(":",$attrVal);
         $h = int($h);
         $m = int($m);
-        return "format hhh:mm required. $attrVal incorrect" if( $h >= 999 || $h <= 0
-                                                             || $m >= 59  || $m <= 0
+        return "format hhh:mm required. $attrVal incorrect" if( $h > 999 || $h < 0
+                                                             || $m > 59  || $m < 0
                                                              || $h + $m <= 0);
         my $attrValNew  = sprintf("%03d:%02d",$h,$m); 
         CUL_HM_ActAdd(CUL_HM_name2Id($name),$attrValNew);
@@ -3875,66 +3875,79 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   my $roleD = $hash->{helper}{role}{dev}?1:0;
   my $roleV = $hash->{helper}{role}{vrt}?1:0;
   my $fkt   = $hash->{helper}{fkt}?$hash->{helper}{fkt}:"";
-  
+
   my ($dst,$chn) = unpack 'A6A2',$hash->{DEF}.($roleC?'01':'00');
 
-  my $h = undef;
-  $h = $culHmGlobalGets->{$cmd}       if(!$roleV      &&($roleD || $roleC));
-  $h = $culHmVrtGets->{$cmd}          if(!defined($h) && $roleV);
-  $h = $culHmSubTypeGets->{$st}{$cmd} if(!defined($h) && $culHmSubTypeGets->{$st});
-  $h = $culHmModelGets->{$md}{$cmd}   if(!defined($h) && $culHmModelGets->{$md});
-  $h = $culHmGlobalGetsDev->{$cmd}    if(!defined($h) && $roleD);
-  $h = ""                             if(!defined($h) && (eval "defined(&HMinfo_GetFn)" && $cmd eq "regTable"));
+  CUL_HM_SetList($name               # refresh command options
+                 ,  "$roleC"
+                  .":$roleD"
+                  .":$roleV"
+                  .":$fkt"
+                  .":$devName"
+                  .":".($defs{$devName}{helper}{mId} ? $defs{$devName}{helper}{mId}:"")
+                  .":$chn"
+                  .":".InternalVal($name,"peerList","")
+                 );# update cmds entry in case
+  
 
-  my @hArr;
-  @hArr = split(" ", $h) if($h);
 
-  if(!defined($h)) {
-    my @arr = ();
-    if(!$roleV &&($roleD || $roleC)){foreach(keys %{$culHmGlobalGets}        ){push @arr,"$_:".$culHmGlobalGets->{$_}          }};
-    if($roleV)                      {foreach(keys %{$culHmVrtGets}           ){push @arr,"$_:".$culHmVrtGets->{$_}             }};
-    if($culHmSubTypeGets->{$st})    {foreach(keys %{$culHmSubTypeGets->{$st}}){push @arr,"$_:".${$culHmSubTypeGets->{$st}}{$_} }};
-    if($culHmModelGets->{$md})      {foreach(keys %{$culHmModelGets->{$md}}  ){push @arr,"$_:".${$culHmModelGets->{$md}}{$_}   }};
-    if($roleD)                      {foreach(keys %{$culHmGlobalGetsDev}     ){push @arr,"$_:".$culHmGlobalGetsDev->{$_}       }};
-    if(eval"defined(&HMinfo_GetFn)"){                                         {push @arr,"regTable:"                           }};
-   
-    foreach(@arr){
-      my ($cmdS,$val) = split(":",$_,2);
-      if (!$val){
-        $_ = "$cmdS:noArg";
+  if(!defined $hash->{helper}{cmds}{rtrvLst}{$cmd}) { ### unknown - return the commandlist
+    my @cmdPrep = ();
+    foreach my $cmdS (keys%{$hash->{helper}{cmds}{rtrvLst}}){
+      my $val = $hash->{helper}{cmds}{rtrvLst}{$cmdS};
+      if($val eq "noArg"){
+          $val = ":$val";
       }
-      elsif (
-          $val !~ m/^\[.*\]$/ ||
-          $val =~ m/\[.*\[/   ||
-          $val =~ m/(\<|\>)]/
-          ){
-        $_ = $cmdS;
+      elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){#add relacements if available
+        my ($null,$repl) = ($1,$2);
+        if (defined $hash->{helper}{cmds}{lst}{$repl}){
+          $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
+          $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
+          next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+        }
+        else{
+          $val = "";
+        }
       }
-      else{
-        $val =~ s/(\[|\])//g;
-        my @vArr = split('\|',$val);
-        foreach (@vArr){
+      elsif($val =~ m/^[\(\[]*([a-zA-Z0-9_-|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
+        my $v1 = $1;
+        $v1 =~ s/[\{\}]//g;#remove default marking
+        my @lst1;
+        foreach(split('\|',$v1)){
           if ($_ =~ m/(.*)\.\.(.*)/ ){
             my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
             pop @list;
-            $_ = join(",",@list);
+            push @lst1,@list;
           }
+          else{
+            push @lst1,$_;
+          }     
         }
-        $_ = "$cmdS:".join(",",@vArr);
+        $val = ":".join(",",@lst1);
       }
+      else      {
+        $val = "";
+      }
+      push @cmdPrep,"$cmdS$val";
     }
-
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr);
-
+    @cmdPrep = ("--") if (!scalar @cmdPrep);
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdPrep)." ";
     return $usg;
   }
-  elsif($h eq "" && @a != 2) {
-    return "$cmd requires no parameters";
 
+  my $paraOpts = $hash->{helper}{cmds}{rtrvLst}{$cmd};
+  if($paraOpts eq "noArg"){ # no argument allowed
+     return "$cmd no params required" if(@a != 2);
   }
-  elsif($h !~ m/\.\.\./ && @hArr != @a-2) {
-    return "$cmd requires parameter: $h";
+  elsif(@a == 2){# no arguments - is this ok?
+    if($paraOpts !~ m/\.\.\./ && $paraOpts !~ m/^\[.*?\] *$/ ){# argument required
+      return "$cmd parameter required:$paraOpts";  
+    }
+    else{
+      push @a,"noArg";
+    }
   }
+
   my $devHash = CUL_HM_getDeviceHash($hash);
 
   #----------- now start processing --------------
@@ -4049,8 +4062,16 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
           $info .= "\n         " if (($val + 1) % 5 == 0);
         }
       }
+      $info = "command syntax:"
+            ."\n"."[optional]         : optional = the parameter is optional"
+            ."\n"."(valX|valY)        : list     = one value valX or valY must be given"
+            ."\n"."[(valX|{valY})]    : default  = one value valX or valY CAN be given. If non is given it defaults to valY"
+            ."\n"."-peer-             : other    = the name of a peer needs to be given"
+            ."\n"."[(-peer-|{self01})]: default  = a peername can be given. If emty the command will use 'self01'"
+            ."\n".""
+            ."\n".""
+           .$info;
     }
-
     return $info;
   }
   elsif($cmd eq "tplInfo"){  ##################################################
@@ -4235,7 +4256,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
   my($name,$cmdKey)=@_;
   my $hash = $defs{$name};
   
-  my $changes = 0;
   if(!$cmdKey){
     my $devName = InternalVal($name,"device",$name);
     my (undef,$chn) = unpack 'A6A2',$hash->{DEF}.'01';#default to chn 01 for dev
@@ -4254,6 +4274,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
     my @arr1 = ();
+    my @gets = ();
     delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep!/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
     if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
@@ -4262,20 +4283,25 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
       }
     }
     
-    if( !$roleV &&($roleD || $roleC)        ){foreach(keys %{$culHmGlobalSets}           ){push @arr1,"$_:".$culHmGlobalSets->{$_}            }};
-    if(( $roleV||!$st||$st eq "no")&& $roleD){foreach(keys %{$culHmGlobalSetsVrtDev}     ){push @arr1,"$_:".$culHmGlobalSetsVrtDev->{$_}      }};
-    if( !$roleV                    && $roleD){foreach(keys %{$culHmSubTypeDevSets->{$st}}){push @arr1,"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}};
-    if( !$roleV                    && $roleC){foreach(keys %{$culHmGlobalSetsChn}        ){push @arr1,"$_:".$culHmGlobalSetsChn->{$_}         }};
-    if( $culHmSubTypeSets->{$st}   && $roleC){foreach(keys %{$culHmSubTypeSets->{$st}}   ){push @arr1,"$_:".${$culHmSubTypeSets->{$st}}{$_}   }};
-    if( $culHmModelSets->{$md})              {foreach(keys %{$culHmModelSets->{$md}}     ){push @arr1,"$_:".${$culHmModelSets->{$md}}{$_}     }};
-    if( $culHmChanSets->{$md."00"} && $roleD){foreach(keys %{$culHmChanSets->{$md."00"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."00"}}{$_} }};
-    if( $culHmChanSets->{$md."xx"} && $roleC){foreach(keys %{$culHmChanSets->{$md."xx"}} ){push @arr1,"$_:".${$culHmChanSets->{$md."xx"}}{$_} }};
-    if( $culHmChanSets->{$md.$chn} && $roleC){foreach(keys %{$culHmChanSets->{$md.$chn}} ){push @arr1,"$_:".${$culHmChanSets->{$md.$chn}}{$_} }};
-    if( $culHmFunctSets->{$fkt}    && $roleC){foreach(keys %{$culHmFunctSets->{$fkt}}    ){push @arr1,"$_:".${$culHmFunctSets->{$fkt}}{$_}    }};
+    if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}            ;   
+                                              push @gets,map{"$_:".$culHmGlobalGets->{$_}            }keys %{$culHmGlobalGets}           };
+    if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      }keys %{$culHmGlobalSetsVrtDev}     };
+    if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}keys %{$culHmSubTypeDevSets->{$st}}};
+    if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         }keys %{$culHmGlobalSetsChn}        };
+    if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   }keys %{$culHmSubTypeSets->{$st}}   };
+    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }keys %{$culHmModelSets->{$md}}      ;              
+                                              push @gets,map{"$_:".${$culHmModelGets->{$md}}{$_}     }keys %{$culHmModelGets->{$md}}     };
+    if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} }keys %{$culHmChanSets->{$md."00"}} };
+    if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }keys %{$culHmChanSets->{$md."xx"}} };
+    if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} }keys %{$culHmChanSets->{$md.$chn}} };
+    if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    }keys %{$culHmFunctSets->{$fkt}}    };
+    if($roleV)                               {push @gets,map{"$_:".$culHmVrtGets->{$_}               }keys %{$culHmVrtGets}              };
+    if($culHmSubTypeGets->{$st})             {push @gets,map{"$_:".${$culHmSubTypeGets->{$st}}{$_}   }keys %{$culHmSubTypeGets->{$st}}   };
+    if($roleD)                               {push @gets,map{"$_:".$culHmGlobalGetsDev->{$_}         }keys %{$culHmGlobalGetsDev}        };
 
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
-    
+   
     my @cond = ();
     push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}} if (defined $lvlStr{md}{$md});
     push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{$md}} if (defined $lvlStr{mdCh}{"$md$chn"});
@@ -4297,10 +4323,16 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     delete $hash->{helper}{cmds}{cmdList} ;
     foreach(@arr1){
       my ($cmdS,$val) = split(":",$_,2);
+      $val =~ s/\{self\}/\{self$chn\}/;
       $hash->{helper}{cmds}{cmdLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
     }
+
+    #---------------- gets ---------------
+    foreach(@gets){
+      my ($cmdS,$val) = split(":",$_,2);
+      $hash->{helper}{cmds}{rtrvLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
+    }
     $hash->{helper}{cmds}{cmdKey}  = $cmdKey;
-    $changes = 1;
   }
 
   my $tmplStamp = CUL_HM_getTemplateModify();
@@ -4326,24 +4358,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
                                      .":$tmplStamp"
                                      .":$tmplAssTs"
                                      ;   
-    $changes = 1;
-  }
-  if ($changes){
-#    param description: 
-#       [optioal]          - optional parameter
-#       (opt|opt2|opt2)    - mandatory to select one of 
-#       [(opt|{opt2}|opt2)]- optional parameter. Opt2 is defaults 
-#       -type-             - 'type' is to be replaced by a value
-#       (opt|opt2|-type-)  - mandatory to enter one of opt/opt2 or type
-
-#    delete $hash->{helper}{cmds}{cmdParams};
-#    foreach my $cmd (keys %{$hash->{helper}{cmds}{cmdLst}}){
-#      my $val = $hash->{helper}{cmds}{cmdLst}{$cmd};
-#      $val =~ s/(\.\.\.|noArg)//;
-#      $hash->{helper}{cmds}{cmdParams}{$cmd}{max} = scalar(split(" ",$val));
-#      $val =~ s/(\[.*?\])//g;
-#      $hash->{helper}{cmds}{cmdParams}{$cmd}{min} = scalar(split(" ",$val));
-#    }
   }
 
   return;
@@ -4401,10 +4415,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if($val eq "noArg"){
           $val = ":$val";
       }
-      elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){
+      elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){#add relacements if available
         my ($null,$repl) = ($1,$2);
         if (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $null = $null ? "noArg," : "";
+          $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
           $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
           next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
         }
@@ -4412,9 +4426,24 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           $val = "";
         }
       }
-      elsif($val =~ m/^\[([a-zA-Z0-9_-|\.]*)\]$/){
+      elsif($val =~ m/^(\[?)\(-([a-zA-Z]*?)-\|\{(.*)\}\)\]? *$/){#add relacements if available plus default
+        my ($null,$repl,$def) = ($1,$2,$3);
+        $def = "" if (!defined $def);
+        if (defined $hash->{helper}{cmds}{lst}{$repl}){
+          $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
+#          $val =~ s/\[?(?-$repl-\)?\]?/:$null$hash->{helper}{cmds}{lst}{$repl}$def/; 
+          $val = ":$null$hash->{helper}{cmds}{lst}{$repl},$def";
+          next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+        }
+        else{
+          $val = $def;
+        }
+      }
+      elsif($val =~ m/^[\(\[]*([a-zA-Z0-9_-|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
+        my $v1 = $1;
+        $v1 =~ s/[\{\}]//g;#remove default marking
         my @lst1;
-        foreach(split('\|',$1)){
+        foreach(split('\|',$v1)){
           if ($_ =~ m/(.*)\.\.(.*)/ ){
             my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
             pop @list;
@@ -4450,7 +4479,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 	}
     return $usg;
   }
-  
+
+  ###------------------- commands parameter parsing -------------------###
   my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
   if($paraOpts eq "noArg"){ # no argument allowed
      return "$cmd no params required" if(@a != 2);
@@ -4463,10 +4493,57 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       push @a,"noArg";
     }
   }
+  if (0){#not active by now
+    my @parIn = grep!/noArg/,@a[2..$#a];
+    my $in = scalar(@parIn);
+    
+    $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//;#remove comment, ... and noArg
+    my $min = scalar(split(" ",$paraOpts));
+#    my @optLst = grep!/\[\]/,split(" ",$paraOpts);#[...] would leave an empty list
+    my @optLst = split(" ",$paraOpts);#[...] would leave an empty list
+    my $pCnt = 0;
+    foreach my $param (@optLst){
+      my $optional = $param =~ m/^\[(.*)\]$/ ? 1:0;
+      $param =~ s/^\[(.*)\]$/$1/; # remove optional
+      if($param =~ m/^\((.*)\)$/ ){# list?
+        my @parLst = split("|",$1);
+        if(  defined $parIn[$pCnt]){
+          if( grep/$parIn[$pCnt]/,@parLst){
+          }
+          else{
+            if($param =~ m/-.*-/){#free value possible
+            }
+            elsif($optional && $param =~ m/\{(.*?)\}/){#found default
+              my $default = $1;
+              splice @parIn, $pCnt, 0,$default;#insert the default
+            }
+            else{
+              return "$parIn[$pCnt] does not match parameter $pCnt: $optLst[$pCnt]";
+            }
+          }
+        }
+        else{
+          if($optional && $param =~ m/\{(.*)\}/){#defaut
+            my $default = $1;
+            splice @parIn, $pCnt, 0,$default;#insert the default
+          }
+          else{
+            return "param $pCnt: $optLst[$pCnt] is not optional or no dafault identifies";
+          }
+        }
+      }
+      return "parameter missing for $pCnt: $optLst[$pCnt]" if(!defined $parIn[$pCnt] && !$optional);
+      
+      $pCnt++;
+    }
+    $paraOpts =~ s/(\[.*?\])//g;
+    my $max = scalar(split(" ",$paraOpts));
+    splice @parIn, $pCnt, 0,"nArg" if(scalar(@parIn) == 0);
+    return;
+  }
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
   my $id; # define id of IO device for later usage
-  
   ###------------------- commands requiring no IO action -------------------###
   my $nonIOcmd = 1;
   if(   $cmd eq "clear") { ####################################################
@@ -9444,7 +9521,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   return "not for virtuals" if($timeout !~ m/^\d\d\d:\d\d/);
   my ($cycleString,undef) = CUL_HM_time2sec($timeout);
   $attr{$devName}{actCycle} = $cycleString;
-  $attr{$devName}{actStatus}=""; # force trigger
+  $attr{$devName}{actStatus}="unset"; # force trigger
   my $actHash = CUL_HM_ActGetCreateHash();
   $actHash->{helper}{$devId}{start} = TimeNow();
   $actHash->{helper}{$devId}{start} =~ s/[\:\-\ ]//g;
@@ -9666,10 +9743,9 @@ sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
   else{
     my %deadH = map{$_ =>1}split(",",$deadAction);
     $defs{$name}{READINGS}{Activity}{VAL} = $oldState if (not defined $defs{$name}{READINGS}{Activity});
-    my $deadVal       = $state   eq "dead" ? "dead" : "notDead";
+    my $deadVal       = $state   eq "dead"    ? "dead"    : "notDead";
     my $deadValsearch = $deadVal eq "notDead" ? "^dead\$" : ".*";
     my @nullReads;
-    my @deadReads;
     push @nullReads,( "measured-temp"
                      ,"humidity"
                      ,"ValvePosition"
@@ -9686,14 +9762,14 @@ sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
                      ,"phyLevel"
                      ,"mLevel"
                     )         if ($deadH{periodValues} && $state eq "dead" );
+    my $grepNull = "^(" .join("|",@nullReads) .")\$";
+    my @deadReads;
     push @deadReads,  "state" if ($deadH{state});
     push @deadReads,( "eState"
                      ,"motion"
                      ,"battery"
                     )         if ($deadH{periodString});
     push @deadReads,grep!/^(state|periodValues|periodString|channels)$/,keys %deadH;# add customer readings to be updated
-    
-    my $grepNull = "^(" .join("|",@nullReads) .")\$";
     my $grepDead = "^(" .join("|",@deadReads) .")\$";
 
     my @entities;
@@ -9703,6 +9779,7 @@ sub CUL_HM_ActDepRead($$$){# Action detector update dependant readings
       my @readNull = map{"$_:0"}        grep/$grepNull/,keys %{$defs{$e}{READINGS}};
       my @readDead = map{"$_:$deadVal"} grep/$grepDead/,map{$defs{$e}{READINGS}{$_}{VAL} =~ m/$deadValsearch/ ? $_:"no"} keys %{$defs{$e}{READINGS}};
       push @readDead,"Activity:$state" if ($e eq $name);
+      next if (!(scalar(@readNull) + scalar(@readDead)));
       CUL_HM_UpdtReadBulk($defs{$e},1,@readNull,@readDead);
     }
   }
