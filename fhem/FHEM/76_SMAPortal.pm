@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
   "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
                            "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
   "3.3.4"  => "12.07.2020  fix break in header if attribute hourCount was reduced ",
@@ -2067,7 +2068,7 @@ sub ParseData {                                                    ## no critic 
       @da = split "###", $lc;
   }
   
-  deleteData($hash, 0) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
+  deleteData($hash, 1) if($getp ne "none");                    # Daten nur löschen wenn Datenabruf (kein Verbraucher schalten)
   
   readingsBeginUpdate($hash);
   
@@ -2890,7 +2891,7 @@ return;
 
 ################################################################
 #         delete Readings und Hash HELPER-Daten
-#   $conspl = providerLevel berücksichtigen
+#         $conspl = providerLevel berücksichtigen
 ################################################################
 sub deleteData {
   my $hash   = shift;
@@ -2898,11 +2899,11 @@ sub deleteData {
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
-  my $bl     = "state|lastCycleTime|Counter|loginState";                   # Blacklist
+  my $bl     = "state|lastCycleTime|Counter|loginState";                       # Blacklist
   
-  my $pblvl  = $stpl{plantLogbook}{level};                                 # Logbuch Level
+  my $pblvl = $stpl{plantLogbook}{level};                                      # Logbuch Level
   
-  if(!$subs{$name}{forecastData}{doit}) {                                  # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
+  if(!$subs{$name}{forecastData}{doit}) {                                      # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
       my $fclvl = $stpl{forecastData}{level};
       delete $hash->{HELPER}{"${fclvl}_ThisHour_WeatherId"};
       for my $i (1..23) {
@@ -2911,22 +2912,32 @@ sub deleteData {
       }
   }
    
-  if($conspl) {                                                            # Readings löschen wenn nicht im providerLevel enthalten
-      for my $key(@allrds) {
-          my ($lvl) = $key =~ m/^(L\d+)_/x;     
-          if($lvl) {
-              for my $p (keys %{$subs{$name}}) {
-                  delete($defs{$name}{READINGS}{$key}) if($subs{$name}{$p}{level} eq $lvl && !$subs{$name}{$p}{doit});
-              }
-          } else {
-              delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
+  if($conspl) {                                                                # Readings löschen wenn nicht im providerLevel enthalten
+      my $pbl = q{};
+      for my $prl (keys %{$mandatory{$name}}) {                                # mandatory Provider die abgerufen wurden
+          my $lvlm = $mandatory{$name}{$prl}{level};                           # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
+          if ($lvlm) {
+              $pbl .= "|^".$lvlm."_";
           }
-          delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);      # Logbuchreadings immer löschen          
       }
+      
+      for my $prl (keys %{$subs{$name}}) {                                     # Provider die abgerufen wurden
+          my $lvl  = $subs{$name}{$prl}{level} if($subs{$name}{$prl}{doit});   # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
+          if ($lvl) {
+              $pbl .= "|^".$lvl."_";
+          }
+      }      
+      $bl .= $pbl;                                                             # Blacklist ergänzen
+
+      for my $key(@allrds) {
+          delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
+          delete $defs{$name}{READINGS}{$key}  if($key =~ /^$pblvl/x);         # Logbuchreadings immer löschen       
+      }
+      
       return;
   } 
 
-  for my $key(@allrds) {
+  for my $key(@allrds) {                                                       # alle Readings löschen bis auf Standard-Blacklist
       delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
   }
 
