@@ -333,7 +333,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0108" => {name=>"HM-HM-LC-DW-WM"          ,st=>'rgb'               ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Bright:1:1,Col:2:2,Bright_V1:3:3,Col_V1:4:4,Bright_V2:5:5,Col_V2:6:6",}
  ,"0109" => {name=>"HM-DW-WM"                ,st=>'dimmer'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Dim:1:2,Dim1_V:3:4,Dim2_V:5:6",}
  ,"010A" => {name=>"HM-SEN-MDIR-O-3"         ,alias=>"HM-SEN-MDIR-O"}
-
+ ,"010C" => {name=>"HM-RC-2-PBU-FM-2"        ,alias=>"HM-RC-2-PBU-FM"  }
  ,"8001" => {name=>"PS-SWITCH"               ,st=>'switch'            ,cyc=>''      ,rxt=>''       ,lst=>'1,3'          ,chn=>"Sw:1:4",}
  ,"8002" => {name=>"PS-TH-SENS"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''       ,lst=>'1,4'          ,chn=>"Sen:1:4",}
  ,"FFF0" => {name=>"CCU-FHEM"                ,st=>'virtual'           ,cyc=>''      ,rxt=>''       ,lst=>''             ,chn=>"Btn:1:50",}
@@ -1670,25 +1670,26 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 #define gets - try use same names as for set
 %culHmGlobalGets    = (
                        param      => "-param-",
-                       reg        => "-addr- ... -list- -peerChn-",
-                       regVal     => "-addr- ... -list- -peerChn-",
+                       reg        => "-addr- -list- [-peerChn-]",
+                       regVal     => "-addr- -list- [-peerChn-]",
                        regList    => "",
-                       cmdList    => "[short|long]",
-                       saveConfig => "-filename- ...",
-                       deviceInfo => "[short|long]",
+                       regTable   => "",
+                       cmdList    => "[({short}|long)]",
+                       saveConfig => "[-filename-]",
+                       deviceInfo => "[({short}|long)]",
                        tplInfo    => ""
                       );
 %culHmVrtGets       = (
                        param      => "-param-",
-                       cmdList    => "[short|long]",
+                       cmdList    => "[({short}|long)]",
                       );
 %culHmSubTypeGets   = (
                        none4Type  =>{ "test"=>"" }
                       );
 %culHmModelGets     = (
                        "CCU-FHEM"     =>{ "listDevice"=>""}
-                      ,ACTIONDETECTOR =>{ "listDevice"=>"[all|alive|unknown|dead|notAlive] ..." 
-                                         ,"status"      =>""
+                      ,ACTIONDETECTOR =>{ "listDevice"=>"[({all}|alive|unknown|dead|notAlive)]" 
+                                         ,"status"    =>""
                                         }
                       );
 %culHmGlobalGetsDev = (# all devices
@@ -1696,39 +1697,39 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 
 ##############################---set---########################################
 %culHmGlobalSets       = (# all but virtuals
-                       regBulk       => "-list-.-peerChn- -addr1:data1- -addr2:data2- ..."
-                      ,getRegRaw     => "[List0|List1|List2|List3|List4|List5|List6] ... [-PeerChannel-]"
+                       regBulk       => "-list-.-peerChn- -addr1:data1- -addr2:data2-..."
+                      ,getRegRaw     => "(List0|List1|List2|List3|List4|List5|List6) [-peerChn-]"
                       ,getConfig     => ""
-                      ,regSet        => "[prep|exec] -regName- -value- ... [-peerChannel-]"
-                      ,clear         => "[readings|trigger|register|oldRegs|rssi|msgEvents|msgErrors|attack|all]"
+                      ,regSet        => "[(prep|{exec})] -regName- -value- [-peerChn-]"
+                      ,clear         => "[(readings|trigger|register|oldRegs|rssi|msgEvents|{msgErrors}|attack|all)]"
                       ,tplDel        => "-tplDel-"
 );
 %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
                        virtual       => "-noButtons-"
-                      ,clear         => "[readings|rssi|msgErrors|msgErrors|unknownDev]"
+                      ,clear         => "[(readings|rssi|msgErrors|{msgErrors}|unknownDev)]"
 );
 
 %culHmReglSets         = (# entities with regList
                       "0"              =>{  #this is a device
-                                            raw           => "data ..."
+                                            raw           => "-data-..."
                                            ,reset         => ""
                                            ,unpair        => ""
                                            ,assignHmKey   => ""
-                                           ,deviceRename  => "newName"
-                                           ,fwUpdate      => "-filename- -bootTime- ..."
+                                           ,deviceRename  => "-newName-"
+                                           ,fwUpdate      => "-filename- [-bootTime-]"
                                            ,getDevInfo    => ""
                                          }
                      ,"1"              =>{  #this is a channel
-                                            sign          => "[on|off]"
+                                            sign          => "[(on|{off})]"
                                          }
-                     ,"3p"             =>{ press          => "[long|short] -peer- [-repCount(long only)-] [-repDelay-] ..."
+                     ,"3p"             =>{ press          => "[(long|{short})] [(-peer-|{self})] [-repCount-] [-repDelay-]"
                                           ,eventL         => "-peer- -cond-"
                                           ,eventS         => "-peer- -cond-"
                                          }
-                     ,"4p"             =>{ trgPressS      =>"[-peer-]"
-                                          ,trgPressL      =>"[-peer-]"
-                                          ,trgEventS      =>"[-peer-] -condition-"
-                                          ,trgEventL      =>"[-peer-] -condition-"
+                     ,"4p"             =>{ trgPressS      =>"[(-peer-|{all})]"
+                                          ,trgPressL      =>"[(-peer-|{all})]"
+                                          ,trgEventS      =>"-peer- -condition-"
+                                          ,trgEventL      =>"-peer- -condition-"
                                          }
 );
 
@@ -1749,7 +1750,7 @@ $culHmSubTypeDevSets{dimmer}            =
 $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
 
 %culHmGlobalSetsChn    = (# all channels but virtuals
-                      peerBulk      => "-peer1,peer2,...- [set|unset]"
+                      peerBulk         => "-peer1,peer2,..- [({set}|unset)]"
 );
 %culHmSubTypeSets      = (# channels of this subtype
                       switch           =>{ "on-for-timer" =>"-ontime-"
@@ -1757,52 +1758,52 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,on             =>""
                                           ,off            =>""
                                           ,toggle         =>""
-                                          ,inhibit        =>"[on|off]"
+                                          ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
-                                          ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                          ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                          }
-                     ,dimmer           =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
-                                          ,"on-till"      =>"-time- [-ramptime-]..."
+                     ,dimmer           =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{0})]"
+                                          ,"on-till"      =>"-time- [(-ramptime-|{0})]"
                                           ,on             =>""
                                           ,off            =>""
                                           ,old            =>""
                                           ,toggle         =>""
-                                          ,pct            =>"[-value-|old] ... [-ontime-] [-ramptime-]"
+                                          ,pct            =>"(-value-|old) [(-ontime-|{0})] [(-ramptime-|{0})]"
                                           ,stop           =>""
-                                          ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                          ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                          ,inhibit        =>"[on|off]"
+                                          ,up             =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,down           =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
-                                          ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                          ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                          }
                      ,blindActuator    =>{ on             =>""
                                           ,off            =>""
                                           ,toggle         =>""
                                           ,toggleDir      =>""
-                                          ,pct            =>"[-value-] ... [-ontime-]"
+                                          ,pct            =>"-value- [-ontime-]"
                                           ,stop           =>""
-                                          ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                          ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                          ,inhibit        =>"[on|off]"
+                                          ,up             =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,down           =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
-                                          ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                          ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                          }
-                     ,remote           =>{ peerChan       =>"-btnNumber- -actChn- ... [single|dual|reverse] [set|unset] [actor|remote|both]"}
-                     ,threeStateSensor =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,THSensor         =>{ peerChan       =>"0 -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,virtual          =>{ peerChan       =>"-btnNumber- -actChn- ... [single|dual|reverse] [set|unset] [actor|remote|both]"
-                                          ,press          =>"[long|short] [noBurst] [-repCount(long only)-] [-repDelay-] ..."
+                     ,remote           =>{ peerChan       =>"-btnNumber- -actChn- [({single}|dual|reverse)] [({set}|unset)] [(actor|remote|{both})]"}
+                     ,threeStateSensor =>{ peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [actor|remote|both]"}
+                     ,THSensor         =>{ peerChan       =>"0 -actChn- [({single})] [({set}|unset)] [actor|remote|both]"}
+                     ,virtual          =>{ peerChan       =>"-btnNumber- -actChn- [({single}|dual|reverse)] [({set}|unset)] [(actor|remote|{both})]"
+                                          ,press          =>"[(long|{short})] [(noBurst)] [(-repCount-|{1})] [(-repDelay-|{0})]" 
                                           ,postEvent      =>"-condition-"
                                          }
-                     ,smokeDetector    =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] actor"}
+                     ,smokeDetector    =>{ peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [({actor})]"}
                      ,keyMatic         =>{ lock           =>""
-                                          ,unlock         =>"[-sec-] ..."
-                                          ,open           =>"[-sec-] ..."
-                                          ,inhibit        =>"[on|off]"
+                                          ,unlock         =>"[(-sec-|{0})]"
+                                          ,open           =>"[(-sec-|{0})]"
+                                          ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
                                          }
-                     ,repeater         =>{ setRepeat      =>"[no1..36] -sendName- -recName- [bdcast-yes|no]"
-                                          ,inhibit        =>"[on|off]"
+                     ,repeater         =>{ setRepeat      =>"-noX- -sendName- -recName- 'bdcast'(yes|no)"
+                                          ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
                                          }
                      ,KFM100           =>{ statusRequest  =>""}
@@ -1816,14 +1817,14 @@ $culHmSubTypeSets{motionDetector}       =
 $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
 
 %culHmModelSets = (# channels of this subtype-------------
-                      "HM-CC-VD"         =>{ valvePos       =>"[off|0.0..99.0]"}
+                      "HM-CC-VD"         =>{ valvePos       =>"[({off}|0.0..99.0)]"}
                      ,"HM-RC-19"         =>{ service        =>"-count-"
                                             ,alarm          =>"-count-"
-                                            ,display        =>"-text- [comma|no] [unit] [off|1|2|3] [off|on|slow|fast] -symbol-"
+                                            ,display        =>"-text- (comma|no) -unit- (off|1|2|3) (off|on|slow|fast) -symbol-"
                                            }
-                     ,"HM-PB-4DIS-WM-2"  =>{ text           =>"-txt1- -txt2-..."  }
-                     ,"HM-OU-LED16"      =>{ led            =>"[off|red|green|orange]"
-                                            ,ilum           => "[0-15] [0-127]"
+                     ,"HM-PB-4DIS-WM-2"  =>{ text           =>"-txt1- [-txt2-]"  }
+                     ,"HM-OU-LED16"      =>{ led            =>"(off|red|green|orange)"
+                                            ,ilum           => "(0-15) (0-127)"
                                             ,statusRequest  =>""
                                            }
                      ,"HM-OU-CFM-PL"     =>{ "on-for-timer" =>"-sec-"
@@ -1831,16 +1832,16 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                             ,on             =>""
                                             ,off            =>""
                                             ,toggle         =>""
-                                            ,inhibit        =>"[on|off]"
+                                            ,inhibit        =>"[(on|{off})]"
                                            }
-                     ,"HM-CC-RT-DN"      =>{ inhibit        =>"[on|off]"}
-                     ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[on|off]"}
+                     ,"HM-CC-RT-DN"      =>{ inhibit        =>"[(on|{off})]"}
+                     ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[(on|{off})]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
                      ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
-                     ,"HM-LC-JA1PBU-FM"  =>{ pctSlat        =>"[0-100]|old|noChng"
-                                            ,pctLvlSlat     =>"-value-|old|noChng -slatValue-|old|noChng"
+                     ,"HM-LC-JA1PBU-FM"  =>{ pctSlat        =>"(0-100|old|noChng)"
+                                            ,pctLvlSlat     =>"(-value-|old|noChng) (-slatValue-|old|noChng)"
                                            }
-                     ,"ACTIONDETECTOR"   =>{ clear          =>"[readings|all]"
+                     ,"ACTIONDETECTOR"   =>{ clear          =>"(readings|all)"
                                             ,update         =>""
                                            }
 );
@@ -1863,106 +1864,106 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
 
 
 %culHmChanSets = (
-                      "HM-CC-TC00"           =>{ "desired-temp" =>"[on|off|6.0..30.0]"
+                      "HM-CC-TC00"           =>{ "desired-temp" =>"(on|off|6.0..30.0)"
                                                 ,statusRequest  =>""
                                                 ,sysTime        =>""
 #                                                ,getSerial      =>""
                                                }
-                     ,"HM-DIS-EP-WM5501"     =>{ text           =>"-txt1- -txt2-..."  
-                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
+                     ,"HM-DIS-EP-WM5501"     =>{ text           =>"-txt1- [-txt2-]"  
+                                                ,peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [(actor|remote|{both})]"
                                                }
-                     ,"HM-RC-DIS-H-X-EUxx"   =>{ text           =>"-txt1- -txt2-..."  }
-                     ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- ... single [set|unset] [actor|remote|both]"
-                                                ,"desired-temp" =>"[on|off|6.0..30.0]"
-                                                ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                                ,partyMode      =>"[prep|exec] HH:MM durationDays ..."
-                                                ,displayMode    =>"[temp-only|temp-hum]"
-                                                ,displayTemp    =>"[actual|setpoint]"
-                                                ,displayTempUnit=>"[celsius|fahrenheit]"
-                                                ,controlMode    =>"[auto|manual|central|party]"
+                     ,"HM-RC-DIS-H-X-EUxx"   =>{ text           =>"-txt1- [-txt2-]"  }
+                     ,"HM-CC-TC02"           =>{ peerChan       =>" 0 -actChn- single [({set}|unset)] [(actor|remote|{both})]"
+                                                ,"desired-temp" =>"(on|off|6.0..30.0)"
+                                                ,tempListSat    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListSun    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListMon    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListTue    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListThu    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListWed    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListFri    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListTmpl   =>"[({verify}|restore)] [[-file-:]-templateName-]"
+                                                ,tempTmplSet    =>"[[-file-:]-templateName-]"
+                                                ,partyMode      =>"[(prep|{exec})] -HH:MM- -durationDays- [...]"
+                                                ,displayMode    =>"(temp-only|temp-hum)"
+                                                ,displayTemp    =>"(actual|setpoint)"
+                                                ,displayTempUnit=>"(celsius|fahrenheit)"
+                                                ,controlMode    =>"(auto|manual|central|party)"
                                                 ,statusRequest  =>""
                                                 ,sysTime        =>""
                                                }
                      ,"HM-CC-RT-DN00"        =>{ sysTime        =>"" }
-                     ,"HM-CC-RT-DN04"        =>{ controlMode    =>"[auto|manual|boost|day|night]"
-                                                ,controlManu    =>"[on|off|5.0..30.0]"
+                     ,"HM-CC-RT-DN04"        =>{ controlMode    =>"(auto|manual|boost|day|night)"
+                                                ,controlManu    =>"(on|off|5.0..30.0)"
                                                 ,controlParty   =>"-temp- -startDate- -startTime- -endDate- -endTime-"
-                                                ,tempListSat    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListSun    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListMon    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListTue    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListThu    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListWed    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListFri    =>"[prep|exec] HH:MM temp ..."
-                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                                ,"desired-temp" =>"[on|off|5.0..30.0]"
+                                                ,tempListSat    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListSun    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListMon    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListTue    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListThu    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListWed    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListFri    =>"[(prep|{exec})] -HH:MM- -temp- [...]"
+                                                ,tempListTmpl   =>"[({verify}|restore)] [[-file-:]-templateName-]"
+                                                ,tempTmplSet    =>"[[-file-:]-templateName-]"
+                                                ,"desired-temp" =>"(on|off|5.0..30.0)"
                                                 ,sysTime        =>""
                                                }
                      ,"HM-TC-IT-WM-W-EU00"   =>{ sysTime        =>""
 #                                                ,getSerial      => ""
                                                }
-                     ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
-                     ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"[auto|manual|boost|day|night]"
-                                                ,controlManu    =>"[on|off|5.0..30.0]"
+                     ,"HM-TC-IT-WM-W-EU01"   =>{ peerChan       =>"-btnNumber- -actChn- ... [({single})] [({set}|unset)] [(actor|remote|{both})]"}
+                     ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"(auto|manual|boost|day|night)"
+                                                ,controlManu    =>"(on|off|5.0..30.0)"
                                                 ,controlParty   =>"-temp- -startDate- -startTime- -endDate- -endTime-"
-                                                ,tempListSat    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListSun    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListMon    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListTue    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListThu    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListWed    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,tempListFri    =>"[prep|exec] [p1|p2|p3] HH:MM temp ..."
-                                                ,"desired-temp" =>"[on|off|5.0..30.0]"
-                                                ,tempListTmpl   =>"[verify|restore] [[-file-:]templateName] ..."
-                                                ,tempTmplSet    =>"[[-file-:]templateName] ..."
-                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"
+                                                ,tempListSat    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListSun    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListMon    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListTue    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListThu    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListWed    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListFri    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,"desired-temp" =>"(on|off|5.0..30.0)"
+                                                ,tempListTmpl   =>"[({verify}|restore)] [[-file-:]-templateName-]"
+                                                ,tempTmplSet    =>"[[-file-:]-templateName-] ..."
+                                                ,peerChan       =>"-btnNumber- -actChn- ... [({single})] [({set}|unset)] [(actor|remote|{both})]"
                                                }
-                     ,"HM-OU-CFM-PL01"       =>{ led            =>"[redL|greenL|orangeL|redS|greenS|orangeS|pause][,-color2-...] [-repeat-]"}
-                     ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [-repeat-]"
+                     ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[(,-color2-...)] [-repeat-]"}
+                     ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [(-repeat-|{1})]"
                                                 ,pct            =>"[-value- ... [-ontime-]"}
                      ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"text1,icon1:text2,icon2:text3,icon3 ... -sound- -repetition- -pause- -signal-"}                                       
-                     ,"HM-DIS-WM5501"        =>{ displayWM      =>"[long|short|help] -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "
-                                                ,peerChan       =>"-btnNumber- -actChn- ... single [set|unset] [actor|remote|both]"}
+                     ,"HM-DIS-WM5501"        =>{ displayWM      =>"(long|short|help) -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] ...[-textNo6- -color6- -icon6-] "
+                                                ,peerChan       =>"-btnNumber- -actChn- ... [({single})] [({set}|unset)] [(actor|remote|{both})]"}
                      ,"HM-ES-PMSW1-PL01"     =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
                                                 ,on             =>""
                                                 ,off            =>""
                                                 ,toggle         =>""
-                                                ,press          =>"[long|short] [-peer-] [-repCount(long only)-] [-repDelay-] ..."
-                                                ,inhibit        =>"[on|off]"
+                                                ,press          =>"[(long|{short})] [(-peer-|{self})] [(-repCount-|{1})] [(-repDelay-|{0})]"
+                                                ,inhibit        =>"[(on|{off})]"
                                                 ,statusRequest  =>""
                                                }
 #                     ,"HM-ES-PMSW1-PL00"     =>{ getSerial      => ""
 #                                                ,getDevInfo     => ""
 #                                               }
-                     ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [-ramptime-]..."
-                                                ,"on-till"      =>"-time- [-ramptime-]..."
+                     ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{0})]"
+                                                ,"on-till"      =>"-time- [(-ramptime-|{0})]"
                                                 ,on             =>""
                                                 ,off            =>""
                                                 ,toggle         =>""
-                                                ,pct            =>"-value- ... [-ontime-] [-ramptime-]"
+                                                ,pct            =>"-value- ... [(-ontime-|{0})] [(-ramptime-|{0})]"
                                                 ,stop           =>""
-                                                ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                                ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                                ,inhibit        =>"[on|off]"
+                                                ,up             =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,down           =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,inhibit        =>"[(on|{off})]"
                                                 ,statusRequest  =>""
-                                                ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                                ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                                }
                      ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright[0-100]- -colVal[0-100]- -duration- -ramp- ..."
                                                 ,color          =>"-colVal[0-100]-"
                                                 ,on             =>""
                                                 ,off            =>""
-                                                ,up             =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
-                                                ,down           =>"[-changeValue-] [-ontime-] [-ramptime-] ..."
+                                                ,up             =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,down           =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
                                                }
                      ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- -min- -max- -duration- -ramp- ..."
                                                 ,colProgram     =>"[0|1|2|3|4|5|6]"
@@ -1971,15 +1972,15 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,off            =>""
                                                 ,"on-for-timer" =>"-ontime-"
                                                 ,"on-till"      =>"-time-"
-                                                ,inhibit        =>"[on|off]"
+                                                ,inhibit        =>"[(on|{off})]"
                                                }
-                     ,"HM-SEC-SIR-WM04"      =>{ alarmLevel     =>"[disarmed|armExtSens|armAll|armBlocked]"
+                     ,"HM-SEC-SIR-WM04"      =>{ alarmLevel     =>"(disarmed|armExtSens|armAll|armBlocked)"
                                                }
                      ,"HM-SEC-WIN01"         =>{ stop           =>"",
-                                                ,level          =>"-level- -relockDly- -speed-..."
+                                                ,level          =>"-level- [(-relockDly-|{0})] [(-speed-|{0})]"
                                                 ,keydef         =>"-btn- -txt1- -txt2-"
-                                                ,inhibit        =>"[on|off]"
-                                                ,peerIODev      =>"[IO] -btn- [set|unset]... not for future use"
+                                                ,inhibit        =>"[(on|{off})]"
+                                                ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                                }
                      ,"HM-SEN-RD-O02"        =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
@@ -1988,10 +1989,10 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,toggle         =>""
                                                }
                      ,"CCU-FHEM00"           =>{ update         =>""
-                                                ,hmPairForSec   =>"-sec- ..."
+                                                ,hmPairForSec   =>"[-sec-]"
                                                 ,hmPairSerial   =>"-serial-"
                                                 ,defIgnUnknown  =>""
-                                                ,assignIO       =>"-IO- [set|unset]..."
+                                                ,assignIO       =>"-IO- [({set}|unset)]"
                                                }
  );
 # clones- - - - - - - - - - - - - - - - -
@@ -2040,11 +2041,11 @@ $culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
                         },
   sdLead2             =>{ alarmOn       =>""
                          ,alarmOff      =>""
-                         ,teamCall      =>"no ..."
+                         ,teamCall      =>"[({no})]"
                         },
-  vdCtrl              =>{ valvePos      =>"[off|0.0..99.0]"},
-  virtThSens          =>{ virtTemp      =>"[off|-20.0..50.0]",
-                          virtHum       =>"[off|0.0..99.0]"}
+  vdCtrl              =>{ valvePos      =>"(off|0.0..99.0)"},
+  virtThSens          =>{ virtTemp      =>"(off|-20.0..50.0)",
+                          virtHum       =>"(off|0.0..99.0)"}
 );
 
 #General $culHmFunctSets{"sdLead2"}          = $culHmFunctSets{"sdLead1"};
