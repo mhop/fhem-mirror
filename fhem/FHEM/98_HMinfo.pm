@@ -971,10 +971,10 @@ sub HMinfo_listOfTempTemplates() { ############################################
   @tmpl = map{s/$dir//;$_}      @tmpl;# then only the default dir -if avaialble
   
   $defs{$n}{helper}{weekplanList} = \@tmpl;
-  
   if ($modules{CUL_HM}{AttrList}){
     my $lst = "none,defaultWeekplan,".join(",",@tmpl);
     $modules{CUL_HM}{AttrList} =~ s/ tempListTmpl(.*? )/ tempListTmpl:$lst /;
+    $modules{CUL_HM}{tempListTmplLst} =  $lst;
   }
   return ;
 }
