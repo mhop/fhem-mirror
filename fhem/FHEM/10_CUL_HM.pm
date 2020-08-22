@@ -4269,7 +4269,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
                 .":".InternalVal($name,"peerList","")
                ;# update cmds entry in case
   }
-  if( $hash->{helper}{cmds}{cmdKey} ne $cmdKey){
+  if( $hash->{helper}{cmds}{cmdKey} ne $cmdKey || 1){
     my ($roleC,$roleD,$roleV,$fkt,$devName,$mId,$chn,$peerLst) = split(":", $cmdKey);
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
@@ -4312,8 +4312,8 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     $hash->{helper}{cmds}{lst}{peer} = join",",grep/./,split",",InternalVal($name,"peerList","");
     if ($peerLst ne ""){
       if (grep /^press:/,@arr1){
-        push @arr1,"pressS:-peer-";
-        push @arr1,"pressL:-peer-";
+        push @arr1,"pressS:[(-peer-|{self})]";
+        push @arr1,"pressL:[(-peer-|{self})]";
       }
     }
     else{#remove command
@@ -4412,134 +4412,136 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my @cmdPrep = ();
     foreach my $cmdS (keys%{$hash->{helper}{cmds}{cmdLst}}){
       my $val = $hash->{helper}{cmds}{cmdLst}{$cmdS};
-      if($val eq "noArg"){
-          $val = ":$val";
+
+      if($cmdS =~ m/^(pct|pctSlat)$/){
+        $val = ":slider,0,1,100";
       }
-      elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){#add relacements if available
-        my ($null,$repl) = ($1,$2);
-        if (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
-          $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
-          next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+      elsif($val !~ m/ /){#no space - this is a single param command (or less)
+        if   ($val eq "noArg"){
+            $val = ":$val";
         }
-        else{
+        elsif($val eq "-tempTmpl-"){
+          if(!defined $modules{CUL_HM}{tempListTmplLst} ){
+            $val = "";
+          }
+          else{
+            $val = ":$modules{CUL_HM}{tempListTmplLst}";
+          }
+        }
+        elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){#add relacements if available
+          my ($null,$repl) = ($1,$2);
+          if (defined $hash->{helper}{cmds}{lst}{$repl}){
+            $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
+            $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
+            next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+          }
+          else{
+            $val = "";
+          }
+        }
+        elsif($val =~ m/^(\[?)\(-([a-zA-Z]*?)-\|\{(.*)\}\)\]? *$/){#add relacements if available plus default
+          my ($null,$repl,$def) = ($1,$2,$3);
+          $def = "" if (!defined $def);
+          if (defined $hash->{helper}{cmds}{lst}{$repl}){
+            $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
+#            $val =~ s/\[?(?-$repl-\)?\]?/:$null$hash->{helper}{cmds}{lst}{$repl}$def/; 
+            $val = ":$null$hash->{helper}{cmds}{lst}{$repl},$def";
+            next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+          }
+          else{
+            $val = $def;
+          }
+        }
+        elsif($val =~ m/^[\(\[]*([a-zA-Z0-9\;_-\|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
+          my $v1 = $1;
+          $v1 =~ s/[\{\}]//g;#remove default marking
+          my @lst1;
+          foreach(split('\|',$v1)){
+            if ($_ =~ m/(.*)\.\.(.*)/ ){
+              my ($min,$max,$step) = ($1,$2,0.5);
+              if ($max =~ m/(.*);(.*)/){
+                ($max,$step) = ($1,$2);
+              }
+              my @list = ();
+              for(my $i = $min;$i <= $max; $i += $step){
+                push @list,$i;
+              }
+              push @lst1,@list;
+            }
+            else{
+              push @lst1,$_;
+            }     
+          }
+          $val = ":".join(",",@lst1);
+        }
+        elsif($cmdS eq "color"){
+          $val = ":colorpicker,HUE,0,0.5,100";
+        }
+        else    {# no shortcut
           $val = "";
         }
       }
-      elsif($val =~ m/^(\[?)\(-([a-zA-Z]*?)-\|\{(.*)\}\)\]? *$/){#add relacements if available plus default
-        my ($null,$repl,$def) = ($1,$2,$3);
-        $def = "" if (!defined $def);
-        if (defined $hash->{helper}{cmds}{lst}{$repl}){
-          $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
-#          $val =~ s/\[?(?-$repl-\)?\]?/:$null$hash->{helper}{cmds}{lst}{$repl}$def/; 
-          $val = ":$null$hash->{helper}{cmds}{lst}{$repl},$def";
-          next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
-        }
-        else{
-          $val = $def;
-        }
-      }
-      elsif($val =~ m/^[\(\[]*([a-zA-Z0-9_-|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
-        my $v1 = $1;
-        $v1 =~ s/[\{\}]//g;#remove default marking
-        my @lst1;
-        foreach(split('\|',$v1)){
-          if ($_ =~ m/(.*)\.\.(.*)/ ){
-            my @list = map { ($_.".0", $_+0.5) } (($1+0)..($2+0));
-            pop @list;
-            push @lst1,@list;
-          }
-          else{
-            push @lst1,$_;
-          }     
-        }
-        $val = ":".join(",",@lst1);
-      }
-      elsif($cmdS eq  "virtual"){
-        $val = ":slider,1,1,50";
-      }
-      elsif($cmdS eq  "color"){
-        $val = ":colorpicker,HUE,0,0.5,100";
-      }
-      elsif($cmdS =~ m/^(pct|pctSlat)$/){
-        $val = ":slider,0,1,100";
-      }
-      else      {
+      else      {# multi-parameter - no quick select
         $val = "";
       }
       push @cmdPrep,"$cmdS$val";
     }
     @cmdPrep = ("--") if (!scalar @cmdPrep);
-    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @cmdPrep)." ";
-	if ($usg =~ m/ tempTmplSet/){
-      my $tl = $modules{CUL_HM}{AttrList}."";
-      my $ok = ($tl =~ s/.* (tempListTmpl)(\:.*? ).*/$2/);
-	  $tl = $ok ? $tl : "";
-      $usg =~ s/ tempTmplSet/ tempTmplSet$tl/;
-	}
-    return $usg;
+    return "Unknown argument $cmd, choose one of ".join(" ",@cmdPrep)." ";
   }
 
   ###------------------- commands parameter parsing -------------------###
-  my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
-  if($paraOpts eq "noArg"){ # no argument allowed
-     return "$cmd no params required" if(@a != 2);
-  }
-  elsif(@a == 2){# no arguments - is this ok?
-    if($paraOpts !~ m/\.\.\./ && $paraOpts !~ m/^\[.*?\] *$/ ){# argument required
-      return "$cmd parameter required:$paraOpts";  
-    }
-    else{
-      push @a,"noArg";
-    }
-  }
-  if (0){#not active by now
+  if (1){
     my @parIn = grep!/noArg/,@a[2..$#a];
-    my $in = scalar(@parIn);
-    
-    $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//;#remove comment, ... and noArg
-    my $min = scalar(split(" ",$paraOpts));
-#    my @optLst = grep!/\[\]/,split(" ",$paraOpts);#[...] would leave an empty list
+
+    my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
+    $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//;#remove comment, "..." and noArg
     my @optLst = split(" ",$paraOpts);#[...] would leave an empty list
+    #my $max = $hash->{helper}{cmds}{cmdLst}{$cmd} =~ m/\.\.\./ ? 99 : scalar(@optLst);
+    $paraOpts =~ s/(\[.*?\])//g; # remove optionals
     my $pCnt = 0;
-    foreach my $param (@optLst){
-      my $optional = $param =~ m/^\[(.*)\]$/ ? 1:0;
-      $param =~ s/^\[(.*)\]$/$1/; # remove optional
-      if($param =~ m/^\((.*)\)$/ ){# list?
-        my @parLst = split("|",$1);
-        if(  defined $parIn[$pCnt]){
-          if( grep/$parIn[$pCnt]/,@parLst){
+    my $paraFail = "";
+    foreach my $param (@optLst){ # check each parameter
+      my $optional = $param =~ m/^\[(.*)\]$/ ? 1:0; # is parameter optional?
+      $param =~ s/^\[(.*)\]$/$1/;                   # remove optional brackets
+      if($param =~ m/^\((.*)\)$/ ){                 # list of optionals?
+        my @parLst = split('\|',$1);
+        if(  defined $parIn[$pCnt]){                # user param provided
+          if( grep/$parIn[$pCnt]/,@parLst){         # parameter matched 
           }
-          else{
-            if($param =~ m/-.*-/){#free value possible
+          else{                                     # user param no match
+            if($param =~ m/-.*-/){                  #    but not distinct
             }
-            elsif($optional && $param =~ m/\{(.*?)\}/){#found default
+            elsif($optional && $param =~ m/\{(.*?)\}/){# no match, distinct but optional with default
               my $default = $1;
               splice @parIn, $pCnt, 0,$default;#insert the default
             }
-            else{
-              return "$parIn[$pCnt] does not match parameter $pCnt: $optLst[$pCnt]";
+            else{                                   # no match, distinct, not optional or no default => fail
+              $paraFail = "$parIn[$pCnt] does not match options";
             }
           }
         }
-        else{
-          if($optional && $param =~ m/\{(.*)\}/){#defaut
+        else{                                       # no user param
+          if($optional && $param =~ m/\{(.*)\}/){   # defaut available, use it
             my $default = $1;
             splice @parIn, $pCnt, 0,$default;#insert the default
           }
-          else{
-            return "param $pCnt: $optLst[$pCnt] is not optional or no dafault identifies";
+          else{                                     # no user param, no default => fail
+            $paraFail = "is not optional. No dafault identifies";
           }
         }
       }
-      return "parameter missing for $pCnt: $optLst[$pCnt]" if(!defined $parIn[$pCnt] && !$optional);
-      
+      $paraFail = "is required but missing" if(!defined $parIn[$pCnt] && !$optional);
+    
+      return "param $pCnt:($optLst[$pCnt]) => $paraFail"
+            ."\n$cmd: $hash->{helper}{cmds}{cmdLst}{$cmd}" if($paraFail);
+
       $pCnt++;
     }
-    $paraOpts =~ s/(\[.*?\])//g;
-    my $max = scalar(split(" ",$paraOpts));
+
     splice @parIn, $pCnt, 0,"nArg" if(scalar(@parIn) == 0);
-    return;
+    @a = ($a[0],$cmd,@parIn);
+    Log3 $name,3,"CUL_HM set $name " . join(" ", @a[1..$#a]);
   }
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
