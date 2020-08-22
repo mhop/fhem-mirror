@@ -868,6 +868,7 @@ f18_textInput()
   $("#"+n).dialog({
     dialogClass:"no-close", modal:true, width:"auto", closeOnEscape:true, 
     maxWidth:$(window).width()*0.9, maxHeight:$(window).height()*0.9,
+    position: { my: "right", at: "center" },
     buttons: [
     {text:"Execute",click:function(){ FW_execRawDef( ta.val()) }},
     {text:"Close", click:function(){ $(this).remove(); }},
