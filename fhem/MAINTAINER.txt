@@ -303,7 +303,7 @@ FHEM/59_HCS.pm               hjr                  Automatisierung (oder auch PM)
 FHEM/59_LuftdatenInfo        igami                Bastelecke
 FHEM/59_OPENWEATHER.pm       tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
 FHEM/59_PROPLANTA.pm         tupol                Unterstützende Dienste/Wettermodule (Link als PM an tupol)
-FHEM/59_Twilight.pm          jeschkec             Unterstützende Dienste/Wettermodule
+FHEM/59_Twilight.pm          rudolfkoenig         Unterstützende Dienste/Wettermodule
 FHEM/59_Weather.pm           neubert              Unterstützende Dienste/Wettermodule
 FHEM/59_Wunderground.pm      loredo               (deprecated)
 FHEM/59_WUup.pm              mahowi               Unterstützende Dienste/Wettermodule
@@ -583,7 +583,7 @@ FHEM/WMBus.pm                kaihs                Sonstige Systeme
 FHEM/wundergroundAPI.pm      loredo               Unterstützende Dienste/Wettermodule
 FHEM/YahooWeatherAPI.pm      neubert              (deprecated)
 FHEM/FhemUtils/*             mfr69bs              Sonstiges
-FHEM/holiday/*               jeschkec             Sonstiges
+FHEM/holiday/*               rudolfkoenig         Sonstiges
 FHEM/lib/*deviceconfig.xml.gz        krikan       ZWave
 FHEM/lib/*manufacturer_specific.xml  krikan       ZWave
 FHEM/lib/AttrTemplate/huedevice.template Shojo    https://forum.fhem.de/index.php/topic,101829.html
@@ -602,7 +602,7 @@ FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
 lib/FHEM/Core/Timer/Helper.pm sidey79             FHEM Development
 
-contrib/sacha_gloor/*        jeschkec             Sonstiges
+contrib/sacha_gloor/*        rudolfkoenig         Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)
 contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
