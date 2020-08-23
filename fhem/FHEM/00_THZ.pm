@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2020
-my $thzversion = "0.187";
+my $thzversion = "0.188";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1476,6 +1476,7 @@ sub THZ_Get_Comunication($$) {
     if  ($msg ne "10")       {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
     else  {
         THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
+        select(undef, undef, undef, 0.1); #needed by heiner? msg1080204
         ($err, $msg) = THZ_ReadAnswer($hash);
     }
     if  (defined($err))     {$err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
@@ -1503,12 +1504,12 @@ sub THZ_ReadAnswer($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
-    select(undef, undef, undef, 0.001);
+    select(undef, undef, undef, 0.002);
 	my $buf = DevIo_SimpleRead($hash);
     if(!defined($buf)) {
         select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")) / 2; #added for Andre he would like to have 8/2 second.
-        $rtimeout = 0.5 if (AttrVal($name, "nonblocking", "0") eq 0); # set to 0.5s if nonblocking disabled
+        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")); 
+        $rtimeout = minNum($rtimeout,0.7) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 0.7s if nonblocking disabled
         $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
     }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
