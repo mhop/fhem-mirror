@@ -29,7 +29,7 @@ use warnings;
 use utf8;
 use HttpUtils;
 use List::Util qw( any );
-use Text::Balanced qw ( extract_codeblock extract_delimited );
+use Text::Balanced qw ( extract_codeblock extract_delimited extract_bracketed );
 use Time::Local qw( timelocal timegm );
 use Unicode::Normalize qw( NFD );
 
@@ -119,7 +119,8 @@ sub JsonMod_Run {
 sub JsonMod_Set {
 	my ($hash, $name, $cmd, @args) = @_;
 
-	return "Unknown argument $cmd, choose one of secret" if ($cmd eq '?');
+	my @cmds = qw( reread secret );
+	return sprintf ("Unknown argument $cmd, choose one of %s", join(' ', @cmds)) unless (any {$cmd eq $_} @cmds);
 
 	if ($cmd eq 'secret') {
 		if (not $args[1] and (exists($hash->{'CONFIG'}->{'SECRET'}->{$args[0]}))) {
@@ -129,6 +130,10 @@ sub JsonMod_Set {
 			$hash->{'CONFIG'}->{'SECRET'}->{$args[0]} = \$args[1];
 			JsonMod_WritePvtConfig($hash);
 		};
+		return;
+	} elsif ($cmd eq 'reread') {
+		return 'request already pending' if ($hash->{'CONFIG'}->{'IN_REQUEST'});
+		JsonMod_ApiRequest($hash);
 		return;
 	};
 
@@ -277,154 +282,8 @@ sub JsonMod_DoReadings {
 	foreach my $key (keys %{$hash->{'READINGS'}}) {
 		$oldReadings->{$key} = 0;
 	};
-	
-	my sub jsonPathf {
-		# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
-		no if $] >= 5.022, 'warnings', qw( redundant missing );
-		#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
-		my ($jsonPathExpression, $format) = @_;
-		$format //= '%s';
-		my $value = $path->get($jsonPathExpression)->getResultValue();
-		#$path->get($jsonPathExpression)->getResultNormVal();
-		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
-		if (defined($value)) {
-			return sprintf($format, $value);
-		} else {
-			return undef;
-		};
-	};
 
-	my sub jsonPath {
-		my ($jsonPathExpression) = @_;
-		return $path->get($jsonPathExpression)->getResultValue();
-	};
-
-	my sub concat {
-		my @args = @_;
-		return sub {
-			my ($o) = @_;
-			my $result = '';
-			foreach my $arg (@args) {
-				if (ref($arg) eq 'CODE') {
-					$result .= $arg->($o);
-				} elsif (ref($arg) eq 'ARRAY' and @{$arg}) {
-					$result .= $arg->[0];
-				} else {
-					$result .= $arg;
-				};
-			};
-			return $result;
-		};
-	};
-
-	# my sub propertyf {
-	# 	my ($p, $default, $format) = @_;
-	# 	$default //= '';
-	# 	$format //= '';
-	# 	return sub {
-	# 		my ($o) = @_;
-	# 		if (ref($o) eq 'CODE') {
-	# 			return $o->($p, $default);
-	# 		} elsif (ref($o) eq 'HASH') {
-	# 			my $result = $o->{$p} if (exists($o->{$p}));
-	# 			if (defined($result)) {
-	# 				if (ref($result) eq '') {
-	# 					return sprintf ($format, $result);
-	# 				} else {
-	# 					return $result;
-	# 				};
-	# 			} else {
-	# 				return $default;
-	# 			};
-	# 		} elsif (ref($o) eq 'ARRAY') {
-	# 			my $result = $o->[$p] if ((scalar @{$o}) > ($p + 0));
-	# 			if (defined($result)) {
-	# 				if (ref($result) eq '') {
-	# 					return sprintf ($format, $result);
-	# 				} else {
-	# 					return $result;
-	# 				};
-	# 			} else {
-	# 				return $default;
-	# 			};
-	# 		} elsif (ref($o) eq '') {
-	# 			return $o;
-	# 		} else {
-	# 			die('syntax');
-	# 		};
-	# 	};
-	# };
-
-	my sub propertyf {
-		my ($propertyPath, $default, $format) = @_;
-		$default //= '';
-		$format //= '%s';
-		return sub {
-			my ($o) = @_;
-			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
-			$default = $default->($o) if (ref($default) eq 'CODE');
-			$format = $format->($o) if (ref($format) eq 'CODE');
-
-			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
-				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
-				if (defined($presult)) {
-					if (ref($presult) eq 'ARRAY') {
-						if (scalar(@{$presult})) {
-							no if $] >= 5.022, 'warnings', qw( redundant missing );
-							return sprintf($format, $presult->[0]); # the first element if multiple. be gentle ;)
-						} else {
-							return $default;
-						};
-					} else {
-						return $presult;
-					};
-				};
-		 	} else {
-		 		no if $] >= 5.022, 'warnings', qw( redundant missing );
-		 		return sprintf($format, $o);
-		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
-		 	};
-		};
-	};
-
-	my sub property {
-		my ($propertyPath, $default) = @_;
-		$default //= '';
-		return sub {
-			my ($o) = @_;
-			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
-			$default = $default->($o) if (ref($default) eq 'CODE');
-
-			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
-				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
-				if (defined($presult)) {
-					if (ref($presult) eq 'ARRAY') {
-						if (scalar(@{$presult})) {
-							return $presult->[0]; # the first hit if many. be gentle ;)
-						} else {
-							return $default;
-						};
-					} else {
-						return $presult;
-					};
-				};
-		 	} else {
-		 		return $o;
-		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
-		 	};
-		};
-	};
-
-
-	my $_index = 0;
-	my sub index {
-		#my $index = 0;
-		return sub {
-			return $_index;
-		};
-	};
-
-	# sanitize reading names to comply with the rules
+	# sanitize reading names to comply with fhem naming conventions
 	# (allowed chars: A-Za-z/\d_\.-)
 	my sub sanitizedSetReading {
 		my ($r, $v) = @_;
@@ -437,7 +296,7 @@ sub JsonMod_DoReadings {
 		$r =~ s/([^A-Za-z0-9\/_\.-])//g;
 		# prevent a totally stripped reading name
 		# todo, log it?
-		$r = "_Identifier_$_index" unless($r);
+		#$r = "_Identifier_$_index" unless($r);
 		$v //='';
 		utf8::encode($v) if utf8::is_utf8($v);
 		$newReadings->{$r} = $v;
@@ -445,73 +304,474 @@ sub JsonMod_DoReadings {
 		#printf "1 %s %s %s %s\n", $r, length($r), $v, length($v);
 	};
 
-	my sub multi {
-		my ($value, @refs) = @_;
-		die ('jsonPath result not a list') if (ref($value) ne 'ARRAY');
+	my sub concat {
+		my @args = @_;
+		my $result = '';
+		foreach my $arg (@args) {
+			$result .= $arg;
+		};
+		return $result;
+	};
 
-		# if ($name eq 'irantest') {
-		# 	use Data::Dumper;
-		# 	print Dumper $value;
-		# }
+	# processing attr readingList
+	my $readingList = AttrVal($name, 'readingList', '');
+	utf8::decode($readingList); # data from "ouside"
 
-		$_index = 0;
-		foreach my $element (@{$value}) {
-			#use Data::Dumper;
-			#print Dumper $element;
-			my @reading;
-			foreach my $ref (@refs) {
-				push @reading, $ref->($element);
+	while ($readingList) {
+
+		my ($args, $cmd);
+
+		next if ($readingList =~ s/^\s*#.*\R*//); # remove comments
+		($args, $readingList, $cmd) = extract_codeblock ($readingList, '()', '(?m)[^(]*');
+		if (not $cmd or $@) {
+			JsonMod_Logger($hash, 2, 'syntax error in readingList statement: \'%s%s\' %s', $readingList);
+			last;
+		};
+		$cmd =~ s/^\s+|\s+$//g; # chomp
+		$readingList =~ s/\s*;//;
+
+		# control warnings, required in multi()
+		my $warnings = 1;
+		my sub logWarnings {
+			return unless ($warnings);
+			my ($msg) = @_;
+			$msg =~ s/at \(eval.*$//;
+			JsonMod_Logger($hash, 3, 'warning: %s in \'%s%s\'', $msg, $cmd, $args);
+		};
+
+		if ($cmd eq 'single') {
+
+			my sub jsonPath {
+				my ($propertyPath) = @_;
+				my $presult = $path->get($propertyPath)->getResultValue();
+				if (defined($presult)) {
+					if ((ref($presult) eq 'ARRAY') and (scalar(@{$presult}))) {
+						return $presult->[0]; # the first hit if many. be gentle ;)
+					} elsif ((ref($presult) eq 'HASH') or (ref($presult) eq '')) {
+						return $presult;
+					};
+				};
+				return;
 			};
-			$_index++;
-			sanitizedSetReading($reading[0], $reading[1]);
-			# $newReadings->{$reading[0]} = $reading[1];
-			# $oldReadings->{$reading[0]} = 1;
+
+			my sub jsonPathf {
+				my ($propertyPath, $format) = @_;
+				$format //= '%s';
+				my $presult = jsonPath($propertyPath);
+				if (defined($presult)) {
+					return sprintf($format, $presult);
+				};
+				return;
+			};
+
+			my sub s1 {
+				my ($readingValue, $readingName, $default) = @_;
+				$readingValue //= $default;
+				$readingName //= '';
+				sanitizedSetReading($readingName, $readingValue) if (defined($readingValue));
+			};
+
+			{
+				local $SIG{__WARN__} = \&logWarnings;
+				eval 's1'.$args;
+				if ($@) {
+					my $msg = $@;
+					$msg =~ s/at \(eval.*$//;
+					JsonMod_Logger($hash, 2, 'error: %s in \'%s%s\'', $msg, $cmd, $args);
+				};
+			};
+
+		} elsif ($cmd eq 'multi') {
+
+			my $resultSet;
+			my $resultObject;
+			my $index = 0;
+
+			my sub count {
+				return $index;
+			};
+
+			my sub index {
+				my @args = @_;
+				if (scalar @args > 1) {
+					return CORE::index($args[0], $args[1], $args[2]);
+				} else {
+					JsonMod_Logger($hash, 1, 'use of \'index()\' as item counter is depraced in \'%s%s\'. Replace with \'count\'.', $cmd, $args);
+					return $index;
+				};
+			};
+
+			my sub property {
+				my ($propertyPath, $default) = @_;
+				#$default //= '';
+				return unless (defined($resultObject));
+				
+				if (ref($resultObject) eq 'HASH' or ref($resultObject) eq 'ARRAY') {
+					my $presult = JsonMod::JSON::Path->new($resultObject)->get($propertyPath)->getResultValue();
+					if (defined($presult)) {
+						if ((ref($presult) eq 'ARRAY') and (scalar(@{$presult}))) {
+							return $presult->[0]; # the first hit if many. be gentle ;)
+						} elsif ((ref($presult) eq 'HASH') or (ref($presult) eq '')) {
+							return $presult;
+						};
+					};
+				};
+				return $default if (defined($default));
+				return;
+			};
+
+			my sub propertyf {
+				my ($propertyPath, $default, $format) = @_;
+				$format //= '%s';
+				my $presult = property($propertyPath, $default);
+				if (defined($presult)) {
+					return sprintf($format, $presult);
+				};
+				return;
+			};
+
+			my sub jsonPath {
+				my ($jsonPathExpression) = @_;
+				$resultSet = $path->get($jsonPathExpression)->getResultValue() unless (defined($resultSet));
+				return $jsonPathExpression;
+			};
+
+			my sub m2 {
+				my ($jsonPathExpression, $readingName, $readingValue) = @_;
+				sanitizedSetReading($readingName, $readingValue);
+				$index++;
+			};
+
+			my sub m1 {
+				my ($jsonPathExpression, $readingName, $readingValue) = @_;
+
+				$warnings = 1;
+
+				if (ref($resultSet) eq 'ARRAY') {
+					foreach (@{$resultSet}) {
+						$resultObject = $_;
+						eval 'm2'.$args; warn $@ if $@;
+					};
+				};				
+			};
+
+			{
+				local $SIG{__WARN__} = \&logWarnings;
+				$warnings = 0;
+				eval 'm1'.$args;
+				if ($@) {
+					my $msg = $@;
+					$msg =~ s/at \(eval.*$//;
+					JsonMod_Logger($hash, 2, 'error: %s in \'%s%s\'', $msg, $cmd, $args);
+				};
+			};
+		} elsif ($cmd eq 'complete') {
+
+			my $index = 0;
+
+			my sub c1 {
+				my ($jsonPathExpression) = @_;
+				$jsonPathExpression //= '$..*';
+
+				my $resultSet = $path->get($jsonPathExpression)->getResultList();
+				#use Data::Dumper;
+				#print Dumper $resultSet;
+				if (ref($resultSet) eq 'ARRAY') {
+					foreach my $res (@{$resultSet}) {
+						my $k = $res->[0];
+						my $v = $res->[1];
+						# we are only interested in the values, not objects or arrays
+						if (ref($v) eq '') {
+							my @r;
+							$k =~ s/^\$//;
+					    	while (my $part = (extract_bracketed($k), '[]')[0]) { push @r, $part };
+							my $readingName = join('.', @r);
+							sanitizedSetReading($readingName, $v) if length($readingName);
+						};
+					};
+				};
+			};
+
+			{
+				local $SIG{__WARN__} = \&logWarnings;
+				eval 'c1'.$args;
+				if ($@) {
+					my $msg = $@;
+					#$msg =~ s/at \(eval.*$//;
+					$msg =~ s/(.*at ).*?(eval|98_JsonMod).*$/$1$cmd$args/m;
+					JsonMod_Logger($hash, 2, 'error: %s', $msg);
+				};
+			};
 		};
 	};
 
-	# value  (mostly jsonPath) / reading name / default if value is not available
-	my sub single {
-		my ($value, $reading, $default) = @_;
-		$value = $value->() if (ref($value) eq 'CODE');
-		$reading = $reading->() if (ref($reading) eq 'CODE');
-		$default = $default->() if (ref($default) eq 'CODE');
 
-		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
-		$value //= $default;
-		sanitizedSetReading($reading, $value);
-		# $newReadings->{$reading} = $value;
-		# $oldReadings->{$reading} = 1;
-		return;
+	# update readings
+	if (keys %{$newReadings}) {
+		my @newReadings;
+		my @oldReadings = split ',', ReadingsVal($name, '.computedReadings', '');
+		readingsBeginUpdate($hash);
+		foreach my $k (keys %{$newReadings}) {
+			#sanitizedSetReading($reading, $value);
+			readingsBulkUpdate($hash, $k, $newReadings->{$k});
+			push @newReadings, $k;
+		};
+		# reading is not used anymore
+		foreach my $k (keys %{$oldReadings}) {
+			readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
+		};
+		readingsBulkUpdate($hash, '.computedReadings', join ',', @newReadings);
+		readingsEndUpdate($hash, 1);
 	};
 
-	if (my $readingList = AttrVal($name, 'readingList', '')) {
-		# data from "ouside"
-		utf8::decode($readingList);
-		#JsonMod_Logger ($hash, 1, 'readingList: %s', $readingList);
-		# support for perl expressions within
-		my $NAME = $name; 
-		if (not eval $readingList and $@) {
-			JsonMod_Logger($hash, 2, 'error while evaluating readingList: %s', $@);
-			return;
-		};
-		if (keys %{$newReadings}) {
-			my @newReadings;
-			my @oldReadings = split ',', ReadingsVal($name, '.computedReadings', '');
-			readingsBeginUpdate($hash);
-			foreach my $k (keys %{$newReadings}) {
-				#sanitizedSetReading($reading, $value);
-				readingsBulkUpdate($hash, $k, $newReadings->{$k});
-				push @newReadings, $k;
-			};
-			# reading is not used anymore
-			foreach my $k (keys %{$oldReadings}) {
-				readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
-			};
-			readingsBulkUpdate($hash, '.computedReadings', join ',', @newReadings);
-			readingsEndUpdate($hash, 1);
-		};
-	};
 };
+
+# sub JsonMod_DoReadingsX {
+# 	my ($hash, $data) = @_;
+# 	my $name = $hash->{'NAME'};
+
+# 	my $path = JsonMod::JSON::Path->new($data);
+
+# 	my $newReadings = {};
+# 	my $oldReadings = {};
+# 	foreach my $key (keys %{$hash->{'READINGS'}}) {
+# 		$oldReadings->{$key} = 0;
+# 	};
+	
+# 	my sub jsonPathf {
+# 		# https://forum.fhem.de/index.php/topic,109413.msg1034685.html#msg1034685
+# 		no if $] >= 5.022, 'warnings', qw( redundant missing );
+# 		#eval 'no warnings qw( redundant missing )' if ($] >= 5.22);
+# 		my ($jsonPathExpression, $format) = @_;
+# 		$format //= '%s';
+# 		my $value = $path->get($jsonPathExpression)->getResultValue();
+# 		#$path->get($jsonPathExpression)->getResultNormVal();
+# 		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
+# 		if (defined($value)) {
+# 			return sprintf($format, $value);
+# 		} else {
+# 			return undef;
+# 		};
+# 	};
+
+# 	my sub jsonPath {
+# 		my ($jsonPathExpression) = @_;
+# 		return $path->get($jsonPathExpression)->getResultValue();
+# 	};
+
+# 	my sub concat {
+# 		my @args = @_;
+# 		return sub {
+# 			my ($o) = @_;
+# 			my $result = '';
+# 			foreach my $arg (@args) {
+# 				if (ref($arg) eq 'CODE') {
+# 					$result .= $arg->($o);
+# 				} elsif (ref($arg) eq 'ARRAY' and @{$arg}) {
+# 					$result .= $arg->[0];
+# 				} else {
+# 					$result .= $arg;
+# 				};
+# 			};
+# 			return $result;
+# 		};
+# 	};
+
+# 	# my sub propertyf {
+# 	# 	my ($p, $default, $format) = @_;
+# 	# 	$default //= '';
+# 	# 	$format //= '';
+# 	# 	return sub {
+# 	# 		my ($o) = @_;
+# 	# 		if (ref($o) eq 'CODE') {
+# 	# 			return $o->($p, $default);
+# 	# 		} elsif (ref($o) eq 'HASH') {
+# 	# 			my $result = $o->{$p} if (exists($o->{$p}));
+# 	# 			if (defined($result)) {
+# 	# 				if (ref($result) eq '') {
+# 	# 					return sprintf ($format, $result);
+# 	# 				} else {
+# 	# 					return $result;
+# 	# 				};
+# 	# 			} else {
+# 	# 				return $default;
+# 	# 			};
+# 	# 		} elsif (ref($o) eq 'ARRAY') {
+# 	# 			my $result = $o->[$p] if ((scalar @{$o}) > ($p + 0));
+# 	# 			if (defined($result)) {
+# 	# 				if (ref($result) eq '') {
+# 	# 					return sprintf ($format, $result);
+# 	# 				} else {
+# 	# 					return $result;
+# 	# 				};
+# 	# 			} else {
+# 	# 				return $default;
+# 	# 			};
+# 	# 		} elsif (ref($o) eq '') {
+# 	# 			return $o;
+# 	# 		} else {
+# 	# 			die('syntax');
+# 	# 		};
+# 	# 	};
+# 	# };
+
+# 	my sub propertyf {
+# 		my ($propertyPath, $default, $format) = @_;
+# 		$default //= '';
+# 		$format //= '%s';
+# 		return sub {
+# 			my ($o) = @_;
+# 			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
+# 			$default = $default->($o) if (ref($default) eq 'CODE');
+# 			$format = $format->($o) if (ref($format) eq 'CODE');
+
+# 			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
+# 				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
+# 				if (defined($presult)) {
+# 					if (ref($presult) eq 'ARRAY') {
+# 						if (scalar(@{$presult})) {
+# 							no if $] >= 5.022, 'warnings', qw( redundant missing );
+# 							return sprintf($format, $presult->[0]); # the first element if multiple. be gentle ;)
+# 						} else {
+# 							return $default;
+# 						};
+# 					} else {
+# 						return $presult;
+# 					};
+# 				};
+# 		 	} else {
+# 		 		no if $] >= 5.022, 'warnings', qw( redundant missing );
+# 		 		return sprintf($format, $o);
+# 		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
+# 		 	};
+# 		};
+# 	};
+
+# 	my sub property {
+# 		my ($propertyPath, $default) = @_;
+# 		$default //= '';
+# 		return sub {
+# 			my ($o) = @_;
+# 			$propertyPath = $propertyPath->($o) if (ref($propertyPath) eq 'CODE');
+# 			$default = $default->($o) if (ref($default) eq 'CODE');
+
+# 			if (ref($o) eq 'HASH' or ref($o) eq 'ARRAY') {
+# 				my $presult = JsonMod::JSON::Path->new($o)->get($propertyPath)->getResultValue();
+# 				if (defined($presult)) {
+# 					if (ref($presult) eq 'ARRAY') {
+# 						if (scalar(@{$presult})) {
+# 							return $presult->[0]; # the first hit if many. be gentle ;)
+# 						} else {
+# 							return $default;
+# 						};
+# 					} else {
+# 						return $presult;
+# 					};
+# 				};
+# 		 	} else {
+# 		 		return $o;
+# 		 		# die("something went wrong while processing the JsonMod property '$propertyPath'. pls report it");
+# 		 	};
+# 		};
+# 	};
+
+
+# 	my $_index = 0;
+# 	my sub index {
+# 		#my $index = 0;
+# 		return sub {
+# 			return $_index;
+# 		};
+# 	};
+
+# 	# sanitize reading names to comply with the rules
+# 	# (allowed chars: A-Za-z/\d_\.-)
+# 	my sub sanitizedSetReading {
+# 		my ($r, $v) = @_;
+
+# 		# convert into valid reading
+# 		#printf "0 %s %s %s %s\n", $r, length($r), $v, length($v);
+# 		$r = Unicode::Normalize::NFD($r);
+# 		utf8::encode($r) if utf8::is_utf8($r);
+# 		$r =~ s/\s/_/g;	# whitespace 
+# 		$r =~ s/([^A-Za-z0-9\/_\.-])//g;
+# 		# prevent a totally stripped reading name
+# 		# todo, log it?
+# 		$r = "_Identifier_$_index" unless($r);
+# 		$v //='';
+# 		utf8::encode($v) if utf8::is_utf8($v);
+# 		$newReadings->{$r} = $v;
+# 		$oldReadings->{$r} = 1;
+# 		#printf "1 %s %s %s %s\n", $r, length($r), $v, length($v);
+# 	};
+
+# 	my sub multi {
+# 		my ($value, @refs) = @_;
+# 		die ('jsonPath result not a list') if (ref($value) ne 'ARRAY');
+
+# 		# if ($name eq 'irantest') {
+# 		# 	use Data::Dumper;
+# 		# 	print Dumper $value;
+# 		# }
+
+# 		$_index = 0;
+# 		foreach my $element (@{$value}) {
+# 			#use Data::Dumper;
+# 			#print Dumper $element;
+# 			my @reading;
+# 			foreach my $ref (@refs) {
+# 				push @reading, $ref->($element);
+# 			};
+# 			$_index++;
+# 			sanitizedSetReading($reading[0], $reading[1]);
+# 			# $newReadings->{$reading[0]} = $reading[1];
+# 			# $oldReadings->{$reading[0]} = 1;
+# 		};
+# 	};
+
+# 	# value  (mostly jsonPath) / reading name / default if value is not available
+# 	my sub single {
+# 		my ($value, $reading, $default) = @_;
+# 		$value = $value->() if (ref($value) eq 'CODE');
+# 		$reading = $reading->() if (ref($reading) eq 'CODE');
+# 		$default = $default->() if (ref($default) eq 'CODE');
+
+# 		$value = $value->[0] if (ref($value) eq 'ARRAY' and scalar(@{$value}));
+# 		$value //= $default;
+# 		sanitizedSetReading($reading, $value);
+# 		# $newReadings->{$reading} = $value;
+# 		# $oldReadings->{$reading} = 1;
+# 		return;
+# 	};
+
+# 	if (my $readingList = AttrVal($name, 'readingList', '')) {
+# 		# data from "ouside"
+# 		utf8::decode($readingList);
+# 		#JsonMod_Logger ($hash, 1, 'readingList: %s', $readingList);
+# 		# support for perl expressions within
+# 		my $NAME = $name; 
+# 		if (not eval $readingList and $@) {
+# 			JsonMod_Logger($hash, 2, 'error while evaluating readingList: %s', $@);
+# 			return;
+# 		};
+# 		if (keys %{$newReadings}) {
+# 			my @newReadings;
+# 			my @oldReadings = split ',', ReadingsVal($name, '.computedReadings', '');
+# 			readingsBeginUpdate($hash);
+# 			foreach my $k (keys %{$newReadings}) {
+# 				#sanitizedSetReading($reading, $value);
+# 				readingsBulkUpdate($hash, $k, $newReadings->{$k});
+# 				push @newReadings, $k;
+# 			};
+# 			# reading is not used anymore
+# 			foreach my $k (keys %{$oldReadings}) {
+# 				readingsDelete($hash, $k) if ($oldReadings->{$k} == 0 and any { $_ eq $k} @oldReadings);
+# 			};
+# 			readingsBulkUpdate($hash, '.computedReadings', join ',', @newReadings);
+# 			readingsEndUpdate($hash, 1);
+# 		};
+# 	};
+# };
 
 sub JsonMod_StartTimer {
 	my ($hash) = @_;
@@ -652,6 +912,7 @@ sub JsonMod_ApiResponse {
 		return doError('invalid server response');
 	};
 
+	#use Memory::Usage;
 	#my $mu = Memory::Usage->new();
 	#$mu->record('before');
 	JsonMod_DoReadings($hash, $rs);
@@ -996,88 +1257,6 @@ sub DESTROY {
 	$self->{'root'}->release() if defined($self->{'root'});
 	delete $self->{'root'};	
 };
-
-# package JsonMod::Unicode::Node;
-
-# use strict;
-# use warnings;
-# use utf8;
-# use Scalar::Util qw( blessed );
-
-# sub new {
-# 	my ($class, $o, $direction, $encoding) = @_;
-# 	# special case for JSON 'true' / 'false'
-# 	$o = "$o" if (blessed($o) and blessed($o) eq 'JSON::PP::Boolean');
-# 	my $t = ref($o);
-# 	if ($t eq 'HASH') {
-# 		return JsonMod::Unicode::HNode->new($o, $direction, $encoding);
-# 	} elsif ($t eq 'ARRAY') {
-# 		return JsonMod::Unicode::ANode->new($o, $direction, $encoding);
-# 	} elsif ($t eq '') {
-# 		return JsonMod::Unicode::VNode->new($o, $direction, $encoding);
-# 	};
-# };
-
-# package JsonMod::Unicode::HNode;
-
-# use strict;
-# use warnings;
-# use utf8;
-# use parent -norequire, qw( JsonMod::Unicode::Node );
-
-# sub new {
-# 	my ($class, $o, $direction, $encoding) = @_;
-# 	my $self = bless {}, $class;
-# 	$encoding //= 'UTF-8';
-# 	my $converter = Encode::find_encoding($encoding);
-# 	my $result = {};
-# 	my $dec;
-# 	foreach my $k (keys %{$o}) {
-# 		$dec = $converter->decode($k) if (not $direction and ref($converter)); # outside to Unicode
-# 		$dec = $converter->encode($k) if ($direction and ref($converter)); # Unicode to outside
-# 		$dec //= $k; # in case of en- decoding failure
-# 		$result->{$dec} = JsonMod::Unicode::Node->new($o->{$k}, $direction, $encoding);
-# 	};
-# 	return $result;
-# };
-
-# package JsonMod::Unicode::ANode;
-
-# use strict;
-# use warnings;
-# use utf8;
-# use parent -norequire, qw( JsonMod::Unicode::Node );
-
-# sub new {
-# 	my ($class, $o, $direction, $encoding) = @_;
-# 	my $self = bless {}, $class;
-# 	#$encoding //= 'UTF-8';
-# 	#my $converter = Encode::find_encoding($encoding);
-# 	my $result = [];
-# 	for my $i (0 .. scalar(@{$o}) -1) {
-# 		push @{$result}, JsonMod::Unicode::Node->new($o->[$i], $direction, $encoding);
-# 	};
-# 	return $result;
-# };
-
-# package JsonMod::Unicode::VNode;
-
-# use strict;
-# use warnings;
-# use utf8;
-# use parent -norequire, qw( JsonMod::Unicode::Node );
-
-# sub new {
-# 	my ($class, $o, $direction, $encoding) = @_;
-# 	my $self = bless {}, $class;
-# 	$encoding //= 'UTF-8';
-# 	my $converter = Encode::find_encoding($encoding);
-# 	printf "value %s %s\n", $o, $converter;
-# 	$o = $converter->decode($o) if (not $direction and ref($converter)); # outside to Unicode
-# 	$o = $converter->encode($o) if ($direction and ref($converter)); # Unicode to outside
-# 	printf "value2 %s %s\n", $o, length($o);
-# 	return $o;
-# };
 
 package JsonMod::JSON::Path::Node;
 
@@ -1773,6 +1952,13 @@ sub listDates {
 	<a name="JsonModset"></a>
 	<b>Set</b>
 	<ul>
+		<li>reread
+			<ul>
+				<code>set &lt;name&gt; reread</code>
+				<br><br>
+				Trigger a load and processing of the json source manually.
+			</ul>
+		</li>
 		<li>secret
 			<ul>
 				<code>set &lt;name&gt; secret &lt;identifier&gt; &lt;value&gt;</code>
@@ -1823,25 +2009,39 @@ sub listDates {
 					Typically, this is based on the index of the array element and / or a property of the addressed objects.
 				</li>
 				<li>
-					jsonPath('$.');<br>
+					complete();<br>
+					Automatically creates readings for the entire JSON source. The readings ​​are named after their JSON path.
+				</li>
+				<li>
+					jsonPath('$.')<br>
 					Creates a jsonpath expression as part of a 'single' or 'multi' expression.
 				</li>
 				<li>
-					jsonPathf('$.', 'format');<br>
-					Creates a jsonpath expression as part of a 'single' expression and format its result. 
-					The syntax of the 'format' expression Mimics the syntax of printf.
+					jsonPathf('$.', 'format')<br>
+					Creates a jsonpath expression as part of a 'single' expression and format its result.
+					The syntax of the expression 'format' match to the syntax of printf.
 				</li>
 				<li>
-					concat('expression', 'expression', ...);
+					property('expression')<br>
+					Is used to access properties of the json objects within a multi() statement.
+				</li>
+				<li>
+					propertyf('expression', 'format')<br>
+					Is used to access properties of the json objects within a multi() statement and format its result.
+					The syntax of the expression 'format' match to the syntax of printf.
+				</li>
+				<li>
+					concat('expression', 'expression', ...)<br>
 					Concatenates the expressions to one result. 
-					Can be used in a 'multi ()' statement to create a reading name from one or more object properties or the index.
+					Can be used in a 'multi()' statement to create a reading name from one or more object properties or the index.
 				</li>
 				<li>
-					index();
+					count|count()<br>
+					<i>the old syntax index() is depraced but for a limited period of time still functional.</i>
 					Contains the index number of the current list element. 
-					Within 'multi ()' instructions for generating reading names using 'connect ()' are used.
+					Within 'multi()' instructions for generating reading names, ie by using concat('item_', count) or similar.
 				</li>
-
+				within the expresiions single() and multi(), additional perl expressions may be used if required. 
 			</ul>
 		</li>
 	</ul>
