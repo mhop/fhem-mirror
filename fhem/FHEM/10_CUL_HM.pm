@@ -4307,9 +4307,9 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{$md}} if (defined $lvlStr{mdCh}{"$md$chn"});
     push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{md}{$st}} if (defined $lvlStr{st}{$st});
     push @cond,"slider,0,1,255" if (!scalar @cond);
-    $hash->{helper}{cmds}{lst}{condition} = join(",",grep /./,@cond);
+    $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
-    $hash->{helper}{cmds}{lst}{peer} = join",",grep/./,split",",InternalVal($name,"peerList","");
+    $hash->{helper}{cmds}{lst}{peer} = join",",sort grep/./,split",",InternalVal($name,"peerList","");
     if ($peerLst ne ""){
       if (grep /^press:/,@arr1){
         push @arr1,"pressS:[(-peer-|{self})]";
@@ -4417,44 +4417,41 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $val = ":slider,0,1,100";
       }
       elsif($val !~ m/ /){#no space - this is a single param command (or less)
+        my $opt  = ($val =~ s/^\[(.*)\] *$/$1/ ? "noArg" : "");
+        $val =~ s/^\((.*)\)$/$1/;
+        my $dflt = ($val =~ s/\{(.*)\}// ? $1 : "");
+
         if   ($val eq "noArg"){
             $val = ":$val";
         }
+        elsif($cmdS eq "color"){
+          $val = ":colorpicker,HUE,0,0.5,100";
+        }
         elsif($val eq "-tempTmpl-"){
-          if(!defined $modules{CUL_HM}{tempListTmplLst} ){
+          if(!defined $modules{CUL_HM}{tempListTmplLst}){
             $val = "";
           }
           else{
             $val = ":$modules{CUL_HM}{tempListTmplLst}";
           }
         }
-        elsif($val =~ m/^(\[?)-([a-zA-Z]*?)-\]? *$/){#add relacements if available
-          my ($null,$repl) = ($1,$2);
+        elsif($val =~ m/^-([a-zA-Z]*?)-\|?(.*)$/){#add relacements if available plus default
+          my ($repl,$def) = ($1,$2);
+          $def = "" if (!defined $def);
           if (defined $hash->{helper}{cmds}{lst}{$repl}){
-            $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
-            $val =~ s/\[?-$repl-\]?/:$null$hash->{helper}{cmds}{lst}{$repl}/; 
-            next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
+            $repl = $hash->{helper}{cmds}{lst}{$repl};
+            next if ($repl.$dflt.$opt eq "");# - options
+            $val = ":".join(",",grep/./,( $dflt
+                                         ,$opt
+                                         ,$repl
+                                         ,$def));
           }
           else{
             $val = "";
           }
         }
-        elsif($val =~ m/^(\[?)\(-([a-zA-Z]*?)-\|\{(.*)\}\)\]? *$/){#add relacements if available plus default
-          my ($null,$repl,$def) = ($1,$2,$3);
-          $def = "" if (!defined $def);
-          if (defined $hash->{helper}{cmds}{lst}{$repl}){
-            $null = $null ? "noArg," : ""; # if "optional" add "noArg" to optionList
-#            $val =~ s/\[?(?-$repl-\)?\]?/:$null$hash->{helper}{cmds}{lst}{$repl}$def/; 
-            $val = ":$null$hash->{helper}{cmds}{lst}{$repl},$def";
-            next if ($hash->{helper}{cmds}{lst}{$repl} eq "");# no options - no command
-          }
-          else{
-            $val = $def;
-          }
-        }
-        elsif($val =~ m/^[\(\[]*([a-zA-Z0-9\;_-\|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
+        elsif($val =~ m/^([a-zA-Z0-9\;_-\|\.]*)$/){#(xxx|yyy) as optionlist - new
           my $v1 = $1;
-          $v1 =~ s/[\{\}]//g;#remove default marking
           my @lst1;
           foreach(split('\|',$v1)){
             if ($_ =~ m/(.*)\.\.(.*)/ ){
@@ -4472,10 +4469,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
               push @lst1,$_;
             }     
           }
-          $val = ":".join(",",@lst1);
-        }
-        elsif($cmdS eq "color"){
-          $val = ":colorpicker,HUE,0,0.5,100";
+          $val = ":".join(",",grep/./,($dflt,$opt,@lst1));
         }
         else    {# no shortcut
           $val = "";
@@ -4504,10 +4498,16 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     foreach my $param (@optLst){ # check each parameter
       my $optional = $param =~ m/^\[(.*)\]$/ ? 1:0; # is parameter optional?
       $param =~ s/^\[(.*)\]$/$1/;                   # remove optional brackets
-      if($param =~ m/^\((.*)\)$/ ){                 # list of optionals?
+      if($param =~ m/^\((.*)\)$/ ){                 # list of options?
         my @parLst = split('\|',$1);
         if(  defined $parIn[$pCnt]){                # user param provided
           if( grep/$parIn[$pCnt]/,@parLst){         # parameter matched 
+          }
+          elsif($param =~ m/([\d\.]*)\.\.([\d\.]*)/ ){# we check for min/max but not for step
+            my ($min,$max) = ($1,$2);
+            if ($parIn[$pCnt] < $min || $parIn[$pCnt] > $max ){
+              $paraFail = "$parIn[$pCnt] out of range";
+            }
           }
           else{                                     # user param no match
             if($param =~ m/-.*-/){                  #    but not distinct
@@ -4522,9 +4522,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           }
         }
         else{                                       # no user param
-          if($optional && $param =~ m/\{(.*)\}/){   # defaut available, use it
-            my $default = $1;
-            splice @parIn, $pCnt, 0,$default;#insert the default
+          if($optional){                            # optional
+            if($param =~ m/\{(.*)\}/){              #   defaut available, use it
+              my $default = $1;
+              splice @parIn, $pCnt, 0,$default;#insert the default
+            }
+            else{                                   # insert "noArg"
+              splice @parIn, $pCnt, 0,"noArg";
+            }
           }
           else{                                     # no user param, no default => fail
             $paraFail = "is not optional. No dafault identifies";
@@ -4533,13 +4538,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       }
       $paraFail = "is required but missing" if(!defined $parIn[$pCnt] && !$optional);
     
-      return "param $pCnt:($optLst[$pCnt]) => $paraFail"
+      return "param $pCnt:'$optLst[$pCnt]' => $paraFail"
             ."\n$cmd: $hash->{helper}{cmds}{cmdLst}{$cmd}" if($paraFail);
 
       $pCnt++;
     }
 
-    splice @parIn, $pCnt, 0,"nArg" if(scalar(@parIn) == 0);
+    splice @parIn, $pCnt, 0,"noArg" if(scalar(@parIn) == 0);
     @a = ($a[0],$cmd,@parIn);
     Log3 $name,3,"CUL_HM set $name " . join(" ", @a[1..$#a]);
   }
@@ -6076,8 +6081,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $sId = $roleV ? $dst : $id;  # ID of cmd-source must not be a physical
                                     # device. It can cause trouble with 
                                     # subsequent alarming 
-
-    $hash->{TESTNR} = ($a[2] ? $a[2] : ($hash->{TESTNR} + 1))%255;
+    $hash->{TESTNR} = (($a[2] && $a[2] ne "noArg") ? $a[2] : ($hash->{TESTNR} + 1))%255;
     if ($fkt eq "sdLead1"){# ($md eq "HM-CC-SCD")
       my $tstNo = sprintf("%02X",$hash->{TESTNR});
       my $val = ($cmd eq "teamCallBat")? "80" : "00";
