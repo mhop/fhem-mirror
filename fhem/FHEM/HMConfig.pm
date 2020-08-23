@@ -2041,11 +2041,11 @@ $culHmChanSets{"HM-TC-IT-WM-W-EU07"}    = $culHmChanSets{"HM-TC-IT-WM-W-EU01"};
                         },
   sdLead2             =>{ alarmOn       =>""
                          ,alarmOff      =>""
-                         ,teamCall      =>"[({no})]"
+                         ,teamCall      =>"[(1..255;1)]"
                         },
-  vdCtrl              =>{ valvePos      =>"(off|0.0..99.0;0.5)"},
-  virtThSens          =>{ virtTemp      =>"(off|-20.0..50.0;0.5)",
-                          virtHum       =>"(off|0.0..99.0;0.5)"}
+  vdCtrl              =>{ valvePos      =>"(off|0.0..99.0;0.1)"},
+  virtThSens          =>{ virtTemp      =>"(off|-20.0..50.0;0.1)",
+                          virtHum       =>"(off|0.0..99.0;0.1)"}
 );
 
 #General $culHmFunctSets{"sdLead2"}          = $culHmFunctSets{"sdLead1"};
