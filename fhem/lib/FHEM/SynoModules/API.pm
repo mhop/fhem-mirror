@@ -35,7 +35,8 @@ use Carp qw(croak carp);
 use version; our $VERSION = qv('1.0.0');
 
 use Exporter ('import');
-our @EXPORT_OK = qw(apistatic);
+our @EXPORT_OK   = qw(apistatic);
+our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 my %hspecs = (                                                           # Hash der verfügbaren API-Specs
   surveillance => {fn => "_staticSurveillance" },
