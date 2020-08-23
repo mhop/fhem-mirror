@@ -41,6 +41,7 @@ our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 my %hspecs = (                                                           # Hash der verfügbaren API-Specs
   surveillance => {fn => "_staticSurveillance" },
   chat         => {fn => "_staticChat"         },
+  calendar     => {fn => "_staticCalendar"     },
 );
 
 ########################################################################
@@ -103,6 +104,23 @@ sub _staticChat {                                ## no critic "not used"
   my %hapi = (                                                    
       INFO     => { NAME => "SYNO.API.Info"      }, 
       EXTERNAL => { NAME => "SYNO.Chat.External" },
+  );
+
+return \%hapi;
+}
+
+########################################################################
+#      Liefert die statischen Informationen der Calendar API
+########################################################################
+sub _staticCalendar {                            ## no critic "not used"
+  my %hapi = (                                                    
+      INFO   => { NAME => "SYNO.API.Info"    },                                          
+      AUTH   => { NAME => "SYNO.API.Auth"    },     # API used to perform session login and logout  
+      CAL    => { NAME => "SYNO.Cal.Cal"     },     # API to manipulate calendar
+      EVENT  => { NAME => "SYNO.Cal.Event"   },     # Provide methods to manipulate events in the specific calendar
+      SHARE  => { NAME => "SYNO.Cal.Sharing" },     # Get/set sharing setting of calendar
+      TODO   => { NAME => "SYNO.Cal.Todo"    },     # Provide methods to manipulate events in the specific calendar
+
   );
 
 return \%hapi;
