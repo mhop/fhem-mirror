@@ -65,6 +65,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename configTempFile "
                        ."hmDefaults "
+                       ."verbCULHM:multiple,allSet,allGet,none "
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
 }
@@ -104,6 +105,13 @@ sub HMinfo_Attr(@) {###########################################################
   my ($cmd,$name, $attrName,$attrVal) = @_;
   my @hashL;
   my $hash = $defs{$name};
+
+  my @attOptLst = ();# get option list for this attribut
+  if ($cmd eq "set"){
+    my $attOpts = $modules{HMinfo}{AttrList};
+    $attOpts =~ s/.*$attrName:?(.*?) .*/$1/;
+    @attOptLst = grep !/multiple/,split(",",$attOpts);
+  }
 
   if   ($attrName eq "autoUpdate"){# 00:00 hh:mm
     delete $hash->{helper}{autoUpdate};
@@ -205,6 +213,20 @@ sub HMinfo_Attr(@) {###########################################################
     }
     else{
       delete $modules{CUL_HM}{AttrListDef};
+    }
+  }
+  elsif($attrName eq "verbCULHM"){
+    delete $modules{CUL_HM}{helper}{verbose};
+    $modules{CUL_HM}{helper}{verbose}{none} = 1; # init hash
+    if ($cmd eq "set"){
+      my @optSets = ();
+      foreach my $optIn (split(",",$attrVal)){
+        next if(0 == grep/^$optIn$/,@attOptLst);
+        $modules{CUL_HM}{helper}{verbose}{$optIn} = 1;
+        push @optSets,$optIn;
+      }
+      $attr{$name}{$attrName} = join(",",@optSets);
+      return "set $attrName to $attr{$name}{$attrName}" if ($attr{$name}{$attrName} ne $attrVal);
     }
   }
   elsif($attrName eq "autoLoadArchive"){
@@ -3568,6 +3590,11 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
        example:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
      </li>
+     <li><a name="#HMinfoverbCULHM">verbCULHM</a>
+       set verbose logging for a special action for any CUL_HM entity.<br>
+       allSet: all set commands to be executed.<br>
+       allGet: all get requests to be executed.<br>
+     </li>
      <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
        if set the register config will be loaded after reboot automatically. See <a ref="#HMinfoloadConfig">loadConfig</a> for details<br>
      </li>
@@ -3984,49 +4011,54 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
         </code></ul>
         f&uuml;hrt den Befehl alle 10 Minuten aus<br>
     </li>
-    <li><a name="#HMinfoautoArchive">autoArchive</a>
+     <li><a name="#HMinfoautoArchive">autoArchive</a>
         Sobald neue Daten verf&uuml;gbar sind, wird das configFile aktualisiert.
         F&uuml;r die Aktualisierung ist <a ref="#HMinfoautoUpdate">autoUpdate</a> zwingend erforderlich.<br>
         siehe auch <a ref="#HMinfoarchConfig">archConfig</a>
         <br>
-    </li>
-    <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
+     </li>
+     <li><a name="#HMinfohmAutoReadScan">hmAutoReadScan</a>
         definiert die Zeit in Sekunden bis zum n&auml;chsten autoRead durch CUL_HM. Trotz dieses Zeitwertes stellt
         FHEM sicher, dass zu einem Zeitpunkt immer nur ein Ger&auml;t gelesen wird, auch wenn der Minimalwert von 1
         Sekunde eingestellt ist. Mit dem Timer kann der Zeitabstand
         ausgeweitet werden - bis zu 300 Sekunden zwischen zwei Ausf&uuml;hrungen.<br>
         Das Herabsetzen erh&ouml;ht die Funkbelastung, Heraufsetzen erh&ouml;ht die Wartzezeit.<br>
-    </li>
-    <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
+     </li>
+     <li><a name="#HMinfohmIoMaxDly">hmIoMaxDly</a>
         maximale Zeit in Sekunden f&uuml;r die CUL_HM Meldungen puffert, wenn das Ger&auml;t nicht sendebereit ist.
         Ist das Ger&auml;t nicht wieder rechtzeitig sendebereit, werden die gepufferten Meldungen verworfen und
         IOErr ausgel&ouml;st.<br>
         Hinweis: Durch die Pufferung kann es vorkommen, dass Aktivit&auml;t lange nach dem Absetzen des Befehls stattfindet.<br>
         Standard ist 60 Sekunden, maximaler Wert ist 3600 Sekunden.<br>
-    </li>
-    <li><a name="#HMinfoconfigDir">configDir</a>
+     </li>
+     <li><a name="#HMinfoconfigDir">configDir</a>
         Verzeichnis f&uuml;r das Speichern und Lesen der Konfigurationsdateien, sofern in einem Befehl nur ein Dateiname ohne
         Pfad angegen wurde.<br>
         Verwendung beispielsweise bei <a ref="#HMinfotempList">tempList</a> oder <a ref="#HMinfosaveConfig">saveConfig</a><br>
-    </li>
-    <li><a name="#HMinfoconfigFilename">configFilename</a>
+     </li>
+     <li><a name="#HMinfoconfigFilename">configFilename</a>
         Standard Dateiname zur Verwendung von 
         <a ref="#HMinfosaveConfig">saveConfig</a>, 
         <a ref="#HMinfopurgeConfig">purgeConfig</a>, 
         <a ref="#HMinfoloadConfig">loadConfig</a><br>
-    </li>
-    <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
+     </li>
+     <li><a name="#HMinfoconfigTempFile">configTempFile&lt;;configTempFile2&gt;&lt;;configTempFile3&gt; </a>
         Liste der Templfiles (weekplan) welche in HM berücksichtigt werden<br>
         Die Files werden kommasepariert eingegeben. Das erste File ist der Default. Dessen Name muss beim Template nicht eingegeben werden.<br>
-    </li>
-    <li><a name="#HMinfohmManualOper">hmManualOper</a>
+     </li>
+     <li><a name="#HMinfohmManualOper">hmManualOper</a>
         auf 1 gesetzt, verhindert dieses Attribut jede automatische Aktion oder Aktualisierung seitens CUL_HM.<br>
-    </li>
-    <li><a name="#HMinfohmDefaults">hmDefaults</a>
+     </li>
+     <li><a name="#HMinfohmDefaults">hmDefaults</a>
        setzt default Atribute fuer HM devices. Mehrere Attribute sind moeglich, Komma separiert.<br>
        Beispiel:<br>
        attr hm hmDefaults hmProtocolEvents:0_off,rssiLog:0<br>
-    </li>
+     </li>
+     <li><a name="#HMinfoverbCULHM">verbCULHM</a>
+       set verbose logging fuer ausgewaehlte aktionen von allen CUL_HM entities.<br>
+       allSet: alle set Kommandos fertig zur Ausführung.<br>
+       allGet: alle get Anfragen fertig zur Ausführung.<br>
+     </li>
      <li><a name="#HMinfoautoLoadArchive">autoLoadArchive</a>
        das Register Archive sowie Templates werden nach reboot automatischgeladen.
        Siehe <a ref="#HMinfoloadConfig">loadConfig</a> fuer details<br>
