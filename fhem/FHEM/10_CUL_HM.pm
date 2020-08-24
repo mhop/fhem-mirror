@@ -159,7 +159,7 @@ my $mIdReverse = 0; # CUL_HM model ID reverse search is not supported by default
 sub CUL_HM_Initialize($) {
   my ($hash) = @_;
 
-  my @modellist;
+  my @modellist = ();
   foreach my $model (keys %{$culHmModel}){
     next if (!$model);
     push @modellist,$culHmModel->{$model}{name};
@@ -241,6 +241,8 @@ sub CUL_HM_Initialize($) {
   $hash->{hmIoMaxDly}     = 60;# poll timeout - stop poll and discard
   $hash->{hmAutoReadScan} = 4; # delay autoConf readings
   $hash->{helper}{hmManualOper} = 0;# default automode
+  $modules{CUL_HM}{helper}{verbose}{none} = 1; # init hash
+
 }
 
 sub CUL_HM_updateConfig($){##########################
@@ -3949,6 +3951,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
 
   my $devHash = CUL_HM_getDeviceHash($hash);
+  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allGet} ? 0:3),"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
   #----------- now start processing --------------
   if   ($cmd eq "param") {  ###################################################
@@ -4269,7 +4272,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
                 .":".InternalVal($name,"peerList","")
                ;# update cmds entry in case
   }
-  if( $hash->{helper}{cmds}{cmdKey} ne $cmdKey || 1){
+  if( $hash->{helper}{cmds}{cmdKey} ne $cmdKey){
     my ($roleC,$roleD,$roleV,$fkt,$devName,$mId,$chn,$peerLst) = split(":", $cmdKey);
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
@@ -4372,6 +4375,7 @@ sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?++++++++++++++
 
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
+  my $T0 = gettimeofday();
   return "no value specified" if(@a < 2);
   return "FW update in progress - please wait" 
         if ($modules{CUL_HM}{helper}{updating});
@@ -4487,7 +4491,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   ###------------------- commands parameter parsing -------------------###
   if (1){
     my @parIn = grep!/noArg/,@a[2..$#a];
-
     my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
     $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//;#remove comment, "..." and noArg
     my @optLst = split(" ",$paraOpts);#[...] would leave an empty list
@@ -4496,14 +4499,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $pCnt = 0;
     my $paraFail = "";
     foreach my $param (@optLst){ # check each parameter
-      my $optional = $param =~ m/^\[(.*)\]$/ ? 1:0; # is parameter optional?
-      $param =~ s/^\[(.*)\]$/$1/;                   # remove optional brackets
+      my $optional = $param =~ s/^\[(.*)\]$/$1/ ? 1:0; # is parameter optional?
       if($param =~ m/^\((.*)\)$/ ){                 # list of options?
         my @parLst = split('\|',$1);
         if(  defined $parIn[$pCnt]){                # user param provided
           if( grep/$parIn[$pCnt]/,@parLst){         # parameter matched 
           }
-          elsif($param =~ m/([\d\.]*)\.\.([\d\.]*)/ ){# we check for min/max but not for step
+          elsif($param =~ m/([\-\d\.]*)\.\.([\-\d\.]*)/ ){# we check for min/max but not for step
             my ($min,$max) = ($1,$2);
             if ($parIn[$pCnt] < $min || $parIn[$pCnt] > $max ){
               $paraFail = "$parIn[$pCnt] out of range";
@@ -4546,8 +4548,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 
     splice @parIn, $pCnt, 0,"noArg" if(scalar(@parIn) == 0);
     @a = ($a[0],$cmd,@parIn);
-    Log3 $name,3,"CUL_HM set $name " . join(" ", @a[1..$#a]);
+    
   }
+  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:3),"CUL_HM set $name " . join(" ", @a[1..$#a]);
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
   my $id; # define id of IO device for later usage
@@ -6591,7 +6594,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                             .$PInfo{$myNo}{chn}
                             .$cmdB
                             .$PInfo{$pNo}{DId}
-                            .($PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
+                            .($PInfo{$pNo}{st}     eq "smokeDetector" ? "01" : $PInfo{$pNo}{chn})
                             .($PInfo{$pNo}{remote} eq "remote"        
                             ||$PInfo{$pNo}{st}     eq "smokeDetector" ? "00" : $PInfo{$pNo}{chn})
                             );
