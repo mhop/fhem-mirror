@@ -1824,7 +1824,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                                            }
                      ,"HM-PB-4DIS-WM-2"  =>{ text           =>"-txt1- [-txt2-]"  }
                      ,"HM-OU-LED16"      =>{ led            =>"(off|red|green|orange)"
-                                            ,ilum           => "(0-15) (0-127)"
+                                            ,ilum           => "(0..15;1) (0..127;1)"
                                             ,statusRequest  =>""
                                            }
                      ,"HM-OU-CFM-PL"     =>{ "on-for-timer" =>"-sec-"
@@ -1930,7 +1930,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[(,-color2-...)] [-repeat-]"}
                      ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [(-repeat-|{0})]"
                                                 ,pct            =>"[-value- [-ontime-]"}
-                     ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|help|{})] [(-sound-|{off})] [(-repetition-|{1}]] [(-pause-|{10})] [(-signal-|{off})]"}
+                     ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|help|{})] [(-sound-|{off})] [(-repetition-|{1})] [(-pause-|{10})] [(-signal-|{off})]"}
                      ,"HM-DIS-WM5501"        =>{ displayWM      =>"(long|short|help) -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] [...] [-textNo6- -color6- -icon6-]"
                                                 ,peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [(actor|remote|{both})]"}
                      ,"HM-ES-PMSW1-PL01"     =>{ "on-for-timer" =>"-sec-"
