@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2020
-my $thzversion = "0.188";
+my $thzversion = "0.189";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -899,7 +899,7 @@ sub THZ_Initialize($) {
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
-            ."simpleReadTimeout:0.25,0.5,1,2,3,4,5,6,7,8,9,10 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
+            ."simpleReadTimeout:0.25,0.5,1,2,4,6,8 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
             ."nonblocking:0,1 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
@@ -1506,10 +1506,12 @@ sub THZ_ReadAnswer($) {
 	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
     select(undef, undef, undef, 0.002);
 	my $buf = DevIo_SimpleRead($hash);
+    #$hash->{total_simleread}+=1;
     if(!defined($buf)) {
+        #$hash->{total_simleread_withtimeout}+=1;
         select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.5")); 
-        $rtimeout = minNum($rtimeout,0.7) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 0.7s if nonblocking disabled
+        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8")); 
+        $rtimeout = minNum($rtimeout,1.6) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.6s if nonblocking disabled
         $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
     }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
