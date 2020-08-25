@@ -97,7 +97,7 @@ sub getClHash {
       for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
           Log3 ($name, 4, "$name - Clienthash number: $k");
           while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
-              $val = $val // " ";
+              $val = $val // q{};
               Log3 ($name, 4, "$name - Clienthash: $key -> $val");
           }
       }
