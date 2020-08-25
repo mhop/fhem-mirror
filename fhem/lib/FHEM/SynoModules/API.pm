@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = qv('1.0.0');
+use version; our $VERSION = version->declare('1.0.1');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(apistatic);

@@ -35,7 +35,7 @@ use utf8;
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = qv('1.0.0');
+use version; our $VERSION = version->declare('1.1.0');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(
@@ -43,6 +43,7 @@ our @EXPORT_OK   = qw(
                        trim
                        sortVersion
                        setVersionInfo
+                       jboolmap
                      );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -156,6 +157,9 @@ sub setVersionInfo {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
+  $hash->{HELPER}{VERSION_API}     = FHEM::SynoModules::API->VERSION()     // "unused";
+  $hash->{HELPER}{VERSION_SMUtils} = FHEM::SynoModules::SMUtils->VERSION() // "unused";
+  
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
       
@@ -167,7 +171,7 @@ sub setVersionInfo {
       return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
       
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                         # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version; our $VERSION = FHEM::Meta::Get( $hash, 'version' );               ## no critic 'VERSION Reused'                                      
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );          ## no critic 'VERSION Reused'                                      
       }
   
   } else {                                                                               # herkömmliche Modulstruktur
@@ -175,6 +179,21 @@ sub setVersionInfo {
   }
   
 return;
+}
+
+###############################################################################
+#                       JSON Boolean Test und Mapping
+###############################################################################
+sub jboolmap { 
+  my $bool = shift // carp "got no value to check if bool !" && return;
+  
+  my $is_boolean = JSON::is_bool($bool);
+  
+  if($is_boolean) {
+      $bool = $bool ? "true" : "false";
+  }
+  
+return $bool;
 }
 
 1;
