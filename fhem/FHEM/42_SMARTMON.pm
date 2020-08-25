@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-my $VERSION = "0.9.7";
+my $VERSION = "0.9.8";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -404,22 +404,24 @@ sub SMARTMON_readDeviceData($%) {
       my $line = $dev_data[0];
       shift @dev_data;
       my($k,$v) = split(/:\s*/,$line);
-      $v = trim($v);
-      if($k eq "Device Model") {
-        $hash->{DEVICE_MODEL}=$v;
-        $map->{"deviceModel"}=$v if($sd eq '1');
-      }
-      if($k eq "Serial Number") {
-        $hash->{DEVICE_SERIAL}=$v;
-        $map->{"deviceSerial"}=$v if($sd eq '1');
-      }
-      if($k eq "Firmware Version") {
-        $hash->{DEVICE_FIRMWARE}=$v;
-        $map->{"deviceFirmware"}=$v if($sd eq '1');
-      }
-      if($k eq "User Capacity") {
-        $hash->{DEVICE_CAPACITY}=$v;
-        $map->{"deviceCapacity"}=$v if($sd eq '1');
+      if(defined $v) {
+		  $v = trim($v);
+		  if($k eq "Device Model") {
+			$hash->{DEVICE_MODEL}=$v;
+			$map->{"deviceModel"}=$v if($sd eq '1');
+		  }
+		  if($k eq "Serial Number") {
+			$hash->{DEVICE_SERIAL}=$v;
+			$map->{"deviceSerial"}=$v if($sd eq '1');
+		  }
+		  if($k eq "Firmware Version") {
+			$hash->{DEVICE_FIRMWARE}=$v;
+			$map->{"deviceFirmware"}=$v if($sd eq '1');
+		  }
+		  if($k eq "User Capacity") {
+			$hash->{DEVICE_CAPACITY}=$v;
+			$map->{"deviceCapacity"}=$v if($sd eq '1');
+		  }
       }
     }
   }
