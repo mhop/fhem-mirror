@@ -36,7 +36,9 @@ package FHEM::SSCam;                                                            
 
 use strict;                           
 use warnings;
-use GPUtils qw(GP_Import GP_Export);                                               # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw( GP_Import GP_Export );                                             # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use FHEM::SynoModules::API qw(:all);
+use FHEM::SynoModules::SMUtils qw(:all);
 use Data::Dumper;                                                                
 use MIME::Base64;
 use Time::HiRes qw( gettimeofday tv_interval );
@@ -159,6 +161,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm move ".
+                           "getPtzPresetList, getPtzPatrolList to return path of OpMOde Getcaminfo ",
   "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
   "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
   "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
@@ -703,28 +707,7 @@ sub Define {
   $hash->{PROTOCOL}               = $proto;
   $hash->{COMPATIBILITY}          = $compstat;                                   # getestete SVS-version Kompatibilität 
   $hash->{HELPER}{MODMETAABSENT}  = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
-  
-  # benötigte API's in $hash einfügen
-  $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth";                             # API used to perform session login and logout
-  $hash->{HELPER}{APISVSINFO}     = "SYNO.SurveillanceStation.Info"; 
-  $hash->{HELPER}{APIEVENT}       = "SYNO.SurveillanceStation.Event"; 
-  $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording"; 
-  $hash->{HELPER}{APIEXTEVT}      = "SYNO.SurveillanceStation.ExternalEvent";
-  $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";           # stark geändert ab API v2.8
-  $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";         # This API provides functions on snapshot, including taking, editing and deleting snapshots.
-  $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
-  $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
-  $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
-  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" -> StreamKey-Methode
-  # $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";        # provides methods to get Live View or Event video stream, removed in API v2.8
-  $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Stream";           # Beschreibung ist falsch und entspricht "SYNO.SurveillanceStation.Streaming" auch noch ab v2.8
-  $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
-  $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
-  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
-  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
-  $hash->{HELPER}{APIREC}         = "SYNO.SurveillanceStation.Recording";        # This API provides method to query recording information.
-  
+    
   # Startwerte setzen
   if(IsModelCam($hash)) {                                                        # initiale Webkommandos setzen
       $attr{$name}{webCmd}             = "on:off:snap:enable:disable:runView:stopView";  
@@ -743,20 +726,23 @@ sub Define {
   $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
   # Versionsinformationen setzen
-  setVersionInfo($hash);
+  setVersionInfo ($hash, \%vNotesIntern);
   
-  readingsBeginUpdate ($hash);
+  readingsBeginUpdate ($hash );
   readingsBulkUpdate  ($hash, "PollState", "Inactive");                          # es ist keine Gerätepolling aktiv  
+  
   if(IsModelCam($hash)) {
       readingsBulkUpdate ($hash, "Availability", "???");                         # Verfügbarkeit ist unbekannt
       readingsBulkUpdate ($hash, "state",        "off");                         # Init für "state" , Problemlösung für setstate, Forum #308
+  
   } else {
       readingsBulkUpdate ($hash, "state", "Initialized");                        # Init für "state" wenn SVS  
   }
-  readingsEndUpdate($hash,1);                                          
   
-  getCredentials($hash,1, "svs" );                                               # Credentials lesen und in RAM laden ($boot=1)      
-  getCredentials($hash,1, "smtp");
+  readingsEndUpdate ($hash,1);                                          
+  
+  getCredentials ($hash,1, "svs" );                                              # Credentials lesen und in RAM laden ($boot=1)      
+  getCredentials ($hash,1, "smtp");
   
   # initiale Routinen zufällig verzögert nach Restart ausführen
   RemoveInternalTimer ($hash,                        "FHEM::SSCam::initOnBoot"          );
@@ -1029,7 +1015,7 @@ sub Attr {
     }
     
     if ($aName eq "simu_SVSversion") {
-        delete $hash->{HELPER}{APIPARSET};
+        delete $hash->{HELPER}{API}{PARSET};
         delete $hash->{HELPER}{SID};
         delete $hash->{CAMID};
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getCaminfoAll" );
@@ -1145,7 +1131,7 @@ sub Set {
                  "smtpcredentials ".
                  "createReadingsGroup ".
                  "extevent:1,2,3,4,5,6,7,8,9,10 ".
-                 ($hash->{HELPER}{APIHMMAXVER} ? "homeMode:on,off " : "").
+                 ($hash->{HELPER}{API}{HMODE}{VER} ? "homeMode:on,off " : "").
                  "snapCams ";
   }  
 
@@ -1158,11 +1144,7 @@ sub Set {
       
       if($success) {
           getCaminfoAll($hash,0);
-          RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPresetList");
-          InternalTimer(gettimeofday()+11, "FHEM::SSCam::getPtzPresetList", $hash, 0);
-          RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPatrolList");
-          InternalTimer(gettimeofday()+12, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
-          versionCheck($hash);
+          versionCheck ($hash);
           return "Username and Password saved successfully";
       } else {
            return "Error while saving Username / Password - see logfile for details";
@@ -1361,12 +1343,12 @@ sub Set {
               
   } elsif ($opt eq "startTracking" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
+      if ($hash->{HELPER}{API}{PTZ}{VER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
       startTrack($hash);
         
   } elsif ($opt eq "stopTracking" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
+      if ($hash->{HELPER}{API}{PTZ}{VER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
       stopTrack($hash);
         
   } elsif ($opt eq "setZoom" && IsModelCam($hash)) {
@@ -1672,13 +1654,13 @@ sub Set {
 
   } elsif ($opt eq "move" && IsModelCam($hash)) {     
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{APIPTZMAXVER});
+      return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{API}{PTZ}{VER});
       
-      if($hash->{HELPER}{APIPTZMAXVER} <= 4) {
+      if($hash->{HELPER}{API}{PTZ}{VER} <= 4) {
           if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/x)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
           $hash->{HELPER}{GOMOVEDIR} = $prop;
       
-      } elsif ($hash->{HELPER}{APIPTZMAXVER} >= 5) {
+      } elsif ($hash->{HELPER}{API}{PTZ}{VER} >= 5) {
           if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/x)) {return "Function \"move\" needs an argument like right, upright, up, upleft, left, downleft, down, downright ";}
           my %dirs = (
                       right     => 0,
@@ -1871,7 +1853,7 @@ sub Get {
         # getlist für SVS Devices
         $getlist = "Unknown argument $opt, choose one of ".
                    "caminfoall:noArg ".
-                   ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
+                   ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
                    "svsinfo:noArg ".
                    "listLog ".
                    "storedCredentials:noArg ".
@@ -2000,16 +1982,15 @@ sub Get {
     } elsif ($opt eq "scanVirgin") {
         if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         sessionOff($hash);
-        delete $hash->{HELPER}{APIPARSET};
+        delete $hash->{HELPER}{API}{PARSET};
         delete $hash->{CAMID};
-        # alte Readings außer state löschen
+        
         my @allrds = keys%{$defs{$name}{READINGS}};
-        for my $key(@allrds) {
-            # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
+        for my $key(@allrds) {                                           # vorhandene Readings außer "state" löschen
             delete($defs{$name}{READINGS}{$key}) if($key ne "state");
         }
-        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-        getCaminfoAll($hash,1);
+        
+        getCaminfoAll($hash,1);                                          # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
     
     } elsif ($opt =~ /versionNotes/x) {
       my $header  = "<b>Module release information</b><br>";
@@ -2364,7 +2345,7 @@ return $ret;
 #                   initiale Startroutinen nach Restart FHEM
 ######################################################################################
 sub initOnBoot {
-  my ($hash) = @_;
+  my $hash = shift;
   my $name = $hash->{NAME};
   
   RemoveInternalTimer($hash, "FHEM::SSCam::initOnBoot");
@@ -2374,36 +2355,28 @@ sub initOnBoot {
      
      delete($defs{$name}{READINGS}{LiveStreamUrl}) if($defs{$name}{READINGS}{LiveStreamUrl});        # LiveStream URL zurücksetzen
      
-     # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
-     if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
+     if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {                                  # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
          Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
          camStopRec($hash);
      }
          
-     # Konfiguration der Synology Surveillance Station abrufen
-     if (!$hash->{CREDENTIALS}) {
+     if (!$hash->{CREDENTIALS}) {                                                                    # Konfiguration der Synology Surveillance Station abrufen
          Log3($name, 2, "$name - Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"");
+     
      } else {
          readingsSingleUpdate($hash, "compstate", "true", 0);                                        # Anfangswert f. versionCheck setzen
-         # allg. SVS-Eigenschaften abrufen
-         getSvsInfo($hash);
+         getSvsInfo          ($hash);                                                                # allg. SVS-Eigenschaften abrufen
          
          if(IsModelCam($hash)) {
-             # Kameraspezifische Infos holen
-             getCamInfo($hash);           
-             getCapabilities($hash);
-             getStmUrlPath($hash);
-             
-             # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
-             getPtzPresetList($hash);
-             getPtzPatrolList($hash);
+             getCamInfo      ($hash);                                                                # Kameraspezifische Infos holen
+             getCapabilities ($hash);
+             getStmUrlPath   ($hash);
 
-             # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
-             my ($slim,$ssize) = snapLimSize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+             my ($slim,$ssize) = snapLimSize($hash,1);                                               # Schnappschußgalerie abrufen oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
              RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"); 
              InternalTimer       (gettimeofday()+0.9, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0); 
          }
-         versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
+         versionCheck($hash);                                                                        # Einstieg in regelmäßigen Check Kompatibilität
      }
          
      # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
@@ -3849,6 +3822,7 @@ sub getCaminfoAll {
     my ($hash,$mode)   = @_;
     my $camname        = $hash->{CAMNAME};
     my $name           = $hash->{NAME};
+    
     my ($now,$new);
     
     RemoveInternalTimer($hash, "FHEM::SSCam::getCaminfoAll");
@@ -3857,8 +3831,7 @@ sub getCaminfoAll {
     RemoveInternalTimer($hash, "FHEM::SSCam::getSvsInfo");
     InternalTimer(gettimeofday()+1, "FHEM::SSCam::getSvsInfo", $hash, 0);
     
-    if(IsModelCam($hash)) {
-        # Model ist CAM
+    if(IsModelCam($hash)) {                                                               # Model ist CAM
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getEventList");
         InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::getEventList", $hash, 0);
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getMotionEnum");
@@ -3870,20 +3843,13 @@ sub getCaminfoAll {
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getStreamFormat");
         InternalTimer       (gettimeofday()+1.4, "FHEM::SSCam::getStreamFormat", $hash, 0);
         
-        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-        my ($slim,$ssize) = snapLimSize($hash,1);                                         # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+        my ($slim,$ssize) = snapLimSize($hash,1);                                         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"); 
         InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-    
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getPtzPresetList");
-        InternalTimer       (gettimeofday()+1.6, "FHEM::SSCam::getPtzPresetList", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getPtzPatrolList");
-        InternalTimer       (gettimeofday()+1.9, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getStmUrlPath");
         InternalTimer       (gettimeofday()+2.1, "FHEM::SSCam::getStmUrlPath", $hash, 0);
 
-    } else {
-        # Model ist SVS
+    } else {                                                                              # Model ist SVS
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getHomeModeState");
         InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getHomeModeState", $hash, 0);
         RemoveInternalTimer ($hash,              "FHEM::SSCam::getSvsLog");
@@ -3908,10 +3874,9 @@ sub getCaminfoAll {
             Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
     
-    } else {
-        # Beenden Polling aller Caminfos
+    } else {                                                                                             # Beenden Polling aller Caminfos
         readingsSingleUpdate($hash, "PollState", "Inactive",   1);
-        readingsSingleUpdate($hash, "state",     "initialized",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+        readingsSingleUpdate($hash, "state",     "initialized",1) if(!IsModelCam($hash));                # state für SVS-Device setzen
         Log3($name, 3, "$name - Polling of $camname is deactivated");
     }
     
@@ -3926,7 +3891,7 @@ return;
 #  $tac   = Transaktionscode (für gemeinsamen Versand)
 ###########################################################################
 sub getSnapInfo {
-    my ($str)                   = @_;
+    my $str                      = shift;
     my ($name,$slim,$ssize,$tac) = split(":",$str);
     my $hash                     = $defs{$name};
     my $camname                  = $hash->{CAMNAME};
@@ -4014,7 +3979,7 @@ sub setHomeMode {
     my $name     = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::setHomeMode");
-    return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
+    return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE}               = "sethomemode";
@@ -4064,7 +4029,7 @@ sub getHomeModeState {
     my $name     = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::getHomeModeState");
-    return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
+    return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
         $hash->{OPMODE}               = "gethomemodestate";
@@ -4163,10 +4128,10 @@ sub getStreamFormat {
     my $name     = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::getStreamFormat");
-    my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+    my $apivideostmsver = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
     return if(IsDisabled($name));  
     
-    if(!$apivideostmsmaxver) {
+    if(!$apivideostmsver) {
         # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
         readingsSingleUpdate($hash,"CamStreamFormat", "no API", 1);
         return;
@@ -4359,44 +4324,26 @@ return;
 #######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
 #############################################################################################################################
 sub getApiSites {
-   my $hash         = shift;
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $name         = $hash->{NAME};
-   my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite !
-   my $apiauth      = $hash->{HELPER}{APIAUTH};            
-   my $apiextrec    = $hash->{HELPER}{APIEXTREC};            
-   my $apiextevt    = $hash->{HELPER}{APIEXTEVT};             
-   my $apicam       = $hash->{HELPER}{APICAM};                          
-   my $apitakesnap  = $hash->{HELPER}{APISNAPSHOT};
-   my $apiptz       = $hash->{HELPER}{APIPTZ};
-   my $apipreset    = $hash->{HELPER}{APIPRESET};
-   my $apisvsinfo   = $hash->{HELPER}{APISVSINFO};
-   my $apicamevent  = $hash->{HELPER}{APICAMEVENT};
-   my $apievent     = $hash->{HELPER}{APIEVENT};
-   my $apivideostm  = $hash->{HELPER}{APIVIDEOSTM};
-   my $apiaudiostm  = $hash->{HELPER}{APIAUDIOSTM};
-   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apistm       = $hash->{HELPER}{APISTM};
-   my $apihm        = $hash->{HELPER}{APIHM};
-   my $apilog       = $hash->{HELPER}{APILOG};
-   my $apirec       = $hash->{HELPER}{APIREC};
-   my $proto        = $hash->{PROTOCOL};   
-   my $url;
-   my $param;
+   my $hash        = shift;
+   my $serveraddr  = $hash->{SERVERADDR};
+   my $serverport  = $hash->{SERVERPORT};
+   my $name        = $hash->{NAME};
+   my $proto       = $hash->{PROTOCOL};   
+   
+   my ($url,$param);
   
-   # API-Pfade und MaxVersions ermitteln 
+   # API-Pfade und Versions ermitteln 
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - --- Begin Function getApiSites nonblocking ---");
    
-   if ($shutdownInProcess) {                                                           # shutdown in Proces -> keine weiteren Aktionen
+   if ($shutdownInProcess) {                                                             # shutdown in Proces -> keine weiteren Aktionen
        Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
        return;       
    }
    
-   if ($hash->{HELPER}{APIPARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+   if ($hash->{HELPER}{API}{PARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
        return checkSid($hash);
    }
@@ -4404,19 +4351,35 @@ sub getApiSites {
    my $httptimeout = AttrVal($name,"httptimeout",4);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
-   # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms,$apirec";
+   # API initialisieren und abrufen
+   ####################################
+   $hash->{HELPER}{API} = apistatic ("surveillance");                                    # API Template im HELPER instanziieren
+   # $hash->{HELPER}{API} = \%hapi;                                                       # API Template im HELPER instanziieren
+   Log3 ($name, 4, "$name - API imported:\n".Dumper $hash->{HELPER}{API});
+     
+   my @ak;
+   for my $key (keys %{$hash->{HELPER}{API}}) {
+       next if($key =~ /^(?: PARSET | INFO)$/x);  
+       push @ak, $hash->{HELPER}{API}{$key}{NAME};
+   }
+   my $apis = join ",", @ak;
+   
+   $url = "$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{INFO}{PATH}?".
+              "api=$hash->{HELPER}{API}{INFO}{NAME}".
+              "&method=Query".
+              "&version=$hash->{HELPER}{API}{INFO}{VER}".
+              "&query=$apis";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
    $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getApiSites_Parse
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getApiSites_Parse
+   };
    HttpUtils_NonblockingGet ($param);  
    
 return;
@@ -4434,25 +4397,25 @@ sub getApiSites_Parse {
    my $name         = $hash->{NAME};
    my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
-   my $apiauth      = $hash->{HELPER}{APIAUTH};
-   my $apiextrec    = $hash->{HELPER}{APIEXTREC};
-   my $apiextevt    = $hash->{HELPER}{APIEXTEVT};
-   my $apicam       = $hash->{HELPER}{APICAM};
-   my $apitakesnap  = $hash->{HELPER}{APISNAPSHOT};
-   my $apiptz       = $hash->{HELPER}{APIPTZ};
-   my $apipreset    = $hash->{HELPER}{APIPRESET};
-   my $apisvsinfo   = $hash->{HELPER}{APISVSINFO};
-   my $apicamevent  = $hash->{HELPER}{APICAMEVENT};
-   my $apievent     = $hash->{HELPER}{APIEVENT};
-   my $apivideostm  = $hash->{HELPER}{APIVIDEOSTM};
-   my $apiaudiostm  = $hash->{HELPER}{APIAUDIOSTM};
-   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apistm       = $hash->{HELPER}{APISTM};
-   my $apihm        = $hash->{HELPER}{APIHM};
-   my $apilog       = $hash->{HELPER}{APILOG};
-   my $apirec       = $hash->{HELPER}{APIREC};
+   my $apiauth      = $hash->{HELPER}{API}{AUTH}{NAME};
+   my $apiextrec    = $hash->{HELPER}{API}{EXTREC}{NAME};
+   my $apiextevt    = $hash->{HELPER}{API}{EXTEVT}{NAME};
+   my $apicam       = $hash->{HELPER}{API}{CAM}{NAME};
+   my $apitakesnap  = $hash->{HELPER}{API}{SNAPSHOT}{NAME};
+   my $apiptz       = $hash->{HELPER}{API}{PTZ}{NAME};
+   my $apipreset    = $hash->{HELPER}{API}{PRESET}{NAME};
+   my $apisvsinfo   = $hash->{HELPER}{API}{SVSINFO}{NAME};
+   my $apicamevent  = $hash->{HELPER}{API}{CAMEVENT}{NAME};
+   my $apievent     = $hash->{HELPER}{API}{EVENT}{NAME};
+   my $apivideostm  = $hash->{HELPER}{API}{VIDEOSTM}{NAME};
+   my $apiaudiostm  = $hash->{HELPER}{API}{AUDIOSTM}{NAME};
+   my $apivideostms = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
+   my $apistm       = $hash->{HELPER}{API}{STM}{NAME};
+   my $apihm        = $hash->{HELPER}{API}{HMODE}{NAME};
+   my $apilog       = $hash->{HELPER}{API}{LOG}{NAME};
+   my $apirec       = $hash->{HELPER}{API}{REC}{NAME};
    
-   my ($apicammaxver,$apicampath);
+   my ($apicamver,$apicampath);
   
     if ($err ne "") {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -4481,177 +4444,95 @@ sub getApiSites_Parse {
         $success = $data->{'success'};
     
         if ($success) {
-            my $logstr;
+            my ($logp,$logv);
+            
+            my $pundef = "Path: undefined - Surveillance Station may be stopped";
+            my $vundef = "Version: undefined - Surveillance Station may be stopped";
                         
-          # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
+          # Pfad und Version von "SYNO.API.Auth" ermitteln
             my $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
-            $apiauthpath =~ tr/_//d if (defined($apiauthpath));
-            my $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
+            $apiauthpath    =~ tr/_//d if(defined($apiauthpath));
+            my $apiauthver  = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
        
-            $logstr = defined($apiauthpath) ? "Path of $apiauth selected: $apiauthpath" : "Path of $apiauth undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiauthmaxver) ? "MaxVersion of $apiauth selected: $apiauthmaxver" : "MaxVersion of $apiauth undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-       
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
             my $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
-            $apiextrecpath =~ tr/_//d if (defined($apiextrecpath));
-            my $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
+            $apiextrecpath    =~ tr/_//d if (defined($apiextrecpath));
+            my $apiextrecver  = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
        
-            $logstr = defined($apiextrecpath) ? "Path of $apiextrec selected: $apiextrecpath" : "Path of $apiextrec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apiextrec selected: $apiextrecmaxver" : "MaxVersion of $apiextrec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-       
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.Camera" ermitteln
             $apicampath = $data->{'data'}->{$apicam}->{'path'};
             $apicampath =~ tr/_//d if (defined($apicampath));
-            $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
-                               
-            $logstr = defined($apicampath) ? "Path of $apicam selected: $apicampath" : "Path of $apicam undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam: $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apicamver  = $data->{'data'}->{$apicam}->{'maxVersion'};
        
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln  
+          # Pfad und Version von "SYNO.SurveillanceStation.SnapShot" ermitteln  
             my $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
-            $apitakesnappath =~ tr/_//d if (defined($apitakesnappath));
-            my $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
-                            
-            $logstr = defined($apitakesnappath) ? "Path of $apitakesnap selected: $apitakesnappath" : "Path of $apitakesnap undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apitakesnapmaxver) ? "MaxVersion of $apitakesnap: $apitakesnapmaxver" : "MaxVersion of $apitakesnap undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apitakesnappath    =~ tr/_//d if (defined($apitakesnappath));
+            my $apitakesnapver  = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
 
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln 
+          # Pfad und Version von "SYNO.SurveillanceStation.PTZ" ermitteln 
             my $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
-            $apiptzpath =~ tr/_//d if (defined($apiptzpath));
-            my $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
-                            
-            $logstr = defined($apiptzpath) ? "Path of $apiptz selected: $apiptzpath" : "Path of $apiptz undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiptzmaxver) ? "MaxVersion of $apiptz: $apiptzmaxver" : "MaxVersion of $apiptz undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");  
+            $apiptzpath    =~ tr/_//d if (defined($apiptzpath));
+            my $apiptzver  = $data->{'data'}->{$apiptz}->{'maxVersion'};
 
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ.Preset" ermitteln 
+          # Pfad und Version von "SYNO.SurveillanceStation.PTZ.Preset" ermitteln 
             my $apipresetpath = $data->{'data'}->{$apipreset}->{'path'};
-            $apipresetpath =~ tr/_//d if (defined($apipresetpath));
-            my $apipresetmaxver = $data->{'data'}->{$apipreset}->{'maxVersion'};
-                            
-            $logstr = defined($apipresetpath) ? "Path of $apipreset selected: $apipresetpath" : "Path of $apipreset undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apipresetmaxver) ? "MaxVersion of $apipreset: $apipresetmaxver" : "MaxVersion of $apipreset undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");              
+            $apipresetpath    =~ tr/_//d if (defined($apipresetpath));
+            my $apipresetver  = $data->{'data'}->{$apipreset}->{'maxVersion'};        
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.Info" ermitteln
             my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
-            $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
-            my $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
-                            
-            $logstr = defined($apisvsinfopath) ? "Path of $apisvsinfo selected: $apisvsinfopath" : "Path of $apisvsinfo undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apisvsinfopath    =~ tr/_//d if (defined($apisvsinfopath));
+            my $apisvsinfover  = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
                         
-          # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln    
+          # Pfad und Version von "SYNO.Surveillance.Camera.Event" ermitteln    
             my $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
             $apicameventpath =~ tr/_//d if (defined($apicameventpath));
-            my $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
-                            
-            $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            my $apicameventver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
                         
-          # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln     
+          # Pfad und Version von "SYNO.Surveillance.Event" ermitteln     
             my $apieventpath = $data->{'data'}->{$apievent}->{'path'};
-            $apieventpath =~ tr/_//d if (defined($apieventpath));
-            my $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
-                            
-            $logstr = defined($apieventpath) ? "Path of $apievent selected: $apieventpath" : "Path of $apievent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apieventmaxver) ? "MaxVersion of $apievent: $apieventmaxver" : "MaxVersion of $apievent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apieventpath    =~ tr/_//d if (defined($apieventpath));
+            my $apieventver  = $data->{'data'}->{$apievent}->{'maxVersion'};
                         
-          # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
+          # Pfad und Version von "SYNO.Surveillance.VideoStream" ermitteln
             my $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
-            $apivideostmpath =~ tr/_//d if (defined($apivideostmpath));
-            my $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
-                            
-            $logstr = defined($apivideostmpath) ? "Path of $apivideostm selected: $apivideostmpath" : "Path of $apivideostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apivideostmmaxver) ? "MaxVersion of $apivideostm: $apivideostmmaxver" : "MaxVersion of $apivideostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apivideostmpath    =~ tr/_//d if (defined($apivideostmpath));
+            my $apivideostmver  = $data->{'data'}->{$apivideostm}->{'maxVersion'};
                         
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
             my $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
-            $apiextevtpath =~ tr/_//d if (defined($apiextevtpath));
-            my $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
-       
-            $logstr = defined($apiextevtpath) ? "Path of $apiextevt selected: $apiextevtpath" : "Path of $apiextevt undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextevtmaxver) ? "MaxVersion of $apiextevt selected: $apiextevtmaxver" : "MaxVersion of $apiextevt undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apiextevtpath    =~ tr/_//d if (defined($apiextevtpath));
+            my $apiextevtver  = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
                         
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.Streaming" ermitteln
             my $apistmpath = $data->{'data'}->{$apistm}->{'path'};
-            $apistmpath =~ tr/_//d if (defined($apistmpath));
-            my $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
-       
-            $logstr = defined($apistmpath) ? "Path of $apistm selected: $apistmpath" : "Path of $apistm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apistmpath    =~ tr/_//d if (defined($apistmpath));
+            my $apistmver  = $data->{'data'}->{$apistm}->{'maxVersion'}; 
 
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.HomeMode" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.HomeMode" ermitteln
             my $apihmpath = $data->{'data'}->{$apihm}->{'path'};
-            $apihmpath =~ tr/_//d if (defined($apihmpath));
-            my $apihmmaxver = $data->{'data'}->{$apihm}->{'maxVersion'}; 
-       
-            $logstr = defined($apihmpath) ? "Path of $apihm selected: $apihmpath" : "Path of $apihm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apihmmaxver) ? "MaxVersion of $apihm selected: $apihmmaxver" : "MaxVersion of $apihm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apihmpath    =~ tr/_//d if (defined($apihmpath));
+            my $apihmver  = $data->{'data'}->{$apihm}->{'maxVersion'}; 
         
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Log" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.Log" ermitteln
             my $apilogpath = $data->{'data'}->{$apilog}->{'path'};
-            $apilogpath =~ tr/_//d if (defined($apilogpath));
-            my $apilogmaxver = $data->{'data'}->{$apilog}->{'maxVersion'}; 
-       
-            $logstr = defined($apilogpath) ? "Path of $apilog selected: $apilogpath" : "Path of $apilog undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apilogmaxver) ? "MaxVersion of $apilog selected: $apilogmaxver" : "MaxVersion of $apilog undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apilogpath    =~ tr/_//d if (defined($apilogpath));
+            my $apilogver  = $data->{'data'}->{$apilog}->{'maxVersion'}; 
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.AudioStream" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.AudioStream" ermitteln
             my $apiaudiostmpath = $data->{'data'}->{$apiaudiostm}->{'path'};
-            $apiaudiostmpath =~ tr/_//d if (defined($apiaudiostmpath));
-            my $apiaudiostmmaxver = $data->{'data'}->{$apiaudiostm}->{'maxVersion'}; 
-       
-            $logstr = defined($apiaudiostmpath) ? "Path of $apiaudiostm selected: $apiaudiostmpath" : "Path of $apiaudiostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiaudiostmmaxver) ? "MaxVersion of $apiaudiostm selected: $apiaudiostmmaxver" : "MaxVersion of $apiaudiostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apiaudiostmpath    =~ tr/_//d if (defined($apiaudiostmpath));
+            my $apiaudiostmver  = $data->{'data'}->{$apiaudiostm}->{'maxVersion'}; 
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.VideoStream" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.VideoStream" ermitteln
             my $apivideostmspath = $data->{'data'}->{$apivideostms}->{'path'};
-            $apivideostmspath =~ tr/_//d if (defined($apivideostmspath));
-            my $apivideostmsmaxver = $data->{'data'}->{$apivideostms}->{'maxVersion'}; 
-       
-            $logstr = defined($apivideostmspath) ? "Path of $apivideostms selected: $apivideostmspath" : "Path of $apivideostms undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apivideostmsmaxver) ? "MaxVersion of $apivideostms selected: $apivideostmsmaxver" : "MaxVersion of $apivideostms undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apivideostmspath    =~ tr/_//d if (defined($apivideostmspath));
+            my $apivideostmsver  = $data->{'data'}->{$apivideostms}->{'maxVersion'}; 
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Recording" ermitteln
+          # Pfad und Version von "SYNO.SurveillanceStation.Recording" ermitteln
             my $apirecpath = $data->{'data'}->{$apirec}->{'path'};
-            $apirecpath =~ tr/_//d if (defined($apirecpath));
-            my $apirecmaxver = $data->{'data'}->{$apirec}->{'maxVersion'}; 
-       
-            $logstr = defined($apirecpath) ? "Path of $apirec selected: $apirecpath" : "Path of $apirec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apirecmaxver) ? "MaxVersion of $apirec selected: $apirecmaxver" : "MaxVersion of $apirec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $apirecpath    =~ tr/_//d if (defined($apirecpath));
+            my $apirecver  = $data->{'data'}->{$apirec}->{'maxVersion'}; 
         
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
@@ -4676,13 +4557,12 @@ sub getApiSites_Parse {
             # -> diese Steuerung erfolgt in den einzelnen Funktionsaufrufen in camOp            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            #$apiptzmaxver = 4;
-            #Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-            #$apicammaxver = 8;
-            #Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
+            #$apiptzver = 4;
+            #Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");
+            #$apicamver = 8;
+            #Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
-            
                                     
             # Simulation anderer SVS-Versionen
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
@@ -4690,48 +4570,52 @@ sub getApiSites_Parse {
             if (AttrVal($name, "simu_SVSversion", undef)) {
                 Log3($name, 4, "$name - SVS version $actvs will be simulated");
                 if ($actvs =~ /^71/x) {
-                    $apicammaxver = 8;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 4;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 2;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 4;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
+                    $apicamver = 8;
+                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
+                    $apiauthver = 4;
+                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
+                    $apiextrecver = 2;
+                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
+                    $apiptzver    = 4;
+                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");
+                
                 } elsif ($actvs =~ /^72/x) {
-                    $apicammaxver = 8;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                    $apicamver = 8;
+                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
+                    $apiauthver = 6;
+                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
+                    $apiextrecver = 3;
+                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
+                    $apiptzver    = 5;
+                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
+                
                 } elsif ($actvs =~ /^800/x) {
-                    $apicammaxver = 9;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                    $apicamver = 9;
+                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
+                    $apiauthver = 6;
+                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
+                    $apiextrecver = 3;
+                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
+                    $apiptzver    = 5;
+                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
+                
                 } elsif ($actvs =~ /^815/x) {
-                    $apicammaxver = 9;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
+                    $apicamver = 9;
+                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
+                    $apiauthver = 6;
+                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
+                    $apiextrecver = 3;
+                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
+                    $apiptzver    = 5;
+                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
+                
                 } elsif ($actvs =~ /^820/x) {
                     # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
                     # "SYNO.SurveillanceStation.Streaming" mehr enthalten
-                    $apivideostmsmaxver = 0;
-                    Log3($name, 4, "$name - MaxVersion of $apivideostms adapted to: $apivideostmsmaxver");
-                    $apiaudiostmmaxver = 0;
-                    Log3($name, 4, "$name - MaxVersion of $apiaudiostm adapted to: $apiaudiostmmaxver");                              
+                    $apivideostmsver = 0;
+                    Log3($name, 4, "$name - Version of $apivideostms adapted to: $apivideostmsver");
+                    $apiaudiostmver = 0;
+                    Log3($name, 4, "$name - Version of $apiaudiostm adapted to: $apiaudiostmver");                              
                 }
             
             } else {
@@ -4740,49 +4624,49 @@ sub getApiSites_Parse {
             Log3($name, 4, "$name - ------- End of simulation section -------");  
                    
             # ermittelte Werte in $hash einfügen
-            $hash->{HELPER}{APIAUTHPATH}        = $apiauthpath;
-            $hash->{HELPER}{APIAUTHMAXVER}      = $apiauthmaxver;
-            $hash->{HELPER}{APIEXTRECPATH}      = $apiextrecpath;
-            $hash->{HELPER}{APIEXTRECMAXVER}    = $apiextrecmaxver;
-            $hash->{HELPER}{APICAMPATH}         = $apicampath;
-            $hash->{HELPER}{APICAMMAXVER}       = $apicammaxver;
-            $hash->{HELPER}{APITAKESNAPPATH}    = $apitakesnappath;
-            $hash->{HELPER}{APITAKESNAPMAXVER}  = $apitakesnapmaxver;
-            $hash->{HELPER}{APIPTZPATH}         = $apiptzpath;
-            $hash->{HELPER}{APIPTZMAXVER}       = $apiptzmaxver;
-            $hash->{HELPER}{APIPRESETPATH}      = $apipresetpath;
-            $hash->{HELPER}{APIPRESETMAXVER}    = $apipresetmaxver;
-            $hash->{HELPER}{APISVSINFOPATH}     = $apisvsinfopath;
-            $hash->{HELPER}{APISVSINFOMAXVER}   = $apisvsinfomaxver;
-            $hash->{HELPER}{APICAMEVENTPATH}    = $apicameventpath;
-            $hash->{HELPER}{APICAMEVENTMAXVER}  = $apicameventmaxver;
-            $hash->{HELPER}{APIEVENTPATH}       = $apieventpath;
-            $hash->{HELPER}{APIEVENTMAXVER}     = $apieventmaxver;
-            $hash->{HELPER}{APIVIDEOSTMPATH}    = $apivideostmpath;
-            $hash->{HELPER}{APIVIDEOSTMMAXVER}  = $apivideostmmaxver;
-            $hash->{HELPER}{APIAUDIOSTMPATH}    = $apiaudiostmpath?$apiaudiostmpath:"undefinded";
-            $hash->{HELPER}{APIAUDIOSTMMAXVER}  = $apiaudiostmmaxver?$apiaudiostmmaxver:0;
-            $hash->{HELPER}{APIEXTEVTPATH}      = $apiextevtpath;
-            $hash->{HELPER}{APIEXTEVTMAXVER}    = $apiextevtmaxver;
-            $hash->{HELPER}{APISTMPATH}         = $apistmpath;
-            $hash->{HELPER}{APISTMMAXVER}       = $apistmmaxver;
-            $hash->{HELPER}{APIHMPATH}          = $apihmpath;
-            $hash->{HELPER}{APIHMMAXVER}        = $apihmmaxver;
-            $hash->{HELPER}{APILOGPATH}         = $apilogpath;
-            $hash->{HELPER}{APILOGMAXVER}       = $apilogmaxver;
-            $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath?$apivideostmspath:"undefinded";
-            $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver?$apivideostmsmaxver:0;
-            $hash->{HELPER}{APIRECPATH}         = $apirecpath;
-            $hash->{HELPER}{APIRECMAXVER}       = $apirecmaxver;
+            $hash->{HELPER}{API}{AUTH}{PATH}      = $apiauthpath;
+            $hash->{HELPER}{API}{AUTH}{VER}       = $apiauthver;
+            $hash->{HELPER}{API}{EXTREC}{PATH}    = $apiextrecpath;
+            $hash->{HELPER}{API}{EXTREC}{VER}     = $apiextrecver;
+            $hash->{HELPER}{API}{CAM}{PATH}       = $apicampath;
+            $hash->{HELPER}{API}{CAM}{VER}        = $apicamver;
+            $hash->{HELPER}{API}{SNAPSHOT}{PATH}  = $apitakesnappath;
+            $hash->{HELPER}{API}{SNAPSHOT}{VER}   = $apitakesnapver;
+            $hash->{HELPER}{API}{PTZ}{PATH}       = $apiptzpath;
+            $hash->{HELPER}{API}{PTZ}{VER}        = $apiptzver;
+            $hash->{HELPER}{API}{PRESET}{PATH}    = $apipresetpath;
+            $hash->{HELPER}{API}{PRESET}{VER}     = $apipresetver;
+            $hash->{HELPER}{API}{SVSINFO}{PATH}   = $apisvsinfopath;
+            $hash->{HELPER}{API}{SVSINFO}{VER}    = $apisvsinfover;
+            $hash->{HELPER}{API}{CAMEVENT}{PATH}  = $apicameventpath;
+            $hash->{HELPER}{API}{CAMEVENT}{VER}   = $apicameventver;
+            $hash->{HELPER}{API}{EVENT}{PATH}     = $apieventpath;
+            $hash->{HELPER}{API}{EVENT}{VER}      = $apieventver;
+            $hash->{HELPER}{API}{VIDEOSTM}{PATH}  = $apivideostmpath;
+            $hash->{HELPER}{API}{VIDEOSTM}{VER}   = $apivideostmver;
+            $hash->{HELPER}{API}{AUDIOSTM}{PATH}  = $apiaudiostmpath ? $apiaudiostmpath : "undefinded";
+            $hash->{HELPER}{API}{AUDIOSTM}{VER}   = $apiaudiostmver  ? $apiaudiostmver  : 0;
+            $hash->{HELPER}{API}{EXTEVT}{PATH}    = $apiextevtpath;
+            $hash->{HELPER}{API}{EXTEVT}{VER}     = $apiextevtver;
+            $hash->{HELPER}{API}{STM}{PATH}       = $apistmpath;
+            $hash->{HELPER}{API}{STM}{VER}        = $apistmver;
+            $hash->{HELPER}{API}{HMODE}{PATH}     = $apihmpath;
+            $hash->{HELPER}{API}{HMODE}{VER}      = $apihmver;
+            $hash->{HELPER}{API}{LOG}{PATH}       = $apilogpath;
+            $hash->{HELPER}{API}{LOG}{VER}        = $apilogver;
+            $hash->{HELPER}{API}{VIDEOSTMS}{PATH} = $apivideostmspath ? $apivideostmspath : "undefinded";
+            $hash->{HELPER}{API}{VIDEOSTMS}{VER}  = $apivideostmsver  ? $apivideostmsver  : 0;
+            $hash->{HELPER}{API}{REC}{PATH}       = $apirecpath;
+            $hash->{HELPER}{API}{REC}{VER}        = $apirecver;
             
-       
             readingsBeginUpdate($hash);
             readingsBulkUpdate ($hash,"Errorcode","none");
             readingsBulkUpdate ($hash,"Error",    "none");
             readingsEndUpdate  ($hash,1);
             
-            # API Hash values sind gesetzt
-            $hash->{HELPER}{APIPARSET} = 1;
+            $hash->{HELPER}{API}{PARSET} = 1;              # API Hash values sind gesetzt
+            
+            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});
                         
         } else {
             my $error = "couldn't call API-Infosite";
@@ -4794,8 +4678,7 @@ sub getApiSites_Parse {
 
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
                         
-            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            delActiveToken($hash);
+            delActiveToken($hash);                        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             return;
         }
     }
@@ -4846,9 +4729,9 @@ sub getCamId {
    my $name         = $hash->{NAME};
    my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
-   my $apicam       = $hash->{HELPER}{APICAM};
-   my $apicampath   = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
+   my $apicam       = $hash->{HELPER}{API}{CAM}{NAME};
+   my $apicampath   = $hash->{HELPER}{API}{CAM}{PATH};
+   my $apicamver    = $hash->{HELPER}{API}{CAM}{VER};
    my $sid          = $hash->{HELPER}{SID};
    my $proto        = $hash->{PROTOCOL};
    
@@ -4866,9 +4749,9 @@ sub getCamId {
    my $httptimeout = AttrVal($name,"httptimeout", 4);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
-   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
-   if ($apicammaxver >= 9) {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
+   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
+   if ($apicamver >= 9) {
+       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
    }
  
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -4895,7 +4778,7 @@ sub getCamId_Parse {
    my $hash              = $param->{hash};
    my $name              = $hash->{NAME};
    my $camname           = $hash->{CAMNAME};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER}; 
+   my $apicamver         = $hash->{HELPER}{API}{CAM}{VER}; 
    my $OpMode            = $hash->{OPMODE};   
    my ($data,$success,$error,$errorcode,$camid);
    my ($i,$n,$id,$errstate,$camdef,$nrcreated);
@@ -4934,7 +4817,7 @@ sub getCamId_Parse {
            # Namen aller installierten Kameras mit Id's in Assoziatives Array einlesen
            %allcams = ();
            while ($data->{'data'}->{'cameras'}->[$i]) {
-               if ($apicammaxver <= 8) {
+               if ($apicamver <= 8) {
                    $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
                } else {
                    $n = $data->{'data'}->{'cameras'}->[$i]->{'newName'};  # Änderung ab SVS 8.0.0
@@ -5028,61 +4911,61 @@ return camOp($hash);
 sub camOp {  
    my $hash = shift;
    
-   my $name               = $hash->{NAME};
-   my $apicam             = $hash->{HELPER}{APICAM};                     # SYNO.SurveillanceStation.Camera
-   my $apicampath         = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER};  
-   my $apiextrec          = $hash->{HELPER}{APIEXTREC};                  # SYNO.SurveillanceStation.ExternalRecording
-   my $apiextrecpath      = $hash->{HELPER}{APIEXTRECPATH};
-   my $apiextrecmaxver    = $hash->{HELPER}{APIEXTRECMAXVER};
-   my $apiextevt          = $hash->{HELPER}{APIEXTEVT};                  # SYNO.SurveillanceStation.ExternalEvent
-   my $apiextevtpath      = $hash->{HELPER}{APIEXTEVTPATH};
-   my $apiextevtmaxver    = $hash->{HELPER}{APIEXTEVTMAXVER};
-   my $apitakesnap        = $hash->{HELPER}{APISNAPSHOT};                # SYNO.SurveillanceStation.SnapShot
-   my $apitakesnappath    = $hash->{HELPER}{APITAKESNAPPATH};
-   my $apitakesnapmaxver  = $hash->{HELPER}{APITAKESNAPMAXVER};
-   my $apiptz             = $hash->{HELPER}{APIPTZ};                     # SYNO.SurveillanceStation.PTZ
-   my $apiptzpath         = $hash->{HELPER}{APIPTZPATH};
-   my $apiptzmaxver       = $hash->{HELPER}{APIPTZMAXVER};
-   my $apipreset          = $hash->{HELPER}{APIPRESET};                  # SYNO.SurveillanceStation.PTZ.Preset
-   my $apipresetpath      = $hash->{HELPER}{APIPRESETPATH};
-   my $apipresetmaxver    = $hash->{HELPER}{APIPRESETMAXVER};
-   my $apisvsinfo         = $hash->{HELPER}{APISVSINFO};                 # SYNO.SurveillanceStation.Info
-   my $apisvsinfopath     = $hash->{HELPER}{APISVSINFOPATH};
-   my $apisvsinfomaxver   = $hash->{HELPER}{APISVSINFOMAXVER};
-   my $apicamevent        = $hash->{HELPER}{APICAMEVENT};                # SYNO.SurveillanceStation.Camera.Event
-   my $apicameventpath    = $hash->{HELPER}{APICAMEVENTPATH};
-   my $apicameventmaxver  = $hash->{HELPER}{APICAMEVENTMAXVER};
-   my $apievent           = $hash->{HELPER}{APIEVENT};                   # SYNO.SurveillanceStation.Event
-   my $apieventpath       = $hash->{HELPER}{APIEVENTPATH};
-   my $apieventmaxver     = $hash->{HELPER}{APIEVENTMAXVER};
-   my $apivideostm        = $hash->{HELPER}{APIVIDEOSTM};                # SYNO.SurveillanceStation.VideoStreaming
-   my $apivideostmpath    = $hash->{HELPER}{APIVIDEOSTMPATH};
-   my $apivideostmmaxver  = $hash->{HELPER}{APIVIDEOSTMMAXVER};  
-   my $apiaudiostm        = $hash->{HELPER}{APIAUDIOSTM};                # SYNO.SurveillanceStation.AudioStream
-   my $apiaudiostmpath    = $hash->{HELPER}{APIAUDIOSTMPATH};
-   my $apiaudiostmmaxver  = $hash->{HELPER}{APIAUDIOSTMMAXVER};   
-   my $apistm             = $hash->{HELPER}{APISTM};                     # SYNO.SurveillanceStation.Stream
-   my $apistmpath         = $hash->{HELPER}{APISTMPATH};
-   my $apistmmaxver       = $hash->{HELPER}{APISTMMAXVER};
-   my $apihm              = $hash->{HELPER}{APIHM};                      # SYNO.SurveillanceStation.HomeMode
-   my $apihmpath          = $hash->{HELPER}{APIHMPATH};
-   my $apihmmaxver        = $hash->{HELPER}{APIHMMAXVER};
-   my $apilog             = $hash->{HELPER}{APILOG};                     # SYNO.SurveillanceStation.Log
-   my $apilogpath         = $hash->{HELPER}{APILOGPATH};
-   my $apilogmaxver       = $hash->{HELPER}{APILOGMAXVER};
-   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};               # SYNO.SurveillanceStation.VideoStream
-   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
-   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-   my $apirec             = $hash->{HELPER}{APIREC};                     # SYNO.SurveillanceStation.Recording
-   my $apirecpath         = $hash->{HELPER}{APIRECPATH};
-   my $apirecmaxver       = $hash->{HELPER}{APIRECMAXVER};   
-   my $sid                = $hash->{HELPER}{SID};
-   my $OpMode             = $hash->{OPMODE};
-   my $camid              = $hash->{CAMID};
-   my $proto              = $hash->{PROTOCOL};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
+   my $name             = $hash->{NAME};
+   my $apicam           = $hash->{HELPER}{API}{CAM}{NAME};                     # SYNO.SurveillanceStation.Camera
+   my $apicampath       = $hash->{HELPER}{API}{CAM}{PATH};
+   my $apicamver        = $hash->{HELPER}{API}{CAM}{VER};  
+   my $apiextrec        = $hash->{HELPER}{API}{EXTREC}{NAME};                  # SYNO.SurveillanceStation.ExternalRecording
+   my $apiextrecpath    = $hash->{HELPER}{API}{EXTREC}{PATH};
+   my $apiextrecver     = $hash->{HELPER}{API}{EXTREC}{VER};
+   my $apiextevt        = $hash->{HELPER}{API}{EXTEVT}{NAME};                  # SYNO.SurveillanceStation.ExternalEvent
+   my $apiextevtpath    = $hash->{HELPER}{API}{EXTEVT}{PATH};
+   my $apiextevtver     = $hash->{HELPER}{API}{EXTEVT}{VER};
+   my $apitakesnap      = $hash->{HELPER}{API}{SNAPSHOT}{NAME};                # SYNO.SurveillanceStation.SnapShot
+   my $apitakesnappath  = $hash->{HELPER}{API}{SNAPSHOT}{PATH};
+   my $apitakesnapver   = $hash->{HELPER}{API}{SNAPSHOT}{VER};
+   my $apiptz           = $hash->{HELPER}{API}{PTZ}{NAME};                     # SYNO.SurveillanceStation.PTZ
+   my $apiptzpath       = $hash->{HELPER}{API}{PTZ}{PATH};
+   my $apiptzver        = $hash->{HELPER}{API}{PTZ}{VER};
+   my $apipreset        = $hash->{HELPER}{API}{PRESET}{NAME};                  # SYNO.SurveillanceStation.PTZ.Preset
+   my $apipresetpath    = $hash->{HELPER}{API}{PRESET}{PATH};
+   my $apipresetver     = $hash->{HELPER}{API}{PRESET}{VER};
+   my $apisvsinfo       = $hash->{HELPER}{API}{SVSINFO}{NAME};                 # SYNO.SurveillanceStation.Info
+   my $apisvsinfopath   = $hash->{HELPER}{API}{SVSINFO}{PATH};
+   my $apisvsinfover    = $hash->{HELPER}{API}{SVSINFO}{VER};
+   my $apicamevent      = $hash->{HELPER}{API}{CAMEVENT}{NAME};                # SYNO.SurveillanceStation.Camera.Event
+   my $apicameventpath  = $hash->{HELPER}{API}{CAMEVENT}{PATH};
+   my $apicameventver   = $hash->{HELPER}{API}{CAMEVENT}{VER};
+   my $apievent         = $hash->{HELPER}{API}{EVENT}{NAME};                   # SYNO.SurveillanceStation.Event
+   my $apieventpath     = $hash->{HELPER}{API}{EVENT}{PATH};
+   my $apieventver      = $hash->{HELPER}{API}{EVENT}{VER};
+   my $apivideostm      = $hash->{HELPER}{API}{VIDEOSTM}{NAME};                # SYNO.SurveillanceStation.VideoStreaming
+   my $apivideostmpath  = $hash->{HELPER}{API}{VIDEOSTM}{PATH};
+   my $apivideostmver   = $hash->{HELPER}{API}{VIDEOSTM}{VER};  
+   my $apiaudiostm      = $hash->{HELPER}{API}{AUDIOSTM}{NAME};                # SYNO.SurveillanceStation.AudioStream
+   my $apiaudiostmpath  = $hash->{HELPER}{API}{AUDIOSTM}{PATH};
+   my $apiaudiostmver   = $hash->{HELPER}{API}{AUDIOSTM}{VER};   
+   my $apistm           = $hash->{HELPER}{API}{STM}{NAME};                     # SYNO.SurveillanceStation.Stream
+   my $apistmpath       = $hash->{HELPER}{API}{STM}{PATH};
+   my $apistmver        = $hash->{HELPER}{API}{STM}{VER};
+   my $apihm            = $hash->{HELPER}{API}{HMODE}{NAME};                   # SYNO.SurveillanceStation.HomeMode
+   my $apihmpath        = $hash->{HELPER}{API}{HMODE}{PATH};
+   my $apihmver         = $hash->{HELPER}{API}{HMODE}{VER};
+   my $apilog           = $hash->{HELPER}{API}{LOG}{NAME};                     # SYNO.SurveillanceStation.Log
+   my $apilogpath       = $hash->{HELPER}{API}{LOG}{PATH};
+   my $apilogver        = $hash->{HELPER}{API}{LOG}{VER};
+   my $apivideostms     = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};               # SYNO.SurveillanceStation.VideoStream
+   my $apivideostmspath = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
+   my $apivideostmsver  = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+   my $apirec           = $hash->{HELPER}{API}{REC}{NAME};                     # SYNO.SurveillanceStation.Recording
+   my $apirecpath       = $hash->{HELPER}{API}{REC}{PATH};
+   my $apirecver        = $hash->{HELPER}{API}{REC}{VER};   
+   my $sid              = $hash->{HELPER}{SID};
+   my $OpMode           = $hash->{OPMODE};
+   my $camid            = $hash->{CAMID};
+   my $proto            = $hash->{PROTOCOL};
+   my $serveraddr       = $hash->{SERVERADDR};
+   my $serverport       = $hash->{SERVERPORT};
    my ($exturl,$winname,$attr,$room,$param);
    my ($url,$httptimeout,$expmode,$motdetsc);
        
@@ -5094,26 +4977,26 @@ sub camOp {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
    if ($OpMode eq "Start") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\"";
-      if($apiextrecmaxver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=start&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraId=$camid&action=start&_sid=\"$sid\"";
+      if($apiextrecver >= 3) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraIds=$camid&action=start&_sid=\"$sid\"";
       }
    } elsif ($OpMode eq "Stop") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
-      if($apiextrecmaxver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraId=$camid&action=stop&_sid=\"$sid\"";
+      if($apiextrecver >= 3) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
       }   
    
    } elsif ($OpMode eq "Snap") {
       # ein Schnappschuß wird ausgelöst
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
       readingsSingleUpdate($hash,"state", "snap", 1); 
    
    } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
       # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
       my $recid = ReadingsVal("$name", "CamLastRecId", 0);
       if($recid) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecmaxver\"&method=\"Download\"&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecver\"&method=\"Download\"&_sid=\"$sid\"";
       } else {
           Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
           delActiveToken($hash);
@@ -5129,32 +5012,32 @@ sub camOp {
       if($OpMode eq "getsnapinfo" && $snapid =~/\d+/x) {
           # getsnapinfo UND Reading LastSnapId gesetzt
           Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
       } else {
           # snapgallery oder kein Reading LastSnapId gesetzt
           Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
       }
       
    } elsif ($OpMode eq "getsnapfilename") {
       # der Filename der aktuellen Schnappschuß-ID wird ermittelt
       my $snapid = ReadingsVal("$name", "LastSnapId", "");
       Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "gopreset") {
       # Preset wird angefahren
-      $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $apiptzver = ($apiptzver >= 5) ? 4 : $apiptzver;
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "getPresets") {
       # Liste der Presets abrufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "piract") {
       # PIR Sensor aktivieren/deaktivieren
       my $piract = $hash->{HELPER}{PIRACT};
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"PDParamSave\"&keep=true&source=$piract&camId=\"$camid\"&_sid=\"$sid\""; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"PDParamSave\"&keep=true&source=$piract&camId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "setPreset") {
       # einen Preset setzen
@@ -5162,31 +5045,31 @@ sub camOp {
       my $pname   = $hash->{HELPER}{PNAME};
       my $pspeed  = $hash->{HELPER}{PSPEED};
       if ($pspeed) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       } else {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
+          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
       }
       
    } elsif ($OpMode eq "delPreset") {
       # einen Preset löschen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
    
    } elsif ($OpMode eq "setHome") {
       # aktuelle Position als Home setzen
       if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       } else {
           my $bindpos = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}};
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
+          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
       }
       
    } elsif ($OpMode eq "startTrack") {
       # Object Tracking einschalten
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "stopTrack") {
       # Object Tracking stoppen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "setZoom") {
       # Zoom in / stop / out
@@ -5195,41 +5078,41 @@ sub camOp {
       my $sttime   = $hash->{HELPER}{ZOOM}{STOPTIME} // "";
       Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType:$sttime"});
       
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
+      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
       
    } elsif ($OpMode eq "runpatrol") {
       # eine Überwachungstour starten
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="RunPatrol"&patrolId="$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}"&cameraId="$camid"&_sid="$sid"};
+      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzver"&method="RunPatrol"&patrolId="$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}"&cameraId="$camid"&_sid="$sid"};
    
    } elsif ($OpMode eq "goabsptz") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "movestart") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
       
    } elsif ($OpMode eq "movestop") {
       Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "Enable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
+      if($apicamver >= 9) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicamver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
       }
    
    } elsif ($OpMode eq "Disable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
+      if($apicamver >= 9) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicamver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
       }
       
    } elsif ($OpMode eq "sethomemode") {
       my $sw = $hash->{HELPER}{HOMEMODE};     # HomeMode on,off
-      $sw  = ($sw eq "on")?"true":"false";
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmmaxver&_sid=\"$sid\"";     
+      $sw  = ($sw eq "on") ? "true" : "false";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "gethomemodestate") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
+      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmver&_sid=\"$sid\"";     
    
    } elsif ($OpMode eq "getsvslog") {
       my $sev = $hash->{HELPER}{LISTLOGSEVERITY} // "";
@@ -5249,42 +5132,42 @@ sub camOp {
       delete($hash->{HELPER}{LISTLOGMATCH});
       
    } elsif ($OpMode eq "getsvsinfo") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfover\"&method=\"GetInfo\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "setoptpar") {
-      my $mirr = $hash->{HELPER}{MIRROR}?$hash->{HELPER}{MIRROR}:ReadingsVal("$name","CamVideoMirror","");
-      my $flip = $hash->{HELPER}{FLIP}?$hash->{HELPER}{FLIP}:ReadingsVal("$name","CamVideoFlip","");
-      my $rot  = $hash->{HELPER}{ROTATE}?$hash->{HELPER}{ROTATE}:ReadingsVal("$name","CamVideoRotate","");
-      my $ntp  = $hash->{HELPER}{NTPSERV}?$hash->{HELPER}{NTPSERV}:ReadingsVal("$name","CamNTPServer","");
-      my $clst = $hash->{HELPER}{CHKLIST}?$hash->{HELPER}{CHKLIST}:"";
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
+      my $mirr = $hash->{HELPER}{MIRROR}  ? $hash->{HELPER}{MIRROR}  : ReadingsVal("$name","CamVideoMirror","");
+      my $flip = $hash->{HELPER}{FLIP}    ? $hash->{HELPER}{FLIP}    : ReadingsVal("$name","CamVideoFlip",""  );
+      my $rot  = $hash->{HELPER}{ROTATE}  ? $hash->{HELPER}{ROTATE}  : ReadingsVal("$name","CamVideoRotate","");
+      my $ntp  = $hash->{HELPER}{NTPSERV} ? $hash->{HELPER}{NTPSERV} : ReadingsVal("$name","CamNTPServer",""  );
+      my $clst = $hash->{HELPER}{CHKLIST} ? $hash->{HELPER}{CHKLIST} : "";
+      $apicamver = ($apicamver >= 9) ? 8 : $apicamver;
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
              
    } elsif ($OpMode eq "Getcaminfo") {
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
+      $apicamver = ($apicamver >= 9) ? 8 : $apicamver;
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "getStmUrlPath") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicammaxver&idList=\"$camid\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
+      if($apicamver >= 9) {
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicamver&idList=\"$camid\"&_sid=\"$sid\"";   
       }
    
    } elsif ($OpMode eq "geteventlist") {
       # Abruf der Events einer Kamera
-      $url = "$proto://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventmaxver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getptzlistpreset") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "Getcapabilities") {
       # Capabilities einer Cam werden abgerufen
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
+      $apicamver = ($apicamver >= 9)?8:$apicamver;
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
    
    } elsif ($OpMode eq "Getptzlistpatrol") {
       # PTZ-ListPatrol werden abgerufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "ExpMode") {
       if ($hash->{HELPER}{EXPMODE} eq "auto") {
@@ -5296,8 +5179,8 @@ sub camOp {
       elsif ($hash->{HELPER}{EXPMODE} eq "night") {
           $expmode = "2";
       }
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
+      $apicamver = ($apicamver >= 9)?8:$apicamver;
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "MotDetSc") {
       # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
@@ -5305,7 +5188,7 @@ sub camOp {
         
       if ($hash->{HELPER}{MOTDETSC} eq "disable") {
           $motdetsc = "-1";
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
       } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
           $motdetsc = "0";
           
@@ -5313,7 +5196,7 @@ sub camOp {
           $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
           $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
           
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
           
           if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP13}) {
               # umschalten und neue Werte setzen
@@ -5348,7 +5231,7 @@ sub camOp {
           $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
       
           # nur Umschaltung, alte Werte beibehalten
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
+          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
 
           if ($hash->{HELPER}{MOTDETSC_PROP1}) {
               # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
@@ -5366,28 +5249,28 @@ sub camOp {
       $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;
    
    } elsif ($OpMode eq "getmotionenum") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
+      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
    
    } elsif ($OpMode eq "extevent") {
       Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
    
    } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
       $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
       $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;      
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
-          if($apiaudiostmmaxver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
-              $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          if($apiaudiostmver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
+              $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
           } else {
               delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
           }
           
-          if($apivideostmsmaxver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+          if($apivideostmsver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
               # externe URL in Reading setzen
-              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
               
               # interne URL
-              $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+              $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
           } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
               $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
           }
@@ -5398,9 +5281,9 @@ sub camOp {
           my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);
           if($lrecid) {
               # externe URL in Reading setzen
-              $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
+              $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
               # interne URL          
-              $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid";   
+              $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid";   
               readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
           }
       }
@@ -5434,20 +5317,20 @@ sub camOp {
       my $limit   = 1;                # nur 1 Snap laden, für lastsnap_fw 
       my $imgsize = 2;                # full size image, für lastsnap_fw 
       my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
+      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
    
    } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) || $OpMode eq "activate_hls") {
       # HLS Livestreaming aktivieren
       $httptimeout = $httptimeout+90; # aktivieren HLS dauert lange !
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
    
    } elsif ($OpMode eq "stopliveview_hls" || $OpMode eq "reactivate_hls") {
       # HLS Livestreaming deaktivieren
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
    
    } elsif ($OpMode eq "getstreamformat") {
       # aktuelles Streamformat abfragen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Query&cameraId=$camid&_sid=$sid"; 
+      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Query&cameraId=$camid&_sid=$sid"; 
    }
    
    Log3($name, 4, "$name - Call-Out now: $url");
@@ -5481,10 +5364,10 @@ sub camOp_Parse {
    my $serveraddr         = $hash->{SERVERADDR};
    my $serverport         = $hash->{SERVERPORT};
    my $camid              = $hash->{CAMID};
-   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
-   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER}; 
+   my $apivideostms       = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
+   my $apivideostmspath   = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
+   my $apivideostmsver    = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+   my $apicamver          = $hash->{HELPER}{API}{CAM}{VER}; 
    my $sid                = $hash->{HELPER}{SID};
    my $proto              = $hash->{PROTOCOL};
    
@@ -5575,8 +5458,8 @@ sub camOp_Parse {
                 
                 if ($rectime != 0) {
                     # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
-                    my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
+                    my $emtxt   = $hash->{HELPER}{SMTPRECMSG} // "";
+                    my $teletxt = $hash->{HELPER}{TELERECMSG} // "";
                     RemoveInternalTimer($hash, "FHEM::SSCam::camStopRec");
                     InternalTimer(gettimeofday()+$rectime, "FHEM::SSCam::camStopRec", $hash);
                 }      
@@ -5908,9 +5791,9 @@ sub camOp_Parse {
                 }
                 $ncount--;                                                           # wird vermindert je Snap
                 my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
-                my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
-                my $teletxt = $hash->{HELPER}{TELEMSG}?$hash->{HELPER}{TELEMSG}:"";  # Text für TelegramBot-Versand
-                my $chattxt = $hash->{HELPER}{CHATMSG}?$hash->{HELPER}{CHATMSG}:"";  # Text für SSChatBot-Versand
+                my $emtxt   = $hash->{HELPER}{SMTPMSG} // "";                        # Text für Email-Versand
+                my $teletxt = $hash->{HELPER}{TELEMSG} // "";                        # Text für TelegramBot-Versand
+                my $chattxt = $hash->{HELPER}{CHATMSG} // "";                        # Text für SSChatBot-Versand
                 if($ncount > 0) {
                     InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
                     if(!$tac) {
@@ -5940,8 +5823,7 @@ sub camOp_Parse {
                 Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
                 
                 # aktuellsten Snap zur Anzeige im streamDev "lastsnap" speichern
-                # $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};
-                $cache = cache($name, "c_init");                               # Cache initialisieren  
+                $cache = cache($name, "c_init");                                                            # Cache initialisieren  
                 Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
                 if(!$cache || $cache eq "internal" ) {
                     $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
@@ -6312,15 +6194,15 @@ sub camOp_Parse {
                     roomRefresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
             
-            } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
+            } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) {
                 # HLS Streaming wurde aktiviert
                 $hash->{HELPER}{HLSSTREAM} = "active";
                 # externe LivestreamURL setzen
                 my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-                $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
                 readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
                 
-                my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+                my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
                 # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
                 $hash->{HELPER}{LINK}      = $url;
                 Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
@@ -6573,7 +6455,7 @@ sub camOp_Parse {
             } elsif ($OpMode eq "getStmUrlPath") {
                 # Parse SVS-Infos
                 my($camforcemcast,$mjpegHttp,$multicst,$mxpegHttp,$unicastOverHttp,$unicastPath);
-                if($apicammaxver < 9) {
+                if($apicamver < 9) {
                     $camforcemcast   = jboolmap($data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'});
                     $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
                     $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
@@ -6581,7 +6463,7 @@ sub camOp_Parse {
                     $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
                     $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
                 }
-                if($apicammaxver >= 9) {
+                if($apicamver >= 9) {
                     $mjpegHttp        = $data->{'data'}[0]{'mjpegHttpPath'};
                     $multicst         = $data->{'data'}[0]{'multicstPath'};
                     $mxpegHttp        = $data->{'data'}[0]{'mxpegHttpPath'};
@@ -6792,6 +6674,9 @@ sub camOp_Parse {
                    
                 $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(IsModelCam($hash));                   
                 Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
+                
+                getPtzPresetList($hash);                               # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
+                getPtzPatrolList($hash);
             
             } elsif ($OpMode eq "geteventlist") {              
                 my $eventnum  = $data->{'data'}{'total'};
@@ -7072,20 +6957,17 @@ sub camOp_Parse {
 return;
 }
 
-#############################################################################################################################
-#########                                               Hilfsroutinen                                           #############
-#############################################################################################################################
-
 ####################################################################################  
-#   Login in SVS wenn kein oder ungültige Session-ID vorhanden ist
+#         Login in wenn kein oder ungültige Session-ID vorhanden ist
+####################################################################################
 sub login {
   my ($hash,$fret) = @_;
   my $name          = $hash->{NAME};
   my $serveraddr    = $hash->{SERVERADDR};
   my $serverport    = $hash->{SERVERPORT};
-  my $apiauth       = $hash->{HELPER}{APIAUTH};
-  my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
-  my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
+  my $apiauth       = $hash->{HELPER}{API}{AUTH}{NAME};
+  my $apiauthpath   = $hash->{HELPER}{API}{AUTH}{PATH};
+  my $apiauthver    = $hash->{HELPER}{API}{AUTH}{VER};
   my $proto         = $hash->{PROTOCOL};
   my $lrt = AttrVal($name,"loginRetries",3);
   my ($url,$param);
@@ -7121,27 +7003,28 @@ sub login {
   my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
   
   if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
+      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
   } else {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=$sid"; 
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=$sid";
+      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&format=$sid"; 
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&format=$sid";
   }
   
   AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
   $hash->{HELPER}{LOGINRETRIES}++;
   
   $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               user     => $username,
-               funcret  => $fret,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&loginReturn
-           };
-   HttpUtils_NonblockingGet ($param);
+      url      => $url,
+      timeout  => $httptimeout,
+      hash     => $hash,
+      user     => $username,
+      funcret  => $fret,
+      method   => "GET",
+      header   => "Accept: application/json",
+      callback => \&loginReturn
+  };
+  
+  HttpUtils_NonblockingGet ($param);
    
 return;
 }
@@ -7189,10 +7072,10 @@ sub loginReturn {
             # Session ID in hash eintragen
             $hash->{HELPER}{SID} = $sid;
        
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode","none");
-            readingsBulkUpdate($hash,"Error","none");
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash,"Errorcode","none");
+            readingsBulkUpdate  ($hash,"Error","none");
+            readingsEndUpdate   ($hash, 1);
        
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
             
@@ -7205,10 +7088,10 @@ sub loginReturn {
             # Fehlertext zum Errorcode ermitteln
             my $error = expErrorsAuth($hash,$errorcode);
 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate  ($hash,"Error",$error);
+            readingsEndUpdate   ($hash, 1);
        
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
@@ -7227,14 +7110,13 @@ sub logout {
    my $name          = $hash->{NAME};
    my $serveraddr    = $hash->{SERVERADDR};
    my $serverport    = $hash->{SERVERPORT};
-   my $apiauth       = $hash->{HELPER}{APIAUTH};
-   my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
-   my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
+   my $apiauth       = $hash->{HELPER}{API}{AUTH}{NAME};
+   my $apiauthpath   = $hash->{HELPER}{API}{AUTH}{PATH};
+   my $apiauthver    = $hash->{HELPER}{API}{AUTH}{VER};
    my $sid           = $hash->{HELPER}{SID};
    my $proto         = $hash->{PROTOCOL};
-   my $url;
-   my $param;
-   my $httptimeout;
+   
+   my ($url,$param,$httptimeout);
     
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
@@ -7245,19 +7127,19 @@ sub logout {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
    if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&session=SurveillanceStation&_sid=$sid";
    } else {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";
    }
 
    $param = {
-            url      => $url,
-            timeout  => $httptimeout,
-            hash     => $hash,
-            method   => "GET",
-            header   => "Accept: application/json",
-            callback => \&logoutReturn
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&logoutReturn
+   };
    
    HttpUtils_NonblockingGet ($param);
 
@@ -7275,17 +7157,14 @@ sub logoutReturn {
    my $error;
    my $errorcode;
   
-   if ($err ne "") {
-       # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "") {                                                               # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
        readingsSingleUpdate($hash, "Error", $err, 1);                                             
    
-   } elsif ($myjson ne "") {
-       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+   } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
-       # Evaluiere ob Daten im JSON-Format empfangen wurden
-       ($hash, $success) = evaljson($hash,$myjson);
+       ($hash, $success) = evaljson($hash,$myjson);                                # Evaluiere ob Daten im JSON-Format empfangen wurden
         
        unless ($success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -7294,31 +7173,25 @@ sub logoutReturn {
        }
         
        $data = decode_json($myjson);
-        
-       # Logausgabe decodierte JSON Daten
-       Log3($name, 4, "$name - JSON returned: ". Dumper $data);
+       
+       Log3($name, 4, "$name - JSON returned: ". Dumper $data);                   # Logausgabe decodierte JSON Daten
    
        $success = $data->{'success'};
 
-       if ($success) {
-           # die Logout-URL konnte erfolgreich aufgerufen werden                        
+       if ($success) {                                                                                        # die Logout-URL konnte erfolgreich aufgerufen werden                        
            Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
              
        } else {
-           # Errorcode aus JSON ermitteln
-           $errorcode = $data->{'error'}->{'code'};
-
-           # Fehlertext zum Errorcode ermitteln
-           $error = expErrorsAuth($hash,$errorcode);
+           $errorcode = $data->{'error'}->{'code'};                               # Errorcode aus JSON ermitteln
+           $error     = expErrorsAuth($hash,$errorcode);                          # Fehlertext zum Errorcode ermitteln
 
            Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
        }
    }   
-   # Session-ID aus Helper-hash löschen
-   delete $hash->{HELPER}{SID};
    
-   # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   delActiveToken($hash);
+   delete $hash->{HELPER}{SID};                                                   # Session-ID aus Helper-hash löschen
+   
+   delActiveToken($hash);                                                         # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
    
    CancelDelayedShutdown($name);
    
@@ -7378,7 +7251,8 @@ return ($err,$camname);
 #   Test ob JSON-String empfangen wurde
 ###############################################################################
 sub evaljson { 
-  my ($hash,$myjson) = @_;
+  my $hash    = shift;
+  my $myjson  = shift;
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
   my $success = 1;
@@ -7392,13 +7266,14 @@ sub evaljson {
               $success = 1;
               $myjson  = '{"success":true}';    
           } 
+      
       } else {
           $success = 0;
 
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"Errorcode","none");
-          readingsBulkUpdate($hash,"Error","malformed JSON string received");
-          readingsEndUpdate($hash, 1);  
+          readingsBeginUpdate ($hash);
+          readingsBulkUpdate  ($hash, "Errorcode", "none");
+          readingsBulkUpdate  ($hash, "Error",     "malformed JSON string received");
+          readingsEndUpdate   ($hash, 1);  
       }
   };
   
@@ -7505,7 +7380,7 @@ sub IsCapHLS {                                                            # HLS 
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my $cap    = 0;
-  my $api    = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+  my $api    = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
   my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
   
   $cap = 1 if($api && $csf);
@@ -7594,19 +7469,6 @@ return $mm;
 }
 
 ###############################################################################
-#                       JSON Boolean Test und Mapping
-###############################################################################
-sub jboolmap { 
-  my ($bool)= @_;
-  
-  if(JSON::is_bool($bool)) {
-      $bool = $bool?"true":"false";
-  }
-  
-return $bool;
-}
-
-###############################################################################
 #      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
 #
 #      $force = wenn auf jeden Fall der/die letzten Snaps von der SVS
@@ -7681,57 +7543,6 @@ sub extoptpar {
                               ($hash->{HELPER}{ROTATE}?$cpcl->{rotate}:0);
   
 return;
-}
-
-###############################################################################
-# Clienthash übernehmen oder zusammenstellen
-# Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
-###############################################################################
-sub getClHash {      
-  my ($hash,$nobgd)= @_;
-  my $name  = $hash->{NAME};
-  my $ret;
-  
-  if($nobgd) {
-      # nur übergebenen CL-Hash speichern, 
-      # keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-      return;
-  }
-
-  if (!defined($hash->{CL})) {
-      # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
-      my $outdev;
-      my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
-      my $i = 1;
-      for (@webdvs) {
-          $outdev = $_;
-          next if(!$defs{$outdev});
-          $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
-          $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
-          $hash->{HELPER}{CL}{$i}->{COMP} = 1;
-          $i++;               
-      }
-  } else {
-      # übergebenen CL-Hash in Helper eintragen
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-  }
-      
-  # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz
-  if (defined($hash->{HELPER}{CL}{1})) {
-      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-          Log3($name, 4, "$name - Clienthash number: $k");
-          while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
-              $val = $val?$val:" ";
-              Log3($name, 4, "$name - Clienthash: $key -> $val");
-          }
-      }
-  } else {
-      Log3($name, 2, "$name - Clienthash was neither delivered nor created !");
-      $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for function.";
-  }
-  
-return ($ret);
 }
 
 ###############################################################################
@@ -8140,15 +7951,15 @@ sub streamDev {                                               ## no critic 'comp
     pws                => $pws,
     serveraddr         => $hash->{SERVERADDR},
     serverport         => $hash->{SERVERPORT},
-    apivideostm        => $hash->{HELPER}{APIVIDEOSTM},
-    apivideostmpath    => $hash->{HELPER}{APIVIDEOSTMPATH},
-    apivideostmmaxver  => $hash->{HELPER}{APIVIDEOSTMMAXVER}, 
-    apiaudiostm        => $hash->{HELPER}{APIAUDIOSTM},
-    apiaudiostmpath    => $hash->{HELPER}{APIAUDIOSTMPATH},
-    apiaudiostmmaxver  => $hash->{HELPER}{APIAUDIOSTMMAXVER},
-    apivideostms       => $hash->{HELPER}{APIVIDEOSTMS},  
-    apivideostmspath   => $hash->{HELPER}{APIVIDEOSTMSPATH},
-    apivideostmsmaxver => $hash->{HELPER}{APIVIDEOSTMSMAXVER},
+    apivideostm        => $hash->{HELPER}{API}{VIDEOSTM}{NAME},
+    apivideostmpath    => $hash->{HELPER}{API}{VIDEOSTM}{PATH},
+    apivideostmver     => $hash->{HELPER}{API}{VIDEOSTM}{VER}, 
+    apiaudiostm        => $hash->{HELPER}{API}{AUDIOSTM}{NAME},
+    apiaudiostmpath    => $hash->{HELPER}{API}{AUDIOSTM}{PATH},
+    apiaudiostmver     => $hash->{HELPER}{API}{AUDIOSTM}{VER},
+    apivideostms       => $hash->{HELPER}{API}{VIDEOSTMS}{NAME},  
+    apivideostmspath   => $hash->{HELPER}{API}{VIDEOSTMS}{PATH},
+    apivideostmsver    => $hash->{HELPER}{API}{VIDEOSTMS}{VER},
     camid              => $hash->{CAMID},
     sid                => $hash->{HELPER}{SID},
     proto              => $hash->{PROTOCOL},
@@ -8257,10 +8068,10 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $serverport         = $params->{serverport};
   my $apivideostms       = $params->{apivideostms};
   my $apivideostmspath   = $params->{apivideostmspath};
-  my $apivideostmsmaxver = $params->{apivideostmsmaxver};
+  my $apivideostmsver = $params->{apivideostmsver};
   my $apiaudiostm        = $params->{apiaudiostm};
   my $apiaudiostmpath    = $params->{apiaudiostmpath};
-  my $apiaudiostmmaxver  = $params->{apiaudiostmmaxver};
+  my $apiaudiostmver  = $params->{apiaudiostmver};
   
   my $cmdrecendless      = $params->{cmdrecendless};
   my $ttrecstart         = $params->{ttrecstart};
@@ -8280,16 +8091,16 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
       return $ret;
       
   } else {
-      if($apivideostmsmaxver) {                                  
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      if($apivideostmsver) {                                  
+          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
       
       return $ret if(!$link);
       
-      if($apiaudiostmmaxver) {                                   
-          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+      if($apiaudiostmver) {                                   
+          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
       
       if(!$ftui) {
@@ -9274,29 +9085,6 @@ sub expErrors {
   $error = $errlist{"$errorcode"};
   
 return ($error);
-}
-
-################################################################
-# sortiert eine Liste von Versionsnummern x.x.x
-# Schwartzian Transform and the GRT transform
-# Übergabe: "asc | desc",<Liste von Versionsnummern>
-################################################################
-sub sortVersion {
-  my ($sseq,@versions) = @_;
-
-  my @sorted = map {$_->[0]}
-               sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./x]} @versions;
-             
-  @sorted = map {join ".", unpack "C*", $_}
-            sort
-            map {pack "C*", split /\./x} @versions;
-  
-  if($sseq eq "desc") {
-      @sorted = reverse @sorted;
-  }
-  
-return @sorted;
 }
 
 ##############################################################################
@@ -11170,16 +10958,6 @@ return;
 }
 
 #############################################################################################
-#             Leerzeichen am Anfang / Ende eines strings entfernen           
-#############################################################################################
-sub trim {
-  my $str = shift;
-  $str =~ s/^\s+|\s+$//gx;
-
-return ($str);
-}
-
-#############################################################################################
 #        Check ob "sscam" im iconpath des FHEMWEB Devices enthalten ist
 #############################################################################################
 sub checkIconpath {
@@ -11446,41 +11224,6 @@ sub cache {
   }
   
 return 0;
-}
-
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-
-  my $v                    = (sortVersion("desc",keys %vNotesIntern))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-      # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                                  # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                 ## no critic 'VERSION'                                      
-      }
-  } else {
-      # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
-return;
 }
 
 1;
@@ -15462,7 +15205,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         "GPUtils": 0,
         "HttpUtils": 0,
         "Blocking": 0,
-        "Encode": 0      
+        "Encode": 0,
+        "FHEM::SynoModules::API": 0       
       },
       "recommends": {
         "FHEM::Meta": 0,
