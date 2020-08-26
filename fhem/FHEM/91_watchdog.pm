@@ -395,7 +395,7 @@ watchdog_Set($@)
       regexp2 are identical, or regexp2 is ., then this behavior is default.
       </li><br>
 
-    <li><a href="#execOnReactivate">execOnActivate</a>
+    <li><a href="#execOnReactivate">execOnReactivate</a>
       If set, its value will be executed as a FHEM command when the watchdog is
       reactivated (after triggering) by receiving an event matching regexp1.
       </li><br>
@@ -543,7 +543,7 @@ watchdog_Set($@)
       gestartet. Falls regexp1 und regexp2 gleich sind, oder regexp2 ist .,
       dann ist dieses Verhalten die Voreinstellung.</li></br>
 
-    <li><a href="#execOnReactivate">execOnActivate</a>
+    <li><a href="#execOnReactivate">execOnReactivate</a>
       Falls gesetzt, wird der Wert des Attributes als FHEM Befehl
       ausgef&uuml;hrt, wenn ein regexp1 Ereignis den Watchdog
       aktiviert nachdem er ausgel&ouml;st wurde.</li></br>
