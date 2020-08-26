@@ -1930,7 +1930,7 @@ par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included,
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
 set DEVICE attrTemplate shelly1
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
-attr DEVICE stateFormat { my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $state,\nP1: $cons1 W / Total P1: $total1 kWh\nP2: $cons2 W / Total P2: $total2 kWh\nP3: $cons3 W / Total P3: $total3 kWh) }
+attr DEVICE stateFormat { my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $state,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
@@ -1968,7 +1968,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200824
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -2850,7 +2850,7 @@ par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sa
 attr DEVICE icon ICON
 modify DEVICE DEV_ID
 attr DEVICE autocreate 1
-attr DEVICE bridgeRegexp (ebus..*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
+attr DEVICE bridgeRegexp (ebus..*?)/(bai|\d+|cc|e7f|ehp|f\d\d|hc|he.|hmu|hwc|mc|mc.\d|omu|omu.\d|pms|rcc|rcc.\d|sc|sdr_p|solar|ui|uih|v\d\d|v81.\d|vd\d|vl\d|vr_\d\d|zeo)/.*:.* "$1_$2"\
 (ebus..*?)/(global|broadcast|general|scan([^/]*))/.*:.* "$1"
 attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
 attr DEVICE stateFormat Status: \
@@ -2865,7 +2865,7 @@ set DEVICE getKnown
 attr DEVICE comment NOTE: additional templates and code have been downloaded from svn (contrib).
 farewell:template has been applied successfully. <br>NOTE: additional templates and code have been downloaded from svn (contrib). <br>To configure further parts of your ebus ecosystem, have a look at these templates and the <a href=https://wiki.fhem.de/wiki/EBUS-MQTT2">Wiki</a>.
 attr DEVICE model eBus_daemon_splitter
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200824
 
 
 ###########################################
