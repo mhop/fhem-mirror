@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2020
-my $thzversion = "0.189";
+my $thzversion = "0.190";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -899,7 +899,7 @@ sub THZ_Initialize($) {
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
-            ."simpleReadTimeout:0.25,0.5,1,2,4,6,8 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
+            ."simpleReadTimeout:0.25,0.5,0.75,1,2,4,6 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
             ."nonblocking:0,1 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
@@ -997,7 +997,7 @@ sub THZ_GetRefresh($) {
             return;
         }
     }
-    elsif ($hash->{STATE} ne "disconnected")  {
+    elsif (($hash->{STATE} ne "disconnected") and (AttrVal($name, "state", " ")  ne "disconnected" )) {
         THZ_Get($hash, $hash->{NAME}, $command);        
     }
     
@@ -1470,13 +1470,13 @@ sub THZ_Get_Comunication($$) {
     my ($err, $msg) =("", " ");
     Log3 $hash->{NAME}, 5, "THZ_Get_Comunication: Check if port is open. State = '($hash->{STATE})'";
     if  (!(($hash->{STATE}) eq "opened"))  { return("closed connection", "");}
+    select(undef, undef, undef, 0.001);
     THZ_Write($hash,  "02"); 			# step0 --> STX start of text
     ($err, $msg) = THZ_ReadAnswer($hash);
     #Expectedanswer0    is  "10"  DLE data link escape
     if  ($msg ne "10")       {$err .= " THZ_Get_Com: error found at step0 $msg"; $err .=" NAK!!" if ($msg eq "15"); select(undef, undef, undef, 0.1); return($err, $msg) ;}
     else  {
         THZ_Write($hash,  $cmdHex); 		# step1 --> send request   SOH start of heading -- Null 	-- ?? -- DLE data link escape -- EOT End of Text
-        select(undef, undef, undef, 0.1); #needed by heiner? msg1080204
         ($err, $msg) = THZ_ReadAnswer($hash);
     }
     if  (defined($err))     {$err .=  " THZ_Get_Com: error found at step1 "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
@@ -1484,7 +1484,7 @@ sub THZ_Get_Comunication($$) {
     if  ($msg eq "10") 	    {($err, $msg) = THZ_ReadAnswer($hash);}
     elsif ($msg eq "15") 	{$err .=  " THZ_Get_Com: error found at step1  NAK!! "; select(undef, undef, undef, 0.1); return($err, $msg) ;}
     if  ($msg eq "1002" || $msg eq "02") {
-        THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape  
+        THZ_Write($hash,  "10"); 		    	# step2 send  DLE data link escape
         ($err, $msg) = THZ_ReadAnswer($hash);	# Expectedanswer2 // read from the heatpump
         THZ_Write($hash,  "10");  
     }
@@ -1504,20 +1504,19 @@ sub THZ_ReadAnswer($) {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
-    select(undef, undef, undef, 0.002);
-	my $buf = DevIo_SimpleRead($hash);
-    #$hash->{total_simleread}+=1;
-    if(!defined($buf)) {
-        #$hash->{total_simleread_withtimeout}+=1;
-        select(undef, undef, undef, 0.025) if( $^O =~ /Win/ ); ###delay of 25 ms for windows-OS, because SimpleReadWithTimeout does not wait
-        my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8")); 
-        $rtimeout = minNum($rtimeout,1.6) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.6s if nonblocking disabled
-        $buf = DevIo_SimpleReadWithTimeout($hash, $rtimeout);
+    my $buf =undef;
+    my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8"));
+    $rtimeout = minNum($rtimeout,1.6) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.5s if nonblocking disabled
+    my $count = 0; my $countmax = 20;
+    while ((!defined($buf)) and ($count <= $countmax)) {
+        select(undef, undef, undef, 0.01) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
+        $buf = DevIo_SimpleReadWithTimeout($hash, (minNum($count,1)*$rtimeout/$countmax + 0.001)); ##pay attention with DevIo_SimpleRead: it closes the connection if no answe given; DevIo_SimpleReadWithTimeout does not close
+        #$hash->{"total_count_$count"}+=1;
+        $count ++;
     }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
 	my $data =  uc(unpack('H*', $buf));
-	my $count =1;
-	my $countmax = 60;
+	$count =1; $countmax = 60;
 	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
         select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
         my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
