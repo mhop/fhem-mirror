@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: commandRef revised
  - change:  76_SMAPortal: avoid deletion of readings if provider is selected
                           but value not delivered. 
                           Forum: #102112.msg1078990.html#msg1078990

@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.6"  => "27.08.2020  commandRef revised ",
   "8.40.5"  => "29.07.2020  fix crash if delEntries startet without any time limits, Forum:#113202 ",
   "8.40.4"  => "23.07.2020  new aggregation value 'minute', some fixes ",
   "8.40.3"  => "22.07.2020  delete prototypes ",
@@ -12497,7 +12498,7 @@ return;
 								 
 								 <b>Note: <br>
 								 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
-                                 optimization want to be used ! </b> <br><br>
+                                 optimization is used ! </b> <br><br>
 								 
 								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
                                  
@@ -12518,7 +12519,7 @@ return;
 								 
                                  The target directory can be set by <a href="#DbRepattr">attribute</a> "dumpDirRemote". 
                                  It must be located on the MySQL-Host and has to be writable by the MySQL-server process. <br>
-								 The used database user must have the "FILE"-privilege. <br><br>
+								 The used database user must have the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 								 
 								 <b>Note:</b> <br>
 								 If the internal version management of DbRep should be used and the size of the created dumpfile be 
@@ -13065,6 +13066,7 @@ return;
 								 <br><br>
 								 
 								 <b>Usage of clientSide-Dumps </b> <br>
+                                 The used database user needs the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#4._Restore_2">Wiki</a>). <br>
 								 All tables and views (if present) are restored.
 								 The directory which contains the dump files has to be set by attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
 								 to make it usable by the DbRep device. <br>
@@ -15088,7 +15090,7 @@ sub bdump {
 								 
 								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirRemote" verändert werden. 
 								 Es muß sich auf dem MySQL-Host gefinden und durch den MySQL-Serverprozess beschreibbar sein. <br>
-								 Der verwendete Datenbankuser benötigt das "FILE"-Privileg. <br><br>
+								 Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 								 
 								 <b>Hinweis:</b> <br>
 								 Soll die interne Versionsverwaltung und die Dumpfilekompression des Moduls genutzt, sowie die Größe des erzeugten 
@@ -15646,6 +15648,7 @@ sub bdump {
                           		 Die Funktion stellt über eine Drop-Down Liste eine Dateiauswahl für den Restore zur Verfügung. <br><br>
 								 
 								 <b>Verwendung eines serverSide-Dumps </b> <br>
+                                 Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#4._Restore_2">Wiki</a>). <br>
 								 Es wird der Inhalt der history-Tabelle aus einem serverSide-Dump wiederhergestellt.
                                  Dazu ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
 								 und im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
