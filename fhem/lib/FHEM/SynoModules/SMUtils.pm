@@ -30,12 +30,14 @@ package FHEM::SynoModules::SMUtils;
 use strict;           
 use warnings;
 use utf8;
+use MIME::Base64;
+eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no critic 'eval'
 
-# use lib qw(/opt/fhem/FHEM);                                   # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+# use lib qw(/opt/fhem/FHEM);                                             # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.1.0');
+use version; our $VERSION = version->declare('1.2.0');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(
@@ -44,6 +46,9 @@ our @EXPORT_OK   = qw(
                        sortVersion
                        setVersionInfo
                        jboolmap
+                       setCredentials
+                       getCredentials
+                       evaljson
                      );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -53,10 +58,16 @@ BEGIN {
   # Import from main::
   GP_Import( 
       qw(
+          AttrVal
           Log3
           defs
           modules
           devspec2array
+          setKeyValue
+          getKeyValue
+          readingsBeginUpdate
+          readingsBulkUpdate
+          readingsEndUpdate
         )
   );  
 };
@@ -148,7 +159,7 @@ return @sorted;
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
 sub setVersionInfo {
-  my $hash  = shift  // carp "got no hash value !" && return;
+  my $hash  = shift  // carp "got no hash value !"         && return;
   my $notes = shift  // carp "got no vNotesIntern value !" && return;
   my $name  = $hash->{NAME};
 
@@ -194,6 +205,156 @@ sub jboolmap {
   }
   
 return $bool;
+}
+
+######################################################################################
+#                            Username / Paßwort speichern
+#   $ao = "credentials"     -> Standard Credentials
+#   $ao = "SMTPcredentials" -> Credentials für Mailversand
+######################################################################################
+sub setCredentials {
+    my $hash = shift // carp "got no hash value !"       && return;
+    my $ao   = shift // carp "got no credentials type !" && return;
+    my $user = shift // carp "got no user name !"        && return;
+    my $pass = shift // carp "got no password !"         && return;
+    my $name = $hash->{NAME};
+    
+    my $success;
+    
+    my $credstr = encode_base64 ("$user:$pass");
+    
+    # Beginn Scramble-Routine
+    my @key = qw(1 3 4 5 6 3 2 1 9);
+    my $len = scalar @key;  
+    my $i   = 0;  
+    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
+    # End Scramble-Routine    
+       
+    my $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
+    my $retcode = setKeyValue($index, $credstr);
+    
+    if ($retcode) { 
+        Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
+        $success = 0;
+    
+    } else {
+        getCredentials($hash,1,$ao);                                                            # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
+        $success = 1;
+    }
+
+return ($success);
+}
+
+######################################################################################
+#                             Username / Paßwort abrufen
+#   $ao = "credentials"     -> Standard Credentials
+#   $ao = "SMTPcredentials" -> Credentials für Mailversand
+######################################################################################
+sub getCredentials {
+    my $hash = shift // carp "got no hash value !"       && return;
+    my $boot = shift;
+    my $ao   = shift // carp "got no credentials type !" && return;
+    my $name = $hash->{NAME};
+    my ($success, $username, $passwd, $index, $retcode, $credstr);
+    my (@key,$len,$i);
+    
+    my $pp;
+    
+    if ($boot) {                                                            # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
+        $index               = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
+        ($retcode, $credstr) = getKeyValue($index);
+    
+        if ($retcode) {
+            Log3($name, 2, "$name - Unable to read password from file: $retcode");
+            $success = 0;
+        }  
+
+        if ($credstr) {
+            if($ao eq "credentials") {                                      # beim Boot scrambled Credentials in den RAM laden
+                $hash->{HELPER}{CREDENTIALS} = $credstr;
+                $hash->{CREDENTIALS}         = "Set";                       # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
+                $success                     = 1;
+            
+            } elsif ($ao eq "SMTPcredentials") {                            # beim Boot scrambled Credentials in den RAM laden
+                $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
+                $hash->{SMTPCREDENTIALS}         = "Set";                   # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
+                $success                         = 1;                
+            }
+        }
+    
+    } else {                                                                # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+        if ($ao eq "credentials") {
+            $credstr = $hash->{HELPER}{CREDENTIALS};
+            $pp      = q{};
+        
+        } elsif ($ao eq "SMTPcredentials") {
+            $pp      = q{SMTP};
+            $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
+        }
+        
+        if($credstr) {
+            # Beginn Descramble-Routine
+            @key = qw(1 3 4 5 6 3 2 1 9); 
+            $len = scalar @key;  
+            $i = 0;  
+            $credstr = join "",  
+            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;    ## no critic 'Map blocks';  
+            # Ende Descramble-Routine
+            
+            ($username, $passwd) = split ":",decode_base64($credstr);
+            
+            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
+        
+            Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
+        
+        } else {
+            Log3($name, 2, "$name - ".$pp."Credentials not set in RAM !");
+        }
+    
+        $success = (defined $passwd) ? 1 : 0;
+    }
+
+return ($success, $username, $passwd);        
+}
+
+
+###############################################################################
+#                        Test ob JSON-String vorliegt
+###############################################################################
+sub evaljson { 
+  my $hash    = shift // carp "got no hash value !"           && return;
+  my $myjson  = shift // carp "got no string for JSON test !" && return;
+  my $OpMode  = $hash->{OPMODE};
+  my $name    = $hash->{NAME};
+  
+  my $success = 1;
+  
+  if($nojsonmod) {
+      $success = 0;
+      Log3($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
+      return ($success,$myjson);
+  }
+  
+  eval {decode_json($myjson)} or do {
+      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
+              $OpMode =~ m/^.*_hls$/x ) {                                                    # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
+          Log3($name, 5, "$name - HLS-activation data return: $myjson");
+          if ($myjson =~ m/{"success":true}/x) {
+              $success = 1;
+              $myjson  = '{"success":true}';    
+          } 
+      
+      } else {
+          $success = 0;
+
+          readingsBeginUpdate ($hash);
+          readingsBulkUpdate  ($hash, "Errorcode", "none");
+          readingsBulkUpdate  ($hash, "Error",     "malformed JSON string received");
+          readingsEndUpdate   ($hash, 1);  
+      }
+  };
+  
+return ($success,$myjson);
 }
 
 1;

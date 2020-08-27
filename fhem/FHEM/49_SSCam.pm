@@ -45,7 +45,7 @@ use Time::HiRes qw( gettimeofday tv_interval );
 use HttpUtils;
 use Blocking;                                                                      # für EMail-Versand
 use Encode;
-eval "use JSON;1;"               or my $SScamMMDBI        = "JSON";                ## no critic 'eval' # Debian: apt-get install libjson-perl
+eval "use JSON;1;"               or my $MMJSON            = "JSON";                ## no critic 'eval' # Debian: apt-get install libjson-perl
 eval "use FHEM::Meta;1"          or my $modMetaAbsent     = 1;                     ## no critic 'eval'
 
 # Cache 
@@ -161,6 +161,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.2"  => "26.08.2020  move sub setCredentials, getCredentials, evaljson to SMUtils ",
   "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm move ".
                            "getPtzPresetList, getPtzPatrolList to return path of OpMOde Getcaminfo ",
   "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
@@ -687,7 +688,7 @@ sub Define {
   my $def  = shift;
   my $name = $hash->{NAME};
   
- return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
+ return "Error: Perl module ".$MMJSON." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($MMJSON);
   
   my @a = split m{\s+}x, $def;
   
@@ -741,8 +742,8 @@ sub Define {
   
   readingsEndUpdate ($hash,1);                                          
   
-  getCredentials ($hash,1, "svs" );                                              # Credentials lesen und in RAM laden ($boot=1)      
-  getCredentials ($hash,1, "smtp");
+  getCredentials ($hash,1, "credentials" );                                      # Credentials lesen und in RAM laden ($boot=1)      
+  getCredentials ($hash,1, "SMTPcredentials");
   
   # initiale Routinen zufällig verzögert nach Restart ausführen
   RemoveInternalTimer ($hash,                        "FHEM::SSCam::initOnBoot"          );
@@ -1139,7 +1140,7 @@ sub Set {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
       return "Password is too long. It is limited up to and including 20 characters." if (length $prop1 > 20);
       delete $hash->{HELPER}{SID};          
-      ($success) = setCredentials($hash,"svs",$prop,$prop1);
+      ($success) = setCredentials($hash,"credentials",$prop,$prop1);
       $hash->{HELPER}{ACTIVE} = "off";  
       
       if($success) {
@@ -1154,7 +1155,7 @@ sub Set {
   
   if ($opt eq "smtpcredentials") {
       return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
-      ($success) = setCredentials($hash,"smtp",$prop,$prop1);
+      ($success) = setCredentials($hash,"SMTPcredentials",$prop,$prop1);
       
       if($success) {
           return "SMTP-Username and SMTP-Password saved successfully";
@@ -1906,10 +1907,10 @@ sub Get {
     } elsif ($opt eq "storedCredentials") {
         if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
         # Credentials abrufen
-        my ($success, $username, $password) = getCredentials($hash,0,"svs");
+        my ($success, $username, $password) = getCredentials($hash,0,"credentials");
         unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
         
-        my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash,0,"smtp");
+        my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash,0,"SMTPcredentials");
         my $so;
         if($smtpsuccess) {
             $so = "SMTP-Username: $smtpuname, SMTP-Password: $smtpword";
@@ -2427,118 +2428,6 @@ sub myVersion {
   }
   
 return $actvs; 
-}
-
-######################################################################################
-#                            Username / Paßwort speichern
-#   $cre = "svs"  -> Credentials für SVS und Cams
-#   $cre = "smtp" -> Credentials für Mailversand
-######################################################################################
-sub setCredentials {
-    my ($hash, $cre, @credentials) = @_;
-    my $name                       = $hash->{NAME};
-    my ($success, $credstr, $index, $retcode);
-    my (@key,$len,$i);
-    my $ao = ($cre eq "svs")?"credentials":"SMTPcredentials";
-    
-    
-    $credstr = encode_base64(join(':', @credentials));
-    
-    # Beginn Scramble-Routine
-    @key = qw(1 3 4 5 6 3 2 1 9);
-    $len = scalar @key;  
-    $i = 0;  
-    $credstr = join "",  
-            map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
-    # End Scramble-Routine    
-       
-    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-    $retcode = setKeyValue($index, $credstr);
-    
-    if ($retcode) { 
-        Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
-        $success = 0;
-    } else {
-        getCredentials($hash,1,$cre);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
-        $success = 1;
-    }
-
-return ($success);
-}
-
-######################################################################################
-#                             Username / Paßwort abrufen
-#   $cre = "svs"  -> Credentials für SVS und Cams
-#   $cre = "smtp" -> Credentials für Mailversand
-######################################################################################
-sub getCredentials {
-    my ($hash,$boot, $cre) = @_;
-    my $name               = $hash->{NAME};
-    my ($success, $username, $passwd, $index, $retcode, $credstr);
-    my (@key,$len,$i);
-    my $ao = ($cre eq "svs")?"credentials":"SMTPcredentials";
-    my $pp = "";
-    
-    if ($boot) {
-        # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
-        $index = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-        ($retcode, $credstr) = getKeyValue($index);
-    
-        if ($retcode) {
-            Log3($name, 2, "$name - Unable to read password from file: $retcode");
-            $success = 0;
-        }  
-
-        if ($credstr) {
-            if($cre eq "svs") {
-                # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{CREDENTIALS} = $credstr;
-        
-                # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $hash->{CREDENTIALS} = "Set";
-                $success = 1;
-            
-            } elsif ($cre eq "smtp") {
-                # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
-        
-                # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $hash->{SMTPCREDENTIALS} = "Set";  
-                $success = 1;                
-            }
-        }
-    } else {
-        # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
-        if ($cre eq "svs") {
-            $credstr = $hash->{HELPER}{CREDENTIALS};
-        } elsif ($cre eq "smtp") {
-            $pp = "SMTP";
-            $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
-        }
-        
-        if($credstr) {
-            # Beginn Descramble-Routine
-            @key = qw(1 3 4 5 6 3 2 1 9); 
-            $len = scalar @key;  
-            $i = 0;  
-            $credstr = join "",  
-            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;    ## no critic 'Map blocks';  
-            # Ende Descramble-Routine
-            
-            ($username, $passwd) = split(":",decode_base64($credstr));
-            
-            my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
-        
-            Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
-        
-        } else {
-            Log3($name, 2, "$name - ".$pp."Credentials not set in RAM !");
-        }
-    
-        $success = (defined($passwd)) ? 1 : 0;
-    }
-
-return ($success, $username, $passwd);        
 }
 
 ######################################################################################
@@ -4429,9 +4318,9 @@ sub getApiSites_Parse {
         
     } elsif ($myjson ne "") {          
         # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, my $success) = evaljson($hash,$myjson);
+        my ($success) = evaljson($hash,$myjson);
         
-        unless ($success) {
+        if(!$success) {
             delActiveToken($hash);
             return;
         }
@@ -4706,7 +4595,7 @@ sub checkSid {
    my $sid = $hash->{HELPER}{SID};
    if(!$sid) {
        Log3($name, 3, "$name - no session ID found - get new one");
-       login($hash,$subref);
+       login($hash,$hash->{HELPER}{API},$subref);
        return;
    }
    
@@ -4790,14 +4679,14 @@ sub getCamId_Parse {
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
        readingsSingleUpdate($hash, "Error", $err, 1);
-       return login($hash,'getApiSites');
+       return login($hash,$hash->{HELPER}{API},'getApiSites');
    
    } elsif ($myjson ne "") {
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
        # evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
-       ($hash, $success) = evaljson($hash,$myjson);
+       ($success) = evaljson($hash,$myjson);
         
-       unless ($success) {
+       if (!$success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);          
            delActiveToken($hash);
            return; 
@@ -4891,7 +4780,7 @@ sub getCamId_Parse {
            if ($errorcode =~ /(105|401)/x) {
                # neue Login-Versuche
                Log3($name, 2, "$name - ERROR - $errorcode - $error -> try new login");
-               return login($hash,'getApiSites');
+               return login($hash,$hash->{HELPER}{API},'getApiSites');
            
            } else {
                # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
@@ -5408,8 +5297,8 @@ sub camOp_Parse {
         # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         # Evaluiere ob Daten im JSON-Format empfangen wurden 
         if($OpMode !~ /SaveRec|GetRec/x) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
-            ($hash,$success,$myjson) = evaljson($hash,$myjson);        
-            unless ($success) {
+            ($success,$myjson) = evaljson($hash,$myjson);        
+            if (!$success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
                 delActiveToken($hash);
                 return;
@@ -6941,7 +6830,7 @@ sub camOp_Parse {
                Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                undef $data;
                undef $myjson;
-               return login($hash,'getApiSites');
+               return login($hash,$hash->{HELPER}{API},'getApiSites');
             }
        
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
@@ -6958,59 +6847,63 @@ return;
 }
 
 ####################################################################################  
-#         Login in wenn kein oder ungültige Session-ID vorhanden ist
+#         Login wenn keine oder ungültige Session-ID vorhanden ist
+#         $apiref = Referenz zum API Hash
+#         $fret   = Rückkehrfunktion nach erfolgreichen Login
 ####################################################################################
 sub login {
-  my ($hash,$fret) = @_;
-  my $name          = $hash->{NAME};
-  my $serveraddr    = $hash->{SERVERADDR};
-  my $serverport    = $hash->{SERVERPORT};
-  my $apiauth       = $hash->{HELPER}{API}{AUTH}{NAME};
-  my $apiauthpath   = $hash->{HELPER}{API}{AUTH}{PATH};
-  my $apiauthver    = $hash->{HELPER}{API}{AUTH}{VER};
-  my $proto         = $hash->{PROTOCOL};
-  my $lrt = AttrVal($name,"loginRetries",3);
-  my ($url,$param);
+  my $hash         = shift;
+  my $apiref       = shift;
+  my $fret         = shift;
+  my $name         = $hash->{NAME};
+  my $serveraddr   = $hash->{SERVERADDR};
+  my $serverport   = $hash->{SERVERPORT};
+  my $apiauth      = $apiref->{AUTH}{NAME};
+  my $apiauthpath  = $apiref->{AUTH}{PATH};
+  my $apiauthver   = $apiref->{AUTH}{VER};
+  my $proto        = $hash->{PROTOCOL};
+
+  my ($url,$param,$urlwopw);
   
   delete $hash->{HELPER}{SID};
     
-  # Login und SID ermitteln
   Log3($name, 4, "$name - --- Begin Function login ---");
   
-  # Credentials abrufen
-  my ($success, $username, $password) = getCredentials($hash,0,"svs");
+  my ($success, $username, $password) = getCredentials($hash,0,"credentials");                      # Credentials abrufen
   
-  unless ($success) {
+  if (!$success) {
       Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
-      delActiveToken($hash);      
+      delActiveToken($hash) if(defined &delActiveToken);      
       return;
   }
   
-  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {
-      # login wird abgebrochen, Freigabe Funktionstoken
-      delActiveToken($hash);
+  my $lrt = AttrVal($name,"loginRetries",3);
+  
+  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {                                               # Max Versuche erreicht -> login wird abgebrochen, Freigabe Funktionstoken
+      delActiveToken($hash) if(defined &delActiveToken);
       Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
       return;
   }
 
-  my $httptimeout = AttrVal($name,"httptimeout",60);
+  my $timeout     = AttrVal($name,"timeout",60);                                            # Kompatibilität zu Modulen die das Attr "timeout" verwenden
+  my $httptimeout = AttrVal($name,"httptimeout",$timeout);
   $httptimeout    = 60 if($httptimeout < 60);
-  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");
+  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
   
-  my $urlwopw;      # nur zur Anzeige bei verbose >= 4 und "showPassInLog" == 0
+  my $sid = AttrVal($name, "noQuotesForSID", 0) ? "sid" : qq{"sid"};                        # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
   
-  # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
-  my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
-  
-  if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
-  } else {
+  if (AttrVal($name,"session","DSM") eq "DSM") {
       $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&format=$sid"; 
       $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&format=$sid";
+
+  } else {
+      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
   }
   
-  AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
+  my $printurl = AttrVal($name, "showPassInLog", 0) ? $url : $urlwopw;
+  
+  Log3($name, 4, "$name - Call-Out now: $printurl");
   $hash->{HELPER}{LOGINRETRIES}++;
   
   $param = {
@@ -7019,6 +6912,7 @@ sub login {
       hash     => $hash,
       user     => $username,
       funcret  => $fret,
+	  apiref   => $apiref,
       method   => "GET",
       header   => "Accept: application/json",
       callback => \&loginReturn
@@ -7035,24 +6929,20 @@ sub loginReturn {
   my $name     = $hash->{NAME};
   my $username = $param->{user};
   my $fret     = $param->{funcret};
+  my $apiref   = $param->{apiref};
   my $subref   = \&$fret;
   my $success; 
 
-  # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
-  if ($err ne "") {
-      # ein Fehler bei der HTTP Abfrage ist aufgetreten
+  if ($err ne "") {                                                                # ein Fehler bei der HTTP Abfrage ist aufgetreten
       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
         
       readingsSingleUpdate($hash, "Error", $err, 1);                               
         
-      return login($hash,$fret);
+      return login($hash,$apiref,$fret);
    
-   } elsif ($myjson ne "") {
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
-        
-        # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = evaljson($hash,$myjson);
-        unless ($success) {
+   } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
+        ($success) = evaljson($hash,$myjson);                                      # Evaluiere ob Daten im JSON-Format empfangen wurden
+        if (!$success) {
             Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
             delActiveToken($hash);
             return;
@@ -7060,17 +6950,14 @@ sub loginReturn {
         
         my $data = decode_json($myjson);
         
-        # Logausgabe decodierte JSON Daten
         Log3($name, 5, "$name - JSON decoded: ". Dumper $data);
    
         $success = $data->{'success'};
         
-        if ($success) {
-            # login war erfolgreich     
+        if ($success) {                                                            # login war erfolgreich     
             my $sid = $data->{'data'}->{'sid'};
              
-            # Session ID in hash eintragen
-            $hash->{HELPER}{SID} = $sid;
+            $hash->{HELPER}{SID} = $sid;                                           # Session ID in hash eintragen
        
             readingsBeginUpdate ($hash);
             readingsBulkUpdate  ($hash,"Errorcode","none");
@@ -7082,11 +6969,8 @@ sub loginReturn {
             return &$subref($hash);
         
         } else {          
-            # Errorcode aus JSON ermitteln
-            my $errorcode = $data->{'error'}->{'code'};
-       
-            # Fehlertext zum Errorcode ermitteln
-            my $error = expErrorsAuth($hash,$errorcode);
+            my $errorcode = $data->{'error'}->{'code'};                           # Errorcode aus JSON ermitteln
+            my $error     = expErrorsAuth($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
 
             readingsBeginUpdate ($hash);
             readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
@@ -7095,11 +6979,11 @@ sub loginReturn {
        
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
-            return login($hash,$fret);
+            return login($hash,$apiref,$fret);
        }
    }
    
-return login($hash,$fret);
+return login($hash,$apiref,$fret);
 }
 
 ###################################################################################  
@@ -7151,7 +7035,7 @@ sub logoutReturn {
    my $hash                   = $param->{hash};
    my $name                   = $hash->{NAME};
    my $sid                    = $hash->{HELPER}{SID};
-   my ($success, $username)   = getCredentials($hash,0,"svs");
+   my ($success, $username)   = getCredentials($hash,0,"credentials");
    my $OpMode                 = $hash->{OPMODE};
    my $data;
    my $error;
@@ -7164,9 +7048,9 @@ sub logoutReturn {
    } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
-       ($hash, $success) = evaljson($hash,$myjson);                                # Evaluiere ob Daten im JSON-Format empfangen wurden
+       ($success) = evaljson($hash,$myjson);                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
         
-       unless ($success) {
+       if (!$success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
            delActiveToken($hash);
            return;
@@ -7233,7 +7117,7 @@ sub setAutocreate {
            CommandAttr (undef,"$camname httptimeout 20");
 
            # Credentials abrufen und setzen
-           my ($success, $username, $password) = getCredentials($hash,0,"svs");
+           my ($success, $username, $password) = getCredentials($hash,0,"credentials");
            if($success) {
                CommandSet(undef, "$camname credentials $username $password");   
            }
@@ -7245,39 +7129,6 @@ sub setAutocreate {
    }  
    
 return ($err,$camname);
-}
-
-###############################################################################
-#   Test ob JSON-String empfangen wurde
-###############################################################################
-sub evaljson { 
-  my $hash    = shift;
-  my $myjson  = shift;
-  my $OpMode  = $hash->{OPMODE};
-  my $name    = $hash->{NAME};
-  my $success = 1;
-  
-  eval {decode_json($myjson)} or do 
-  {
-      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || $OpMode =~ m/^.*_hls$/x ) {
-          # HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
-          Log3($name, 5, "$name - HLS-activation data return: $myjson");
-          if ($myjson =~ m/{"success":true}/x) {
-              $success = 1;
-              $myjson  = '{"success":true}';    
-          } 
-      
-      } else {
-          $success = 0;
-
-          readingsBeginUpdate ($hash);
-          readingsBulkUpdate  ($hash, "Errorcode", "none");
-          readingsBulkUpdate  ($hash, "Error",     "malformed JSON string received");
-          readingsEndUpdate   ($hash, 1);  
-      }
-  };
-  
-return ($hash,$success,$myjson);
 }
 
 ######################################################################################################
@@ -10448,7 +10299,7 @@ sub sendEmailblocking {
   my ($err,$smtp,@as,$cache);
   
   # Credentials abrufen
-  my ($success, $username, $password) = getCredentials($hash,0,"smtp");
+  my ($success, $username, $password) = getCredentials($hash,0,"SMTPcredentials");
   
   unless ($success) {
       $err = "SMTP credentials couldn't be retrieved successfully - make sure you've set it with \"set $name smtpcredentials <username> <password>\"";
