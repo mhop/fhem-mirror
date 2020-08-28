@@ -1930,8 +1930,16 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[(,-color2-...)] [-repeat-]"}
                      ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [(-repeat-|{0})]"
                                                 ,pct            =>"[-value- [-ontime-]"}
-                     ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|help|{})] [(-sound-|{off})] [(-repetition-|{1})] [(-pause-|{10})] [(-signal-|{off})]"}
-                     ,"HM-DIS-WM5501"        =>{ displayWM      =>"(long|short|help) -lineX- -textNo1- -color1- -icon1- [-textNo2- -color2- -icon2-] [...] [-textNo6- -color6- -icon6-]"
+                     ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|{help})]"
+                                                                 ." [({off}|longlong|longshort|long2short|short|shortshort|long)]"
+                                                                 ." 'rep:' [(1..16;1|{1})]"
+                                                                 ." 'pause:' [(1..160;1|{10})]"
+                                                                 ." [({off}|red|green|orange)]"}
+                     ,"HM-DIS-WM5501"        =>{ displayWM      =>"[(long|short|{help})]"
+                                                                 ." [({line1}|line2|line3|line4|line5|line6)]"
+                                                                 ." [({nc}|off|-text-)]"
+                                                                 ." [({nc}|off|white|red|orange|yellow|green|blue)]"
+                                                                 ." [({nc}|off|on|open|closed|error|ok|info|newMsg|serviceMsg|sigGreen|sigYellow|sigRed|ic12|ic13|noIcon)]"
                                                 ,peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [(actor|remote|{both})]"}
                      ,"HM-ES-PMSW1-PL01"     =>{ "on-for-timer" =>"-sec-"
                                                 ,"on-till"      =>"-time-"
