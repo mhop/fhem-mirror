@@ -1630,6 +1630,10 @@ sub HMinfo_GetFn($@) {#########################################################
 #    my @entities = HMinfo_getEntities($opt."d",$filter);
 #    return HMI_overview(\@entities,\@a);
 #  }                                
+
+  elsif($cmd eq "showTimer"){
+    $ret = join("\n",sort map{sprintf("%8d",int($intAt{$_}{TRIGGERTIME}-gettimeofday())).":$intAt{$_}{FN}\t$intAt{$_}{ARG}"} (keys %intAt));
+  }
   
   elsif($cmd eq "configInfo") {
     $ret = ""  ;
@@ -1663,6 +1667,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"templateChk"
             ,"templateUsg"
             ,"templateUsgG:sortTemplate,sortPeer,noTmpl,all"
+            ,"showTimer:noArg"
             );
             
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
@@ -1828,7 +1833,49 @@ sub HMinfo_SetFn($@) {#########################################################
     # replace a device with a new one
     $ret = HMinfo_deviceReplace($name,$a[0],$a[1]);
   }
-  
+  elsif($cmd eq "simDev"){
+    my ($simName,$hmId) = ("sim_00","D00F00");
+    my $i = 0;
+    for ($i = 0;$i<0xff;$i++){
+      $hmId = sprintf("D00F%02X",$i);
+      next if (defined $modules{CUL_HM}{defptr}{$hmId});
+      $simName = sprintf("sim_%02X",$i);
+      next if (defined $defs{$simName});
+      last;
+    }
+    return "no definition possible - too many simulations?" if($i > 0xfe );
+
+    return "model $a[0] cannot be identified" if(!defined $HMConfig::culHmModel2Id{$a[0]});
+    my $model = $a[0];
+#    CommandDelete(undef,$simName);
+    CommandDefine(undef,"$simName CUL_HM $hmId");
+    CUL_HM_assignIO($defs{$simName});
+    my $id = $HMConfig::culHmModel2Id{$model};
+
+    Log 1,"testdevice my $id, $model";
+
+    CUL_HM_Parse($defs{ioPCB},"A00018400${hmId}00000010${id}4D592D434F464645453612060100"."::::");
+    CUL_HM_Set($defs{$simName},$simName,"clear","msgEvents");
+    CUL_HM_protState($defs{$simName},"Info_Cleared");
+    my $cmds = "\n================= cmds for $model===\n";
+    $attr{$simName}{room} = "simulate";
+    $attr{$simName}{dummy} = 1;
+    $ret = "defined model:$model id:$id name:$simName RFaddr:$hmId\n";
+    $ret  .= CUL_HM_Get($defs{$simName},$simName,"regList");
+    $cmds .= CUL_HM_Get($defs{$simName},$simName,"cmdList","short");
+    
+    foreach (grep (/^channel_/, keys%{$defs{$simName}})){
+      next if(!$_);
+      $attr{$_}{room} = "simulate";
+
+      $ret  .= "################## $defs{$simName}->{$_}###\n"
+              .CUL_HM_Get($defs{$defs{$simName}->{$_}},$defs{$simName}->{$_},"regList");
+      $cmds .= "\n================= $defs{$simName}->{$_}===\n"
+              .CUL_HM_Get($defs{$defs{$simName}->{$_}},$defs{$simName}->{$_},"cmdList","short");
+    }
+    $ret .= $cmds;
+  }
+
   
   ### redirect set commands to get - thus the command also work in webCmd
   elsif($cmd ne '?' && HMinfo_GetFn($hash,$name,"?") =~ m/\b$cmd\b/){##--------
@@ -1838,6 +1885,8 @@ sub HMinfo_SetFn($@) {#########################################################
  }
 
   else{
+    my $mdList = join(",",sort keys %HMConfig::culHmModel2Id);
+ 
     my @cmdLst =     
            ( "autoReadReg"
             ,"cmdRequestG:ping,status"
@@ -1850,6 +1899,7 @@ sub HMinfo_SetFn($@) {#########################################################
             ,"x-deviceReplace"
             ,"tempListG:verify,status,save,restore,genPlot"
             ,"templateDef","templateSet","templateDel","templateExe"
+            ,"simDev:$mdList"
             );
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
   }
@@ -1916,6 +1966,8 @@ sub HMInfo_help(){ ############################################################
            ."\n                 remove a template set"
            ."\n set templateExe -templateName-"
            ."\n                 write all assigned templates to the file"
+           ."\n set simDev      create a device for simualtion purpuse"
+           ."\n"
            ."\n get templateUsg -templateName-[sortPeer|sortTemplate]"
            ."\n                 show template usage"
            ."\n get templateChk [-typeFilter-] -templateName- -peer:[long|short]- [-param1- ...] "
@@ -1923,6 +1975,7 @@ sub HMInfo_help(){ ############################################################
            ."\n get templateList [-templateName-]         # gives a list of templates or a description of the named template"
            ."\n                  list all currently defined templates or the structure of a given template"
            ."\n get configInfo  # information to getConfig status"
+           ."\n get showTimer   # list all timer running in FHEM currently"
            ."\n                 "
            ."\n ======= typeFilter options: supress class of devices  ===="
            ."\n set -name- -cmd- [-dcasev] [-f -filter-] [params]"
@@ -3303,6 +3356,9 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          set hm templateChk sortPeer                                 # all assigned templates sortiert nach Peer<br>
         </code></ul>
       </li>
+      <li><a name="#HMinfoshowTimer">showTimer </a><br>
+          show all timer currently running at this point in time.<br>
+      </li>
   </ul>
   <a name="HMinfoset"><b>Set</b></a>
   <ul>
@@ -3413,6 +3469,7 @@ sub HMinfo_noDup(@) {#return list with no duplicates###########################
          <li><B>entities</B> comma separated list of entities which refers to the temp lists following.
            The actual entity holding the templist must be given - which is channel 04 for RTs or channel 02 for TCs</li>
          <li><B>tempList...</B> time and temp couples as used in the set tempList commands</li>
+         <li><B>simDev -model-</B> tsimulate a device</li>
          </ul>
          <br>
      </li>
