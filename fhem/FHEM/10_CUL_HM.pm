@@ -3911,7 +3911,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
           $val = "";
         }
       }
-      elsif($val =~ m/^[\(\[]*([a-zA-Z0-9_-|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
+      elsif($val =~ m/^[\(\[]*([-+a-zA-Z0-9_|\.\{\}]*)[\]\)]*$/){#(xxx|yyy) as optionlist - new
         my $v1 = $1;
         $v1 =~ s/[\{\}]//g;#remove default marking
         my @lst1;
@@ -4306,9 +4306,9 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
    
     my @cond = ();
-    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}} if (defined $lvlStr{md}{$md});
-    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{$md}} if (defined $lvlStr{mdCh}{"$md$chn"});
-    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{md}{$st}} if (defined $lvlStr{st}{$st});
+    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}}       if (defined $lvlStr{md}{$md});
+    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{"$md$chn"}} if (defined $lvlStr{mdCh}{"$md$chn"});
+    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{st}{$st}}       if (defined $lvlStr{st}{$st});
     push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
@@ -4492,7 +4492,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   if (1){
     my @parIn = grep!/noArg/,@a[2..$#a];
     my $paraOpts = $hash->{helper}{cmds}{cmdLst}{$cmd};
-    $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//;#remove comment, "..." and noArg
+    $paraOpts =~ s/(\.\.\.|noArg|\'.*?\')//g;#remove comment, "..." and noArg
     my @optLst = split(" ",$paraOpts);#[...] would leave an empty list
     #my $max = $hash->{helper}{cmds}{cmdLst}{$cmd} =~ m/\.\.\./ ? 99 : scalar(@optLst);
     $paraOpts =~ s/(\[.*?\])//g; # remove optionals
@@ -4503,12 +4503,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if($param =~ m/^\((.*)\)$/ ){                 # list of options?
         my @parLst = split('\|',$1);
         if(  defined $parIn[$pCnt]){                # user param provided
-          if( grep/$parIn[$pCnt]/,@parLst){         # parameter matched 
+          if( $parIn[$pCnt] !~ m/[:\{\[\(]/ && grep/$parIn[$pCnt]/,@parLst){ # parameter not comparable or matched 
           }
           elsif($param =~ m/([\-\d\.]*)\.\.([\-\d\.]*)/ ){# we check for min/max but not for step
             my ($min,$max) = ($1,$2);
-            if ($parIn[$pCnt] < $min || $parIn[$pCnt] > $max ){
-              $paraFail = "$parIn[$pCnt] out of range";
+            if ($parIn[$pCnt] !~ m/^[-+]?[0-9]+\.?[0-9]*$/){
+              $paraFail = "$parIn[$pCnt] not numeric";
+            }
+            elsif ($parIn[$pCnt] < $min || $parIn[$pCnt] > $max ){
+              $paraFail = "$parIn[$pCnt] out of range min:$min max:$max";
             }
           }
           else{                                     # user param no match
@@ -4539,9 +4542,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
       }
       $paraFail = "is required but missing" if(!defined $parIn[$pCnt] && !$optional);
-    
-      return "param $pCnt:'$optLst[$pCnt]' => $paraFail"
-            ."\n$cmd: $hash->{helper}{cmds}{cmdLst}{$cmd}" if($paraFail);
+      if($paraFail){
+        $paraFail = "param $pCnt:'$optLst[$pCnt]' => $paraFail"
+                    ."\n$cmd: $hash->{helper}{cmds}{cmdLst}{$cmd}";
+        Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:3),"CUL_HM reject-set $name $cmd: $paraFail ";
+        return $paraFail;
+      }
 
       $pCnt++;
     }
@@ -5609,15 +5615,15 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                   .ReadingsVal( InternalVal($devName,"channel_$ch","no")
                                 ,"text$ln","unkown");
       }
-      $ret .= "\n      off nc(no change)"
+      $ret .= "\n      nc(no change), off(no text)"
              ."\ncolor:".join(",",sort keys %disColor)
-             ."\n      nc(no change)"
+             ."\n      nc(no change), off(no color)"
              ."\nicon :".join(",",sort keys %disIcon)
+             ."\n      nc(no change), noIcon(no Icon)"
              ;
       return $ret;
     }
 
-    return "$a[2] not valid - choose short or long" if($a[2] !~ m/^(short|long)$/);
     my $type = $a[2] eq "short"?"s":"l";
 
     if(!defined $hash->{helper}{dispi}{$type}{"l1"}{d}){# setup if one is missing
@@ -5630,38 +5636,39 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "please add a text " if(!$a[4]);
       my $lnRd = "disp_$a[2]_l$lnNr";# reading assotiated with this entry
       my $dh = $hash->{helper}{dispi}{$type}{"l$lnNr"};
-      if ($a[4] eq "off"){ #no display in this line
-        delete $dh->{txt};
-      }
-      elsif($a[4] =~ m/^e:/){ # equation
+
+      if($a[4] =~ m/^e:/){ # equation
         $dh->{d} = 2; # mark as equation
         $dh->{exe} = $a[4];
         $dh->{exe} =~ s/^e://;
         ($dh->{txt},$a[5],$a[6]) = eval $dh->{exe};
         return "define eval must return 3 values:" if(!defined $a[6]);
       }
-      elsif($a[4] ne "nc"){ # new text
-        return "text too long " .$a[4]   if (length($a[4])>12);
-        $dh->{txt}=$a[4];
-      }
+      else{
+        if ($a[4] eq "off"){ #no display in this line
+          $dh->{d} = 0; # mark as none
+          delete $dh->{txt};
+        }
+        elsif($a[4] ne "nc"){ # new text
+          return "text too long " .$a[4]   if (length($a[4])>12);
+          $dh->{d} = 1; # mark as none
+          $dh->{txt}=$a[4];
+        }
 
-      if($a[5]){ # set new color
-        if($a[5] eq "off"){ # set new color
+        if($a[5] eq "off"){ # set color off
           delete $dh->{col};
         }
         elsif($a[5] ne "nc"){ # set new color
           return "color wrong $a[5] use:".join(",",sort keys %disColor) if (!defined $disColor{$a[5]});
-          $dh->{col}=$a[5];
+          $dh->{col} = $a[5];
         }
-      }
-
-      if($a[6]){ # new icon
+        
         if($a[6] eq "noIcon"){ # new icon
           delete $dh->{icn};
         }
         elsif($a[6] ne "nc"){ # new icon
-          return "icon wrong $a[6] use:".join(",",sort keys %disIcon)  if (!defined $disIcon {$a[6]});
-          $dh->{icn}=$a[6];
+          return "icon wrong $a[6] use:".join(",",sort keys %disIcon)  if (!defined $disIcon{$a[6]});
+          $dh->{icn} = $a[6];
         }
       }
     }
@@ -5724,12 +5731,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     if($msg eq 'help'){ # display command info
       return      "command options:"
                  ."\n  line1,icon1:line2,icon2:line3,icon3 sound repeat pause signal"
+                 ."\n  "
                  ."\n  line: 12 char text to be dispalyed. No change if empty."
-                 ."\n  icon: icon per line: ".join(" ",keys(%disp_icons))
-                 ."\n  sound: ".join(" ",keys(%disp_sounds))
-                 ."\n  repeat: 1..16 default=1"
-                 ."\n  pause: 1..160 default=10"
-                 ."\n  signal: ".join(" ",keys(%disp_signals))
+                 ."\n  icon: per line: ".join(", ",keys(%disp_icons))
+                 ."\n  sound: ".join(", ",keys(%disp_sounds))
+                 ."\n  repeat: 1..16 default = 1"
+                 ."\n  pause: 1..160 default = 10"
+                 ."\n  signal: ".join(", ",keys(%disp_signals))
                  ."\n "
                  ."\n  check for param reWriteDisplayxx: "
                  ."\n  translate chars: "
