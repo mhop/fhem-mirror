@@ -843,13 +843,13 @@ attr DEVICE setList \
   off:noArg    CMNDTOPIC/POWER1 0\
   on:noArg     CMNDTOPIC/POWER1 1\
   toggle:noArg CMNDTOPIC/POWER1 2
-attr DEVICE devStateIcon {my $text = ' uptime: '.ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1")); my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; "<div><a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl).'</a> <a href="/fhem?cmd.dummy=set '.$name.' toggle&XHR=1">'.FW_makeImage($state)."</a>$text<b></b>"}
+attr DEVICE devStateIcon {my $text = ' uptime: '.ReadingsVal($name,"Uptime","unknown").sprintf(" aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1")); my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off");"<div><a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl).'</a> <a href="/fhem?cmd.dummy=set '.$name.' toggle&XHR=1">'.FW_makeImage($light)."</a>$text<b></b>"}
 attr DEVICE stateFormat {sprintf("aktuell: %.1f W Tag: %.2f kWh Gestern: %.3f kWh Gesamt: %.4f kWh", ReadingsVal($name,"ENERGY_Power","-1"), ReadingsVal($name,"ENERGY_Today","-1"), ReadingsVal($name,"ENERGY_Yesterday","-1"), ReadingsVal($name,"ENERGY_Total","-1"))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE setStateList on off toggle
 attr DEVICE webCmd :
 attr DEVICE model tasmota_POW
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200828
 
 
 # sonoff 1 channel + USB device flashed with Tasmota.
@@ -881,8 +881,8 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 attr DEVICE comment Mains channel for DEVICE, see also DEVICE_CH2 for rgb LED
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; "<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a> uptime: ".ReadingsVal($name,"Uptime",undef)}
-attr DEVICE jsonMap POWER1:state Dimmer:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER2:0
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"LWT","false") eq "Online"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");;"<a href=\"http://".ReadingsVal($name,"IPAddress","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> uptime: ".ReadingsVal($name,"Uptime",undef)}
+attr DEVICE jsonMap POWER1:0 Dimmer:0 Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER2:0
 setreading DEVICE associatedWith DEVICE_CH2
 deletereading -q DEVICE (?!associatedWith).*
 copy DEVICE DEVICE_CH2
@@ -912,7 +912,7 @@ deletereading -q DEVICE_CH2 (?!associatedWith).*
 set DEVICE attrTemplate speechcontrol_type_switch
 set DEVICE_CH2 attrTemplate speechcontrol_type_light_255
 attr DEVICE,DEVICE_CH2 model tasmota_plug_with_rgbw_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200801
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
@@ -1064,8 +1064,6 @@ copy DEVICE DEVICE_CH2
 attr DEVICE_CH2 readingList \
   STATTOPIC/POWER2:.* state
 attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
-#attr DEVICE_CH2 comment Channel 2 for DEVICE
-#setreading DEVICE_CH2 associatedWith DEVICE
 attr DEVICE_CH2 setList \
   off:noArg    CMNDTOPIC/POWER2 0\
   on:noArg     CMNDTOPIC/POWER2 1\
@@ -1161,16 +1159,8 @@ order:A_04
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0 SETCHANNELINFO=0
-#attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
-#setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
-#setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
-#attr DEVICE_CH2 comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
-#attr DEVICE_CH2 jsonMap POWER2:state Dimmer:pct POWER1:0 POWER3:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
 #create device for CH3
-copy DEVICE DEVICE_CH3
-#attr DEVICE_CH2 jsonMap POWER3:state Dimmer:pct POWER1:0 POWER2:0 POWER4:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
-#setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
-#attr DEVICE_CH3 comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
+copy DEVICE_CH2 DEVICE_CH3
 attr DEVICE_CH3 setList \
   off:noArg    CMNDTOPIC/POWER3 0\
   on:noArg     CMNDTOPIC/POWER3 1\
@@ -1179,8 +1169,7 @@ attr DEVICE_CH3 setStateList on off toggle
 attr DEVICE_CH3 readingList \
   STATTOPIC/POWER3:.* state
 #create device for CH4
-copy DEVICE DEVICE_CH4
-#attr DEVICE_CH2 jsonMap POWER4:state Dimmer:pct POWER1:0 POWER2:0 POWER3:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
+copy DEVICE_CH2 DEVICE_CH4
 attr DEVICE_CH4 setList \
   off:noArg    CMNDTOPIC/POWER4 0\
   on:noArg     CMNDTOPIC/POWER4 1\
@@ -1190,7 +1179,7 @@ attr DEVICE_CH4 readingList \
 attr DEVICE_CH4 setStateList on off toggle
 #set the model attr for all new devices
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model tasmota_4channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20200529
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20200828
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
 
@@ -1440,6 +1429,64 @@ attr DEVICE stateFormat LWT\
 8:POWER8
 attr DEVICE model tasmota_8ch_unified_icon
 setreading DEVICE attrTemplateVersion 20200522 or prior
+
+
+name:tasmota_8channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:sonoff 8 channel device flashed with Tasmota. <br>NOTE: several additional devices will be created for each channel
+order:A_04c1
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+set DEVICE attrTemplate tasmota_2channel_split CALLSPEECHRECOGN=0 SETCHANNELINFO=0
+attr DEVICE jsonMap POWER1:0  POWER2:0  POWER3:0 POWER4:0 POWER5:0 POWER6:0 POWER7:0 POWER8:0
+attr DEVICE_CH2 jsonMap POWER1:0  POWER2:0  POWER3:0 POWER4:0 POWER5:0 POWER6:0 POWER7:0 POWER8:0 Dimmer:pct Channel_4:white Channel_1:0 Channel_2:0 Channel_3:0 HSBColor:0 POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0
+copy DEVICE_CH2 DEVICE_CH3
+attr DEVICE_CH3 setList \
+  off:noArg    CMNDTOPIC/POWER3 0\
+  on:noArg     CMNDTOPIC/POWER3 1\
+  toggle:noArg CMNDTOPIC/POWER3 2
+attr DEVICE_CH3 readingList \
+  STATTOPIC/POWER3:.* state
+copy DEVICE_CH2 DEVICE_CH4
+attr DEVICE_CH4 setList \
+  off:noArg    CMNDTOPIC/POWER4 0\
+  on:noArg     CMNDTOPIC/POWER4 1\
+  toggle:noArg CMNDTOPIC/POWER4 2
+attr DEVICE_CH4 readingList \
+  STATTOPIC/POWER4:.* state
+copy DEVICE_CH2 DEVICE_CH5
+attr DEVICE_CH5 setList \
+  off:noArg    CMNDTOPIC/POWER5 0\
+  on:noArg     CMNDTOPIC/POWER5 1\
+  toggle:noArg CMNDTOPIC/POWER5 2
+attr DEVICE_CH5 readingList \
+  STATTOPIC/POWER5:.* state
+copy DEVICE_CH2 DEVICE_CH6
+attr DEVICE_CH6 setList \
+  off:noArg    CMNDTOPIC/POWER6 0\
+  on:noArg     CMNDTOPIC/POWER6 1\
+  toggle:noArg CMNDTOPIC/POWER6 2
+attr DEVICE_CH6 readingList \
+  STATTOPIC/POWER6:.* state
+copy DEVICE_CH2 DEVICE_CH7
+attr DEVICE_CH7 setList \
+  off:noArg    CMNDTOPIC/POWER7 0\
+  on:noArg     CMNDTOPIC/POWER7 1\
+  toggle:noArg CMNDTOPIC/POWER7 2
+attr DEVICE_CH7 readingList \
+  STATTOPIC/POWER7:.* state
+copy DEVICE_CH2 DEVICE_CH8
+attr DEVICE_CH8 setList \
+  off:noArg    CMNDTOPIC/POWER8 0\
+  on:noArg     CMNDTOPIC/POWER8 1\
+  toggle:noArg CMNDTOPIC/POWER8 2
+attr DEVICE_CH8 readingList \
+  STATTOPIC/POWER8:.* state
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 model tasmota_8channel_split
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20200828
+set DEVICE attrTemplate set_associatedWith \CHANNELS=8
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplate speechcontrol_type_switch
+
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg899041.html#msg899041
 name:tasmota_rgb_led_controller
@@ -1830,12 +1877,12 @@ attr DEVICE readingList \
   shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a></div>" }
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen";; my $light = ReadingsVal($name,"state","off");; my $show = '<a href="';;$show .= $onl eq "gelb" ? "/fhem?cmd.dummy=set $name x_update&XHR=1\">" : "http://".ReadingsVal($name,"ip","none").' "target="_blank">';;$show .= FW_makeImage("10px-kreis-".$onl)."</a>";; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a></div>" }
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model shelly1
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200828
 
 name:shelly_announces
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -1893,13 +1940,13 @@ attr DEVICE readingList \
   shellies/DEVNAME/relay/0/energy:.* relay_0_energy\
   shellies/DEVNAME/relay/0/energy:.* {'relay_0_kWh' => sprintf("%.2f",$EVENT/60/1000)}\
   shellies/DEVNAME/longpush/0:.* longpush_0
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $total = ReadingsVal($name,"relay_0_kWh","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>Verbrauch: $cons / Total: $total/ Temp: $temp °C</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_0_power","unknown");; my $total = ReadingsVal($name,"relay_0_kWh","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons / Total: $total/ Temp: $temp °C</div>"}
 attr DEVICE comment To get appropriate loadState values: Change the default limit "100" in readingList to your needs.
 attr DEVICE webCmd :
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly1_w_energy_measuring
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200828
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_switch
 option:{ RADIO_SETUSERREADING }
@@ -1929,7 +1976,7 @@ par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumptio
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}';; my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
 set DEVICE attrTemplate shelly1
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
 attr DEVICE stateFormat { my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $state,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
@@ -1968,7 +2015,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200824
+setreading DEVICE attrTemplateVersion 20200828
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -2141,9 +2188,9 @@ attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
-attr DEVICE_CH2 devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $cons = ReadingsVal($name,"relay_1_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a> Aktuell: $cons W / Temp.: $temp °C<b></b>"}
+attr DEVICE_CH2 devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"relay_1_power","unknown");; my $temp = ReadingsVal($name,"temperature","-100");;"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C<b></b>"}
 attr DEVICE,DEVICE_CH2 model shelly25_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200801
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
 option:{ CALLSPEECHRECOGN }  
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
@@ -2305,13 +2352,13 @@ attr DEVICE readingList\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE userReadings ct:temp.* {ReadingsVal($name,"temp",3000)}
 attr DEVICE webCmd on:off:pct:ct
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>Verbrauch: $cons</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 #attr DEVICE genericDeviceType light
 attr DEVICE jsonMap brightness:pct
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellyduo
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200828
 
 
 # shellyht using original firmware
@@ -2439,7 +2486,6 @@ attr DEVICE setStateList on off
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
 attr DEVICE webCmd on:off:pct
 set DEVICE x_mqttcom announce
-#attr DEVICE jsonMap brightness:pct
 attr DEVICE autocreate 0
 attr DEVICE_CH2 readingList shellies/DEVNAME/white/1/status:.* {json2nameValue($EVENT,'',$JSONMAP)}\
   shellies/DEVNAME/white/1:.* state\
@@ -2498,11 +2544,11 @@ attr DEVICE readingList \
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
 attr DEVICE webCmd pct:on:off
 attr DEVICE jsonMap brightness:pct
-attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "true"?"10px-kreis-rot":"10px-kreis-gruen";; my $ison = ReadingsVal($name,"ison","false") eq "true"?"on":"off";; my $cons = ReadingsVal($name,"light_0_power","unknown");; FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($ison)."</a><div>Leistung: $cons</div>"}
+attr DEVICE devStateIcon {my $lderr = ReadingsVal($name,"loaderror","true") eq "true"?"10px-kreis-rot":"10px-kreis-gruen";; my $light = ReadingsVal($name,"ison","false") eq "true"?"on":"off";; my $cons = ReadingsVal($name,"light_0_power","unknown");; FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Leistung: $cons</div>"}
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellydimmer
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200828
 
 
 ###########################################
