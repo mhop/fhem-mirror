@@ -32,19 +32,22 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.0.0');
+use version; our $VERSION = version->declare('1.1.0');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
-  SSCam => {fnerrauth => "_errauthsscam", fnerr => "_errsscam" },    
-  SSCal => {fnerrauth => "_errauthsscal", fnerr => "_errsscal" },
+  SSCam     => {fnerrauth => "_errauthsscam", fnerr => "_errsscam"  },    
+  SSCal     => {fnerrauth => "_errauthsscal", fnerr => "_errsscal"  },
+  SSChatBot => {                              fnerr => "_errsschat" },
 );
 
-# Standard Rückgabewert wenn keine Message zum Error Code gefunden wurde
-my $nofound = qq{Message not found for error code:};
+# Standard Rückgabewert wenn keine Message zum Error Code / keine Rückgabefunktion gefunden wurde
+my $nofound    = qq{Message not found for error code:};
+my $noauthfunc = qq{No authentication error resolution function defined for module type:};
+my $nofunc     = qq{No error resolution function defined for module type:};
 
 ##############################################################################
 #                             Error Code Hashes 
@@ -152,6 +155,24 @@ my %errsscal = (                                                       # Standar
   910 => "Wrong timestamp definition. Check attributes \"cutOlderDays\", \"cutLaterDays\". ",
 );
 
+## SSChatBot ##
+my %errsschat = (                                                       # Standard Error Codes des Chat Servers
+  100 => "Unknown error",
+  101 => "Payload is empty",
+  102 => "API does not exist - may be the Synology Chat Server package is stopped",
+  117 => "illegal file name or path",
+  120 => "payload has wrong format",
+  404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
+  407 => "record not valid",
+  409 => "exceed max file size",
+  410 => "message too long",
+  800 => "malformed or unsupported URL",
+  805 => "empty API data received - may be the Synology Chat Server package is stopped",
+  806 => "couldn't get Synology Chat API informations",
+  810 => "The botToken couldn't be retrieved",
+  900 => "malformed JSON string received from Synology Chat Server",
+);
+
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
 ##############################################################################
@@ -167,7 +188,7 @@ sub expErrorsAuth {
   }
   use strict "refs";
   
-  carp qq{No resolution function of authentication errors for module type "$type" defined};
+  carp $noauthfunc." ".$type;
 
 return q{};
 }
@@ -187,7 +208,7 @@ sub expErrors {
   }
   use strict "refs";
   
-  carp qq{No resolution function of authentication errors for module type "$type" defined};
+  carp $nofunc." ".$type;
 
 return q{};
 }
