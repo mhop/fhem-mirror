@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.4"  => "29.08.2020  some code changes ",
   "9.7.3"  => "29.08.2020  move sub login, loginReturn, logout, logoutReturn, setActiveToken, delActiveToken to SMUtils.pm ".
                            "move sub expErrorsAuth, expErrors to ErrCodes.pm",
   "9.7.2"  => "26.08.2020  move sub setCredentials, getCredentials, evaljson to SMUtils.pm ",
@@ -820,14 +821,9 @@ sub Attr {
     if ($aName eq "disable") {
         my $iscam = IsModelCam($hash); 
         if($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
+            $do = $aVal ? 1 : 0;
         }
         $do = 0 if($cmd eq "del");
-        if(IsModelCam($hash)) {
-            $val = ($do == 1 ? "inactive" : "off");
-        } else {
-            $val = ($do == 1 ? "inactive" : "initialized");
-        }
         
         if ($do == 1) {
             RemoveInternalTimer($hash);
@@ -1529,7 +1525,7 @@ sub Set {
           return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop1 !~ /^[1-9]$|^[1-9][0-9]$/x);
           $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
       }
-      amMotDetSc($hash);
+      camMotDetSc($hash);
         
   } elsif ($opt eq "expmode" && IsModelCam($hash)) {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
@@ -1570,7 +1566,7 @@ sub Set {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       if(ReadingsVal("$name", "CapPIR", "false") eq "false") {return "Function \"$opt\" not possible. Camera \"$name\" don't have a PIR sensor."}
       if(!$prop) {return "Function \"$opt\" needs an argument";}
-      $hash->{HELPER}{PIRACT} = ($prop eq "activate")?0:($prop eq "deactivate")?-1:5;
+      $hash->{HELPER}{PIRACT} = ($prop eq "activate") ? 0 : ($prop eq "deactivate") ? -1 : 5;
       if($hash->{HELPER}{PIRACT} == 5) {return " Illegal argument for \"$opt\" detected, use \"activate\" or \"activate\" !";}
       managePir($hash);
         
@@ -2468,24 +2464,8 @@ sub camStartRec {
     RemoveInternalTimer($hash, "camStartRec");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate ($hash);
-        readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate  ($hash,"Error",$error);
-        readingsEndUpdate   ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Start Recording of Camera $camname can't be executed - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Start Recording of Camera $camname can't be executed");        
         return;
     }
         
@@ -2531,23 +2511,8 @@ sub camStopRec {
     RemoveInternalTimer($hash, "FHEM::SSCam::camStopRec");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Stop Recording of Camera $camname can't be executed - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Stop Recording of Camera $camname can't be executed");        
         return;
     }
         
@@ -2583,23 +2548,8 @@ sub camExpmode {
     RemoveInternalTimer($hash, "FHEM::SSCam::camExpmode");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Setting exposure mode of Camera $camname can't be executed - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Setting exposure mode of Camera $camname can't be executed");        
         return;
     }
     
@@ -2620,33 +2570,18 @@ return;
 ###############################################################################
 #                    Art der Bewegungserkennung setzen
 ###############################################################################
-sub amMotDetSc {
+sub camMotDetSc {
     my ($hash)   = @_;
     my $camname  = $hash->{CAMNAME};
     my $name     = $hash->{NAME};
     my $errorcode;
     my $error;
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::amMotDetSc");
+    RemoveInternalTimer($hash, "FHEM::SSCam::camMotDetSc");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Setting of motion detection source of Camera $camname can't be executed - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Setting of motion detection source of Camera $camname can't be executed");        
         return;
     }
     
@@ -2658,7 +2593,7 @@ sub amMotDetSc {
         getApiSites($hash);
         
     } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::amMotDetSc", $hash, 0);
+        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camMotDetSc", $hash, 0);
     }
    
 return;
@@ -2684,29 +2619,12 @@ sub camSnap {
     RemoveInternalTimer($hash, "FHEM::SSCam::camSnap");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate ($hash);
-        readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate  ($hash,"Error",$error);
-        readingsEndUpdate   ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Snapshot of Camera $camname can't be executed - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Snapshot of Camera $camname can't be executed");        
         return;
     }
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) { 
-               
+    if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {             
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         $hash->{HELPER}{CANSENDSNAP}  = 1       if($emtxt);                        # Versand Schnappschüsse soll per Email erfolgen
@@ -2741,24 +2659,8 @@ sub getRec {
     RemoveInternalTimer($hash, "FHEM::SSCam::getRec");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed");        
         return;
     }
     
@@ -2789,24 +2691,8 @@ sub getRecAndSave {
     RemoveInternalTimer($hash, "FHEM::SSCam::getRecAndSave");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed");        
         return;
     }
     
@@ -2837,23 +2723,8 @@ sub startTrack {
     RemoveInternalTimer($hash, "FHEM::SSCam::startTrack");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched on - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Object Tracking of Camera $camname can't switched on");        
         return;
     }
     
@@ -2884,23 +2755,8 @@ sub stopTrack {
     RemoveInternalTimer($hash, "FHEM::SSCam::stopTrack");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched off - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Object Tracking of Camera $camname can't switched off");        
         return;
     }
     
@@ -2933,23 +2789,8 @@ sub setZoom {
     RemoveInternalTimer($hash, "FHEM::SSCam::setZoom");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Zoom $op of Camera $camname can't be started - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Zoom $op of Camera $camname can't be started");        
         return;
     }
     
@@ -2987,23 +2828,8 @@ sub getPresets {
     RemoveInternalTimer($hash, "FHEM::SSCam::getPresets");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash, "Errorcode", $errorcode);
-        readingsBulkUpdate ($hash, "Error",     $error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset list of Camera $camname can't be get - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Preset list of Camera $camname can't be get");        
         return;
     }
     
@@ -3035,23 +2861,8 @@ sub setPreset {
     RemoveInternalTimer($hash, "FHEM::SSCam::setPreset");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be set - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Preset of Camera $camname can't be set");        
         return;
     }
     
@@ -3082,23 +2893,8 @@ sub delPreset {
     RemoveInternalTimer($hash, "FHEM::SSCam::delPreset");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be deleted - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Preset of Camera $camname can't be deleted");        
         return;
     }
     
@@ -3130,23 +2926,8 @@ sub setHome {
     RemoveInternalTimer($hash, "FHEM::SSCam::setHome");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Home preset of Camera $camname can't be set - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Home preset of Camera $camname can't be set");        
         return;
     }
     
@@ -3178,23 +2959,8 @@ sub managePir {
     RemoveInternalTimer($hash, "FHEM::SSCam::managePir");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Home preset of Camera $camname can't be set - $error");
-        
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "PIR of camera $camname cannot be managed");        
         return;
     }
     
@@ -3226,22 +2992,8 @@ sub runLiveview {
     RemoveInternalTimer($hash, "FHEM::SSCam::runLiveview");
     return if(IsDisabled($name));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Liveview of Camera $camname can't be started - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "Liveview of Camera $camname can't be started");        
         return;
     }
     
@@ -3276,22 +3028,8 @@ sub activateHls {
     RemoveInternalTimer($hash, "FHEM::SSCam::activateHls");
     return if(IsDisabled($name));
  
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "HLS-Stream of Camera $camname can't be activated");        
         return;
     }
     
@@ -3323,22 +3061,8 @@ sub camAutocreate {
     RemoveInternalTimer($hash, "FHEM::SSCam::camAutocreate");
     return if(IsDisabled($name));
  
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - autocreate cameras - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "autocreate cameras not possible");        
         return;
     }
     
@@ -3369,22 +3093,8 @@ sub reactivateHls {
     RemoveInternalTimer($hash, "FHEM::SSCam::reactivateHls");
     return if(IsDisabled($name));
  
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
+    if (ReadingsVal($name, "state", "") =~ /^dis/x) {
+        exitOnDis ($name, "HLS-Stream of Camera $camname can't be reactivated");        
         return;
     }
     
@@ -3433,12 +3143,11 @@ sub stopLiveview {
         
         readingsSingleUpdate($hash,"state","stopview",1);           
         
-        if($hash->{HELPER}{WLTYPE} eq "hls") {
-            # HLS Stream war aktiv, Streaming beenden
+        if($hash->{HELPER}{WLTYPE} eq "hls") {              # HLS Stream war aktiv, Streaming beenden
             $hash->{OPMODE} = "stopliveview_hls";
             getApiSites($hash);
-        } else {
-            # kein HLS Stream
+        
+        } else {                                            # kein HLS Stream
             roomRefresh   ($hash,0,1,1);                    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
             delActiveToken($hash);
         }
@@ -3454,8 +3163,8 @@ return;
 #                       external Event 1-10 auslösen
 ###############################################################################
 sub extEvent {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
+    my ($hash) = @_;
+    my $name   = $hash->{NAME};
     
     RemoveInternalTimer($hash, "FHEM::SSCam::extEvent");
     return if(IsDisabled($name));
@@ -3494,7 +3203,7 @@ sub doPtzAaction {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with Reading \"CapPTZAbs\"");
         return;
     }
-    if ( $hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
+    if ($hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"");
         return;
     }
@@ -3502,14 +3211,12 @@ sub doPtzAaction {
     if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
         if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
             $errorcode = "600";
-            # Fehlertext zum Errorcode ermitteln
-            $error = expErrors($hash,$errorcode);
+            $error     = expErrors($hash,$errorcode);                                    # Fehlertext zum Errorcode ermitteln
         
-            # Setreading 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate  ($hash, "Error",     $error    );
+            readingsEndUpdate   ($hash, 1);
     
             Log3($name, 2, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
             return;        
@@ -3519,14 +3226,12 @@ sub doPtzAaction {
     if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
         if (!defined($hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}})) {
             $errorcode = "600";
-            # Fehlertext zum Errorcode ermitteln
-            $error = expErrors($hash,$errorcode);
+            $error     = expErrors($hash,$errorcode);                                   # Fehlertext zum Errorcode ermitteln
         
-            # Setreading 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate  ($hash, "Error",     $error    );
+            readingsEndUpdate   ($hash, 1);
     
             Log3($name, 2, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
             return;        
@@ -3534,38 +3239,26 @@ sub doPtzAaction {
     }
     
     if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - $hash->{HELPER}{PTZACTION} of Camera $camname can't be executed - $error");
+        exitOnDis ($name, "$hash->{HELPER}{PTZACTION} of Camera $camname can't be executed");        
         return;
-        }
+    }
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
         
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
             Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now");
+        
         } elsif ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
             Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
+        
         } elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
             Log3($name, 4, "$name - Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\" now");
+        
         } elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
         }
      
-        $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
+        $hash->{OPMODE}               = $hash->{HELPER}{PTZACTION};
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
         setActiveToken($hash);
@@ -3594,8 +3287,8 @@ sub moveStop {
         $hash->{OPMODE} = "movestop";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        setActiveToken ($hash);
+        getApiSites    ($hash);
    
     } else {
         InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::moveStop", $hash, 0);
@@ -3616,14 +3309,13 @@ sub camEnable {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # eine Kamera aktivieren
         Log3($name, 4, "$name - Enable Camera $camname");
                         
         $hash->{OPMODE} = "Enable";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        setActiveToken ($hash);
+        getApiSites    ($hash);
     
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camEnable", $hash, 0);
@@ -3644,14 +3336,13 @@ sub camDisable {
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
-        # eine Kamera deaktivieren
         Log3($name, 4, "$name - Disable Camera $camname");
                         
         $hash->{OPMODE} = "Disable";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        setActiveToken ($hash);
+        getApiSites    ($hash);
         
     } else {
         InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camDisable", $hash, 0);
@@ -3677,28 +3368,28 @@ sub getCaminfoAll {
     InternalTimer(gettimeofday()+1, "FHEM::SSCam::getSvsInfo", $hash, 0);
     
     if(IsModelCam($hash)) {                                                               # Model ist CAM
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getEventList");
-        InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::getEventList", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getMotionEnum");
-        InternalTimer       (gettimeofday()+0.6, "FHEM::SSCam::getMotionEnum", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCamInfo");
-        InternalTimer       (gettimeofday()+0.9, "FHEM::SSCam::getCamInfo", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCapabilities");
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getEventList"             );
+        InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::getEventList", $hash, 0   );
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getMotionEnum"            );
+        InternalTimer       (gettimeofday()+0.6, "FHEM::SSCam::getMotionEnum", $hash, 0  );
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCamInfo"               );
+        InternalTimer       (gettimeofday()+0.9, "FHEM::SSCam::getCamInfo", $hash, 0     );
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCapabilities"          );
         InternalTimer       (gettimeofday()+1.3, "FHEM::SSCam::getCapabilities", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStreamFormat");
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStreamFormat"          );
         InternalTimer       (gettimeofday()+1.4, "FHEM::SSCam::getStreamFormat", $hash, 0);
         
         my ($slim,$ssize) = snapLimSize($hash,1);                                         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"); 
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"                         ); 
         InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStmUrlPath");
-        InternalTimer       (gettimeofday()+2.1, "FHEM::SSCam::getStmUrlPath", $hash, 0);
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStmUrlPath"                       );
+        InternalTimer       (gettimeofday()+2.1, "FHEM::SSCam::getStmUrlPath", $hash, 0             );
 
     } else {                                                                              # Model ist SVS
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getHomeModeState");
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getHomeModeState"          );
         InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getHomeModeState", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSvsLog");
-        InternalTimer       (gettimeofday()+0.8, "FHEM::SSCam::getSvsLog", $hash, 0);
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSvsLog"                 );
+        InternalTimer       (gettimeofday()+0.8, "FHEM::SSCam::getSvsLog", $hash, 0       );
     }
     
     # wenn gesetzt = manuelle Abfrage
@@ -4113,7 +3804,7 @@ sub getPtzPresetList {
     RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPresetList");
     return if(IsDisabled($name));
     
-    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(ReadingsVal($name, "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4147,7 +3838,7 @@ sub getPtzPatrolList {
     RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPatrolList");
     return if(IsDisabled($name));
     
-    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(ReadingsVal($name, "DeviceType", "") ne "PTZ") {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4167,6 +3858,35 @@ sub getPtzPatrolList {
         InternalTimer(gettimeofday()+2, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
     }
     
+return;
+}
+
+###############################################################################
+#          Status / Log setzen wenn Device disabled oder disconnected          
+###############################################################################
+sub exitOnDis { 
+  my $name = shift;
+  my $log  = shift;
+  my $hash = $defs{$name};
+  
+  my $errorcode = "000";
+  my $state     = ReadingsVal($name, "state", "");
+  
+  if ($state eq "disabled") {
+      $errorcode = "402";
+  } elsif ($state eq "disconnected") {
+      $errorcode = "502";
+  }
+
+  my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+  readingsBulkUpdate  ($hash, "Error",     $error    );
+  readingsEndUpdate   ($hash, 1);
+
+  Log3($name, 2, "$name - ERROR - $log - $error");
+  
 return;
 }
 
