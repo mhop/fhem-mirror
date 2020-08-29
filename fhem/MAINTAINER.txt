@@ -601,8 +601,9 @@ FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
 lib/FHEM/Core/Timer/Helper.pm sidey79             FHEM Development
-lib/FHEM/SynoModules/API.pm  DS_Starter           Sonstiges
-lib/FHEM/SynoModules/SMUtils.pm DS_Starter        Sonstiges
+lib/FHEM/SynoModules/API.pm      DS_Starter       Sonstiges
+lib/FHEM/SynoModules/SMUtils.pm  DS_Starter       Sonstiges
+lib/FHEM/SynoModules/ErrCodes.pm DS_Starter       Sonstiges
 
 contrib/sacha_gloor/*        rudolfkoenig         Sonstiges
 contrib/70_ONKYO_AVR_PULL.pm loredo               (deprecated)

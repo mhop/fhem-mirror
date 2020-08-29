@@ -32,24 +32,31 @@ use warnings;
 use utf8;
 use MIME::Base64;
 eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no critic 'eval'
+use Data::Dumper;
 
-# use lib qw(/opt/fhem/FHEM);                                             # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+
+use FHEM::SynoModules::ErrCodes qw(:all);                                 # Error Code Modul
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.2.0');
+use version; our $VERSION = version->declare('1.3.0');
 
 use Exporter ('import');
-our @EXPORT_OK   = qw(
-                       getClHash 
-                       trim
-                       sortVersion
-                       setVersionInfo
-                       jboolmap
-                       setCredentials
-                       getCredentials
-                       evaljson
-                     );
+our @EXPORT_OK = qw(
+                     getClHash 
+                     trim
+                     sortVersion
+                     setVersionInfo
+                     jboolmap
+                     setCredentials
+                     getCredentials
+                     evaljson
+                     login
+                     logout
+                     setActiveToken
+                     delActiveToken
+                   );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
@@ -62,12 +69,15 @@ BEGIN {
           Log3
           defs
           modules
+          CancelDelayedShutdown
           devspec2array
           setKeyValue
           getKeyValue
+          readingsSingleUpdate
           readingsBeginUpdate
           readingsBulkUpdate
           readingsEndUpdate
+          HttpUtils_NonblockingGet
         )
   );  
 };
@@ -77,7 +87,7 @@ BEGIN {
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 ###############################################################################
 sub getClHash {      
-  my $hash  = shift // carp "got no hash value !" && return;
+  my $hash  = shift // carp "got no hash value" && return;
   my $nobgd = shift;
   my $name  = $hash->{NAME};
   my $ret;
@@ -159,8 +169,8 @@ return @sorted;
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
 sub setVersionInfo {
-  my $hash  = shift  // carp "got no hash value !"         && return;
-  my $notes = shift  // carp "got no vNotesIntern value !" && return;
+  my $hash  = shift  // carp "got no hash value"         && return;
+  my $notes = shift  // carp "got no vNotesIntern value" && return;
   my $name  = $hash->{NAME};
 
   my $v                    = (sortVersion("desc",keys %{$notes}))[0];
@@ -196,7 +206,7 @@ return;
 #                       JSON Boolean Test und Mapping
 ###############################################################################
 sub jboolmap { 
-  my $bool = shift // carp "got no value to check if bool !" && return;
+  my $bool = shift // carp "got no value to check if bool" && return;
   
   my $is_boolean = JSON::is_bool($bool);
   
@@ -213,10 +223,10 @@ return $bool;
 #   $ao = "SMTPcredentials" -> Credentials für Mailversand
 ######################################################################################
 sub setCredentials {
-    my $hash = shift // carp "got no hash value !"       && return;
-    my $ao   = shift // carp "got no credentials type !" && return;
-    my $user = shift // carp "got no user name !"        && return;
-    my $pass = shift // carp "got no password !"         && return;
+    my $hash = shift // carp "got no hash value"       && return;
+    my $ao   = shift // carp "got no credentials type" && return;
+    my $user = shift // carp "got no user name"        && return;
+    my $pass = shift // carp "got no password"         && return;
     my $name = $hash->{NAME};
     
     my $success;
@@ -251,9 +261,9 @@ return ($success);
 #   $ao = "SMTPcredentials" -> Credentials für Mailversand
 ######################################################################################
 sub getCredentials {
-    my $hash = shift // carp "got no hash value !"       && return;
+    my $hash = shift // carp "got no hash value"       && return;
     my $boot = shift;
-    my $ao   = shift // carp "got no credentials type !" && return;
+    my $ao   = shift // carp "got no credentials type" && return;
     my $name = $hash->{NAME};
     my ($success, $username, $passwd, $index, $retcode, $credstr);
     my (@key,$len,$i);
@@ -322,8 +332,8 @@ return ($success, $username, $passwd);
 #                        Test ob JSON-String vorliegt
 ###############################################################################
 sub evaljson { 
-  my $hash    = shift // carp "got no hash value !"           && return;
-  my $myjson  = shift // carp "got no string for JSON test !" && return;
+  my $hash    = shift // carp "got no hash value"           && return;
+  my $myjson  = shift // carp "got no string for JSON test" && return;
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
   
@@ -356,5 +366,276 @@ sub evaljson {
   
 return ($success,$myjson);
 }
+
+####################################################################################  
+#         Login wenn keine oder ungültige Session-ID vorhanden ist
+#         $apiref = Referenz zum API Hash
+#         $fret   = Rückkehrfunktion nach erfolgreichen Login
+####################################################################################
+sub login {
+  my $hash         = shift  // carp "got no hash value"                && return;
+  my $apiref       = shift  // carp "got no API reference"             && return;
+  my $fret         = shift  // carp "got no return function reference" && return;
+  my $name         = $hash->{NAME};
+  my $serveraddr   = $hash->{SERVERADDR};
+  my $serverport   = $hash->{SERVERPORT};
+  my $apiauth      = $apiref->{AUTH}{NAME};
+  my $apiauthpath  = $apiref->{AUTH}{PATH};
+  my $apiauthver   = $apiref->{AUTH}{VER};
+  my $proto        = $hash->{PROTOCOL};
+  my $type         = $hash->{TYPE};
+
+  my ($url,$param,$urlwopw);
+  
+  delete $hash->{HELPER}{SID};
+    
+  Log3($name, 4, "$name - --- Begin Function login ---");
+  
+  my ($success, $username, $password) = getCredentials($hash,0,"credentials");                      # Credentials abrufen
+  
+  if (!$success) {
+      Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
+      delActiveToken($hash) if($type eq "SSCam");      
+      return;
+  }
+  
+  my $lrt = AttrVal($name,"loginRetries",3);
+  
+  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {                                               # Max Versuche erreicht -> login wird abgebrochen, Freigabe Funktionstoken
+      delActiveToken($hash) if($type eq "SSCam");  
+      Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
+      return;
+  }
+
+  my $timeout     = AttrVal($name,"timeout",60);                                            # Kompatibilität zu Modulen die das Attr "timeout" verwenden
+  my $httptimeout = AttrVal($name,"httptimeout",$timeout);
+  $httptimeout    = 60 if($httptimeout < 60);
+  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
+  
+  my $sid = AttrVal($name, "noQuotesForSID", 0) ? "sid" : qq{"sid"};                        # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
+  
+  if (AttrVal($name,"session","DSM") eq "DSM") {
+      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&format=$sid"; 
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&format=$sid";
+
+  } else {
+      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
+      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
+  }
+  
+  my $printurl = AttrVal($name, "showPassInLog", 0) ? $url : $urlwopw;
+  
+  Log3($name, 4, "$name - Call-Out now: $printurl");
+  $hash->{HELPER}{LOGINRETRIES}++;
+  
+  $param = {
+      url      => $url,
+      timeout  => $httptimeout,
+      hash     => $hash,
+      user     => $username,
+      funcret  => $fret,
+	  apiref   => $apiref,
+      method   => "GET",
+      header   => "Accept: application/json",
+      callback => \&loginReturn
+  };
+  
+  HttpUtils_NonblockingGet ($param);
+   
+return;
+}
+
+sub loginReturn {
+  my $param    = shift;
+  my $err      = shift;
+  my $myjson   = shift;
+  my $hash     = $param->{hash};
+  my $name     = $hash->{NAME};
+  my $username = $param->{user};
+  my $fret     = $param->{funcret};
+  my $apiref   = $param->{apiref};
+  my $type     = $hash->{TYPE};
+  
+  my $success; 
+
+  if ($err ne "") {                                                                # ein Fehler bei der HTTP Abfrage ist aufgetreten
+      Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
+        
+      readingsSingleUpdate($hash, "Error", $err, 1);                               
+        
+      return login($hash,$apiref,$fret);
+   
+   } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
+        ($success) = evaljson($hash,$myjson);                                      # Evaluiere ob Daten im JSON-Format empfangen wurden
+        if (!$success) {
+            Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
+            delActiveToken($hash) if($type eq "SSCam");
+            return;
+        }
+        
+        my $data = decode_json($myjson);
+        
+        Log3($name, 5, "$name - JSON decoded: ". Dumper $data);
+   
+        $success = $data->{'success'};
+        
+        if ($success) {                                                            # login war erfolgreich     
+            my $sid = $data->{'data'}->{'sid'};
+             
+            $hash->{HELPER}{SID} = $sid;                                           # Session ID in hash eintragen
+       
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash,"Errorcode","none");
+            readingsBulkUpdate  ($hash,"Error","none");
+            readingsEndUpdate   ($hash, 1);
+       
+            Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
+            
+            return &$fret($hash);
+        
+        } else {          
+            my $errorcode = $data->{'error'}->{'code'};                           # Errorcode aus JSON ermitteln
+            my $error     = expErrorsAuth($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
+
+            readingsBeginUpdate ($hash);
+            readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
+            readingsBulkUpdate  ($hash,"Error",$error);
+            readingsEndUpdate   ($hash, 1);
+       
+            Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
+             
+            return login($hash,$apiref,$fret);
+       }
+   }
+   
+return login($hash,$apiref,$fret);
+}
+
+###################################################################################  
+#      Funktion logout
+###################################################################################
+sub logout {
+   my $hash        = shift  // carp "got no hash value"                && return;
+   my $apiref      = shift  // carp "got no API reference"             && return;
+   my $name        = $hash->{NAME};
+   my $serveraddr  = $hash->{SERVERADDR};
+   my $serverport  = $hash->{SERVERPORT};
+   my $apiauth     = $apiref->{AUTH}{NAME};
+   my $apiauthpath = $apiref->{AUTH}{PATH};
+   my $apiauthver  = $apiref->{AUTH}{VER};
+   my $sid         = $hash->{HELPER}{SID};
+   my $proto       = $hash->{PROTOCOL};
+   
+   my $url;
+     
+   Log3($name, 4, "$name - --- Start Synology logout ---");
+    
+   my $httptimeout = AttrVal($name,"httptimeout",4);
+   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
+  
+   if (AttrVal($name,"session","DSM") eq "DSM") {
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";
+       
+   } else {
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&session=SurveillanceStation&_sid=$sid";
+   }
+
+   my $param = {
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&logoutReturn
+   };
+   
+   HttpUtils_NonblockingGet ($param);
+
+return;
+}
+
+sub logoutReturn {  
+   my $param  = shift;
+   my $err    = shift;
+   my $myjson = shift;
+   my $hash   = $param->{hash};
+   my $name   = $hash->{NAME};
+   my $sid    = $hash->{HELPER}{SID};
+   my $type   = $hash->{TYPE};
+   
+   my ($success, $username) = getCredentials($hash,0,"credentials");
+  
+   if ($err ne "") {                                                                                          # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
+       readingsSingleUpdate($hash, "Error", $err, 1);                                             
+   
+   } elsif ($myjson ne "") {                                                                                  # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
+       Log3($name, 4, "$name - URL-Call: ".$param->{url});
+        
+       ($success) = evaljson($hash,$myjson);                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+        
+       if (!$success) {
+           Log3($name, 4, "$name - Data returned: ".$myjson);
+           delActiveToken($hash) if($type eq "SSCam");
+           return;
+       }
+        
+       my $data = decode_json($myjson);
+       
+       Log3($name, 4, "$name - JSON returned: ". Dumper $data);                   
+   
+       $success = $data->{'success'};
+
+       if ($success) {                                                                                        # die Logout-URL konnte erfolgreich aufgerufen werden                        
+           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
+             
+       } else {
+           my $errorcode = $data->{'error'}->{'code'};                                                        # Errorcode aus JSON ermitteln
+           my $error     = expErrorsAuth($hash,$errorcode);                                                   # Fehlertext zum Errorcode ermitteln
+
+           Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
+       }
+   }   
+   
+   delete $hash->{HELPER}{SID};                                                                               # Session-ID aus Helper-hash löschen
+   
+   delActiveToken($hash);                                                                                     # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
+   
+   CancelDelayedShutdown($name);
+   
+return;
+}
+
+#############################################################################################
+#                                   Token setzen
+#############################################################################################
+sub setActiveToken { 
+   my $hash = shift // carp "got no hash value" && return;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "on";
+   
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
+   } 
+   
+return;
+} 
+
+#############################################################################################
+#                                   Token freigeben
+#############################################################################################
+sub delActiveToken { 
+   my $hash = shift // carp "got no hash value" && return;
+   my $name = $hash->{NAME};
+               
+   $hash->{HELPER}{ACTIVE} = "off";
+   
+   if (AttrVal($name,"debugactivetoken",0)) {
+       Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
+   }  
+   
+return;
+} 
 
 1;
