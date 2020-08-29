@@ -1058,9 +1058,8 @@ par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingLi
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 par:SETCHANNELINFO;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
-#attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2
-#setreading DEVICE associatedWith DEVICE_CH2
 copy DEVICE DEVICE_CH2
+deleteattr DEVICE_CH2 alias
 attr DEVICE_CH2 readingList \
   STATTOPIC/POWER2:.* state
 attr DEVICE_CH2 jsonMap POWER2:0 Dimmer:pct POWER1:0 Heap:0 LedTable:0 LoadAvg:0 MqttCount:0 SaveData:0 Scheme:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0 ANALOG_A0:0 SetOption26:0 Sleep:0 SleepMode:0 Speed:0 StateText1:0 StateText2:0 StateText3:0 StateText4:0 Time:0 Uptime:0 UptimeSec:0 Wifi_SSId:0 Wifi_RSSI:0 Wifi_LinkCount:0 Wifi_Downtime:0 Wifi_Channel:0 Wifi_BSSId:0 Wifi_AP:0
