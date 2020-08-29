@@ -37,8 +37,11 @@ package FHEM::SSCam;                                                            
 use strict;                           
 use warnings;
 use GPUtils qw( GP_Import GP_Export );                                             # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-use FHEM::SynoModules::API qw(:all);
-use FHEM::SynoModules::SMUtils qw(:all);
+
+use FHEM::SynoModules::API qw(:all);                                               # API Modul
+use FHEM::SynoModules::SMUtils qw(:all);                                           # Hilfsroutinen Modul
+use FHEM::SynoModules::ErrCodes qw(:all);                                          # Error Code Modul
+
 use Data::Dumper;                                                                
 use MIME::Base64;
 use Time::HiRes qw( gettimeofday tv_interval );
@@ -161,9 +164,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.7.2"  => "26.08.2020  move sub setCredentials, getCredentials, evaljson to SMUtils ",
-  "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm move ".
-                           "getPtzPresetList, getPtzPatrolList to return path of OpMOde Getcaminfo ",
+  "9.7.3"  => "29.08.2020  move sub login, loginReturn, logout, logoutReturn, setActiveToken, delActiveToken to SMUtils.pm ".
+                           "move sub expErrorsAuth, expErrors to ErrCodes.pm",
+  "9.7.2"  => "26.08.2020  move sub setCredentials, getCredentials, evaljson to SMUtils.pm ",
+  "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm ".
+                           "move getPtzPresetList, getPtzPatrolList to return path of OpMOde Getcaminfo ",
   "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
   "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
   "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
@@ -350,55 +355,6 @@ my %vNotesExtern = (
   "1.4.0"   => "23.12.2015 function \"enable\" and \"disable\" for SS-Cams added, changed timout of Http-calls to a higher value ",
   "1.3.0"   => "19.12.2015 function \"snap\" for taking snapshots added, fixed a bug that functions may impact each other  ",
   "1.0.0"   => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
-);
-
-# Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
-my %errauthlist = (
-  100 => "Unknown error",
-  101 => "The account parameter is not specified",
-  102 => "API does not exist",
-  400 => "Invalid user or password",
-  401 => "Guest or disabled account",
-  402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  403 => "One time password not specified",
-  404 => "One time password authenticate failed",
-  405 => "method not allowd - maybe the password is too long",
-  406 => "OTP code enforced",
-  407 => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  408 => "Password Expired Can not Change",
-  409 => "Password Expired",
-  410 => "Password must change (when first time use or after reset password by admin)",
-  411 => "Account Locked (when account max try exceed)",
-);
-
-my %errlist = (
-  100 => "Unknown error",
-  101 => "Invalid parameters",
-  102 => "API does not exist",
-  103 => "Method does not exist",
-  104 => "This API version is not supported",
-  105 => "Insufficient user privilege",
-  106 => "Connection time out",
-  107 => "Multiple login detected",
-  117 => "need manager rights in SurveillanceStation for operation",
-  400 => "Execution failed",
-  401 => "Parameter invalid",
-  402 => "Camera disabled",
-  403 => "Insufficient license",
-  404 => "Codec activation failed",
-  405 => "CMS server connection failed",
-  407 => "CMS closed",
-  410 => "Service is not enabled",
-  412 => "Need to add license",
-  413 => "Reach the maximum of platform",
-  414 => "Some events not exist",
-  415 => "message connect failed",
-  417 => "Test Connection Error",
-  418 => "Object is not exist",
-  419 => "Visualstation name repetition",
-  439 => "Too many items selected",
-  502 => "Camera disconnected",
-  600 => "Presetname and PresetID not found in Hash",
 );
 
 # Tooltipps Textbausteine (http://www.walterzorn.de/tooltip/tooltip.htm#download), §NAME§ wird durch Kameranamen ersetzt 
@@ -2750,7 +2706,7 @@ sub camSnap {
     }
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) { 
-        # einen Schnappschuß aufnehmen              
+               
         $hash->{OPMODE} = "Snap";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         $hash->{HELPER}{CANSENDSNAP}  = 1       if($emtxt);                        # Versand Schnappschüsse soll per Email erfolgen
@@ -3974,7 +3930,12 @@ sub sessionOff {
         $hash->{OPMODE} = "logout";
         
         setActiveToken($hash);
-        logout        ($hash);
+        
+        Log3($name, 4, "$name - ####################################################"); 
+        Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
+        Log3($name, 4, "$name - ####################################################");
+   
+        logout        ($hash, $hash->{HELPER}{API});
         
     } else {
         InternalTimer(gettimeofday()+1.1, "FHEM::SSCam::sessionOff", $hash, 0);
@@ -4585,17 +4546,17 @@ sub checkSid {
    
    if(IsModelCam($hash)) {
        # Folgefunktion wenn Cam-Device
-       $subref = "getCamId";
+       $subref = \&getCamId;
    } else {
        # Folgefunktion wenn SVS-Device
-       $subref = "camOp";
+       $subref = \&camOp;
    }
    
    # SID holen bzw. login
    my $sid = $hash->{HELPER}{SID};
    if(!$sid) {
        Log3($name, 3, "$name - no session ID found - get new one");
-       login($hash,$hash->{HELPER}{API},$subref);
+       login($hash, $hash->{HELPER}{API}, $subref);
        return;
    }
    
@@ -4679,7 +4640,7 @@ sub getCamId_Parse {
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
        readingsSingleUpdate($hash, "Error", $err, 1);
-       return login($hash,$hash->{HELPER}{API},'getApiSites');
+       return login($hash, $hash->{HELPER}{API}, \&getApiSites);
    
    } elsif ($myjson ne "") {
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
@@ -4727,38 +4688,35 @@ sub getCamId_Parse {
                
            }
            
-           if ($OpMode eq "Autocreate") {
-               # Cam autocreate
+           if ($OpMode eq "Autocreate") {                                                     # Cam autocreate
                Log3($name, 3, "$name - Cameras defined by autocreate: $cdall") if($cdall);
                
-               $errstate = $errstate?$errstate:"none";
-               readingsBeginUpdate($hash); 
-               readingsBulkUpdate($hash,"NumberAutocreatedCams",$nrcreated);
-               readingsBulkUpdate($hash,"Errorcode","none");
-               readingsBulkUpdate($hash,"Error",$errstate);
-               readingsBulkUpdate($hash,"state","autocreate finished");
-               readingsEndUpdate($hash, 1);
+               $errstate = $errstate // "none";
+               
+               readingsBeginUpdate ($hash); 
+               readingsBulkUpdate  ($hash, "NumberAutocreatedCams", $nrcreated           );
+               readingsBulkUpdate  ($hash, "Errorcode",             "none"               );
+               readingsBulkUpdate  ($hash, "Error",                 $errstate            );
+               readingsBulkUpdate  ($hash, "state",                 "autocreate finished");
+               readingsEndUpdate   ($hash, 1);
            
                CommandSave(undef, undef) if($errstate eq "none" && $nrcreated && AttrVal("global","autosave", 1));
 
-               # Freigabe Funktionstoken
-               delActiveToken($hash);
+               delActiveToken($hash);                                                         # Freigabe Funktionstoken
                return;
            }
              
-           # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
-           if (exists($allcams{$camname})) {
-               $camid = $allcams{$camname};
+           if (exists($allcams{$camname})) {                                                  # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
+               $camid         = $allcams{$camname};
                $hash->{CAMID} = $camid;
                  
                Log3($name, 4, "$name - Detection Camid successful - $camname ID: $camid");
            
-           } else {
-               # Kameraname nicht gefunden, id = ""
-               readingsBeginUpdate($hash);
-               readingsBulkUpdate($hash,"Errorcode","none");
-               readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
-               readingsEndUpdate($hash, 1);
+           } else {                                                                           # Kameraname nicht gefunden, id = ""
+               readingsBeginUpdate ($hash);
+               readingsBulkUpdate  ($hash, "Errorcode", "none"                                        );
+               readingsBulkUpdate  ($hash, "Error",     "Camera(ID) not found in Surveillance Station");
+               readingsEndUpdate   ($hash, 1);
                                   
                Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");          
                delActiveToken($hash);
@@ -4766,24 +4724,19 @@ sub getCamId_Parse {
            }
       
       } else {
-           # Errorcode aus JSON ermitteln
-           $errorcode = $data->{'error'}->{'code'};
-
-           # Fehlertext zum Errorcode ermitteln
-           $error = expErrors($hash,$errorcode);
+           $errorcode = $data->{'error'}->{'code'};                                          # Errorcode aus JSON ermitteln
+           $error     = expErrors($hash,$errorcode);                                         # Fehlertext zum Errorcode ermitteln
        
-           readingsBeginUpdate($hash);
-           readingsBulkUpdate($hash,"Errorcode",$errorcode);
-           readingsBulkUpdate($hash,"Error",$error);
-           readingsEndUpdate($hash, 1);
+           readingsBeginUpdate ($hash);
+           readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+           readingsBulkUpdate  ($hash, "Error",     $error    );
+           readingsEndUpdate   ($hash, 1);
            
-           if ($errorcode =~ /(105|401)/x) {
-               # neue Login-Versuche
+           if ($errorcode =~ /(105|401)/x) {                                                 # neue Login-Versuche
                Log3($name, 2, "$name - ERROR - $errorcode - $error -> try new login");
-               return login($hash,$hash->{HELPER}{API},'getApiSites');
+               return login($hash, $hash->{HELPER}{API}, \&getApiSites);
            
-           } else {
-               # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+           } else {                                                                          # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                delActiveToken($hash);
                Log3($name, 2, "$name - ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error");
                return;
@@ -6830,7 +6783,7 @@ sub camOp_Parse {
                Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                undef $data;
                undef $myjson;
-               return login($hash,$hash->{HELPER}{API},'getApiSites');
+               return login($hash, $hash->{HELPER}{API}, \&getApiSites);
             }
        
             Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
@@ -6843,242 +6796,6 @@ sub camOp_Parse {
   # Token freigeben   
   delActiveToken($hash);
 
-return;
-}
-
-####################################################################################  
-#         Login wenn keine oder ungültige Session-ID vorhanden ist
-#         $apiref = Referenz zum API Hash
-#         $fret   = Rückkehrfunktion nach erfolgreichen Login
-####################################################################################
-sub login {
-  my $hash         = shift;
-  my $apiref       = shift;
-  my $fret         = shift;
-  my $name         = $hash->{NAME};
-  my $serveraddr   = $hash->{SERVERADDR};
-  my $serverport   = $hash->{SERVERPORT};
-  my $apiauth      = $apiref->{AUTH}{NAME};
-  my $apiauthpath  = $apiref->{AUTH}{PATH};
-  my $apiauthver   = $apiref->{AUTH}{VER};
-  my $proto        = $hash->{PROTOCOL};
-
-  my ($url,$param,$urlwopw);
-  
-  delete $hash->{HELPER}{SID};
-    
-  Log3($name, 4, "$name - --- Begin Function login ---");
-  
-  my ($success, $username, $password) = getCredentials($hash,0,"credentials");                      # Credentials abrufen
-  
-  if (!$success) {
-      Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
-      delActiveToken($hash) if(defined &delActiveToken);      
-      return;
-  }
-  
-  my $lrt = AttrVal($name,"loginRetries",3);
-  
-  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {                                               # Max Versuche erreicht -> login wird abgebrochen, Freigabe Funktionstoken
-      delActiveToken($hash) if(defined &delActiveToken);
-      Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
-      return;
-  }
-
-  my $timeout     = AttrVal($name,"timeout",60);                                            # Kompatibilität zu Modulen die das Attr "timeout" verwenden
-  my $httptimeout = AttrVal($name,"httptimeout",$timeout);
-  $httptimeout    = 60 if($httptimeout < 60);
-  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
-  
-  my $sid = AttrVal($name, "noQuotesForSID", 0) ? "sid" : qq{"sid"};                        # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
-  
-  if (AttrVal($name,"session","DSM") eq "DSM") {
-      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&format=$sid"; 
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&format=$sid";
-
-  } else {
-      $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
-  }
-  
-  my $printurl = AttrVal($name, "showPassInLog", 0) ? $url : $urlwopw;
-  
-  Log3($name, 4, "$name - Call-Out now: $printurl");
-  $hash->{HELPER}{LOGINRETRIES}++;
-  
-  $param = {
-      url      => $url,
-      timeout  => $httptimeout,
-      hash     => $hash,
-      user     => $username,
-      funcret  => $fret,
-	  apiref   => $apiref,
-      method   => "GET",
-      header   => "Accept: application/json",
-      callback => \&loginReturn
-  };
-  
-  HttpUtils_NonblockingGet ($param);
-   
-return;
-}
-
-sub loginReturn {
-  my ($param, $err, $myjson) = @_;
-  my $hash     = $param->{hash};
-  my $name     = $hash->{NAME};
-  my $username = $param->{user};
-  my $fret     = $param->{funcret};
-  my $apiref   = $param->{apiref};
-  my $subref   = \&$fret;
-  my $success; 
-
-  if ($err ne "") {                                                                # ein Fehler bei der HTTP Abfrage ist aufgetreten
-      Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
-      readingsSingleUpdate($hash, "Error", $err, 1);                               
-        
-      return login($hash,$apiref,$fret);
-   
-   } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
-        ($success) = evaljson($hash,$myjson);                                      # Evaluiere ob Daten im JSON-Format empfangen wurden
-        if (!$success) {
-            Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
-            delActiveToken($hash);
-            return;
-        }
-        
-        my $data = decode_json($myjson);
-        
-        Log3($name, 5, "$name - JSON decoded: ". Dumper $data);
-   
-        $success = $data->{'success'};
-        
-        if ($success) {                                                            # login war erfolgreich     
-            my $sid = $data->{'data'}->{'sid'};
-             
-            $hash->{HELPER}{SID} = $sid;                                           # Session ID in hash eintragen
-       
-            readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash,"Errorcode","none");
-            readingsBulkUpdate  ($hash,"Error","none");
-            readingsEndUpdate   ($hash, 1);
-       
-            Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
-            
-            return &$subref($hash);
-        
-        } else {          
-            my $errorcode = $data->{'error'}->{'code'};                           # Errorcode aus JSON ermitteln
-            my $error     = expErrorsAuth($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
-
-            readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate  ($hash,"Error",$error);
-            readingsEndUpdate   ($hash, 1);
-       
-            Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
-             
-            return login($hash,$apiref,$fret);
-       }
-   }
-   
-return login($hash,$apiref,$fret);
-}
-
-###################################################################################  
-#      Funktion logout
-###################################################################################
-sub logout {
-   my $hash          = shift;
-   my $name          = $hash->{NAME};
-   my $serveraddr    = $hash->{SERVERADDR};
-   my $serverport    = $hash->{SERVERPORT};
-   my $apiauth       = $hash->{HELPER}{API}{AUTH}{NAME};
-   my $apiauthpath   = $hash->{HELPER}{API}{AUTH}{PATH};
-   my $apiauthver    = $hash->{HELPER}{API}{AUTH}{VER};
-   my $sid           = $hash->{HELPER}{SID};
-   my $proto         = $hash->{PROTOCOL};
-   
-   my ($url,$param,$httptimeout);
-    
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - --- Begin Function logout nonblocking ---");
-    
-   $httptimeout = AttrVal($name,"httptimeout",4);
-   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
-  
-   if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&session=SurveillanceStation&_sid=$sid";
-   } else {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";
-   }
-
-   $param = {
-       url      => $url,
-       timeout  => $httptimeout,
-       hash     => $hash,
-       method   => "GET",
-       header   => "Accept: application/json",
-       callback => \&logoutReturn
-   };
-   
-   HttpUtils_NonblockingGet ($param);
-
-return;
-}
-
-sub logoutReturn {  
-   my ($param, $err, $myjson) = @_;
-   my $hash                   = $param->{hash};
-   my $name                   = $hash->{NAME};
-   my $sid                    = $hash->{HELPER}{SID};
-   my ($success, $username)   = getCredentials($hash,0,"credentials");
-   my $OpMode                 = $hash->{OPMODE};
-   my $data;
-   my $error;
-   my $errorcode;
-  
-   if ($err ne "") {                                                               # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
-       readingsSingleUpdate($hash, "Error", $err, 1);                                             
-   
-   } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-       Log3($name, 4, "$name - URL-Call: ".$param->{url});
-        
-       ($success) = evaljson($hash,$myjson);                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
-        
-       if (!$success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
-           delActiveToken($hash);
-           return;
-       }
-        
-       $data = decode_json($myjson);
-       
-       Log3($name, 4, "$name - JSON returned: ". Dumper $data);                   # Logausgabe decodierte JSON Daten
-   
-       $success = $data->{'success'};
-
-       if ($success) {                                                                                        # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
-             
-       } else {
-           $errorcode = $data->{'error'}->{'code'};                               # Errorcode aus JSON ermitteln
-           $error     = expErrorsAuth($hash,$errorcode);                          # Fehlertext zum Errorcode ermitteln
-
-           Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
-       }
-   }   
-   
-   delete $hash->{HELPER}{SID};                                                   # Session-ID aus Helper-hash löschen
-   
-   delActiveToken($hash);                                                         # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   
-   CancelDelayedShutdown($name);
-   
 return;
 }
 
@@ -8903,42 +8620,6 @@ return $htmlCode;
 }
 
 ##############################################################################
-#              Auflösung Errorcodes bei Login / Logout
-#              Übernahmewerte sind $hash, $errorcode
-##############################################################################
-sub expErrorsAuth {
-  my $hash      = shift;
-  my $errorcode = shift;
-  my $device    = $hash->{NAME};
-  my $error;
-  
-  unless (exists($errauthlist{"$errorcode"})) {$error = qq{Message of errorcode "$errorcode" not found. Please turn to Synology Web API-Guide.}; return ($error);}
-
-  # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
-  $error = $errauthlist{"$errorcode"};
-
-return ($error);
-}
-
-##############################################################################
-#  Auflösung Errorcodes SVS API
-#  Übernahmewerte sind $hash, $errorcode
-##############################################################################
-sub expErrors {
-  my $hash      = shift;
-  my $errorcode = shift;
-  my $device = $hash->{NAME};
-  my $error;
-  
-  unless (exists($errlist{"$errorcode"})) {$error = qq{Message of errorcode "$errorcode" not found. Please turn to Synology Web API-Guide.}; return ($error);}
-
-  # Fehlertext aus Hash-Tabelle %errorlist ermitteln
-  $error = $errlist{"$errorcode"};
-  
-return ($error);
-}
-
-##############################################################################
 # Zusätzliche Redings in Rotation erstellen
 # Sub ($hash,<readingName>,<Wert>,<Rotationszahl>,<Trigger[0|1]>)
 ##############################################################################
@@ -10643,36 +10324,6 @@ sub extractTIDfromCache {
           
 return;
 }
-
-#############################################################################################
-#                                   Token setzen
-#############################################################################################
-sub setActiveToken { 
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-               
-   $hash->{HELPER}{ACTIVE} = "on";
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
-   } 
-   
-return;
-}
-
-#############################################################################################
-#                                   Token freigeben
-#############################################################################################
-sub delActiveToken { 
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-               
-   $hash->{HELPER}{ACTIVE} = "off";
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-   }  
-   
-return;
-}  
 
 #############################################################################################
 #              Transaktion starten oder vorhandenen TA Code zurück liefern
