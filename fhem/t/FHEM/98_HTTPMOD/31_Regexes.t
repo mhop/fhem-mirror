@@ -15,6 +15,18 @@ use strict;
 use warnings;
 use Test::More;
 
+my $hash = $defs{'H2'};
+my $modVersion = $hash->{ModuleVersion};
+$modVersion =~ /^([0-9]+)\./;
+my $major = $1;
+
+if ($major && $major >= 4) {
+    plan tests => 13;
+} else {
+    plan skip_all => "This test only works for HTTPMOD version 4 or later, installed is $modVersion";
+}
+
+
 fhem('set H1 reread');
 is(FhemTestUtils_gotEvent(qr/H1:TestReading1:\sRainbowChase/xms), 1, "match simple case with regex compilation");
 is(FhemTestUtils_gotEvent(qr/H1:TestReading2:\sRainbowChase/xms), 1, "match with options xms with regex compilation");

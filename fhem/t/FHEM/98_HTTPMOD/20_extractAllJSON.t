@@ -5,6 +5,14 @@ use strict;
 use warnings;
 use Test::More;
 
+eval "use JSON";
+if ($@) {
+    plan skip_all => "This test checks an optional JSON-Feature of HTTPMOD and can only be run with the JSON library installed. Please install JSON Library (apt-get install libjson-perl)";
+} else {
+    plan tests => 3;
+}
+
+
 fhem('set H1 reread');
 InternalTimer(time()+1, sub() {
 
