@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.0');
+use version; our $VERSION = version->declare('1.4.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -178,8 +178,9 @@ sub setVersionInfo {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
-  $hash->{HELPER}{VERSION_API}     = FHEM::SynoModules::API->VERSION()     // "unused";
-  $hash->{HELPER}{VERSION_SMUtils} = FHEM::SynoModules::SMUtils->VERSION() // "unused";
+  $hash->{HELPER}{VERSION_API}      = FHEM::SynoModules::API->VERSION()      // "unused";
+  $hash->{HELPER}{VERSION_SMUtils}  = FHEM::SynoModules::SMUtils->VERSION()  // "unused";
+  $hash->{HELPER}{VERSION_ErrCodes} = FHEM::SynoModules::ErrCodes->VERSION() // "unused";
   
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
