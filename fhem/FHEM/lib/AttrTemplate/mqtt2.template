@@ -1432,7 +1432,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:tasmota_8channel_split
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:sonoff 8 channel device flashed with Tasmota. <br>NOTE: several additional devices will be created for each channel
+desc:sonoff 8 channel device flashed with Tasmota. <br>NOTE: several additional devices will be created for channels 2 to 8 
 order:A_04c1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -1482,7 +1482,7 @@ attr DEVICE_CH8 setList \
 attr DEVICE_CH8 readingList \
   STATTOPIC/POWER8:.* state
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 model tasmota_8channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20200828
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplateVersion 20200830
 set DEVICE attrTemplate set_associatedWith \CHANNELS=8
 set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4,DEVICE_CH5,DEVICE_CH6,DEVICE_CH7,DEVICE_CH8 attrTemplate speechcontrol_type_switch
 
@@ -1968,7 +1968,7 @@ setreading DEVICE attrTemplateVersion 20200609
 name:shelly3em
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 order:A_10c
-desc:Applies to Shelly 3em devices. <br>NOTE: first, experimental version
+desc:Applies to Shelly 3em devices. <br>NOTE: early version, might still need some testing
 par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
@@ -1976,11 +1976,11 @@ par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included,
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
 set DEVICE attrTemplate shelly1
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
-attr DEVICE stateFormat { my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $state,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
+attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $light,\nP1: $cons1 W / Total P1: $total1 kWh\nP2: $cons2 W / Total P2: $total2 kWh\nP3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
-  shellies/DEVNAME/relay/0:.* relay_0\
+  shellies/DEVNAME/relay/0:.* state\
   shellies/DEVNAME/input_event/0:.* { json2nameValue($EVENT) }\
   shellies/DEVNAME/input/0:.* input0\
   shellies/DEVNAME/online:.* online\
@@ -2013,8 +2013,9 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/emeter/2/total_returned:.* emeter_2_total_returned
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
+set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200828
+setreading DEVICE attrTemplateVersion 20200830
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -2203,46 +2204,32 @@ set DEVICE attrTemplate shellyplug
 attr DEVICE getList \
   power0:noArg shellies/DEVNAME/relay/0/power power0\
   energy0:noArg shellies/DEVNAME/relay/0/energy energy0
-attr DEVICE comment Channel 1 for DEVICE, see also DEVICE_CH2, DEVICE_CH3 and DEVICE_CH4
-setreading DEVICE associatedWith DEVICE_CH2,DEVICE_CH3,DEVICE_CH4
-copy DEVICE DEVICE_CH2
+attr DEVICE model shelly4pro_split
+setreading DEVICE attrTemplateVersion 20200830
+set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state
-setreading DEVICE_CH2 associatedWith DEVICE,DEVICE_CH3,DEVICE_CH4
 attr DEVICE_CH2 setList \
   off:noArg shellies/DEVNAME/relay/1/command off\
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE getList \
   power1:noArg shellies/DEVNAME/relay/1/power power1\
   energy1:noArg shellies/DEVNAME/relay/1/energy energy1
-attr DEVICE comment Channel 2 for DEVICE, see also DEVICE, DEVICE_CH3 and DEVICE_CH4
-copy DEVICE DEVICE_CH3
 attr DEVICE_CH3 readingList shellies/DEVNAME/relay/2:.* state
-setreading DEVICE_CH3 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH4
 attr DEVICE_CH3 setList \
   off:noArg shellies/DEVNAME/relay/2/command off\
   on:noArg shellies/DEVNAME/relay/2/command on
-attr DEVICE getList \
+attr DEVICE_CH3 getList \
   power2:noArg shellies/DEVNAME/relay/2/power power2\
   energy2:noArg shellies/DDEVNAME/relay/2/energy energy2
-attr DEVICE comment Channel 3 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH4
-copy DEVICE DEVICE_CH4
 attr DEVICE_CH4 readingList shellies/DEVNAME/relay/3:.* state
-setreading DEVICE_CH4 associatedWith DEVICE,DEVICE_CH2,DEVICE_CH3
 attr DEVICE_CH4 setList \
   off:noArg shellies/DEVNAME/relay/3/command off\
   on:noArg shellies/DEVNAME/relay/3/command on
 attr DEVICE_CH4 getList \
   power3:noArg shellies/DEVNAME/relay/3/power power3\
   energy3:noArg shellies/DEVNAME/relay/3/energy energy3
-attr DEVICE_CH4 comment Channel 4 for DEVICE, see also DEVICE, DEVICE_CH2 and DEVICE_CH3
-attr DEVICE model shelly4pro_split
-setreading DEVICE attrTemplateVersion 20200522 or prior
-attr DEVICE_CH2 model shelly4pro_split
-setreading DEVICE_CH2 attrTemplateVersion 20200522 or prior
-attr DEVICE_CH3 model shelly4pro_split
-setreading DEVICE_CH3 attrTemplateVersion 20200522 or prior
-attr DEVICE_CH4 model shelly4pro_split
-setreading DEVICE_CH4 attrTemplateVersion 20200522 or prior
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
+
 
 # shelly4pro unified device using original firmware
 # source: https://forum.fhem.de/index.php/topic,97218.msg905689.html#msg905689
@@ -2453,11 +2440,11 @@ attr DEVICE readingList \
 attr DEVICE userReadings rgb:red.* {if(ReadingsVal($name,"mode","") eq "color"){sprintf("%02X%02X%02X", ReadingsVal($name,"red",99), ReadingsVal($name,"green",99), ReadingsVal($name,"blue",99))}else{my $a=sprintf("%02X",ReadingsVal($name,"brightness",0)*2.555);"$a$a$a"}}
 attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
-attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($state)."</a><div>Verbrauch: $cons</div>"}
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons = ReadingsVal($name,"power","unknown");; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shelly2rgbw_color
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20200830
 
 #contributed by user sledge
 name:shelly2rgbw_4w_split
