@@ -1156,10 +1156,11 @@ sub CUL_HM_AttrCheck(@) {############################
       if ($modules{CUL_HM}{Attr}{chn} =~ m/$attrName\b/);
   }
   if (!$defs{$name}{helper}{role}{dev}){
-    return " $attrName only valid for devices"
-      if ( $modules{CUL_HM}{Attr}{dev}
+    my $x = $modules{CUL_HM}{Attr}{dev}
           .$modules{CUL_HM}{Attr}{devPhy}
-          .$modules{CUL_HM}{Attr}{devVrt}     =~ m/$attrName\b/);
+          .$modules{CUL_HM}{Attr}{devVrt};
+    return " $attrName only valid for devices"
+      if ( $x     =~ m/$attrName\b/);
   }
   return undef;
 }
@@ -4357,7 +4358,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     my $st      = $mId ne "" ? $culHmModel->{$mId}{st}   : AttrVal($devName, "subType", "");
     my $md      = $mId ne "" ? $culHmModel->{$mId}{name} : AttrVal($devName, "model"  , "");
     my @arr1 = ();
-    my @gets = ();
     delete $hash->{helper}{cmds}{cmdLst}{$_} foreach(grep!/^tpl(Set|Para)/,keys%{$hash->{helper}{cmds}{cmdLst}});
     if (defined $hash->{helper}{regLst}){
       foreach my $rl(grep /./,split(",",$hash->{helper}{regLst})){        
@@ -4376,12 +4376,6 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }keys %{$culHmChanSets->{$md."xx"}} };
     if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} }keys %{$culHmChanSets->{$md.$chn}} };
     if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    }keys %{$culHmFunctSets->{$fkt}}    };
-
-    if(!$roleV)                              {push @gets,map{"$_:".$culHmGlobalGets->{$_}            }keys %{$culHmGlobalGets}              };
-    if($roleV)                               {push @gets,map{"$_:".$culHmVrtGets->{$_}               }keys %{$culHmVrtGets}              };
-    if($culHmSubTypeGets->{$st})             {push @gets,map{"$_:".${$culHmSubTypeGets->{$st}}{$_}   }keys %{$culHmSubTypeGets->{$st}}   };
-    if($culHmModelGets->{$md})               {push @gets,map{"$_:".${$culHmModelGets->{$md}}{$_}     }keys %{$culHmModelGets->{$md}}     };
-    if($roleD)                               {push @gets,map{"$_:".$culHmGlobalGetsDev->{$_}         }keys %{$culHmGlobalGetsDev}        };
 
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
@@ -4412,6 +4406,13 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     }
 
     #---------------- gets ---------------
+    my @gets = ();
+    if(!$roleV)                              {push @gets,map{"$_:".$culHmGlobalGets->{$_}            }keys %{$culHmGlobalGets}              };
+    if($roleV)                               {push @gets,map{"$_:".$culHmVrtGets->{$_}               }keys %{$culHmVrtGets}              };
+    if($culHmSubTypeGets->{$st})             {push @gets,map{"$_:".${$culHmSubTypeGets->{$st}}{$_}   }keys %{$culHmSubTypeGets->{$st}}   };
+    if($culHmModelGets->{$md})               {push @gets,map{"$_:".${$culHmModelGets->{$md}}{$_}     }keys %{$culHmModelGets->{$md}}     };
+    if($roleD)                               {push @gets,map{"$_:".$culHmGlobalGetsDev->{$_}         }keys %{$culHmGlobalGetsDev}        };
+
     delete $hash->{helper}{cmds}{rtrvLst};
     foreach(@gets){
       my ($cmdS,$val) = split(":",$_,2);
@@ -6491,6 +6492,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],($a[4]?$a[4]:"dual"),
                                                          ($a[5]?$a[5]:"set"),
                                                          ($a[6]?$a[6]:"both"));
+
     $state = "";
     if ($roleD){
       $bNo = 1 if ($bNo == 0 && $roleC); # role device and channel => button=1
