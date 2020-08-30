@@ -1974,9 +1974,8 @@ par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}';; my $old =  AttrVal("DEVICE","userReadings",undef);; !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
 set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
-set DEVICE attrTemplate shelly1
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot";; my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; my $total_sum = $total1+$total2+$total3;; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh</div>"}
-attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $light,\nP1: $cons1 W / Total P1: $total1 kWh\nP2: $cons2 W / Total P2: $total2 kWh\nP3: $cons3 W / Total P3: $total3 kWh) }
+attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off");; my $cons1 = ReadingsVal($name,"emeter_0_power","unknown");; my $cons2 = ReadingsVal($name,"emeter_1_power","unknown");; my $cons3 = ReadingsVal($name,"emeter_2_power","unknown");; my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown");; my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown");; my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown");; return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
   shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }\
@@ -2013,9 +2012,8 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/emeter/2/total_returned:.* emeter_2_total_returned
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200830
+setreading DEVICE attrTemplateVersion 20200830_1
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
