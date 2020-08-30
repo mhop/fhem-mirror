@@ -1927,8 +1927,8 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,tempTmplSet    =>"-tempTmpl-"
                                                 ,peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [(actor|remote|{both})]"
                                                }
-                     ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[(,-color2-...)] [-repeat-]"}
-                     ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[replay|-MP3No-[,-MP3No-...]] [(-repeat-|{0})]"
+                     ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[,(-color2-...)] 'rep:' [(1..255;1|{1})]"}
+                     ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[{replay}|-MP3No-[,-MP3No-...]] 'rep:' [(1..255;1|{1})] 'vol:' [(0..10;1|{10})] 'dur:' [(-duration-|{108000})]"
                                                 ,pct            =>"[-value- [-ontime-]"}
                      ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|{help})]"
                                                                  ." [({off}|longlong|longshort|long2short|short|shortshort|long)]"
