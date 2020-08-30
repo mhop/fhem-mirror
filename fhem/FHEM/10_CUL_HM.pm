@@ -4031,7 +4031,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
   }
 
   my $devHash = CUL_HM_getDeviceHash($hash);
-  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allGet} ? 0:3),"CUL_HM get $name " . join(" ", @a[1..$#a]);
+  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allGet} ? 0:4),"CUL_HM get $name " . join(" ", @a[1..$#a]);
 
   #----------- now start processing --------------
   if   ($cmd eq "param") {  ###################################################
@@ -4639,7 +4639,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     @a = ($a[0],$cmd,@parIn);
     
   }
-  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:3),"CUL_HM set $name " . join(" ", @a[1..$#a]);
+  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:4),"CUL_HM set $name " . join(" ", @a[1..$#a]);
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
   my $id; # define id of IO device for later usage
@@ -6884,7 +6884,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   CUL_HM_UpdtReadSingle($hash,"state",$state,1) if($state);
 
   my $rxType = CUL_HM_getRxType($devHash);
-  Log3 $name,3,"CUL_HM set $name $act";
+#  Log3 $name,3,"CUL_HM set $name $act";
   if($rxType & 0x01){#always
     CUL_HM_ProcessCmdStack($devHash);
   }
