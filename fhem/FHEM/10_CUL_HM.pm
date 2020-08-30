@@ -28,6 +28,7 @@ my $culHmRegChan          =\%HMConfig::culHmRegChan;
 
 my $culHmGlobalGets       =\%HMConfig::culHmGlobalGets;
 my $culHmVrtGets          =\%HMConfig::culHmVrtGets;
+
 my $culHmSubTypeGets      =\%HMConfig::culHmSubTypeGets;
 my $culHmModelGets        =\%HMConfig::culHmModelGets;
 my $culHmGlobalGetsDev    =\%HMConfig::culHmGlobalGetsDev;
@@ -184,6 +185,8 @@ sub CUL_HM_Initialize($) {
                        ."modelForce:".join(",", sort @modellist)." "
                        .".mId "
                        ;
+  $hash->{Attr}{devVrt} = 
+                        "logIDs:multiple,none,sys,all,broadcast ";
   $hash->{Attr}{devPhy} =    # -- physical device only attributes
                         "serialNr firmware .stc .devInfo "
                        ."actStatus "
@@ -211,6 +214,7 @@ sub CUL_HM_Initialize($) {
                        ;
   $hash->{AttrList}  =  $hash->{Attr}{glb}
                        .$hash->{Attr}{dev}
+                       .$hash->{Attr}{devVrt}
                        .$hash->{Attr}{devPhy}
                        .$hash->{Attr}{chn}
                        .$readingFnAttributes
@@ -301,6 +305,8 @@ sub CUL_HM_updateConfig($){##########################
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
       $hash->{helper}{role}{dev} = 1;
+      delete $hash->{helper}{mId};
+
       next;
     }
     CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
@@ -312,6 +318,7 @@ sub CUL_HM_updateConfig($){##########################
     
     my $dHash = CUL_HM_getDeviceHash($hash);
     $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} && $hash->{helper}{regLst} =~ m/3p/);
+    delete $hash->{helper}{mId};
 
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
@@ -324,7 +331,8 @@ sub CUL_HM_updateConfig($){##########################
 
     if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
       $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
-    }
+      delete $hash->{helper}{mId};
+   }
     elsif ($md =~ m/^HM-CC-RT-DN/){
       $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "04");# shadowReg List 7 read from CH 0
       $hash->{helper}{shRegW}{"07"} = "04" if ($chn eq "00");# shadowReg List 7 write to CH 4
@@ -348,6 +356,7 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($md =~ m/^(CCU-FHEM)/){
       $hash->{helper}{role}{vrt} = 1;
+      delete $hash->{helper}{mId};
       if($hash->{helper}{role}{dev}){
         CUL_HM_UpdtCentral($name); # first update, then keys
 
@@ -410,6 +419,7 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
+      delete $hash->{helper}{mId};
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -568,6 +578,7 @@ sub CUL_HM_Define($$) {##############################
     $devHash->{"channel_$chn"} = $name;     #reference in device as well
     $attr{$name}{model}        = AttrVal($devName, "model", undef);
     $hash->{helper}{role}{chn} = 1;
+    delete $hash->{helper}{mId};
     if($chn eq "01"){
       $attr{$name}{peerIDs}            = AttrVal($devName, "peerIDs", "peerUnread");
       $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","peerUnread");
@@ -582,6 +593,7 @@ sub CUL_HM_Define($$) {##############################
   }
   else{# define a device
     $hash->{helper}{role}{dev}   = 1;
+    delete $hash->{helper}{mId};
     $hash->{helper}{role}{chn}   = 1;# take role of chn 01 until it is defined
     $hash->{helper}{q}{qReqConf} = ""; # queue autoConfig requests 
     $hash->{helper}{q}{qReqStat} = ""; # queue statusRequest for this device
@@ -631,6 +643,7 @@ sub CUL_HM_Undef($$) {###############################
     my $devHash = $defs{$devName};
     delete $devHash->{"channel_$chn"} if ($devName);
     $devHash->{helper}{role}{chn} = 1 if($chn eq "01");# return chan 01 role
+    delete $hash->{helper}{mId};
   }
   else{# delete a device
      CommandDelete(undef,$hash->{$_}) foreach (grep(/^channel_/,keys %{$hash}));
@@ -1062,7 +1075,67 @@ sub CUL_HM_Attr(@) {#################################
     }
     return $retVal;
   }
-  
+  elsif($attrName eq "logIDs"){
+    my $retVal= "";
+    return "use $attrName only for vccu device" 
+            if (!$hash->{helper}{role}{dev}
+                || AttrVal($name,"model","CCU-FHEM") !~ "CCU-FHEM");
+    if ($cmd eq "set"){
+      my $newVal = "";
+      my @logIds = split (",",$attrVal);
+      if (grep /^none$/,@logIds){
+        $newVal = "none";
+      }
+      else{
+        if (grep /^all$/,@logIds){
+          $newVal = "all";
+        }
+        else{
+          $newVal = join(",",
+                       grep!/^(IO:|ingore)/,
+                       map{if(   defined $defs{$_} 
+                              && $defs{$_}{TYPE} eq "CUL_HM"
+                              && $defs{$_}{DEF} =~ m/^......$/){
+                                $defs{$_}{DEF}
+                              }
+                            else{
+                                "ingore"
+                              }
+                           } 
+                       @logIds
+                      );
+        }
+        if (grep /^sys$/,@logIds){
+          $newVal = "sys"
+                    .($newVal != "" ? ",$newVal" :"");
+        }
+        if (grep /^broadcast$/,@logIds){
+          $newVal = "broadcast"
+                    .($newVal != "" ? ",$newVal" :"");
+        }
+        
+      }
+      my @IOlst = map{(my $foo = $_) =~ s/^IO://; $foo;} grep/^IO:/,split(",",$attrVal);
+      if (scalar @IOlst){
+        foreach my $IOname (split(",",AttrVal($name,"IOList",""))){
+          CommandAttr(undef, "$IOname logIDs none")
+                                          if (  defined $defs{$IOname} 
+                                             && $modules{$defs{$IOname}{TYPE}}{AttrList} =~  m/logIDs/
+                                             && grep !/$IOname/,@IOlst);
+        }
+      }
+      else{ # IOlist is full list
+        @IOlst = split(",",AttrVal($name,"IOList",""));
+      }
+      
+      foreach my $IOname  (@IOlst){
+        next if (   !defined $defs{$IOname});
+        next if (   $modules{$defs{$IOname}{TYPE}}{AttrList} !~  m/logIDs/);
+        CommandAttr(undef, "$IOname logIDs $newVal");
+      }
+    }
+  }
+ 
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
 }
@@ -1074,13 +1147,19 @@ sub CUL_HM_AttrCheck(@) {############################
     return " $attrName illegal for virtual devices"
       if ($modules{CUL_HM}{Attr}{devPhy} =~ m/$attrName\b/);
   }
+  else{
+    return " $attrName only for for virtual devices"
+      if ($modules{CUL_HM}{Attr}{devVrt} =~ m/$attrName\b/);
+  }
   if (!$defs{$name}{helper}{role}{chn}){
     return " $attrName only valid for channels"
       if ($modules{CUL_HM}{Attr}{chn} =~ m/$attrName\b/);
   }
   if (!$defs{$name}{helper}{role}{dev}){
     return " $attrName only valid for devices"
-      if (($modules{CUL_HM}{Attr}{dev}.$modules{CUL_HM}{Attr}{devPhy}) =~ m/$attrName\b/);
+      if ( $modules{CUL_HM}{Attr}{dev}
+          .$modules{CUL_HM}{Attr}{devPhy}
+          .$modules{CUL_HM}{Attr}{devVrt}     =~ m/$attrName\b/);
   }
   return undef;
 }
@@ -4031,6 +4110,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
     if(!$roleV) {push @arr,"$_ $culHmGlobalGets->{$_}"    foreach (keys %{$culHmGlobalGets}   )};
     if($roleV)  {push @arr,"$_ $culHmVrtGets->{$_}"       foreach (keys %{$culHmVrtGets}      )};
+
     if($roleD)  {push @arr,"$_ $culHmGlobalGetsDev->{$_}" foreach (keys %{$culHmGlobalGetsDev})};
 
     push @arr,"$_ $culHmSubTypeGets->{$st}{$_}" foreach (keys %{$culHmSubTypeGets->{$st}});
@@ -4286,29 +4366,30 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
       }
     }
     
-    if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}            ;   
-                                              push @gets,map{"$_:".$culHmGlobalGets->{$_}            }keys %{$culHmGlobalGets}           };
+    if( !$roleV &&($roleD || $roleC)        ){push @arr1,map{"$_:".$culHmGlobalSets->{$_}            }keys %{$culHmGlobalSets}           };
     if(( $roleV||!$st||$st eq "no")&& $roleD){push @arr1,map{"$_:".$culHmGlobalSetsVrtDev->{$_}      }keys %{$culHmGlobalSetsVrtDev}     };
     if( !$roleV                    && $roleD){push @arr1,map{"$_:".${$culHmSubTypeDevSets->{$st}}{$_}}keys %{$culHmSubTypeDevSets->{$st}}};
     if( !$roleV                    && $roleC){push @arr1,map{"$_:".$culHmGlobalSetsChn->{$_}         }keys %{$culHmGlobalSetsChn}        };
     if( $culHmSubTypeSets->{$st}   && $roleC){push @arr1,map{"$_:".${$culHmSubTypeSets->{$st}}{$_}   }keys %{$culHmSubTypeSets->{$st}}   };
-    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }keys %{$culHmModelSets->{$md}}      ;              
-                                              push @gets,map{"$_:".${$culHmModelGets->{$md}}{$_}     }keys %{$culHmModelGets->{$md}}     };
+    if( $culHmModelSets->{$md})              {push @arr1,map{"$_:".${$culHmModelSets->{$md}}{$_}     }keys %{$culHmModelSets->{$md}}     };
     if( $culHmChanSets->{$md."00"} && $roleD){push @arr1,map{"$_:".${$culHmChanSets->{$md."00"}}{$_} }keys %{$culHmChanSets->{$md."00"}} };
     if( $culHmChanSets->{$md."xx"} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md."xx"}}{$_} }keys %{$culHmChanSets->{$md."xx"}} };
     if( $culHmChanSets->{$md.$chn} && $roleC){push @arr1,map{"$_:".${$culHmChanSets->{$md.$chn}}{$_} }keys %{$culHmChanSets->{$md.$chn}} };
     if( $culHmFunctSets->{$fkt}    && $roleC){push @arr1,map{"$_:".${$culHmFunctSets->{$fkt}}{$_}    }keys %{$culHmFunctSets->{$fkt}}    };
+
+    if(!$roleV)                              {push @gets,map{"$_:".$culHmGlobalGets->{$_}            }keys %{$culHmGlobalGets}              };
     if($roleV)                               {push @gets,map{"$_:".$culHmVrtGets->{$_}               }keys %{$culHmVrtGets}              };
     if($culHmSubTypeGets->{$st})             {push @gets,map{"$_:".${$culHmSubTypeGets->{$st}}{$_}   }keys %{$culHmSubTypeGets->{$st}}   };
+    if($culHmModelGets->{$md})               {push @gets,map{"$_:".${$culHmModelGets->{$md}}{$_}     }keys %{$culHmModelGets->{$md}}     };
     if($roleD)                               {push @gets,map{"$_:".$culHmGlobalGetsDev->{$_}         }keys %{$culHmGlobalGetsDev}        };
 
     $hash->{helper}{cmds}{lst}{peerOpt} = CUL_HM_getPeerOption($name);
     push @arr1,"peerSmart:-peerOpt-" if ($hash->{helper}{cmds}{lst}{peerOpt}); 
    
     my @cond = ();
-    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}}       if (defined $lvlStr{md}{$md});
-    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{md}{"$md$chn"}} if (defined $lvlStr{mdCh}{"$md$chn"});
-    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{st}{$st}}       if (defined $lvlStr{st}{$st});
+    push @cond,map{$lvlStr{md}{$md}{$_}}         keys%{$lvlStr{md}{$md}}         if (defined $lvlStr{md}{$md});
+    push @cond,map{$lvlStr{mdCh}{"$md$chn"}{$_}} keys%{$lvlStr{mdCh}{"$md$chn"}} if (defined $lvlStr{mdCh}{"$md$chn"});
+    push @cond,map{$lvlStr{st}{$st}{$_}}         keys%{$lvlStr{st}{$st}}         if (defined $lvlStr{st}{$st});
     push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
@@ -4331,6 +4412,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     }
 
     #---------------- gets ---------------
+    delete $hash->{helper}{cmds}{rtrvLst};
     foreach(@gets){
       my ($cmdS,$val) = split(":",$_,2);
       $hash->{helper}{cmds}{rtrvLst}{$cmdS} = (defined $val && $val ne "") ? $val : "noArg";
@@ -9973,7 +10055,12 @@ sub CUL_HM_UpdtCentral($){
       }
     }
   }
-  
+  my $logOpt = 
+                "logIDs:multiple,none,sys,all,broadcast,"
+               .join(",",map{"IO:$_"}split(",",AttrVal($name,"IOList",""))).","
+               .join(",",devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual"))
+               ." ";
+  $modules{CUL_HM}{AttrList} =~ s/logIDs:.*? /$logOpt/;
   CUL_HM_UpdtCentralState($name);
 }
 sub CUL_HM_UpdtCentralState($){
