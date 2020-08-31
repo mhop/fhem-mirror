@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.6"  => "31.08.2020  refactored setter: snapGallery createSnapGallery createPTZcontrol createStreamDev, minor bugfixes ",
   "9.7.5"  => "30.08.2020  some more code review and optimisation, exitOnDis with fix check Availability instead of state ",
   "9.7.4"  => "29.08.2020  some code changes ",
   "9.7.3"  => "29.08.2020  move login, loginReturn, logout, logoutReturn, setActiveToken, delActiveToken to SMUtils.pm ".
@@ -396,16 +397,20 @@ my %ttips_de = (
   helpsvs     => "Die Onlinehilfe der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
 );
 
-my %hset = (                                                                # Hash für Set-Funktion
-    credentials     => { fn => "_setcredentials"     }, 
-    smtpcredentials => { fn => "_setsmtpcredentials" },
-    on              => { fn => "_seton"              },
-    off             => { fn => "_setoff"             },
-    snap            => { fn => "_setsnap"            },
-    snapCams        => { fn => "_setsnapCams"        },
-    startTracking   => { fn => "_setstartTracking"   },
-    stopTracking    => { fn => "_setstopTracking"    },
-    setZoom         => { fn => "_setsetZoom"         },
+my %hset = (                                                                # Hash für Set-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+    credentials       => { fn => "_setcredentials",       needcred => 0 },                     
+    smtpcredentials   => { fn => "_setsmtpcredentials",   needcred => 0 },
+    on                => { fn => "_seton",                needcred => 1 },
+    off               => { fn => "_setoff",               needcred => 1 },
+    snap              => { fn => "_setsnap",              needcred => 1 },
+    snapCams          => { fn => "_setsnapCams",          needcred => 1 },
+    startTracking     => { fn => "_setstartTracking",     needcred => 1 },
+    stopTracking      => { fn => "_setstopTracking",      needcred => 1 },
+    setZoom           => { fn => "_setsetZoom",           needcred => 1 },
+    snapGallery       => { fn => "_setsnapGallery",       needcred => 1 },
+    createSnapGallery => { fn => "_setcreateSnapGallery", needcred => 1 },
+    createPTZcontrol  => { fn => "_setcreatePTZcontrol",  needcred => 1 },
+    createStreamDev   => { fn => "_setcreateStreamDev",   needcred => 1 },
 );
 
 my %imc = (                                                                 # disbled String modellabhängig (SVS / CAM)
@@ -1114,71 +1119,19 @@ sub Set {
   no strict "refs";                                                        ## no critic 'NoStrict'  
   if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
       my $ret = q{};
-      $ret = &{$hset{$opt}{fn}} ($params); 
+      
+      if (!$hash->{CREDENTIALS} && $hset{$opt}{needcred}) {                
+          return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"};
+      }
+  
+      $ret = &{$hset{$opt}{fn}} ($params);
+      
       return $ret;
   }
   use strict "refs";  
   
    
-  if ($opt eq "snapGallery" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my $ret = getClHash($hash);
-      return $ret if($ret);
-  
-      if(!AttrVal($name, "snapGalleryBoost",0)) {
-          # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
-          $hash->{HELPER}{GETSNAPGALLERY} = 1;
-        
-          # snap-Infos für Gallerie abrufen
-          my ($sg,$slim,$ssize); 
-          $slim  = $prop?AttrVal($name,"snapGalleryNumber",$prop):AttrVal($name,"snapGalleryNumber",$defSlim);  # Anzahl der abzurufenden Snapshots
-          $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon")?1:2;                                        # Image Size 1-Icon, 2-Full      
-        
-          getSnapInfo("$name:$slim:$ssize");
-        
-      } else {
-          # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
-          $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
-          my %pars = ( linkparent => $name,
-                       linkname   => '',
-                       ftui       => 0
-                     );
-          my $htmlCode = composeGallery(\%pars);
-          for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-              if ($hash->{HELPER}{CL}{$k}->{COMP}) {
-                  # CL zusammengestellt (Auslösung durch Notify)
-                  asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");                        
-              } else {
-                  # Output wurde über FHEMWEB ausgelöst
-                  return $htmlCode;
-              }
-          }
-          delete($hash->{HELPER}{CL});
-      }
-      
-  } elsif ($opt eq "createSnapGallery" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my ($ret,$sgdev);
-      return qq{Before you can use "$opt", you must first set the "snapGalleryBoost" attribute, since automatic snapshot retrieval is required.} 
-              if(!AttrVal($name,"snapGalleryBoost",0));
-      $sgdev = "SSCamSTRM.$name.snapgallery";
-      $ret   = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {FHEM::SSCam::composeGallery('$name','$sgdev','snapgallery')}");
-      return $ret if($ret);
-      my $room             = "SSCam";
-      $attr{$sgdev}{room}  = $room;
-      return qq{Snapgallery device "$sgdev" created and assigned to room "$room".};
-      
-  } elsif ($opt eq "createPTZcontrol" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
-      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {FHEM::SSCam::ptzPanel('$name','$ptzcdev','ptzcontrol')}");
-      return $ret if($ret);
-      my $room               = AttrVal($name,"room","SSCam");
-      $attr{$ptzcdev}{room}  = $room;
-      $attr{$ptzcdev}{group} = $name."_PTZcontrol";
-      return qq{PTZ control device "$ptzcdev" created and assigned to room "$room".};
-  
-  } elsif ($opt eq "createStreamDev") {
+  if ($opt eq "createStreamDev") {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       my ($livedev,$ret);
       
@@ -1642,10 +1595,6 @@ sub _seton {                             ## no critic "not used"
   
   return if(!IsModelCam($hash));
   
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
-  
   if (defined($prop) && $prop =~ /^\d+$/x) {
       $hash->{HELPER}{RECTIME_TEMP} = $prop;
   }
@@ -1699,10 +1648,6 @@ sub _setoff {                            ## no critic "not used"
   
   return if(!IsModelCam($hash));
   
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
-  
   my $spec = join(" ",@$aref);
   
   my ($inf)               = $spec =~ m/STRM:(.*)/ix;         # Aufnahmestop durch SSCamSTRM-Device
@@ -1725,10 +1670,6 @@ sub _setsnap {                           ## no critic "not used"
   my $aref  = $paref->{aref};
   
   return if(!IsModelCam($hash));
-  
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
         
   my ($num,$lag,$ncount) = (1,2,1);  
   
@@ -1795,10 +1736,6 @@ sub _setsnapCams {                       ## no critic "not used"
   my $aref  = $paref->{aref};
   
   return if(IsModelCam($hash));
-  
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
            
   my ($num,$lag,$ncount) = (1,2,1);
   my $cams               = "all";
@@ -1882,10 +1819,6 @@ sub _setstartTracking {                  ## no critic "not used"
   
   return if(!IsModelCam($hash));
   
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
-  
   if ($hash->{HELPER}{API}{PTZ}{VER} < 5) {
       return qq{Function "$opt" needs a higher version of Surveillance Station};
   }
@@ -1905,10 +1838,6 @@ sub _setstopTracking {                   ## no critic "not used"
   my $opt   = $paref->{opt};
   
   return if(!IsModelCam($hash));
-  
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
   
   if ($hash->{HELPER}{API}{PTZ}{VER} < 5) {
       return qq{Function "$opt" needs a higher version of Surveillance Station};
@@ -1930,10 +1859,6 @@ sub _setsetZoom {                        ## no critic "not used"
   
   return if(!IsModelCam($hash));
   
-  if (!$hash->{CREDENTIALS}) {
-      return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"."};
-  }
-  
   $prop = $prop // "+";                         # Korrektur -> "+" in Taste wird als undef geliefert 
   $prop = ".++" if($prop eq ".");               # Korrektur -> ".++" in Taste wird als "." geliefert       
   setZoom ("$name!_!$prop");
@@ -1941,6 +1866,168 @@ sub _setsetZoom {                        ## no critic "not used"
 return;
 }
 
+################################################################
+#                      Setter snapGallery
+################################################################
+sub _setsnapGallery {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  my $ret = getClHash($hash);
+  return $ret if($ret);
+
+  if(!AttrVal($name, "snapGalleryBoost",0)) {                                  # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;
+    
+      my ($squant,$slim,$ssize);                                               # snap-Infos für Gallerie abrufen
+      $squant = $prop // $defSlim ;                                            # Anzahl der abzurufenden Snapshots
+      $slim   = AttrVal($name,"snapGalleryNumber",$squant);
+      $ssize  = AttrVal($name,"snapGallerySize","Icon") eq "Icon" ? 1 : 2;     # Image Size 1-Icon, 2-Full      
+    
+      getSnapInfo("$name:$slim:$ssize");
+    
+  } else {                                                                     # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
+      $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
+      
+      my %pars = ( linkparent => $name,
+                   linkname   => '',
+                   ftui       => 0
+                 );
+                 
+      my $htmlCode = composeGallery(\%pars);
+      
+      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+          if ($hash->{HELPER}{CL}{$k}->{COMP}) {                               # CL zusammengestellt (Auslösung durch Notify)
+              asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");
+              
+          } else {                                                             # Output wurde über FHEMWEB ausgelöst
+              return $htmlCode;
+          }
+      }
+      
+      delete($hash->{HELPER}{CL});
+  }
+           
+return;
+}
+
+################################################################
+#                      Setter createSnapGallery
+################################################################
+sub _setcreateSnapGallery {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  
+  return if(!IsModelCam($hash));
+  
+  if(!AttrVal($name,"snapGalleryBoost",0)) {
+      return qq{Before you can use "$opt", you must first set the "snapGalleryBoost" attribute, since automatic snapshot retrieval is required.};
+  }
+  
+  my $sgdev = "SSCamSTRM.$name.snapgallery";
+  my $ret   = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {FHEM::SSCam::composeGallery('$name','$sgdev','snapgallery')}");
+  
+  return $ret if($ret);
+  
+  my $room             = "SSCam";
+  $attr{$sgdev}{room}  = $room;
+ 
+return qq{Snapgallery device "$sgdev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter createPTZcontrol
+################################################################
+sub _setcreatePTZcontrol {               ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  return if(!IsModelCam($hash));
+  
+  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
+  my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {FHEM::SSCam::ptzPanel('$name','$ptzcdev','ptzcontrol')}");
+ 
+  return $ret if($ret);
+  
+  my $room               = AttrVal($name,"room","SSCam");
+  $attr{$ptzcdev}{room}  = $room;
+  $attr{$ptzcdev}{group} = $name."_PTZcontrol";
+      
+return qq{PTZ control device "$ptzcdev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter createStreamDev
+################################################################
+sub _setcreateStreamDev {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  my ($livedev,$ret);
+  
+  if($prop =~ /mjpeg/x) {
+      $livedev = "SSCamSTRM.$name.mjpeg";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','mjpeg')}");
+      return $ret if($ret);
+  }
+  
+  if($prop =~ /generic/x) {
+      $livedev = "SSCamSTRM.$name.generic";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','generic')}");
+      return $ret if($ret);
+  } 
+  
+  if($prop =~ /hls/x) {
+      $livedev = "SSCamSTRM.$name.hls";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','hls')}");
+      return $ret if($ret);
+     
+      my $c = "The device needs to set attribute \"hlsStrmObject\" in camera device \"$name\" to a valid HLS videostream";
+      CommandAttr($hash->{CL},"$livedev comment $c");
+  } 
+  
+  if($prop =~ /lastsnap/x) {
+      $livedev = "SSCamSTRM.$name.lastsnap";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','lastsnap')}");
+      return $ret if($ret);
+      
+      my $c = "The device shows the last snapshot of camera device \"$name\". \n".
+              "If you always want to see the newest snapshot, please set attribute \"pollcaminfoall\" in camera device \"$name\".\n".
+              "Set also attribute \"snapGallerySize = Full\" in camera device \"$name\" to retrieve snapshots in original resolution.";
+      CommandAttr($hash->{CL},"$livedev comment $c");
+  } 
+  
+  if($prop =~ /switched/x) {
+      $livedev = "SSCamSTRM.$name.switched";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','switched')}");
+      return $ret if($ret);
+  }
+  
+  if($prop =~ /master/x) {
+      $livedev = "SSCamSTRM.$name.master";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','master')}");
+      return $ret if($ret);
+  }
+  
+  my $room              = AttrVal($name,"room","SSCam");
+  $attr{$livedev}{room} = $room;
+      
+return qq{Livestream device "$livedev" created and assigned to room "$room".};
+}
+
+################################################################
+#                           Get
 ################################################################
 sub Get {
     my ($hash, @a) = @_;
@@ -3942,14 +4029,16 @@ sub exitOnDis {
       $exit      = 1;
   }
 
-  my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
+  if($exit) {
+      my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
 
-  readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
-  readingsBulkUpdate  ($hash, "Error",     $error    );
-  readingsEndUpdate   ($hash, 1);
-  
-  Log3($name, 2, "$name - ERROR - $log - $error") if($exit);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+      readingsBulkUpdate  ($hash, "Error",     $error    );
+      readingsEndUpdate   ($hash, 1);
+      
+      Log3($name, 2, "$name - ERROR - $log - $error");
+  }
   
 return $exit;
 }
@@ -7431,7 +7520,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my ($link,$audiolink);
   my $ret = "";
   
-  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
+  if(ReadingsVal($camname, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot play back MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
       return $ret;
       
