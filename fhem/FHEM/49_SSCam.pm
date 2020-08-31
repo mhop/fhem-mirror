@@ -1131,52 +1131,7 @@ sub Set {
   use strict "refs";  
   
    
-  if ($opt eq "createStreamDev") {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my ($livedev,$ret);
-      
-      if($prop =~ /mjpeg/x) {
-          $livedev = "SSCamSTRM.$name.mjpeg";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','mjpeg')}");
-          return $ret if($ret);
-      }
-      if($prop =~ /generic/x) {
-          $livedev = "SSCamSTRM.$name.generic";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','generic')}");
-          return $ret if($ret);
-      } 
-      if($prop =~ /hls/x) {
-          $livedev = "SSCamSTRM.$name.hls";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','hls')}");
-          return $ret if($ret);
-          my $c = "The device needs to set attribute \"hlsStrmObject\" in camera device \"$name\" to a valid HLS videostream";
-          CommandAttr($hash->{CL},"$livedev comment $c");
-      }  
-      if($prop =~ /lastsnap/x) {
-          $livedev = "SSCamSTRM.$name.lastsnap";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','lastsnap')}");
-          return $ret if($ret);
-          my $c = "The device shows the last snapshot of camera device \"$name\". \n".
-                  "If you always want to see the newest snapshot, please set attribute \"pollcaminfoall\" in camera device \"$name\".\n".
-                  "Set also attribute \"snapGallerySize = Full\" in camera device \"$name\" to retrieve snapshots in original resolution.";
-          CommandAttr($hash->{CL},"$livedev comment $c");
-      }      
-      if($prop =~ /switched/x) {
-          $livedev = "SSCamSTRM.$name.switched";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','switched')}");
-          return $ret if($ret);
-      }
-      if($prop =~ /master/x) {
-          $livedev = "SSCamSTRM.$name.master";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','master')}");
-          return $ret if($ret);
-      }
-      
-      my $room = AttrVal($name,"room","SSCam");
-      $attr{$livedev}{room} = $room;
-      return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
-  
-  } elsif ($opt eq "createReadingsGroup") {
+  if ($opt eq "createReadingsGroup") {
       if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
       my $rgdev = $prop?$prop:"RG.SSCam";
       
