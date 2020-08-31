@@ -494,7 +494,8 @@ SVG_PEdit($$$$)
       $lw =~ s/.*stroke-width://g;
       $lw =~ s/"//g; 
     }
-    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,3,4,8,12,16,24",($lw ? $lw:1));
+    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,2.5,3,4,8,12,16,24",
+                        ($lw ? $lw:1));
     $o .= "</td></tr>";
     $output[$idx] = $o;
   }
