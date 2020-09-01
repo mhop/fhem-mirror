@@ -28,6 +28,7 @@
 # Discussed in FHEM Forum: https://forum.fhem.de/index.php/topic,38328.0.html
 #
 # $Id$
+# 
 #
 ##############################################################################
 # 0.0 2015-09-16 Started
@@ -171,20 +172,30 @@
 
 #   FIX: correct parsemodesend for inMsg with multiple lines - msg1041326
 #
-#
+#   TelegramBot_Callback add support for channel messages and edit
+#   Add contact support for channels
+#   add version id as internal - sourceVersion
+#   New attr allowChannels for allowing channel messages explicitely
+#   check command handing for channels
+#   remove keyboard after favorite confirm
+#   replyKeyboardRemove - #msg592808
+
+#   replace single semicolons in favorites (with double semicolons) - msg1078989
+#   FIX: answercallback always if querydata is set
+#   
 #   
 ##############################################################################
 # TASKS 
-#   Restructure help in logical blocks
 #   
+#   
+#   
+#   
+#   
+#   Restructure help in logical blocks
 #   
 #   queryDialogStart / queryDialogEnd - keep msg id 
 #   
-#   remove keyboard after favorite confirm
-#   
 #   cleanup encodings
-#   
-#   replyKeyboardRemove - #msg592808
 #   
 #   
 ##############################################################################
@@ -207,6 +218,8 @@ use File::Basename;
 use URI::Escape;
 
 use Scalar::Util qw(reftype looks_like_number);
+
+use DevIo;
 
 #########################
 # Forward declaration
@@ -232,6 +245,8 @@ sub TelegramBot_storeToken($$;$);
 
 #########################
 # Globals
+my $repositoryID = '$Id$'; 
+
 my %sets = (
   "_msg" => "textField",
   "message" => "textField",
@@ -313,8 +328,6 @@ my $TelegramBot_arg_retrycnt = 6;
 sub TelegramBot_Initialize($) {
   my ($hash) = @_;
 
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
-
   $hash->{DefFn}      = "TelegramBot_Define";
   $hash->{UndefFn}    = "TelegramBot_Undef";
   $hash->{StateFn}    = "TelegramBot_State";
@@ -327,7 +340,7 @@ sub TelegramBot_Initialize($) {
   "allowUnknownContacts:1,0 textResponseConfirm:textField textResponseCommands:textField allowedCommands filenameUrlEscape:1,0 ". 
   "textResponseFavorites:textField textResponseResult:textField textResponseUnauthorized:textField ".
   "parseModeSend:0_None,1_Markdown,2_HTML,3_InMsg webPagePreview:1,0 utf8Special:1,0 favorites2Col:0,1 ".
-  " maxRetries:0,1,2,3,4,5 ".$readingFnAttributes;           
+  " maxRetries:0,1,2,3,4,5 allowChannels:0,1 ".$readingFnAttributes;           
 }
 
 
@@ -610,29 +623,38 @@ sub TelegramBot_Set($@)
     } else {
       if ( ! defined( $addPar ) ) {
         # check for Keyboard given (only if not forcing reply) and parse it to keys / jsonkb
+        my $onetime = 1;
+        
         my @keys; 
-        while ( $args[0] =~ /^\s*\(.*$/ ) {
-          my $aKey = "";
-          while ( $aKey !~ /^\s*\((.*)\)\s*$/ ) {
-            $aKey .= " ".$args[0];
-            
-            shift @args;
-            last if ( int(@args) == 0 );
-          }  
-          # trim key
-          $aKey =~ s/^\s+|\s+$//g;
+        if ( $args[0] =~ /^\s*\(\)\s*$/ ) {
+          Log3 $name, 4, "TelegramBot_Set $name: empty keys remove keyboard";
+          shift @args;
+          $onetime = 0;
+        } else {
+          
+          while ( $args[0] =~ /^\s*\(.*$/ ) {
+            my $aKey = "";
+            while ( $aKey !~ /^\s*\((.*)\)\s*$/ ) {
+              $aKey .= " ".$args[0];
+              
+              shift @args;
+              last if ( int(@args) == 0 );
+            }  
+            # trim key
+            $aKey =~ s/^\s+|\s+$//g;
 
-          if ( $aKey =~ /^\((.*)\)$/ ) {
-            my @tmparr = split( /\|/, $1 );  
-            push( @keys, \@tmparr );           
-          } else {
-            # incomplete key handle as message
-            unshift( @args, $aKey ) if ( length( $aKey ) > 0 );
-            last;
+            if ( $aKey =~ /^\((.*)\)$/ ) {
+              my @tmparr = split( /\|/, $1 );  
+              push( @keys, \@tmparr );           
+            } else {
+              # incomplete key handle as message
+              unshift( @args, $aKey ) if ( length( $aKey ) > 0 );
+              last;
+            }
           }
         }
     
-        $addPar = TelegramBot_MakeKeyboard( $hash, 1, $inline, @keys ) if ( scalar( @keys ) );
+        $addPar = TelegramBot_MakeKeyboard( $hash, $onetime, $inline, @keys ) if ( ( scalar( @keys ) ) || ( $onetime == 0) );
       }
     
       return "TelegramBot_Set: Command $cmd, no text for msg specified " if ( int(@args) == 0 );
@@ -1192,8 +1214,19 @@ sub TelegramBot_SendFavorites($$$$$;$$) {
     
   } 
   
-  # trim cmd addition if given
-  $cmdAddition =~ s/^\s+|\s+$//g if ( $cmdAddition );
+  
+  if ( $cmdAddition ) {
+    # trim cmd addition if given
+    $cmdAddition =~ s/^\s+|\s+$//g;
+    
+    # first replace double semicolons
+    $cmdAddition =~ s/;;/SeMiCoLoN/g; 
+    
+    # replace single semicolon with double in cmd addition to avoid separate commands in addition
+    $cmdAddition =~ s/;/;;/g;
+
+    $cmdAddition =~ s/SeMiCoLoN/;;/g; # reestablish double ; for inside commands 
+  }
   
   Log3 $name, 5, "TelegramBot_SendFavorites parsed cmdFavId :".(defined($cmdFavId)?$cmdFavId:"<undef>")."   cmdaddition :".(defined($cmdAddition)?$cmdAddition:"<undef>").": ";
 
@@ -1913,6 +1946,8 @@ sub TelegramBot_SendIt($$$$$;$$$)
 #      $hash->{HU_DO_PARAMS}->{data} = encode_utf8($hash->{HU_DO_PARAMS}->{data});
     }
     
+    Log3 $name, 4, "TelegramBot_SendIt $name: Message for sending :".$hash->{HU_DO_PARAMS}->{data}.":";
+
     Log3 $name, 4, "TelegramBot_SendIt $name: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ";
     HttpUtils_NonblockingGet( $hash->{HU_DO_PARAMS} );
 
@@ -2035,7 +2070,7 @@ sub TelegramBot_MakeKeyboard($$$@)
     %par = ( "inline_keyboard" => \@parKeys  );
     
   } elsif ( ( defined( $onetime_hide ) ) && ( ! $onetime_hide ) ) {
-    %par = ( "hide_keyboard" => JSON::true );
+    %par = ( "remove_keyboard" => JSON::true );
   } else {
     return $ret if ( ! @keys );
     %par = ( "one_time_keyboard" => (( ( defined( $onetime_hide ) ) && ( $onetime_hide ) )?JSON::true:JSON::true ) );
@@ -2285,6 +2320,12 @@ sub TelegramBot_Callback($$$)
         } elsif ( defined( $update->{callback_query} ) ) {
           
           $ret = TelegramBot_ParseCallbackQuery( $hash, $update->{update_id}, $update->{callback_query} );
+        } elsif ( defined( $update->{channel_post} ) ) {
+          
+          $ret = TelegramBot_ParseChannelPost( $hash, $update->{update_id}, $update->{channel_post} );
+        } elsif ( defined( $update->{edited_channel_post} ) ) {
+          
+          $ret = TelegramBot_ParseChannelPost( $hash, $update->{update_id}, $update->{edited_channel_post} );
         } else {
           Log3 $name, 3, "UpdatePoll $name: inline_query  id:".$update->{inline_query}->{id}.
                 ":  query:".$update->{inline_query}->{query}.":" if ( defined( $update->{inline_query} ) );
@@ -2620,6 +2661,213 @@ sub TelegramBot_ParseMsg($$$)
 
 
 #####################################
+#  INTERNAL: _ParseChannelPost handle a channel message from the update call 
+#   params are the hash, the updateid and the actual channelpost (or edited channelpost)
+sub TelegramBot_ParseChannelPost($$$)
+{
+  my ( $hash, $uid, $message ) = @_;
+  my $name = $hash->{NAME};
+
+  my @contacts;
+  
+  my $ret;
+  
+  my $mid = $message->{message_id};
+  
+  if ( ! AttrVal($name,'allowChannels',0) ) {
+    Log3 $name, 4, "TelegramBot $name: Channel message ignored";
+    return $ret;
+  }
+
+  # No from in Channels only chat ID infos
+  my $chatId = "";
+  my $chat = $message->{chat};
+  if ( ( ! defined( $chat ) ) || ( $chat->{type} ne "channel" ) ) {
+    Log3 $name, 3, "TelegramBot $name: Channel message without chat blocked";
+    return $ret;
+  }
+  $chatId = $chat->{id};
+
+  my $mpeer = $chatId;
+
+
+  # ignore if unknown contacts shall be accepter
+  if ( ( AttrVal($name,'allowUnknownContacts',1) == 0 ) && ( ! TelegramBot_IsKnownContact( $hash, $chatId ) ) ) {
+    my $mName = $chat->{title};
+    Log3 $name, 3, "TelegramBot $name: Channel message from unknown Contact (id:$chatId: name:$mName:) blocked";
+    
+    return $ret;
+  }
+
+  push( @contacts, $chat );
+
+
+  # get reply message id
+  my $replyId;
+  my $replyPart = $message->{reply_to_message};
+  if ( defined( $replyPart ) ) {
+    $replyId = $replyPart->{message_id};
+  }
+  
+  # mtext contains the text of the message (if empty no further handling)
+  my ( $mtext, $mfileid );
+
+  if ( defined( $message->{text} ) ) {
+    # handle text message
+    $mtext = $message->{text};
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: Textmessage";
+
+  } elsif ( defined( $message->{audio} ) ) {
+    # handle audio message
+    my $subtype = $message->{audio};
+    $mtext = "received audio ";
+
+    $mfileid = $subtype->{file_id};
+
+    $mtext .= " # Performer: ".$subtype->{performer} if ( defined( $subtype->{performer} ) );
+    $mtext .= " # Title: ".$subtype->{title} if ( defined( $subtype->{title} ) );
+    $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
+    $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: audio fileid: $mfileid";
+
+  } elsif ( defined( $message->{document} ) ) {
+    # handle document message
+    my $subtype = $message->{document};
+    $mtext = "received document ";
+
+    $mfileid = $subtype->{file_id};
+
+    $mtext .= " # Caption: ".$message->{caption} if ( defined( $message->{caption} ) );
+    $mtext .= " # Name: ".$subtype->{file_name} if ( defined( $subtype->{file_name} ) );
+    $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
+    $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: document fileid: $mfileid ";
+
+  } elsif ( defined( $message->{voice} ) ) {
+    # handle voice message
+    my $subtype = $message->{voice};
+    $mtext = "received voice ";
+
+    $mfileid = $subtype->{file_id};
+
+    $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
+    $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: voice fileid: $mfileid";
+
+  } elsif ( defined( $message->{video} ) ) {
+    # handle video message
+    my $subtype = $message->{video};
+    $mtext = "received video ";
+
+    $mfileid = $subtype->{file_id};
+
+    $mtext .= " # Caption: ".$message->{caption} if ( defined( $message->{caption} ) );
+    $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
+    $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: video fileid: $mfileid";
+
+  } elsif ( defined( $message->{photo} ) ) {
+    # handle photo message
+    # photos are always an array with (hopefully) the biggest size last in the array
+    my $photolist = $message->{photo};
+    
+    if ( scalar(@$photolist) > 0 ) {
+      my $subtype = $$photolist[scalar(@$photolist)-1] ;
+      $mtext = "received photo ";
+
+      $mfileid = $subtype->{file_id};
+
+      $mtext .= " # Caption: ".$message->{caption} if ( defined( $message->{caption} ) );
+      $mtext .= " # Mime: ".$subtype->{mime_type} if ( defined( $subtype->{mime_type} ) );
+      $mtext .= " # Size: ".$subtype->{file_size} if ( defined( $subtype->{file_size} ) );
+      Log3 $name, 4, "TelegramBot_ParseChannelPost $name: photo fileid: $mfileid";
+    }
+  } elsif ( defined( $message->{venue} ) ) {
+    # handle location type message
+    my $ven = $message->{venue};
+    my $loc = $ven->{location};
+    
+    $mtext = "received venue ";
+
+    $mtext .= " # latitude: ".$loc->{latitude}." # longitude: ".$loc->{longitude};
+    $mtext .= " # title: ".$ven->{title}." # address: ".$ven->{address};
+    
+# urls will be discarded in fhemweb    $mtext .= "\n# url: <a href=\"http://maps.google.com/?q=loc:".$loc->{latitude}.",".$loc->{longitude}."\">maplink</a>";
+    
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: location received: latitude: ".$loc->{latitude}." longitude: ".$loc->{longitude};;
+  } elsif ( defined( $message->{location} ) ) {
+    # handle location type message
+    my $loc = $message->{location};
+    
+    $mtext = "received location ";
+
+    $mtext .= " # latitude: ".$loc->{latitude}." # longitude: ".$loc->{longitude};
+    
+# urls will be discarded in fhemweb    $mtext .= "\n# url: <a href=\"http://maps.google.com/?q=loc:".$loc->{latitude}.",".$loc->{longitude}."\">maplink</a>";
+    
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: location received: latitude: ".$loc->{latitude}." longitude: ".$loc->{longitude};;
+  }
+
+
+  if ( defined( $mtext ) ) {
+    Log3 $name, 4, "TelegramBot_ParseChannelPost $name: text   :$mtext:";
+
+    my $mpeernorm = $mpeer;
+    $mpeernorm =~ s/^\s+|\s+$//g;
+    $mpeernorm =~ s/ /_/g;
+
+    my $mchatnorm = "";
+    $mchatnorm = $chatId if ( AttrVal($name,'cmdRespondChat',1) == 1 ); 
+
+    #    Log3 $name, 5, "TelegramBot_ParseChannelPost $name: Found message $mid from $mpeer :$mtext:";
+
+    # contacts handled separately since readings are updated in here
+    TelegramBot_ContactUpdate($hash, @contacts) if ( scalar(@contacts) > 0 );
+    
+    readingsBeginUpdate($hash);
+
+    readingsBulkUpdate($hash, "prevMsgId", $hash->{READINGS}{msgId}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgPeer", $hash->{READINGS}{msgPeer}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgPeerId", $hash->{READINGS}{msgPeerId}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgChat", $hash->{READINGS}{msgChat}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgText", $hash->{READINGS}{msgText}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgFileId", $hash->{READINGS}{msgFileId}{VAL});        
+    readingsBulkUpdate($hash, "prevMsgReplyMsgId", $hash->{READINGS}{msgReplyMsgId}{VAL});        
+
+    readingsEndUpdate($hash, 0);
+    
+    readingsBeginUpdate($hash);
+
+    readingsBulkUpdate($hash, "msgId", $mid);        
+    readingsBulkUpdate($hash, "msgPeer", "<channel>");        
+    readingsBulkUpdate($hash, "msgPeerId", $mpeernorm);        
+    readingsBulkUpdate($hash, "msgChat", TelegramBot_GetFullnameForContact( $hash, ((!$chatId)?$mpeernorm:$chatId) ) );        
+    readingsBulkUpdate($hash, "msgChatId", ((!$chatId)?$mpeernorm:$chatId) );        
+    readingsBulkUpdate($hash, "msgText", $mtext);
+    readingsBulkUpdate($hash, "msgReplyMsgId", (defined($replyId)?$replyId:""));        
+
+    readingsBulkUpdate($hash, "msgFileId", ( ( defined( $mfileid ) ) ? $mfileid : "" ) );        
+
+    readingsEndUpdate($hash, 1);
+    
+    # COMMAND Handling (only if no fileid found
+    Telegram_HandleCommandInMessages( $hash, $mpeernorm, $mchatnorm, $mtext, undef, 0 ) if ( ! defined( $mfileid ) );
+   
+  } elsif ( scalar(@contacts) > 0 )  {
+    # will also update reading
+    TelegramBot_ContactUpdate( $hash, @contacts );
+
+    Log3 $name, 5, "TelegramBot_ParseChannelPost $name: Found channel message $mid from $mpeer without text/media but with contacts";
+
+  } else {
+    Log3 $name, 5, "TelegramBot_ParseChannelPost $name: Found channel message $mid from $mpeer without text/media";
+  }
+  
+  return $ret;
+}
+
+
+#####################################
 #  INTERNAL: _ParseCallbackQuery handle the callback of a query provide as 
 #   params are the hash, the updateid and the actual message
 sub TelegramBot_ParseCallbackQuery($$$)
@@ -2732,8 +2980,9 @@ sub TelegramBot_ParseCallbackQuery($$$)
     }
   } 
   
-  # sent answer if not undef 
-  if ( defined( $answerData ) ) {
+  # sent answer if data was set -- required 
+  if ( defined( $data ) ) {
+#  if ( defined( $answerData ) ) {
     $answerData = "" if ( ! $answerData  );
     if ( length( $answerData ) > 0 ) {
       my %dummy; 
@@ -2825,6 +3074,8 @@ sub TelegramBot_Setup($) {
   $hash->{me} = "<unknown>";
   $hash->{STATE} = "Undefined";
 
+  $hash->{sourceVersion} = $repositoryID;
+  
   $hash->{POLLING} = -1;
   $hash->{HU_UPD_PARAMS}->{callback} = \&TelegramBot_Callback;
   $hash->{HU_DO_PARAMS}->{callback} = \&TelegramBot_Callback;
@@ -3148,7 +3399,7 @@ sub TelegramBot_userObjectToString($) {
   my $ret = $user->{id}.":";
   
   # user objects do not contain a type field / chat objects need to contain a type but only if type=group or type=supergroup it is really a group
-  if ( ( defined( $user->{type} ) ) && ( ( $user->{type} eq "group" ) || ( $user->{type} eq "supergroup" ) ) ) {
+  if ( ( defined( $user->{type} ) ) && ( ( $user->{type} eq "group" ) || ( $user->{type} eq "supergroup" ) || ( $user->{type} eq "channel" ) ) ) {
     
     $ret .= ":";
 
@@ -3504,10 +3755,11 @@ sub TelegramBot_BinaryFileWrite($$$) {
   <a name="TelegramBotset"></a>
   <b>Set</b>
   <ul>
-    <li><code>message|msg|_msg|send [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] [ (&lt;keyrow1&gt;) ... (&lt;keyrowN&gt;) ] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer(s) is ommitted currently defined default peer user. Each peer given needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #). Multiple peers are to be separated by space<br>
+    <li><code>message|msg|_msg|send [ @&lt;peer1&gt; ... @&lt;peerN&gt; ] [ (&lt;keyrow1&gt;) ... (&lt;keyrowN&gt;) ] &lt;text&gt;</code><br>Sends the given message to the given peer or if peer(s) is ommitted currently defined default peer user. Each peer given needs to be always prefixed with a '@'. Peers can be specified as contact ids, full names (with underscore instead of space), usernames (prefixed with another @) or chat names (also known as groups in telegram groups must be prefixed with #). Multiple peers are to be separated by space.<br><br>
     A reply keyboard can be specified by adding a list of strings enclosed in parentheses "()". Each separate string will make one keyboard row in a reply keyboard. The different keys in the row need to be separated by |. The key strings can contain spaces.<br>
-    Messages do not need to be quoted if containing spaces. If you want to use parentheses at the start of the message than add one extra character before the parentheses (i.e. an underline) to avoid the message being parsed as a keyboard <br>
-    Messages can also contain special characters for the message. These include newline =&#92;n, tab = &#92;t and also a normal space = &#92;s <br>
+    Messages do not need to be quoted if containing spaces. If you want to use parentheses at the start of the message than add one extra character before the parentheses (i.e. an underline) to avoid the message being parsed as a keyboard. <br><br>
+    if an empty keyoard is given "()" an existing keyboard is removed<br><br>
+    Messages can also contain special characters. These include newline = &#92;n, tab = &#92;t and also a normal space = &#92;s <br><br>
 
     Examples:<br>
       <dl>
@@ -3713,6 +3965,9 @@ sub TelegramBot_BinaryFileWrite($$$) {
 
     <li><code>allowedCommands &lt;list of command&gt;</code><br>Restrict the commands that can be executed through favorites and cmdKeyword to the listed commands (separated by space). Similar to the corresponding restriction in FHEMWEB. The allowedCommands will be set on the corresponding instance of an allowed device with the name "allowed_&lt;TelegrambotDeviceName&gt; and not on the telegramBotDevice! This allowed device is created and modified automatically.<br>
     <b>ATTENTION: This is not a hardened secure blocking of command execution, there might be ways to break the restriction!</b>
+    </li> 
+
+    <li><code>allowChannels &lt;0 or 1&gt;</code><br>Support also messages coming from channels to the bot. This must be explicitely activated, since channels contain anonymous messages (without a defined sender of the message)
     </li> 
 
     <li><code>cmdTriggerOnly &lt;0 or 1&gt;</code><br>Restrict the execution of commands only to trigger command. If this attr is set (value 1), then only the name of the trigger even has to be given (i.e. without the preceding statement trigger). 
