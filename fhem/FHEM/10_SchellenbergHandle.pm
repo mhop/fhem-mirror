@@ -73,7 +73,10 @@ sub SchellenbergHandle_Define {
 
 sub SchellenbergHandle_Undef {                     
 	my ($hash, $name) = @_;
-	# delete defptr
+
+	# remove watchdog
+	RemoveInternalTimer($hash, \&SchellenbergHandle_Watchdog);
+	# remove defptr
 	delete $modules{'SchellenbergHandle'}{'defptr'}{$hash->{'ID'}};
 	return;
 };
@@ -81,6 +84,10 @@ sub SchellenbergHandle_Undef {
 # modul, all readings and attribute are loaded
 sub SchellenbergHandle_Run {
 	my ($hash) = @_;
+
+	# enable watchdog
+	InternalTimer(Time::HiRes::time() + 86400, \&SchellenbergHandle_Watchdog, $hash);
+	
 	return;
 };
 
@@ -88,6 +95,17 @@ sub SchellenbergHandle_Set {
 	my ($hash, $name, $cmd, @args) = @_;
 
 	return "Unknown argument $cmd, choose one of none" if ($cmd eq '?');
+};
+
+sub SchellenbergHandle_Watchdog {
+	my ($hash) = @_;
+
+	readingsBeginUpdate($hash);
+	readingsBulkUpdateIfChanged($hash, 'state', 'dead');
+	readingsBulkUpdateIfChanged($hash, 'alive', 'dead');
+	readingsEndUpdate($hash, 1);
+
+	return;
 };
 
 # not used atm, rolling-code is synchronized after each startup
@@ -141,13 +159,6 @@ sub SchellenbergHandle_ProcessMsg {
 		return exists($table->{$fncode})?$table->{$fncode}:$fncode;
 	};
 
-	my sub watchdog {
-		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'state', 'dead');
-		readingsBulkUpdateIfChanged($hash, 'alive', 'dead');
-		readingsEndUpdate($hash, 1);
-	};
-
 	if ($mt eq '1') {
 		# message counter > last known ?
 		$mc = hex($mc);
@@ -179,7 +190,7 @@ sub SchellenbergHandle_ProcessMsg {
 	} elsif ($mt eq '0') {
 		my $f = hex($mc) >> 8;
 		if ($f == 0x84) {
-			RemoveInternalTimer($hash, \&watchdog);
+			RemoveInternalTimer($hash, \&SchellenbergHandle_Watchdog);
 			readingsBeginUpdate($hash);
 			my $battery = sprintf('%.1f', (hex($mc) & 0xFF) / 10);
 			readingsBulkUpdateIfChanged($hash, 'state', 'alive') if ($hash->{'STATE'} eq 'dead');
@@ -188,7 +199,7 @@ sub SchellenbergHandle_ProcessMsg {
 			readingsBulkUpdateIfChanged($hash, 'alive', 'ok');
 			readingsBulkUpdate($hash, 'rssi', $rssi);
 			readingsEndUpdate($hash, 1);
-			InternalTimer(Time::HiRes::time() + 86400, \&watchdog, $hash);
+			InternalTimer(Time::HiRes::time() + 86400, \&SchellenbergHandle_Watchdog, $hash);
 			#InternalTimer(Time::HiRes::time() + 5, \&watchdog, $hash);
 		};
 	};
