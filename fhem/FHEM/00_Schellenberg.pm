@@ -129,6 +129,8 @@ sub Schellenberg_Init {
 
 sub Schellenberg_Undef {
 	my ($hash) = @_;
+
+	RemoveInternalTimer($hash, \&SSchellenberg_ResetPairTimer);
 	DevIo_CloseDev($hash);
 	return undef;
 };
@@ -143,21 +145,24 @@ sub Schellenberg_Set {
 	} elsif ($cmd eq 'pair') {
 		my $t = $args[0] || 60;
 		return 'missing time (seconds)' if ($t !~ m/[0-9]+/);
-
-		my sub resetPairTimer {
-			delete $hash->{'PAIRING'};
-			return;
-		};
 		$hash->{'PAIRING'} = 1;
-		InternalTimer(Time::HiRes::time() + $t, \&resetPairTimer, {});
+		InternalTimer(Time::HiRes::time() + $t, \&Schellenberg_ResetPairTimer, $hash);
 	};
 
 	return;
 };
 
+sub Schellenberg_ResetPairTimer {
+	my ($hash) = @_;
+
+	delete $hash->{'PAIRING'};
+	return;
+};
+
 sub Schellenberg_Ready {
-  my ($hash) = @_;
-  return DevIo_OpenDev($hash, 1, "Schellenberg_Init");
+	my ($hash) = @_;
+
+	return DevIo_OpenDev($hash, 1, "Schellenberg_Init");
 };
 
 
