@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.4.0');
+use version; our $VERSION = version->declare('1.5.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -56,6 +56,7 @@ our @EXPORT_OK = qw(
                      logout
                      setActiveToken
                      delActiveToken
+					 setReadingErrorNone
                    );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -76,6 +77,7 @@ BEGIN {
           readingsSingleUpdate
           readingsBeginUpdate
           readingsBulkUpdate
+		  readingsBulkUpdateIfChanged
           readingsEndUpdate
           HttpUtils_NonblockingGet
         )
@@ -638,5 +640,22 @@ sub delActiveToken {
    
 return;
 } 
+
+#############################################################################################
+#            Readings Error & Errorcode auf 
+#            Standard "none" setzen
+#            $evt: 1 -> Event, 0/nicht gesetzt -> kein Event
+#############################################################################################
+sub setReadingErrorNone {                     
+  my $hash = shift // carp "got no hash value" && return;
+  my $evt  = shift;
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "Errorcode", "none");
+  readingsBulkUpdate ($hash, "Error"    , "none");
+  readingsEndUpdate  ($hash, $evt);
+
+return;
+}
 
 1;
