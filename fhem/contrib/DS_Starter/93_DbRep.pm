@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 22455 2020-07-23 21:09:07Z DS_Starter $
+# $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -41,8 +41,8 @@ package main;
 
 use strict;                           
 use warnings;
-use POSIX qw(strftime);
-use Time::HiRes qw(gettimeofday tv_interval);
+use POSIX qw(strftime SIGALRM);
+use Time::HiRes qw(gettimeofday tv_interval ualarm);
 use Scalar::Util qw(looks_like_number);
 eval "use DBI;1" or my $DbRepMMDBI = "DBI";
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
@@ -57,6 +57,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.7"  => "03.09.2020  consider attr timeout in function DbRep_dbValue (blocking function) ",
+  "8.40.6"  => "27.08.2020  commandRef revised ",
   "8.40.5"  => "29.07.2020  fix crash if delEntries startet without any time limits, Forum:#113202 ",
   "8.40.4"  => "23.07.2020  new aggregation value 'minute', some fixes ",
   "8.40.3"  => "22.07.2020  delete prototypes ",
@@ -11487,12 +11489,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22455 2020-07-23 21:09:07Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22455 2020-07-23 21:09:07Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11511,114 +11513,137 @@ return;
 #     liefert Ergebnis sofort zurück, setzt keine Readings
 ####################################################################################################
 sub DbRep_dbValue {
-  my ($name,$cmd) = @_;
+  my $name       = shift;
+  my $cmd        = shift;
   my $hash       = $defs{$name};
   my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn     = $dbloghash->{dbconn};
   my $dbuser     = $dbloghash->{dbuser};
   my $dblogname  = $dbloghash->{NAME};
   my $dbpassword = $attr{"sec$dblogname"}{secret};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  my $srs        = AttrVal($name, "sqlResultFieldSep", "|");
+  my $utf8       = $hash->{UTF8} // 0;
+  
+  my $srs        = AttrVal($name, "sqlResultFieldSep", "|"  );
+  my $to         = AttrVal($name, "timeout",           86400);
+  
   my ($err,$ret,$dbh);
   
-  readingsDelete($hash, "errortext");
+  readingsDelete            ($hash, "errortext");
   ReadingsSingleUpdateValue ($hash, "state", "running", 1);
   
   eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });};
  
   if ($@) {
-     $err = $@;
-     Log3 ($name, 2, "DbRep $name - $err");
-     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-     return ($err);  
+      $err = $@;
+      Log3 ($name, 2, "DbRep $name - $err");
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      return $err;  
   } 
 
-  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";";
+  my $sql = ($cmd =~ m/\;$/xs) ? $cmd : $cmd.";";
   
-  # Ausgaben
   Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
   Log3 ($name, 4, "DbRep $name - Command: dbValue");  
   Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
   
-  # split SQL-Parameter Statement falls mitgegeben
-  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
   my $set;
-  if($cmd =~ /^SET.*;/i) {
-      $cmd =~ m/^(SET.*?;)(.*)/i;
+  if($cmd =~ /^SET.*;/i) {                                                         # split SQL-Parameter Statement falls mitgegeben ->
+      $cmd =~ m/^(SET.*?;)(.*)/i;                                                  # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
       $set = $1;
       $sql = $2;
   }
   
   if($set) {
       Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
-      eval {$dbh->do($set);};   # @\RB = Resetbit wenn neues Selektionsintervall beginnt
+      eval {$dbh->do($set);};                                                      # @\RB = Resetbit wenn neues Selektionsintervall beginnt
   }
+  
   if ($@) {
-     $err = $@;
-     Log3 ($name, 2, "DbRep $name - $err");
-     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-     return ($err);  
+      $err = $@;
+      Log3 ($name, 2, "DbRep $name - $err");
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      return ($err);  
   } 
 
-  # SQL-Startzeit
-  my $st = [gettimeofday];  
+  my $st = [gettimeofday];                                                        # SQL-Startzeit
+ 
+  my $totxt = qq{Timeout occured (limit: $to seconds). You may be able to adjust the "Timeout" attribute.};
   
-  my ($sth,$r);
-  eval {$sth = $dbh->prepare($sql);
-        $r = $sth->execute();
-       }; 
+  my ($sth,$r,$failed);
+
+  eval {                                                                          # outer eval fängt Alarm auf, der gerade vor diesem Alarm feuern könnte(0)
+      POSIX::sigaction(SIGALRM, POSIX::SigAction->new(sub {die "Timeout\n"}));    # \n ist nötig !
+      
+      alarm($to); 
+      eval {
+          $sth = $dbh->prepare($sql);
+          $r   = $sth->execute();
+          1;
+      };
+      alarm(0);                                                                   # Alarm aufheben (wenn der Code schnell lief)
+      
+      if ($@) {
+          if($@ eq "Timeout\n") {                                                 # timeout
+              $failed = $totxt;
+          
+          } else {                                                                # ein anderer Fehler
+              $failed = $@;
+          }
+      }
+      1;
   
-  if ($@) {
-     $err = $@;
-     Log3 ($name, 2, "DbRep $name - $err");
-     $dbh->disconnect;
-     ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-     ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-     return ($err);     
+  } or $failed = $@;
+  
+  alarm(0);                                                                      # Schutz vor Race Condition
+  
+  if ($failed) {
+      $err = $failed eq "Timeout\n" ? $totxt : $failed;
+      Log3 ($name, 2, "DbRep $name - $err");
+      $sth->finish if($sth);
+      $dbh->disconnect;
+      ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+      ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+      return $err;  
   }
   
   my $nrows = 0;
   if($sql =~ m/^\s*(select|pragma|show)/is) {
-    while (my @line = $sth->fetchrow_array()) {
-      Log3 ($name, 4, "DbRep $name - SQL result: @line");
-      $ret .= "\n" if($nrows);              # Forum: #103295
-      $ret .= join("$srs", @line);
-      # Anzahl der Datensätze
-      $nrows++;
-    }
+      while (my @line = $sth->fetchrow_array()) {
+          Log3 ($name, 4, "DbRep $name - SQL result: @line");
+          $ret .= "\n" if($nrows);                                              # Forum: #103295
+          $ret .= join("$srs", @line);
+          $nrows++;                                                             # Anzahl der Datensätze
+      }
     
   } else {
-     $nrows = $sth->rows;
-     eval {$dbh->commit() if(!$dbh->{AutoCommit});};
-     if ($@) {
-         $err = $@;
-         Log3 ($name, 2, "DbRep $name - $err");
-         $dbh->disconnect;
-         ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-         ReadingsSingleUpdateValue ($hash, "state", "error", 1);
-         return ($err);    
-     }
-	 $ret = $nrows; 
+      $nrows = $sth->rows;
+      eval {$dbh->commit() if(!$dbh->{AutoCommit});};
+      if ($@) {
+          $err = $@;
+          Log3 ($name, 2, "DbRep $name - $err");
+          $dbh->disconnect;
+          ReadingsSingleUpdateValue ($hash, "errortext", $err,    1);
+          ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
+          return $err;    
+      }
+	  $ret = $nrows; 
   }
   
   $sth->finish;
   $dbh->disconnect;
   
-  # SQL-Laufzeit ermitteln
-  my $rt = tv_interval($st);
+  my $rt = tv_interval($st);                                                   # SQL-Laufzeit ermitteln
   
   my $com = (split(" ",$sql, 2))[0];
   Log3 ($name, 4, "DbRep $name - Number of entries processed in db $hash->{DATABASE}: $nrows by $com");
   
-  # Readingaufbereitung
-  readingsBeginUpdate($hash);
-  ReadingsBulkUpdateTimeState($hash,undef,$rt,"done");
-  readingsEndUpdate($hash, 1);
+  readingsBeginUpdate         ($hash);
+  ReadingsBulkUpdateTimeState ($hash,undef,$rt,"done");
+  readingsEndUpdate           ($hash, 1);
   
-return ($ret); 
+return $ret; 
 }
 
 ####################################################################################################
@@ -12497,7 +12522,7 @@ return;
 								 
 								 <b>Note: <br>
 								 To avoid FHEM from blocking, you have to operate DbLog in asynchronous mode if the table
-                                 optimization want to be used ! </b> <br><br>
+                                 optimization is used ! </b> <br><br>
 								 
 								 After the dump a FHEM-command can be executed as well (see attribute "executeAfterProc"). <br><br>
                                  
@@ -12518,7 +12543,7 @@ return;
 								 
                                  The target directory can be set by <a href="#DbRepattr">attribute</a> "dumpDirRemote". 
                                  It must be located on the MySQL-Host and has to be writable by the MySQL-server process. <br>
-								 The used database user must have the "FILE"-privilege. <br><br>
+								 The used database user must have the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 								 
 								 <b>Note:</b> <br>
 								 If the internal version management of DbRep should be used and the size of the created dumpfile be 
@@ -13065,6 +13090,7 @@ return;
 								 <br><br>
 								 
 								 <b>Usage of clientSide-Dumps </b> <br>
+                                 The used database user needs the <b>FILE</b> privilege (see <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#4._Restore_2">Wiki</a>). <br>
 								 All tables and views (if present) are restored.
 								 The directory which contains the dump files has to be set by attribute <a href="#dumpDirLocal">dumpDirLocal</a> 
 								 to make it usable by the DbRep device. <br>
@@ -15088,7 +15114,7 @@ sub bdump {
 								 
 								 Das Zielverzeichnis kann mit dem <a href="#DbRepattr">Attribut</a> "dumpDirRemote" verändert werden. 
 								 Es muß sich auf dem MySQL-Host gefinden und durch den MySQL-Serverprozess beschreibbar sein. <br>
-								 Der verwendete Datenbankuser benötigt das "FILE"-Privileg. <br><br>
+								 Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#3._Backup_durchf.C3.BChren_2">Wiki</a>). <br><br>
 								 
 								 <b>Hinweis:</b> <br>
 								 Soll die interne Versionsverwaltung und die Dumpfilekompression des Moduls genutzt, sowie die Größe des erzeugten 
@@ -15646,6 +15672,7 @@ sub bdump {
                           		 Die Funktion stellt über eine Drop-Down Liste eine Dateiauswahl für den Restore zur Verfügung. <br><br>
 								 
 								 <b>Verwendung eines serverSide-Dumps </b> <br>
+                                 Der verwendete Datenbankuser benötigt das <b>FILE</b> Privileg (siehe <a href="https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#4._Restore_2">Wiki</a>). <br>
 								 Es wird der Inhalt der history-Tabelle aus einem serverSide-Dump wiederhergestellt.
                                  Dazu ist das Verzeichnis "dumpDirRemote" des MySQL-Servers auf dem Client zu mounten 
 								 und im Attribut <a href="#dumpDirLocal">dumpDirLocal</a> dem DbRep-Device bekannt zu machen. <br>
