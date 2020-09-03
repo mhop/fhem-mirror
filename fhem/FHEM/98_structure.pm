@@ -753,6 +753,8 @@ structure_Attr($@)
           <li>attr door struct_kitchen_map A:open:on A:closed:off</li>
           <li>attr door2 struct_kitchen_map A</li>
         </ul>
+        If this attribute is not set, the member devices state reading is taken,
+        or, if also absent, the STATE internal.
         </li>
 
     <a name="evaluateSetResult"></a>
@@ -993,6 +995,8 @@ structure_Attr($@)
         <li>attr tuer struct_kitchen_map A:open:on A:closed:off</li>
         <li>attr tuer2 struct_kitchen_map A</li>
       </ul>
+      Ist das Attribut nicht gesetzt, wertet structure den state des Devices
+      aus, bzw. falls dieser nicht existiert, dessen STATE.
       </li>
 
     <a name="evaluateSetResult"></a>
