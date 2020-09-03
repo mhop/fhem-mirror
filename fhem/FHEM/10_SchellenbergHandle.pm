@@ -183,7 +183,7 @@ sub SchellenbergHandle_ProcessMsg {
 		} else {
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, 'state', 'out-of-sync');
-			eadingsBulkUpdateIfChanged($hash, 'alive', 'ok');
+			readingsBulkUpdateIfChanged($hash, 'alive', 'ok');
 			readingsBulkUpdate($hash, 'rssi', $rssi);
 			readingsEndUpdate($hash, 1);
 		};
