@@ -420,7 +420,7 @@ attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/set {"state":"TOGGLE"}
-attr DEVICE setStateList on off
+attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model zigbee2mqtt_plug
 setreading DEVICE attrTemplateVersion 20200903
