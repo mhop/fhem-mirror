@@ -240,6 +240,7 @@ FHT_Set($@)
       my $tmpList="on,off,".join(",",@list);
       $cmdList =~ s/-temp/-temp:$tmpList/g;     # FHEMWEB sugar
       $cmdList =~ s/(-from.|-to.)/$1:time/g;
+      $cmdList .= " date:noArg time:noArg";
       return "Unknown argument $cmd, choose one of $cmdList";
     }
 
