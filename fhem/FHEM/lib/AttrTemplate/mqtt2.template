@@ -407,7 +407,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:zigbee2mqtt_plug
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-desc: Should work e.g. with Osram smart+plug <br>Untested updated version
+desc: Should work e.g. with Osram smart+plug
 order:L_05
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).+, ? $1 : undef }
@@ -426,18 +426,12 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:zigbee2mqtt_plug_w_energy_measuring
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
-desc: Preliminary version reserved for plugs with energy measuring features like innr SP 120 <br>NOTE: needs to be completed!
+desc: For plugs with energy measuring features like innr SP 120 or Blitzwolf Powerplug BW-SHP13
 order:L_05a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).+, ? $1 : undef }
-par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
-attr DEVICE icon ICON
-set DEVICE attrTemplate zigbee2mqtt_smart+plug
-#missing readingList with sth. comparable to shellies/shellyplug-s-123456/relay/0/power:.* { my $limit = 100;; my $compare = $EVTPART0<$limit ? "off":"on";; ReadingsVal($NAME,"loadState","on") eq $compare ? undef: {loadState => $compare} } 
-#and additional devStateIcon
-set DEVICE attrTemplate speechcontrol_type_switch
+set DEVICE attrTemplate zigbee2mqtt_plug
+attr DEVICE devStateIcon {my $light = FW_makeImage(ReadingsVal($name,"state","off")); my $current = ReadingsVal($name,"current",0); my $pwr = ReadingsVal($name,"power",0); my $energy = ReadingsVal($name,"energy",0); qq(<div> <a href="/fhem?cmd.dummy=set $name toggle&XHR=1">$light</a> Aktuell: $current A  Leistung.: $pwr W<b></b>)}
 attr DEVICE model zigbee2mqtt_plug_w_energy_measuring
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200903
 
 # zigbee2mqtt 2 channel device
 name:zigbee2mqtt_2channel_split
