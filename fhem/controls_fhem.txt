@@ -1,4 +1,4 @@
-REV 22711
+REV 22717
 DIR unused
 UPD 2020-09-02_07:45:03 349573 ./CHANGED
 UPD 2020-08-30_07:45:03 42743 ./MAINTAINER.txt
@@ -30,7 +30,7 @@ UPD 2015-07-28_14:05:31 48674 FHEM/00_OWX_ASYNC.pm
 UPD 2019-06-05_07:45:02 35759 FHEM/00_RPII2C.pm
 UPD 2020-07-17_07:45:03 226509 FHEM/00_SIGNALduino.pm
 UPD 2020-07-15_07:45:02 497774 FHEM/00_SONOS.pm
-UPD 2020-09-02_07:45:03 4624 FHEM/00_Schellenberg.pm
+UPD 2020-09-03_07:45:03 4722 FHEM/00_Schellenberg.pm
 UPD 2017-06-30_07:45:02 20215 FHEM/00_SmartMeterP1.pm
 UPD 2020-08-18_07:45:03 63231 FHEM/00_TCM.pm
 UPD 2020-08-27_07:45:03 147205 FHEM/00_THZ.pm
@@ -72,7 +72,7 @@ UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
 UPD 2020-07-11_07:45:03 20462 FHEM/10_SD_GT.pm
 UPD 2020-04-29_07:45:02 64598 FHEM/10_SOMFY.pm
-UPD 2020-09-02_07:45:03 7935 FHEM/10_SchellenbergHandle.pm
+UPD 2020-09-03_07:45:03 8197 FHEM/10_SchellenbergHandle.pm
 UPD 2019-12-21_07:45:03 18318 FHEM/10_UNIRoll.pm
 UPD 2020-08-11_07:45:02 54394 FHEM/10_WS980.pm
 UPD 2020-06-24_07:45:03 259657 FHEM/10_ZWave.pm
@@ -257,7 +257,7 @@ UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2020-08-08_07:45:02 100783 FHEM/48_BlinkCamera.pm
 UPD 2020-02-18_07:45:02 66733 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2020-09-02_07:45:03 758580 FHEM/49_SSCam.pm
+UPD 2020-09-03_07:45:03 758282 FHEM/49_SSCam.pm
 UPD 2020-08-15_07:45:02 58131 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
@@ -738,8 +738,8 @@ UPD 2020-09-02_07:45:07 4354521 docs/commandref.html
 UPD 2020-09-02_07:45:09 2703006 docs/commandref_DE.html
 UPD 2020-08-20_07:45:03 80720 docs/commandref_frame.html
 UPD 2020-08-20_07:45:03 90332 docs/commandref_frame_DE.html
-UPD 2020-09-02_07:45:11 234017 docs/commandref_modular.html
-UPD 2020-09-02_07:45:12 244728 docs/commandref_modular_DE.html
+UPD 2020-09-03_07:45:10 234017 docs/commandref_modular.html
+UPD 2020-09-03_07:45:12 244728 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -763,7 +763,7 @@ UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2020-08-19_07:45:03 24533 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2020-08-26_07:45:02 6483 lib/FHEM/SynoModules/API.pm
 UPD 2020-08-30_07:45:02 11272 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2020-08-30_07:45:02 26867 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2020-09-03_07:45:03 27563 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
@@ -2012,6 +2012,7 @@ UPD 2015-07-28_14:05:33 1994 www/images/openautomation/message_socket_on_off.svg
 UPD 2015-07-28_14:05:33 1776 www/images/openautomation/message_tendency_downward.svg
 UPD 2015-07-28_14:05:33 1690 www/images/openautomation/message_tendency_steady.svg
 UPD 2015-07-28_14:05:33 1776 www/images/openautomation/message_tendency_upward.svg
+UPD 2020-09-03_07:45:03 132345 www/images/openautomation/nodemcu.svg
 UPD 2015-07-28_14:05:33 1838 www/images/openautomation/phone_answering.svg
 UPD 2015-07-28_14:05:33 1262 www/images/openautomation/phone_call.svg
 UPD 2015-07-28_14:05:33 1340 www/images/openautomation/phone_call_end.svg
