@@ -5365,6 +5365,14 @@ addToWritebuffer($$@)
 {
   my ($hash, $txt, $callback, $nolimit) = @_;
 
+  if(!defined($hash->{FD})) {
+    my $n = $hash->{NAME};
+    Log 1, "ERROR: addToWritebuffer for $n without FD";
+    Log 1, "probably caused at ".$hash->{stacktrace} if($hash->{stacktrace});
+    delete($defs{$n});
+    delete($attr{$n});
+    return;
+  }
   if($hash->{isChild}) {  # Wont go to the main select in a forked process
     TcpServer_WriteBlocking( $hash, $txt );
     if($callback) {

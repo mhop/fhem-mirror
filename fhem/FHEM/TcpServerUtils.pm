@@ -213,8 +213,12 @@ TcpServer_Close($@)
     delete($hash->{CD}); 
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
-    delete $attr{$name} if($dodel);
-    delete $defs{$name} if($dodel);
+    if($dodel) {
+      delete $attr{$name};
+      delete $defs{$name};
+    } else {
+      $hash->{stacktrace} = stacktraceAsString(1);
+    }
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
@@ -243,6 +247,7 @@ TcpServer_Disown($)
     delete($hash->{CD});
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
+    $hash->{stacktrace} = stacktraceAsString(1);
   }
 
   return;
