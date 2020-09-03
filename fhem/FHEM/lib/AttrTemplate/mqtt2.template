@@ -419,10 +419,11 @@ attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/set {"state":"TOGGLE"}
 attr DEVICE setStateList on off
 set DEVICE attrTemplate speechcontrol_type_switch
 attr DEVICE model zigbee2mqtt_plug
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200903
 
 name:zigbee2mqtt_plug_w_energy_measuring
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
