@@ -1435,10 +1435,8 @@ sub SunRiseShuttersAfterTimerFn {
                 && (   $shutters->getSelfDefenseMode eq 'gone'
                     || $shutters->getSelfDefenseMode eq 'absent' )
                 && $ascDev->getResidentsStatus ne 'gone'
+                && $ascDev->getResidentsStatus ne 'absent'
             )
-            || (   $ascDev->getSelfDefense eq 'on'
-                && $shutters->getSelfDefenseMode eq 'absent'
-                && $ascDev->getResidentsStatus ne 'absent' )
         )
         && (
             $shutters->getUp ne 'brightness'
