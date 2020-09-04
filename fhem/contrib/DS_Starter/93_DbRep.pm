@@ -1107,8 +1107,7 @@ sub DbRep_Get {
           $ret .= "</div>";
       }
       
-      # Notes
-      if(!$prop || $prop =~ /rel/) {
+      if(!$prop || $prop =~ /rel/) {                                                                      # Notes
           $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
           $ret .= "<table class=\"block wide internals\">";
           $ret .= "<tbody>";
@@ -1119,8 +1118,7 @@ sub DbRep_Get {
               $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
               $ret .= "</tr>";
               $i++;
-              if ($i & 1) {
-                  # $i ist ungerade
+              if ($i & 1) {                                                                               # $i ist ungerade
                   $ret .= "<tr class=\"odd\">";
               } else {
                   $ret .= "<tr class=\"even\">";
@@ -13436,7 +13434,7 @@ return;
                                 <br><br>
                 
     <a name="dbstatus"></a>	
-    <li><b> dbstatus </b> -  lists global informations about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
+    <li><b> dbstatus </b> -  lists global information about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
                              Initially all available informations are reported. Using the <a href="#DbRepattr">attribute</a> "showStatus" the quantity of
                              results can be limited to show only the desired values. Further detailed informations of items meaning are 
                              explained <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>there</a>.  <br><br>
@@ -13452,8 +13450,20 @@ return;
 
     <a name="sqlCmdBlocking"></a>
     <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> - 
-                            Executes the specified SQL-statement in <b>blocking</b> manner. Because of its mode of operation
-                            this function is particular convenient for user own perl scripts.  <br>
+                            Executes the specified SQL-statement in <b>blocking</b> manner. 
+							
+                            <br><br>
+                           
+						    <ul>
+							  <b>Examples:</b>  <br>
+							  { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+							  { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>                                   
+							  get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+							</ul>
+                            </li> 
+                            <br>							
+							
+							Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
                             The input accepts multi line commands and delivers multi line results as well. 
                             This command also accept the setting of SQL session variables like "SET @open:=NULL, 
                             @closed:=NULL;". <br>
@@ -13461,15 +13471,6 @@ return;
                             by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep" (default "|"). Several result lines 
                             are separated by newline ("\n"). <br>
                             This function only set/update status readings, the userExitFn function isn't called.                            
-                            <br><br>
-                           
-                                 <ul>
-                                   <b>Examples:</b>  <br>
-                                   { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-                                   { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>                                   
-								   get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-                                 </ul>
-                            </li> 
                             <br><br>
 							
                             If you create a little routine in 99_myUtils, for example: 
@@ -13568,23 +13569,28 @@ sub dbval {
   
     <a name="versionNotes"></a>
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
-                              Shows realease informations and/or hints about the module. It contains only main release 
-                              informations for module users. <br>
-                              If no options are specified, both release informations and hints will be shown. "rel" shows 
-                              only release informations and "hints" shows only hints. By the &lt;key&gt;-specification only 
-                              the hint with the specified number is shown.                          
+                              Shows realease informations and/or hints about the module. 
+							  
                               <br><br>
                              
                               <ul>
-                              <table>  
-                              <colgroup> <col width=5%> <col width=95%> </colgroup>
-                                <tr><td> rel          </td><td>: zeigt nur Release Informationen                           </td></tr>
-                                <tr><td> hints        </td><td>: zeigt nur Hinweise an                                     </td></tr>                                    
-                                <tr><td> &lt;key&gt;  </td><td>: es wird der Hinweis mit der angegebenen Nummer angezeigt  </td></tr>
-                              </table>
+                               <table>  
+                               <colgroup> <col width=5%> <col width=95%> </colgroup>
+                                   <tr><td> rel          </td><td>: shows only release information                   </td></tr>
+                                   <tr><td> hints        </td><td>: shows only hints                                 </td></tr>                                    
+                                   <tr><td> &lt;key&gt;  </td><td>: the note with the specified number is displayed  </td></tr>
+                               </table>
                               </ul>
                              
-                              </li> 
+                              </li>
+							 
+						      <br>							  
+							  
+							  It contains only main release informations for module users. <br>
+                              If no options are specified, both release informations and hints will be shown. "rel" shows 
+                              only release informations and "hints" shows only hints. By the &lt;key&gt;-specification only 
+                              the hint with the specified number is shown.                          
+                              <br> 
   
   </ul></ul>
   
@@ -14634,23 +14640,24 @@ sub bdump {
  
  <ul><ul>
  
+
     <li><b> adminCredentials &lt;User&gt; &lt;Passwort&gt; </b>          
                                - Speichert einen User / Passwort für den privilegierten bzw. administrativen 
                                Datenbankzugriff. Er wird bei Datenbankoperationen benötigt, die mit einem privilegierten User 
                                ausgeführt werden müssen. Siehe auch Attribut <a href="#useAdminCredentials">'useAdminCredentials'</a>. <br>
                                (nur gültig bei Datenbanktyp MYSQL und DbRep-Typ "Client")
-                               
                                </li> <br>
-                               
+                  
+			  
     <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b> 
                                  - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen 
                                  der möglichen time.*-Attribute. <br><br>
-                                 
+                                 </li>
+								 
                                  Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
                                  angegeben sein.                                  
                                  Mit dem Attribut <a href="#averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur 
-                                 Mittelwertermittlung definiert. <br><br>
-                                 
+                                 Mittelwertermittlung definiert. <br>               
                                  Ist keine oder die Option <b>display</b> angegeben, werden die Ergebnisse nur angezeigt. Mit 
                                  den Optionen <b>writeToDB</b>, <b>writeToDBSingle</b> bzw. <b>writeToDBInTime</b> werden die Berechnungsergebnisse 
                                  mit einem neuen Readingnamen in der Datenbank gespeichert. <br><br>
@@ -14664,7 +14671,7 @@ sub bdump {
                                    </table>
                                    </ul>
                                    <br>
-                                 
+								 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
                                  wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
@@ -14698,38 +14705,42 @@ sub bdump {
                                    <br>
                                    <br>                           
                                  
-                                 </li> <br>
+                                <br>
 
+	
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
     
+
     <li><b> changeValue </b>  -  ändert den gespeicherten Wert eines Readings.
-                                 Ist die Selektion auf bestimmte Device/Reading-Kombinationen durch die 
-                                 <a href="#DbRepattr">Attribute</a> "device" bzw. "reading" beschränkt, werden sie genauso 
+                                 Ist die Selektion auf bestimmte Device/Reading-Kombinationen durch die Attribute
+                                 <a href="#device">device</a> bzw. <a href="#reading">reading</a> beschränkt, werden sie genauso 
                                  berücksichtigt wie gesetzte Zeitgrenzen (Attribute time.*).  <br>
                                  Fehlen diese Beschränkungen, wird die gesamte Datenbank durchsucht und der angegebene Wert 
                                  geändert. <br><br>
+								 </li>
                                  
                                  <ul>
-                                 <b>Syntax: </b> <br>
-                                 set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br><br>
+                                   <b>Syntax: </b> <br>
+                                   set &lt;name&gt; changeValue "&lt;alter String&gt;","&lt;neuer String&gt;"  <br><br>
                                  
-                                 Die Strings werden in Doppelstrich eingeschlossen und durch Komma getrennt. 
-                                 Dabei kann "String" sein: <br>
+                                   "String" kann sein: <br>
                                  
-                                <table>  
-                                <colgroup> <col width=15%> <col width=85%> </colgroup>
-                                   <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
+                                   <table>  
+                                      <colgroup> <col width=15%> <col width=85%> </colgroup>
+                                      <tr><td><b>&lt;alter String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "OL 12" </li>
                                                                                                         <li>ein String mit Verwendung von SQL-Wildcard, z.B. "%OL%" </li> </td></tr>
-                                   <tr><td> </td><td> </td></tr>
-                                   <tr><td> </td><td> </td></tr>
-                                   <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
-                                                                                                        <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
+                                      <tr><td> </td><td> </td></tr>
+                                      <tr><td> </td><td> </td></tr>
+                                      <tr><td><b>&lt;neuer String&gt; :</b> </td><td><li>ein einfacher String mit/ohne Leerzeichen, z.B. "12 kWh" </li>
+                                                                                                          <li>Perl Code eingeschlossen in "{}" inkl. Quotes, z.B. "{($VALUE,$UNIT) = split(" ",$VALUE)}". 
                                                                                                           Dem Perl-Ausdruck werden die Variablen $VALUE und $UNIT übergeben. Sie können innerhalb
                                                                                                           des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
                                                                                                           VALUE bzw. UNIT des Datensatzes gespeichert. </li></td></tr>
-                                </table>
+                                   </table>
+								</ul>
                                 <br>
-                                 
+                                
+                                 <ul>								
                                  <b>Beispiele: </b> <br>
                                  set &lt;name&gt; changeValue "OL","12 OL"  <br>               
                                  # der alte Feldwert "OL" wird in "12 OL" geändert.  <br><br>
@@ -14764,18 +14775,21 @@ sub bdump {
                                  <b>Hinweis:</b> <br>
                                  Obwohl die Funktion selbst non-blocking ausgelegt ist, sollte das zugeordnete DbLog-Device
                                  im asynchronen Modus betrieben werden um ein Blockieren von FHEMWEB zu vermeiden (Tabellen-Lock). <br><br> 
-                                 </li> <br>
+                                 <br>
                                  </ul>
-                                 
+                      
+					  
     <li><b> countEntries [history | current] </b> 
                                  -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
                                  Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
                                  Sind die Timestamps nicht gesetzt, werden alle Einträge der Tabelle gezählt. 
-                                 Beschränkungen durch die <a href="#DbRepattr">Attribute</a> Device bzw. Reading 
+                                 Beschränkungen durch die Attribute <a href="#device">device</a> bzw. <a href="#reading">reading</a> 
                                  gehen in die Selektion mit ein. <br>
+								 </li>	
+								 
                                  Standardmäßig wird die Summe aller Datensätze, gekennzeichnet mit "ALLREADINGS", erstellt.
                                  Ist das Attribut "countEntriesDetail" gesetzt, wird die Anzahl jedes einzelnen Readings 
-                                 zusätzlich ausgegeben. <br><br>                               
+                                 zusätzlich ausgegeben. <br><br>							 
                                  
                                  Die für diese Funktion relevanten Attribute sind: <br><br>
 
@@ -14793,14 +14807,16 @@ sub bdump {
                                    </ul>
                                    <br>
                                    
-                                 </li> <br>
-                                 
+                                 <br>
+             
+			 
     <li><b> delDoublets [adviceDelete | delete]</b>   -  zeigt bzw. löscht doppelte / mehrfach vorkommende Datensätze.
                                  Dazu wird Timestamp, Device,Reading und Value ausgewertet. <br>
                                  Die <a href="#DbRepattr">Attribute</a> zur Aggregation,Zeit-,Device- und Reading-Abgrenzung werden dabei 
                                  berücksichtigt. Ist das Attribut "aggregation" nicht oder auf "no" gesetzt, wird im Standard die Aggregation 
                                  "day" verwendet.
                                  <br><br>
+								 </li>
                                  
                                    <ul>
                                    <table>  
@@ -14811,16 +14827,16 @@ sub bdump {
                                    </ul>
                                    <br>
 
-                                 Aus Sicherheitsgründen muss das <a href="#DbRepattr">Attribut</a> "allowDeletion" für die "delete" Option
+                                 Aus Sicherheitsgründen muss das Attribut <a href="#allowDeletion">allowDeletion</a> für die "delete" Option
                                  gesetzt sein. <br>
                                  Die Anzahl der anzuzeigenden Datensätze des Kommandos "delDoublets adviceDelete" ist zunächst 
-                                 begrenzt (default 1000) und kann durch das <a href="#DbRepattr">Attribut</a> "limit" angepasst 
+                                 begrenzt (default 1000) und kann durch das Attribut <a href="#limit">limit</a> angepasst 
                                  werden.
                                  Die Einstellung von "limit" hat keinen Einfluss auf die "delDoublets delete" Funktion, sondern 
                                  beeinflusst <b>NUR</b> die Anzeige der Daten.   <br>
                                  Vor und nach der Ausführung von "delDoublets" kann ein FHEM-Kommando bzw. Perl-Routine ausgeführt 
-                                 werden. (siehe <a href="#DbRepattr">Attribute</a>  "executeBeforeProc", "executeAfterProc")
-                                 <br><br>                          
+                                 werden. (siehe Attribute <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>)
+                                 <br><br>								 
                                   
                                  <ul>
                                  <b>Beispiel:</b> <br><br>
@@ -14853,9 +14869,7 @@ sub bdump {
                                     </table>
                                  </ul>
                                  <br>
-                                 <br>                                 
-                                
-                                 </li>
+                                 <br>
 
     <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
                                  reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
@@ -16067,8 +16081,8 @@ sub bdump {
                              
 							 <ul>
 							   <b>Beispiel</b>  <br>
-							   get &lt;name&gt; dbstatus  <br>
-							   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
+							   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br> 
+							   get &lt;name&gt; dbstatus  <br>              
 							   # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthaltenen
 							 </ul>                                 
 							 </li> 
@@ -16077,19 +16091,6 @@ sub bdump {
     <a name="sqlCmdBlocking"></a>                        
     <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> - 
                             Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus. 
-                            Der Timeout kann mit dem Attribut <a href="#dbreptimeout">timeout</a> verändert werden. 
-                            <br>                            
-                            
-                            Diese Funktion ist durch ihre Arbeitsweise 
-                            speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
-                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
-                            Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
-                            "SET @open:=NULL, @closed:=NULL;". <br>                            
-                            Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
-                            des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
-                            werden mit Newline ("\n") separiert. <br>
-                            Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn" 
-                            wird nicht aufgerufen.                            
                             <br><br>
                            
 							<ul>
@@ -16099,6 +16100,20 @@ sub bdump {
 							  get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
 							</ul>
                             </li>
+							<br>
+							
+                            Der Timeout kann mit dem Attribut <a href="#dbreptimeout">timeout</a> verändert werden. 
+                            <br>                            
+                            
+                            Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
+                            Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
+                            Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
+                            "SET @open:=NULL, @closed:=NULL;". <br>                            
+                            Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
+                            des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
+                            werden mit Newline ("\n") separiert. <br>
+                            Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn" 
+                            wird nicht aufgerufen.                            
                             <br><br>
                             
 							Erstellt man eine kleine Routine in 99_myUtils, wie z.B.: 
@@ -16132,8 +16147,8 @@ sub dbval {
                            
 						   <ul>
 						     <b>Beispiel</b>  <br>
-						     get &lt;name&gt; dbvars  <br>
-						     attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
+						     attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
+						     get &lt;name&gt; dbvars  <br>               
 						     # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
 						   </ul>
 						   </li> 
@@ -16173,8 +16188,8 @@ sub dbval {
                                  
 					        <ul>
 							  <b>Beispiel</b>  <br>
-							  get &lt;name&gt; svrinfo  <br>
-							  attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
+							  attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br> 
+							  get &lt;name&gt; svrinfo  <br>              
 							  # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten
 							</ul> 
 							</li> 
@@ -16188,8 +16203,8 @@ sub dbval {
                                  
 							  <ul>
 							    <b>Beispiel</b>  <br>
-							    get &lt;name&gt; tableinfo  <br>
-							    attr &lt;name&gt; showTableInfo current,history   <br>               
+							    attr &lt;name&gt; showTableInfo current,history   <br>
+							    get &lt;name&gt; tableinfo  <br>               
 							    # Es werden nur Information der Tabellen "current" und "history" angezeigt
 							  </ul>
 							  </li> 
@@ -16197,9 +16212,7 @@ sub dbval {
 
     <a name="versionNotes"></a> 
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
-                             Zeigt Release Informationen und/oder Hinweise zum Modul an. Es sind nur Release Informationen mit 
-                             Bedeutung für den Modulnutzer enthalten. <br>
-                             Sind keine Optionen angegben, werden sowohl Release Informationen als auch Hinweise angezeigt. 
+                             Zeigt Release Informationen und/oder Hinweise zum Modul an. 
                              <br><br>
                              
                              <ul>
@@ -16211,7 +16224,12 @@ sub dbval {
                               </table>
                              </ul>
                              
-                             </li>                                      
+                             </li>
+							 
+							 <br>
+							 Sind keine Optionen angegeben, werden sowohl Release Informationen als auch Hinweise angezeigt.
+							 Es sind nur Release Informationen mit Bedeutung für den Modulnutzer enthalten. <br>
+                                      
                                                      
   <br>
   </ul></ul>
