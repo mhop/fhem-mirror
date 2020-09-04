@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: the the blocking executed commands are monitored with an
+                      adjustable timeout,
+                      NOTE: get dbValue is deprecated and was changed to 
+                      the command sqlCmdBlocking
  - bugfix:  73_AutoShuttersControl: fix bug in Sunrise Drive if SelfDefense set
  - change:  50_TelegramBot: channels, versionid, keyboard / favorite fixes
  - change:  93_DbRep: commandRef revised
