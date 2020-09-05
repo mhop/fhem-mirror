@@ -1085,6 +1085,7 @@ sub EventDoIf
 
   my $dev=$hash->{helper}{triggerDev};
   my $eventa=$hash->{helper}{triggerEvents};
+  return 0 if (!defined $dev); 
   if ($check) {
     if ($dev eq "" or $dev ne $n) {
       if (defined $filter) {
