@@ -1224,7 +1224,7 @@ FileLog_sampleDataFn($$$$$)
   my $colregs = join(",", sort keys %h);
   my $example = join("<br>", grep /.+/,map { $h{$_} } sort keys %h);
 
-  $colnums = join(",", 3..$colnums);
+  $colnums = join(",", 2..$colnums);
 
   my %tickh;
   FileLog_addTics($conf->{ytics}, \%tickh);
