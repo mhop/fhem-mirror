@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  59_Twilight: deactivate yahoo service dependend routines
  - change:  93_DbRep: the the blocking executed commands are monitored with an
                       adjustable timeout,
                       NOTE: get dbValue is deprecated and was changed to 

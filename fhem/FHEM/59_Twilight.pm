@@ -35,30 +35,25 @@
 package main;
 use strict;
 use warnings;
-use POSIX;
+#use List::Util qw(max min);
 use HttpUtils;
 use Math::Trig;
 use Time::Local 'timelocal_nocheck';
 
-sub Twilight_calc($$);
-sub Twilight_my_gmt_offset();
-sub Twilight_midnight_seconds($);
 
 ################################################################################
-sub Twilight_Initialize($)
-{
-  my ($hash) = @_;
+sub Twilight_Initialize {
+  my $hash = shift;
 
 # Consumer
   $hash->{DefFn}   = "Twilight_Define";
   $hash->{UndefFn} = "Twilight_Undef";
   $hash->{GetFn}   = "Twilight_Get";
   $hash->{AttrList}= "$readingFnAttributes " ."useExtWeather";
-  return undef;
+  return;
 }
 ################################################################################
-sub Twilight_Get($@)
-{
+sub Twilight_Get {
   my ($hash, @a) = @_;
   return "argument is missing" if(int(@a) != 2);
 
@@ -73,54 +68,37 @@ sub Twilight_Get($@)
   return "$a[0] $reading => $value";
 }
 ################################################################################
-sub Twilight_Define($$)
+sub Twilight_Define
 {
-  my ($hash, $def) = @_;
-
-  my @a = split("[ \t][ \t]*", $def);
-
+  my $hash = shift;
+  my $def  = shift // return;
+  my @arr  = split m{\s+}xms, $def;
+  
   return "syntax: define <name> Twilight <latitude> <longitude> [indoor_horizon [Weather]]"
-    if(int(@a) < 4 && int(@a) > 6);
+    if(int(@arr) < 1 && int(@arr) > 6);
 
   $hash->{STATE} = "0";
-
-  my $latitude;
-  my $longitude;
-  my $name      = $a[0];
-  if ($a[2] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[2] !~ /^[\. ]*$/ ) {
-     $latitude  = $a[2];
-	    if($latitude >  90){$latitude =  90;}
-	    if($latitude < -90){$latitude = -90;}
-	 }else{
-     return "Argument Latitude is not a valid number";
-  }
-
-  if ($a[3] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[3] !~ /^[\. ]*$/ ) {
-     $longitude  = $a[3];
-	    if($longitude >  180){$longitude =  180;}
-	    if($longitude < -180){$longitude = -180;}
-	 }else{
-     return "Argument Longitude is not a valid number";
-  }
-
-  my $weather         = 0;
-  my $indoor_horizon  = 0;
-  if(int(@a)>5) { $weather=$a[5] }
-  if(int(@a)>4) { if ($a[4] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[4] !~ /^[\. ]*$/ ) {
-     $indoor_horizon  = $a[4];
- 	   if($indoor_horizon > 20) { $indoor_horizon=20;}
-       # minimal indoor_horizon makes values like  civil_sunset and civil_sunrise
-	   if($indoor_horizon <  -6) { $indoor_horizon= -6;}
-  }else{
-     return "Argument Indoor_Horizon is not a valid number";}
-  }
-
+  my $name           = shift @arr;
+  my $type           = shift @arr;
+  my $latitude       = shift @arr // AttrVal('global','latitude',50.112);
+  my $longitude      = shift @arr // AttrVal('global','longitude',8.686);
+  my $indoor_horizon = shift @arr // 0;
+  my $weather        = shift @arr // 0;
+  
+  return "Argument Latitude is not a valid number" if !looks_like_number($latitude);
+  return "Argument Longitude is not a valid number" if !looks_like_number($longitude);
+  return "Argument Indoor_Horizon is not a valid number" if !looks_like_number($indoor_horizon);
+  
+  $latitude       = List::Util::min(  90, List::Util::max( -90, $latitude));
+  $longitude      = List::Util::min( 180, List::Util::max(-180, $longitude));
+  $indoor_horizon = List::Util::min(  20, List::Util::max(  -6, $indoor_horizon));
+  
   $hash->{WEATHER_HORIZON}  = 0;
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
   $hash->{LATITUDE}       = $latitude;
   $hash->{LONGITUDE}      = $longitude;
   $hash->{WEATHER}        = $weather;
-  $hash->{VERSUCHE}       = 0;
+  #$hash->{VERSUCHE}       = 0;
   $hash->{DEFINE}         = 1;
   $hash->{CONDITION}      = 50;
   $hash->{SUNPOS_OFFSET}  = 5*60;
@@ -132,24 +110,26 @@ sub Twilight_Define($$)
   Twilight_Midnight($mHash);
 
   delete $hash->{DEFINE};
-
-  return undef;
+  Log3 $hash, 2, "[$hash->{NAME}] Note: Twilight formerly used weather info from yahoo, but source is offline.";
+ 
+  return;
 }
 ################################################################################
-sub Twilight_Undef($$) {
-  my ($hash, $arg) = @_;
-
-  foreach my $key (keys %{$hash->{TW}}) {
+sub Twilight_Undef {
+  my $hash = shift;
+  my $arg  = shift // return;
+  
+  for my $key (keys %{$hash->{TW}}) {
      myRemoveInternalTimer($key, $hash);
   }
   myRemoveInternalTimer    ("Midnight", $hash);
   myRemoveInternalTimer    ("weather",  $hash);
   myRemoveInternalTimer    ("sunpos",   $hash);
 
-  return undef;
+  return;
 }
 ################################################################################
-sub myInternalTimer($$$$$) {
+sub myInternalTimer {
    my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
 
    my $timerName = "$hash->{NAME}_$modifier";
@@ -166,8 +146,9 @@ sub myInternalTimer($$$$$) {
    return $mHash;
 }
 ################################################################################
-sub myRemoveInternalTimer($$) {
-   my ($modifier, $hash) = @_;
+sub myRemoveInternalTimer {
+   my $modifier = shift;
+   my $hash     = shift // return;
 
    my $timerName = "$hash->{NAME}_$modifier";
    my $myHash = $hash->{TIMER}{$timerName};
@@ -176,55 +157,33 @@ sub myRemoveInternalTimer($$) {
       Log3 $hash, 5, "[$hash->{NAME}] removing Timer: $timerName";
       RemoveInternalTimer($myHash);
    }
+   return;
 }
+
 ################################################################################
-#sub myRemoveInternalTimerByName($){
-#  my ($name) = @_;
-#  foreach my $a (keys %intAt) {
-#     my $nam = "";
-#     my $arg = $intAt{$a}{ARG};
-#        if (ref($arg) eq "HASH" && defined($arg->{NAME})  ) {
-#           $nam = $arg->{NAME} if (ref($arg) eq "HASH" && defined($arg->{NAME})  );
-#        }
-#     delete($intAt{$a}) if($nam =~  m/^$name/g);
-#  }
-#}
-################################################################################
-sub myGetHashIndirekt ($$) {
-  my ($myHash, $function) = @_;
+sub myGetHashIndirekt {
+  my $myHash   = shift;
+  my $function = shift // return;
 
   if (!defined($myHash->{HASH})) {
     Log 3, "[$function] myHash not valid";
-    return undef;
+    return;
   };
   return $myHash->{HASH};
 }
 ################################################################################
-sub Twilight_midnight_seconds($) {
-  my ($now) = @_;
+
+sub Twilight_midnight_seconds {
+  my $now = shift // return;
   my @time = localtime($now);
   my $secs = ($time[2] * 3600) + ($time[1] * 60) + $time[0];
   return $secs;
 }
+
 ################################################################################
-#sub Twilight_ssTimeAsEpoch($) {
-#   my ($zeit) = @_;
-#   my ($hour, $min, $sec) = split(":",$zeit);
-#
-#   my $days=0;
-#   if ($hour>=24) {$days = 1; $hour -=24};
-#
-#   my @jetzt_arr = localtime(time());
-#   #Stunden               Minuten               Sekunden
-#   $jetzt_arr[2]  = $hour; $jetzt_arr[1] = $min; $jetzt_arr[0] = $sec;
-#   $jetzt_arr[3] += $days;
-#   my $next = timelocal_nocheck(@jetzt_arr);
-#
-#   return $next;
-#}
-################################################################################
-sub Twilight_calc($$) {
-   my ($deg, $idx) = @_;
+sub Twilight_calc {
+   my $deg = shift;
+   my $idx = shift // return;
 
    my $midnight = time() - Twilight_midnight_seconds(time());
 
@@ -238,12 +197,10 @@ sub Twilight_calc($$) {
    my $ss1 = $midnight + 3600*$sshour+60*$ssmin+$sssec;
 
    return (0,0) if (abs ($sr1 - $ss1) < 30);
-   #return Twilight_ssTimeAsEpoch($sr) + 0.01*$idx,
-   #       Twilight_ssTimeAsEpoch($ss) - 0.01*$idx;
    return ($sr1 + 0.01*$idx), ($ss1 - 0.01*$idx);
 }
 ################################################################################
-sub Twilight_TwilightTimes(@) {
+sub Twilight_TwilightTimes {
   my ($hash, $whitchTimes, $xml) = @_;
 
   my $Name = $hash->{NAME};
@@ -251,12 +208,12 @@ sub Twilight_TwilightTimes(@) {
   my $horizon    = $hash->{HORIZON};
   my $swip       = $hash->{SWIP} ;
 
-  my $lat  = $attr{global}{latitude};  $attr{global}{latitude}  = $hash->{LATITUDE};
-  my $long = $attr{global}{longitude}; $attr{global}{longitude} = $hash->{LONGITUDE};
+  my $lat  = $hash->{LATITUDE};
+  my $long = $hash->{LONGITUDE};
 # ------------------------------------------------------------------------------
   my $idx = -1;
   my @horizons = ("_astro:-18", "_naut:-12", "_civil:-6",":0", "_indoor:$hash->{INDOOR_HORIZON}", "_weather:$hash->{WEATHER_HORIZON}");
-  foreach my $horizon (@horizons) {
+  for my $horizon (@horizons) {
     $idx++; next if ($whitchTimes eq "weather" && !($horizon =~ m/weather/) );
 
     my ($name, $deg) = split(":", $horizon);
@@ -273,11 +230,11 @@ sub Twilight_TwilightTimes(@) {
        Log3 $hash, 4, "[$Name] hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(HORIZON=$deg)";
     }
   }
-  $attr{global}{latitude}  = $lat;
-  $attr{global}{longitude} = $long;
+  #$attr{global}{latitude}  = $lat;
+  #$attr{global}{longitude} = $long;
 # ------------------------------------------------------------------------------
   readingsBeginUpdate ($hash);
-  foreach my $ereignis (keys %{$hash->{TW}}) {
+  for my $ereignis (keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
     readingsBulkUpdate($hash, $ereignis, $hash->{TW}{$ereignis}{TIME} == 0 ? "undefined" : FmtTime($hash->{TW}{$ereignis}{TIME}));
   }
@@ -299,7 +256,7 @@ sub Twilight_TwilightTimes(@) {
   my $jetztIstMitternacht = abs($now+5-$nextMitternacht)<=10;
 
   my @keyListe = qw "DEG LIGHT STATE SWIP TIME NAMENEXT";
-  foreach my $ereignis (sort keys %{$hash->{TW}}) {
+  for my $ereignis (sort keys %{$hash->{TW}}) {
     next if ($whitchTimes eq "weather" && !($ereignis =~ m/weather/) );
 
     myRemoveInternalTimer($ereignis, $hash); # if(!$jetztIstMitternacht);
@@ -312,8 +269,8 @@ sub Twilight_TwilightTimes(@) {
   return 1;
 }
 ################################################################################
-sub Twilight_fireEvent($) {
-   my ($myHash) = @_;
+sub Twilight_fireEvent {
+   my $myHash = shift // return;
 
    my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
    return if (!defined($hash));
@@ -351,31 +308,34 @@ sub Twilight_fireEvent($) {
    readingsBulkUpdate ($hash, "nextEvent",       $nextEvent);
    readingsBulkUpdate ($hash, "nextEventTime",   $nextEventTime);
 
-   readingsEndUpdate  ($hash, $doTrigger);
+   return readingsEndUpdate  ($hash, $doTrigger);
 
 }
 ################################################################################
-sub Twilight_Midnight($) {
-  my ($myHash) = @_;
+sub Twilight_Midnight {
+  my $myHash = shift // return;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
 
   $hash->{SWIP} = 0;
   my $param = Twilight_CreateHttpParameterAndGetData($myHash, "Mid");
+  return;
 }
 ################################################################################
 # {Twilight_WeatherTimerUpdate( {HASH=$defs{"Twilight"}} ) }
-sub Twilight_WeatherTimerUpdate($) {
-  my ($myHash) = @_;
+sub Twilight_WeatherTimerUpdate {
+  my $myHash = shift // return;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
 
   $hash->{SWIP} = 1;
   my $param = Twilight_CreateHttpParameterAndGetData($myHash, "weather");
+  return;
 }
 ################################################################################
-sub Twilight_CreateHttpParameterAndGetData($$) {
-  my ($myHash, $mode) = @_;
+sub Twilight_CreateHttpParameterAndGetData {
+  my $myHash = shift;
+  my $mode   = shift // return;
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
 
@@ -403,17 +363,19 @@ sub Twilight_CreateHttpParameterAndGetData($$) {
   } else {
     HttpUtils_NonblockingGet($param);
   }
+  return;
 
 }
 ################################################################################
-sub Twilight_WeatherCallback(@) {
+sub Twilight_WeatherCallback {
   my ($param, $err, $result) = @_;
 
   my $hash = $param->{hash};
   return if (!defined($hash));
 
   if ($err) {
-    Log3 $hash, 3, "[$hash->{NAME}] got no weather info from yahoo. Error code: $err";
+    #Log3 $hash, 3, "[$hash->{NAME}] got no weather info from yahoo. Error code: $err";
+    #disabled due to yahoo 
     $result = undef;
   } else {
      Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
@@ -423,49 +385,52 @@ sub Twilight_WeatherCallback(@) {
   Twilight_getWeatherHorizon($hash, $result);
   #$hash->{CONDITION} = 50;
 
-  if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
-     $hash->{VERSUCHE} += 1;
-     Twilight_RepeatTimerSet($hash, $param->{mode});
-     return;
-  }
+  ##repetition makes no longer sense...!
+  #if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} <= 10) {
+  #   $hash->{VERSUCHE} += 1;
+  #   Twilight_RepeatTimerSet($hash, $param->{mode});
+  #   return;
+  #}
 
-  Twilight_TwilightTimes      ($hash, $param->{mode}, $result);
+  Twilight_TwilightTimes($hash, $param->{mode}, $result);
 
-  Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
-  Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
-  $hash->{VERSUCHE} = 0;
+  #Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed to get valid weather data from yahoo"   if ($hash->{CONDITION} != 50 && $hash->{VERSUCHE} >  0);
+  #Log3 $hash, 3, "[$hash->{NAME}] " . ($hash->{VERSUCHE}+1) . " attempt(s) needed got NO valid weather data from yahoo"   if ($hash->{CONDITION} == 50 && $hash->{VERSUCHE} >  0);
+  #$hash->{VERSUCHE} = 0;
 
-  Twilight_StandardTimerSet   ($hash);
+  return Twilight_StandardTimerSet($hash);
+
 }
 ################################################################################
-sub Twilight_RepeatTimerSet($$) {
-  my ($hash, $mode) = @_;
+sub Twilight_RepeatTimerSet {
+  my $hash = shift;
+  my $mode   = shift // return;
+  
   my $midnight = time() + 60;
 
   myRemoveInternalTimer("Midnight", $hash);
-  if ($mode eq "Mid") {
-     myInternalTimer   ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
-  } else {
-     myInternalTimer   ("Midnight", $midnight, "Twilight_WeatherTimerUpdate", $hash, 0);
-  }
-
+  return myInternalTimer ("Midnight", $midnight, "Twilight_Midnight", $hash, 0) if $mode eq "Mid";
+  
+  return myInternalTimer   ("Midnight", $midnight, "Twilight_WeatherTimerUpdate", $hash, 0);
 }
+
 ################################################################################
-sub Twilight_StandardTimerSet($) {
-  my ($hash) = @_;
+sub Twilight_StandardTimerSet {
+  my $hash = shift // return;
   my $midnight = time() - Twilight_midnight_seconds(time()) + 24*3600 + 1;
 
   myRemoveInternalTimer       ("Midnight", $hash);
   myInternalTimer             ("Midnight", $midnight, "Twilight_Midnight", $hash, 0);
-  Twilight_WeatherTimerSet    ($hash);
+  return Twilight_WeatherTimerSet($hash);
 }
+
 ################################################################################
-sub Twilight_WeatherTimerSet($) {
-  my ($hash) = @_;
-  my $now    = time();
+sub Twilight_WeatherTimerSet {
+  my $hash = shift // return;
+  my $now  = time();
 
   myRemoveInternalTimer    ("weather", $hash);
-  foreach my $key ("sr_weather", "ss_weather") {
+  for my $key ("sr_weather", "ss_weather") {
      my $tim = $hash->{TW}{$key}{TIME};
      if ($tim-60*60>$now+60) {
         myInternalTimer       ("weather", $tim-60*60, "Twilight_WeatherTimerUpdate", $hash, 0);
@@ -474,18 +439,18 @@ sub Twilight_WeatherTimerSet($) {
   }
 }
 ################################################################################
-sub Twilight_sunposTimerSet($) {
-  my ($hash) = @_;
-
-  myRemoveInternalTimer       ("sunpos", $hash);
-  myInternalTimer             ("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
-
+sub Twilight_sunposTimerSet {
+  my $hash = shift // return;
+  
+  myRemoveInternalTimer("sunpos", $hash);
+  return myInternalTimer("sunpos", time()+$hash->{SUNPOS_OFFSET},  "Twilight_sunpos", $hash, 0);
 }
-################################################################################
-sub Twilight_getWeatherHorizon(@)
-{
-  my ($hash, $result) = @_;
 
+################################################################################
+sub Twilight_getWeatherHorizon {
+  my $hash   = shift;
+  my $result = shift // return;
+  
   my $location=$hash->{WEATHER};
   if ($location == 0)  {
      $hash->{WEATHER_HORIZON}="0";
@@ -553,12 +518,12 @@ sub Twilight_getWeatherHorizon(@)
   }
 
   return 1;
-
 }
+
 ################################################################################
-sub Twilight_sunpos($)
-{
-  my ($myHash) = @_;
+sub Twilight_sunpos {
+  my $myHash = shift // return;
+  
   my $hash = myGetHashIndirekt($myHash, (caller(0))[3]);
   return if (!defined($hash));
 
@@ -642,27 +607,26 @@ sub Twilight_sunpos($)
      $twilight = 100 if ($twilight>100);
      $twilight = 0   if ($twilight<  0);
 
-  my $twilight_weather	 ;
+  my $twilight_weather     ;
 
   if( (my $ExtWeather = AttrVal($hashName, "useExtWeather", "")) eq "") {
      $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-	    Log3 $hash, 5, "[$hash->{NAME}] " . "Original weather readings";
+        Log3 $hash, 5, "[$hash->{NAME}] " . "Original weather readings";
   } else {
-	   my($extDev,$extReading) = split(":",$ExtWeather);
-	   my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1);
-	   if ($extWeatherHorizont >= 0){
-		     $extWeatherHorizont = 100 if ($extWeatherHorizont > 100);
-		     Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;
-		     $twilight_weather = $twilight - int(0.007 * ($extWeatherHorizont ** 2)); ## SCM: 100% clouds => 30% light (rough estimation)
-	   } else {
-		     $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-		     Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";
-	   }
+       my($extDev,$extReading) = split(":",$ExtWeather);
+       my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1);
+       if ($extWeatherHorizont >= 0){
+             $extWeatherHorizont = 100 if ($extWeatherHorizont > 100);
+             Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;
+             $twilight_weather = $twilight - int(0.007 * ($extWeatherHorizont ** 2)); ## SCM: 100% clouds => 30% light (rough estimation)
+       } else {
+             $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
+             Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";
+       }
   }
 
-  $twilight_weather = 100 if ($twilight_weather>100);
-  $twilight_weather = 0   if ($twilight_weather<  0);
-
+  $twilight_weather = List::Util::min(100, List::Util::max($twilight_weather,0));
+  
   #  set readings
   $dAzimuth   = int(100*$dAzimuth  )/100;
   $dElevation = int(100*$dElevation)/100;
@@ -679,51 +643,33 @@ sub Twilight_sunpos($)
 
   Twilight_sunposTimerSet($hash);
 
-  return undef;
+  return;
 }
 ################################################################################
-sub Twilight_CompassPoint($) {
-  my ($azimuth) = @_;
+sub Twilight_CompassPoint {
+  my $azimuth = shift // return;
 
-  my $compassPoint = "unknown";
-
-  if ($azimuth      < 22.5) {
-     $compassPoint = "north";
-  } elsif ($azimuth < 45)   {
-     $compassPoint = "north-northeast";
-  } elsif ($azimuth < 67.5) {
-     $compassPoint = "northeast";
-  } elsif ($azimuth < 90)   {
-     $compassPoint = "east-northeast";
-  } elsif ($azimuth < 112.5){
-     $compassPoint = "east";
-  } elsif ($azimuth < 135)  {
-     $compassPoint = "east-southeast";
-  } elsif ($azimuth < 157.5){
-    $compassPoint = "southeast";
-  } elsif ($azimuth < 180)  {
-    $compassPoint = "south-southeast";
-  } elsif ($azimuth < 202.5){
-    $compassPoint = "south";
-  } elsif ($azimuth < 225)  {
-    $compassPoint = "south-southwest";
-  } elsif ($azimuth < 247.5){
-    $compassPoint = "southwest";
-  } elsif ($azimuth < 270)  {
-    $compassPoint = "west-southwest";
-  } elsif ($azimuth < 292.5){
-    $compassPoint = "west";
-  } elsif ($azimuth < 315)  {
-    $compassPoint = "west-northwest";
-  } elsif ($azimuth < 337.5){
-    $compassPoint = "northwest";
-  } elsif ($azimuth <= 361)  {
-    $compassPoint = "north-northwest";
-  }
-  return $compassPoint;
+  return "unknown"         if !looks_like_number($azimuth) || $azimuth < 0;
+  return "north"           if $azimuth < 22.5; 
+  return "north-northeast" if $azimuth < 45;
+  return "northeast"       if $azimuth < 67.5;
+  return "east-northeast"  if $azimuth < 90;
+  return "east"            if $azimuth < 112.5;
+  return "east-southeast"  if $azimuth < 135;
+  return "southeast"       if $azimuth < 157.5;
+  return "south-southeast" if $azimuth < 180;
+  return "south"           if $azimuth < 202.5;
+  return "south-southwest" if $azimuth < 225;
+  return "southwest"       if $azimuth < 247.5;
+  return "west-southwest"  if $azimuth < 270;
+  return "west"            if $azimuth < 292.5;
+  return "west-northwest"  if $azimuth < 315;
+  return "northwest"       if $azimuth < 337.5;
+  return "north-northwest" if $azimuth <= 361;
+  return "unknown";
 }
 
-sub twilight($$$$) {
+sub twilight {
   my ($twilight, $reading, $min, $max) = @_;
 
   my $t = hms2h(ReadingsVal($twilight,$reading,0));
@@ -738,51 +684,54 @@ sub twilight($$$$) {
 
 =pod
 =item device
-=item summary    delivers twilight and other sun related events for use in notify
-=item summary_DE liefert Dämmerungs Sonnen basierte Ereignisse, für notify
+=item summary generate twilight & sun related events; check alternative Astro.
+=item summary_DE liefert Dämmerungs Sonnen basierte Events. Alternative: Astro
 =begin html
 
 <a name="Twilight"></a>
 <h3>Twilight</h3>
 <ul>
   <br>
-
+  <a name="Twilightgeneral"></a>
+  <b>General Remarks</b><br>
+  This module profited much from the use of the yahoo weather API. Unfortunately, this service is no longer available, so Twilight functionality is very limited nowerdays. To some extend, the use of <a href="#Twilightattr">useExtWeather</a> may compensate to dect cloudy skys. If you just want to have astronomical data available, consider using Astro instead.<br><br>
   <a name="Twilightdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Twilight &lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]</code><br>
+    <code>define &lt;name&gt; Twilight [&lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]]</code><br>
     <br>
     Defines a virtual device for Twilight calculations <br><br>
 
   <b>latitude, longitude</b>
   <br>
-    The parameters <b>latitude</b> and <b>longitude</b> are decimal numbers which give the position on earth for which the twilight states shall be calculated.
+    The parameters <b>latitude</b> and <b>longitude</b> are decimal numbers which give the position on earth for which the twilight states shall be calculated. They are optional, if not set, global values will be used instead (global itself defaults to Frankfurt/Main).
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values.
-	   indoor_horizon 0 means indoor values are the same as real values. indoor_horizon > 0 means earlier indoor sunset resp. later indoor sunrise.
+       The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values.
+       indoor_horizon 0 means indoor values are the same as real values. indoor_horizon > 0 means earlier indoor sunset resp. later indoor sunrise.
     <br><br>
   <b>Weather_Position</b>
   <br>
-	   The parameter <b>Weather_Position</b> is the yahoo weather id used for getting the weather condition. Go to http://weather.yahoo.com/ and enter a city or zip code. In the upcoming webpage, the id is a the end of the URL. Example: Munich, Germany -> 676757
+       The parameter <b>Weather_Position</b> is the yahoo weather id used for getting the weather condition. Go to http://weather.yahoo.com/ and enter a city or zip code. In the upcoming webpage, the id is a the end of the URL. Example: Munich, Germany -> 676757
     <br><br>
-
+    NOTE: As yahoo weather service is no longer available, this setting will not be used any longer; consider using useExtWeather attribute to partly compensate.
+    <br>
     A Twilight device periodically calculates the times of different twilight phases throughout the day.
-	It calculates a virtual "light" element, that gives an indicator about the amount of the current daylight.
-	Besides the location on earth it is influenced by a so called "indoor horizon" (e.g. if there are high buildings, mountains) as well as by weather conditions. Very bad weather conditions lead to a reduced daylight for nearly the whole day.
-	The light calculated spans between 0 and 6, where the values mean the following:
+    It calculates a virtual "light" element, that gives an indicator about the amount of the current daylight.
+    Besides the location on earth it is influenced by a so called "indoor horizon" (e.g. if there are high buildings, mountains) as well as by weather conditions. Very bad weather conditions lead to a reduced daylight for nearly the whole day.
+    The light calculated spans between 0 and 6, where the values mean the following:
  <br><br>
   <b>light</b>
   <br>
-	<code>0 - total night, sun is at least -18 degree below horizon</code><br>
-	<code>1 - astronomical twilight, sun is between -12 and -18 degree below horizon</code><br>
-	<code>2 - nautical twilight, sun is between -6 and -12 degree below horizon</code><br>
-	<code>3 - civil twilight, sun is between 0 and -6 degree below horizon</code><br>
-	<code>4 - indoor twilight, sun is between the indoor_horizon and 0 degree below horizon (not used if indoor_horizon=0)</code><br>
-	<code>5 - weather twilight, sun is between indoor_horizon and a virtual weather horizon (the weather horizon depends on weather conditions (optional)</code><br>
-	<code>6 - maximum daylight</code><br>
-	<br>
+    <code>0 - total night, sun is at least -18 degree below horizon</code><br>
+    <code>1 - astronomical twilight, sun is between -12 and -18 degree below horizon</code><br>
+    <code>2 - nautical twilight, sun is between -6 and -12 degree below horizon</code><br>
+    <code>3 - civil twilight, sun is between 0 and -6 degree below horizon</code><br>
+    <code>4 - indoor twilight, sun is between the indoor_horizon and 0 degree below horizon (not used if indoor_horizon=0)</code><br>
+    <code>5 - weather twilight, sun is between indoor_horizon and a virtual weather horizon (the weather horizon depends on weather conditions (optional)</code><br>
+    <code>6 - maximum daylight</code><br>
+    <br>
  <b>Azimut, Elevation, Twilight</b>
  <br>
    The module calculates additionally the <b>azimuth</b> and the <b>elevation</b> of the sun. The values can be used to control a roller shutter.
@@ -795,9 +744,9 @@ sub twilight($$$$) {
    <br><br>
    Any control depending on the value of Twilight must
    consider these aspects.
- 	<br><br>
+     <br><br>
 
-	Example:
+    Example:
     <pre>
       define myTwilight Twilight 49.962529  10.324845 3 676757
     </pre>
@@ -851,10 +800,10 @@ sub twilight($$$$) {
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-	<li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
-	use data from other devices to calculate <b>twilight_weather</b>.<br/>
-	The reading used shoud be in the range of 0 to 100 like the reading <b>c_clouds</b>	in an <b><a href="#openweathermap">openweathermap</a></b> device, where 0 is clear sky and 100 are overcast clouds.<br/>
-	With the use of this attribute weather effects like heavy rain or thunderstorms are neglegted for the calculation of the <b>twilight_weather</b> reading.<br/>
+    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
+    use data from other devices to calculate <b>twilight_weather</b>.<br/>
+    The reading used shoud be in the range of 0 to 100 like the reading <b>c_clouds</b>    in an <b><a href="#openweathermap">openweathermap</a></b> device, where 0 is clear sky and 100 are overcast clouds.<br/>
+    With the use of this attribute weather effects like heavy rain or thunderstorms are neglegted for the calculation of the <b>twilight_weather</b> reading.<br/>
   </ul>
   <br>
 
@@ -885,29 +834,32 @@ Example:
 <a name="Twilight"></a>
 <h3>Twilight</h3>
 <ul>
+  <b>Akkgemeine Hinweise</b><br>
+  Dieses Modul nutzte früher Daten von der Yahoo Wetter API. Diese ist leider nicht mehr verfügbar, daher ist die heutige Funktionalität deutlich eingeschränkt. Dies kann zu einem gewissen Grad kompensiert werden, indem man <a href="#Twilightattr">useExtWeather</a> setzt, um Bedeckungsgrade mit Wolken zu berücksichtigen. Falls Sie nur Astronomische Daten benötigen, wäre Astro hierfür eine genauere Alternative.<br><br>
+
   <br>
 
   <a name="Twilightdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Twilight &lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]</code><br>
+    <code>define &lt;name&gt; Twilight [&lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]]</code><br>
     <br>
     Erstellt ein virtuelles Device f&uuml;r die D&auml;mmerungsberechnung (Zwielicht)<br><br>
 
   <b>latitude, longitude (geografische L&auml;nge & Breite)</b>
   <br>
-    Die Parameter <b>latitude</b> und <b>longitude</b> sind Dezimalzahlen welche die Position auf der Erde bestimmen, f&uuml;r welche der Dämmerungs-Status berechnet werden soll.
+    Die Parameter <b>latitude</b> und <b>longitude</b> sind Dezimalzahlen welche die Position auf der Erde bestimmen, f&uuml;r welche der Dämmerungs-Status berechnet werden soll. Sie sind optional, wenn nicht vorhanden, werden die Angaben in global berücksichtigt, bzw. ohne weitere Angaben die Daten von Frankfurt/Main.
     <br><br>
   <b>indoor_horizon</b>
   <br>
-	   Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen
-	   indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.
+       Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen
+       indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.
     <br><br>
   <b>Weather_Position</b>
   <br>
-	   Der Parameter <b>Weather_Position</b> ist die Yahoo! Wetter-ID welche f&uuml;r den Bezug der Wetterinformationen gebraucht wird. Gehe auf http://weather.yahoo.com/ und gebe einen Ort (ggf. PLZ) ein. In der URL der daraufhin geladenen Seite ist an letzter Stelle die ID. Beispiel: München, Deutschland -> 676757
+       Der Parameter <b>Weather_Position</b> ist die Yahoo! Wetter-ID welche f&uuml;r den Bezug der Wetterinformationen gebraucht wird. Gehe auf http://weather.yahoo.com/ und gebe einen Ort (ggf. PLZ) ein. In der URL der daraufhin geladenen Seite ist an letzter Stelle die ID. Beispiel: München, Deutschland -> 676757
     <br><br>
-
+    Hinweis: Da der Yahoo-Wetterdienst nicht mehr zur Verfügung steht, ist dieses Attribut nutzlos. Siehe useExtWeather als Alternative.<br>
     Ein Twilight-Device berechnet periodisch die D&auml;mmerungszeiten und -phasen w&auml;hrend des Tages.
     Es berechnet ein virtuelles "Licht"-Element das einen Indikator f&uuml;r die momentane Tageslichtmenge ist.
     Neben der Position auf der Erde wird es vom sog. "indoor horizon" (Beispielsweise hohe Geb&auml;de oder Berge)
@@ -915,14 +867,14 @@ Example:
     Das berechnete Licht liegt zwischen 0 und 6 wobei die Werte folgendes bedeuten:<br><br>
   <b>light</b>
   <br>
-	<code>0 - Totale Nacht, die Sonne ist mind. -18 Grad hinter dem Horizont</code><br>
-	<code>1 - Astronomische D&auml;mmerung, die Sonne ist zw. -12 und -18 Grad hinter dem Horizont</code><br>
-	<code>2 - Nautische D&auml;mmerung, die Sonne ist zw. -6 and -12 Grad hinter dem Horizont</code><br>
-	<code>3 - Zivile/B&uuml;rgerliche D&auml;mmerung, die Sonne ist zw. 0 and -6 hinter dem Horizont</code><br>
-	<code>4 - "indoor twilight", die Sonne ist zwischen dem Wert indoor_horizon und 0 Grad hinter dem Horizont (wird nicht verwendet wenn indoor_horizon=0)</code><br>
-	<code>5 - Wetterbedingte D&auml;mmerung, die Sonne ist zwischen indoor_horizon und einem virtuellen Wetter-Horizonz (der Wetter-Horizont ist Wetterabh&auml;ngig (optional)</code><br>
-	<code>6 - Maximales Tageslicht</code><br>
-	<br>
+    <code>0 - Totale Nacht, die Sonne ist mind. -18 Grad hinter dem Horizont</code><br>
+    <code>1 - Astronomische D&auml;mmerung, die Sonne ist zw. -12 und -18 Grad hinter dem Horizont</code><br>
+    <code>2 - Nautische D&auml;mmerung, die Sonne ist zw. -6 and -12 Grad hinter dem Horizont</code><br>
+    <code>3 - Zivile/B&uuml;rgerliche D&auml;mmerung, die Sonne ist zw. 0 and -6 hinter dem Horizont</code><br>
+    <code>4 - "indoor twilight", die Sonne ist zwischen dem Wert indoor_horizon und 0 Grad hinter dem Horizont (wird nicht verwendet wenn indoor_horizon=0)</code><br>
+    <code>5 - Wetterbedingte D&auml;mmerung, die Sonne ist zwischen indoor_horizon und einem virtuellen Wetter-Horizonz (der Wetter-Horizont ist Wetterabh&auml;ngig (optional)</code><br>
+    <code>6 - Maximales Tageslicht</code><br>
+    <br>
  <b>Azimut, Elevation, Twilight (Seitenwinkel, Höhenwinkel, D&auml;mmerung)</b>
  <br>
    Das Modul berechnet zus&auml;tzlich Azimuth und Elevation der Sonne. Diese Werte k&ouml;nnen zur Rolladensteuerung verwendet werden.<br><br>
@@ -933,9 +885,9 @@ Das Reading <b>Twilight</b> wird als neuer "(twi)light" Wert hinzugef&uuml;gt. E
 Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte Elevationen nicht erreicht. Im Juni und Juli liegt die Sonne in Mitteleuropa nie unter -18&deg;. In n&ouml;rdlicheren Gebieten (Norwegen, ...) kommt die Sonne beispielsweise nicht &uuml;ber 0&deg.
    <br><br>
    All diese Aspekte m&uuml;ssen ber&uuml;cksichtigt werden bei Schaltungen die auf Twilight basieren.
- 	<br><br>
+     <br><br>
 
-	Beispiel:
+    Beispiel:
     <pre>
       define myTwilight Twilight 49.962529  10.324845 3 676757
     </pre>
@@ -988,10 +940,10 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-	<li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
-	Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
-	Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
-	Wird diese Attribut genutzt , werden Wettereffekte wie Starkregen oder Gewitter fuer die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen.
+    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
+    Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
+    Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
+    Wird diese Attribut genutzt , werden Wettereffekte wie Starkregen oder Gewitter fuer die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen.
   </ul>
   <br>
 
