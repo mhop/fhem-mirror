@@ -190,6 +190,14 @@ sub EventProcessingGeneral {
         {
             FHEM::Automation::ShuttersControl::RenewSunRiseSetShuttersTimer($hash);
         }
+        elsif (
+            $events =~ m{^(DELETEATTR|ATTR)
+                \s(.*)\s(ASC_Shading_StateChange_SunnyCloudy)
+                (.*)?}xms
+          )
+        {
+            $FHEM::Automation::ShuttersControl::shutters->deleteShadingStateChangeSunny;
+        }
 
         if (
             $events =~

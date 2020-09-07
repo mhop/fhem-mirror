@@ -919,6 +919,14 @@ sub setShadingStateChangeSunnyCloudy {
     return;
 }
 
+sub deleteShadingStateChangeSunny {
+    my $self = shift;
+
+    delete $self->{ $self->{shuttersDev} }->{BrightnessAverageArray};
+
+    return;
+}
+
 sub getShadingStateChangeSunny {
     my $self = shift;
 

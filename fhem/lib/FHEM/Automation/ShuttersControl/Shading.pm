@@ -294,7 +294,9 @@ sub ShadingProcessing {
             ->getShadingMinOutsideTemperature - 4
             || $azimuth < $azimuthLeft
             || $azimuth > $azimuthRight
-            || !$FHEM::Automation::ShuttersControl::shutters->getIsDay
+            || (   !$FHEM::Automation::ShuttersControl::shutters->getIsDay
+                && $FHEM::Automation::ShuttersControl::shutters->getSunriseUnixTime
+                  - ( int( gettimeofday() ) ) > 7200 )
         )
         && $FHEM::Automation::ShuttersControl::shutters->getShadingStatus ne
         'out'
@@ -530,6 +532,11 @@ sub ShadingProcessingDriveCommand {
         && $getShadingPos != $getStatus
         && ( $getStatus != $FHEM::Automation::ShuttersControl::shutters->getClosedPos
           || ( $getStatus == $FHEM::Automation::ShuttersControl::shutters->getClosedPos
+            && $marker
+            )
+          )
+        && ( $getStatus != $FHEM::Automation::ShuttersControl::shutters->getSleepPos
+          || ( $getStatus == $FHEM::Automation::ShuttersControl::shutters->getSleepPos
             && $marker
             )
           )
