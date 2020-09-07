@@ -71,7 +71,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 name:fuel_oil_check
 filter:TYPE=HTTPMOD
 desc: checks fuel oil prices via easyoil.com<br>Define a HTTPMOD device like<br>define heizoelpreis HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= 3600 <a href="https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754">Source: Forum</a>
-order:order: 100005
+order: 100005
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
 defmod DEVICE HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= INTERVAL
@@ -177,6 +177,7 @@ attr DEVICE get02Regex Sonnenaufgang um <\/span>(.*)<s[\w\W]*Sonnenuntergang um 
 attr DEVICE get02URL MAINURL
 attr DEVICE reading01Regex (?s)Temperatur.*?.*?>.*?(?<temperature>[\d,]+)&thinsp.*?Taupunkt.*?.*?>.*?(?<taupunkt>[\d,]+)&thinsp.*?Wind.*?>\n\s*(?<wind>[^<]+)\s<abbr.*?Windspitzen.*?>\n\s*(?<windspitzen>[^<]+)\s<abbr.*?Luftdruck.*?>\n\s*(?<luftdruck>[^<]+)\s<abbr.*?Luftfeuchtigkeit.*?>\n\s*(?<humidity>[^<]+)\s<abbr.*?Sonnenschein.*?>\n\s*(?<sonne>[^<]+)\s<abbr.*?Niederschlag.*?>\n\s*(?<rain>[^<\n]+).*?</p.*?(?<messwerte>Messwerte[^<\n]+)
 attr DEVICE room WHICHROOM
+attr ORF_Weather readingOExpr $val =~ s/([\d]+),([\d]+) */$1.$2/ if $val =~ m{\A[\d]+,[\d]+ *\z};;$val
 attr DEVICE stateFormat W: wind, H: humidity%rH, T: temperature°C
 attr DEVICE model ORF_weather
 setreading DEVICE attrTemplateVersion 20200522 or prior
@@ -647,7 +648,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 name:aculfw_fw_check
 filter:TYPE=X_01d
 desc: checks a-culfw firmware updates<br />Define a HTTPMOD device like<br />define aculfw_fw_check HTTPMOD https://github.com/heliflieger/a-culfw/blob/master/CHANGELOG 86400<br /><a href="https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829">Source: Forum</a>
-order:order: XXXXX
+order: XXXXX
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to daily (86400s); {InternalVal("DEVICE","Interval",86400)}
 defmod DEVICE HTTPMOD https://github.com/heliflieger/a-culfw/blob/master/CHANGELOG INTERVAL
