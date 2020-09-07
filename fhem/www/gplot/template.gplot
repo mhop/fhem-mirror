@@ -14,6 +14,6 @@ set grid
 set ytics
 set y2tics
 
-#FileLog 4:RegExp::
+#FileLog 4:.*::
 
 plot "<IN>" using 1:2 title 'Line 1' with lines
