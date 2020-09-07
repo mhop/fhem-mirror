@@ -34,7 +34,7 @@ use Blocking;
 use Data::Dumper;
 use GPUtils qw(GP_Import);
 
-use constant API => "https://api.oilfox.io/v3/";
+use constant API => "https://api.oilfox.io/";
 
 BEGIN {
     GP_Import(
@@ -294,7 +294,7 @@ sub APIAuth($) {
                 }';
 
     HttpUtils_NonblockingGet({
-        url        	=> API . "login",
+        url        	=> API . "v3/login",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "POST",
@@ -399,7 +399,7 @@ sub get($) {
     my $header = "Content-Type: application/json\r\nAccept: application/json\r\nAuthorization: Bearer " . $token;
 
     HttpUtils_NonblockingGet({
-        url        	=> API . "user/summary",
+        url        	=> API . "v4/summary",
         timeout    	=> 5,
         hash       	=> $hash,
         method     	=> "GET",
@@ -445,11 +445,11 @@ sub getResponse($) {
             $hash->{OilFox}->{oilfox_name} = $myoilfox->{'name'};
             $hash->{OilFox}->{oilfox_hwid} = $myoilfox->{'hwid'};
             $hash->{OilFox}->{oilfox_tankVolume} = $myoilfox->{'tankVolume'};
-            $hash->{OilFox}->{oilfox_metering_value} = $myoilfox->{'metering'}->{'value'};
-            $hash->{OilFox}->{oilfox_metering_fillingPercentage} = $myoilfox->{'metering'}->{'fillingPercentage'};
-            $hash->{OilFox}->{oilfox_metering_liters} = $myoilfox->{'metering'}->{'liters'};
-            $hash->{OilFox}->{oilfox_metering_currentOilHeight} = $myoilfox->{'metering'}->{'currentOilHeight'};
-            $hash->{OilFox}->{oilfox_metering_battery} = $myoilfox->{'metering'}->{'battery'};
+            $hash->{OilFox}->{oilfox_metering_value} = $myoilfox->{'lastMetering'}->{'value'};
+            $hash->{OilFox}->{oilfox_metering_fillingPercentage} = $myoilfox->{'lastMetering'}->{'fillingPercentage'};
+            $hash->{OilFox}->{oilfox_metering_liters} = $myoilfox->{'lastMetering'}->{'liters'};
+            $hash->{OilFox}->{oilfox_metering_currentOilHeight} = $myoilfox->{'lastMetering'}->{'currentOilHeight'};
+            $hash->{OilFox}->{oilfox_metering_battery} = $myoilfox->{'lastMetering'}->{'battery'};
        
             CONNECTED($hash,'connected');
 
