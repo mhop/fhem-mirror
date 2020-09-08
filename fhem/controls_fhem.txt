@@ -1,6 +1,6 @@
-REV 22741
+REV 22746
 DIR unused
-UPD 2020-09-06_07:45:03 349966 ./CHANGED
+UPD 2020-09-08_07:45:03 350318 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
 UPD 2020-07-05_07:45:03 41333 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -87,7 +87,7 @@ UPD 2018-04-29_07:45:04 25762 FHEM/11_OWX_TCP.pm
 UPD 2018-05-30_07:45:03 10823 FHEM/12_HMS.pm
 UPD 2019-11-21_07:45:03 13688 FHEM/12_HProtocolGateway.pm
 UPD 2019-11-21_07:45:03 5493 FHEM/12_HProtocolTank.pm
-UPD 2020-03-10_07:45:03 16203 FHEM/12_OilFox.pm
+UPD 2020-09-08_07:45:03 16221 FHEM/12_OilFox.pm
 UPD 2019-08-18_07:45:03 15242 FHEM/13_KS300.pm
 UPD 2020-06-14_07:45:02 55778 FHEM/14_CUL_MAX.pm
 UPD 2019-01-21_07:45:02 10452 FHEM/14_CUL_REDIRECT.pm
@@ -375,7 +375,7 @@ UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
 UPD 2020-07-07_07:45:06 196050 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2020-09-05_07:45:03 97659 FHEM/73_AutoShuttersControl.pm
+UPD 2020-09-08_07:45:03 97659 FHEM/73_AutoShuttersControl.pm
 UPD 2020-05-05_07:45:02 201709 FHEM/73_DoorBird.pm
 UPD 2020-03-10_07:45:03 96019 FHEM/73_ElectricityCalculator.pm
 UPD 2020-05-02_07:45:02 42673 FHEM/73_GardenaSmartBridge.pm
@@ -634,7 +634,7 @@ UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2020-06-18_07:45:02 7778 FHEM/lib/AttrTemplate/general_use.template
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-05-23_07:45:02 60312 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
 UPD 2020-09-05_07:45:03 267959 FHEM/lib/AttrTemplate/mqtt2.template
@@ -738,23 +738,23 @@ UPD 2020-09-06_07:45:07 4369215 docs/commandref.html
 UPD 2020-09-06_07:45:09 2717150 docs/commandref_DE.html
 UPD 2020-08-20_07:45:03 80720 docs/commandref_frame.html
 UPD 2020-08-20_07:45:03 90332 docs/commandref_frame_DE.html
-UPD 2020-09-07_07:45:10 234158 docs/commandref_modular.html
-UPD 2020-09-07_07:45:12 244875 docs/commandref_modular_DE.html
+UPD 2020-09-08_07:45:10 234158 docs/commandref_modular.html
+UPD 2020-09-08_07:45:11 244875 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
-UPD 2020-09-05_07:45:03 74122 lib/FHEM/Automation/ShuttersControl.pm
+UPD 2020-09-08_07:45:03 74160 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2020-06-23_07:45:04 2701 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2020-07-27_07:45:02 11614 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2020-06-23_07:45:04 7300 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
-UPD 2020-08-07_07:45:02 109175 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
+UPD 2020-09-08_07:45:03 109444 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
 UPD 2020-08-19_07:45:03 45565 lib/FHEM/Automation/ShuttersControl/Helper.pm
 UPD 2020-07-27_07:45:02 2545 lib/FHEM/Automation/ShuttersControl/Roommate.pm
-UPD 2020-08-21_07:45:02 24273 lib/FHEM/Automation/ShuttersControl/Shading.pm
+UPD 2020-09-08_07:45:03 24637 lib/FHEM/Automation/ShuttersControl/Shading.pm
 UPD 2020-08-13_07:45:03 31425 lib/FHEM/Automation/ShuttersControl/Shutters.pm
-UPD 2020-07-27_07:45:02 52329 lib/FHEM/Automation/ShuttersControl/Shutters/Attr.pm
+UPD 2020-09-08_07:45:03 52474 lib/FHEM/Automation/ShuttersControl/Shutters/Attr.pm
 UPD 2020-06-23_07:45:04 2952 lib/FHEM/Automation/ShuttersControl/Shutters/Readings.pm
 UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
 UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
@@ -918,7 +918,7 @@ UPD 2015-07-28_14:05:32 668 www/gplot/temp4hum4.gplot
 UPD 2015-07-28_14:05:32 915 www/gplot/temp4hum6.gplot
 UPD 2015-07-28_14:05:32 1473 www/gplot/temp4rain10.gplot
 UPD 2015-07-28_14:05:32 867 www/gplot/temp4valve4.gplot
-UPD 2018-05-11_07:45:02 382 www/gplot/template.gplot
+UPD 2020-09-08_07:45:03 378 www/gplot/template.gplot
 UPD 2015-07-28_14:05:32 402 www/gplot/templateDB.gplot
 UPD 2015-07-28_14:05:32 455 www/gplot/vol4.gplot
 UPD 2015-07-28_14:05:32 1086 www/gplot/wind4windDir4.gplot
