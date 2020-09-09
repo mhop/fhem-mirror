@@ -1,4 +1,4 @@
-REV 22746
+REV 22747
 DIR unused
 UPD 2020-09-08_07:45:03 350318 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
@@ -738,8 +738,8 @@ UPD 2020-09-06_07:45:07 4369215 docs/commandref.html
 UPD 2020-09-06_07:45:09 2717150 docs/commandref_DE.html
 UPD 2020-08-20_07:45:03 80720 docs/commandref_frame.html
 UPD 2020-08-20_07:45:03 90332 docs/commandref_frame_DE.html
-UPD 2020-09-08_07:45:10 234158 docs/commandref_modular.html
-UPD 2020-09-08_07:45:11 244875 docs/commandref_modular_DE.html
+UPD 2020-09-09_07:45:10 234158 docs/commandref_modular.html
+UPD 2020-09-09_07:45:11 244875 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
