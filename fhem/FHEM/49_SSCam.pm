@@ -164,6 +164,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
+  "9.7.11" => "07.09.2020  implement new camOp control ",
   "9.7.10" => "06.09.2020  rebuild timer sequences, minor fixes ",
   "9.7.9"  => "05.09.2020  more refactoring according PBP ",
   "9.7.8"  => "02.09.2020  refactored setter: pirSensor runPatrol goAbsPTZ move runView hlsreactivate hlsactivate refresh ".
@@ -501,7 +503,7 @@ my %hdt = (                                                                 # De
   __getPtzPatrolList => 2.0,
   __getCamInfo       => 2.0,
   __camAutocreate    => 2.1,
-    sessionOff       => 2.7,
+  __sessionOff       => 2.7,
 );
 
 my %imc = (                                                                 # disbled String modellabhängig (SVS / CAM)
@@ -509,7 +511,13 @@ my %imc = (                                                                 # di
   1 => { 0 => "off",         1 => "inactive" },              
 );
 
-my %hrkeys = (                                                             # Hash der möglichen Response Keys 
+my %hexmo = (                                                               # Hash Exposure Modes
+  auto  => 0,
+  day   => 1,
+  night => 2,
+);
+
+my %hrkeys = (                                                              # Hash der möglichen Response Keys 
   camLiveMode      => { 0  => "Liveview from DS", 1 => "Liveview from Camera", },
   source           => { -1 => "disabled",         0 => "Camera",                 1 => "SVS", },   
   deviceType       => { 1  => "Camera",           2 => "Video_Server",           4 => "PTZ",          8 => "Fisheye", },
@@ -556,6 +564,7 @@ my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl de
 my $compstat          = "8.2.8";                           # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
+my $todef             = 20;                                # httptimeout default Wert
 
 #use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 #use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -865,11 +874,11 @@ sub delayedShutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  $shutdownInProcess = 1;                                       # Statusbit shutdown setzen -> getApiSites wird nicht mehr ausgeführt
+  $shutdownInProcess = 1;                                       # Statusbit shutdown setzen -> asynchrone Funktionen nicht mehr ausgeführen
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
 
-  sessionOff($hash);
+  __sessionOff($hash);
   
   if($hash->{HELPER}{CACHEKEY}) {
       cache($name, "c_destroy"); 
@@ -971,13 +980,16 @@ sub FWsummaryFn {
   $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   
   if($wltype eq "image") {
-    if(ReadingsVal($name, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
+    if(ReadingsVal($name, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
+    
     } else {
       $ret .= "<img src=$link $attr><br>";
     }
+    
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-    $ret .= $imgblank;  
+    $ret .= $imgblank; 
+    
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {
       if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
@@ -987,8 +999,10 @@ sub FWsummaryFn {
         $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
       }       
     $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
-    }      
+    }
+    
     $ret .= "<br>";
+    
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
                 "Your browser does not support the audio element.".
@@ -1229,6 +1243,61 @@ sub versionCheck {
 InternalTimer(gettimeofday()+$rc, "FHEM::SSCam::versionCheck", $hash, 0);
 
 return; 
+}
+
+################################################################
+#               return 0 - Startmeldung OpMode im Log 
+#               return 1 - wenn Shutdown läuft
+################################################################
+sub startOrShut {                      
+  my $name = shift;
+  my $hash = $defs{$name};
+  
+  if ($shutdownInProcess) {                                                             # shutdown in Proces -> keine weiteren Aktionen
+      Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
+      return 1;       
+  }
+  
+  Log3($name, 4, "$name - ####################################################"); 
+  Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
+  Log3($name, 4, "$name - ####################################################"); 
+          
+return 0;
+}
+
+###############################################################################
+# Err-Status / Log setzen wenn Device Verfügbarkeit disabled oder disconnected          
+###############################################################################
+sub exitOnDis { 
+  my $name = shift;
+  my $log  = shift;
+  my $hash = $defs{$name};
+  
+  my $exit = 0;
+  
+  my $errorcode = "000";
+  my $avail     = ReadingsVal($name, "Availability", "");
+  
+  if ($avail eq "disabled") {
+      $errorcode = "402";
+      $exit      = 1;
+  } elsif ($avail eq "disconnected") {
+      $errorcode = "502";
+      $exit      = 1;
+  }
+
+  if($exit) {
+      my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
+
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+      readingsBulkUpdate  ($hash, "Error",     $error    );
+      readingsEndUpdate   ($hash, 1);
+      
+      Log3($name, 2, "$name - ERROR - $log - $error");
+  }
+  
+return $exit;
 }
 
 ###########################################################################
@@ -2852,7 +2921,9 @@ sub __camStartRec {
     my $hash                            = $defs{$name};
     my $camname                         = $hash->{CAMNAME};
     
-    RemoveInternalTimer($hash, "__camStartRec");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name)); 
     return if(exitOnDis ($name, "Start Recording of Camera $camname can't be executed"));
@@ -2863,8 +2934,21 @@ sub __camStartRec {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                      
-        $hash->{OPMODE}               = "Start";
+        $hash->{OPMODE}               = "Start"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=start&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraIds=_CID_&action=start&_sid="_SID_"};
+        }
         
         if($emtxt || $teletxt || $chattxt) {
             $hash->{HELPER}{CANSENDREC} = 1        if($emtxt);           # Versand Aufnahme soll per Email erfolgen
@@ -2876,7 +2960,7 @@ sub __camStartRec {
         }   
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $str);
@@ -2893,7 +2977,9 @@ sub __camStopRec {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camStopRec");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Stop Recording of Camera $camname can't be executed"));        
@@ -2904,11 +2990,24 @@ sub __camStopRec {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE}               = "Stop";
+        $hash->{OPMODE}               = "Stop"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=stop&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraIds=_CID_&action=stop&_sid="_SID_"};
+        }  
                
         setActiveToken($hash);  
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -2925,17 +3024,31 @@ sub __camExpmode {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camExpmode");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Setting exposure mode of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                           
-        $hash->{OPMODE}               = "ExpMode";
+        $hash->{OPMODE}               = "ExpMode"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $expmode                   = $hexmo{$hash->{HELPER}{EXPMODE}};
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&cameraIds="_CID_"&expMode="$expmode"&camParamChkList=32&_sid="_SID_"};     
+                
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -2952,17 +3065,93 @@ sub __camMotDetSc {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camMotDetSc");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Setting of motion detection source of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "MotDetSc";
+        $hash->{OPMODE}               = "MotDetSc"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
-    
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        
+        my %motdetoptions = ();                                                  # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
+        my $motdetsc;
+        
+        if ($hash->{HELPER}{MOTDETSC} eq "disable") {
+            $motdetsc                   = "-1";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc&keep=true};
+      
+        } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
+            $motdetsc                   = "0";
+            $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+            $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
+            $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
+          
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc};
+          
+            if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP3}) {
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=1};                      # umschalten und neue Werte setzen
+          
+            } else {                                                             # nur Umschaltung, alte Werte beibehalten
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=0};
+            }
+ 
+            if ($hash->{HELPER}{MOTDETSC_PROP1}) {                               # der Wert für Bewegungserkennung Kamera -> Empfindlichkeit ist gesetzt
+                my $sensitivity              = delete $hash->{HELPER}{MOTDETSC_PROP1};
+                $hash->{HELPER}{CALL}{PART} .= qq{&sensitivity="$sensitivity"};
+            }
+          
+            if ($hash->{HELPER}{MOTDETSC_PROP2}) {                               # der Wert für Bewegungserkennung Kamera -> Objektgröße ist gesetzt
+                my $objectsize               = delete $hash->{HELPER}{MOTDETSC_PROP2};
+                $hash->{HELPER}{CALL}{PART} .= qq{&objectSize="$objectsize"};
+            }
+ 
+            if ($hash->{HELPER}{MOTDETSC_PROP3}) {                               # der Wert für Bewegungserkennung Kamera -> Prozentsatz für Auslösung ist gesetzt
+                my $percentage               = delete $hash->{HELPER}{MOTDETSC_PROP3};
+                $hash->{HELPER}{CALL}{PART} .= qq{&percentage="$percentage"};
+            }          
+      
+        } elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
+            $motdetsc                   = "1";
+            $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+            $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
+
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc};
+
+            if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2}) {
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=1};                      # umschalten und neue Werte setzen
+          
+            } else {                                                             # nur Umschaltung, alte Werte beibehalten
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=0};
+            }
+            
+            if ($hash->{HELPER}{MOTDETSC_PROP1}) {                               # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
+                my $sensitivity              = delete $hash->{HELPER}{MOTDETSC_PROP1};
+                $hash->{HELPER}{CALL}{PART} .= qq{&sensitivity="$sensitivity"};
+            }
+
+            if ($hash->{HELPER}{MOTDETSC_PROP2}) {                               # der Wert für Bewegungserkennung SVS -> Schwellwert ist gesetzt
+                my $threshold                = delete $hash->{HELPER}{MOTDETSC_PROP2};
+                $hash->{HELPER}{CALL}{PART} .= qq{&threshold="$threshold"};
+            }
+        }
+        
+        $hash->{HELPER}{CALL}{PART} .= qq{&_sid="_SID_"};
+      
+        $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;                        # Optionswerte in Hash sichern für Logausgabe in Befehlsauswertung
+     
         setActiveToken($hash);    
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -2983,17 +3172,25 @@ sub __camSnap {
     my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
     
-    $tac   = $tac // 5000;
-    my $ta = $hash->{HELPER}{TRANSACTION};
+    $tac       = $tac // 5000;
+    my $ta     = $hash->{HELPER}{TRANSACTION};
+    my $caller = (caller(0))[3];
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camSnap");
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Snapshot of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || (defined $ta && $ta == $tac)) {             
         $hash->{OPMODE}               = "Snap";
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
         $hash->{HELPER}{CANSENDSNAP}  = 1       if($emtxt);                        # Versand Schnappschüsse soll per Email erfolgen
         $hash->{HELPER}{CANTELESNAP}  = 1       if($teletxt);                      # Versand Schnappschüsse soll per TelegramBot erfolgen
         $hash->{HELPER}{CANCHATSNAP}  = 1       if($chattxt);                      # Versand Schnappschüsse soll per SSChatBot erfolgen
@@ -3001,9 +3198,14 @@ sub __camSnap {
         $hash->{HELPER}{SNAPLAG}      = $lag    if($lag);                          # Zeitverzögerung zwischen zwei Schnappschüssen
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
         $hash->{HELPER}{SMTPMSG}      = $emtxt  if($emtxt);                        # Text für Email-Versand
+
+        $hash->{HELPER}{CALL}{AKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&dsId="0"&method="TakeSnapshot"&blSave="true"&camId="_CID_"&_sid="_SID_"};
         
+        readingsSingleUpdate($hash,"state", "snap", 1); 
+    
         setActiveToken($hash); 
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         $tac = $tac // "";
@@ -3021,17 +3223,36 @@ sub __getRec {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getRec");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {              
-        $hash->{OPMODE}               = "GetRec";
+        $hash->{OPMODE}               = "GetRec"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "REC";
+        my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
+      
+        if($recid) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&id=$recid&mountId=0&method="Download"&_sid="_SID_"};      
+      
+        } else {
+            Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
+            return;      
+        }
 
         setActiveToken($hash); 
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3048,17 +3269,36 @@ sub __getRecAndSave {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getRecAndSave");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed"));    
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {              
-        $hash->{OPMODE}               = "SaveRec";
+        $hash->{OPMODE}               = "SaveRec"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "REC";
+        my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
+      
+        if($recid) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&id=$recid&mountId=0&method="Download"&_sid="_SID_"};      
+      
+        } else {
+            Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
+            return;      
+        }
 
         setActiveToken($hash); 
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3075,17 +3315,28 @@ sub __startTrack {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__startTrack");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Object Tracking of Camera $camname can't switched on"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "startTrack";
+        $hash->{OPMODE}               = "startTrack"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&cameraId="_CID_"&_sid="_SID_"}; 
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3102,17 +3353,28 @@ sub __stopTrack {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__stopTrack");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Object Tracking of Camera $camname can't switched off"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "stopTrack";
+        $hash->{OPMODE}               = "stopTrack"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&moveType="Stop"&cameraId="_CID_"&_sid="_SID_"};     
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3122,8 +3384,8 @@ return;
 }
 
 ###############################################################################
-#                       Zoom starten / stoppen
-#        $op = + / stop / -
+#                 Zoom in / stop / out starten bzw. stoppen
+#                              $op = + / stop / -
 ###############################################################################
 sub __setZoom {
     my $str        = shift;
@@ -3131,55 +3393,44 @@ sub __setZoom {
     my $hash       = $defs{$name};
     my $camname    = $hash->{CAMNAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__setZoom");
+    my $caller     = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Zoom $op of Camera $camname can't be started"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};     # Richtung (in / out)
-        $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                              # Start / Stop
-        $hash->{HELPER}{ZOOM}{STOPTIME} = $zd{$op}{sttime};                                # Stopzeit -> Verzögerungszeit für Stop nach Start
-        $hash->{OPMODE}                 = "setZoom";
+        $hash->{OPMODE}                 = "setZoom"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES}   = 0;
         
-        return if(!$hash->{HELPER}{ZOOM}{DIR});                                                  # es muss ! eine Richtung gesetzt sein
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
+        $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};     # Richtung (in / out)
+        $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                              # Start / Stop                               
+        
+        return if(!$hash->{HELPER}{ZOOM}{DIR});                                            # es muss ! eine Richtung gesetzt sein
+
+        my $dir                     = $hash->{HELPER}{ZOOM}{DIR};
+        my $moveType                = $hash->{HELPER}{ZOOM}{MOVETYPE};
+      
+        $hash->{HELPER}{CALL}{AKEY} = "PTZ";                                                                     
+        $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Zoom"&cameraId="_CID_"&control="$dir"&moveType="$moveType"&_sid="_SID_"};
     
-        InternalTimer(gettimeofday()+$zd{$op}{sttime}, "FHEM::SSCam::__setZoom", "$name!_!stop", 0) if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop");
+        if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop") {
+            InternalTimer(gettimeofday()+$zd{$op}{sttime}, "FHEM::SSCam::__setZoom", "$name!_!stop", 0);
+        }
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $str);
     }
-
-return;    
-}
-
-###############################################################################
-#                       Preset-Array abrufen
-###############################################################################
-sub __getPresets {
-    my $hash    = shift;
-    my $camname = $hash->{CAMNAME};
-    my $name    = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getPresets");
-
-    return if(IsDisabled($name));
-    return if(exitOnDis ($name, "Preset list of Camera $camname can't be get"));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "getPresets";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites   ($hash);
-        
-    } else {
-        schedule ($name, $hash);
-    }  
 
 return;    
 }
@@ -3192,17 +3443,38 @@ sub __setPreset {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__setPreset");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
 
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Preset of Camera $camname can't be set"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "setPreset";
+        $hash->{OPMODE}               = "setPreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        
+        my $pnumber = $hash->{HELPER}{PNUMBER};
+        my $pname   = $hash->{HELPER}{PNAME};
+        my $pspeed  = $hash->{HELPER}{PSPEED};
+      
+        if ($pspeed) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetPreset"&position=$pnumber&name="$pname"&speed="$pspeed"&cameraId="_CID_"&_sid="_SID_"};                  
+      
+        } else {    
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetPreset"&position=$pnumber&name="$pname"&cameraId="_CID_"&_sid="_SID_"};                          
+        }
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3219,17 +3491,29 @@ sub __delPreset {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__delPreset");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Preset of Camera $camname can't be deleted"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "delPreset";
+        $hash->{OPMODE}               = "delPreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $delp                      = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}};
+        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="DelPreset"&position="$delp"&cameraId="_CID_"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3246,17 +3530,35 @@ sub __setHome {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__setHome");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Home preset of Camera $camname can't be set"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "setHome";
+        $hash->{OPMODE}               = "setHome"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        
+        if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetHome"&cameraId="_CID_"&_sid="_SID_"};        
+      
+        } else {
+            my $bindpos                 = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}}; 
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetHome"&bindPosition="$bindpos"&cameraId="_CID_"&_sid="_SID_"};      
+        }
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3269,19 +3571,32 @@ return;
 #                                HomeMode setzen 
 ###########################################################################
 sub __setHomeMode {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__setHomeMode");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "sethomemode";
+        $hash->{OPMODE}               = "sethomemode"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $sw                        = $hash->{HELPER}{HOMEMODE};                 # HomeMode on,off
+        $sw                           = ($sw eq "on") ? "true" : "false";
+        $hash->{HELPER}{CALL}{AKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=Switch&on=$sw&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3294,19 +3609,40 @@ return;
 #                         Optimierparameter setzen 
 ###########################################################################
 sub __setOptParams {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer ($hash, "FHEM::SSCam::__setOptParams");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "setoptpar";
+        $hash->{OPMODE}               = "setoptpar"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $mirr                    = $hash->{HELPER}{MIRROR}  // ReadingsVal($name, "CamVideoMirror", "");
+        my $flip                    = $hash->{HELPER}{FLIP}    // ReadingsVal($name, "CamVideoFlip",   "");
+        my $rot                     = $hash->{HELPER}{ROTATE}  // ReadingsVal($name, "CamVideoRotate", "");
+        my $ntp                     = $hash->{HELPER}{NTPSERV} // ReadingsVal($name, "CamNTPServer",   "");
+      
+        $ntp                        = q{} if($ntp eq "none");
+        my $clst                    = $hash->{HELPER}{CHKLIST} // "";
+
+        my $ver                     = $hash->{HELPER}{API}{CAM}{VER} >= 9 ? 8 : $hash->{HELPER}{API}{CAM}{VER};        
+               
+        $hash->{HELPER}{CALL}{AKEY} = "CAM";
+        $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer="$ntp"&camParamChkList=$clst&cameraIds="_CID_"&_sid="_SID_"};  
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3323,17 +3659,29 @@ sub __managePir {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__managePir");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "PIR of camera $camname cannot be managed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "piract";
+        $hash->{OPMODE}               = "piract"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        my $piract                    = $hash->{HELPER}{PIRACT};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="PDParamSave"&keep=true&source=$piract&camId="_CID_"&_sid="_SID_"};     
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3350,21 +3698,37 @@ sub __runLiveview {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__runLiveview");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "Liveview of Camera $camname can't be started"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {           
-        $hash->{OPMODE}               = "runliveview";
+        $hash->{OPMODE}               = "runliveview"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0; 
         
-        delete $hash->{CAMID};                              # erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        delete $hash->{CAMID};                                                               # erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
         
         readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
         
+        if ($hash->{HELPER}{RUNVIEW} =~ /snap/x) {                                           # den letzten Schnappschuß live anzeigen
+            my $limit                   = 1;                                                 # nur 1 Snap laden, für lastsnap_fw 
+            my $imgsize                 = 2;                                                 # full size image, für lastsnap_fw 
+            my $keyword                 = $hash->{CAMNAME};                                  # nur Snaps von $camname selektieren, für lastsnap_fw   
+            $hash->{HELPER}{CALL}{AKEY} = "SNAPSHOT";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
+        }
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -3381,17 +3745,25 @@ sub __activateHls {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__activateHls");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "HLS-Stream of Camera $camname can't be activated"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {            
-        $hash->{OPMODE}               = "activate_hls";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
+        $hash->{OPMODE}               = "activate_hls"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;  
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }       
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -3408,17 +3780,28 @@ sub __reactivateHls {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__reactivateHls");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "HLS-Stream of Camera $camname can't be reactivated"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "reactivate_hls";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
+        $hash->{OPMODE}               = "reactivate_hls"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+
+        $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_};     
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -3434,17 +3817,25 @@ sub __camAutocreate {
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camAutocreate");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     
     return if(IsDisabled($name));
     return if(exitOnDis ($name, "autocreate cameras not possible"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {            
-        $hash->{OPMODE}               = "Autocreate";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
+        $hash->{OPMODE}               = "Autocreate"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;  
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }       
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -3460,12 +3851,19 @@ sub __stopLiveview {
     my $hash = shift;
     my $name = $hash->{NAME};
    
-    RemoveInternalTimer($hash, "FHEM::SSCam::__stopLiveview");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {           
         $hash->{OPMODE}               = "stopliveview";
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
         setActiveToken($hash);
         
@@ -3478,8 +3876,13 @@ sub __stopLiveview {
         readingsSingleUpdate($hash,"state","stopview",1);           
         
         if($hash->{HELPER}{WLTYPE} eq "hls") {              # HLS Stream war aktiv, Streaming beenden
-            $hash->{OPMODE} = "stopliveview_hls";
-            getApiSites($hash);
+            $hash->{OPMODE} = "stopliveview_hls"; 
+            
+            $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+            $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_}; 
+            
+            return if(startOrShut($name));
+            checkSid ($hash);
         
         } else {                                            # kein HLS Stream
             roomRefresh   ($hash,0,1,1);                    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
@@ -3500,15 +3903,29 @@ sub __extEvent {
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__extEvent");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "extevent";
+        $hash->{OPMODE}               = "extevent"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $evtid                     = $hash->{HELPER}{EVENTID};
+        $hash->{HELPER}{CALL}{AKEY}   = "EXTEVT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Trigger&eventId=$evtid&eventName=$evtid&_sid="_SID_"};       
+        
+        Log3($name, 4, "$name - trigger external event \"$evtid\"");
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -3524,76 +3941,103 @@ sub __doPtzAaction {
     my $hash    = shift;
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
+    
     my ($errorcode,$error);
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__doPtzAaction");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
 
-    if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
+    if (!IsCapPTZ($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings");
         return;
     }
-    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !ReadingsVal("$name", "CapPTZAbs", "false")) {
+    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !IsCapPTZAbs($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with Reading \"CapPTZAbs\"");
         return;
     }
-    if ($hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
+    if ($hash->{HELPER}{PTZACTION} eq "movestart" && !IsCapPTZDir($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"");
         return;
-    }
-    
-    if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-        if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
-            $errorcode = "600";
-            $error     = expErrors($hash,$errorcode);                                    # Fehlertext zum Errorcode ermitteln
-        
-            readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
-            readingsBulkUpdate  ($hash, "Error",     $error    );
-            readingsEndUpdate   ($hash, 1);
-    
-            Log3($name, 2, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
-            return;        
-        }
-    }
-    
-    if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
-        if (!defined($hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}})) {
-            $errorcode = "600";
-            $error     = expErrors($hash,$errorcode);                                   # Fehlertext zum Errorcode ermitteln
-        
-            readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
-            readingsBulkUpdate  ($hash, "Error",     $error    );
-            readingsEndUpdate   ($hash, 1);
-    
-            Log3($name, 2, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
-            return;        
-        }
     }
     
     return if(exitOnDis ($name, "$hash->{HELPER}{PTZACTION} of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
+        if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
+            if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
+                $errorcode = "600";
+                $error     = expErrors($hash,$errorcode);                                    # Fehlertext zum Errorcode ermitteln
+            
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate  ($hash, "Error",     $error    );
+                readingsEndUpdate   ($hash, 1);
+        
+                Log3($name, 2, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
+                return;        
+            }
+        }
+        
+        if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
+            my $patid = $hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}};
+            if (!defined $patid) {
+                $errorcode = "600";
+                $error     = expErrors($hash,$errorcode);                                             # Fehlertext zum Errorcode ermitteln
+            
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate  ($hash, "Error",     $error    );
+                readingsEndUpdate   ($hash, 1);
+        
+                Log3($name, 2, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
+                return;        
+            }
+            
+            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="RunPatrol"&patrolId="$patid"&cameraId="_CID_"&_sid="_SID_"};
+
+            Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
+        }
         
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-            Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now");
+            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            my $ver                     = ($hash->{HELPER}{API}{PTZ}{VER} >= 5) ? 4 : $hash->{HELPER}{API}{PTZ}{VER};
+            my $posid                   = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}};
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="GoPreset"&position="$posid"&cameraId="_CID_"&_sid="_SID_"};
+
+            Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$posid\" now");
+        }
         
-        } elsif ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
-            Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
+        if ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
+            my $posx                    = $hash->{HELPER}{GOPTZPOSX};
+            my $posy                    = $hash->{HELPER}{GOPTZPOSY};
+            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="AbsPtz"&cameraId="_CID_"&posX="$posx"&posY="$posy"&_sid="_SID_"};
         
-        } elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
             Log3($name, 4, "$name - Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\" now");
+        } 
         
-        } elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
+        if ($hash->{HELPER}{PTZACTION} eq "movestart") {
+            my $mdir                    = $hash->{HELPER}{GOMOVEDIR};
+            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&speed="3"&moveType="Start"&_sid="_SID_"};
+
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
         }
      
-        $hash->{OPMODE}               = $hash->{HELPER}{PTZACTION};
+        $hash->{OPMODE}               = $hash->{HELPER}{PTZACTION}; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
  
     } else {
         schedule ($name, $hash);
@@ -3609,15 +4053,29 @@ sub __moveStop {                                        ## no critic "not used"
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__moveStop");
+    my $caller = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "movestop";
+        $hash->{OPMODE}               = "movestop"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $mdir                      = $hash->{HELPER}{GOMOVEDIR};
+        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&moveType="Stop"&_sid="_SID_"};
+        
+        Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
    
     } else {
         schedule ($name, $hash);
@@ -3634,17 +4092,32 @@ sub __camEnable {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camEnable");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        Log3($name, 4, "$name - Enable Camera $camname");
-                        
-        $hash->{OPMODE}               = "Enable";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "Enable"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Enable&cameraIds=_CID_&_sid="_SID_"};     
+        
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="Enable"&idList="_CID_"&_sid="_SID_"};     
+        }
+        
+        Log3($name, 4, "$name - Enable Camera $camname");
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -3661,17 +4134,32 @@ sub __camDisable {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__camDisable");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
-        Log3($name, 4, "$name - Disable Camera $camname");
-                        
-        $hash->{OPMODE}               = "Disable";
+    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {                       
+        $hash->{OPMODE}               = "Disable"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Disable&cameraIds=_CID_&_sid="_SID_"};     
+        
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="Disable"&idList="_CID_"&_sid="_SID_"};     
+        }
+        
+        Log3($name, 4, "$name - Disable Camera $camname");
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4005,7 +4493,7 @@ sub _getscanVirgin {                     ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   
-  sessionOff($hash);
+  __sessionOff($hash);
   
   delete $hash->{HELPER}{API}{PARSET};
   delete $hash->{CAMID};
@@ -4118,15 +4606,27 @@ sub __getCamInfo {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getCamInfo");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
 
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "Getcaminfo";
-        $hash->{HELPER}{LOGINRETRIES} = 0;  
+        $hash->{OPMODE}               = "Getcaminfo"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="GetInfo"&cameraIds="_CID_"&deviceOutCap="true"&streamInfo="true"&ptz="true"&basic="true"&camAppInfo="true"&optimize="true"&fisheye="true"&eventDetection="true"&_sid="_SID_"};            
         
         setActiveToken($hash); 
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4144,7 +4644,9 @@ sub __getCaminfoAll {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getCaminfoAll");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if(IsModelCam($hash)) {                                                               # Model ist CAM
@@ -4172,7 +4674,7 @@ sub __getCaminfoAll {
     my $pnl  = AttrVal($name,"pollnologging",0);
     if ($pcia) {        
         my $new = gettimeofday()+$pcia; 
-        InternalTimer($new, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
+        InternalTimer($new, $caller, $hash, 0);
         
         my $now = FmtTime(gettimeofday());
         $new    = FmtTime(gettimeofday()+$pcia);
@@ -4201,15 +4703,26 @@ sub __getHomeModeState {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getHomeModeState");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "gethomemodestate";
+        $hash->{OPMODE}               = "gethomemodestate"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=GetInfo&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4226,15 +4739,35 @@ sub __getSvsLog {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getSvsLog");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getsvslog";
+        $hash->{OPMODE}               = "getsvslog"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $sev                       = delete $hash->{HELPER}{LISTLOGSEVERITY} // "";
+        my $lim                       = delete $hash->{HELPER}{LISTLOGLIMIT}    // 0;
+        my $mco                       = delete $hash->{HELPER}{LISTLOGMATCH}    // "";
+        $lim                          = 1 if(!$hash->{HELPER}{CL}{1});                                   # Datenabruf im Hintergrund
+        $mco                          = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
+        $sev                          = (lc($sev) =~ /error/x) ? 3 :(lc($sev) =~ /warning/x) ? 2 :(lc($sev) =~ /info/x) ? 1 : "";
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "LOG";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version="2"&method="List"&time2String="no"&level="$sev"&limit="$lim"&keyword="$mco"&_sid="_SID_"};
+        
+        Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4251,15 +4784,26 @@ sub __getSvsInfo {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getSvsInfo");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getsvsinfo";
+        $hash->{OPMODE}               = "getsvsinfo"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "SVSINFO";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetInfo"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4281,22 +4825,42 @@ sub __getSnapInfo {
     my $hash                     = $defs{$name};
     my $camname                  = $hash->{CAMNAME};
     
-    $tac   = $tac // 5000;
-    my $ta = $hash->{HELPER}{TRANSACTION};
+    $tac       = $tac // 5000;
+    my $ta     = $hash->{HELPER}{TRANSACTION};
+    my $caller = (caller(0))[3];
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getSnapInfo"); 
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
         $hash->{OPMODE}               = "getsnapinfo";
         $hash->{OPMODE}               = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{SNAPLIMIT}    = $slim;        # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
-        $hash->{HELPER}{SNAPIMGSIZE}  = $ssize;       # 0-Do not append image, 1-Icon size, 2-Full size
-        $hash->{HELPER}{KEYWORD}      = $camname;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
+        my $limit   = $slim;                                                         # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
+        my $imgsize = $ssize;                                                        # 0-Do not append image, 1-Icon size, 2-Full size
+        my $keyword = $camname;
+        my $snapid  = ReadingsVal("$name", "LastSnapId", " ");       
+               
+        $hash->{HELPER}{CALL}{AKEY} = "SNAPSHOT";
+        
+        if($hash->{OPMODE} eq "getsnapinfo" && $snapid =~/\d+/x) {                   # getsnapinfo UND Reading LastSnapId gesetzt
+            Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&idList="$snapid"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};      
+      
+        } else {                                                                     # snapgallery oder kein Reading LastSnapId gesetzt
+            Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
+        }
         
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $str);
@@ -4306,21 +4870,73 @@ return;
 }
 
 ###############################################################################
-#                     Filename zu Schappschuß ermitteln
+#                       Liste der Presets abrufen
+###############################################################################
+sub __getPresets {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Preset list of Camera $camname can't be get"));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE}               = "getPresets"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Enum"&cameraId="_CID_"&_sid="_SID_"}; 
+           
+        setActiveToken($hash);
+        checkSid      ($hash);
+        
+    } else {
+        schedule ($name, $hash);
+    }  
+
+return;    
+}
+
+###############################################################################
+#        der Filename der aktuellen Schnappschuß-ID wird ermittelt
 ###############################################################################
 sub __getSnapFilename {
     my $hash = shift;
     my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getSnapFilename");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
-        $hash->{OPMODE}               = "getsnapfilename";
+        $hash->{OPMODE}               = "getsnapfilename"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $snapid = ReadingsVal("$name", "LastSnapId", "");
+        Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&imgSize="0"&idList="$snapid"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
     
     } else {
         schedule ($name, $hash);
@@ -4337,16 +4953,30 @@ sub __getStmUrlPath {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getStmUrlPath");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Stream-Urls abrufen              
-        $hash->{OPMODE}               = "getStmUrlPath";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {            
+        $hash->{OPMODE}               = "getStmUrlPath"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetStmUrlPath"&cameraIds="_CID_"&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="GetLiveViewPath"&idList="_CID_"&_sid="_SID_"};   
+        }
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4357,21 +4987,33 @@ return;
 
 ###########################################################################
 #                         query SVS-Event information 
+#                        Abruf der Events einer Kamera
 ###########################################################################
 sub __getEventList {
     my $hash    = shift;
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getEventList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
-        $hash->{OPMODE}               = "geteventlist";
+        $hash->{OPMODE}               = "geteventlist"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "EVENT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&cameraIds="_CID_"&locked="0"&blIncludeSnapshot="false"&reason=""&limit="2"&includeAllCam="false"&_sid="_SID_"};       
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4388,15 +5030,27 @@ sub __getCapabilities {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getCapabilities");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE}               = "Getcapabilities";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        $hash->{OPMODE}               = "Getcapabilities";        
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=$ver&method="GetCapabilityByCamId"&cameraId=_CID_&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4413,16 +5067,26 @@ sub __getStreamFormat {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getStreamFormat");
-    my $apivideostmsver = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));  
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getstreamformat";
+        $hash->{OPMODE}               = "getstreamformat"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Query&cameraId=_CID_&_sid=_SID_};
+        
         setActiveToken($hash); 
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4439,15 +5103,26 @@ sub __getMotionEnum {
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getMotionEnum");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
-        $hash->{OPMODE}               = "getmotionenum";
+        $hash->{OPMODE}               = "getmotionenum"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="MotionEnum"&camId="_CID_"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4460,14 +5135,16 @@ return;
 #                      PTZ Presets abrufen (Get)
 ##########################################################################
 sub __getPtzPresetList {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getPtzPresetList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if(ReadingsVal($name, "DeviceType", "") ne "PTZ") {
+    if(!IsCapPTZ($hash)) {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4477,11 +5154,20 @@ sub __getPtzPresetList {
     }
     
     if($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE}               = "Getptzlistpreset";
+        $hash->{OPMODE}               = "Getptzlistpreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=ListPreset&cameraId=_CID_&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4494,14 +5180,16 @@ return;
 #                    PTZ Patrols abrufen (Get)
 ##########################################################################
 sub __getPtzPatrolList {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::__getPtzPatrolList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if(ReadingsVal($name, "DeviceType", "") ne "PTZ") {
+    if(!IsCapPTZ($hash)) {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4511,11 +5199,20 @@ sub __getPtzPatrolList {
     }
 
     if($hash->{HELPER}{ACTIVE} ne "on") {                        
-        $hash->{OPMODE}               = "Getptzlistpatrol";
+        $hash->{OPMODE}               = "Getptzlistpatrol"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=ListPatrol&cameraId=_CID_&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites   ($hash);
+        checkSid      ($hash);
         
     } else {
         schedule ($name, $hash);
@@ -4527,22 +5224,20 @@ return;
 ###########################################################################
 #                           Session logout
 ###########################################################################
-sub sessionOff {
+sub __sessionOff {
     my $hash    = shift;
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer ($hash, "FHEM::SSCam::sessionOff");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "logout";
+        $hash->{OPMODE} = "logout"; 
         
         setActiveToken($hash);
-        
-        Log3($name, 4, "$name - ####################################################"); 
-        Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
-        Log3($name, 4, "$name - ####################################################");
    
         logout ($hash, $hash->{HELPER}{API});
         
@@ -4553,76 +5248,40 @@ sub sessionOff {
 return;
 }
 
-###############################################################################
-# Err-Status / Log setzen wenn Device Verfügbarkeit disabled oder disconnected          
-###############################################################################
-sub exitOnDis { 
-  my $name = shift;
-  my $log  = shift;
-  my $hash = $defs{$name};
-  
-  my $exit = 0;
-  
-  my $errorcode = "000";
-  my $avail     = ReadingsVal($name, "Availability", "");
-  
-  if ($avail eq "disabled") {
-      $errorcode = "402";
-      $exit      = 1;
-  } elsif ($avail eq "disconnected") {
-      $errorcode = "502";
-      $exit      = 1;
-  }
-
-  if($exit) {
-      my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
-
-      readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
-      readingsBulkUpdate  ($hash, "Error",     $error    );
-      readingsEndUpdate   ($hash, 1);
-      
-      Log3($name, 2, "$name - ERROR - $log - $error");
-  }
-  
-return $exit;
-}
-
-#############################################################################################################################
-#######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
-#############################################################################################################################
+##################################################################################
+#                           API-Pfade und Versionen ermitteln 
+##################################################################################
 sub getApiSites {
    my $hash        = shift;
+   my $fret        = shift // "";
+   my $arg         = shift // "";
+   
    my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
    my $name        = $hash->{NAME};
    my $proto       = $hash->{PROTOCOL};   
    
    my ($url,$param);
-  
-   # API-Pfade und Versions ermitteln 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - --- Start getApiSites ---");
    
-   if ($shutdownInProcess) {                                                             # shutdown in Proces -> keine weiteren Aktionen
-       Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
-       return;       
+   if($fret) {                                                                           # Activetoken setzen wenn Caller angegeben
+       setActiveToken($hash);
    }
+
+   Log3($name, 4, "$name - --- Start getApiSites ---");
    
    if ($hash->{HELPER}{API}{PARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
-       return checkSid($hash);
+       checkSid($hash);
+       return;
    }
 
-   my $httptimeout = AttrVal($name,"httptimeout",4);
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
    # API initialisieren und abrufen
    ####################################
    $hash->{HELPER}{API} = apistatic ("surveillance");                                    # API Template im HELPER instanziieren
-   # $hash->{HELPER}{API} = \%hapi;                                                       # API Template im HELPER instanziieren
+
    Log3 ($name, 4, "$name - API imported:\n".Dumper $hash->{HELPER}{API});
      
    my @ak;
@@ -4644,6 +5303,8 @@ sub getApiSites {
        url      => $url,
        timeout  => $httptimeout,
        hash     => $hash,
+       fret     => $fret,
+       arg      => $arg,
        method   => "GET",
        header   => "Accept: application/json",
        callback => \&getApiSites_Parse
@@ -4662,6 +5323,9 @@ sub getApiSites_Parse {
    my $myjson       = shift;
    
    my $hash         = $param->{hash};
+   my $fret         = $param->{fret};
+   my $arg          = $param->{arg};
+   
    my $name         = $hash->{NAME};
    my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
@@ -4923,7 +5587,7 @@ sub getApiSites_Parse {
             
             setReadingErrorNone( $hash, 1 ); 
             
-            $hash->{HELPER}{API}{PARSET} = 1;              # API Hash values sind gesetzt
+            $hash->{HELPER}{API}{PARSET} = 1;                                       # API Hash values sind gesetzt
             
             Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});
                         
@@ -4937,9 +5601,17 @@ sub getApiSites_Parse {
 
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
                         
-            delActiveToken($hash);                        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+            delActiveToken($hash);                                                  # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             return;
         }
+    }
+    
+    if($fret) {                                                                     # Caller aufrufen wenn angegeben
+        no strict "refs";
+        delActiveToken($hash);                                                      # Freigabe Funktionstoken vor Neudurchlauf der aufrufenden Funktion 
+        &$fret($arg);
+        use strict "refs";
+        return;
     }
     
 return checkSid($hash);
@@ -4951,18 +5623,17 @@ return checkSid($hash);
 sub checkSid {  
    my ($hash) = @_;
    my $name   = $hash->{NAME};
+   
    my $subref;
    
-   if(IsModelCam($hash)) {
-       # Folgefunktion wenn Cam-Device
+   if(IsModelCam($hash)) {                                          # Folgefunktion wenn Cam-Device
        $subref = \&getCamId;
-   } else {
-       # Folgefunktion wenn SVS-Device
+       
+   } else {                                                         # Folgefunktion wenn SVS-Device
        $subref = \&camOp;
    }
    
-   # SID holen bzw. login
-   my $sid = $hash->{HELPER}{SID};
+   my $sid = $hash->{HELPER}{SID};                                  # SID holen bzw. login
    if(!$sid) {
        Log3($name, 3, "$name - no session ID found - get new one");
        login($hash, $hash->{HELPER}{API}, $subref);
@@ -4981,6 +5652,7 @@ return;
 
 #############################################################################################
 #                             Abruf der installierten Cams
+#           die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt
 #############################################################################################
 sub getCamId {  
    my ($hash)       = @_;
@@ -4995,16 +5667,14 @@ sub getCamId {
    
    my $url;
     
-   # die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt
    Log3($name, 4, "$name - --- Start getCamId ---");
     
-   if ($hash->{CAMID}) {
-       # Camid ist bereits ermittelt -> Abruf überspringen
+   if ($hash->{CAMID}) {                                                     # Camid ist bereits ermittelt -> Abruf überspringen
        Log3($name, 4, "$name - CAMID already set - ignore get camid");
        return camOp($hash);
    }
     
-   my $httptimeout = AttrVal($name,"httptimeout", 4);
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
    $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
@@ -5015,13 +5685,13 @@ sub getCamId {
    Log3($name, 4, "$name - Call-Out now: $url");
   
    my $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getCamId_Parse
-               };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getCamId_Parse
+   };
    
    HttpUtils_NonblockingGet($param);
    
@@ -5210,317 +5880,53 @@ sub camOp {
    my $serveraddr       = $hash->{SERVERADDR};
    my $serverport       = $hash->{SERVERPORT};
    my ($exturl,$winname,$attr,$room,$param);
-   my ($url,$httptimeout,$expmode,$motdetsc);
+   my ($url,$expmode);
        
    Log3($name, 4, "$name - --- Start $OpMode ---");
 
-   $httptimeout = AttrVal($name, "httptimeout", 4);
-   $httptimeout = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/x);                          # setzen der Optimierungsparameter/Disable dauert lange !
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
+   $httptimeout    = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/x);                       # setzen der Optimierungsparameter/Disable dauert lange !
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
-   if ($OpMode eq "Start") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraId=$camid&action=start&_sid=\"$sid\"";
-      if($apiextrecver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraIds=$camid&action=start&_sid=\"$sid\"";
-      }
-   } elsif ($OpMode eq "Stop") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraId=$camid&action=stop&_sid=\"$sid\"";
-      if($apiextrecver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
-      }   
+   if($hash->{HELPER}{CALL}) {                                                                  # neue camOp Ausführungsvariante
+       my $akey =  delete $hash->{HELPER}{CALL}{AKEY};
+       my $part =  delete $hash->{HELPER}{CALL}{PART};
+       delete $hash->{HELPER}{CALL};
+       
+       $part =~ s/_NAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
+       $part =~ s/_VER_/$hash->{HELPER}{API}{$akey}{VER}/x;
+       $part =~ s/_CID_/$hash->{CAMID}/x;
+       $part =~ s/_SID_/$hash->{HELPER}{SID}/x;
+       
+       $url  = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+   }
    
-   } elsif ($OpMode eq "Snap") {
-      # ein Schnappschuß wird ausgelöst
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
-      readingsSingleUpdate($hash,"state", "snap", 1); 
-   
-   } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
-      # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
-      my $recid = ReadingsVal("$name", "CamLastRecId", 0);
-      if($recid) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecver\"&method=\"Download\"&_sid=\"$sid\"";
-      } else {
-          Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
-          delActiveToken($hash);
-          return;      
-      }
-      
-   } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery") {
-      # Informationen über den letzten oder mehrere Schnappschüsse ermitteln
-      my $limit   = $hash->{HELPER}{SNAPLIMIT};
-      my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
-      my $keyword = $hash->{HELPER}{KEYWORD};
-      my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
-      if($OpMode eq "getsnapinfo" && $snapid =~/\d+/x) {
-          # getsnapinfo UND Reading LastSnapId gesetzt
-          Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
-      } else {
-          # snapgallery oder kein Reading LastSnapId gesetzt
-          Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-      }
-      
-   } elsif ($OpMode eq "getsnapfilename") {
-      # der Filename der aktuellen Schnappschuß-ID wird ermittelt
-      my $snapid = ReadingsVal("$name", "LastSnapId", "");
-      Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "gopreset") {
-      # Preset wird angefahren
-      $apiptzver = ($apiptzver >= 5) ? 4 : $apiptzver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "getPresets") {
-      # Liste der Presets abrufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "piract") {
-      # PIR Sensor aktivieren/deaktivieren
-      my $piract = $hash->{HELPER}{PIRACT};
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"PDParamSave\"&keep=true&source=$piract&camId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "setPreset") {
-      # einen Preset setzen
-      my $pnumber = $hash->{HELPER}{PNUMBER};
-      my $pname   = $hash->{HELPER}{PNAME};
-      my $pspeed  = $hash->{HELPER}{PSPEED};
-      if ($pspeed) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      } else {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
-      }
-      
-   } elsif ($OpMode eq "delPreset") {
-      # einen Preset löschen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "setHome") {
-      # aktuelle Position als Home setzen
-      if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      } else {
-          my $bindpos = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}};
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      }
-      
-   } elsif ($OpMode eq "startTrack") {
-      # Object Tracking einschalten
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "stopTrack") {
-      # Object Tracking stoppen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "setZoom") {
-      # Zoom in / stop / out
-      my $dir      = $hash->{HELPER}{ZOOM}{DIR};
-      my $moveType = $hash->{HELPER}{ZOOM}{MOVETYPE};
-      my $sttime   = $hash->{HELPER}{ZOOM}{STOPTIME} // "";
-      Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType:$sttime"});
-      
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
-      
-   } elsif ($OpMode eq "runpatrol") {
-      # eine Überwachungstour starten
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzver"&method="RunPatrol"&patrolId="$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}"&cameraId="$camid"&_sid="$sid"};
-   
-   } elsif ($OpMode eq "goabsptz") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "movestart") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
-      
-   } elsif ($OpMode eq "movestop") {
-      Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "Enable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicamver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicamver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
-      }
-   
-   } elsif ($OpMode eq "Disable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicamver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicamver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
-      }
-      
-   } elsif ($OpMode eq "sethomemode") {
-      my $sw = $hash->{HELPER}{HOMEMODE};     # HomeMode on,off
-      $sw  = ($sw eq "on") ? "true" : "false";
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmver&_sid=\"$sid\"";     
-   
-   } elsif ($OpMode eq "gethomemodestate") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmver&_sid=\"$sid\"";     
-   
-   } elsif ($OpMode eq "getsvslog") {
-      my $sev = $hash->{HELPER}{LISTLOGSEVERITY} // "";
-      my $lim = $hash->{HELPER}{LISTLOGLIMIT}    // 0;
-      my $mco = $hash->{HELPER}{LISTLOGMATCH}    // "";
-      
-      Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
-      
-      $mco = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
-      $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
-      $sev = (lc($sev) =~ /error/x) ? 3 :(lc($sev) =~ /warning/x) ? 2 :(lc($sev) =~ /info/x) ? 1 : "";
-      
-      $url = "$proto://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
-
-      delete($hash->{HELPER}{LISTLOGSEVERITY});
-      delete($hash->{HELPER}{LISTLOGLIMIT});
-      delete($hash->{HELPER}{LISTLOGMATCH});
-      
-   } elsif ($OpMode eq "getsvsinfo") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfover\"&method=\"GetInfo\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "setoptpar") {
-      my $mirr   = $hash->{HELPER}{MIRROR}  // ReadingsVal($name, "CamVideoMirror", "");
-      my $flip   = $hash->{HELPER}{FLIP}    // ReadingsVal($name, "CamVideoFlip",   "");
-      my $rot    = $hash->{HELPER}{ROTATE}  // ReadingsVal($name, "CamVideoRotate", "");
-      my $ntp    = $hash->{HELPER}{NTPSERV} // ReadingsVal($name, "CamNTPServer",   "");
-      $ntp       = q{} if($ntp eq "none");
-      my $clst   = $hash->{HELPER}{CHKLIST} // "";
-      $apicamver = $apicamver >= 9 ? 8 : $apicamver;
-      $url       = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
-             
-   } elsif ($OpMode eq "Getcaminfo") {
-      $apicamver = ($apicamver >= 9) ? 8 : $apicamver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "getStmUrlPath") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
-      if($apicamver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicamver&idList=\"$camid\"&_sid=\"$sid\"";   
-      }
-   
-   } elsif ($OpMode eq "geteventlist") {
-      # Abruf der Events einer Kamera
-      $url = "$proto://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "Getptzlistpreset") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "Getcapabilities") {                          # Capabilities einer Cam werden abgerufen
-      $apicamver = ($apicamver >= 9) ? 8 : $apicamver;
-      $url       = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
-   
-   } elsif ($OpMode eq "Getptzlistpatrol") {                         # PTZ-ListPatrol werden abgerufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "ExpMode") {
-      if ($hash->{HELPER}{EXPMODE} eq "auto") {
-          $expmode = "0";
-      }
-      elsif ($hash->{HELPER}{EXPMODE} eq "day") {
-          $expmode = "1";
-      }
-      elsif ($hash->{HELPER}{EXPMODE} eq "night") {
-          $expmode = "2";
-      }
-      $apicamver = ($apicamver >= 9)?8:$apicamver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicamver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "MotDetSc") {
-      # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
-      my %motdetoptions = ();    
-        
-      if ($hash->{HELPER}{MOTDETSC} eq "disable") {
-          $motdetsc = "-1";
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
-      } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
-          $motdetsc = "0";
-          
-          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
-          $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
-          $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
-          
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
-          
-          if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP13}) {
-              # umschalten und neue Werte setzen
-              $url .= "&keep=false";
-          } else {
-              # nur Umschaltung, alte Werte beibehalten
-              $url .= "&keep=true";
-          }
- 
-          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
-              # der Wert für Bewegungserkennung Kamera -> Empfindlichkeit ist gesetzt
-              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
-              $url .= "&sensitivity=\"$sensitivity\"";
-          }
-          
-          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
-              # der Wert für Bewegungserkennung Kamera -> Objektgröße ist gesetzt
-              my $objectsize = delete $hash->{HELPER}{MOTDETSC_PROP2};
-              $url .= "&objectSize=\"$objectsize\"";
-          }
- 
-          if ($hash->{HELPER}{MOTDETSC_PROP3}) {
-              # der Wert für Bewegungserkennung Kamera -> Prozentsatz für Auslösung ist gesetzt
-              my $percentage = delete $hash->{HELPER}{MOTDETSC_PROP3};
-              $url .= "&percentage=\"$percentage\"";
-          }          
-      
-      } elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
-          $motdetsc = "1";
-          
-          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
-          $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
-      
-          # nur Umschaltung, alte Werte beibehalten
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
-
-          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
-              # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
-              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
-              $url .= "&sensitivity=\"$sensitivity\"";
-          }
-
-          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
-              # der Wert für Bewegungserkennung SVS -> Schwellwert ist gesetzt
-              my $threshold = delete $hash->{HELPER}{MOTDETSC_PROP2};
-              $url .= "&threshold=\"$threshold\"";
-          }
-      }
-      # Optionswerte in Hash sichern für Logausgabe in Befehlsauswertung
-      $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;
-   
-   } elsif ($OpMode eq "getmotionenum") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "extevent") {
-      Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
+   if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
       $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-      $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;      
+      $exturl = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;      
+      
       if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
-          if($apiaudiostmver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
+          if($apiaudiostmver) {                                                # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
               $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
+          
           } else {
               delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
           }
           
-          if($apivideostmsver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
-              # externe URL in Reading setzen
-              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-              
-              # interne URL
-              $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+          if($apivideostmsver) {                                               # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";                                   # externe URL
+              $url     = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";       # interne URL
+          
           } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
               $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
           }
+          
           readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
       
-      } else {
-          # Abspielen der letzten Aufnahme (EventId)
-          my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);
+      } else {                                                                 # Abspielen der letzten Aufnahme (EventId)
+          my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);                
+          
           if($lrecid) {
               # externe URL in Reading setzen
               $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
@@ -5530,18 +5936,15 @@ sub camOp {
           }
       }
        
-      # Liveview-Link in Hash speichern
-      $hash->{HELPER}{LINK} = $url;
+      $hash->{HELPER}{LINK} = $url;                                            # Liveview-Link in Hash speichern
  
       Log3($name, 4, "$name - Set Streaming-URL: $url");
       
-      # livestream sofort in neuem Browsertab öffnen
-      if ($hash->{HELPER}{OPENWINDOW}) {
+      if ($hash->{HELPER}{OPENWINDOW}) {                                       # livestream sofort in neuem Browsertab öffnen
           $winname = $name."_view";
-          $attr = AttrVal($name, "htmlattr", "");
+          $attr    = AttrVal($name, "htmlattr", "");
           
-          # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
-          if ($hash->{HELPER}{VIEWOPENROOM}) {
+          if ($hash->{HELPER}{VIEWOPENROOM}) {                                 # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
               $room = $hash->{HELPER}{VIEWOPENROOM};
               map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");   ## no critic 'void context'
           } else {
@@ -5549,28 +5952,17 @@ sub camOp {
           }
       }
            
-      roomRefresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+      roomRefresh($hash,0,1,1);                                                # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
       
       delActiveToken($hash);
       return;
       
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/x) {         # den letzten Schnappschuß live anzeigen
-      my $limit   = 1;                                                                 # nur 1 Snap laden, für lastsnap_fw 
-      my $imgsize = 2;                                                                 # full size image, für lastsnap_fw 
-      my $keyword = $hash->{CAMNAME};                                                  # nur Snaps von $camname selektieren, für lastsnap_fw   
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-   
    } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) || $OpMode eq "activate_hls") {
       # HLS Livestreaming aktivieren
-      $httptimeout = $httptimeout+90;                                                  # aktivieren HLS dauert lange !
+      $httptimeout = $httptimeout+90;                                          # aktivieren HLS dauert lange !
       $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
    
-   } elsif ($OpMode eq "stopliveview_hls" || $OpMode eq "reactivate_hls") {            # HLS Livestreaming deaktivieren
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
-   
-   } elsif ($OpMode eq "getstreamformat") {                                            # aktuelles Streamformat abfragen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Query&cameraId=$camid&_sid=$sid"; 
-   }
+   }  
    
    Log3($name, 4, "$name - Call-Out now: $url");
    
@@ -5717,6 +6109,8 @@ sub camOp_Parse {
             } elsif ($OpMode eq "ExpMode") {
                 setReadingErrorNone( $hash, 1 );
                 Log3               ( $name, 3, qq{$name - Camera $camname exposure mode is set to "$hash->{HELPER}{EXPMODE}"} );
+                
+                __getCamInfo($hash);                                        # Aktualisierung Readings
             
             } elsif ($OpMode eq "setZoom") { 
                 setReadingErrorNone( $hash, 1 );   
@@ -6757,18 +7151,17 @@ sub camOp_Parse {
                 }
                 
                 readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"CamEventNum",$eventnum);
-                readingsBulkUpdate  ($hash,"CamLastRec",$lrec) if($lrec); 
-                readingsBulkUpdate  ($hash,"CamLastRecId",$lrecid) if($lrecid);                 
-                readingsBulkUpdate  ($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
+                readingsBulkUpdate  ($hash, "CamEventNum",    $eventnum);
+                readingsBulkUpdate  ($hash, "CamLastRec",     $lrec) if($lrec); 
+                readingsBulkUpdate  ($hash, "CamLastRecId",   $lrecid) if($lrecid);                 
+                readingsBulkUpdate  ($hash, "CamLastRecTime", $lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
+                readingsBulkUpdate  ($hash, "Errorcode",      "none");
+                readingsBulkUpdate  ($hash, "Error",          "none");
                 readingsEndUpdate   ($hash, 1);
        
                 Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
                 
-                # Versand Aufnahme initiieren
-                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
+                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {        # Versand Aufnahme initiieren
                     __getRec($hash);
                 }
             
@@ -6777,21 +7170,21 @@ sub camOp_Parse {
                 my $motdetsc           = $data->{'data'}{'MDParam'}{'source'};
                 $motdetsc              = $hrkeys{source}{$motdetsc};
                 
-                my $sensitivity_camCap = $data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'};
+                my $sensitivity_camCap = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'});
                 my $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
-                my $sensitivity_ssCap  = $data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'};
+                my $sensitivity_ssCap  = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'});
                 
-                my $threshold_camCap   = $data->{'data'}{'MDParam'}{'threshold'}{'camCap'};
+                my $threshold_camCap   = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'camCap'});
                 my $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
-                my $threshold_ssCap    = $data->{'data'}{'MDParam'}{'threshold'}{'ssCap'};
+                my $threshold_ssCap    = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'ssCap'});
 
-                my $percentage_camCap  = $data->{'data'}{'MDParam'}{'percentage'}{'camCap'};
+                my $percentage_camCap  = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'camCap'});
                 my $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
-                my $percentage_ssCap   = $data->{'data'}{'MDParam'}{'percentage'}{'ssCap'};
+                my $percentage_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'ssCap'});
                 
-                my $objectSize_camCap  = $data->{'data'}{'MDParam'}{'objectSize'}{'camCap'};
+                my $objectSize_camCap  = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'camCap'});
                 my $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
-                my $objectSize_ssCap   = $data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'};
+                my $objectSize_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'});
                 
                 
                 if ($motdetsc eq "Camera") {                    
@@ -6816,12 +7209,6 @@ sub camOp_Parse {
                     }
                     if ($threshold_ssCap) {
                         $motdetsc .= ", threshold: $threshold_value";
-                    }
-                    if ($percentage_ssCap) {
-                        $motdetsc .= ", percentage: $percentage_value";
-                    }
-                    if ($objectSize_ssCap) {
-                        $motdetsc .= ", objectSize: $objectSize_value";
                     }
                 }
                 
@@ -11145,7 +11532,8 @@ return 0;
     
   <ul>  
     All functions of SSCam use HTTP-calls to SVS Web API. <br>
-    The default-value of HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
+    You can set the attribute <a href="#httptimeout">httptimeout</a> &gt; 0 to adjust 
+    the value as needed in your technical environment. <br>
     
   </ul>
   <br><br><br>
@@ -11451,10 +11839,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc camera [sensitivity] [threshold] [percentage] </td><td># command pattern  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                </td><td># set the sensitivity to 89, percentage to 20  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                </td><td># keep old value for sensitivity, set threshold to 40, percentage to 10  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 30                                     </td><td># set the sensitivity to 30, other values keep unchanged  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera [sensitivity] [object size] [percentage] </td><td># command pattern  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                  </td><td># set the sensitivity to 89, percentage to 20  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                  </td><td># keep old value for sensitivity, set threshold to 40, percentage to 10  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 30                                       </td><td># set the sensitivity to 30, other values keep unchanged  </td></tr>
       </table>
   </ul>
   <br><br>
@@ -12146,7 +12534,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   If polling is used, the interval should be adjusted only as short as needed due to the detected camera values are predominantly static. <br>
   A feasible guide value for attribute "pollcaminfoall" could be between 600 - 1800 (s). <br>
   Per polling call and camera approximately 10 - 20 Http-calls will are stepped against Surveillance Station. <br>
-  Because of that if HTTP-Timeout (pls. refer <a href="#SSCamattr">Attribut</a> "httptimeout") is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
+  Because of that if HTTP-Timeout (pls. refer attribute <a href="#httptimeout">httptimeout</a>) is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
   Considering a safety margin, in that example you shouldn't set the polling interval lower than 160 seconds. <br><br>
 
   If several Cameras are defined in SSCam, attribute "pollcaminfoall" of every Cameras shouldn't be set exactly to the same value to avoid processing bottlenecks <br>
@@ -12287,8 +12675,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
-    Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" 
-    or not set) </li><br>
+    Timeout-Value of HTTP-Calls to Synology Surveillance Station. <br> 
+    (default: 20 seconds) </li><br>
   
   <a name="htmlattr"></a>
   <li><b>htmlattr</b><br>
@@ -13089,9 +13477,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
     <ul>
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
-    Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des 
-    <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen 
-    Gegebenheiten angepasst werden. <br> 
+    Durch Setzen des Attributes <a href="#httptimeout">httptimeout</a> &gt; 0 kann dieser Wert bei Bedarf entsprechend 
+    den technischen Gegebenheiten angepasst werden. <br> 
     
   </ul>
   <br><br><br>
@@ -13296,37 +13683,42 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+    <a name=goAbsPTZ></a>
+    <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   
-  Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
-  Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
-  <br><br>
+    Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen 
+    Absolutposition in Richtung up/down/left/right. 
+    Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die 
+    Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
+    <br><br>
 
-  Beispiel für Ansteuerung absoluter X/Y-Koordinaten: <br>
+    Beispiel für Ansteuerung absoluter X/Y-Koordinaten: <br>
 
-  <pre>
-    set &lt;name&gt; goAbsPTZ 120 450
-  </pre>
+    <pre>
+      set &lt;name&gt; goAbsPTZ 120 450
+    </pre>
  
-  Dieses Beispiel bewegt die Kameralinse in die Position X=120 und Y=450. <br>
-  Der Wertebereich ist dabei:
+    Dieses Beispiel bewegt die Kameralinse in die Position X=120 und Y=450. <br>
+    Der Wertebereich ist dabei:
 
-  <pre>
-    X = 0 - 640      (0 - 319 bewegt nach links, 321 - 640 bewegt nach rechts, 320 bewegt die Linse nicht)
-    Y = 0 - 480      (0 - 239 bewegt nach unten, 241 - 480 bewegt nach oben, 240 bewegt die Linse nicht) 
-  </pre>
+    <pre>
+      X = 0 - 640      (0 - 319 bewegt nach links, 321 - 640 bewegt nach rechts, 320 bewegt die Linse nicht)
+      Y = 0 - 480      (0 - 239 bewegt nach unten, 241 - 480 bewegt nach oben, 240 bewegt die Linse nicht) 
+    </pre>
 
-  Die Linse kann damit in kleinsten bis sehr großen Schritten in die gewünschte Richtung bewegt werden. 
-  Dieser Vorgang muß ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. <br><br>
+    Die Linse kann damit in kleinsten bis sehr großen Schritten in die gewünschte Richtung bewegt werden. 
+    Dieser Vorgang muß ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. 
+    </li>
+    <br><br>
 
-  Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
+    Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
 
-  <pre>
-   set &lt;name&gt; goAbsPTZ [up|down|left|right]
-  </pre>
+    <pre>
+      set &lt;name&gt; goAbsPTZ [up|down|left|right]
+    </pre>
 
-  verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
-  Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
+    verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
+    Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
   </ul>
   <br><br>
   
@@ -13375,21 +13767,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <a name="motdetsc"></a>
+  <li><b> motdetsc [camera [&lt;options&gt;] | SVS [&lt;options&gt;] | disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   
-  Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
+  Der Befehl schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
-  Kamera / SVS beibehalten. Die erfolgreiche Ausführung der Operation lässt sich u.a. anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; 
-  Bewegung nachvollziehen. <br><br>
-  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. Die verfügbaren Optionen bezüglich der Bewegungserkennung 
-  durch SVS sind "Empfindlichkeit" und "Schwellwert". <br><br>
+  Kamera / SVS beibehalten. Optionen können in einem Script verwendet werden.
+  </li>
+  <br><br>
+  
+  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. 
+  Die verfügbaren Optionen bezüglich der Bewegungserkennung durch SVS sind "Empfindlichkeit" und "Schwellenwert". <br><br>
+  
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc SVS [Empfindlichkeit] [Schwellwert]  </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 91 30                            </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 0 40                             </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 15                               </td><td># setzt die Empfindlichkeit auf 15, Schwellwert bleibt unverändert   </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS [Empfindlichkeit] [Schwellenwert]  </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 91 30                              </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 0 40                               </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 15                                 </td><td># setzt die Empfindlichkeit auf 15, Schwellenwert bleibt unverändert   </td></tr>
   </table>
   </ul>
   <br><br>
@@ -13398,12 +13794,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc camera [Empfindlichkeit] [Schwellwert] [Prozentsatz] </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                       </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                      </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera [Empfindlichkeit] [Objektgröße] [Prozentsatz]   </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                         </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                         </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 30                                              </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
       </table>
-  </ul>
+  </ul> 
   <br><br>
 
   Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
@@ -13415,7 +13811,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Über den Befehl "get &lt;name&gt; caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert. 
   Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
   
-  Beipiel:
+  <b>Beipiel:</b>
   <pre>
   CamMotDetSc    SVS, sensitivity: 76, threshold: 55
   </pre>
@@ -14239,8 +14635,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
-    Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn 
-    httptimeout = "0" oder nicht gesetzt) </li><br>
+    Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station. <br> 
+    (default: 20 Sekunden) </li><br>
     
   <a name="hlsNetScript"></a>
   <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Model "SVS") <br>
