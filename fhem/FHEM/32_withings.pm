@@ -173,7 +173,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      125 => { name => "unknown 125", reading => "unknown125", },#
                      126 => { name => "unknown 126", reading => "unknown126", },#
                      127 => { name => "unknown 127", reading => "unknown127", },#
-                     128 => { name => "unknown 128", reading => "unknown128", },#vasistas
+                     128 => { name => "unknown 128", reading => "unknown128", },#vasistas invalid for trackers from 2020/09
                      129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep
                      130 => { name => "ECG", reading => "heartECG", },#bpm core
                      131 => { name => "Heart Sounds", reading => "heartSounds", },#bpm core
@@ -332,7 +332,7 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'breathing_event_probability' => { name => "Breathing Event Probability", reading => "breathingEventProbability", unit => 0, },
                         'apnea_activated' => { name => "Apnea Activated", reading => "apneaActivated", unit => 0, },
                         'apnea_algo_version' => { name => "Apnea Algo Version", reading => "apneaAlgoVersion", unit => 0, },
-                        'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },                        
+                        'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
 
                         # 'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
@@ -362,7 +362,7 @@ my %alarm_song = (  'Unknown' => 0,
                     'Spotify' => 5,
                     'Internet radio' => 6, );
 
-my %nap_sound = (  0 => "Unknown",
+my %nap_sound = (     0 => "Unknown",
                       1 => "Celestial Piano (20 min)",
                       2 => "Cotton Cloud (10 min)",
                       3 => "Deep Smile (10 min)",
@@ -425,7 +425,7 @@ sub withings_Initialize($) {
 
   $hash->{AttrList} .= $readingFnAttributes;
 
-Log3 "withings", 5, "withings: initialize";
+  Log3 "withings", 5, "withings: initialize";
 }
 
 #####################################
@@ -526,15 +526,15 @@ sub withings_Define($$) {
     withings_initDevice($hash) if( $hash->{SUBTYPE} eq "DEVICE" );
     InternalTimer(gettimeofday()+60, "withings_poll", $hash, 0) if( $hash->{SUBTYPE} eq "DUMMY" );
 
-  #connect aura
-  my $auraip = $attr{$name}{IP};
-  if($auraip){
-    $hash->{DeviceName} = $auraip.":7685";
+    #connect aura
+    my $auraip = $attr{$name}{IP};
+    if($auraip){
+      $hash->{DeviceName} = $auraip.":7685";
 
       Log3 $hash, 3, "$name: Opening Aura socket";
-    withings_Close($hash) if(DevIo_IsOpen($hash));
-    withings_Open($hash);
-  }
+      withings_Close($hash) if(DevIo_IsOpen($hash));
+    	withings_Open($hash);
+    }
   }
   else
   {
@@ -790,13 +790,13 @@ sub withings_getSessionKey($) {
   #   }
   #   Log3 $name, 4, "$name: appliver ".$hash->{helper}{appliver};
   # #}
-  # 
-  # 
+  #
+  #
   # #if( !defined($hash->{helper}{csrf_token}) )
   # #{
   #   $data1 =~ /csrf_token" value="(.*)"/;
   #   $hash->{helper}{csrf_token} = $1;
-  #   
+  #
   #   if(!defined($hash->{helper}{csrf_token})) {
   #     Log3 $name, 1, "$name: CSRF ERROR ";
   #     $hash->{STATE} = "CSRF error" if( $hash->{SUBTYPE} eq "ACCOUNT" );
@@ -960,7 +960,7 @@ sub withings_connect($) {
         $d->{User} = $device->{deviceproperties}{linkuserid} if(defined($device->{deviceproperties}{linkuserid}));
         $d->{color} = $device->{deviceproperties}{product_color} if(defined($device->{deviceproperties}{product_color}));
       }
-      
+
       Log3 $name, 2, "$name: device '$device->{deviceid}' already defined as $d->{NAME}" if( defined($d) && $d->{NAME} ne $name );
       next;
     }
@@ -1942,11 +1942,11 @@ sub withings_getUserReadingsActivity($) {
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90,120,128,132', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
-      hash => $hash,
-      type => 'userReadingsActivity',
-      enddate => int($enddate),
-      callback => \&withings_Dispatch,
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90,120,132', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
+    hash => $hash,
+    type => 'userReadingsActivity',
+    enddate => int($enddate),
+    callback => \&withings_Dispatch,
   });
 
   my ($seconds) = gettimeofday();
@@ -2400,7 +2400,7 @@ sub withings_parseWorkouts($$) {
   #parse
   Log3 $name, 1, "$name: parseworkouts\n".Dumper($json);
 
-return undef;
+  return undef;
 }
 
 
@@ -2495,7 +2495,7 @@ sub withings_parseVasistas($$;$) {
             $newlastupdate = $readingsdate if($readingsdate > $newlastupdate);
             $i++;
           }
-#start in-bed detection
+          #start in-bed detection
           if($hash->{modelID} eq "61" && $datatype =~ /Sleep/ && $iscurrent == 0){
             if($i>40 && $readingsdate > time()-3600){
               $iscurrent = 1;
@@ -2507,7 +2507,7 @@ sub withings_parseVasistas($$;$) {
               readingsEndUpdate($hash,1);
             }
           }
-#end in-bed detection
+          #end in-bed detection
         }
       }
     }
@@ -3035,18 +3035,18 @@ sub withings_readAuraAlarm($) {
   $data="010100050101250000"; #new alarmdata
   withings_Write($hash, $data);
 
-  #$data="0101000b0109060006090800020000"; #unknown
-  #withings_Write($hash, $data);
+  # $data="0101000b0109060006090800020000"; #unknown
+  # withings_Write($hash, $data);
   # #0101000f010100000a011000060906fffffffe
-  #$data="0101000b0109060006090800020100"; #unknown
-  #withings_Write($hash, $data);
+  # $data="0101000b0109060006090800020100"; #unknown
+  # withings_Write($hash, $data);
   # #0101000d01090600080906000432320101
-  #$data="0101000b0109060006090800020400"; #unknown
-  #withings_Write($hash, $data);
+  # $data="0101000b0109060006090800020400"; #unknown
+  # withings_Write($hash, $data);
   # #0101000f010100000a011000060906fffffffe
 
-  #$data="010100050109010000"; #getstate
-  #withings_Write($hash, $data);
+  # $data="010100050109010000"; #getstate
+  # withings_Write($hash, $data);
 
   return undef;
 }
@@ -3181,77 +3181,77 @@ sub withings_parseAuraData($$) {
   elsif($data =~ /010100..01012500/) {
     Log3 $name, 4, "$name: alarm data ".$data;
     $data = pack('H*', $data);
-  my $datalength = ord(substr($data,2,1))*256 + ord(substr($data,3,1));
-  Log3 $name, 5, "$name: alarmdata ($datalength)".unpack('H*', $data);
+    my $datalength = ord(substr($data,2,1))*256 + ord(substr($data,3,1));
+    Log3 $name, 5, "$name: alarmdata ($datalength)".unpack('H*', $data);
 
-  my $base = 9;
-  readingsBeginUpdate($hash);
-  my $alarmcounter = 1;
+    my $base = 9;
+    readingsBeginUpdate($hash);
+    my $alarmcounter = 1;
 
-  my @dataarray = split("05120007",unpack('H*', $data));
+    my @dataarray = split("05120007",unpack('H*', $data));
 
-  while(defined($dataarray[$alarmcounter]))
-  {
-    my @alarmparts = split("091600",$dataarray[$alarmcounter]);#seriously, withings?
-    my $timedatehex = pack('H*', $alarmparts[0]);
-
-    my $alarmhour = ord(substr($timedatehex,0,1));
-    my $alarmminute = ord(substr($timedatehex,1,1));
-    my $alarmdays = ord(substr($timedatehex,2,1));
-    my $alarmstate = (ord(substr($timedatehex,2,1)) > 128) ? "on" : "off";
-    my $alarmperiod = ord(substr($timedatehex,6,1));
-
-    my $alarmvolume = 0;
-    my $alarmbrightness = 0;
-    my $alarmsong = 0;
-
-    for(my $i=1;$i<=3;$i++) #whoever did this must have been high as fuck!
+    while(defined($dataarray[$alarmcounter]))
     {
-      my $hexdata = pack('H*', $alarmparts[$i]);
-      my $datatype = ord(substr($hexdata,1,1)); #order is not consistent
-      my $datalength = ord(substr($hexdata,2,1));
-      if($datatype == 1)
+      my @alarmparts = split("091600",$dataarray[$alarmcounter]);#seriously, withings?
+      my $timedatehex = pack('H*', $alarmparts[0]);
+
+      my $alarmhour = ord(substr($timedatehex,0,1));
+      my $alarmminute = ord(substr($timedatehex,1,1));
+      my $alarmdays = ord(substr($timedatehex,2,1));
+      my $alarmstate = (ord(substr($timedatehex,2,1)) > 128) ? "on" : "off";
+      my $alarmperiod = ord(substr($timedatehex,6,1));
+
+      my $alarmvolume = 0;
+      my $alarmbrightness = 0;
+      my $alarmsong = 0;
+
+      for(my $i=1;$i<=3;$i++) #whoever did this must have been high as fuck!
       {
-        $alarmvolume = ord(substr($hexdata,3,1))-48; #value as ascii characters
-        $alarmvolume = $alarmvolume*10 + ord(substr($hexdata,4,1))-48 if($datalength>1);
-        $alarmvolume = $alarmvolume*10 + ord(substr($hexdata,5,1))-48 if($datalength>2);
+        my $hexdata = pack('H*', $alarmparts[$i]);
+        my $datatype = ord(substr($hexdata,1,1)); #order is not consistent
+        my $datalength = ord(substr($hexdata,2,1));
+        if($datatype == 1)
+        {
+          $alarmvolume = ord(substr($hexdata,3,1))-48; #value as ascii characters
+          $alarmvolume = $alarmvolume*10 + ord(substr($hexdata,4,1))-48 if($datalength>1);
+          $alarmvolume = $alarmvolume*10 + ord(substr($hexdata,5,1))-48 if($datalength>2);
+        }
+        elsif($datatype == 2)
+        {
+          $alarmbrightness = ord(substr($hexdata,3,1))-48; #same for other values - wtf?
+          $alarmbrightness = $alarmbrightness*10 + ord(substr($hexdata,4,1))-48 if($datalength>1);
+          $alarmbrightness = $alarmbrightness*10 + ord(substr($hexdata,5,1))-48 if($datalength>2);
+        }
+        elsif($datatype == 3)
+        {
+          $alarmsong = ord(substr($hexdata,3,1))-48;
+        }
+        else{
+          Log3 $name, 2, "$name: unknown alarm data type: $datatype";
+        }
+
       }
-      elsif($datatype == 2)
-      {
-        $alarmbrightness = ord(substr($hexdata,3,1))-48; #same for other values - wtf?
-        $alarmbrightness = $alarmbrightness*10 + ord(substr($hexdata,4,1))-48 if($datalength>1);
-        $alarmbrightness = $alarmbrightness*10 + ord(substr($hexdata,5,1))-48 if($datalength>2);
-      }
-      elsif($datatype == 3)
-      {
-        $alarmsong = ord(substr($hexdata,3,1))-48;
-      }
-      else{
-        Log3 $name, 2, "$name: unknown alarm data type: $datatype";
-      }
+
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_time", sprintf( "%02d:%02d:%02d",$alarmhour,$alarmminute,0), 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_wdays", withings_int2Weekdays($alarmdays), 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_volume", $alarmvolume, 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_brightness", $alarmbrightness, 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_smartwake", $alarmperiod, 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_state", $alarmstate, 1 );
+      readingsBulkUpdate( $hash, "alarm".$alarmcounter."_sound", $alarm_sound{$alarmsong}, 1 );
+
+      Log3 $name, 4, "$name: alarm $alarmstate $alarmhour:$alarmminute ($alarmperiod) on ".withings_int2Weekdays($alarmdays)." light:$alarmbrightness vol:$alarmvolume  [$base]";
+
+      $hash->{helper}{ALARMSCOUNT} = $alarmcounter;
+      $alarmcounter++;
 
     }
-
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_time", sprintf( "%02d:%02d:%02d",$alarmhour,$alarmminute,0), 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_wdays", withings_int2Weekdays($alarmdays), 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_volume", $alarmvolume, 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_brightness", $alarmbrightness, 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_smartwake", $alarmperiod, 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_state", $alarmstate, 1 );
-    readingsBulkUpdate( $hash, "alarm".$alarmcounter."_sound", $alarm_sound{$alarmsong}, 1 );
-
-    Log3 $name, 4, "$name: alarm $alarmstate $alarmhour:$alarmminute ($alarmperiod) on ".withings_int2Weekdays($alarmdays)." light:$alarmbrightness vol:$alarmvolume  [$base]";
-
-    $hash->{helper}{ALARMSCOUNT} = $alarmcounter;
-    $alarmcounter++;
-
-  }
     readingsEndUpdate($hash,1);
 
-  for(my $i=$alarmcounter;$i<10;$i++)
-  {
-    fhem( "deletereading $name alarm".$i."_.*" );
-  }
+    for(my $i=$alarmcounter;$i<10;$i++)
+    {
+      fhem( "deletereading $name alarm".$i."_.*" );
+    }
 
   }
   else {
@@ -3622,7 +3622,7 @@ sub withings_decrypt($) {
 
   return $encoded if( $encoded !~ /crypt:/ );
   return "" if($encoded eq "crypt:");
-  
+
   $encoded = $1 if( $encoded =~ /crypt:(.*)/ );
 
   for my $char (map { pack('C', hex($_)) } ($encoded =~ /(..)/g)) {

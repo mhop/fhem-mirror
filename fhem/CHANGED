@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  32_withings: remove invalid meastype in userReadingsActivity call
  - bugfix:  73_AutoShuttersControl: add feature isNotDay and all condition for
                                     shading is true. shutter drive in the
                                     morning from ClosedPos to Shading Pos,
