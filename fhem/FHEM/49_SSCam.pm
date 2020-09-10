@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.13" => "10.09.2020  optimize liveview handling ",
   "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
   "9.7.11" => "07.09.2020  implement new camOp control ",
   "9.7.10" => "06.09.2020  rebuild timer sequences, minor fixes ",
@@ -3640,6 +3641,7 @@ sub __setOptParams {
                
         $hash->{HELPER}{CALL}{AKEY} = "CAM";
         $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer="$ntp"&camParamChkList=$clst&cameraIds="_CID_"&_sid="_SID_"};  
+        $hash->{HELPER}{CALL}{TO}   = 90;                                                # setzen Optimierungsparameter dauert lange !
         
         setActiveToken($hash);
         checkSid      ($hash);
@@ -3725,6 +3727,12 @@ sub __runLiveview {
             my $keyword                 = $hash->{CAMNAME};                                  # nur Snaps von $camname selektieren, für lastsnap_fw   
             $hash->{HELPER}{CALL}{AKEY} = "SNAPSHOT";
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
+        }
+        
+        if ($hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) {                                 # HLS Livestreaming aktivieren
+            $hash->{HELPER}{CALL}{AKEY} = "VIDEOSTMS"; 
+            $hash->{HELPER}{CALL}{TO}   = 90;                                                # aktivieren HLS dauert lange !
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
         }
         
         setActiveToken($hash);
@@ -4150,6 +4158,7 @@ sub __camDisable {
         }
         
         $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{TO}     = 90;                                                # Disable dauert lange !
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Disable&cameraIds=_CID_&_sid="_SID_"};     
         
         if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
@@ -5879,20 +5888,20 @@ sub camOp {
    my $proto            = $hash->{PROTOCOL};
    my $serveraddr       = $hash->{SERVERADDR};
    my $serverport       = $hash->{SERVERPORT};
-   my ($exturl,$winname,$attr,$room,$param);
-   my ($url,$expmode);
+   my ($exturl,$winname,$attr,$room);
+   my $url;
        
    Log3($name, 4, "$name - --- Start $OpMode ---");
 
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
-   $httptimeout    = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/x);                       # setzen der Optimierungsparameter/Disable dauert lange !
-   
-   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    
    if($hash->{HELPER}{CALL}) {                                                                  # neue camOp Ausführungsvariante
-       my $akey =  delete $hash->{HELPER}{CALL}{AKEY};
-       my $part =  delete $hash->{HELPER}{CALL}{PART};
+       my $akey =  delete $hash->{HELPER}{CALL}{AKEY};                                          # API Key
+       my $part =  delete $hash->{HELPER}{CALL}{PART};                                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
+       my $to   =  delete $hash->{HELPER}{CALL}{TO};                                            # evtl. zuätzlicher Timeout Add-On
        delete $hash->{HELPER}{CALL};
+       
+       $httptimeout += $to;
        
        $part =~ s/_NAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
        $part =~ s/_VER_/$hash->{HELPER}{API}{$akey}{VER}/x;
@@ -5957,16 +5966,12 @@ sub camOp {
       delActiveToken($hash);
       return;
       
-   } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) || $OpMode eq "activate_hls") {
-      # HLS Livestreaming aktivieren
-      $httptimeout = $httptimeout+90;                                          # aktivieren HLS dauert lange !
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
-   
    }  
    
+   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    Log3($name, 4, "$name - Call-Out now: $url");
    
-   $param = {
+   my $param = {
        url      => $url,
        timeout  => $httptimeout,
        hash     => $hash,
