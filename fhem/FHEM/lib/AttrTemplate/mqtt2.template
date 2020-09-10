@@ -1638,6 +1638,42 @@ set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_TuyaMCU_dimmer
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+# tasmota battery powered window sensor MC400A
+# contributed by OppiM, source post https://forum.fhem.de/index.php/topic,94495.msg1084052.html#msg1084052
+name:tasmota_window_sensor_MC400A
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:Configures a MC400A windows sensor. <br>Note: This is part of the TuyaMCU model family within tasmota, see https://tasmota.github.io/docs/TuyaMCU/ for further details!
+order:A_05c
+attr DEVICE icon tuer_fenster_kontakt
+attr DEVICE jsonMap TuyaReceived_Cmnd:0 TuyaReceived_CmndData:0 TuyaReceived_Data:0
+attr DEVICE autocreate 0
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+set IO_DEV publish CMNDTOPIC/Rule1 ON TuyaReceived#Data=55AA00050005030400010213 DO publish stat/%topic%/batteryState ok; publish stat/%topic%/batteryPercent 100 ENDON ON TuyaReceived#Data=55AA00050005030400010112 DO publish stat/%topic%/batteryState ok; publish stat/%topic%/batteryPercent 50 ENDON ON TuyaReceived#Data=55AA00050005030400010011 DO publish stat/%topic%/batteryState low; publish stat/%topic%/batteryPercent 5 ENDON
+set IO_DEV publish CMNDTOPIC/Backlog Template {"NAME":"MC400A","GPIO":[0,107,0,108,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":54}; Module 0; SetOption1 1; SetOption65 1; SetOption66 1; SwitchMode 1; TuyaMCU 51,21; StateText1 closed; StateText2 open; Timezone 99; Rule1 1;SaveData 1; Reboot 1
+attr DEVICE setList \
+  nosleep:noArg CMNDTOPIC/SerialSend5 55AA000200010002\
+  setOtaUrl:textField CMNDTOPIC/OtaUrl $EVTPART1\
+  upgrade:noArg   CMNDTOPIC/upgrade 1
+attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
+  STATTOPIC/POWER:.* state\
+  TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
+  STATTOPIC/batteryState:.* batteryState\
+  STATTOPIC/batteryPercent:.* batteryPercent
+attr DEVICE stateFormat LWT\
+state
+attr DEVICE model tasmota_window_sensor_MC400A
+setreading DEVICE attrTemplateVersion 20200910
+
+
+
 name:tasmota_set_lowercase_texts_and_state1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change ON, OFF etc. sent from tasmota side to lowercase. <br>After applying the template you might consider to delete or change stateFormat, eventMap and/or userReadings attribute values
