@@ -5898,7 +5898,7 @@ sub camOp {
    if($hash->{HELPER}{CALL}) {                                                                  # neue camOp Ausführungsvariante
        my $akey =  delete $hash->{HELPER}{CALL}{AKEY};                                          # API Key
        my $part =  delete $hash->{HELPER}{CALL}{PART};                                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
-       my $to   =  delete $hash->{HELPER}{CALL}{TO};                                            # evtl. zuätzlicher Timeout Add-On
+       my $to   =  delete $hash->{HELPER}{CALL}{TO} // 0;                                       # evtl. zuätzlicher Timeout Add-On
        delete $hash->{HELPER}{CALL};
        
        $httptimeout += $to;
