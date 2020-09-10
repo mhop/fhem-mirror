@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
   "9.7.13" => "10.09.2020  optimize liveview handling ",
   "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
   "9.7.11" => "07.09.2020  implement new camOp control ",
@@ -2944,7 +2945,7 @@ sub __camStartRec {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{VKEY} = "EXTREC";
         $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=start&_sid="_SID_"};
       
         if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
@@ -3000,7 +3001,7 @@ sub __camStopRec {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{VKEY} = "EXTREC";
         $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=stop&_sid="_SID_"};
       
         if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
@@ -3044,7 +3045,7 @@ sub __camExpmode {
         
         my $expmode                   = $hexmo{$hash->{HELPER}{EXPMODE}};
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&cameraIds="_CID_"&expMode="$expmode"&camParamChkList=32&_sid="_SID_"};     
                 
@@ -3083,7 +3084,7 @@ sub __camMotDetSc {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
         
         my %motdetoptions = ();                                                  # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
         my $motdetsc;
@@ -3200,7 +3201,7 @@ sub __camSnap {
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
         $hash->{HELPER}{SMTPMSG}      = $emtxt  if($emtxt);                        # Text für Email-Versand
 
-        $hash->{HELPER}{CALL}{AKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&dsId="0"&method="TakeSnapshot"&blSave="true"&camId="_CID_"&_sid="_SID_"};
         
         readingsSingleUpdate($hash,"state", "snap", 1); 
@@ -3241,7 +3242,7 @@ sub __getRec {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "REC";
+        $hash->{HELPER}{CALL}{VKEY}   = "REC";
         my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
       
         if($recid) {
@@ -3287,7 +3288,7 @@ sub __getRecAndSave {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "REC";
+        $hash->{HELPER}{CALL}{VKEY}   = "REC";
         my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
       
         if($recid) {
@@ -3333,7 +3334,7 @@ sub __startTrack {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&cameraId="_CID_"&_sid="_SID_"}; 
         
         setActiveToken($hash);
@@ -3371,7 +3372,7 @@ sub __stopTrack {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&moveType="Stop"&cameraId="_CID_"&_sid="_SID_"};     
         
         setActiveToken($hash);
@@ -3419,7 +3420,7 @@ sub __setZoom {
         my $dir                     = $hash->{HELPER}{ZOOM}{DIR};
         my $moveType                = $hash->{HELPER}{ZOOM}{MOVETYPE};
       
-        $hash->{HELPER}{CALL}{AKEY} = "PTZ";                                                                     
+        $hash->{HELPER}{CALL}{VKEY} = "PTZ";                                                                     
         $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Zoom"&cameraId="_CID_"&control="$dir"&moveType="$moveType"&_sid="_SID_"};
     
         if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop") {
@@ -3461,7 +3462,7 @@ sub __setPreset {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
         
         my $pnumber = $hash->{HELPER}{PNUMBER};
         my $pname   = $hash->{HELPER}{PNAME};
@@ -3510,7 +3511,7 @@ sub __delPreset {
         }
         
         my $delp                      = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}};
-        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="DelPreset"&position="$delp"&cameraId="_CID_"&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -3548,7 +3549,7 @@ sub __setHome {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
         
         if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetHome"&cameraId="_CID_"&_sid="_SID_"};        
@@ -3593,7 +3594,7 @@ sub __setHomeMode {
         
         my $sw                        = $hash->{HELPER}{HOMEMODE};                 # HomeMode on,off
         $sw                           = ($sw eq "on") ? "true" : "false";
-        $hash->{HELPER}{CALL}{AKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{VKEY}   = "HMODE";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=Switch&on=$sw&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -3639,7 +3640,7 @@ sub __setOptParams {
 
         my $ver                     = $hash->{HELPER}{API}{CAM}{VER} >= 9 ? 8 : $hash->{HELPER}{API}{CAM}{VER};        
                
-        $hash->{HELPER}{CALL}{AKEY} = "CAM";
+        $hash->{HELPER}{CALL}{VKEY} = "CAM";
         $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer="$ntp"&camParamChkList=$clst&cameraIds="_CID_"&_sid="_SID_"};  
         $hash->{HELPER}{CALL}{TO}   = 90;                                                # setzen Optimierungsparameter dauert lange !
         
@@ -3678,7 +3679,7 @@ sub __managePir {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
         my $piract                    = $hash->{HELPER}{PIRACT};
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="PDParamSave"&keep=true&source=$piract&camId="_CID_"&_sid="_SID_"};     
         
@@ -3725,12 +3726,12 @@ sub __runLiveview {
             my $limit                   = 1;                                                 # nur 1 Snap laden, für lastsnap_fw 
             my $imgsize                 = 2;                                                 # full size image, für lastsnap_fw 
             my $keyword                 = $hash->{CAMNAME};                                  # nur Snaps von $camname selektieren, für lastsnap_fw   
-            $hash->{HELPER}{CALL}{AKEY} = "SNAPSHOT";
+            $hash->{HELPER}{CALL}{VKEY} = "SNAPSHOT";
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
         }
         
         if ($hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) {                                 # HLS Livestreaming aktivieren
-            $hash->{HELPER}{CALL}{AKEY} = "VIDEOSTMS"; 
+            $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS"; 
             $hash->{HELPER}{CALL}{TO}   = 90;                                                # aktivieren HLS dauert lange !
             $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
         }
@@ -3770,6 +3771,10 @@ sub __activateHls {
             return;
         }       
         
+        $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS"; 
+        $hash->{HELPER}{CALL}{TO}   = 90;                                                # aktivieren HLS dauert lange !
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
+        
         setActiveToken($hash);
         checkSid      ($hash);
     
@@ -3805,7 +3810,7 @@ sub __reactivateHls {
             return;
         }
 
-        $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_};     
         
         setActiveToken($hash);
@@ -3886,7 +3891,7 @@ sub __stopLiveview {
         if($hash->{HELPER}{WLTYPE} eq "hls") {              # HLS Stream war aktiv, Streaming beenden
             $hash->{OPMODE} = "stopliveview_hls"; 
             
-            $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+            $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
             $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_}; 
             
             return if(startOrShut($name));
@@ -3927,7 +3932,7 @@ sub __extEvent {
         }
         
         my $evtid                     = $hash->{HELPER}{EVENTID};
-        $hash->{HELPER}{CALL}{AKEY}   = "EXTEVT";
+        $hash->{HELPER}{CALL}{VKEY}   = "EXTEVT";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Trigger&eventId=$evtid&eventName=$evtid&_sid="_SID_"};       
         
         Log3($name, 4, "$name - trigger external event \"$evtid\"");
@@ -4003,14 +4008,14 @@ sub __doPtzAaction {
                 return;        
             }
             
-            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="RunPatrol"&patrolId="$patid"&cameraId="_CID_"&_sid="_SID_"};
 
             Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
         }
         
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
             my $ver                     = ($hash->{HELPER}{API}{PTZ}{VER} >= 5) ? 4 : $hash->{HELPER}{API}{PTZ}{VER};
             my $posid                   = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}};
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="GoPreset"&position="$posid"&cameraId="_CID_"&_sid="_SID_"};
@@ -4021,7 +4026,7 @@ sub __doPtzAaction {
         if ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
             my $posx                    = $hash->{HELPER}{GOPTZPOSX};
             my $posy                    = $hash->{HELPER}{GOPTZPOSY};
-            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="AbsPtz"&cameraId="_CID_"&posX="$posx"&posY="$posy"&_sid="_SID_"};
         
             Log3($name, 4, "$name - Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\" now");
@@ -4029,7 +4034,7 @@ sub __doPtzAaction {
         
         if ($hash->{HELPER}{PTZACTION} eq "movestart") {
             my $mdir                    = $hash->{HELPER}{GOMOVEDIR};
-            $hash->{HELPER}{CALL}{AKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
             $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&speed="3"&moveType="Start"&_sid="_SID_"};
 
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
@@ -4077,7 +4082,7 @@ sub __moveStop {                                        ## no critic "not used"
         }
         
         my $mdir                      = $hash->{HELPER}{GOMOVEDIR};
-        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&moveType="Stop"&_sid="_SID_"};
         
         Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
@@ -4115,7 +4120,7 @@ sub __camEnable {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Enable&cameraIds=_CID_&_sid="_SID_"};     
         
         if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
@@ -4157,7 +4162,7 @@ sub __camDisable {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         $hash->{HELPER}{CALL}{TO}     = 90;                                                # Disable dauert lange !
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Disable&cameraIds=_CID_&_sid="_SID_"};     
         
@@ -4630,7 +4635,7 @@ sub __getCamInfo {
             return;
         }
 
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="GetInfo"&cameraIds="_CID_"&deviceOutCap="true"&streamInfo="true"&ptz="true"&basic="true"&camAppInfo="true"&optimize="true"&fisheye="true"&eventDetection="true"&_sid="_SID_"};            
         
@@ -4727,7 +4732,7 @@ sub __getHomeModeState {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{VKEY}   = "HMODE";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=GetInfo&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -4770,7 +4775,7 @@ sub __getSvsLog {
         $mco                          = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
         $sev                          = (lc($sev) =~ /error/x) ? 3 :(lc($sev) =~ /warning/x) ? 2 :(lc($sev) =~ /info/x) ? 1 : "";
         
-        $hash->{HELPER}{CALL}{AKEY}   = "LOG";
+        $hash->{HELPER}{CALL}{VKEY}   = "LOG";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version="2"&method="List"&time2String="no"&level="$sev"&limit="$lim"&keyword="$mco"&_sid="_SID_"};
         
         Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
@@ -4808,7 +4813,7 @@ sub __getSvsInfo {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "SVSINFO";
+        $hash->{HELPER}{CALL}{VKEY}   = "SVSINFO";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetInfo"&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -4857,7 +4862,7 @@ sub __getSnapInfo {
         my $keyword = $camname;
         my $snapid  = ReadingsVal("$name", "LastSnapId", " ");       
                
-        $hash->{HELPER}{CALL}{AKEY} = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{VKEY} = "SNAPSHOT";
         
         if($hash->{OPMODE} eq "getsnapinfo" && $snapid =~/\d+/x) {                   # getsnapinfo UND Reading LastSnapId gesetzt
             Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
@@ -4903,7 +4908,7 @@ sub __getPresets {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Enum"&cameraId="_CID_"&_sid="_SID_"}; 
            
         setActiveToken($hash);
@@ -4941,7 +4946,7 @@ sub __getSnapFilename {
         my $snapid = ReadingsVal("$name", "LastSnapId", "");
         Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
         
-        $hash->{HELPER}{CALL}{AKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&imgSize="0"&idList="$snapid"&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -4977,7 +4982,7 @@ sub __getStmUrlPath {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetStmUrlPath"&cameraIds="_CID_"&_sid="_SID_"};
       
         if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
@@ -5018,7 +5023,7 @@ sub __getEventList {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "EVENT";
+        $hash->{HELPER}{CALL}{VKEY}   = "EVENT";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&cameraIds="_CID_"&locked="0"&blIncludeSnapshot="false"&reason=""&limit="2"&includeAllCam="false"&_sid="_SID_"};       
         
         setActiveToken($hash);
@@ -5054,7 +5059,7 @@ sub __getCapabilities {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
         my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=$ver&method="GetCapabilityByCamId"&cameraId=_CID_&_sid="_SID_"};
         
@@ -5091,7 +5096,7 @@ sub __getStreamFormat {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Query&cameraId=_CID_&_sid=_SID_};
         
         setActiveToken($hash); 
@@ -5127,7 +5132,7 @@ sub __getMotionEnum {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "CAMEVENT";
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="MotionEnum"&camId="_CID_"&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -5172,7 +5177,7 @@ sub __getPtzPresetList {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
         $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=ListPreset&cameraId=_CID_&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -5217,7 +5222,7 @@ sub __getPtzPatrolList {
             return;
         }
         
-        $hash->{HELPER}{CALL}{AKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
         $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=ListPatrol&cameraId=_CID_&_sid="_SID_"};
         
         setActiveToken($hash);
@@ -5895,10 +5900,11 @@ sub camOp {
 
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
    
-   if($hash->{HELPER}{CALL}) {                                                                  # neue camOp Ausführungsvariante
-       my $akey =  delete $hash->{HELPER}{CALL}{AKEY};                                          # API Key
-       my $part =  delete $hash->{HELPER}{CALL}{PART};                                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
-       my $to   =  delete $hash->{HELPER}{CALL}{TO} // 0;                                       # evtl. zuätzlicher Timeout Add-On
+   if($hash->{HELPER}{CALL}) {                                                  # neue camOp Ausführungsvariante
+       my $akey =  delete $hash->{HELPER}{CALL}{VKEY};                          # API Key
+       my $head =  delete $hash->{HELPER}{CALL}{HEAD};                          # vom Standard abweichende Serveradresse / Port
+       my $part =  delete $hash->{HELPER}{CALL}{PART};                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
+       my $to   =  delete $hash->{HELPER}{CALL}{TO} // 0;                       # evtl. zuätzlicher Timeout Add-On
        delete $hash->{HELPER}{CALL};
        
        $httptimeout += $to;
@@ -5908,7 +5914,12 @@ sub camOp {
        $part =~ s/_CID_/$hash->{CAMID}/x;
        $part =~ s/_SID_/$hash->{HELPER}{SID}/x;
        
-       $url  = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+       if($head) {
+           $url = $head.qq{/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+       
+       } else {       
+           $url = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+       }
    }
    
    if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
@@ -6805,7 +6816,7 @@ sub camOp_Parse {
                 
             } elsif ($OpMode eq "reactivate_hls") {                                                     # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" deactivated for streaming device");
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated for reactivation");
 
                 delActiveToken($hash);                                                                  # Token freigeben vor hlsactivate
                 __activateHls ($hash);
@@ -6813,7 +6824,7 @@ sub camOp_Parse {
                 
             } elsif ($OpMode eq "activate_hls") {                                                       # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "active"; 
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated for streaming device");
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated");
                 
                 roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                                 
