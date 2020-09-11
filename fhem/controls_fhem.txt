@@ -1,6 +1,6 @@
-REV 22749
+REV 22755
 DIR unused
-UPD 2020-09-08_07:45:03 350318 ./CHANGED
+UPD 2020-09-11_07:45:03 350396 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
 UPD 2020-07-05_07:45:03 41333 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
@@ -176,7 +176,7 @@ UPD 2019-03-16_07:45:03 18457 FHEM/32_TechemWZ.pm
 UPD 2020-04-20_07:45:02 209209 FHEM/32_WifiLight.pm
 UPD 2018-03-02_07:47:09 15860 FHEM/32_mailcheck.pm
 UPD 2016-08-23_07:45:12 5646 FHEM/32_speedtest.pm
-UPD 2020-08-05_07:45:03 161379 FHEM/32_withings.pm
+UPD 2020-09-11_07:45:03 161528 FHEM/32_withings.pm
 UPD 2016-09-30_07:45:11 15878 FHEM/32_yowsup.pm
 UPD 2017-12-15_07:45:02 4576 FHEM/33_readingsChange.pm
 UPD 2020-02-09_07:45:03 90608 FHEM/33_readingsGroup.pm
@@ -257,7 +257,7 @@ UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2020-08-08_07:45:02 100783 FHEM/48_BlinkCamera.pm
 UPD 2020-02-18_07:45:02 66733 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
-UPD 2020-09-10_07:45:02 770380 FHEM/49_SSCam.pm
+UPD 2020-09-11_07:45:03 771382 FHEM/49_SSCam.pm
 UPD 2020-08-15_07:45:02 58131 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
@@ -637,7 +637,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-09-05_07:45:03 267959 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-09-11_07:45:03 270542 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
@@ -738,8 +738,8 @@ UPD 2020-09-10_07:45:06 4369153 docs/commandref.html
 UPD 2020-09-10_07:45:09 2717094 docs/commandref_DE.html
 UPD 2020-08-20_07:45:03 80720 docs/commandref_frame.html
 UPD 2020-08-20_07:45:03 90332 docs/commandref_frame_DE.html
-UPD 2020-09-10_07:45:10 234167 docs/commandref_modular.html
-UPD 2020-09-10_07:45:11 244884 docs/commandref_modular_DE.html
+UPD 2020-09-11_07:45:10 234167 docs/commandref_modular.html
+UPD 2020-09-11_07:45:11 244884 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
