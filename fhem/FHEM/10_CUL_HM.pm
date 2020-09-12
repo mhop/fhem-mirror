@@ -4547,8 +4547,11 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                 ($max,$step) = ($1,$2);
               }
               my @list = ();
+              my $f = 0;
+              ($f) = map{(my $foo = $_) =~ s/.*\.//;length($foo)}($step) if ($step =~ m/\./);
+              
               for(my $i = $min;$i <= $max; $i += $step){
-                push @list,$i;
+                push @list,sprintf("%.${f}f",$i);
               }
               push @lst1,@list;
             }
