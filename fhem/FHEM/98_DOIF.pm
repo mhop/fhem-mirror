@@ -238,7 +238,7 @@ sub DOIF_Widget_Register
     return "<div class='dval' doifId='$doifId' style='display:inline-table;$style'>$value</div>";
   }
 }
- 
+
 sub DOIF_RegisterCell
 {
   my ($hash,$table,$func,$r,$c,$cc,$cr) =@_;
@@ -281,9 +281,13 @@ sub DOIF_RegisterCell
     $err="'error $err: in expression: $expr'";
     return $err;
   } else {
+    $lastWarningMsg="";
     my ($exp,$sty,$wid,$com)=eval ($hash->{$table}{package}.$expr);
-    if ($@) {
-      return "'error $@ in expression: $expr'";
+    return "'error $@ in expression: $expr'" if ($@);
+    if ($lastWarningMsg) {
+      $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+      Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterCell:$hash->{$table}{package}.$expr");
+      $lastWarningMsg="";
     }
     if (defined $sty and $sty eq "" and defined $wid and $wid ne "") {
        if ($event) {
@@ -312,9 +316,12 @@ sub DOIF_RegisterCell
       $err="'error $err: in widget: $widget'";
       return $err;
     } else {
+      $lastWarningMsg="";
       eval ($widget);
-      if ($@) {
-        return "'error $@ in widget: $widget'";
+      return "'error $@ in widget: $widget'" if ($@);
+      if ($lastWarningMsg) {
+        Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterCell:$widget");
+        $lastWarningMsg="";
       }
     }
   } else {
@@ -327,9 +334,12 @@ sub DOIF_RegisterCell
       $err="'error $err: in style: $style'";
       return $err;
     } else {
+      $lastWarningMsg="";
       eval $style;
-      if ($@) {
-        return "'error $@ in style: $style'";
+      return "'error $@ in style: $style'" if ($@);
+      if ($lastWarningMsg) {
+        Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterCell:$style");
+        $lastWarningMsg="";
       }
     }
   } else {
@@ -688,7 +698,12 @@ sub DOIF_RegisterEvalAll
       for (my $l=0;$l < $lastcc;$l++){
       for (my $m=0;$m < scalar keys %{$hash->{$table}{table}{$i}{$k}{$l}};$m++) {
           if (defined $hash->{$table}{table}{$i}{$k}{$l}{$m}){
-            my $value= eval ($hash->{$table}{table}{$i}{$k}{$l}{$m});
+            $lastWarningMsg="";
+            my $value= eval($hash->{$table}{table}{$i}{$k}{$l}{$m});
+            if ($lastWarningMsg) {
+              Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterEvalAll:$hash->{$table}{table}{$i}{$k}{$l}{$m}");
+              $lastWarningMsg="";
+            }
             if (defined ($value)) {
               if (defined $defs{$value} and (!defined $hash->{$table}{shownodevicelink} or !$hash->{$table}{shownodevicelink})) {
                 $ret.="<a href='$FW_ME?detail=$value$FW_CSRF'>$value</a>";
@@ -3226,9 +3241,9 @@ CmdDoIfPerl($$)
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
-    #readingsBulkUpdate($hash,"state","initialized");
     readingsBulkUpdate ($hash,"mode","enabled");
     readingsEndUpdate($hash, 1);
+    readingsSingleUpdate($hash,"state","initialized",0);
     $hash->{helper}{globalinit}=1;
     #foreach my $key (keys %{$attr{$hash->{NAME}}}) {
     #  if ($key ne "disable" and AttrVal($hash->{NAME},$key,"")) {
@@ -3534,9 +3549,10 @@ DOIF_Attr(@)
     DOIF_delTimer($hash);
     DOIF_delAll ($hash);
     readingsBeginUpdate($hash);
-    if ($hash->{MODEL} ne "Perl") {
-      readingsBulkUpdate ($hash, "state", "deactivated");
-    }
+    #if ($hash->{MODEL} ne "Perl") {
+    #  readingsBulkUpdate ($hash, "state", "deactivated");
+    #}
+    readingsBulkUpdate ($hash, "state", "deactivated");
     readingsBulkUpdate ($hash, "mode", "deactivated");
     readingsEndUpdate  ($hash, 1);
   } elsif($a[0] eq "set" && $a[2] eq "state") {
