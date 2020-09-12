@@ -5938,6 +5938,7 @@ sub camOp {
    if($hash->{HELPER}{ACALL}) {                                                 # neue camOp Audio Ausführungsvariante 
        my $akey  = delete $hash->{HELPER}{CALL}{AKEY};                          # API Key Audio Parts
        my $apart = delete $hash->{HELPER}{CALL}{APART};                         # URL-Teilstring Audio
+       delete $hash->{HELPER}{ACALL};
        
        $apart =~ s/_ANAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
        $apart =~ s/_AVER_/$hash->{HELPER}{API}{$akey}{VER}/x;
