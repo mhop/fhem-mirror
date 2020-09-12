@@ -1,0 +1,92 @@
+###########################################
+# $Id$
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+###########################################
+name:General_Info_ZWave
+filter:TYPE=ZWave
+desc: This attrTemplate-file is still in a very early stage and more like a POC, see <a href="https://forum.fhem.de/index.php/topic,114109.0.html">Forum Thread</a> for further info.
+order:000000
+
+###############
+# For general use
+#
+name:zwave_delete_error_readings
+filter:TYPE=ZWave
+desc:delete some readings in one or all ZWave devices (atm: "UNPARSED", "SEND_DATA", "CMD").<br>For direct use of one of the options, use "set <ZWave-device> attrTemplate RADIO_SINGLEDEV=1"set <ZWave-device> attrTemplate RADIO_SINGLEDEV=1 or "set <ZWave-device> attrTemplate RADIO_ALLDEVS=1".
+order:000001
+par:RADIO_SINGLEDEV;apply to single device;{ undef }
+par:RADIO_ALLDEVS;apply to all ZWave type devices;{ undef }
+option:{ RADIO_SINGLEDEV }
+deletereading -q DEVICE (UNPARSED|SEND_DATA|CMD)
+option:{ RADIO_ALLDEVS }
+deletereading -q TYPE=ZWave (UNPARSED|SEND_DATA|CMD)
+
+name:zwave_get_myutils_from_svn
+filter:TYPE=ZWave
+desc:template to download or update additional code from svn
+order:000002
+{ Svn_GetFile("contrib/AttrTemplate/99_attrT_ZWave_Utils.pm", "FHEM/99_attrT_ZWave_Utils.pm", sub(){CommandReload(undef, "99_attrT_ZWave_Utils")}) }
+
+
+name:zwave_showcase_show_main_and_channel_devices_2
+filter:TYPE=ZWave
+desc:example template just to identify all main and channel devices for a 2-channel device like Fibaro FGs-223
+order:000003
+par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); return $parent ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : undef }
+#par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); $parent ne "0" ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : return undef; my @children = split(",", InternalVal("DEVICE","endpointChildren",0)); return if !$children[0]; $children[0]}
+#par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); $parent = $parent ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : return undef; my @children = split(",", InternalVal("DEVICE","endpointChildren",0)); return if !$children[0]; $children[1]}
+show MAINCHANNEL
+#show MAINCHANNEL,CHANNEL01,CHANNEL02
+
+name:----Fibaro-devices-section--------
+filter:TYPE=ZWave
+order:01Fibaro00000
+
+name:FGRM222
+filter:TYPE=ZWave
+order:01Fibaro000005
+desc:Applies to Fibaro FGRM222 devices. You can choose between normal shutter mode or venetian blind mode. For other modes use manual configuration. Note: additional code will be downloaded from svn.
+farewell:Things to be done manually: configure switch type (configSwitchType) and (for venetain mode only) turning time for lamellas (configInVenetianBlindModeTheParameter12).
+par:RADIO_ROLLER_MODE;Configure as normal shutter (no option to turn lamellas);{ undef }
+par:RADIO_VENETIANBLIND_MODE;Configure as venetian blind (allow turning of lamellas);{ undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
+attr DEVICE icon ICON
+set DEVICE attrTemplate zwave_get_myutils_from_svn
+deletereading -q DEVICE (?!associatedWith|model.*).*
+attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
+attr DEVICE webCmd dim:stop
+attr DEVICE cmdIcon stop:fts_shutter_manual
+attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
+
+option:{ RADIO_ROLLER_MODE }
+set DEVICE configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
+set DEVICE configReportsType BlindPositionReportsSentToThe0
+
+option:{ RADIO_VENETIANBLIND_MODE }
+attr DEVICE devStateIcon { FHEM::attrT::ZWave::devStateIcon_venetian_shutter($name,"FGRM222") }
+set DEVICE configRollerShutterOperatingModes 2VenetianBlindModeWith2
+set DEVICE configReportsType BlindPositionReportsSentToThe1
+set DEVICE configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
+attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0) =~ m,dim, ? ReadingsNum($name,"state",0) : ReadingsNum($name,"dim",0);; my $pos1 = ReadingsNum($name,"position",0);; $pos = $pos1 if ($pos > $pos1 +3 || $pos < $pos1 -3);; return $pos }, positionSlat:power..0.0.W {ReadingsVal($name,"position",0) =~ m,Slat.([0-9]+),?$1:undef}
+
+option:{ CALLSPEECHRECOGN }  
+set DEVICE attrTemplate speechcontrol_type_blind
+#closing section
+option:{ 1 }  
+get DEVICE configAll
+get DEVICE associationAll
+setreading DEVICE attrTemplateVersion FGRM222_20200912
+
+
+
+name:----AEOTEC-devices-section--------
+filter:TYPE=ZWave
+order:03AEOTEC00000
