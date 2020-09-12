@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
   "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
   "9.7.13" => "10.09.2020  optimize liveview handling ",
   "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
@@ -3736,6 +3737,18 @@ sub __runLiveview {
             $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
         }
         
+        if ($hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
+            if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
+                if($hash->{HELPER}{API}{AUDIOSTM}{VER}) {                                    # Audio aktivieren                                       
+                    $hash->{HELPER}{ACALL}{AKEY}  = "AUDIOSTM"; 
+                    $hash->{HELPER}{ACALL}{APART} = qq{api=_ANAME_&version=_AVER_&method=Stream&cameraId=_CID_&_sid=_SID_}; 
+          
+                } else {
+                    delete $hash->{HELPER}{AUDIOLINK};
+                }
+            }
+        }
+        
         setActiveToken($hash);
         checkSid      ($hash);
     
@@ -5901,39 +5914,44 @@ sub camOp {
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
    
    if($hash->{HELPER}{CALL}) {                                                  # neue camOp Ausführungsvariante
-       my $akey =  delete $hash->{HELPER}{CALL}{VKEY};                          # API Key
-       my $head =  delete $hash->{HELPER}{CALL}{HEAD};                          # vom Standard abweichende Serveradresse / Port
-       my $part =  delete $hash->{HELPER}{CALL}{PART};                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
-       my $to   =  delete $hash->{HELPER}{CALL}{TO} // 0;                       # evtl. zuätzlicher Timeout Add-On
+       my $vkey  = delete $hash->{HELPER}{CALL}{VKEY};                          # API Key Video Parts
+       my $head  = delete $hash->{HELPER}{CALL}{HEAD};                          # vom Standard abweichende Serveradresse / Port
+       my $part  = delete $hash->{HELPER}{CALL}{PART};                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
+       my $to    = delete $hash->{HELPER}{CALL}{TO} // 0;                       # evtl. zuätzlicher Timeout Add-On
        delete $hash->{HELPER}{CALL};
        
        $httptimeout += $to;
        
-       $part =~ s/_NAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
-       $part =~ s/_VER_/$hash->{HELPER}{API}{$akey}{VER}/x;
+       $part =~ s/_NAME_/$hash->{HELPER}{API}{$vkey}{NAME}/x;
+       $part =~ s/_VER_/$hash->{HELPER}{API}{$vkey}{VER}/x;
        $part =~ s/_CID_/$hash->{CAMID}/x;
        $part =~ s/_SID_/$hash->{HELPER}{SID}/x;
        
        if($head) {
-           $url = $head.qq{/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+           $url = $head.qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
        
        } else {       
-           $url = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$part;
+           $url = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
        }
+   }
+   
+   if($hash->{HELPER}{ACALL}) {                                                 # neue camOp Audio Ausführungsvariante 
+       my $akey  = delete $hash->{HELPER}{CALL}{AKEY};                          # API Key Audio Parts
+       my $apart = delete $hash->{HELPER}{CALL}{APART};                         # URL-Teilstring Audio
+       
+       $apart =~ s/_ANAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
+       $apart =~ s/_AVER_/$hash->{HELPER}{API}{$akey}{VER}/x;
+       $apart =~ s/_CID_/$hash->{CAMID}/x;
+       $apart =~ s/_SID_/$hash->{HELPER}{SID}/x;  
+
+       $hash->{HELPER}{AUDIOLINK} = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$apart;           
    }
    
    if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
       $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
       $exturl = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;      
       
-      if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
-          if($apiaudiostmver) {                                                # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
-              $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
-          
-          } else {
-              delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
-          }
-          
+      if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {          
           if($apivideostmsver) {                                               # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
               $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";                                   # externe URL
               $url     = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";       # interne URL
@@ -8218,6 +8236,7 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   } else {
       if($apivideostmsver) {                                  
           $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
