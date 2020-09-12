@@ -82,6 +82,7 @@ sub Twilight_Define
   my $type           = shift @arr;
   my $latitude       = shift @arr // AttrVal('global','latitude',50.112);
   my $longitude      = shift @arr // AttrVal('global','longitude',8.686);
+  
   my $indoor_horizon = shift @arr // 0;
   my $weather        = shift @arr // 0;
   
@@ -92,6 +93,10 @@ sub Twilight_Define
   $latitude       = List::Util::min(  90, List::Util::max( -90, $latitude));
   $longitude      = List::Util::min( 180, List::Util::max(-180, $longitude));
   $indoor_horizon = List::Util::min(  20, List::Util::max(  -6, $indoor_horizon));
+  
+  CommandAttr(undef, "global longitude $longitude") if !AttrVal('global','longitude',0) && $longitude != 8.686;
+  CommandAttr(undef, "global latitude $latitude") if !AttrVal('global','latitude',0) && $latitude != 50.112;
+  Log3 ($hash, 2, "[$hash->{NAME}] check longitude/latitude settings, there's a missmatch between Twilight and global settings. Times will be calculated using global settings!") if $latitude != AttrVal('global','latitude',50.112) || $longitude != AttrVal('global','longitude',8.686);
   
   $hash->{WEATHER_HORIZON}  = 0;
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
@@ -110,7 +115,7 @@ sub Twilight_Define
   Twilight_Midnight($mHash);
 
   delete $hash->{DEFINE};
-  Log3 $hash, 2, "[$hash->{NAME}] Note: Twilight formerly used weather info from yahoo, but source is offline.";
+  Log3 ($hash, 2, "[$hash->{NAME}] Note: Twilight formerly used weather info from yahoo, but source is offline.");
  
   return;
 }
@@ -135,13 +140,13 @@ sub myInternalTimer {
    my $timerName = "$hash->{NAME}_$modifier";
    my $mHash = { HASH=>$hash, NAME=>"$hash->{NAME}_$modifier", MODIFIER=>$modifier};
    if (defined($hash->{TIMER}{$timerName})) {
-      Log3 $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first";
+      Log3 ($hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first");
       stacktrace();
    } else {
       $hash->{TIMER}{$timerName} = $mHash;
    }
 
-   Log3 $hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim);
+   Log3 ($hash, 5, "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim));
    InternalTimer($tim, $callback, $mHash, $waitIfInitNotDone);
    return $mHash;
 }
@@ -154,7 +159,7 @@ sub myRemoveInternalTimer {
    my $myHash = $hash->{TIMER}{$timerName};
    if (defined($myHash)) {
       delete $hash->{TIMER}{$timerName};
-      Log3 $hash, 5, "[$hash->{NAME}] removing Timer: $timerName";
+      Log3 ($hash, 5, "[$hash->{NAME}] removing Timer: $timerName");
       RemoveInternalTimer($myHash);
    }
    return;
@@ -166,7 +171,7 @@ sub myGetHashIndirekt {
   my $function = shift // return;
 
   if (!defined($myHash->{HASH})) {
-    Log 3, "[$function] myHash not valid";
+    #Log3 ($hash, 5, "[$function] myHash not valid");
     return;
   };
   return $myHash->{HASH};
@@ -227,7 +232,7 @@ sub Twilight_TwilightTimes {
     ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME}) = Twilight_calc ($deg, $idx);
 
     if ($hash->{TW}{$sr}{TIME} == 0) {
-       Log3 $hash, 4, "[$Name] hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(HORIZON=$deg)";
+       Log3 ($hash, 4, "[$Name] hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(HORIZON=$deg)");
     }
   }
   #$attr{global}{latitude}  = $lat;
@@ -294,10 +299,10 @@ sub Twilight_fireEvent {
    my $doTrigger = !(defined($hash->{LOCAL})) && ( abs($delta)<6 || $swip  && $state gt $oldState);
   #Log3 $hash, 3, "[$hash->{NAME}] swip-delta-oldState-doTrigger===>$swip/$delta/$oldState/$doTrigger";
 
-   Log3 $hash, 4,
+   Log3 ($hash, 4,
      sprintf  ("[$hash->{NAME}] %-10s %-19s  ",        $event,     FmtDateTime($eventTime)).
      sprintf  ("(%2d/$light/%+5.1f°/$doTrigger)   ",   $state,     $deg).
-     sprintf  ("===> %-10s %-19s  ",                   $nextEvent, $nextEventTime);
+     sprintf  ("===> %-10s %-19s  ",                   $nextEvent, $nextEventTime));
 
 
    readingsBeginUpdate($hash);
@@ -344,7 +349,7 @@ sub Twilight_CreateHttpParameterAndGetData {
 
   my $URL = "http://query.yahooapis.com/v1/public/yql?q=select%%20*%%20from%%20weather.forecast%%20where%%20woeid=%s%%20and%%20u=%%27c%%27&format=%s&env=store%%3A%%2F%%2Fdatatables.org%%2Falltableswithkeys";
   my $url = sprintf($URL, $location, "json");
-  Log3 $hash, 4, "[$hash->{NAME}] url=$url";
+  Log3 ($hash, 4, "[$hash->{NAME}] url=$url");
 
   my $param = {
       url        => $url,
@@ -378,8 +383,8 @@ sub Twilight_WeatherCallback {
     #disabled due to yahoo 
     $result = undef;
   } else {
-     Log3 $hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}";
-     Log3 $hash, 5, "[$hash->{NAME}] answer=$result" if defined $result;
+     Log3 ($hash, 4, "[$hash->{NAME}] got weather info from yahoo for $hash->{WEATHER}");
+     Log3 ($hash, 5, "[$hash->{NAME}] answer=$result") if defined $result;
   }
 
   Twilight_getWeatherHorizon($hash, $result);
@@ -483,10 +488,10 @@ sub Twilight_getWeatherHorizon {
         $perlAusdruck = 'return ' .$perlAusdruck;
 
      my $anonymSub = eval "sub {$perlAusdruck}";
-     Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
+     Log3 ($hash, 3, "[$hash->{NAME}] error $@ parsing $result") if $@;
      if (!$@) {
         my $resHash = $anonymSub->() if ($anonymSub gt "");
-        Log3 $hash, 3, "[$hash->{NAME}] error $@ parsing $result"   if($@);
+        Log3 ($hash, 3, "[$hash->{NAME}] error $@ parsing $result") if($@);
        #Log3 $hash, 3, "jsonAsPerl". Dumper $resHash->{query}{results}{channel}{item}{condition};
        if (!$@) {
 
@@ -508,7 +513,7 @@ sub Twilight_getWeatherHorizon {
      $hash->{CONDITION}          = $cond_code;
      $hash->{CONDITION_TXT}      = $cond_txt;
      $hash->{TEMPERATUR}         = $temperatur;
-     Log3 $hash, 4, "[$hash->{NAME}] $cond_code=$cond_txt $temperatur, correction: $hash->{WEATHER_CORRECTION}°";
+     Log3 ($hash, 4, "[$hash->{NAME}] $cond_code=$cond_txt $temperatur, correction: $hash->{WEATHER_CORRECTION}°");
   }
 
   my $doy         = strftime("%j",localtime);
@@ -538,7 +543,7 @@ sub Twilight_sunpos {
 
   my $dLongitude = $hash->{LONGITUDE};
   my $dLatitude  = $hash->{LATITUDE};
-  Log3 $hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude" if($dHours == 0 && $dMinutes <= 6 );
+  Log3 ($hash, 5, "Compute sunpos for latitude $dLatitude , longitude $dLongitude") if $dHours == 0 && $dMinutes <= 6;
 
   my $pi=3.14159265358979323846;
   my $twopi=(2*$pi);
@@ -611,17 +616,17 @@ sub Twilight_sunpos {
 
   if( (my $ExtWeather = AttrVal($hashName, "useExtWeather", "")) eq "") {
      $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-        Log3 $hash, 5, "[$hash->{NAME}] " . "Original weather readings";
+        Log3 ($hash, 5, "[$hash->{NAME}] " . "Original weather readings");
   } else {
        my($extDev,$extReading) = split(":",$ExtWeather);
        my $extWeatherHorizont = ReadingsVal($extDev,$extReading,-1);
        if ($extWeatherHorizont >= 0){
              $extWeatherHorizont = 100 if ($extWeatherHorizont > 100);
-             Log3 $hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont;
+             Log3 ($hash, 5, "[$hash->{NAME}] " . "New weather readings from: ".$extDev.":".$extReading.":".$extWeatherHorizont);
              $twilight_weather = $twilight - int(0.007 * ($extWeatherHorizont ** 2)); ## SCM: 100% clouds => 30% light (rough estimation)
        } else {
              $twilight_weather = int(($dElevation-$hash->{WEATHER_HORIZON}+12.0)/18.0 * 1000)/10;
-             Log3 $hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings";
+             Log3 ($hash, 3, "[$hash->{NAME}] " . "Error with external readings from: ".$extDev.":".$extReading." , taking original weather readings");
        }
   }
 
