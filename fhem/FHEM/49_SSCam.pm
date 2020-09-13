@@ -164,6 +164,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.17" => "13.09.2020  optimize _oPrunliveview ",
+  "9.7.16" => "12.09.2020  function _oPrunliveview to execute livestream (no snap / HLS) in new camOp variant ",
   "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
   "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
   "9.7.13" => "10.09.2020  optimize liveview handling ",
@@ -3746,6 +3748,16 @@ sub __runLiveview {
                 } else {
                     delete $hash->{HELPER}{AUDIOLINK};
                 }
+                
+                if($hash->{HELPER}{API}{VIDEOSTMS}{VER}) {                                   # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+                    $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS";
+                    $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Stream&cameraId=_CID_&format=mjpeg&_sid=_SID_};
+                }
+                
+            } else {
+                my $lrecid                  = ReadingsVal("$name", "CamLastRecId", 0); 
+                $hash->{HELPER}{CALL}{VKEY} = "STM";
+                $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=EventStream&eventId=$lrecid&timestamp=1&_sid=_SID_};
             }
         }
         
@@ -5849,74 +5861,23 @@ return camOp($hash);
 #                                     Ausführung Operation
 #############################################################################################
 sub camOp {  
-   my $hash = shift;
-   
-   my $name             = $hash->{NAME};
-   my $apicam           = $hash->{HELPER}{API}{CAM}{NAME};                     # SYNO.SurveillanceStation.Camera
-   my $apicampath       = $hash->{HELPER}{API}{CAM}{PATH};
-   my $apicamver        = $hash->{HELPER}{API}{CAM}{VER};  
-   my $apiextrec        = $hash->{HELPER}{API}{EXTREC}{NAME};                  # SYNO.SurveillanceStation.ExternalRecording
-   my $apiextrecpath    = $hash->{HELPER}{API}{EXTREC}{PATH};
-   my $apiextrecver     = $hash->{HELPER}{API}{EXTREC}{VER};
-   my $apiextevt        = $hash->{HELPER}{API}{EXTEVT}{NAME};                  # SYNO.SurveillanceStation.ExternalEvent
-   my $apiextevtpath    = $hash->{HELPER}{API}{EXTEVT}{PATH};
-   my $apiextevtver     = $hash->{HELPER}{API}{EXTEVT}{VER};
-   my $apitakesnap      = $hash->{HELPER}{API}{SNAPSHOT}{NAME};                # SYNO.SurveillanceStation.SnapShot
-   my $apitakesnappath  = $hash->{HELPER}{API}{SNAPSHOT}{PATH};
-   my $apitakesnapver   = $hash->{HELPER}{API}{SNAPSHOT}{VER};
-   my $apiptz           = $hash->{HELPER}{API}{PTZ}{NAME};                     # SYNO.SurveillanceStation.PTZ
-   my $apiptzpath       = $hash->{HELPER}{API}{PTZ}{PATH};
-   my $apiptzver        = $hash->{HELPER}{API}{PTZ}{VER};
-   my $apipreset        = $hash->{HELPER}{API}{PRESET}{NAME};                  # SYNO.SurveillanceStation.PTZ.Preset
-   my $apipresetpath    = $hash->{HELPER}{API}{PRESET}{PATH};
-   my $apipresetver     = $hash->{HELPER}{API}{PRESET}{VER};
-   my $apisvsinfo       = $hash->{HELPER}{API}{SVSINFO}{NAME};                 # SYNO.SurveillanceStation.Info
-   my $apisvsinfopath   = $hash->{HELPER}{API}{SVSINFO}{PATH};
-   my $apisvsinfover    = $hash->{HELPER}{API}{SVSINFO}{VER};
-   my $apicamevent      = $hash->{HELPER}{API}{CAMEVENT}{NAME};                # SYNO.SurveillanceStation.Camera.Event
-   my $apicameventpath  = $hash->{HELPER}{API}{CAMEVENT}{PATH};
-   my $apicameventver   = $hash->{HELPER}{API}{CAMEVENT}{VER};
-   my $apievent         = $hash->{HELPER}{API}{EVENT}{NAME};                   # SYNO.SurveillanceStation.Event
-   my $apieventpath     = $hash->{HELPER}{API}{EVENT}{PATH};
-   my $apieventver      = $hash->{HELPER}{API}{EVENT}{VER};
-   my $apivideostm      = $hash->{HELPER}{API}{VIDEOSTM}{NAME};                # SYNO.SurveillanceStation.VideoStreaming
-   my $apivideostmpath  = $hash->{HELPER}{API}{VIDEOSTM}{PATH};
-   my $apivideostmver   = $hash->{HELPER}{API}{VIDEOSTM}{VER};  
-   my $apiaudiostm      = $hash->{HELPER}{API}{AUDIOSTM}{NAME};                # SYNO.SurveillanceStation.AudioStream
-   my $apiaudiostmpath  = $hash->{HELPER}{API}{AUDIOSTM}{PATH};
-   my $apiaudiostmver   = $hash->{HELPER}{API}{AUDIOSTM}{VER};   
-   my $apistm           = $hash->{HELPER}{API}{STM}{NAME};                     # SYNO.SurveillanceStation.Stream
-   my $apistmpath       = $hash->{HELPER}{API}{STM}{PATH};
-   my $apistmver        = $hash->{HELPER}{API}{STM}{VER};
-   my $apihm            = $hash->{HELPER}{API}{HMODE}{NAME};                   # SYNO.SurveillanceStation.HomeMode
-   my $apihmpath        = $hash->{HELPER}{API}{HMODE}{PATH};
-   my $apihmver         = $hash->{HELPER}{API}{HMODE}{VER};
-   my $apilog           = $hash->{HELPER}{API}{LOG}{NAME};                     # SYNO.SurveillanceStation.Log
-   my $apilogpath       = $hash->{HELPER}{API}{LOG}{PATH};
-   my $apilogver        = $hash->{HELPER}{API}{LOG}{VER};
-   my $apivideostms     = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};               # SYNO.SurveillanceStation.VideoStream
-   my $apivideostmspath = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
-   my $apivideostmsver  = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
-   my $apirec           = $hash->{HELPER}{API}{REC}{NAME};                     # SYNO.SurveillanceStation.Recording
-   my $apirecpath       = $hash->{HELPER}{API}{REC}{PATH};
-   my $apirecver        = $hash->{HELPER}{API}{REC}{VER};   
-   my $sid              = $hash->{HELPER}{SID};
-   my $OpMode           = $hash->{OPMODE};
-   my $camid            = $hash->{CAMID};
-   my $proto            = $hash->{PROTOCOL};
-   my $serveraddr       = $hash->{SERVERADDR};
-   my $serverport       = $hash->{SERVERPORT};
-   my ($exturl,$winname,$attr,$room);
-   my $url;
+   my $hash       = shift;
+   my $name       = $hash->{NAME};
+   my $OpMode     = $hash->{OPMODE};
+   my $proto      = $hash->{PROTOCOL};
+   my $serveraddr = $hash->{SERVERADDR};
+   my $serverport = $hash->{SERVERPORT};
+
+   my ($url,$part,$vkey);
        
    Log3($name, 4, "$name - --- Start $OpMode ---");
 
    my $httptimeout = AttrVal($name, "httptimeout", $todef);
    
-   if($hash->{HELPER}{CALL}) {                                                  # neue camOp Ausführungsvariante
-       my $vkey  = delete $hash->{HELPER}{CALL}{VKEY};                          # API Key Video Parts
-       my $head  = delete $hash->{HELPER}{CALL}{HEAD};                          # vom Standard abweichende Serveradresse / Port
-       my $part  = delete $hash->{HELPER}{CALL}{PART};                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
+   if($hash->{HELPER}{CALL}) {                                                  # neue camOp Videosteuerung Ausführungsvariante
+       $vkey     = delete $hash->{HELPER}{CALL}{VKEY};                          # API Key Video Parts
+       my $head  = delete $hash->{HELPER}{CALL}{HEAD};                          # vom Standard abweichende Serveradresse / Port (z.B. bei external)
+       $part     = delete $hash->{HELPER}{CALL}{PART};                          # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
        my $to    = delete $hash->{HELPER}{CALL}{TO} // 0;                       # evtl. zuätzlicher Timeout Add-On
        delete $hash->{HELPER}{CALL};
        
@@ -5935,9 +5896,9 @@ sub camOp {
        }
    }
    
-   if($hash->{HELPER}{ACALL}) {                                                 # neue camOp Audio Ausführungsvariante 
-       my $akey  = delete $hash->{HELPER}{CALL}{AKEY};                          # API Key Audio Parts
-       my $apart = delete $hash->{HELPER}{CALL}{APART};                         # URL-Teilstring Audio
+   if($hash->{HELPER}{ACALL}) {                                                 # neue camOp Audiosteuerung Ausführungsvariante 
+       my $akey  = delete $hash->{HELPER}{ACALL}{AKEY};                         # API Key Audio Parts
+       my $apart = delete $hash->{HELPER}{ACALL}{APART};                        # URL-Teilstring Audio
        delete $hash->{HELPER}{ACALL};
        
        $apart =~ s/_ANAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
@@ -5949,53 +5910,8 @@ sub camOp {
    }
    
    if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
-      $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-      $exturl = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;      
-      
-      if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {          
-          if($apivideostmsver) {                                               # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
-              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";                                   # externe URL
-              $url     = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid";       # interne URL
-          
-          } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
-              $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
-          }
-          
-          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
-      
-      } else {                                                                 # Abspielen der letzten Aufnahme (EventId)
-          my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);                
-          
-          if($lrecid) {
-              # externe URL in Reading setzen
-              $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
-              # interne URL          
-              $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid";   
-              readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
-          }
-      }
-       
-      $hash->{HELPER}{LINK} = $url;                                            # Liveview-Link in Hash speichern
- 
-      Log3($name, 4, "$name - Set Streaming-URL: $url");
-      
-      if ($hash->{HELPER}{OPENWINDOW}) {                                       # livestream sofort in neuem Browsertab öffnen
-          $winname = $name."_view";
-          $attr    = AttrVal($name, "htmlattr", "");
-          
-          if ($hash->{HELPER}{VIEWOPENROOM}) {                                 # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
-              $room = $hash->{HELPER}{VIEWOPENROOM};
-              map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");   ## no critic 'void context'
-          } else {
-              map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");                        ## no critic 'void context'
-          }
-      }
-           
-      roomRefresh($hash,0,1,1);                                                # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-      
-      delActiveToken($hash);
-      return;
-      
+      _oPrunliveview ($hash, $part, $vkey);
+      return;  
    }  
    
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
@@ -6014,6 +5930,66 @@ sub camOp {
 
 return;   
 } 
+
+################################################################
+#                       camOp runliveview
+# wird bei runliveview aufgerufen wenn nicht Anzeige Snaps 
+# oder kein HLS-Stream aktiviert werden soll
+################################################################
+sub _oPrunliveview {                   
+  my $hash = shift // return;
+  my $part = shift // return;
+  my $vkey = shift // return;
+  my $name = $hash->{NAME};
+  
+  my $proto      = $hash->{PROTOCOL};
+  my $serveraddr = $hash->{SERVERADDR};
+  my $serverport = $hash->{SERVERPORT};
+  
+  my $url;
+
+  my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");                      # externe URL
+  $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;      
+  
+  if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {    
+      if($part) {                                                                                           # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8) 
+          $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;                                   
+          $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;  # interne URL
+      
+      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+          $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
+      }
+  
+  } else {                                                                                                  # Abspielen der letzten Aufnahme (EventId)                       
+      $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part; 
+      $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;      # interne URL
+  }
+  
+  readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
+   
+  $hash->{HELPER}{LINK} = $url;                                                                             # Liveview-Link in Hash speichern
+
+  Log3($name, 4, "$name - Set Streaming-URL: $url");
+  
+  if ($hash->{HELPER}{OPENWINDOW}) {                                                                        # livestream sofort in neuem Browsertab öffnen
+      my $winname = $name."_view";
+      my $attr    = AttrVal($name, "htmlattr", "");
+      
+      if ($hash->{HELPER}{VIEWOPENROOM}) {                                                                  # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
+          my $room = $hash->{HELPER}{VIEWOPENROOM};
+          map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");   ## no critic 'void context'
+      
+      } else {
+          map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");                        ## no critic 'void context'
+      }
+  }
+       
+  roomRefresh($hash,0,1,1);                                                                                 # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+  
+  delActiveToken($hash);
+        
+return;
+}
   
 ###################################################################################  
 #      Check ob Kameraoperation erfolgreich wie in "OpMOde" definiert 
