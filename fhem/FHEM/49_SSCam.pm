@@ -1682,36 +1682,36 @@ sub Set {
   } elsif(IsModelCam($hash)) {
       # selist für Cams
       my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
-      $setlist = "Unknown argument $opt, choose one of ".
-                 "credentials ".
-                 "smtpcredentials ".
-                 "expmode:auto,day,night ".
-                 "on ".
-                 "off:noArg ".
-                 "motdetsc:disable,camera,SVS ".
-                 "snap ".
-                 (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
-                 "createReadingsGroup ".
-                 "createSnapGallery:noArg ".
-                 "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                 "enable:noArg ".
-                 "disable:noArg ".
-                 "optimizeParams ".
-                 "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
-                 "stopView:noArg ".
-                 (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
-                 (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
-                 (IsCapPTZPan($hash)      ? "setPreset ": "").
-                 (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
-                 (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
-                 (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                 (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
-                 (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
-                 (IsCapPTZDir($hash)      ? "move"." " : "").
-                 (IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
-                 (IsCapZoom($hash)        ? "setZoom:$valZoom " : "").
-                 "";
+      $setlist   = "Unknown argument $opt, choose one of ".
+                   "credentials ".
+                   "smtpcredentials ".
+                   "expmode:auto,day,night ".
+                   "on ".
+                   "off:noArg ".
+                   "motdetsc:disable,camera,SVS ".
+                   "snap ".
+                   (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
+                   "createReadingsGroup ".
+                   "createSnapGallery:noArg ".
+                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
+                   "enable:noArg ".
+                   "disable:noArg ".
+                   "optimizeParams ".
+                   "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                   "stopView:noArg ".
+                   (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
+                   (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
+                   (IsCapPTZPan($hash)      ? "setPreset ": "").
+                   (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
+                   (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
+                   (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
+                   (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
+                   (IsCapPTZDir($hash)      ? "move"." " : "").
+                   (IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
+                   (IsCapZoom($hash)        ? "setZoom:$valZoom " : "").
+                   "";
   } else {
       # setlist für SVS Devices
       $setlist = "Unknown argument $opt, choose one of ".
@@ -5646,7 +5646,7 @@ sub getApiSites_Parse {
     }
     
     if($fret) {                                                                     # Caller aufrufen wenn angegeben
-        no strict "refs";
+        no strict "refs";                                                           ## no critic 'NoStrict' 
         delActiveToken($hash);                                                      # Freigabe Funktionstoken vor Neudurchlauf der aufrufenden Funktion 
         &$fret($arg);
         use strict "refs";
@@ -9667,7 +9667,6 @@ sub sendChat {
        return;   
    } 
                                     
-  #no strict "refs";
   my ($subject,$fileUrl,$uid,$fname,@as,%seen,@unique);
   
   $cache = cache($name, "c_init");                                                           # Cache initialisieren        
@@ -10559,7 +10558,6 @@ sub sendEmailblocking {
       );
   }
   
-  # no strict "refs";
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my ($ct,$img,$decoded);
