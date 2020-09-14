@@ -1772,6 +1772,7 @@ my %zwm_unit = (
   heating => ["kWh" ],
   cooling => ["kWh" ]
 );
+my @meter_type_text = ("undef", "energy", "gas", "water", "heating", "cooling");
 
 sub
 ZWave_meterParse($$)
@@ -1789,7 +1790,6 @@ ZWave_meterParse($$)
                         "undef" : $rate_type_text[$rate_type]);
 
   my $meter_type = ($v1 & 0x1f);
-  my @meter_type_text =("undef", "energy", "gas", "water", "heating","cooling");
   my $meter_type_text = ($meter_type > $#meter_type_text ?
                         "undef" : $meter_type_text[$meter_type]);
 
@@ -1843,7 +1843,6 @@ ZWave_meterParse($$)
   }
 }
 
-my @meter_type_text =("undef", "energy", "gas", "water", "undef");
 
 sub
 ZWave_meterSet($$)
@@ -6236,7 +6235,7 @@ ZWave_firmwareUpdateParse($$$)
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
   <li>meterResetToValue type value<br>
-    Reset type (one of energy, gas or water) to the value specified.
+    Reset type (one of energy,gas,water,heating,cooling) to the value specified.
     Only supported by METER version 6.</li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
