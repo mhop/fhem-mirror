@@ -138,7 +138,8 @@ my %zwave_class = (
     get   => { smStatus    => "04" },
     parse => { "..3105(..)(..)(.*)" => 'ZWave_multilevelParse($1,$2,$3)'} },
   METER                    => { id => '32',
-    set   => { meterReset  => "05" },
+    set   => { meterReset  => "05",
+               meterResetToValue => 'ZWave_meterSet($cmd, "%s")' },
     get   => { meter       => 'ZWave_meterGet("%s")',
                meterSupported => "03" },
     parse => { "..3202(.*)"=> 'ZWave_meterParse($hash, $1)',
@@ -622,6 +623,7 @@ my %zwave_classVersion = (
   dimUpDownWithDuration       => { min => 2 },
   dimUpDownIncDecWithDuration => { min => 3 },
   meterReset                  => { min => 2 },
+  meterResetToValue           => { min => 6 },
   meterSupported              => { min => 2 },
   "on-for-timer"              => { min => 2 },
   "off-for-timer"             => { min => 2 },
@@ -1841,6 +1843,24 @@ ZWave_meterParse($$)
   }
 }
 
+my @meter_type_text =("undef", "energy", "gas", "water", "undef");
+
+sub
+ZWave_meterSet($$)
+{
+  my ($cmd, $param) = @_;
+
+  if($cmd eq "meterResetToValue") {
+    my @p = split(" ", $param);
+    my $cnt = 1;
+    my %mtt = map { $_=>$cnt++ } grep { $_ !~ m/undef/ } @meter_type_text;
+    return "$cmd parameters: {".join("|", sort keys %mtt)."} numeric-value"
+        if(@p != 2 || !$mtt{$p[0]} || $p[1] !~ m/^-?[0-9]+$/);
+    return ("", sprintf("05%02x%08x",(4<<5)|$mtt{$p[0]}, $p[1]));
+  }
+  return "Not Yet Implemented: $cmd";
+}
+
 sub
 ZWave_meterGet($)
 {
@@ -1855,7 +1875,6 @@ ZWave_meterGet($)
   } else { # Version 4
     return ("",sprintf('01%02x%02x', 7<<3, $scale-8));
   }
-
 }
 
 #V2: 1b7:reset 1b65:resrvd, 1b4-0:type, 2b7-4:resrvd, 2b3-0:scale
@@ -1879,7 +1898,6 @@ ZWave_meterSupportedParse($$)
   my $meter_rate_text = $meter_rate_text[$meter_rate_type];
 
   my $meter_type = ($v1 & 0x1f);
-  my @meter_type_text =("undef", "energy", "gas", "water", "undef");
   my $meter_type_text = ($meter_type > $#meter_type_text ?
                             "undef" : $meter_type_text[$meter_type]);
 
@@ -6217,6 +6235,9 @@ ZWave_firmwareUpdateParse($$$)
     value is supported by the device.<br>
     The command will reset ALL accumulated values, it is not possible to
     choose a single value.</li>
+  <li>meterResetToValue type value<br>
+    Reset type (one of energy, gas or water) to the value specified.
+    Only supported by METER version 6.</li>
 
   <br><br><b>Class MULTI_CHANNEL</b>
   <li>mcCreateAll<br>
