@@ -1855,7 +1855,8 @@ ZWave_meterSet($$)
     my %mtt = map { $_=>$cnt++ } grep { $_ !~ m/undef/ } @meter_type_text;
     return "$cmd parameters: {".join("|", sort keys %mtt)."} numeric-value"
         if(@p != 2 || !$mtt{$p[0]} || $p[1] !~ m/^-?[0-9]+$/);
-    return ("", sprintf("05%02x%08x",(4<<5)|$mtt{$p[0]}, $p[1]));
+    return ("", sprintf("05%02x",(4<<5)|$mtt{$p[0]}).
+                substr(sprintf("%08x",$p[1]),-8));
   }
   return "Not Yet Implemented: $cmd";
 }
