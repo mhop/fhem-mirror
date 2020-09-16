@@ -69,11 +69,6 @@ sr_alt($$$$$$$$$;$$)
   my $daycheck= shift;
   my $nextDay = shift;
   my $altit   = shift;
-  my $seconds = shift;
-  my $min     = shift;
-  my $max     = shift;
-  $lat        = shift;
-  $long       = shift;
 
   $altit = defined($altit) ? uc($altit) : "";
   if(exists $alti{$altit}) {
@@ -82,7 +77,14 @@ sr_alt($$$$$$$$$;$$)
     $altit=$1;
   } else {
     $altit=-6; #default
+    unshift @_, $altit # make altit optional.
   }
+
+  my $seconds = shift;
+  my $min     = shift;
+  my $max     = shift;
+  $lat        = shift;
+  $long       = shift;
 
   my $needrise = ($rise || $daycheck) ? 1 : 0;
   my $needset = (!$rise || $daycheck) ? 1 : 0;
