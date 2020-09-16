@@ -74,7 +74,7 @@ sub Twilight_Define
   my $def  = shift // return;
   my @arr  = split m{\s+}xms, $def;
   
-  return "syntax: define <name> Twilight <latitude> <longitude> [indoor_horizon [Weather]]"
+  return "syntax: define <name> Twilight [<latitude> <longitude> [indoor_horizon [Weather]]]"
     if(int(@arr) < 1 && int(@arr) > 6);
 
   $hash->{STATE} = "0";
@@ -94,9 +94,9 @@ sub Twilight_Define
   $longitude      = List::Util::min( 180, List::Util::max(-180, $longitude));
   $indoor_horizon = List::Util::min(  20, List::Util::max(  -6, $indoor_horizon));
   
-  CommandAttr(undef, "global longitude $longitude") if !AttrVal('global','longitude',0) && $longitude != 8.686;
-  CommandAttr(undef, "global latitude $latitude") if !AttrVal('global','latitude',0) && $latitude != 50.112;
-  Log3 ($hash, 2, "[$hash->{NAME}] check longitude/latitude settings, there's a missmatch between Twilight and global settings. Times will be calculated using global settings!") if $latitude != AttrVal('global','latitude',50.112) || $longitude != AttrVal('global','longitude',8.686);
+  #CommandAttr(undef, "global longitude $longitude") if !AttrVal('global','longitude',0) && $longitude != 8.686;
+  #CommandAttr(undef, "global latitude $latitude") if !AttrVal('global','latitude',0) && $latitude != 50.112;
+  #Log3 ($hash, 3, "[$hash->{NAME}] check longitude/latitude settings, there's a missmatch between Twilight and global settings. Times will be calculated using global settings!") if $latitude != AttrVal('global','latitude',50.112) || $longitude != AttrVal('global','longitude',8.686);
   
   $hash->{WEATHER_HORIZON}  = 0;
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
@@ -187,14 +187,21 @@ sub Twilight_midnight_seconds {
 
 ################################################################################
 sub Twilight_calc {
-   my $deg = shift;
-   my $idx = shift // return;
+   my $hash = shift;
+   my $deg  = shift;
+   my $idx  = shift // return;
 
    my $midnight = time() - Twilight_midnight_seconds(time());
+   my $lat  = $hash->{LATITUDE};
+   my $long = $hash->{LONGITUDE};
 
-   my $sr = sunrise_abs("Horizon=$deg");
-   my $ss = sunset_abs ("Horizon=$deg");
-
+   #my $sr = sunrise_abs("Horizon=$deg");
+   #sub sunrise_abs(@) { return sr_alt(time(),1,0,0,0,shift,shift,shift,shift); }
+   my $sr = sr_alt(time(),1,0,0,0,"Horizon=$deg",undef,undef,undef,$lat,$long);
+   #my $ss = sunset_abs ("Horizon=$deg");
+   #sub sunset_abs (@) { return sr_alt(time(),0,0,0,0,shift,shift,shift,shift); }
+   my $ss = sr_alt(time(),0,0,0,0,"Horizon=$deg",undef,undef,undef,$lat,$long);
+   
    my ($srhour, $srmin, $srsec) = split(":",$sr); $srhour -= 24 if($srhour>=24);
    my ($sshour, $ssmin, $sssec) = split(":",$ss); $sshour -= 24 if($sshour>=24);
 
@@ -229,7 +236,7 @@ sub Twilight_TwilightTimes {
     $hash->{TW}{$sr}{STATE}  = $idx+1;$hash->{TW}{$ss}{STATE} = 12 - $idx;
     $hash->{TW}{$sr}{SWIP}   = $swip; $hash->{TW}{$ss}{SWIP}  = $swip;
 
-    ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME}) = Twilight_calc ($deg, $idx);
+    ($hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME}) = Twilight_calc ($hash, $deg, $idx);
 
     if ($hash->{TW}{$sr}{TIME} == 0) {
        Log3 ($hash, 4, "[$Name] hint: $hash->{TW}{$sr}{NAME},  $hash->{TW}{$ss}{NAME} are not defined(HORIZON=$deg)");
@@ -709,8 +716,9 @@ sub twilight {
 
   <b>latitude, longitude</b>
   <br>
-    The parameters <b>latitude</b> and <b>longitude</b> are decimal numbers which give the position on earth for which the twilight states shall be calculated. They are optional, if not set, global values will be used instead (global itself defaults to Frankfurt/Main).
-    <br><br>
+    The parameters <b>latitude</b> and <b>longitude</b> are decimal numbers which give the position on earth for which the twilight states shall be calculated. They are optional, but necessary in case you also want to set an indoor horizon. If not set, global values will be used instead (global itself defaults to Frankfurt/Main).
+    <br>
+    <br>
   <b>indoor_horizon</b>
   <br>
        The parameter <b>indoor_horizon</b> gives a virtual horizon, that shall be used for calculation of indoor twilight. Minimal value -6 means indoor values are the same like civil values.
