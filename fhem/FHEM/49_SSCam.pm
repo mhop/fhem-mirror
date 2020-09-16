@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.18" => "16.09.2020  control parse function by the hparse hash ",
   "9.7.17" => "13.09.2020  optimize _oPrunliveview ",
   "9.7.16" => "12.09.2020  function _oPrunliveview to execute livestream (no snap / HLS) in new camOp variant ",
   "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
@@ -465,6 +466,15 @@ my %hget = (                                                                # Ha
   stmUrlPath        => { fn => "_getstmUrlPath",        needcred => 1 },
   scanVirgin        => { fn => "_getscanVirgin",        needcred => 1 },
   versionNotes      => { fn => "_getversionNotes",      needcred => 1 },
+);
+
+my %hparse = (                                                              # Hash der Opcode Parse Funktionen
+  Start        => { fn => "_parseStart",     },
+  Stop         => { fn => "_parseStop",      },
+  GetRec       => { fn => "_parseGetRec",    },
+  MotDetSc     => { fn => "_parseMotDetSc",  },
+  getsvslog    => { fn => "_parsegetsvslog", },
+  SaveRec      => { fn => "_parseSaveRec",   },
 );
 
 my %hdt = (                                                                 # Delta Timer Hash für Zeitsteuerung der Funktionen
@@ -6028,21 +6038,17 @@ sub camOp_Parse {
        $verbose = 3;
    }
    
-   if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "") {                                                                  # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
         readingsSingleUpdate($hash, "Error", $err, 1);                                             
         
-        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        delActiveToken($hash);
+        delActiveToken($hash);                                                        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         return;
    
-   } elsif ($myjson ne "") {    
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-        # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        if($OpMode !~ /SaveRec|GetRec/x) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
+   } elsif ($myjson ne "") {                                                          # wenn die Abfrage erfolgreich war     
+        if($OpMode !~ /SaveRec|GetRec/x) {                                            # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
             ($success,$myjson) = evaljson($hash,$myjson);        
+            
             if (!$success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
                 delActiveToken($hash);
@@ -6051,73 +6057,33 @@ sub camOp_Parse {
             
             $data = decode_json($myjson);
             
-            # Logausgabe decodierte JSON Daten
-            Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+            Log3($name, 5, "$name - JSON returned: ". Dumper $data);                  # Logausgabe decodierte JSON Daten
        
             $success = $data->{'success'};
+            
         } else {
             $success = 1; 
         }
 
-        if ($success) {       
-            # Kameraoperation entsprechend "OpMode" war erfolgreich                
-            
-            if ($OpMode eq "Start") {                             
-                # Die Aufnahmezeit setzen
-                # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
-                # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
-                my $rectime;
-                
-                if (defined($hash->{HELPER}{RECTIME_TEMP})) {
-                    $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
-                } else {
-                    $rectime = AttrVal($name, "rectime", $hash->{HELPER}{RECTIME_DEF});
-                }
-                
-                if ($rectime == 0) {
-                    Log3($name, 3, "$name - Camera $camname endless Recording started  - stop it by stop-command !");
-                } else {
-                    if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                        # Aufnahme läuft schon und wird verlängert
-                        Log3($name, 3, "$name - running recording renewed to $rectime s");
-                    } else {
-                        Log3($name, 3, "$name - Camera $camname recording with recording time $rectime s started");
-                    }
-                }
-                       
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Record","Start");
-                readingsBulkUpdate($hash,"state",    "on");
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                
-                if ($rectime != 0) {                                    # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    my $emtxt   = $hash->{HELPER}{SMTPRECMSG} // "";
-                    my $teletxt = $hash->{HELPER}{TELERECMSG} // "";
-                    
-                    RemoveInternalTimer($hash, "FHEM::SSCam::__camStopRec");
-                    InternalTimer(gettimeofday()+$rectime, "FHEM::SSCam::__camStopRec", $hash);
-                }      
-                
-                roomRefresh($hash,0,0,1);                               # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-            
-            } elsif ($OpMode eq "Stop") {                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash, "Record",    "Stop");
-                readingsBulkUpdate ($hash, "state",     "off" );
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error"    , "none");
-                readingsEndUpdate  ($hash, 1);
-       
-                Log3($name, 3, "$name - Camera $camname Recording stopped");
-                
-                roomRefresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                
-                # Aktualisierung Eventlist der letzten Aufnahme
-                __getEventList($hash);
-            
-            } elsif ($OpMode eq "ExpMode") {
+        if ($success) {                                                               # Kameraoperation entsprechend "OpMode" war erfolgreich                
+
+            my $params = {
+                hash    => $hash,
+                name    => $name,
+                camname => $camname,
+                OpMode  => $OpMode,
+                myjson  => $myjson,
+                data    => $data,
+            };
+              
+            no strict "refs";                                                        ## no critic 'NoStrict'  
+            if($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
+                my $ret = q{};  
+                $ret    = &{$hparse{$OpMode}{fn}} ($params);
+            }
+            use strict "refs";
+  
+            if ($OpMode eq "ExpMode") {
                 setReadingErrorNone( $hash, 1 );
                 Log3               ( $name, 3, qq{$name - Camera $camname exposure mode is set to "$hash->{HELPER}{EXPMODE}"} );
                 
@@ -6130,74 +6096,6 @@ sub camOp_Parse {
             } elsif ($OpMode eq "extevent") {
                 setReadingErrorNone( $hash, 1 );
                 Log3               ( $name, 3, qq{$name - External Event "$hash->{HELPER}{EVENTID}" successfully triggered} );          
-            
-            } elsif ($OpMode eq "GetRec") {              
-                my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
-                my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
-                my $lrec             = ReadingsVal("$name", "CamLastRec",     "");
-                my ($tdir,$fileName) = split("/",$lrec);
-                my $sn               = 0;
-                
-                my $tac = openOrgetTrans($hash);                    # Transaktion starten             
-                
-                my $cache;
-                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
-                    $cache = cache($name, "c_init");                # Cache initialisieren für Versandhash
-                    Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
-                    if(!$cache || $cache eq "internal" ) {
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{tdir}      = $tdir;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
-                    } else {
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{recid}"     ,$recid);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{createdTm}" ,$createdTm);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{fileName}"  ,$fileName);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{tdir}"      ,$tdir);                         
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{imageData}" ,$myjson);                         
-                    }
-                    Log3($name, 4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
-                }
-                
-                # Recording als Email / Telegram / Chat versenden 
-                if(!$cache || $cache eq "internal" ) {                
-                    prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
-                } else {
-                    prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
-                }
-                
-                closeTrans ($hash);                               # Transaktion beenden
-                        
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error",$err);
-                readingsEndUpdate   ($hash, 1);
-       
-            } elsif ($OpMode eq "SaveRec") {              
-
-                my $lrec = ReadingsVal("$name", "CamLastRec", "");
-                $lrec    = (split("/",$lrec))[1]; 
-                my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
-                my $file = $sp."/$lrec";
-                delete $hash->{HELPER}{RECSAVEPATH};
-                
-                open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
-                                                Log3($name, 2, "$name - $err");
-                                              };       
-                
-                if(!$err) {                
-                    binmode $fh;
-                    print $fh $myjson;
-                    close($fh);
-                    $err = "none";
-                    Log3($name, 3, qq{$name - Recording was saved to local file "$file"});
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error",$err);
-                readingsEndUpdate   ($hash, 1);
             
             } elsif ($OpMode eq "sethomemode") {              
                 setReadingErrorNone( $hash, 1 );
@@ -6223,40 +6121,6 @@ sub camOp_Parse {
                 readingsBulkUpdate  ($hash,"Errorcode","none");
                 readingsBulkUpdate  ($hash,"Error","none");
                 readingsEndUpdate   ($hash, 1);
-            
-            } elsif ($OpMode eq "getsvslog") { 
-                my $lec = $data->{'data'}{'total'};    # abgerufene Anzahl von Log-Einträgen
-
-                my $log  = '<html>';
-                my $log0 = "";
-                my $i = 0;
-                while ($data->{'data'}->{'log'}->[$i]) {
-                    my $id = $data->{'data'}->{'log'}->[$i]{'id'};
-                    my $un = $data->{'data'}->{'log'}->[$i]{'user_name'};
-                    my $desc = $data->{'data'}->{'log'}->[$i]{'desc'};
-                    my $level = $data->{'data'}->{'log'}->[$i]{'type'};
-                    $level = ($level == 3)?"Error":($level == 2)?"Warning":"Information";
-                    my $time = $data->{'data'}->{'log'}->[$i]{'time'};
-                    $time = FmtDateTime($time);
-                    $log0 = $time." - ".$level." - ".$desc if($i == 0);
-                    $log .= "$time - $level - $desc<br>";
-                    $i++;
-                }   
-                $log = "<html><b>Surveillance Station Server \"$hash->{SERVERADDR}\" Log</b> ( $i/$lec entries are displayed )<br><br>$log</html>";
-                                
-                # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
-                # bzw. https://forum.fhem.de/index.php/topic,77310.0.html
-                # $log = "Too much log data were selected. Please reduce amount of data by specifying all or one of 'severity', 'limit', 'match'" if (length($log) >= 102400);              
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"LastLogEntry",$log0) if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund;
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);
-                
-                # Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$log");
-                delete($hash->{HELPER}{CL});
             
             } elsif ($OpMode eq "getPresets") {  
                 my %ap = ();
@@ -6336,29 +6200,6 @@ sub camOp_Parse {
                 delActiveToken     ($hash);                                                 # Token freigeben vor Abruf caminfo
                 __getCamInfo       ($hash);
                 
-            } elsif ($OpMode eq "MotDetSc") {
-                setReadingErrorNone( $hash, 1 );
-       
-                my $sensitivity;
-                if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {           # Optionen für "SVS" sind gesetzt
-                    $sensitivity  = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
-                    my $threshold = ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) ? ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) : "-";
-                    
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
-                
-                } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {   # Optionen für "camera" sind gesetzt
-                    $sensitivity   = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
-                    my $objectSize = ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) : "-";
-                    my $percentage = ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) : "-";
-                    
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
- 
-                } else {                                                             # keine Optionen Bewegungserkennung wurden gesetzt
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" ");
-                }
-                
-                __getMotionEnum ($hash);                                             # neu gesetzte Parameter abrufen
-            
             } elsif ($OpMode eq "Snap") {                                            # ein Schnapschuß wurde aufgenommen, falls Aufnahme noch läuft -> state = on setzen
                 roomRefresh($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
 
@@ -7358,8 +7199,261 @@ sub camOp_Parse {
        undef $myjson;
    }
      
-  delActiveToken($hash);                                                      # Token freigeben
+   delActiveToken($hash);                                                      # Token freigeben
 
+return;
+}
+
+###############################################################################
+#               Parse OpMode Start
+# Die Aufnahmezeit setzen
+# wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
+# sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
+###############################################################################
+sub _parseStart {                                       ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};  
+                               
+  my $rectime;
+
+  if (defined($hash->{HELPER}{RECTIME_TEMP})) {
+      $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
+  
+  } else {
+      $rectime = AttrVal($name, "rectime", $hash->{HELPER}{RECTIME_DEF});
+  }
+
+  if ($rectime == 0) {
+      Log3($name, 3, "$name - Camera $camname endless Recording started  - stop it by stop-command !");
+
+  } else {
+      if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                                        # Aufnahme läuft schon und wird verlängert
+          Log3($name, 3, "$name - running recording renewed to $rectime s");
+    
+      } else {
+          Log3($name, 3, "$name - Camera $camname recording with recording time $rectime s started");
+      }
+  }
+       
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "Record",    "Start");
+  readingsBulkUpdate ($hash, "state",     "on"   );
+  readingsBulkUpdate ($hash, "Errorcode", "none" );
+  readingsBulkUpdate ($hash, "Error",     "none" );
+  readingsEndUpdate  ($hash, 1);
+
+  if ($rectime != 0) {                                                                                # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
+      my $emtxt   = $hash->{HELPER}{SMTPRECMSG} // "";
+      my $teletxt = $hash->{HELPER}{TELERECMSG} // "";
+    
+      RemoveInternalTimer ($hash, "FHEM::SSCam::__camStopRec");
+      InternalTimer       (gettimeofday()+$rectime, "FHEM::SSCam::__camStopRec", $hash);
+  }      
+
+  roomRefresh($hash,0,0,1);                                                                           # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event           
+        
+return;
+}
+
+###############################################################################
+#               Parse OpMode Stop
+###############################################################################
+sub _parseStop {                                        ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname}; 
+                               
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "Record",    "Stop");
+  readingsBulkUpdate ($hash, "state",     "off" );
+  readingsBulkUpdate ($hash, "Errorcode", "none");
+  readingsBulkUpdate ($hash, "Error"    , "none");
+  readingsEndUpdate  ($hash, 1);
+
+  Log3($name, 3, "$name - Camera $camname Recording stopped");
+
+  roomRefresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+
+  # Aktualisierung Eventlist der letzten Aufnahme
+  __getEventList($hash);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode GetRec
+###############################################################################
+sub _parseGetRec {                                      ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};
+  my $OpMode  = $paref->{OpMode};
+  my $myjson  = $paref->{myjson};
+                               
+  my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
+  my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
+  my $lrec             = ReadingsVal("$name", "CamLastRec",     "");
+  my ($tdir,$fileName) = split("/",$lrec); 
+  my $sn               = 0;
+
+  my $tac = openOrgetTrans($hash);                                                                     # Transaktion starten             
+
+  my $cache;
+  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
+      $cache = cache($name, "c_init");                                                                 # Cache initialisieren für Versandhash
+      Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
+      
+      if(!$cache || $cache eq "internal" ) {
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{tdir}      = $tdir;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
+      
+      } else {
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{recid}"     ,$recid);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{createdTm}" ,$createdTm);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{fileName}"  ,$fileName);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{tdir}"      ,$tdir);                         
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{imageData}" ,$myjson);                         
+      }
+      
+      Log3($name, 4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+  }
+
+  # Recording als Email / Telegram / Chat versenden 
+  if(!$cache || $cache eq "internal" ) {                
+      prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
+  
+  } else {
+      prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
+  }
+
+  closeTrans         ($hash);                                                                        # Transaktion beenden
+  setReadingErrorNone( $hash, 1 );
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode MotDetSc
+###############################################################################
+sub _parseMotDetSc {                                    ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};
+                               
+  my $sensitivity;
+  if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {           # Optionen für "SVS" sind gesetzt
+      $sensitivity  = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+      my $threshold = ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) ? ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) : "-";
+    
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
+
+  } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {   # Optionen für "camera" sind gesetzt
+      $sensitivity   = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+      my $objectSize = ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) : "-";
+      my $percentage = ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) : "-";
+    
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
+
+  } else {                                                                                      # keine Optionen Bewegungserkennung wurden gesetzt
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" ");
+  }
+
+  setReadingErrorNone( $hash, 1 );
+  
+  __getMotionEnum    ($hash);                                                                   # neu gesetzte Parameter abrufen
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getsvslog
+###############################################################################
+sub _parsegetsvslog {                                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+                               
+  my $lec = $data->{'data'}{'total'};                                                    # abgerufene Anzahl von Log-Einträgen
+
+  my $log  = q{};
+  my $log0 = q{};
+  my $i    = 0;
+
+  while ($data->{'data'}->{'log'}->[$i]) {
+      my $id    = $data->{'data'}->{'log'}->[$i]{'id'};
+      my $un    = $data->{'data'}->{'log'}->[$i]{'user_name'};
+      my $desc  = $data->{'data'}->{'log'}->[$i]{'desc'};
+      my $level = $data->{'data'}->{'log'}->[$i]{'type'};
+      $level    = ($level == 3) ? "Error" : ($level == 2) ? "Warning" : "Information";
+      my $time  = FmtDateTime($data->{'data'}->{'log'}->[$i]{'time'});
+      $log0     = $time." - ".$level." - ".$desc if($i == 0);
+      $log     .= "$time - $level - $desc<br>";
+      $i++;
+  }   
+  
+  $log = "<html><b>Surveillance Station Server \"$hash->{SERVERADDR}\" Log</b> ( $i/$lec entries are displayed )<br><br>$log</html>";
+                
+  # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+  # bzw. https://forum.fhem.de/index.php/topic,77310.0.html
+  # $log = "Too much log data were selected. Please reduce amount of data by specifying all or one of 'severity', 'limit', 'match'" if (length($log) >= 102400);              
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash,"LastLogEntry",$log0) if(!$hash->{HELPER}{CL}{1});         # Datenabruf im Hintergrund;
+  readingsBulkUpdate  ($hash,"Errorcode","none");
+  readingsBulkUpdate  ($hash,"Error","none");
+  readingsEndUpdate   ($hash, 1);
+
+  # Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput($hash->{HELPER}{CL}{1},"$log");
+  delete($hash->{HELPER}{CL});
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode SaveRec
+###############################################################################
+sub _parseSaveRec {                                     ## no critic "not used"
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $myjson = $paref->{myjson};
+         
+  my $err;
+  
+  my $lrec = ReadingsVal("$name", "CamLastRec", "");
+  $lrec    = (split("/",$lrec))[1]; 
+  my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
+  my $file = $sp."/$lrec";
+  
+  delete $hash->{HELPER}{RECSAVEPATH};
+
+  open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
+                                  Log3($name, 2, "$name - $err");
+                                };       
+
+  if(!$err) {
+      $err = "none";      
+      binmode $fh;
+      print $fh $myjson;
+      close($fh);
+      Log3($name, 3, qq{$name - Recording was saved to local file "$file"});
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Errorcode", "none");
+  readingsBulkUpdate  ($hash, "Error",     $err  );
+  readingsEndUpdate   ($hash, 1);
+                
 return;
 }
 
