@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $
+# $Id: 93_DbRep.pm 22733 2020-09-04 19:33:12Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament, commandRef revised ",
   "8.40.7"  => "03.09.2020  rename getter dbValue to sqlCmdBlocking, consider attr timeout in function DbRep_sqlCmdBlocking (blocking function), commandRef revised ",
   "8.40.6"  => "27.08.2020  commandRef revised ",
   "8.40.5"  => "29.07.2020  fix crash if delEntries startet without any time limits, Forum:#113202 ",
@@ -6189,17 +6190,20 @@ sub sqlCmd_DoParse {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";";
+  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
+    
+  my $sql = ($cmd =~ m/\;$/) ? $cmd : $cmd.";";
   
   # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
   my $vars = AttrVal($name, "sqlCmdVars", "");
   if ($vars) {
       @pms = split(";",$vars);           
-      foreach my $pm (@pms) {
+      for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
           }
           $pm = ltrim($pm).";";
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
           Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");    
           eval {$dbh->do($pm);};
           if ($@) {
@@ -6213,15 +6217,24 @@ sub sqlCmd_DoParse {
   
   # Abarbeitung von Session Variablen vor einem SQL-Statement
   # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*SET.*;/i) {   
+  if($cmd =~ /^\s*(SET|PREPARE).*;/i) {   
       @pms = split(";",$cmd);           
-      foreach my $pm (@pms) {
-          if($pm !~ /SET/i) {
+      for my $pm (@pms) {
+          
+          if($pm !~ /SET|PREPARE/i) {
               $sql = $pm.";";
               next;
           }
+          
           $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");    
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          if($pm =~ /SET/i) {
+              Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");
+          } else {
+              Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
+          }
+          
           eval {$dbh->do($pm);};
           if ($@) {
              $err = encode_base64($@,"");
@@ -6234,15 +6247,24 @@ sub sqlCmd_DoParse {
   
   # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
   # wenn Pragmas im SQL vorangestellt sind
-  if($cmd =~ /^\s*PRAGMA.*;/i) {   
+  if($cmd =~ /^\s*(PRAGMA|PREPARE).*;/i) {   
       @pms = split(";",$cmd);           
-      foreach my $pm (@pms) {
-          if($pm !~ /PRAGMA/i) {
+      for my $pm (@pms) {
+          
+          if($pm !~ /PRAGMA|PREPARE/i) {
               $sql = $pm.";";
               next;
           }
+          
           $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");    
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          if($pm =~ /PRAGMA/i) {
+              Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");
+          } else {
+              Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
+          }
+          
           eval {$dbh->do($pm);};
           if ($@) {
              $err = encode_base64($@,"");
@@ -6257,6 +6279,8 @@ sub sqlCmd_DoParse {
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
   
+  $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+  
   Log3($name, 4, "DbRep $name - SQL execute: $sql");        
 
   # SQL-Startzeit
@@ -6265,7 +6289,7 @@ sub sqlCmd_DoParse {
   my ($sth,$r);
   
   eval {$sth = $dbh->prepare($sql);
-        $r = $sth->execute();
+        $r   = $sth->execute();
        }; 
   
   if ($@) {
@@ -6295,6 +6319,7 @@ sub sqlCmd_DoParse {
           # Anzahl der Datensätze
           $nrows++;
       }
+  
   } else {
       $nrows = $sth->rows;
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};
@@ -6312,17 +6337,16 @@ sub sqlCmd_DoParse {
   
   $sth->finish;
 
-  # SQL-Laufzeit ermitteln
-  my $rt = tv_interval($st);
+  my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
   $dbh->disconnect;
  
-  # Daten müssen als Einzeiler zurückgegeben werden
-  my $rowstring = join("§", @rows); 
-  $rowstring = encode_base64($rowstring,"");
-
-  # Background-Laufzeit ermitteln
-  my $brt = tv_interval($bst);
+  my $rowstring = join("§", @rows);                                                # Daten müssen als Einzeiler zurückgegeben werden
+  $rowstring    = encode_base64($rowstring,"");
+  
+  $cmd =~ s/ESC_ESC_ESC/;;/gx;                                                     # wiederherstellen der escapeten ";" -> ";;" 
+  
+  my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
 
   $rt = $rt.",".$brt;
  
@@ -11499,12 +11523,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22733 2020-09-04 19:33:12Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22678 2020-08-27 17:05:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22733 2020-09-04 19:33:12Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -12815,15 +12839,19 @@ return;
                                The used database user needs the ALTER, CREATE and INDEX privilege. <br>
                                    
                                </li> <br>
-                                 
-    <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
+     
+    <a name="insert"></a>     
+    <li><b> insert </b>       -  data are inserted into table "history" manually. Input values for Date, Time and Value are 
+                                 mandatory. The database fields for Type and Event will be filled in with "manual" automatically. 
+                                 The values of <a href="#device">device</a>, <a href="#reading">reading</a> use the 
+                                 attribute settings .  <br><br>
                                  
                                  <ul>
                                  <b>input format: </b>   Date,Time,Value,[Unit]    <br>
-                                 # Unit is optional, attributes of device, reading must be set ! <br>
+                                 # Unit is optional, attributes <a href="#device">device</a>, <a href="#reading">reading</a> must be set ! <br>
                                  # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br><br>
                                  
-                                 <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 <b>example:</b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>  <br>
                                  # Spaces are NOT allowed in fieldvalues ! <br>
                                  <br>
                                  
@@ -13435,14 +13463,14 @@ return;
                 
     <a name="dbstatus"></a>	
     <li><b> dbstatus </b> -  lists global information about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
-                             Initially all available informations are reported. Using the <a href="#DbRepattr">attribute</a> "showStatus" the quantity of
+                             Initially all available informations are reported. Using the attribute <a href="#showStatus">showStatus</a> the quantity of
                              results can be limited to show only the desired values. Further detailed informations of items meaning are 
-                             explained <a href=http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html>there</a>.  <br><br>
+                             explained <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">here</a>.  <br><br>
                              
                                  <ul>
                                    <b>Example</b>  <br>
-                                   get &lt;name&gt; dbstatus  <br>
-                                   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br>               
+                                   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br> 
+                                   get &lt;name&gt; dbstatus  <br>              
                                    # Only readings containing "uptime" and "qcache" in name will be created
                                  </ul> 
                                  </li> 
@@ -13450,8 +13478,8 @@ return;
 
     <a name="sqlCmdBlocking"></a>
     <li><b> sqlCmdBlocking &lt;SQL-statement&gt;</b> - 
-                            Executes the specified SQL-statement in <b>blocking</b> manner. 
-							
+                            Executes the specified SQL statement <b>blocking</b> with a default timeout of 10 seconds. 
+                            The timeout can be set with the attribute <a href="#dbreptimeout">timeout</a>.
                             <br><br>
                            
 						    <ul>
@@ -13468,7 +13496,7 @@ return;
                             This command also accept the setting of SQL session variables like "SET @open:=NULL, 
                             @closed:=NULL;". <br>
                             If several fields are selected and passed back, the fieds are separated by the separator defined  
-                            by <a href="#DbRepattr">attribute</a> "sqlResultFieldSep" (default "|"). Several result lines 
+                            by attribute <a href="#sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Several result lines 
                             are separated by newline ("\n"). <br>
                             This function only set/update status readings, the userExitFn function isn't called.                            
                             <br><br>
@@ -13497,14 +13525,14 @@ sub dbval {
     <a name="dbvars"></a>	
     <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path, 
                            memory- or cache-parameter and so on. The Output reports initially all available informations. Using the 
-                           <a href="#DbRepattr">attribute</a> "showVariables" the quantity of results can be limited to show only the desired values. 
+                           attribute <a href="#showVariables">showVariables</a> the quantity of results can be limited to show only the desired values. 
                            Further detailed informations of items meaning are explained 
-                           <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">there</a>. <br><br>
+                           <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">here</a>. <br><br>
                            
                                  <ul>
                                    <b>Example</b>  <br>
-                                   get &lt;name&gt; dbvars  <br>
-                                   attr &lt;name&gt; showVariables %version%,%query_cache%    <br>               
+                                   attr &lt;name&gt; showVariables %version%,%query_cache%    <br> 
+                                   get &lt;name&gt; dbvars  <br>              
                                    # Only readings containing "version" and "query_cache" in name will be created
                                  </ul>
                                  </li> 
@@ -13526,7 +13554,7 @@ sub dbval {
                             (table row "PROGRESS"). So you can track, for instance, the degree of processing during an index
                             creation. <br>
                             Further informations can be found
-                            <a href="https://mariadb.com/kb/en/mariadb/show-processlist/">there</a>. <br>
+                            <a href="https://mariadb.com/kb/en/mariadb/show-processlist/">here</a>. <br>
                             </li>     
                             <br><br>    
 
@@ -13538,14 +13566,14 @@ sub dbval {
 
     <a name="svrinfo"></a>
     <li><b> svrinfo </b> -  Common database server informations, e.g. DBMS-version, server address and port and so on. The quantity of elements to get depends
-                            on the database type. Using the <a href="#DbRepattr">attribute</a> "showSvrInfo" the quantity of results can be limited to show only 
+                            on the database type. Using the attribute <a href="#showSvrInfo">showSvrInfo</a> the quantity of results can be limited to show only 
                             the desired values. Further detailed informations of items meaning are explained                             
-                            <a href="https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx">there</a>. <br><br>
+                            <a href="https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx">here</a>. <br><br>
                                  
                                  <ul>
                                    <b>Example</b>  <br>
-                                   get &lt;name&gt; svrinfo  <br>
-                                   attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>               
+                                   attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br>
+                                   get &lt;name&gt; svrinfo  <br>               
                                    # Only readings containing "SQL_CATALOG_TERM" and "NAME" in name will be created
                                  </ul>
                                  </li> 
@@ -13554,14 +13582,14 @@ sub dbval {
     <a name="tableinfo"></a>   
     <li><b> tableinfo </b> -  Access detailed informations about tables in MySQL database which is connected by the DbRep-device. 
                               All available tables in the connected database will be selected by default. 
-                              Using the<a href="#DbRepattr">attribute</a> "showTableInfo" the results can be limited to tables you want to show. 
+                              Using the attribute <a href="#showTableInfo">showTableInfo</a> the results can be limited to tables you want to show. 
                               Further detailed informations of items meaning are explained 
-                              <a href="http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html">there</a>.  <br><br>
+                              <a href="http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html">here</a>.  <br><br>
                                  
                                  <ul>
                                    <b>Example</b>  <br>
-                                   get &lt;name&gt; tableinfo  <br>
-                                   attr &lt;name&gt; showTableInfo current,history   <br>               
+                                   attr &lt;name&gt; showTableInfo current,history   <br> 
+                                   get &lt;name&gt; tableinfo  <br>              
                                    # Only informations related to tables "current" and "history" are going to be created
                                  </ul>
                                  </li> 
@@ -15430,16 +15458,18 @@ sub bdump {
                                Der verwendete Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
                                    
                                </li> <br>                                
-       
+    <a name="insert"></a>   
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
+                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für 
+                                 <a href="#device">Device</a>, <a href="#reading">Reading</a> aus den gesetzten Attributen 
+                                 genommen.  <br><br>
                                  
                                  <ul>
                                  <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br>
+                                 # Unit ist optional, Attribute <a href="#device">device</a>, <a href="#reading">reading</a> müssen gesetzt sein  <br>
                                  # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
-                                 <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 <b>Beispiel: </b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
                                  # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
                                  <br>
                                  
@@ -16075,7 +16105,7 @@ sub bdump {
         
     <a name="dbstatus"></a>     
     <li><b> dbstatus </b> -  Listet globale Informationen zum MySQL Serverstatus (z.B. Informationen zum Cache, Threads, Bufferpools, etc. ). 
-                             Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem <a href="#DbRepattr">Attribut</a> "showStatus" kann die 
+                             Es werden zunächst alle verfügbaren Informationen berichtet. Mit dem Attribut <a href="#showStatus">showStatus</a> kann die 
                              Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings 
                              sind <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">hier</a> verfügbar.  <br><br>
                              
@@ -16091,6 +16121,7 @@ sub bdump {
     <a name="sqlCmdBlocking"></a>                        
     <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> - 
                             Führt das angegebene SQL-Statement <b>blockierend</b> mit einem Standardtimeout von 10 Sekunden aus. 
+                            Der Timeout kann mit dem Attribut <a href="#dbreptimeout">timeout</a> eingestellt werden.
                             <br><br>
                            
 							<ul>
@@ -16100,17 +16131,14 @@ sub bdump {
 							  get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
 							</ul>
                             </li>
-							<br>
-							
-                            Der Timeout kann mit dem Attribut <a href="#dbreptimeout">timeout</a> verändert werden. 
-                            <br>                            
+							<br>                           
                             
                             Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
                             Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
                             Dieses Kommando akzeptiert ebenfalls das Setzen von SQL Session Variablen wie z.B.
                             "SET @open:=NULL, @closed:=NULL;". <br>                            
                             Werden mehrere Felder selektiert und zurückgegeben, erfolgt die Feldtrennung mit dem Trenner 
-                            des <a href="#DbRepattr">Attributes</a> "sqlResultFieldSep" (default "|"). Mehrere Ergebniszeilen 
+                            des Attributs <a href="#sqlResultFieldSep">sqlResultFieldSep</a> (default "|"). Mehrere Ergebniszeilen 
                             werden mit Newline ("\n") separiert. <br>
                             Diese Funktion setzt/aktualisiert nur Statusreadings, die Funktion im Attribut  "userExitFn" 
                             wird nicht aufgerufen.                            
@@ -16140,8 +16168,8 @@ sub dbval {
                                  
     <a name="dbvars"></a>
     <li><b> dbvars </b> -  Zeigt die globalen Werte der MySQL Systemvariablen. Enthalten sind zum Beispiel Angaben zum InnoDB-Home, dem Datafile-Pfad, 
-                           Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem 
-                           <a href="#DbRepattr">Attribut</a> "showVariables" kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse 
+                           Memory- und Cache-Parameter, usw. Die Ausgabe listet zunächst alle verfügbaren Informationen auf. Mit dem Attribut
+                           <a href="#showVariables">showVariables</a> kann die Ergebnismenge eingeschränkt werden um nur gewünschte Ergebnisse 
                            abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind 
                            <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">hier</a> verfügbar. <br><br>
                            
@@ -16182,9 +16210,9 @@ sub dbval {
                 
     <a name="svrinfo"></a>              
     <li><b> svrinfo </b> -  allgemeine Datenbankserver-Informationen wie z.B. die DBMS-Version, Serveradresse und Port usw. Die Menge der Listenelemente 
-                            ist vom Datenbanktyp abhängig. Mit dem <a href="#DbRepattr">Attribut</a> "showSvrInfo" kann die Ergebnismenge eingeschränkt werden.
+                            ist vom Datenbanktyp abhängig. Mit dem Attribut <a href="#showSvrInfo">showSvrInfo</a> kann die Ergebnismenge eingeschränkt werden.
                             Weitere Erläuterungen zu den gelieferten Informationen sind 
-                            <a href=https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx>hier</a> zu finden. <br><br>
+                            <a href="https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx">hier</a> zu finden. <br><br>
                                  
 					        <ul>
 							  <b>Beispiel</b>  <br>
@@ -16198,7 +16226,7 @@ sub dbval {
     <a name="tableinfo"></a>    
     <li><b> tableinfo </b> -  ruft Tabelleninformationen aus der mit dem DbRep-Device verbundenen Datenbank ab (MySQL). 
                               Es werden per default alle in der verbundenen Datenbank angelegten Tabellen ausgewertet. 
-                              Mit dem <a href="#DbRepattr">Attribut</a> "showTableInfo" können die Ergebnisse eingeschränkt werden. Erläuterungen zu den erzeugten 
+                              Mit dem Attribut <a href="#showTableInfo">showTableInfo</a> können die Ergebnisse eingeschränkt werden. Erläuterungen zu den erzeugten 
                               Readings sind  <a href="http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html">hier</a> zu finden.  <br><br>
                                  
 							  <ul>
