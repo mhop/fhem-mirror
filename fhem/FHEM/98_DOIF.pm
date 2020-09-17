@@ -1687,8 +1687,8 @@ sub ReplaceAllReadingsDoIf
           $block="[".$block."]";
         }
       } else {
-        $trigger=0 if (substr($block,0,1) eq "\$");
-        if ($block =~ /^\$?[a-z0-9._]*[a-z._]+[a-z0-9._]*($|:.+$|,.+$)/i) {
+        $trigger=0 if (substr($block,0,7) eq "\$DEVICE");
+        if ($block =~ /^(\$DEVICE|[a-z0-9._]*[a-z._]+[a-z0-9._]*)($|:.+$|,.+$)/i) {
           ($block,$err,$device,$reading,$internal)=ReplaceReadingEvalDoIf($hash,$block,$eval);
           return ($block,$err) if ($err);
           if ($condition >= 0) {
@@ -3799,38 +3799,78 @@ sub DOIF_ExecTimer
   my $timername=${$timer}->{name};
   my $name=$hash->{NAME};
   my $subname=${$timer}->{subname};
-  my $param=${$timer}->{param} if (defined ${$timer}->{param});
+  my $count=${$timer}->{count};
+  my $condition=${$timer}->{cond};
   my $cur_hs=$hs;
   $hs=$hash;
   delete ($::defs{$name}{READINGS}{"timer_$timername"});
-  if (!defined ($param)) {
-    eval ("package DOIF;$subname");
-  } else {
-    #eval ("package DOIF;$subname(\"$param\")");
-    eval('package DOIF;no strict "refs";&{$subname}($param);use strict "refs"');
+  if (defined ($condition) and !eval ($condition)) {
+    $hs=$cur_hs;
+    return (0);
   }
+  eval ("package DOIF;$subname");
   if ($@) {
-    ::Log3 ($::defs{$name}{NAME},1 , "$name error in $subname: $@");
+    ::Log3 ($hash->{NAME},1 , "$name error in $subname: $@");
     ::readingsSingleUpdate ($hash, "error", "in $subname: $@",1);
   }
+  if (defined ($condition)) {
+    $count=++${$timer}->{count};
+    if (!eval ($condition)) {
+      $hs=$cur_hs;
+      return (0);
+    }
+  } else {
+    $hs=$cur_hs;
+    return (0);
+  }
+  my $current = ::gettimeofday();
+  my $seconds=eval (${$timer}->{sec});
+  my $next_time = $current+$seconds;
+  ${$timer}->{time}=$next_time;
+  if ($seconds > 0) {
+    ::readingsSingleUpdate ($hash,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
+  }
+  ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",$timer, 0);
   $hs=$cur_hs;
+  return(0);
 }
 
 sub set_Exec
 {
-  my ($timername,$seconds,$subname,$param)=@_;
+  my ($timername,$sec,$subname,$condition)=@_;
+  my $count=0;
+  $hs->{ptimer}{$timername}{sec}=$sec;
+  $hs->{ptimer}{$timername}{name}=$timername;
+  $hs->{ptimer}{$timername}{subname}=$subname;
+  $hs->{ptimer}{$timername}{cond}=$condition if (defined $condition);
+  #$hs->{ptimer}{$timername}{param}=$param if (defined $param);
+  $hs->{ptimer}{$timername}{count}=$count;
+  $hs->{ptimer}{$timername}{hash}=$hs;
+  ::RemoveInternalTimer(\$hs->{ptimer}{$timername});
+  if (defined ($condition)) {
+    my $cond=eval ($condition);
+    if ($@) {
+      ::Log3 ($hs->{NAME},1,"$hs->{NAME} error eval condition: $@");
+      ::readingsSingleUpdate ($hs, "error", "eval condition: $@",1);
+      return (1);
+    }
+    if (!$cond) {
+      return (0);
+    }
+  }  
+  my $seconds=eval($sec);
+  if ($@) {
+    ::Log3 ($hs->{NAME},1,"$hs->{NAME} error eval seconds: $@");
+    ::readingsSingleUpdate ($hs, "error", "eval seconds : $@",1);
+    return(1);
+  }
   my $current = ::gettimeofday();
   my $next_time = $current+$seconds;
   $hs->{ptimer}{$timername}{time}=$next_time;
-  $hs->{ptimer}{$timername}{name}=$timername;
-  $hs->{ptimer}{$timername}{subname}=$subname;
-  $hs->{ptimer}{$timername}{param}=$param if (defined $param);
-  $hs->{ptimer}{$timername}{hash}=$hs;
-  ::RemoveInternalTimer(\$hs->{ptimer}{$timername});
   if ($seconds > 0) {
     ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
   }
-  ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",\$hs->{ptimer}{$timername}, 0);
+  ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",\$hs->{ptimer}{$timername}, 0);       
 }
 
 sub get_Exec
@@ -6978,11 +7018,17 @@ Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuv
 <a name="DOIF_Ausführungstimer"></a><br>
 <u>Ausführungstimer</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
-Mit Hilfe von Ausführungstimern können Anweisungen verzögert ausgeführt werden. Im Gegensatz zum FHEM-Modus können beliebig viele Timer gleichzeitig genutzt werden.
+Mit Hilfe von Ausführungstimern können Perl-Anweisungen verzögert ein- oder mehrmalig ausgeführt werden. Im Gegensatz zum FHEM-Modus können beliebig viele Timer gleichzeitig genutzt werden.
 Ein Ausführungstimer wird mit einem Timer-Namen eindeutig definiert. Über den Timer-Namen kann die Restlaufzeit abgefragt werden, ebenfalls kann er vor seinem Ablauf gelöscht werden.<br>
 <a name="DOIF_set_Exec"></a><br>
-Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;parameter&gt)</code></b>, mit &lt;timerName&gt;: beliebige Angabe, sie spezifiziert eindeutig einen Timer, 
-welcher nach Ablauf den angegebenen Perlcode &lt;perlCode&gt; aufruft. Falls als Perlcode eine Perlfunktion angegeben wird, kann optional ein Übergabeparameter &lt;parameter&gt; angegeben werden. Die Perlfunkion muss eindeutig sein und in FHEM zuvor deklariert worden sein.
+Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;condition&gt)</code></b><br>
+<br>
+<b>&lt;timerName&gt;</b>: beliebige Angabe, sie spezifiziert eindeutig einen Timer<br>
+<b>&lt;seconds&gt;</b>: Verzögerungszeit, sie wird per eval-Perlbefehl ausgewertet und kann daher Perlcode zur Bestimmung der Verzögerungszeit beinhalten<br>
+<b>&lt;perlCode&gt;</b>: Perl-Anweisung, die nach Ablauf der Verzögerungszeit per eval-Perlbefehl ausgeführt wird<br>
+<b>&lt;condition&gt;</b>: optionale Bedingung zur Wiederholung der Perl-Ausführung. Sie wird per eval-Perlbefehl vor dem Setzen des Timers und vor der Ausführung der Perl-Anweisung auf wahr geprüft.
+Bei falsch wird die Wiederholung der Ausführungskette beendet. Wird &lt;condition&gt; nicht angegeben, so erfolgt keine Wiederholung der Perl-Anweisung.<br> 
+<br> 
 Wird set_Exec mit dem gleichen &lt;timerName&gt; vor seinem Ablauf erneut aufgerufen, so wird der laufender Timer gelöscht und neugesetzt.<br>
 <a name="DOIF_get_Exec"></a><br>
 Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wenn Timer abgelaufen oder nicht gesetzt ist, sonst Anzahl der Sekunden bis zum Ablauf des Timers<br>
@@ -6991,19 +7037,52 @@ Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
 Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 30 Sekunden verzögert aufrufen:<br>
 <br>
-<code>set_Exec("lamp_timer",30,'lamp','on');</code><br>
-<br>
-alternativ<br>
-<br>
 <code>set_Exec("lamp_timer",30,'lamp("on")');</code><br>
 <br>
 Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
 <br>
-<code>set_Exec("off",30,'fhem_set("lamp off")');</code><br>
+<code>set_Exec("off_timer",30,'fhem_set("lamp off")');</code><br>
 <br>
 Beispiel: Das Event "off" 30 Sekunden verzögert auslösen:<br>
 <br>
 <code>set_Exec("off_Event",30,'set_Event("off")');</code><br>
+<br>
+<u>Anwendungsbeispiele mit bedingter Wiederholung einer Ausführung</u><br>
+<br>
+Wenn Alarm ausgelöst wird, soll eine Benachrichtigung gesendet werden und alle 60 Sekunden wiederholt werden, solange Alarmanlage auf "on" steht.<br>
+<br>
+<code>defmod di_alarm DOIF {["alarm:on"];;fhem("send myphone alarm!");;set_Exec("timer",60,'fhem("send myphone alarm!")','ReadingsVal("alarm","state","on") eq "on"')}</code><br>
+<br>
+Wenn Taster auslöst, Lampe auf on schalten und noch zwei mal im Abstand von einer Sekunde wiederholt auf on schalten.<br>
+<br>
+<code>defmod di_lamp_on DOIF {["button:on"];;fhem_set"lamp on";;set_Exec("timer",1,'fhem_set("lamp on")','$count < 2')}</code><br>
+<br>
+alternativ:<br>
+<br>
+<code>defmod di_lamp_on DOIF {["button:on"];;set_Exec("timer",'$count == 0 ? 0 : 1','fhem_set("lamp on")','$count < 2')}</code><br>
+<br>
+$count ist eine interne Variable, die beginnend mit 0 nach jedem Durchlauf um eins erhöht wird.<br>
+<br>
+Wenn Fenster geöffnet wird, dann soll eine Benachrichtigung erfolgen, dabei soll die Benachrichtigung bis zu 10 mal jeweils um weitere 60 Sekunden verzögert werden: erste Benachrichtigung nach 5 Minuten,
+zweite Benachrichtigung nach weiteren 6 Minuten, dritte Benachrichtigung nach weiteren 7 Minuten usw.<br>
+<br>
+<code>defmod di_window DOIF {if ([window:state] eq "open") {\<br>
+&nbsp;&nbsp;set_Exec("timer",'300+$count*60','fhem("echo speak window open")','$count < 9')\<br>
+} else {\<br>
+&nbsp;&nbsp;del_Exec("timer")\<br>
+}\<br>
+}</code><br>
+<br>
+Pumpe alle zwei Stunden im Abstand von fünf Minuten 3 mal einschalten, beim ersten mal für 60 Sekunden, beim zweiten mal für 80 Sekunden und beim dritten mal für 100 Sekunden.<br>
+<br>
+<code>defmod di_pump DOIF {[08:00-20:00,+[2]:00];;set_Exec("timer",300,'fhem_set("pump on-for-timer ".60+$count*20)','$count < 3')}</code><br>
+<br>
+Hochdimmen beim Tastendruck im Sekundentakt.<br> 
+<br>
+<code>defmod di_dimm DOIF {["button:on"];;@{$_pct}=(10,35,65,80,90,100);;set_Exec("timer",1,'fhem_set"lamp pct ".$_pct[$count]','$count < 6')}</code><br>
+<br>
+$_pct ist hier ein Array mit Helligkeitswerten, auf das innerhalb des Devices zu jedem Zeitpunkt zugegriffen werden kann.<br>
+<br>
 <a name="DOIF_init-Block"></a><br>
 <u>init-Block</u>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht_Perl-Modus">back</a><br>
 <br>
@@ -7115,21 +7194,6 @@ define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
 &nbsp;&nbsp;&nbsp;&nbsp;$_count++;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;bereits&nbsp;läuft&nbsp;zähle&nbsp;Ereignis<br>
 &nbsp;&nbsp;}<br>
 }<br>
-</code>
-<a name="DOIF_Fenster_offen_Meldung"></a><br>
-<u>Verzögerte Fenster-offen-Meldung mit Wiederholung für mehrere Fenster</u><br>
-<br>
-<code>
-define di_window DOIF<br>
-subs {<br>
-&nbsp;&nbsp;sub logwin {&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Definition der Funktion namens "logwin"<br>
-&nbsp;&nbsp;&nbsp;&nbsp;my ($window)=@_;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # übernehme Parameter in die Variable $window<br>
-&nbsp;&nbsp;&nbsp;&nbsp;Log 3,"Fenster offen, bitte schließen: $window"; # protokolliere Fenster-Offen-Meldung<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec ("$window",1800,"logwin",$window);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# setze Timer auf 30 Minuten für eine wiederholte Meldung<br>
-&nbsp;&nbsp;}<br>
-}<br>
-{ if (["_window$:open"]) {set_Exec ("$DEVICE",600,'logwin',"$DEVICE")}} # wenn, Fenster geöffnet wird, dann setze Timer auf Funktion zum Loggen namens "logwin"<br>
-{ if (["_window$:closed"]) {del_Exec ("$DEVICE")}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # wenn, Fenster geschlossen wird, dann lösche Timer<br>
 </code>
 </ul>
 =end html_DE
