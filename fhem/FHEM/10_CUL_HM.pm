@@ -313,8 +313,8 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_getMId($hash); # need to set regLst in helper
     
     my $chn = substr($id."00",6,2);
-    my $st  = CUL_HM_Get($hash,$name,"param","subType");
-    my $md  = CUL_HM_Get($hash,$name,"param","model");
+    my $st  = CUL_HM_getAttr($name,"subType","");
+    my $md  = CUL_HM_getAttr($name,"model","");
     
     my $dHash = CUL_HM_getDeviceHash($hash);
     $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} && $hash->{helper}{regLst} =~ m/3p/);
@@ -550,7 +550,6 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_setAssotiat($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-
   my ($hm) = devspec2array("TYPE=HMinfo");
   HMinfo_GetFn($defs{$hm},$hm,"configCheck") if(defined $hm && !$modules{CUL_HM}{helper}{hmManualOper});
 
@@ -776,8 +775,8 @@ sub CUL_HM_Attr(@) {#################################
     $updtReq = 1;
   }
   elsif($attrName eq "param"){
-    my $md  = CUL_HM_Get($hash,$name,"param","model");
-    my $st  = CUL_HM_Get($hash,$name,"param","subType");
+    my $md  = CUL_HM_getAttr($name,"model","");
+    my $st  = CUL_HM_getAttr($name,"subType","");
     my $chn = substr(CUL_HM_hash2Id($hash),6,2);
     if    ($md eq "HM-SEN-RD-O"    && $chn eq "02"){
       delete $hash->{helper}{param};
@@ -996,7 +995,7 @@ sub CUL_HM_Attr(@) {#################################
   }
   elsif($attrName eq "levelRange" ){
     if ($cmd eq "set"){
-      return "use $attrName only for dimmer" if ((CUL_HM_Get($defs{$name},$name,"param","subType") ne "dimmer")
+      return "use $attrName only for dimmer" if (CUL_HM_getAttr($name,"subType","") ne "dimmer"
                                                   && $init_done );
       my ($min,$max) = split (",",$attrVal);
       return "use format min,max" if (!defined $max);
@@ -4458,7 +4457,7 @@ sub CUL_HM_SearchCmd($$) {#+++++++++++++++++ is command supported?++++++++++++++
 
 sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   my ($hash, @a) = @_;
-  my $T0 = gettimeofday();
+#  my $T0 = gettimeofday();
   return "no value specified" if(@a < 2);
   return "FW update in progress - please wait" 
         if ($modules{CUL_HM}{helper}{updating});
@@ -4537,7 +4536,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
             $val = "";
           }
         }
-        elsif($val =~ m/^([a-zA-Z0-9\;_-\|\.]*)$/){#(xxx|yyy) as optionlist - new
+        elsif($val =~ m/^([a-zA-Z0-9\;_\-\|\.]*)$/){#(xxx|yyy) as optionlist - new
           my $v1 = $1;
           my @lst1;
           foreach(split('\|',$v1)){
@@ -4546,14 +4545,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
               if ($max =~ m/(.*);(.*)/){
                 ($max,$step) = ($1,$2);
               }
-              my @list = ();
               my $f = 0;
               ($f) = map{(my $foo = $_) =~ s/.*\.//;length($foo)}($step) if ($step =~ m/\./);
-              
-              for(my $i = $min;$i <= $max; $i += $step){
-                push @list,sprintf("%.${f}f",$i);
-              }
-              push @lst1,@list;
+              my $m = ($max - $min)/$step;
+              push @lst1, map{sprintf("%.${f}f",$min + $_ * $step)}(0..$m);
             }
             else{
               push @lst1,$_;
@@ -4642,7 +4637,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     @a = ($a[0],$cmd,@parIn);
     
   }
-  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:4),"CUL_HM set $name " . join(" ", @a[1..$#a]);
+  Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allSet} ? 0:3),"CUL_HM set $name " . join(" ", @a[1..$#a]);
 
   my @postCmds=(); #Commands to be appended after regSet (ugly...)
   my $id; # define id of IO device for later usage
@@ -6533,7 +6528,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "use - single - for ".$st                              if(($st =~ m/^(threeStateSensor|motionDetector)$/) && ($single ne "single"));
     return "TC WindowRec only peers to channel 01 single"         if( $pmd =~ m/^(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/ && $pCh[1] eq "03" && $chn ne "01" && $set eq "set");
 
-    my $pSt = CUL_HM_Get($peerHash,$peerHash->{NAME},"param","subType");
+    my $pSt = CUL_HM_getAttr($peerHash->{NAME},"subType","");
 
     
     if ($set eq "unset"){$set = 0; $cmdB ="02";}
@@ -8854,7 +8849,6 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md eq "HM-SEC-SD-2"){
     CUL_HM_SD_2($hash) if ($list == 0);
   }
-  #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 
   CUL_HM_cfgStateDelay($name);
 }
@@ -9721,7 +9715,7 @@ sub CUL_HM_ActCheck($) {# perform supervision
             CUL_HM_Ping($devName);
             $actHash->{helper}{$devId}{try} = 901;
           }
-        $state = "unknown";
+          $state = "unknown";
         }
       }
       else{                         #message in time
@@ -10752,7 +10746,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
     $ret .= "$tmpl not found in file $fName";
   }
   else{
-    if(CUL_HM_Get($defs{$name},$name,"param","model") ne "HM-TC-IT-WM-W-EU02"){
+    if(CUL_HM_getAttr($name,"model","") ne "HM-TC-IT-WM-W-EU02"){
       delete $dlf{2};
       delete $dlf{3};
     }
