@@ -76,8 +76,8 @@ sr_alt($$$$$$$$$;$$)
   } elsif($altit =~ /HORIZON=([\-\+]*[0-9\.]+)/i) {
     $altit=$1;
   } else {
-    $altit=-6; #default
-    unshift @_, $altit # make altit optional.
+    unshift @_, $altit; # make altit optional.
+    $altit=-6;          # default
   }
 
   my $seconds = shift;
