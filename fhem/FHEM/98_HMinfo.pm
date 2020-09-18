@@ -316,6 +316,7 @@ sub HMinfo_status($){##########################################################
   foreach my $id (keys%{$modules{CUL_HM}{defptr}}){#search/count for parameter
     my $ehash = $modules{CUL_HM}{defptr}{$id};
     my $eName = $ehash->{NAME};
+    next if (CUL_HM_getAttrInt($eName,"ignore"));
     $nbrE++;
     $nbrC++ if ($ehash->{helper}{role}{chn});
     $nbrV++ if ($ehash->{helper}{role}{vrt});
@@ -1146,7 +1147,7 @@ sub HMinfo_getEntities(@) { ###################################################
                ($doChn && $eHash->{helper}{role}{chn})));
     next if ( $noVrt && $eHash->{helper}{role}{vrt});
     next if ( $noPhy && !$eHash->{helper}{role}{vrt});
-    my $eSt = CUL_HM_Get($eHash,$eName,"param","subType");
+    my $eSt = CUL_HM_getAttr($eName,"subType","");
 
     next if ( $noSen && $eSt =~ m/^(THSensor|remote|pushButton|threeStateSensor|sensor|motionDetector|swi)$/);
     next if ( $noAct && $eSt =~ m/^(switch|blindActuator|dimmer|thermostat|smokeDetector|KFM100|outputUnit)$/);
@@ -1217,18 +1218,29 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
   $doAli = 0;#set default
-  
-  if (@a && ($a[0] =~ m/^-/) && ($a[0] !~ m/^-f$/)){# options provided
-    $opt = $a[0];
+  Log3 $hash,3,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
+  if (@a && ($a[0] =~ m/^(-[dcasev]+)/)){# options provided
+    $opt = $1;
+    $a[0] =~ s/^(-[dcasev]*)//;
     $optEmpty = ($opt =~ m/e/)?1:0;
-    shift @a; #remove
+    shift @a if($a[0] || $a[0] =~ m/^[ ]*$/); #remove
   }
   if (@a && $a[0] =~ m/^-f$/){# options provided
     shift @a; #remove
-    $filter = shift @a;
+    if(scalar @a){
+      my $a0 = shift @a;
+      ($filter,$a0) = split(",",$a0,2);
+      if(!defined $a0 || $a0 =~ m/^[ ]*$/){
+        shift @a;
+      }
+      else{
+        $a[0] = $a0;
+      }
+    }
   }
 
   $cmd = "?" if(!$cmd);# by default print options
+
   #------------ statistics ---------------
   if   ($cmd eq "protoEvents"){##print protocol-events-------------------------
     my ($type) = @a;
@@ -1315,8 +1327,8 @@ sub HMinfo_GetFn($@) {#########################################################
                      : ""
              )
             ." condition:".ReadingsVal($_,"cond","-")
-            .(defined $defs{$_}{msgLoadEst}
-                     ? "\n            msgLoadEst: ".$defs{$_}{msgLoadEst}
+            .(defined $defs{$_}{msgLoadCurrent}
+                     ? "\n            msgLoadCurrent: ".$defs{$_}{msgLoadCurrent}
                      : ""
              )
             ;
@@ -1420,30 +1432,62 @@ sub HMinfo_GetFn($@) {#########################################################
     return $defs{$name}{helper}{cfgChkResult} ? $defs{$name}{helper}{cfgChkResult} :"no results available";
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
-    my $id = ++$hash->{nb}{cnt};
-    my $bl = BlockingCall("HMinfo_templateChk_Get", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter,@a)), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:0");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-    $ret = "";
+    if ($hash->{CL}){
+      my $id = ++$hash->{nb}{cnt};
+      my $bl = BlockingCall("HMinfo_templateChk_Get", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter,@a)), 
+                            "HMinfo_bpPost", 30, 
+                            "HMinfo_bpAbort", "$name:0");
+      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+      $ret = "";
+    }
+    else{
+      (undef,undef,undef,$ret) = split(";",HMinfo_templateChk_Get (join(",",("$name;;",$opt,$filter,@a))),4);
+      $ret = HMinfo_bpPost("$name;;;$ret");
+    }
   }
   elsif($cmd =~ m/^templateUs(g|gG)$/){##template: see if it applies ----------
     return HMinfo_templateUsg($opt,$filter,@a);
   }
   #------------ print tables ---------------
   elsif($cmd eq "peerXref")   {##print cross-references------------------------
-    my @peerPairs;
+    my $sort = "act";
+    #sender,actor,receiver,virtual
+    my $disp = "";
+    if (defined $a[0]){
+      foreach (split(",",$a[0])){
+        $disp .= "1" if($_ =~ m/^sender$/);
+        $disp .= "2" if($_ =~ m/^actor$/);
+        $disp .= "3" if($_ =~ m/^receiver$/);
+        $disp .= "4" if($_ =~ m/^virtual$/);
+      }
+    }
+    $disp = "1234" if ($disp eq "");
+    $disp .= "56";
+    
+    my %peerFriends;
     my @peerFhem;
-    my @peerUndef;
+#    my @peerUndef;
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
       my $peerIDs = AttrVal($dName,"peerIDs","");
       $peerIDs =~ s/00000000,//;
+      my $pType = substr($defs{$dName}{helper}{peerOpt},0,1);
+      $pType = ($pType eq '4' ? '1_sender'
+               :$pType eq '3' ? '2_actor'
+               :$pType eq '7' ? '3_receive'
+               :$pType eq 'p' ? '3_receive'
+               :$pType eq 'v' ? '4_virtual'
+               :                '5_undef'
+               );
       foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                               grep /^trigDst_/,
                                               keys %{$defs{$dName}{READINGS}})){
-        push @peerUndef,"$dName triggers $_"
+#        push @peerUndef,"$dName triggers $_"
+#            if(  ($peerIDs && $peerIDs !~ m/$_/)
+#               &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
+        
+        $peerFriends{"6_trigger"}{$dName}{$_} = 1
             if(  ($peerIDs && $peerIDs !~ m/$_/)
                &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
       }
@@ -1451,14 +1495,13 @@ sub HMinfo_GetFn($@) {#########################################################
       #--- check regular references
       next if(!$peerIDs);
       my $dId = unpack 'A6',CUL_HM_name2Id($dName);
-      my @pl = ();
       foreach (split",",$peerIDs){
         my $pn = CUL_HM_peerChName($_,$dId);
         $pn =~ s/_chn-01//;
-        push @pl,$pn;
         push @fheml,"$_$dName" if ($pn =~ m/^fhem..$/);
+
+        $peerFriends{$pType}{$dName}{$pn} = 1;
       }
-      push @peerPairs,$dName." => ".join(" ",(sort @pl)) if (@pl);
     }
     #--- calculate peerings to Central ---
     my %fChn;
@@ -1468,13 +1511,27 @@ sub HMinfo_GetFn($@) {#########################################################
       $fChn{$fhemCh} = ($fChn{$fhemCh}?$fChn{$fhemCh}.", ":"").$p;
     }
     push @peerFhem,map {"$_ => $fChn{$_}"} keys %fChn;
-    $ret = $cmd." done:" ."\n x-ref list"."\n    ".(join "\n    ",sort @peerPairs)
-                                         ."\n    ".(join "\n    ",sort @peerFhem)
-                         ;
-    $ret .=               "\n warning: sensor triggers but no config found"
-                                         ."\n    ".(join "\n    ",sort @peerUndef)
-            if(@peerUndef)
-                         ;
+    
+    $ret = $cmd." done:" ."\n x-ref list";
+    foreach my $type(sort keys %peerFriends){
+      my $typeId = substr($type,0,1);
+      next if($disp !~ m/$typeId/);
+      $ret .= "\n  ".substr($type,2,20);
+      foreach my $Channel(sort keys %{$peerFriends{$type}}){
+        $ret .= sprintf("\n       %-20s %s %s",$Channel
+               ,($sort eq "act" ? " => " : " <= " )
+               ,join (" ",sort keys %{$peerFriends{$type}{$Channel}}))
+          ;
+      }
+    }
+    
+    
+#                                         ."\n    ".(join "\n    ",sort @peerFhem)
+#                         ;
+#    $ret .=               "\n warning: sensor triggers but no config found"
+#                                         ."\n    ".(join "\n    ",sort @peerUndef)
+#            if(@peerUndef)
+#                         ;
   }
   elsif($cmd eq "peerUsg")    {##print cross-references and usage--------------
     my @peerPairs;
@@ -1655,7 +1712,11 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"param"
             ,"peerCheck"
             ,"peerUsg"
-            ,"peerXref"
+            ,"peerXref:multiple"
+                              .",sender"
+                              .",actor"
+                              .",receiver"
+                              .",virtual"
             ,"protoEvents:all,short,long"
             ,"msgStat"
             ,"rssi rssiG:full,reduced"
@@ -1692,6 +1753,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
 
   $cmd = "?" if(!$cmd);# by default print options
+  Log3 $hash,3,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd ne "?");
   if   ($cmd =~ m/^clear[G]?/ )     {##actionImmediate: clear parameter--------
     my ($type) = @a;                               
     return "please enter what to clear" if (! $type);
@@ -1789,7 +1851,7 @@ sub HMinfo_SetFn($@) {#########################################################
   }
   elsif($cmd eq "loadConfig")      {##action: loadConfig-----------------------
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
-    $ret = HMinfo_loadConfig($filter,$fn); 
+    $ret = HMinfo_loadConfig($hash,$filter,$fn); 
   }
   elsif($cmd eq "verifyConfig")    {##action: verifyConfig---------------------
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
@@ -2093,8 +2155,8 @@ sub HMinfo_verifyConfig($) {###################################################
   $ret =~ s/\n/-ret-/g;
   return "$id;$ret";
 }
-sub HMinfo_loadConfig($@) {####################################################
-  my ($filter,$fName)=@_;
+sub HMinfo_loadConfig($$@) {####################################################
+  my ($hash,$filter,$fName)=@_;
   $filter = "." if (!$filter);
   my $ret;
   open(rFile, "$fName") || return("Can't open $fName: $!");
@@ -2104,6 +2166,8 @@ sub HMinfo_loadConfig($@) {####################################################
   my %changes;
   my @rUpdate;
   my @tmplList = (); #collect template definitions
+  
+  my ($cntTStart,$cntDef,$cntSet,$cntEWT,$cntPBulk,$cntRBulk) = (0,0,0,0,0,0);
   while(<rFile>){
     chomp;
     my $line = $_;
@@ -2127,8 +2191,10 @@ sub HMinfo_loadConfig($@) {####################################################
       $defs{$eN}{READINGS}{$cmd}{TIME} = "from archivexx";
     }
     elsif($cmd1 eq "templateDef"){
+      
       if ($eN eq "templateStart"){#if new block we remove all old templates
         @tmplList = ();
+        $cntTStart++;
       }
       else {
         foreach my $read (keys %{$HMConfig::culHmUpdate{regValUpdt}}){# update wrong reg namings and options
@@ -2157,6 +2223,7 @@ sub HMinfo_loadConfig($@) {####################################################
       }
       if (   $timeStamp 
           && $timeStamp gt ReadingsTimestamp($eN,".peerListRDate","1900-01-01 00:00:01")){
+        $cntPBulk++;
         CUL_HM_ID2PeerList($eN,$_,1) foreach (grep /[0-9A-F]{8}/,split(",",$param));
         push @el,"$eN peerIDs";
         $defs{$eN}{READINGS}{".peerListRDate"}{VAL} = $defs{$eN}{READINGS}{".peerListRDate"}{TIME} = $timeStamp;
@@ -2194,13 +2261,14 @@ sub HMinfo_loadConfig($@) {####################################################
       }
     }
   }
-
+  
   close(rFile);
   foreach my $eN (keys %changes){
     foreach my $reg (keys %{$changes{$eN}}){
       $defs{$eN}{READINGS}{$reg}{VAL}  = $changes{$eN}{$reg}{d};
       $defs{$eN}{READINGS}{$reg}{TIME} = $changes{$eN}{$reg}{t};
       my ($list,$pN) = $reg =~ m/RegL_(..)\.(.*)/?($1,$2):("","");
+      $cntRBulk++;
       next if (!$list);
       my $pId = CUL_HM_name2Id($pN);# allow devices also as peer. Regfile is korrekt
       # my $pId = CUL_HM_peerChId($pN,substr($defs{$eN}{DEF},0,6));#old - removed
@@ -2216,13 +2284,30 @@ sub HMinfo_loadConfig($@) {####################################################
     next if (!defined $tmplCmd[4]);
     delete $HMConfig::culHmTpl{$tmplCmd[1]};
     my $r = HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
+    $cntDef++;
   }
   $tmplDefChange = 0;# all changes are obsolete
   $tmplUsgChange = 0;# all changes are obsolete
   foreach my $tmpN(devspec2array("TYPE=CUL_HM")){
     $defs{$tmpN}{helper}{tmplChg} = 0 if(!$defs{$tmpN}{helper}{role}{vrt});
     CUL_HM_setTmplDisp($defs{$tmpN});#set readings if desired    
+    if (defined $defs{$tmpN}{helper}{tmpl}){
+      my $TmpCnt = scalar(keys %{$defs{$tmpN}{helper}{tmpl}}) ;
+      if ($TmpCnt){
+        $cntSet += $TmpCnt;
+        $cntEWT++; # entity with template
+      }
+    }
   }
+  Log3 $hash,4,"HMinfo load config file"
+               ."\n     templateReDefinition:$cntTStart"
+               ."\n     templateDef:$cntDef"
+               ."\n     templateSet:$cntSet"
+               ."\n     Entity with template:$cntEWT"
+               ."\n     peerListUpdate:$cntPBulk"
+               ."\n     regListUpdate:$cntRBulk"
+               ;
+  HMinfo_GetFn($hash,$hash->{NAME},"templateChk");
   return $ret;
 }
 sub HMinfo_purgeConfig($) {####################################################
@@ -2727,9 +2812,9 @@ sub HMinfo_bpPost($) {#bp finished ############################################
       $state = "ok";
     }
     else{
-      $state = join(",",map{$chkIds{$_}{shtxt}} keys%{$defs{$e}{helper}{cfgChk}});
-       CUL_HM_complConfigTest($e);
-   }
+      $state = join(",",sort map{$chkIds{$_}{shtxt}} keys%{$defs{$e}{helper}{cfgChk}});
+      CUL_HM_complConfigTest($e);
+    }
     CUL_HM_UpdtReadSingle($defs{$e},"cfgState",$state,1);  
   }
   
@@ -3162,8 +3247,6 @@ sub HMinfo_cpRegs(@){##########################################################
   return "source channel $srcCh undefined"      if (!$defs{$srcCh});
   return "destination channel $srcCh undefined" if (!$defs{$dstCh});
   #compare source and destination attributes
-#  return "model  not compatible" if (CUL_HM_Get($ehash,$eName,"param","model") ne
-#                                     CUL_HM_Get($ehash,$eName,"param","model"));
 
   if ($srcP){# will be peer related copy
     if   ($srcP =~ m/self(.*)/)      {$srcPid = substr($defs{$srcCh}{DEF},0,6).sprintf("%02X",$1)}
