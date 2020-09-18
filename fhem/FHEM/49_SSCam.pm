@@ -164,9 +164,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.19" => "18.09.2020  control parse function by the hparse hash step 2 ",
   "9.7.18" => "16.09.2020  control parse function by the hparse hash ",
-  "9.7.17" => "13.09.2020  optimize _oPrunliveview ",
-  "9.7.16" => "12.09.2020  function _oPrunliveview to execute livestream (no snap / HLS) in new camOp variant ",
+  "9.7.17" => "13.09.2020  optimize _Oprunliveview ",
+  "9.7.16" => "12.09.2020  function _Oprunliveview to execute livestream (no snap / HLS) in new camOp variant ",
   "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
   "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
   "9.7.13" => "10.09.2020  optimize liveview handling ",
@@ -469,12 +470,24 @@ my %hget = (                                                                # Ha
 );
 
 my %hparse = (                                                              # Hash der Opcode Parse Funktionen
-  Start        => { fn => "_parseStart",     },
-  Stop         => { fn => "_parseStop",      },
-  GetRec       => { fn => "_parseGetRec",    },
-  MotDetSc     => { fn => "_parseMotDetSc",  },
-  getsvslog    => { fn => "_parsegetsvslog", },
-  SaveRec      => { fn => "_parseSaveRec",   },
+  Start            => { fn => "_parseStart",            },
+  Stop             => { fn => "_parseStop",             },
+  GetRec           => { fn => "_parseGetRec",           },
+  MotDetSc         => { fn => "_parseMotDetSc",         },
+  getsvslog        => { fn => "_parsegetsvslog",        },
+  SaveRec          => { fn => "_parseSaveRec",          },
+  gethomemodestate => { fn => "_parsegethomemodestate", },
+  getPresets       => { fn => "_parsegetPresets",       },
+  Snap             => { fn => "_parseSnap",             },
+  getsvsinfo       => { fn => "_parsegetsvsinfo",       },
+  runliveview      => { fn => "_parserunliveview",      },
+  getStmUrlPath    => { fn => "_parsegetStmUrlPath",    },
+  Getcaminfo       => { fn => "_parseGetcaminfo",       },
+  Getptzlistpatrol => { fn => "_parseGetptzlistpatrol", },
+  Getptzlistpreset => { fn => "_parseGetptzlistpreset", },
+  Getcapabilities  => { fn => "_parseGetcapabilities",  },
+  getmotionenum    => { fn => "_parsegetmotionenum",    },
+  geteventlist     => { fn => "_parsegeteventlist",     },
 );
 
 my %hdt = (                                                                 # Delta Timer Hash für Zeitsteuerung der Funktionen
@@ -5670,8 +5683,8 @@ return checkSid($hash);
 #                        Check ob Session ID gesetzt ist - ggf. login
 #############################################################################################
 sub checkSid {  
-   my ($hash) = @_;
-   my $name   = $hash->{NAME};
+   my $hash = shift;
+   my $name = $hash->{NAME};
    
    my $subref;
    
@@ -5766,7 +5779,7 @@ sub getCamId_Parse {
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
        readingsSingleUpdate($hash, "Error", $err, 1);
-       return login($hash, $hash->{HELPER}{API}, \&getApiSites);
+       return login($hash, $hash->{HELPER}{API}, \&getCamId);
    
    } elsif ($myjson ne "") {                                                                  # Datenabruf erfolgreich
        ($success) = evaljson($hash,$myjson);
@@ -5854,7 +5867,7 @@ sub getCamId_Parse {
            
            if ($errorcode =~ /(105|401)/x) {                                                 # neue Login-Versuche
                Log3($name, 2, "$name - ERROR - $errorcode - $error -> try new login");
-               return login($hash, $hash->{HELPER}{API}, \&getApiSites);
+               return login($hash, $hash->{HELPER}{API}, \&getCamId);
            
            } else {                                                                          # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                delActiveToken($hash);
@@ -5920,7 +5933,7 @@ sub camOp {
    }
    
    if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
-      _oPrunliveview ($hash, $part, $vkey);
+      _Oprunliveview ($hash, $part, $vkey);
       return;  
    }  
    
@@ -5946,7 +5959,7 @@ return;
 # wird bei runliveview aufgerufen wenn nicht Anzeige Snaps 
 # oder kein HLS-Stream aktiviert werden soll
 ################################################################
-sub _oPrunliveview {                   
+sub _Oprunliveview {                   
   my $hash = shift // return;
   my $part = shift // return;
   my $vkey = shift // return;
@@ -6024,7 +6037,7 @@ sub camOp_Parse {
    my $proto              = $hash->{PROTOCOL};
    
    my ($data,$success);
-   my ($error,$errorcode,$verbose);
+   my ($error,$errorcode);
    my ($snapid,$update_time);
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
    
@@ -6032,10 +6045,9 @@ sub camOp_Parse {
    
    # Einstellung für Logausgabe Pollinginfos
    # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
-   if (AttrVal($name, "pollnologging", 0) == 1) {
+   my $verbose = 3;
+   if (AttrVal($name, "pollnologging", 0)) {
        $verbose = 4;
-   } else {
-       $verbose = 3;
    }
    
    if ($err ne "") {                                                                  # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
@@ -6074,12 +6086,14 @@ sub camOp_Parse {
                 OpMode  => $OpMode,
                 myjson  => $myjson,
                 data    => $data,
+                verbose => $verbose,
             };
               
             no strict "refs";                                                        ## no critic 'NoStrict'  
             if($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
                 my $ret = q{};  
                 $ret    = &{$hparse{$OpMode}{fn}} ($params);
+                return if($ret);
             }
             use strict "refs";
   
@@ -6103,56 +6117,6 @@ sub camOp_Parse {
                 
                 delActiveToken    ($hash);                                           # Token freigeben vor nächstem Kommando
                 __getHomeModeState($hash);                                           # neuen HomeModeState abrufen   
-            
-            } elsif ($OpMode eq "gethomemodestate") {  
-                my $hmst = $data->{'data'}{'on'}; 
-                my $hmststr = ($hmst == 1)?"on":"off";
-
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-                if($lang eq "DE") {
-                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                } else {
-                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                }               
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"HomeModeState",$hmststr);
-                readingsBulkUpdate  ($hash,"LastUpdateTime",$update_time);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);
-            
-            } elsif ($OpMode eq "getPresets") {  
-                my %ap = ();
-                my $i  = 0;
-                while ($data->{'data'}->{'preset'}->[$i]) {
-                    my $pname  = $data->{'data'}->{'preset'}->[$i]{'name'};
-                    my $ptype  = $data->{'data'}->{'preset'}->[$i]{'type'};
-                    my $ppos   = $data->{'data'}->{'preset'}->[$i]{'position'};
-                    my $pspeed = $data->{'data'}->{'preset'}->[$i]{'speed'};
-                    my $pextra = $data->{'data'}->{'preset'}->[$i]{'extra'};
-                    $ptype     = ($ptype == 1)?"Home":"Normal";
-                    $ap{$ppos} = "Name: $pname, Speed: $pspeed, Type: $ptype";
-                    $i++;
-                }   
-                
-                my $enum;
-                for my $key (sort{$a <=>$b}keys%ap) { 
-                    $enum .= $key." => ".$ap{$key}."<br>";                 
-                }
-                
-                $enum = "<html><b>Preset positions saved of camera \"$hash->{CAMNAME}\" </b> ".
-                        "(PresetNumber => Name: ..., Speed: ..., Type: ...) <br><br>$enum</html>";
-                                
-                # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
-                # bzw. https://forum.fhem.de/index.php/topic,77310.0.html               
-                
-                setReadingErrorNone( $hash, 1 );
-                
-                # Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$enum");
-                delete($hash->{HELPER}{CL});
             
             } elsif ($OpMode eq "setPreset") {              
                 setReadingErrorNone( $hash, 1 );
@@ -6200,56 +6164,6 @@ sub camOp_Parse {
                 delActiveToken     ($hash);                                                 # Token freigeben vor Abruf caminfo
                 __getCamInfo       ($hash);
                 
-            } elsif ($OpMode eq "Snap") {                                            # ein Schnapschuß wurde aufgenommen, falls Aufnahme noch läuft -> state = on setzen
-                roomRefresh($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
-
-                my $tac = "";
-                if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) { 
-                    $tac = openOrgetTrans($hash);                                    # Transaktion starten oder vorhandenen Code holen
-                }
-                
-                $snapid = $data->{data}{'id'};
-                
-                setReadingErrorNone($hash, 1);
-                                
-                if ($snapid) {
-                    Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
-                } else {
-                    Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
-                }
-                
-                
-                my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
-                my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
-                if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
-                }
-                $ncount--;                                                           # wird vermindert je Snap
-                my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
-                my $emtxt   = $hash->{HELPER}{SMTPMSG} // "";                        # Text für Email-Versand
-                my $teletxt = $hash->{HELPER}{TELEMSG} // "";                        # Text für TelegramBot-Versand
-                my $chattxt = $hash->{HELPER}{CHATMSG} // "";                        # Text für SSChatBot-Versand
-                if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::__camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
-                    if(!$tac) {
-                        delActiveToken($hash);                                       # Token freigeben wenn keine Transaktion läuft
-                    }
-                    return;
-                }
-  
-                my ($slim,$ssize) = snapLimSize($hash);                              # Anzahl und Size für Schnappschußabruf bestimmen
-                if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
-                }
-
-                if(!$hash->{HELPER}{TRANSACTION}) {                                  # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
-                    delActiveToken($hash);                        
-                }
-                
-                __getSnapInfo ("$name:$slim:$ssize:$tac");
-                
-                return;
-            
             } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/x)) {
                 my ($cache,@as,$g);
                 
@@ -6623,27 +6537,6 @@ sub camOp_Parse {
                     roomRefresh($hash,0,0,0);                                         # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
                 } 
             
-            } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) {        # HLS Streaming wurde aktiviert
-                $hash->{HELPER}{HLSSTREAM} = "active";
-                
-                my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");    # externe LivestreamURL setzen
-                $exturl   .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-                readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
-                
-                my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-                
-                $hash->{HELPER}{LINK} = $url;                                                           # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
-                
-                if(AttrVal($name, "verbose", 3) == 4) {
-                    Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url");
-                }
-                
-                if(AttrVal($name, "verbose", 3) == 3) {
-                    Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated");
-                }
-                
-                roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-                
             } elsif ($OpMode eq "stopliveview_hls") {                                                   # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated");
@@ -6758,422 +6651,6 @@ sub camOp_Parse {
                    
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
             
-            } elsif ($OpMode eq "getsvsinfo") {                                                   # Parse SVS-Infos
-                my $userPriv = $data->{'data'}{'userPriv'};
-                if (defined($userPriv)) {
-                    $userPriv = $hrkeys{userPriv}{$userPriv};
-                }                    
-
-                $hash->{HELPER}{SVSVERSION}{MAJOR} = $data->{'data'}{'version'}{'major'};         # Werte in $hash zur späteren Auswertung einfügen 
-                $hash->{HELPER}{SVSVERSION}{MINOR} = $data->{'data'}{'version'}{'minor'};
-                $hash->{HELPER}{SVSVERSION}{SMALL} = $data->{'data'}{'version'}{'small'};
-                $hash->{HELPER}{SVSVERSION}{BUILD} = $data->{'data'}{'version'}{'build'};
-
-                my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
-                my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
-                my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
-                my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
-                
-                if (AttrVal($name, "simu_SVSversion", undef)) {                                  # simulieren einer anderen SVS-Version
-                    Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
-
-                    my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
-                    $major = $vl[0];
-                    $minor = $vl[1];
-                    $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
-                    $build = "xxxx-simu";
-                }
-                
-                my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);                      # Kompatibilitätscheck
-                my $avcomp = $hash->{COMPATIBILITY};
-                $avcomp    =~ s/\.//gx;
-                
-                my $compstate = ($avsc <= $avcomp) ? "true" : "false";
-                readingsSingleUpdate($hash, "compstate", $compstate, 1);
-                
-                if (!exists($data->{'data'}{'customizedPortHttp'})) {
-                    delete $defs{$name}{READINGS}{SVScustomPortHttp};
-                }             
-               
-                if (!exists($data->{'data'}{'customizedPortHttps'})) {
-                    delete $defs{$name}{READINGS}{SVScustomPortHttps};
-                }
-                                
-                readingsBeginUpdate ($hash);
-                
-                readingsBulkUpdate  ($hash, "SVScustomPortHttp",  $data->{'data'}{'customizedPortHttp'});
-                readingsBulkUpdate  ($hash, "SVScustomPortHttps", $data->{'data'}{'customizedPortHttps'});
-                readingsBulkUpdate  ($hash, "SVSlicenseNumber",   $data->{'data'}{'liscenseNumber'});
-                readingsBulkUpdate  ($hash, "SVSuserPriv",$userPriv);
-                
-                if(defined($small)) {
-                    readingsBulkUpdate($hash, "SVSversion", $major.".".$minor.".".$small."-".$build);
-                } else {
-                    readingsBulkUpdate($hash, "SVSversion", $major.".".$minor."-".$build);
-                }
-                
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error",     "none");
-                
-                readingsEndUpdate  ($hash, 1);
-                     
-                Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
-            
-            } elsif ($OpMode eq "getStmUrlPath") {                                                 # Parse SVS-Infos
-                my($camforcemcast,$mjpegHttp,$multicst,$mxpegHttp,$unicastOverHttp,$unicastPath);
-                if($apicamver < 9) {
-                    $camforcemcast   = jboolmap($data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'});
-                    $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
-                    $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
-                    $mxpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mxpegHttpPath'};
-                    $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
-                    $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
-                }
-                if($apicamver >= 9) {
-                    $mjpegHttp        = $data->{'data'}[0]{'mjpegHttpPath'};
-                    $multicst         = $data->{'data'}[0]{'multicstPath'};
-                    $mxpegHttp        = $data->{'data'}[0]{'mxpegHttpPath'};
-                    $unicastOverHttp  = $data->{'data'}[0]{'rtspOverHttpPath'};
-                    $unicastPath      = $data->{'data'}[0]{'rtspPath'};
-                }       
-                                
-                if (AttrVal($name, "livestreamprefix", undef)) {                                  # Rewrite Url's falls livestreamprefix ist gesetzt  
-                    my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-                    $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;
-                    
-                    my @mjh    = split(/\//x, $mjpegHttp, 4);
-                    $mjpegHttp = $exturl."/".$mjh[3];
-                    
-                    my @mxh    = split(/\//x, $mxpegHttp, 4);
-                    $mxpegHttp = $exturl."/".$mxh[3];
-                    
-                    if($unicastPath) {
-                        my @ucp      = split(/[@\|:]/x, $unicastPath);
-                        my @lspf     = split(/[\/\/\|:]/x, $exturl);
-                        $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
-                    }
-                }
-                
-                my @sk     = split(/&StmKey=/x, $mjpegHttp);                                     # StmKey extrahieren
-                my $stmkey = $sk[1];
-                
-                # Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
-                if(AttrVal($name, "noQuotesForSID",0)) {                                         # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
-                    $mjpegHttp =~ tr/"//d;
-                    $mxpegHttp =~ tr/"//d;
-                    $stmkey    =~ tr/"//d;
-                }
-                
-                # Streaminginfos in Helper speichern
-                $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp                     if($mjpegHttp);
-                $hash->{HELPER}{STMKEYMXPEGHTTP}      = $mxpegHttp                     if($mxpegHttp);
-                $hash->{HELPER}{STMKEYUNICSTOVERHTTP} = $unicastOverHttp               if($unicastOverHttp);
-                $hash->{HELPER}{STMKEYUNICST}         = $unicastPath                   if($unicastPath);
-                
-                readingsBeginUpdate($hash);
-                
-                readingsBulkUpdate($hash,"CamForceEnableMulticast", $camforcemcast)    if($camforcemcast);
-                readingsBulkUpdate($hash,"StmKey",                  $stmkey);
-                readingsBulkUpdate($hash,"StmKeymjpegHttp",         $mjpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
-                readingsBulkUpdate($hash,"StmKeymxpegHttp",         $mxpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
-                readingsBulkUpdate($hash,"StmKeyUnicstOverHttp",    $unicastOverHttp)  if(AttrVal($name,"showStmInfoFull",0) && $unicastOverHttp);
-                readingsBulkUpdate($hash,"StmKeyUnicst",            $unicastPath)      if(AttrVal($name,"showStmInfoFull",0) && $unicastPath);
-                readingsBulkUpdate($hash,"Errorcode",               "none");
-                readingsBulkUpdate($hash,"Error",                   "none");
-                
-                readingsEndUpdate($hash, 1);
-
-                Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getcaminfo") {                                              # Parse Caminfos                
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-                if($lang eq "DE") {
-                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                } else {
-                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                }
-                
-                my $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
-                $camLiveMode    = $hrkeys{camLiveMode}{$camLiveMode};
-                
-                my $deviceType  = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
-                $deviceType     = $hrkeys{deviceType}{$deviceType};
-                
-                my $camStatus   = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
-                $camStatus      = $hrkeys{camStatus}{$camStatus};
-                
-                if ($camStatus eq "enabled") {                                   
-                    if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                 # falls Aufnahme noch läuft -> STATE = on setzen
-                        readingsSingleUpdate($hash,"state", "on", 0); 
-                    } else {
-                        readingsSingleUpdate($hash,"state", "off", 0); 
-                    }
-                }
-               
-                my $recStatus       = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};                
-                $recStatus          = $recStatus ne "0" ? "Start" : "Stop";
-                
-                my $rotate          = $data->{'data'}->{'cameras'}->[0]->{'video_rotation'};
-                $rotate             = $rotate == 1 ? "true" : "false";
-                
-                my $exposuremode    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_mode'});               
-                $exposuremode       = $hrkeys{exposure_mode}{$exposuremode};
-                    
-                my $exposurecontrol = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_control'});
-                $exposurecontrol    = $hrkeys{exposure_control}{$exposurecontrol};
-   
-                my $camaudiotype    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camAudioType'});
-                $camaudiotype       = $hrkeys{camAudioType}{$camaudiotype};
-                    
-                my $pdcap = jboolmap($data->{'data'}->{'cameras'}->[0]->{'PDCap'});
-                if (!$pdcap || $pdcap == 0) {
-                    $pdcap = "false";
-                } else {
-                    $pdcap = "true";
-                }
-                
-                $data->{'data'}->{'cameras'}->[0]->{'video_flip'}    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_flip'});
-                $data->{'data'}->{'cameras'}->[0]->{'video_mirror'}  = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
-                $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'} = jboolmap($data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
-                
-                my $clstrmno = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveStreamNo'};
-                $clstrmno++ if($clstrmno == 0);
-                
-                my $fw = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camFirmware'};
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash, "CamAudioType",       $camaudiotype);
-                readingsBulkUpdate($hash, "CamFirmware",        $fw) if($fw);
-                readingsBulkUpdate($hash, "CamLiveMode",        $camLiveMode);
-                readingsBulkUpdate($hash, "CamLiveFps",         $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveFps'});
-                readingsBulkUpdate($hash, "CamLiveResolution",  $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveResolution'});
-                readingsBulkUpdate($hash, "CamLiveQuality",     $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveQuality'});
-                readingsBulkUpdate($hash, "CamLiveStreamNo",    $clstrmno);
-                readingsBulkUpdate($hash, "CamExposureMode",    $exposuremode);
-                readingsBulkUpdate($hash, "CamExposureControl", $exposurecontrol);
-                readingsBulkUpdate($hash, "CamModel",           $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
-                readingsBulkUpdate($hash, "CamRecShare",        $data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
-                readingsBulkUpdate($hash, "CamRecVolume",       $data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
-                readingsBulkUpdate($hash, "CamIP",              $data->{'data'}->{'cameras'}->[0]->{'host'});
-                readingsBulkUpdate($hash, "CamNTPServer",       $data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
-                readingsBulkUpdate($hash, "CamVendor",          $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
-                readingsBulkUpdate($hash, "CamVideoType",       $data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
-                readingsBulkUpdate($hash, "CamPreRecTime",      $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
-                readingsBulkUpdate($hash, "CamPort",            $data->{'data'}->{'cameras'}->[0]->{'port'});
-                readingsBulkUpdate($hash, "CamPtSpeed",         $data->{'data'}->{'cameras'}->[0]->{'ptSpeed'}) if($deviceType =~ /PTZ/x);
-                readingsBulkUpdate($hash, "CamblPresetSpeed",   $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
-                readingsBulkUpdate($hash, "CamVideoMirror",     $data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
-                readingsBulkUpdate($hash, "CamVideoFlip",       $data->{'data'}->{'cameras'}->[0]->{'video_flip'});
-                readingsBulkUpdate($hash, "CamVideoRotate",     $rotate);
-                readingsBulkUpdate($hash, "CapPIR",             $pdcap);
-                readingsBulkUpdate($hash, "Availability",       $camStatus);
-                readingsBulkUpdate($hash, "DeviceType",         $deviceType);
-                readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
-                readingsBulkUpdate($hash, "Record",             $recStatus);
-                readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
-                readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
-                readingsBulkUpdate($hash, "Errorcode",          "none");
-                readingsBulkUpdate($hash, "Error",              "none");
-                readingsEndUpdate($hash, 1);
-                   
-                $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(IsModelCam($hash));                   
-                Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
-                
-                __getPtzPresetList($hash);                               # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
-                __getPtzPatrolList($hash);
-            
-            } elsif ($OpMode eq "geteventlist") {              
-                my $eventnum  = $data->{'data'}{'total'};
-                my $lrec      = $data->{'data'}{'events'}[0]{name};
-                my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
-                
-                my ($lastrecstarttime,$lastrecstoptime);
-                
-                if ($eventnum > 0) {
-                    $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
-                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
-                    if($lang eq "DE") {
-                        $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                    } else {
-                        $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                    }
-                    $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
-                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
-                    $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "CamEventNum",    $eventnum);
-                readingsBulkUpdate  ($hash, "CamLastRec",     $lrec) if($lrec); 
-                readingsBulkUpdate  ($hash, "CamLastRecId",   $lrecid) if($lrecid);                 
-                readingsBulkUpdate  ($hash, "CamLastRecTime", $lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
-                readingsBulkUpdate  ($hash, "Errorcode",      "none");
-                readingsBulkUpdate  ($hash, "Error",          "none");
-                readingsEndUpdate   ($hash, 1);
-       
-                Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
-                
-                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {        # Versand Aufnahme initiieren
-                    __getRec($hash);
-                }
-            
-            } elsif ($OpMode eq "getmotionenum") {              
-                
-                my $motdetsc           = $data->{'data'}{'MDParam'}{'source'};
-                $motdetsc              = $hrkeys{source}{$motdetsc};
-                
-                my $sensitivity_camCap = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'});
-                my $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
-                my $sensitivity_ssCap  = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'});
-                
-                my $threshold_camCap   = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'camCap'});
-                my $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
-                my $threshold_ssCap    = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'ssCap'});
-
-                my $percentage_camCap  = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'camCap'});
-                my $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
-                my $percentage_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'ssCap'});
-                
-                my $objectSize_camCap  = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'camCap'});
-                my $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
-                my $objectSize_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'});
-                
-                
-                if ($motdetsc eq "Camera") {                    
-                    if ($sensitivity_camCap) {
-                        $motdetsc .= ", sensitivity: $sensitivity_value";
-                    }
-                    if ($threshold_camCap) {
-                        $motdetsc .= ", threshold: $threshold_value";
-                    }
-                    if ($percentage_camCap) {
-                        $motdetsc .= ", percentage: $percentage_value";
-                    }
-                    if ($objectSize_camCap) {
-                        $motdetsc .= ", objectSize: $objectSize_value";
-                    }
-                
-                } 
-                
-                if ($motdetsc eq "SVS") {                    
-                    if ($sensitivity_ssCap) {
-                        $motdetsc .= ", sensitivity: $sensitivity_value";
-                    }
-                    if ($threshold_ssCap) {
-                        $motdetsc .= ", threshold: $threshold_value";
-                    }
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "CamMotDetSc", $motdetsc);
-                readingsBulkUpdate  ($hash, "Errorcode",   "none"   );
-                readingsBulkUpdate  ($hash, "Error",       "none"   );
-                readingsEndUpdate   ($hash, 1);
-       
-                Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getcapabilities") {
-                my $ptzfocus = $data->{'data'}{'ptzFocus'};
-                $ptzfocus    = $hrkeys{ptzFocus}{$ptzfocus};
-                    
-                my $ptztilt  = $data->{'data'}{'ptzTilt'};
-                $ptztilt     = $hrkeys{ptzTilt}{$ptztilt};
-                    
-                my $ptzzoom  = $data->{'data'}{'ptzZoom'};
-                $ptzzoom     = $hrkeys{ptzZoom}{$ptzzoom};
-                    
-                my $ptzpan   = $data->{'data'}{'ptzPan'};
-                $ptzpan      = $hrkeys{ptzPan}{$ptzpan};                
-                
-                my $ptziris  = $data->{'data'}{'ptzIris'};
-                $ptziris     = $hrkeys{ptzIris}{$ptziris};              
-                
-                $data->{'data'}{'ptzHasObjTracking'} = jboolmap($data->{'data'}{'ptzHasObjTracking'});
-                $data->{'data'}{'audioOut'}          = jboolmap($data->{'data'}{'audioOut'});
-                $data->{'data'}{'ptzSpeed'}          = jboolmap($data->{'data'}{'ptzSpeed'});
-                $data->{'data'}{'ptzAbs'}            = jboolmap($data->{'data'}{'ptzAbs'});
-                $data->{'data'}{'ptzAutoFocus'}      = jboolmap($data->{'data'}{'ptzAutoFocus'});
-                $data->{'data'}{'ptzHome'}           = jboolmap($data->{'data'}{'ptzHome'});
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
-                readingsBulkUpdate ($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
-                readingsBulkUpdate ($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
-                readingsBulkUpdate ($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
-                readingsBulkUpdate ($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
-                readingsBulkUpdate ($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
-                readingsBulkUpdate ($hash,"CapPTZFocus",        $ptzfocus                            );
-                readingsBulkUpdate ($hash,"CapPTZIris",         $ptziris                             );
-                readingsBulkUpdate ($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
-                readingsBulkUpdate ($hash,"CapPTZPan",          $ptzpan                              );
-                readingsBulkUpdate ($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
-                readingsBulkUpdate ($hash,"CapPTZTilt",         $ptztilt                             );
-                readingsBulkUpdate ($hash,"CapPTZZoom",         $ptzzoom                             );
-                readingsBulkUpdate ($hash,"Errorcode",          "none"                               );
-                readingsBulkUpdate ($hash,"Error",              "none"                               );
-                readingsEndUpdate  ($hash, 1);
-                  
-                Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getptzlistpreset") {                                    # Parse PTZ-ListPresets
-                my $presetcnt = $data->{'data'}->{'total'};
-                my $cnt       = 0;
-         
-                # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
-                delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
-                my $home = "not set";
-                while ($cnt < $presetcnt) {
-                    my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
-                    my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
-                    $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
-                    $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
-                    my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
-                    if ($ptype) {
-                        $home = $presname;
-                    }
-                    $cnt += 1;
-                }
-
-                my @preskeys   = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
-                my $presetlist = join(",",@preskeys);
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "Presets",    $presetlist);
-                readingsBulkUpdate  ($hash, "PresetHome", $home      );
-                readingsBulkUpdate  ($hash, "Errorcode",  "none"     );
-                readingsBulkUpdate  ($hash, "Error",      "none"     );
-                readingsEndUpdate   ($hash, 1);
-                
-                addptzattr($name);                                                        # PTZ Panel neu erstellen
-                             
-                Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getptzlistpatrol") {                                     # Parse PTZ-ListPatrols
-                my $patrolcnt = $data->{'data'}->{'total'};
-                my $cnt       = 0;
-         
-                delete $hash->{HELPER}{ALLPATROLS};
-                while ($cnt < $patrolcnt) {                                               # alle Patrols der Kamera mit Id's in Hash einlesen
-                    my $patrolid   = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
-                    my $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
-                    $patrolname    =~ s/\s+/_/gx;                                         # Leerzeichen im Namen ersetzen falls vorhanden
-                    
-                    $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
-                    $cnt += 1;
-                }
-
-                my @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
-                my $patrollist = join ",", @patrolkeys;
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "Patrols",   $patrollist);
-                readingsBulkUpdate  ($hash, "Errorcode", "none"     );
-                readingsBulkUpdate  ($hash, "Error",     "none"     );
-                readingsEndUpdate   ($hash, 1);
-                
-                $hash->{".ptzhtml"} = "";                                                 # ptzPanel wird neu eingelesen in FWdetailFn
-                     
-                Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
             }
             
        } else {                                                               # die API-Operation war fehlerhaft
@@ -7181,18 +6658,18 @@ sub camOp_Parse {
             $error     = expErrors($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
             
             readingsBeginUpdate($hash);
-            readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate ($hash,"Error",    $error    );
+            readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate ($hash, "Error",     $error    );
             readingsEndUpdate  ($hash, 1);
             
             if ($errorcode =~ /105/x) {
                Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                undef $data;
                undef $myjson;
-               return login($hash, $hash->{HELPER}{API}, \&getApiSites);
+               return login($hash, $hash->{HELPER}{API}, \&camOp);
             }
        
-            Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
+            Log3($name, 2, "$name - ERROR - Operation $OpMode not successful. Cause: $errorcode - $error");
        }
                 
        undef $data;
@@ -7454,6 +6931,746 @@ sub _parseSaveRec {                                     ## no critic "not used"
   readingsBulkUpdate  ($hash, "Error",     $err  );
   readingsEndUpdate   ($hash, 1);
                 
+return;
+}
+
+###############################################################################
+#                       Parse OpMode gethomemodestate
+###############################################################################
+sub _parsegethomemodestate {                            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+         
+  my $lang    = AttrVal("global","language","EN");
+  my $hmst    = $data->{'data'}{'on'}; 
+  my $hmststr = $hmst == 1 ? "on" : "off";
+  
+  my $update_time;
+
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+  
+  if($lang eq "DE") {
+      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+  
+  } else {
+      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+  }               
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr     );
+  readingsBulkUpdate  ($hash, "LastUpdateTime", $update_time );
+  readingsBulkUpdate  ($hash, "Errorcode",      "none"       );
+  readingsBulkUpdate  ($hash, "Error",          "none"       );
+  readingsEndUpdate   ($hash, 1);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getPresets
+###############################################################################
+sub _parsegetPresets {                                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+         
+  my %ap = ();
+  my $i  = 0;
+  while ($data->{'data'}->{'preset'}->[$i]) {
+      my $pname  = $data->{'data'}->{'preset'}->[$i]{'name'};
+      my $ptype  = $data->{'data'}->{'preset'}->[$i]{'type'};
+      my $ppos   = $data->{'data'}->{'preset'}->[$i]{'position'};
+      my $pspeed = $data->{'data'}->{'preset'}->[$i]{'speed'};
+      my $pextra = $data->{'data'}->{'preset'}->[$i]{'extra'};
+      $ptype     = ($ptype == 1)?"Home":"Normal";
+      $ap{$ppos} = "Name: $pname, Speed: $pspeed, Type: $ptype";
+      $i++;
+  }   
+
+  my $enum;
+  for my $key (sort{$a <=>$b}keys%ap) { 
+      $enum .= $key." => ".$ap{$key}."<br>";                 
+  }
+
+  $enum = "<html><b>Preset positions saved of camera \"$hash->{CAMNAME}\" </b> ".
+          "(PresetNumber => Name: ..., Speed: ..., Type: ...) <br><br>$enum</html>";
+                
+  # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+  # bzw. https://forum.fhem.de/index.php/topic,77310.0.html               
+
+  setReadingErrorNone( $hash, 1 );
+
+  # Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput($hash->{HELPER}{CL}{1},"$enum");
+  delete($hash->{HELPER}{CL});
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Snap
+# ein Schnapschuß wurde aufgenommen, falls Aufnahme noch läuft -> 
+# state = on setzen
+###############################################################################
+sub _parseSnap {                                        ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $camname = $paref->{camname};
+         
+  roomRefresh($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+
+  my $tac = "";
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) { 
+      $tac = openOrgetTrans($hash);                                    # Transaktion starten oder vorhandenen Code holen
+  }
+
+  my $snapid = $data->{data}{'id'};
+
+  setReadingErrorNone($hash, 1);
+                
+  if ($snapid) {
+      Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
+  
+  } else {
+      Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+  }
+
+  my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
+  my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
+  if (AttrVal($name,"debugactivetoken",0)) {
+      Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
+  }
+  $ncount--;                                                           # wird vermindert je Snap
+  
+  my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
+  my $emtxt   = $hash->{HELPER}{SMTPMSG} // "";                        # Text für Email-Versand
+  my $teletxt = $hash->{HELPER}{TELEMSG} // "";                        # Text für TelegramBot-Versand
+  my $chattxt = $hash->{HELPER}{CHATMSG} // "";                        # Text für SSChatBot-Versand
+  
+  if($ncount > 0) {
+      InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::__camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
+      if(!$tac) {
+          delActiveToken($hash);                                       # Token freigeben wenn keine Transaktion läuft
+      }
+      return;
+  }
+
+  my ($slim,$ssize) = snapLimSize($hash);                              # Anzahl und Size für Schnappschußabruf bestimmen
+  if (AttrVal($name,"debugactivetoken",0)) {
+      Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
+  }
+
+  if(!$hash->{HELPER}{TRANSACTION}) {                                  # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
+      delActiveToken($hash);                        
+  }
+
+  __getSnapInfo ("$name:$slim:$ssize:$tac");
+                
+return 1;
+}
+
+###############################################################################
+#                       Parse OpMode getsvsinfo
+#                       Parse SVS-Infos
+###############################################################################
+sub _parsegetsvsinfo {                                  ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+         
+  my $userPriv = $data->{'data'}{'userPriv'};
+  if (defined($userPriv)) {
+      $userPriv = $hrkeys{userPriv}{$userPriv};
+  }                    
+
+  $hash->{HELPER}{SVSVERSION}{MAJOR} = $data->{'data'}{'version'}{'major'};         # Werte in $hash zur späteren Auswertung einfügen 
+  $hash->{HELPER}{SVSVERSION}{MINOR} = $data->{'data'}{'version'}{'minor'};
+  $hash->{HELPER}{SVSVERSION}{SMALL} = $data->{'data'}{'version'}{'small'};
+  $hash->{HELPER}{SVSVERSION}{BUILD} = $data->{'data'}{'version'}{'build'};
+
+  my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
+  my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+  my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
+  my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
+
+  if (AttrVal($name, "simu_SVSversion", undef)) {                                  # simulieren einer anderen SVS-Version
+      Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
+
+      my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
+      $major = $vl[0];
+      $minor = $vl[1];
+      $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
+      $build = "xxxx-simu";
+  }
+
+  my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);                      # Kompatibilitätscheck
+  my $avcomp = $hash->{COMPATIBILITY};
+  $avcomp    =~ s/\.//gx;
+
+  my $compstate = ($avsc <= $avcomp) ? "true" : "false";
+  readingsSingleUpdate($hash, "compstate", $compstate, 1);
+
+  if (!exists($data->{'data'}{'customizedPortHttp'})) {
+      delete $defs{$name}{READINGS}{SVScustomPortHttp};
+  }             
+
+  if (!exists($data->{'data'}{'customizedPortHttps'})) {
+      delete $defs{$name}{READINGS}{SVScustomPortHttps};
+  }
+                
+  readingsBeginUpdate ($hash);
+
+  readingsBulkUpdate  ($hash, "SVScustomPortHttp",  $data->{'data'}{'customizedPortHttp'});
+  readingsBulkUpdate  ($hash, "SVScustomPortHttps", $data->{'data'}{'customizedPortHttps'});
+  readingsBulkUpdate  ($hash, "SVSlicenseNumber",   $data->{'data'}{'liscenseNumber'});
+  readingsBulkUpdate  ($hash, "SVSuserPriv",$userPriv);
+
+  if(defined($small)) {
+      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor.".".$small."-".$build);
+  } else {
+      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor."-".$build);
+  }
+
+  readingsBulkUpdate ($hash, "Errorcode", "none");
+  readingsBulkUpdate ($hash, "Error",     "none");
+
+  readingsEndUpdate  ($hash, 1);
+     
+  Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode runliveview
+#                     HLS Streaming wurde aktiviert
+###############################################################################
+sub _parserunliveview {                                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+         
+  if($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) {
+      __parserunliveviewhls ($paref);
+  }
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode runliveview HLS
+###############################################################################
+sub __parserunliveviewhls {                             ## no critic "not used"
+  my $paref            = shift;
+  my $hash             = $paref->{hash};
+  my $name             = $paref->{name};
+  
+  my $proto            = $hash->{PROTOCOL};
+  my $serveraddr       = $hash->{SERVERADDR};
+  my $serverport       = $hash->{SERVERPORT};
+  my $camid            = $hash->{CAMID};
+  my $apivideostms     = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
+  my $apivideostmspath = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
+  my $apivideostmsver  = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+  my $sid              = $hash->{HELPER}{SID};
+         
+  $hash->{HELPER}{HLSSTREAM} = "active";
+
+  my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");    # externe LivestreamURL setzen
+  $exturl   .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+  
+  if(AttrVal($name, "showStmInfoFull", 0)) {
+      readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1);
+  }
+
+  my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+
+  $hash->{HELPER}{LINK} = $url;                                                           # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
+
+  Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url");
+  Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated");
+
+  roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getStmUrlPath
+###############################################################################
+sub _parsegetStmUrlPath {                               ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $proto      = $hash->{PROTOCOL};
+  my $serveraddr = $hash->{SERVERADDR};
+  my $serverport = $hash->{SERVERPORT};
+  my $apicamver  = $hash->{HELPER}{API}{CAM}{VER};
+         
+  my($camforcemcast,$mjpegHttp,$multicst,$mxpegHttp,$unicastOverHttp,$unicastPath);
+
+  if($apicamver < 9) {
+      $camforcemcast   = jboolmap($data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'});
+      $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
+      $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
+      $mxpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mxpegHttpPath'};
+      $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
+      $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
+  }
+  
+  if($apicamver >= 9) {
+      $mjpegHttp        = $data->{'data'}[0]{'mjpegHttpPath'};
+      $multicst         = $data->{'data'}[0]{'multicstPath'};
+      $mxpegHttp        = $data->{'data'}[0]{'mxpegHttpPath'};
+      $unicastOverHttp  = $data->{'data'}[0]{'rtspOverHttpPath'};
+      $unicastPath      = $data->{'data'}[0]{'rtspPath'};
+  }       
+                
+  if (AttrVal($name, "livestreamprefix", undef)) {                                  # Rewrite Url's falls livestreamprefix ist gesetzt  
+      my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
+      $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;
+    
+      my @mjh    = split(/\//x, $mjpegHttp, 4);
+      $mjpegHttp = $exturl."/".$mjh[3];
+    
+      my @mxh    = split(/\//x, $mxpegHttp, 4);
+      $mxpegHttp = $exturl."/".$mxh[3];
+    
+      if($unicastPath) {
+          my @ucp      = split(/[@\|:]/x, $unicastPath);
+          my @lspf     = split(/[\/\/\|:]/x, $exturl);
+          $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
+      }
+  }
+
+  my @sk     = split(/&StmKey=/x, $mjpegHttp);                                     # StmKey extrahieren
+  my $stmkey = $sk[1];
+
+  # Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
+  if(AttrVal($name, "noQuotesForSID",0)) {                                         # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
+      $mjpegHttp =~ tr/"//d;
+      $mxpegHttp =~ tr/"//d;
+      $stmkey    =~ tr/"//d;
+  }
+
+  # Streaminginfos in Helper speichern
+  $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp                     if($mjpegHttp);
+  $hash->{HELPER}{STMKEYMXPEGHTTP}      = $mxpegHttp                     if($mxpegHttp);
+  $hash->{HELPER}{STMKEYUNICSTOVERHTTP} = $unicastOverHttp               if($unicastOverHttp);
+  $hash->{HELPER}{STMKEYUNICST}         = $unicastPath                   if($unicastPath);
+
+  readingsBeginUpdate($hash);
+
+  readingsBulkUpdate($hash,"CamForceEnableMulticast", $camforcemcast)    if($camforcemcast);
+  readingsBulkUpdate($hash,"StmKey",                  $stmkey);
+  readingsBulkUpdate($hash,"StmKeymjpegHttp",         $mjpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
+  readingsBulkUpdate($hash,"StmKeymxpegHttp",         $mxpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
+  readingsBulkUpdate($hash,"StmKeyUnicstOverHttp",    $unicastOverHttp)  if(AttrVal($name,"showStmInfoFull",0) && $unicastOverHttp);
+  readingsBulkUpdate($hash,"StmKeyUnicst",            $unicastPath)      if(AttrVal($name,"showStmInfoFull",0) && $unicastPath);
+  readingsBulkUpdate($hash,"Errorcode",               "none");
+  readingsBulkUpdate($hash,"Error",                   "none");
+
+  readingsEndUpdate($hash, 1);
+
+  Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getcaminfo
+#                            Parse Caminfos    
+###############################################################################
+sub _parseGetcaminfo {                                  ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang    = AttrVal("global","language","EN");
+  
+  my $update_time;
+  
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+
+  if($lang eq "DE") {
+      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+
+  } else {
+      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+  }
+
+  my $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
+  $camLiveMode    = $hrkeys{camLiveMode}{$camLiveMode};
+
+  my $deviceType  = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
+  $deviceType     = $hrkeys{deviceType}{$deviceType};
+
+  my $camStatus   = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
+  $camStatus      = $hrkeys{camStatus}{$camStatus};
+
+  if ($camStatus eq "enabled") {                                   
+      if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                 # falls Aufnahme noch läuft -> STATE = on setzen
+          readingsSingleUpdate($hash,"state", "on", 0); 
+    
+      } else {
+          readingsSingleUpdate($hash,"state", "off", 0); 
+      }
+  }
+
+  my $recStatus       = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};                
+  $recStatus          = $recStatus ne "0" ? "Start" : "Stop";
+
+  my $rotate          = $data->{'data'}->{'cameras'}->[0]->{'video_rotation'};
+  $rotate             = $rotate == 1 ? "true" : "false";
+
+  my $exposuremode    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_mode'});               
+  $exposuremode       = $hrkeys{exposure_mode}{$exposuremode};
+    
+  my $exposurecontrol = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_control'});
+  $exposurecontrol    = $hrkeys{exposure_control}{$exposurecontrol};
+
+  my $camaudiotype    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camAudioType'});
+  $camaudiotype       = $hrkeys{camAudioType}{$camaudiotype};
+    
+  my $pdcap           = jboolmap($data->{'data'}->{'cameras'}->[0]->{'PDCap'});
+
+  if (!$pdcap || $pdcap == 0) {
+      $pdcap = "false";
+
+  } else {
+      $pdcap = "true";
+  }
+
+  $data->{'data'}->{'cameras'}->[0]->{'video_flip'}    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_flip'});
+  $data->{'data'}->{'cameras'}->[0]->{'video_mirror'}  = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
+  $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'} = jboolmap($data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
+
+  my $clstrmno = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveStreamNo'};
+  $clstrmno++ if($clstrmno == 0);
+
+  my $fw = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camFirmware'};
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "CamAudioType",       $camaudiotype);
+  readingsBulkUpdate($hash, "CamFirmware",        $fw) if($fw);
+  readingsBulkUpdate($hash, "CamLiveMode",        $camLiveMode);
+  readingsBulkUpdate($hash, "CamLiveFps",         $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveFps'});
+  readingsBulkUpdate($hash, "CamLiveResolution",  $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveResolution'});
+  readingsBulkUpdate($hash, "CamLiveQuality",     $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveQuality'});
+  readingsBulkUpdate($hash, "CamLiveStreamNo",    $clstrmno);
+  readingsBulkUpdate($hash, "CamExposureMode",    $exposuremode);
+  readingsBulkUpdate($hash, "CamExposureControl", $exposurecontrol);
+  readingsBulkUpdate($hash, "CamModel",           $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
+  readingsBulkUpdate($hash, "CamRecShare",        $data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
+  readingsBulkUpdate($hash, "CamRecVolume",       $data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
+  readingsBulkUpdate($hash, "CamIP",              $data->{'data'}->{'cameras'}->[0]->{'host'});
+  readingsBulkUpdate($hash, "CamNTPServer",       $data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
+  readingsBulkUpdate($hash, "CamVendor",          $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
+  readingsBulkUpdate($hash, "CamVideoType",       $data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
+  readingsBulkUpdate($hash, "CamPreRecTime",      $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
+  readingsBulkUpdate($hash, "CamPort",            $data->{'data'}->{'cameras'}->[0]->{'port'});
+  readingsBulkUpdate($hash, "CamPtSpeed",         $data->{'data'}->{'cameras'}->[0]->{'ptSpeed'}) if($deviceType =~ /PTZ/x);
+  readingsBulkUpdate($hash, "CamblPresetSpeed",   $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
+  readingsBulkUpdate($hash, "CamVideoMirror",     $data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
+  readingsBulkUpdate($hash, "CamVideoFlip",       $data->{'data'}->{'cameras'}->[0]->{'video_flip'});
+  readingsBulkUpdate($hash, "CamVideoRotate",     $rotate);
+  readingsBulkUpdate($hash, "CapPIR",             $pdcap);
+  readingsBulkUpdate($hash, "Availability",       $camStatus);
+  readingsBulkUpdate($hash, "DeviceType",         $deviceType);
+  readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
+  readingsBulkUpdate($hash, "Record",             $recStatus);
+  readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
+  readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
+  readingsBulkUpdate($hash, "Errorcode",          "none");
+  readingsBulkUpdate($hash, "Error",              "none");
+  readingsEndUpdate($hash, 1);
+   
+  $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(IsModelCam($hash));                   
+  Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
+
+  __getPtzPresetList($hash);                               # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
+  __getPtzPatrolList($hash);
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getptzlistpatrol
+#                            Parse PTZ-ListPatrols    
+###############################################################################
+sub _parseGetptzlistpatrol {                            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $patrolcnt = $data->{'data'}->{'total'};
+  my $cnt       = 0;
+
+  delete $hash->{HELPER}{ALLPATROLS};
+  
+  while ($cnt < $patrolcnt) {                                               # alle Patrols der Kamera mit Id's in Hash einlesen
+      my $patrolid   = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
+      my $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
+      $patrolname    =~ s/\s+/_/gx;                                         # Leerzeichen im Namen ersetzen falls vorhanden
+    
+      $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
+      $cnt += 1;
+  }
+
+  my @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
+  my $patrollist = join ",", @patrolkeys;
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Patrols",   $patrollist);
+  readingsBulkUpdate  ($hash, "Errorcode", "none"     );
+  readingsBulkUpdate  ($hash, "Error",     "none"     );
+  readingsEndUpdate   ($hash, 1);
+
+  $hash->{".ptzhtml"} = "";                                                 # ptzPanel wird neu eingelesen in FWdetailFn
+     
+  Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getptzlistpreset
+#                            Parse PTZ-ListPresets   
+###############################################################################
+sub _parseGetptzlistpreset {                            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $presetcnt = $data->{'data'}->{'total'};
+  my $cnt       = 0;
+
+  # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
+  delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
+  my $home = "not set";
+  
+  while ($cnt < $presetcnt) {
+      my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
+      my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
+      $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
+      $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
+      my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
+      
+      if ($ptype) {
+          $home = $presname;
+      }
+      
+      $cnt += 1;
+  }
+
+  my @preskeys   = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
+  my $presetlist = join(",", @preskeys);
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Presets",    $presetlist);
+  readingsBulkUpdate  ($hash, "PresetHome", $home      );
+  readingsBulkUpdate  ($hash, "Errorcode",  "none"     );
+  readingsBulkUpdate  ($hash, "Error",      "none"     );
+  readingsEndUpdate   ($hash, 1);
+
+  addptzattr($name);                                                        # PTZ Panel neu erstellen
+             
+  Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getcapabilities 
+###############################################################################
+sub _parseGetcapabilities {                             ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $ptzfocus = $data->{'data'}{'ptzFocus'};
+  $ptzfocus    = $hrkeys{ptzFocus}{$ptzfocus};
+    
+  my $ptztilt  = $data->{'data'}{'ptzTilt'};
+  $ptztilt     = $hrkeys{ptzTilt}{$ptztilt};
+    
+  my $ptzzoom  = $data->{'data'}{'ptzZoom'};
+  $ptzzoom     = $hrkeys{ptzZoom}{$ptzzoom};
+    
+  my $ptzpan   = $data->{'data'}{'ptzPan'};
+  $ptzpan      = $hrkeys{ptzPan}{$ptzpan};                
+
+  my $ptziris  = $data->{'data'}{'ptzIris'};
+  $ptziris     = $hrkeys{ptzIris}{$ptziris};              
+
+  $data->{'data'}{'ptzHasObjTracking'} = jboolmap($data->{'data'}{'ptzHasObjTracking'});
+  $data->{'data'}{'audioOut'}          = jboolmap($data->{'data'}{'audioOut'});
+  $data->{'data'}{'ptzSpeed'}          = jboolmap($data->{'data'}{'ptzSpeed'});
+  $data->{'data'}{'ptzAbs'}            = jboolmap($data->{'data'}{'ptzAbs'});
+  $data->{'data'}{'ptzAutoFocus'}      = jboolmap($data->{'data'}{'ptzAutoFocus'});
+  $data->{'data'}{'ptzHome'}           = jboolmap($data->{'data'}{'ptzHome'});
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
+  readingsBulkUpdate ($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
+  readingsBulkUpdate ($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
+  readingsBulkUpdate ($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
+  readingsBulkUpdate ($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
+  readingsBulkUpdate ($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
+  readingsBulkUpdate ($hash,"CapPTZFocus",        $ptzfocus                            );
+  readingsBulkUpdate ($hash,"CapPTZIris",         $ptziris                             );
+  readingsBulkUpdate ($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
+  readingsBulkUpdate ($hash,"CapPTZPan",          $ptzpan                              );
+  readingsBulkUpdate ($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
+  readingsBulkUpdate ($hash,"CapPTZTilt",         $ptztilt                             );
+  readingsBulkUpdate ($hash,"CapPTZZoom",         $ptzzoom                             );
+  readingsBulkUpdate ($hash,"Errorcode",          "none"                               );
+  readingsBulkUpdate ($hash,"Error",              "none"                               );
+  readingsEndUpdate  ($hash, 1);
+  
+  Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getmotionenum 
+###############################################################################
+sub _parsegetmotionenum {                               ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $motdetsc           = $data->{'data'}{'MDParam'}{'source'};
+  $motdetsc              = $hrkeys{source}{$motdetsc};
+
+  my $sensitivity_camCap = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'});
+  my $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
+  my $sensitivity_ssCap  = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'});
+
+  my $threshold_camCap   = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'camCap'});
+  my $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
+  my $threshold_ssCap    = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'ssCap'});
+
+  my $percentage_camCap  = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'camCap'});
+  my $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
+  my $percentage_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'ssCap'});
+
+  my $objectSize_camCap  = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'camCap'});
+  my $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
+  my $objectSize_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'});
+
+  if ($motdetsc eq "Camera") {                    
+      if ($sensitivity_camCap) {
+          $motdetsc .= ", sensitivity: $sensitivity_value";
+      }
+      if ($threshold_camCap) {
+          $motdetsc .= ", threshold: $threshold_value";
+      }
+      if ($percentage_camCap) {
+          $motdetsc .= ", percentage: $percentage_value";
+      }
+      if ($objectSize_camCap) {
+          $motdetsc .= ", objectSize: $objectSize_value";
+      }
+  } 
+
+  if ($motdetsc eq "SVS") {                    
+      if ($sensitivity_ssCap) {
+          $motdetsc .= ", sensitivity: $sensitivity_value";
+      }
+      if ($threshold_ssCap) {
+          $motdetsc .= ", threshold: $threshold_value";
+      }
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "CamMotDetSc", $motdetsc);
+  readingsBulkUpdate  ($hash, "Errorcode",   "none"   );
+  readingsBulkUpdate  ($hash, "Error",       "none"   );
+  readingsEndUpdate   ($hash, 1);
+
+  Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode geteventlist 
+###############################################################################
+sub _parsegeteventlist {                                ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang      = AttrVal("global","language","EN"); 
+  
+  my $eventnum  = $data->{'data'}{'total'};
+  my $lrec      = $data->{'data'}{'events'}[0]{name};
+  my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
+
+  my ($lastrecstarttime,$lastrecstoptime);
+
+  if ($eventnum > 0) {
+      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
+      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+      
+      if($lang eq "DE") {
+          $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+      
+      } else {
+          $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+      }
+      
+      $lastrecstoptime                                      = $data->{'data'}{'events'}[0]{stopTime};
+      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
+      $lastrecstoptime                                      = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "CamEventNum",    $eventnum);
+  readingsBulkUpdate  ($hash, "CamLastRec",     $lrec) if($lrec); 
+  readingsBulkUpdate  ($hash, "CamLastRecId",   $lrecid) if($lrecid);                 
+  readingsBulkUpdate  ($hash, "CamLastRecTime", $lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
+  readingsBulkUpdate  ($hash, "Errorcode",      "none");
+  readingsBulkUpdate  ($hash, "Error",          "none");
+  readingsEndUpdate   ($hash, 1);
+
+  Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
+
+  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {        # Versand Aufnahme initiieren
+      __getRec($hash);
+  }
+
 return;
 }
 
