@@ -682,9 +682,8 @@ MQTT2_CLIENT_getStr($$)
 
     <a name="MQTT2_CLIENTdisconnectAfter"></a>
     <li>disconnectAfter &lt;seconds&gt;<br>
-      if set, the connection will be closed after &lt;seconds&gt; of inactivity
-      on the connection, and will be automatically reopened when sending a
-      command.
+      if set, the connection will be closed after &lt;seconds&gt; of
+      inactivity, and will be automatically reopened when sending a command.
       </li>
 
     <a name="MQTT2_CLIENTignoreRegexp"></a>
