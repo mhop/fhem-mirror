@@ -41,6 +41,7 @@ MQTT2_CLIENT_Initialize($)
     clientId
     disable:1,0
     disabledForIntervals
+    disconnectAfter
     ignoreRegexp
     lwt
     lwtRetain
@@ -164,6 +165,12 @@ MQTT2_CLIENT_doinit($)
         MQTT2_CLIENT_doPublish($hash, $r->[0], $r->[1], $r->[2], 0);
       }
     }
+    if($hash->{sendHash}) {
+      map { MQTT2_CLIENT_doPublish($hash,$_->[1],$_->[2],$_->[3]) }
+                @{$hash->{sendHash}};
+      delete($hash->{sendHash});
+    } 
+    MQTT2_CLIENT_updateDisconnectTimer($hash);
 
   }
 
@@ -211,8 +218,32 @@ MQTT2_CLIENT_Disco($;$$)
   }
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
   delete($hash->{BUF});
+
+  if($hash->{disconnectTimerHash}) {
+    readingsSingleUpdate($hash, "state", "disconnected", 1);
+    RemoveInternalTimer($hash->{disconnectTimerHash});
+    delete($hash->{disconnectTimerHash});
+  }
 }
 
+sub
+MQTT2_CLIENT_updateDisconnectTimer($)
+{
+  my ($hash) = @_;
+  return if(!$hash->{FD} || $hash->{connecting});
+  if($hash->{disconnectTimerHash}) {
+    RemoveInternalTimer($hash->{disconnectTimerHash});
+    delete($hash->{disconnectTimerHash});
+    delete($hash->{disconnectAt});
+  }
+  my $to = AttrVal($hash->{NAME}, "disconnectAfter", 0);
+  return if(!$to);
+  $to += time();
+  $hash->{disconnectAt} = FmtDateTime($to);
+  $hash->{disconnectTimerHash} = { h=>$hash };
+  InternalTimer($to, sub{ MQTT2_CLIENT_Disco($_[0]->{h},1) },
+        $hash->{disconnectTimerHash}, 0);
+}
 
 sub
 MQTT2_CLIENT_Delete($@)
@@ -268,6 +299,16 @@ MQTT2_CLIENT_Attr(@)
       delete $hash->{qosQueue};
       delete $hash->{qosMaxQueueLength};
     }
+  }
+
+  if($attrName eq "disconnectAfter") {
+    $hash->{devioLoglevel} = ($type eq "set" ? 5 : 0);
+    return undef if(!$init_done);
+    InternalTimer(0, sub {
+      MQTT2_CLIENT_updateDisconnectTimer($hash);
+      MQTT2_CLIENT_connect($hash)
+        if(!$hash->{FD} && ($type ne "set" || $param[0] eq "0"));
+    }, undef, 0);
   }
 
   return undef;
@@ -403,6 +444,7 @@ MQTT2_CLIENT_Read($@)
     }
     $val = substr($pl, $off);
     MQTT2_CLIENT_send($hash, pack("CCnC*", 0x40, 2, $pid)) if($qos); # PUBACK
+    MQTT2_CLIENT_updateDisconnectTimer($hash);
 
     if(!IsDisabled($name)) {
       $val = "" if(!defined($val));
@@ -441,6 +483,15 @@ MQTT2_CLIENT_doPublish($@)
   my $name = $hash->{NAME};
   return if(IsDisabled($name));
   $val = "" if(!defined($val));
+
+  if((!$hash->{FD} || $hash->{connecting}) &&
+        AttrVal($name, "disconnectAfter", undef)) {
+    $hash->{sendHash} = [] if(!defined($hash->{sendHash}));
+    push(@{$hash->{sendHash}}, \@_);
+    MQTT2_CLIENT_connect($hash) if(!$hash->{connecting});
+    return;
+  }
+  MQTT2_CLIENT_updateDisconnectTimer($hash);
 
   my $hdr = 0x30;
   my $pi = "";
@@ -628,6 +679,13 @@ MQTT2_CLIENT_getStr($$)
         <a href="#disabledForIntervals">disabledForIntervals</a><br>
       disable dispatching of messages.
       </li><br>
+
+    <a name="MQTT2_CLIENTdisconnectAfter"></a>
+    <li>disconnectAfter &lt;seconds&gt;<br>
+      if set, the connection will be closed after &lt;seconds&gt; of inactivity
+      on the connection, and will be automatically reopened when sending a
+      command.
+      </li>
 
     <a name="MQTT2_CLIENTignoreRegexp"></a>
     <li>ignoreRegexp<br>
