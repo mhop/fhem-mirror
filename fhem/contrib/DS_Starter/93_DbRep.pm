@@ -57,7 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
-  "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament, commandRef revised ",
+  "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament Forum: #114293, commandRef revised ",
   "8.40.7"  => "03.09.2020  rename getter dbValue to sqlCmdBlocking, consider attr timeout in function DbRep_sqlCmdBlocking (blocking function), commandRef revised ",
   "8.40.6"  => "27.08.2020  commandRef revised ",
   "8.40.5"  => "29.07.2020  fix crash if delEntries startet without any time limits, Forum:#113202 ",
@@ -6197,7 +6197,8 @@ sub sqlCmd_DoParse {
   # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
   my $vars = AttrVal($name, "sqlCmdVars", "");
   if ($vars) {
-      @pms = split(";",$vars);           
+      @pms = split(";",$vars); 
+	  
       for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
@@ -6217,23 +6218,21 @@ sub sqlCmd_DoParse {
   
   # Abarbeitung von Session Variablen vor einem SQL-Statement
   # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*(SET|PREPARE).*;/i) {   
-      @pms = split(";",$cmd);           
+  if($cmd =~ /^\s*SET.*;/i) {
+      @pms = split(";",$cmd); 
+      $sql = q{};
+ 	  
       for my $pm (@pms) {
           
-          if($pm !~ /SET|PREPARE/i) {
-              $sql = $pm.";";
+          if($pm !~ /SET/i) {
+              $sql .= $pm.";";
               next;
           }
           
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
           
-          if($pm =~ /SET/i) {
-              Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");
-          } else {
-              Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
-          }
+          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");
           
           eval {$dbh->do($pm);};
           if ($@) {
@@ -6247,23 +6246,48 @@ sub sqlCmd_DoParse {
   
   # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
   # wenn Pragmas im SQL vorangestellt sind
-  if($cmd =~ /^\s*(PRAGMA|PREPARE).*;/i) {   
-      @pms = split(";",$cmd);           
+  if($cmd =~ /^\s*PRAGMA.*;/i) {   
+      @pms = split(";",$cmd);
+      $sql = q{};
+	  
       for my $pm (@pms) {
           
-          if($pm !~ /PRAGMA|PREPARE/i) {
-              $sql = $pm.";";
+          if($pm !~ /PRAGMA/i) {
+              $sql .= $pm.";";
               next;
           }
           
           $pm = ltrim($pm).";";
           $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
           
-          if($pm =~ /PRAGMA/i) {
-              Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");
-          } else {
-              Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
+          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");
+          
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$sql|''|''|$err"; 
+          }      
+      }
+  }
+  
+  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293
+  # z.B. PREPARE statement FROM @CMD
+  if($sql =~ /^\s*PREPARE.*;/i) {   
+      @pms = split(";",$sql);
+      $sql = q{}; 	  
+      for my $pm (@pms) {
+          
+          if($pm !~ /PREPARE/i) {
+              $sql .= $pm.";";
+              next;
           }
+          
+          $pm = ltrim($pm).";";
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
           
           eval {$dbh->do($pm);};
           if ($@) {
@@ -6302,7 +6326,7 @@ sub sqlCmd_DoParse {
   my (@rows,$row,@head);
   my $nrows = 0;
   if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
-      @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};   # https://metacpan.org/pod/DBI#NAME1
+      @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
           push(@rows, $row);
