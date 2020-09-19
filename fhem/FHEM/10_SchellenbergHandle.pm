@@ -162,7 +162,7 @@ sub SchellenbergHandle_ProcessMsg {
 	if ($mt eq '1') {
 		# message counter > last known ?
 		$mc = hex($mc);
-		my $lastmc = $hash->{'.MC'} // hex($mc) -1;
+		my $lastmc = $hash->{'.MC'} // $mc -1;
 		my $diff;
 		{	
 			use integer; 
@@ -174,7 +174,7 @@ sub SchellenbergHandle_ProcessMsg {
 			#$hash->{'MISSED_PACKET'} += $lc;
 			readingsBeginUpdate($hash);
 			#readingsBulkUpdate($hash, '.mc', hex($mc));
-			$hash->{'.MC'} = hex($mc);
+			$hash->{'.MC'} = $mc;
 			readingsBulkUpdateIfChanged($hash, 'state', statefn($fn));
 			readingsBulkUpdateIfChanged($hash, 'alive', 'ok');
 			readingsBulkUpdate($hash, 'rssi', $rssi);
