@@ -27,56 +27,56 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use SetExtensions qw/ :all /;
 
-sub PIONEERAVRZONE_Get($@);
-sub PIONEERAVRZONE_Set($@);
-sub PIONEERAVRZONE_Attr($@);
-sub PIONEERAVRZONE_Define($$);
+sub PIONEERAVRZONE_Get;
+sub PIONEERAVRZONE_Set;
+sub PIONEERAVRZONE_Attr;
+sub PIONEERAVRZONE_Define;
 
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 ###################################
 sub
-PIONEERAVRZONE_Initialize($)
+PIONEERAVRZONE_Initialize
 {
-  my ($hash) = @_;
+    my ($hash) = @_;
 
-  $hash->{Match}     = ".+"; 
+    $hash->{Match}     = ".+"; 
   
-  $hash->{GetFn}     = "PIONEERAVRZONE_Get";
-  $hash->{SetFn}     = "PIONEERAVRZONE_Set";
-  $hash->{DefFn}     = "PIONEERAVRZONE_Define";
-  $hash->{ParseFn}   = "PIONEERAVRZONE_Parse";
+    $hash->{GetFn}     = "PIONEERAVRZONE_Get";
+    $hash->{SetFn}     = "PIONEERAVRZONE_Set";
+    $hash->{DefFn}     = "PIONEERAVRZONE_Define";
+    $hash->{ParseFn}   = "PIONEERAVRZONE_Parse";
 
-  $hash->{AttrFn}    = "PIONEERAVRZONE_Attr";
-  $hash->{AttrList}  = "IODev ".
+    $hash->{AttrFn}    = "PIONEERAVRZONE_Attr";
+    $hash->{AttrList}  = "IODev ".
                         $readingFnAttributes;
 }
 
 
 ###################################
 sub
-PIONEERAVRZONE_Changed($$$)
+PIONEERAVRZONE_Changed
 {
-        my ($hash, $cmd, $value)= @_;
+	my ($hash, $cmd, $value)= @_;
 
-        readingsBeginUpdate($hash);
-        my $state= $cmd;
+	readingsBeginUpdate($hash);
+	my $state= $cmd;
 
-        if(defined($value) && $value ne "") {
-          readingsBulkUpdate($hash, $cmd, $value);
-          $state.= " $value";
-        }
-        readingsBulkUpdate($hash, "state", $state);
-        readingsEndUpdate($hash, 1);
-        my $name= $hash->{NAME};
-        Log3 $hash, 4 , "PIONEERAVRZONE $name $state";
-        return $state;
+	if(defined($value) && $value ne "") {
+	  readingsBulkUpdate($hash, $cmd, $value);
+	  $state.= " $value";
+	}
+	readingsBulkUpdate($hash, "state", $state);
+	readingsEndUpdate($hash, 1);
+	my $name= $hash->{NAME};
+	Log3 $hash, 4 , "PIONEERAVRZONE $name $state";
+	return $state;
 }
 
 ###################################
 
 sub
-PIONEERAVRZONE_Get($@)
+PIONEERAVRZONE_Get
 {
         my ($hash, @a)= @_;
 
@@ -98,14 +98,12 @@ PIONEERAVRZONE_Get($@)
 
         my $v= IOWrite($hash, $cmd);
 
-#        return PIONEERAVRZONE_Changed($hash, $cmdname, $v);;
-		return undef;
+		return;
 }
-
 
 #############################
 sub
-PIONEERAVRZONE_Set($@)
+PIONEERAVRZONE_Set
 {
 	my ($hash, @a)= @_;
 	my @args= @a; shift @args; shift @args;
@@ -170,7 +168,7 @@ PIONEERAVRZONE_Set($@)
 			my $setCmd= $IOhash->{helper}{SETS}{$zone}{$cmd};
 			my $v= IOWrite($hash, $setCmd);
 			Log3  $hash, 5, "PIONEERAVR $name: Set_IOwrite($zone ... $cmd ): $setCmd";
-			return undef;
+			return;
 
 		### Power on
 		### Command: PO
@@ -180,7 +178,7 @@ PIONEERAVRZONE_Set($@)
 			Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
 			my $setCmd= "";
 			IOWrite($hash, $setCmd);
-			select(undef, undef, undef, 0.1);
+			sleep(0.1);
 
 			if ( $zone eq "zone2" ) {
 				$setCmd = "APO";
@@ -190,9 +188,9 @@ PIONEERAVRZONE_Set($@)
 				$setCmd =  "ZEO";
 			}
 			IOWrite($hash, $setCmd);
-			select(undef, undef, undef, 0.1);
+			sleep(0.1);
 			Log3  $hash, 5, "PIONEERAVR $name: Set_IOwrite: $setCmd";
-			return undef;				
+			return;				
 			
 		# statusRequest: execute all "get" commands	to update the readings
 		} elsif ( $cmd eq "statusRequest") {
@@ -200,7 +198,7 @@ PIONEERAVRZONE_Set($@)
 			foreach my $key ( keys %{$IOhash->{helper}{GETS}{$zone}} ) {
 				IOWrite($hash, $IOhash->{helper}{GETS}->{$zone}->{$key});
 			}
-			return undef;
+			return;
 		}
 		#### commands with argument(s)
 	} elsif(@a > 2) {
@@ -230,7 +228,7 @@ PIONEERAVRZONE_Set($@)
 				}
 			}
 
-			return undef;
+			return;
 		#####VolumeStraight (-80.5 - 12) in dB
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 		} elsif ( $cmd eq "volumeStraight" ) {
@@ -244,7 +242,7 @@ PIONEERAVRZONE_Set($@)
 			readingsBulkUpdate($hash, "volumeStraight", $arg );
 			readingsBulkUpdate($hash, "volume", sprintf "%d", ($a[2]+80)/0.8 );			
 			readingsEndUpdate($hash, 1);
-			return undef;
+			return;
 		####Volume (0 - 100) in %
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 		} elsif ( $cmd eq "volume" ) {
@@ -258,7 +256,7 @@ PIONEERAVRZONE_Set($@)
 			readingsBulkUpdate($hash, "volumeStraight", $zahl - 80 );				
 			readingsBulkUpdate($hash, "volume", sprintf "%d", $a[2] );				
 			readingsEndUpdate($hash, 1); 
-			return undef;
+			return;
 		####Mute (on|off|toggle)
 		####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV 
 		} elsif ( $cmd eq "mute" ) {
@@ -273,20 +271,19 @@ PIONEERAVRZONE_Set($@)
 			elsif ($arg eq "toggle") {
 				IOWrite($hash, $IOhash->{helper}{SETS}{$zone}{muteToggle});
 			}
-			return undef;
+			return;
 		} else {
 		return SetExtensions($hash, $list, $name, $cmd, @args);
 		}
 	} else {
 		return SetExtensions($hash, $list, $name, $cmd, @args);
 	}
-return undef;
-
+return;
 }
 
 #############################
 sub
-PIONEERAVRZONE_Parse($$)
+PIONEERAVRZONE_Parse
 {
   # we are called from dispatch() from the PIONEERAVR device
   # we never come here if $msg does not match $hash->{MATCH} in the first place
@@ -478,23 +475,22 @@ PIONEERAVRZONE_Parse($$)
 	}
 	return @matches if(@matches);
 	return "UNDEFINED PIONEERAVRZONE message1 $msg";  
-  
 }
 
 #####################################
 sub
-PIONEERAVRZONE_Attr($@)
+PIONEERAVRZONE_Attr
 {
 
   my @a = @_;
   my $hash= $defs{$a[1]};
 
-  return undef;
+  return;
 }
 
 #############################
 sub
-PIONEERAVRZONE_Define($$)
+PIONEERAVRZONE_Define
 {
 	my ($hash, $def) = @_;
 	my @a = split("[ \t]+", $def);
@@ -543,8 +539,7 @@ PIONEERAVRZONE_Define($$)
         $attr{$name}{devStateIcon} =
           'on:rc_GREEN:off off:rc_STOP:on absent:rc_RED';
     }
-	
-	return undef;
+	return;
 }
 #####################################
 #Function to show special chars (e.g. \n\r) in logs
