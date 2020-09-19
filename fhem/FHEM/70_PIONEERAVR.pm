@@ -66,20 +66,20 @@ sub PIONEERAVR_RCmakenotify($$);
 
 #####################################
 #Die Funktion wird von Fhem.pl nach dem Laden des Moduls aufgerufen
-# und bekommt einen Hash fï¿½r das Modul als zentrale Datenstruktur ï¿½bergeben.
+# und bekommt einen Hash für das Modul als zentrale Datenstruktur übergeben.
 # Dieser Hash wird im globalen Hash %modules gespeichert - hier $modules{PIONEERAVR}
-# Es handelt sich also nicht um den oben beschriebenen Hash der Gerï¿½teinstanzen sondern einen Hash,
-# der je Modul Werte enthï¿½lt, beispielsweise auch die Namen der Funktionen, die das Modul implementiert
+# Es handelt sich also nicht um den oben beschriebenen Hash der Geräteinstanzen sondern einen Hash,
+# der je Modul Werte enthält, beispielsweise auch die Namen der Funktionen, die das Modul implementiert
 # und die fhem.pl aufrufen soll. Die Initialize-Funktion setzt diese Funktionsnamen, in den Hash des Moduls
 #
-# Darï¿½ber hinaus sollten die vom Modul unterstï¿½tzen Attribute definiert werden
+# Darüber hinaus sollten die vom Modul unterstützen Attribute definiert werden
 # In Fhem.pl werden dann die entsprechenden Werte beim Aufruf eines attr-Befehls in die
-# globale Datenstruktur $attr{$name}, z.B. $attr{$name}{header} fï¿½r das Attribut header gespeichert.
-# Falls im Modul weitere Aktionen oder Prï¿½fungen beim Setzen eines Attributs nï¿½tig sind, dann kann
+# globale Datenstruktur $attr{$name}, z.B. $attr{$name}{header} für das Attribut header gespeichert.
+# Falls im Modul weitere Aktionen oder Prüfungen beim Setzen eines Attributs nötig sind, dann kann
 # die Funktion X_Attr implementiert und in der Initialize-Funktion bekannt gemacht werden.
 #
-# Die Variable $readingFnAttributes, die an die Liste der unterstï¿½tzten Attribute angefï¿½gt wird, definiert Attributnamen,
-# die dann verfï¿½gbar werden, wenn das Modul zum Setzen von Readings die Funktionen
+# Die Variable $readingFnAttributes, die an die Liste der unterstützten Attribute angefügt wird, definiert Attributnamen,
+# die dann verfügbar werden, wenn das Modul zum Setzen von Readings die Funktionen
 # readingsBeginUpdate, readingsBulkUpdate, readingsEndUpdate oder readingsSingleUpdate verwendet.
 # In diesen Funktionen werden Attribute wie event-min-interval oder auch event-on-change-reading ausgewertet
 
@@ -143,14 +143,14 @@ sub PIONEERAVR_Initialize($) {
 }
 
 ######################################
-#Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl fï¿½r ein Gerï¿½te ausgefï¿½hrt wird
+#Die Define-Funktion eines Moduls wird von Fhem aufgerufen wenn der Define-Befehl für ein Geräte ausgeführt wird
 # und das Modul bereits geladen und mit der Initialize-Funktion initialisiert ist. Sie ist typischerweise dazu da,
-# die ï¿½bergebenen Parameter zu prï¿½fen und an geeigneter Stelle zu speichern sowie
-# einen Kommunikationsweg zum Pioneer AV Receiver zu ï¿½ffnen (TCP-Verbindung bzw. RS232-Schnittstelle)
-#Als ï¿½bergabeparameter bekommt die Define-Funktion den Hash der Gerï¿½teinstanz sowie den Rest der Parameter, die im Befehl angegeben wurden.
+# die übergebenen Parameter zu prüfen und an geeigneter Stelle zu speichern sowie
+# einen Kommunikationsweg zum Pioneer AV Receiver zu öffnen (TCP-Verbindung bzw. RS232-Schnittstelle)
+#Als Übergabeparameter bekommt die Define-Funktion den Hash der Geräteinstanz sowie den Rest der Parameter, die im Befehl angegeben wurden.
 #
-# Damit die ï¿½bergebenen Werte auch anderen Funktionen zur Verfï¿½gung stehen und an die jeweilige Gerï¿½teinstanz gebunden sind,
-# werden die Werte typischerweise als Internals im Hash der Gerï¿½teinstanz gespeichert
+# Damit die übergebenen Werte auch anderen Funktionen zur Verfügung stehen und an die jeweilige Geräteinstanz gebunden sind,
+# werden die Werte typischerweise als Internals im Hash der Geräteinstanz gespeichert
 
 sub PIONEERAVR_Define($$) {
     my ( $hash, $a, $h ) = @_;
@@ -1031,7 +1031,7 @@ sub PIONEERAVR_Define($$) {
     "1C"=>"C",
     "1D"=>"F",
     "1E"=>"M",
-    "1F"=>"ï¿½",
+    "1F"=>"¯",
     "20"=>" ",
     "21"=>"!",
     "22"=>"\"",
@@ -1128,8 +1128,8 @@ sub PIONEERAVR_Define($$) {
     "7D"=>"}",
     "7E"=>"~",
     "7F"=>" ",
-    "80"=>"ï¿½",
-    "81"=>"ï¿½",
+    "80"=>"Œ",
+    "81"=>"œ",
     "82"=>"?",
     "83"=>"?",
     "84"=>"p",
@@ -1161,101 +1161,101 @@ sub PIONEERAVR_Define($$) {
     "9E"=>" ",
     "9F"=>" ",
     "A0"=>" ",
-    "A1"=>"ï¿½",
-    "A2"=>"ï¿½",
-    "A3"=>"ï¿½",
-    "A4"=>"ï¿½",
-    "A5"=>"ï¿½",
-    "A6"=>"ï¿½",
-    "A7"=>"ï¿½",
-    "A8"=>"ï¿½",
-    "A9"=>"ï¿½",
-    "AA"=>"ï¿½",
-    "AB"=>"ï¿½",
-    "AC"=>"ï¿½",
+    "A1"=>"¡",
+    "A2"=>"¢",
+    "A3"=>"£",
+    "A4"=>"¤",
+    "A5"=>"¥",
+    "A6"=>"¦",
+    "A7"=>"§",
+    "A8"=>"¨",
+    "A9"=>"©",
+    "AA"=>"ª",
+    "AB"=>"«",
+    "AC"=>"¬",
     "AD"=>"-",
-    "AE"=>"ï¿½",
-    "AF"=>"ï¿½",
-    "B0"=>"ï¿½",
-    "B1"=>"ï¿½",
-    "B2"=>"ï¿½",
-    "B3"=>"ï¿½",
-    "B4"=>"ï¿½",
-    "B5"=>"ï¿½",
-    "B6"=>"ï¿½",
-    "B7"=>"ï¿½",
-    "B8"=>"ï¿½",
-    "B9"=>"ï¿½",
-    "BA"=>"ï¿½",
-    "BB"=>"ï¿½",
-    "BC"=>"ï¿½",
-    "BD"=>"ï¿½",
-    "BE"=>"ï¿½",
-    "BF"=>"ï¿½",
-    "C0"=>"ï¿½",
-    "C1"=>"ï¿½",
-    "C2"=>"ï¿½",
-    "C3"=>"ï¿½",
-    "C4"=>"ï¿½",
-    "C5"=>"ï¿½",
-    "C6"=>"ï¿½",
-    "C7"=>"ï¿½",
-    "C8"=>"ï¿½",
-    "C9"=>"ï¿½",
-    "CA"=>"ï¿½",
-    "CB"=>"ï¿½",
-    "CC"=>"ï¿½",
-    "CD"=>"ï¿½",
-    "CE"=>"ï¿½",
-    "CF"=>"ï¿½",
-    "D0"=>"ï¿½",
-    "D1"=>"ï¿½",
-    "D2"=>"ï¿½",
-    "D3"=>"ï¿½",
-    "D4"=>"ï¿½",
-    "D5"=>"ï¿½",
-    "D6"=>"ï¿½",
-    "D7"=>"ï¿½",
-    "D8"=>"ï¿½",
-    "D9"=>"ï¿½",
-    "DA"=>"ï¿½",
-    "DB"=>"ï¿½",
-    "DC"=>"ï¿½",
-    "DD"=>"ï¿½",
-    "DE"=>"ï¿½",
-    "DF"=>"ï¿½",
-    "E0"=>"ï¿½",
-    "E1"=>"ï¿½",
-    "E2"=>"ï¿½",
-    "E3"=>"ï¿½",
-    "E4"=>"ï¿½",
-    "E5"=>"ï¿½",
-    "E6"=>"ï¿½",
-    "E7"=>"ï¿½",
-    "E8"=>"ï¿½",
-    "E9"=>"ï¿½",
-    "EA"=>"ï¿½",
-    "EB"=>"ï¿½",
-    "EC"=>"ï¿½",
-    "ED"=>"ï¿½",
-    "EE"=>"ï¿½",
-    "EF"=>"ï¿½",
-    "F0"=>"ï¿½",
-    "F1"=>"ï¿½",
-    "F2"=>"ï¿½",
-    "F3"=>"ï¿½",
-    "F4"=>"ï¿½",
-    "F5"=>"ï¿½",
-    "F6"=>"ï¿½",
-    "F7"=>"ï¿½",
-    "F8"=>"ï¿½",
-    "F9"=>"ï¿½",
-    "FA"=>"ï¿½",
-    "FB"=>"ï¿½",
-    "FC"=>"ï¿½",
-    "FD"=>"ï¿½",
-    "FE"=>"ï¿½",
-    "FF"=>"ï¿½"
+    "AE"=>"®",
+    "AF"=>"¯",
+    "B0"=>"°",
+    "B1"=>"±",
+    "B2"=>"²",
+    "B3"=>"³",
+    "B4"=>"´",
+    "B5"=>"µ",
+    "B6"=>"¶",
+    "B7"=>"·",
+    "B8"=>"¸",
+    "B9"=>"¹",
+    "BA"=>"º",
+    "BB"=>"»",
+    "BC"=>"¼",
+    "BD"=>"½",
+    "BE"=>"¾",
+    "BF"=>"¿",
+    "C0"=>"À",
+    "C1"=>"Á",
+    "C2"=>"Â",
+    "C3"=>"Ã",
+    "C4"=>"Ä",
+    "C5"=>"Å",
+    "C6"=>"Æ",
+    "C7"=>"Ç",
+    "C8"=>"È",
+    "C9"=>"É",
+    "CA"=>"Ê",
+    "CB"=>"Ë",
+    "CC"=>"Ì",
+    "CD"=>"Í",
+    "CE"=>"Î",
+    "CF"=>"ï",
+    "D0"=>"Ð",
+    "D1"=>"Ñ",
+    "D2"=>"Ò",
+    "D3"=>"Ó",
+    "D4"=>"Ô",
+    "D5"=>"Õ",
+    "D6"=>"Ö",
+    "D7"=>"×",
+    "D8"=>"Ø",
+    "D9"=>"Ù",
+    "DA"=>"Ú",
+    "DB"=>"Û",
+    "DC"=>"Ü",
+    "DD"=>"Ý",
+    "DE"=>"Þ",
+    "DF"=>"ß",
+    "E0"=>"à",
+    "E1"=>"á",
+    "E2"=>"â",
+    "E3"=>"ã",
+    "E4"=>"ä",
+    "E5"=>"å",
+    "E6"=>"æ",
+    "E7"=>"ç",
+    "E8"=>"è",
+    "E9"=>"é",
+    "EA"=>"ê",
+    "EB"=>"ë",
+    "EC"=>"ì",
+    "ED"=>"í",
+    "EE"=>"î",
+    "EF"=>"ï",
+    "F0"=>"ð",
+    "F1"=>"ñ",
+    "F2"=>"ò",
+    "F3"=>"ó",
+    "F4"=>"ô",
+    "F5"=>"õ",
+    "F6"=>"ö",
+    "F7"=>"÷",
+    "F8"=>"ø",
+    "F9"=>"ù",
+    "FA"=>"ú",
+    "FB"=>"û",
+    "FC"=>"ü",
+    "FD"=>"ý",
+    "FE"=>"þ",
+    "FF"=>"ÿ"
   };
 
   $hash->{helper}{CLEARONINPUTCHANGE} = {
@@ -1304,13 +1304,13 @@ sub PIONEERAVR_Define($$) {
 }
 
 #####################################
-#Die Undef-Funktion ist das Gegenstï¿½ck zur Define-Funktion und wird aufgerufen wenn ein Gerï¿½t mit delete gelï¿½scht wird
-# oder bei der Abarbeitung des Befehls rereadcfg, der ebenfalls alle Gerï¿½te lï¿½scht und danach das Konfigurationsfile neu abarbeitet.
-# Entsprechend mï¿½ssen in der Funktion typische Aufrï¿½umarbeiten durchgefï¿½hrt werden wie das saubere Schlieï¿½en von Verbindungen
-# oder das Entfernen von internen Timern sofern diese im Modul zum Pollen verwendet wurden (siehe spï¿½ter).
+#Die Undef-Funktion ist das Gegenstück zur Define-Funktion und wird aufgerufen wenn ein Gerät mit delete gelöscht wird
+# oder bei der Abarbeitung des Befehls rereadcfg, der ebenfalls alle Geräte löscht und danach das Konfigurationsfile neu abarbeitet.
+# Entsprechend müssen in der Funktion typische Aufräumarbeiten durchgeführt werden wie das saubere Schließen von Verbindungen
+# oder das Entfernen von internen Timern sofern diese im Modul zum Pollen verwendet wurden (siehe später).
 #
-#Zugewiesene Variablen im Hash der Gerï¿½teinstanz, Internals oder Readings mï¿½ssen hier nicht gelï¿½scht werden.
-# In fhem.pl werden die entsprechenden Strukturen beim Lï¿½schen der Gerï¿½teinstanz ohnehin vollstï¿½ndig gelï¿½scht.
+#Zugewiesene Variablen im Hash der Geräteinstanz, Internals oder Readings müssen hier nicht gelöscht werden.
+# In fhem.pl werden die entsprechenden Strukturen beim Löschen der Geräteinstanz ohnehin vollständig gelöscht.
 sub
 PIONEERAVR_Undef($$)
 {
@@ -1766,7 +1766,7 @@ PIONEERAVR_Set($@)
         } elsif ( $cmd eq "input" ) {
         Log3 $name, 5, "PIONEERAVR $name: set $cmd ".dq($arg);
         foreach my $key ( keys %{$hash->{helper}{INPUTNAMES}} ) {
-            if( defined $hash->{helper}{INPUTNAMES}->{$key}{aliasName} ) {
+             if( defined $hash->{helper}{INPUTNAMES}->{$key}{aliasName} ) {
                if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
                    PIONEERAVR_Write( $hash, sprintf "%02dFN", $key );
                } elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
@@ -1774,7 +1774,7 @@ PIONEERAVR_Set($@)
                }
             }
         }
-		return undef;
+        return undef;
 
         ####hdmiOut
         } elsif ( $cmd eq "hdmiOut" ) {
@@ -2513,13 +2513,13 @@ sub PIONEERAVR_Read($)
             } elsif ( $signalSelect eq '1' ) {
                 readingsBulkUpdate( $hash, "signalSelect", "analog" );
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: analog";
-            } elsif ( $signalSelect  eq '2' ) {
+            } elsif ( $signalSelect eq '2' ) {
                 readingsBulkUpdate( $hash, "signalSelect", "digital" );
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: digital";
             } elsif ( $signalSelect eq '3' ) {
                 readingsBulkUpdate( $hash, "signalSelect", "hdmi" );
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: hdmi";
-            } elsif ( $signalSelect  eq '9' ) {
+            } elsif ( $signalSelect eq '9' ) {
                 readingsBulkUpdate( $hash, "signalSelect", "cyclic" );
                 Log3 $hash, 5, "PIONEERAVR $name: ".dq( $line ) ." interpreted as: signalSelect: cycle";
             } else {
@@ -3730,31 +3730,31 @@ sub RC_layout_PioneerAVR() {
 <a name="PIONEERAVR"></a>
 <h3>PIONEERAVR</h3>
 <ul>
-  Dieses Modul erlaubt es einen Pioneer AV Receiver via Fhem zu steuern (nur die MAIN-Zone, etwaige andere Zonen kï¿½nnen mit dem Modul PIONEERAVRZONE gesteuert werden) wenn eine Datenverbindung via Ethernet oder RS232 hergestellt werden kann.
+  Dieses Modul erlaubt es einen Pioneer AV Receiver via Fhem zu steuern (nur die MAIN-Zone, etwaige andere Zonen können mit dem Modul PIONEERAVRZONE gesteuert werden) wenn eine Datenverbindung via Ethernet oder RS232 hergestellt werden kann.
   Es erlaubt Fhem
   <ul>
     <li>Den Receiver ein/auszuschalten</li>
-    <li>die Lautstï¿½rke zu ï¿½ndern</li>
-    <li>die Eingangsquelle auszuwï¿½hlen</li>
+    <li>die Lautstärke zu ändern</li>
+    <li>die Eingangsquelle auszuwählen</li>
     <li>und weitere Parameter zu kontrollieren</li>
   </ul>
   <br><br>
   Dieses Modul basiert auf der <a href="http://www.pioneerelectronics.com/StaticFiles/PUSA/Files/Home%20Custom%20Install/Elite%20&%20Pioneer%20FY14AVR%20IP%20&%20RS-232%207-31-13.zip">Pioneer documentation</a>
   und ist mit einem Pioneer AV Receiver VSX-923 von <a href="http://www.pioneer.de">Pioneer</a> getestet.
   <br><br>
-  Achtung: Dieses Modul benï¿½tigt die Perl-Module Device::SerialPort oder Win32::SerialPort
+  Achtung: Dieses Modul benötigt die Perl-Module Device::SerialPort oder Win32::SerialPort
   wenn die Datenverbindung via USB bzw. rs232 Port erfolgt.
   <br><br>
   Dieses Modul versucht
   <ul>
     <li>die Datenverbindung zwischen Fhem und Pioneer AV Receiver offen zu halten. Wenn die Verbindung abbricht, versucht das Modul
     einmal die Verbindung wieder herzustellen</li>
-    <li>Daten vom/zum Pioneer AV Receiver dem Modul PIONEERAVRZONE (fï¿½r die Kontrolle weiterer Zonen des Pioneer AV Receiver)
-    zur Verfï¿½gung zu stellen.</li>
+    <li>Daten vom/zum Pioneer AV Receiver dem Modul PIONEERAVRZONE (für die Kontrolle weiterer Zonen des Pioneer AV Receiver)
+    zur Verfügung zu stellen.</li>
   </ul>
-  Solange die Datenverbindung zwischen Fhem und dem Pioneer AV Receiver offen ist, kann kein anderes Gerï¿½t (z.B. ein Smartphone)
+  Solange die Datenverbindung zwischen Fhem und dem Pioneer AV Receiver offen ist, kann kein anderes Gerät (z.B. ein Smartphone)
   auf dem gleichen Port eine Verbindung zum Pioneer AV Receiver herstellen.
-  Einige Pioneer AV Receiver bieten mehr als einen Port fï¿½r die Datenverbindung an. Pioneer empfiehlt Port 23 sowie 49152-65535, "Invalid number:00000,08102".
+  Einige Pioneer AV Receiver bieten mehr als einen Port für die Datenverbindung an. Pioneer empfiehlt Port 23 sowie 49152-65535, "Invalid number:00000,08102".
   <br><br>
   <a name="PIONEERAVRdefine"></a>
   <b>Define</b>
@@ -3764,10 +3764,10 @@ sub RC_layout_PioneerAVR() {
     <code>define &lt;name&gt; PIONEERAVR serial &lt;SerialDevice&gt;[&lt;@BaudRate&gt;]</code>
     <br><br>
 
-    Definiert ein Fhem device fï¿½r einen Pioneer AV Receiver (Kommunikationsschnittstelle und Steuerung der Main - Zone). Die Schlï¿½sselwï¿½rter <code>telnet</code> bzw.
-    <code>serial</code> sind fix. Der Standard Port fï¿½r die Ethernet Verbindung bei Pioneer AV Receiver ist 23
-    (laut der oben angefï¿½hrten Pioneer Dokumentation) - oder 8102 (laut Fhem-Forumsberichten).<br>
-    Note: PIONEERAVRZONE-Devices zur Steuerung der Zone2, Zone3 und/oder HD-Zone werden per autocreate beim Eintreffen der ersten Nachricht fï¿½r eine der Zonen erzeugt.
+    Definiert ein Fhem device für einen Pioneer AV Receiver (Kommunikationsschnittstelle und Steuerung der Main - Zone). Die Schlüsselwörter <code>telnet</code> bzw.
+    <code>serial</code> sind fix. Der Standard Port für die Ethernet Verbindung bei Pioneer AV Receiver ist 23
+    (laut der oben angeführten Pioneer Dokumentation) - oder 8102 (laut Fhem-Forumsberichten).<br>
+    Note: PIONEERAVRZONE-Devices zur Steuerung der Zone2, Zone3 und/oder HD-Zone werden per autocreate beim Eintreffen der ersten Nachricht für eine der Zonen erzeugt.
     <br><br>
 
     Beispiele:
@@ -3786,31 +3786,31 @@ sub RC_layout_PioneerAVR() {
     <br><br>
     "was" ist eines von
     <li><b>bass <-6 ... 6></b> - Bass von -6dB bis + 6dB (funktioniert nur wenn tone = on und der ListeningMode es erlaubt)</li>
-    <li><b>channel <1 ... 9></b> - Setzt den Tuner Preset ("gespeicherten Sender"). Nur verfï¿½gbar, wenn Input = 2 (Tuner), wie in http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV beschrieben</li>
-    <li><b>channelDown</b> - Setzt den nï¿½chst niedrigeren Tuner Preset ("gespeicherten Sender"). Wenn vorher channel = 2, so wird nachher channel = 1. Nur verfï¿½gbar, wenn Input = 2 (Tuner).</li>
-    <li><b>channelStraight <A1...G9></b> - </li> Setzt den Tuner Preset ("gespeicherten Sender") mit Werten, wie sie im Display des Pioneer AV Receiver angezeigt werden (z.B. A1). Nur verfï¿½gbar, wenn Input = 2 (Tuner).
-    <li><b>channelUp</b> - Setzt den nï¿½chst hï¿½heren Tuner Preset ("gespeicherten Sender"). Nur verfï¿½gbar, wenn Input = 2 (Tuner).</li>
-    <li><b>down</b> - "Pfeiltaste nach unten". Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>enter</b> - "Eingabe" - Entspricht der "Enter-Taste" der Fernbedienung. Fï¿½r die gleichen Eingangsquellen wie "play"</li>
+    <li><b>channel <1 ... 9></b> - Setzt den Tuner Preset ("gespeicherten Sender"). Nur verfügbar, wenn Input = 2 (Tuner), wie in http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV beschrieben</li>
+    <li><b>channelDown</b> - Setzt den nächst niedrigeren Tuner Preset ("gespeicherten Sender"). Wenn vorher channel = 2, so wird nachher channel = 1. Nur verfügbar, wenn Input = 2 (Tuner).</li>
+    <li><b>channelStraight <A1...G9></b> - </li> Setzt den Tuner Preset ("gespeicherten Sender") mit Werten, wie sie im Display des Pioneer AV Receiver angezeigt werden (z.B. A1). Nur verfügbar, wenn Input = 2 (Tuner).
+    <li><b>channelUp</b> - Setzt den nächst höheren Tuner Preset ("gespeicherten Sender"). Nur verfügbar, wenn Input = 2 (Tuner).</li>
+    <li><b>down</b> - "Pfeiltaste nach unten". Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>enter</b> - "Eingabe" - Entspricht der "Enter-Taste" der Fernbedienung. Für die gleichen Eingangsquellen wie "play"</li>
     <li><b>eq <on|off></b> - Schalten den Equalizer ein oder aus.</li>
-    <li><b>fwd</b> - Schnellvorlauf. Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>hdmiOut <1+2|1|2|off></b> - Schaltet die HDMI-Ausgï¿½nge 1 und/oder 2 des Pioneer AV Receivers ein bzw. aus.</li>
-    <li><b>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle></b> - Schaltet die Eingangsquelle (z.B. CD, HDMI 1,...) auf die Ausgï¿½nge der Main-Zone. Die Liste der verfï¿½gbaren (also der nicht deaktivierten)
-    Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen. Wurden die Eingï¿½nge am Pioneer AV Receiver umbenannt, wird der neue Name des Eingangs angezeigt.</li>
-    <li><b>inputDown</b> - vorherige Eingangsquelle der Main Zone auswï¿½hlen</li>
+    <li><b>fwd</b> - Schnellvorlauf. Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>hdmiOut <1+2|1|2|off></b> - Schaltet die HDMI-Ausgänge 1 und/oder 2 des Pioneer AV Receivers ein bzw. aus.</li>
+    <li><b>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle></b> - Schaltet die Eingangsquelle (z.B. CD, HDMI 1,...) auf die Ausgänge der Main-Zone. Die Liste der verfügbaren (also der nicht deaktivierten)
+    Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen. Wurden die Eingänge am Pioneer AV Receiver umbenannt, wird der neue Name des Eingangs angezeigt.</li>
+    <li><b>inputDown</b> - vorherige Eingangsquelle der Main Zone auswählen</li>
     <li><b>inputSkip <inputName> [0|1]</b> - Aktiviert/deaktiviert den Input <inputName> (0: aktiviert <inputName>, 1: deaktiviert <inputName>)</li>
-    <li><b>inputUp</b> - nï¿½chste Eingangsquelle der Main Zone auswï¿½hlen</li>
-    <li><b>left</b> - "Pfeiltaste nach links". Fï¿½r die gleichen Eingangsquellen wie "play"</li>
+    <li><b>inputUp</b> - nächste Eingangsquelle der Main Zone auswählen</li>
+    <li><b>left</b> - "Pfeiltaste nach links". Für die gleichen Eingangsquellen wie "play"</li>
     <li><b>listeningMode</b> - Setzt einen ListeningMode, z.B. autoSourround, direct, action,...</li>
     <li><b>mcaccMemory <1...6></b> - Setzt einen der bis zu 6 gespeicherten MCACC Einstellungen der Main Zone</li>
-    <li><b>menu</b> - "Menu-Taste" der Fernbedienung. Fï¿½r die gleichen Eingangsquellen wie "play"</li>
+    <li><b>menu</b> - "Menu-Taste" der Fernbedienung. Für die gleichen Eingangsquellen wie "play"</li>
     <li><b>mute <on|off|toggle></b> - Stummschalten der Main Zone des Pioneer AV Receivers. "mute = on" bedeutet: stumm</li>
     <li><b>networkStandby <on|off></b> -  Schaltet Network standby ein oder aus. Um einen Pioneer AV Receiver mit diesem Modul aus dem Standby einzuschalten, muss Network Standby = on sein. Mit <code>set &lt;name&gt; networkStandby on</code> sollte sich das machen lassen.</li>
-    <li><b>next</b> -  fï¿½r die gleichen Eingangsquellen wie "play"</li>
+    <li><b>next</b> -  für die gleichen Eingangsquellen wie "play"</li>
     <li><b>off</b> - Ausschalten der Main Zone in den Standby Modus.</li>
     <li><b>on</b> - Einschalten der Main Zone aus dem Standby Modus. Das funktioniert nur, wenn am Pioneer AV Receiver "Network Standby" "on" eingestellt ist. Siehe dazu auch "networkStandby" weiter unten.</li>
-    <li><b>pause</b> - Unterbricht die Wiedergabe fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>play</b> - Startet die Wiedergabe fï¿½r folgende Eingangsquellen:
+    <li><b>pause</b> - Unterbricht die Wiedergabe für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>play</b> - Startet die Wiedergabe für folgende Eingangsquellen:
     <ul>
         <li>usbDac</li>
         <li>ipodUsb</li>
@@ -3825,8 +3825,8 @@ sub RC_layout_PioneerAVR() {
         <li>mhl</li>
     </ul>
     </li>
-    <li><b>prev</b> - Wechselt zum vorherigen Titel. Fï¿½r die gleichen Eingangsquellen wie "play".</li>
-    <li><b>raw <PioneerKommando></b> - Sendet den Befehl <code><PioneerKommando></code> unverï¿½ndert an den Pioneer AV Receiver. Eine Liste der verfï¿½gbaren Pioneer Kommandos ist in dem Link zur Pioneer Dokumentation oben enthalten</li>
+    <li><b>prev</b> - Wechselt zum vorherigen Titel. Für die gleichen Eingangsquellen wie "play".</li>
+    <li><b>raw <PioneerKommando></b> - Sendet den Befehl <code><PioneerKommando></code> unverändert an den Pioneer AV Receiver. Eine Liste der verfügbaren Pioneer Kommandos ist in dem Link zur Pioneer Dokumentation oben enthalten</li>
     <li><b>renameInputAlias <inputName> <neuerInputAlias></b> - Gibt dem Eingang <inputName> am Pioneer AV Receiver (und in diesem Modul) den neuen Namen <neuerInputAlias></li>
     <li><b>remoteControl <attr></b> -  wobei <attr> eines von folgenden sein kann:
     <ul>
@@ -3841,37 +3841,37 @@ sub RC_layout_PioneerAVR() {
         <li>hdmiOutputParameter</li>
         <li>videoParameter</li>
         <li>homeMenu</li>
-        Simuliert die Tasten der Fernbedienung. Achtung: mit cursorXX kï¿½nnen die Eingï¿½nge nicht beeinflusst werden -> set <name> up ... kann zur Steuerung der Inputs verwendet werden.
+        Simuliert die Tasten der Fernbedienung. Achtung: mit cursorXX können die Eingänge nicht beeinflusst werden -> set <name> up ... kann zur Steuerung der Inputs verwendet werden.
     </ul>
     </li>
     <li><b>reopen</b> - Versucht die Datenverbindung zwischen Fhem und dem Pioneer AV Receiver wieder herzustellen</li>
-    <li><b>repeat</b> - Wiederholung fï¿½r folgende Eingangsquellen: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer. Wechselt zyklisch zwischen
+    <li><b>repeat</b> - Wiederholung für folgende Eingangsquellen: AdapterPort, Ipod, Favorites, InternetRadio, MediaServer. Wechselt zyklisch zwischen
       <ul>
         <li>keine Wiederholung</li>
         <li>Wiederholung des aktuellen Titels</li>
         <li>Wiederholung aller Titel</li>
       </ul>
     </li>
-    <li><b>return</b> - "Zurï¿½ck"... Entspricht der "Return-Taste" der Fernbedienung. Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>rev</b> -  "Rï¿½ckwï¿½rtssuchlauf". Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>right</b> - "Pfeiltaste nach rechts". Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>selectLine01 - selectLine08</b> -  fï¿½r die gleichen Eingangsquellen wie "play".Wird am Bildschirm ein Pioneer-Menu angezeigt, kann hiermit die gewï¿½nschte Zeile direkt angewï¿½hlt werden</li>
-    <li><b>shuffle</b> - Zufï¿½llige Wiedergabe fï¿½r die gleichen Eingangsquellen wie "repeat". Wechselt zyklisch zwischen Zufallswiedergabe "ein" und "aus".</li>
-    <li><b>signalSelect <auto|analog|digital|hdmi|cycle></b> - Setzt den zu verwendenden Eingang (bei Eingï¿½ngen mit mehreren Anschlï¿½ssen) </li>
-    <li><b>speakers <off|A|B|A+B></b> - Schaltet die Lautsprecherausgï¿½nge ein/aus.</li>
+    <li><b>return</b> - "Zurück"... Entspricht der "Return-Taste" der Fernbedienung. Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>rev</b> -  "Rückwärtssuchlauf". Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>right</b> - "Pfeiltaste nach rechts". Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>selectLine01 - selectLine08</b> -  für die gleichen Eingangsquellen wie "play".Wird am Bildschirm ein Pioneer-Menu angezeigt, kann hiermit die gewünschte Zeile direkt angewählt werden</li>
+    <li><b>shuffle</b> - Zufällige Wiedergabe für die gleichen Eingangsquellen wie "repeat". Wechselt zyklisch zwischen Zufallswiedergabe "ein" und "aus".</li>
+    <li><b>signalSelect <auto|analog|digital|hdmi|cycle></b> - Setzt den zu verwendenden Eingang (bei Eingängen mit mehreren Anschlüssen) </li>
+    <li><b>speakers <off|A|B|A+B></b> - Schaltet die Lautsprecherausgänge ein/aus.</li>
     <li><b>standingWave <on|off></b> - Schaltet Standing Wave der Main Zone aus/ein</li>
     <li><b>statusRequest</b> - Fragt Informationen vom Pioneer AV Receiver ab und aktualisiert die readings entsprechend</li>
-    <li><b>stop</b> - Stoppt die Wiedergabe fï¿½r die gleichen Eingangsquellen wie "play"</li>
+    <li><b>stop</b> - Stoppt die Wiedergabe für die gleichen Eingangsquellen wie "play"</li>
     <li><b>toggle</b> - Ein/Ausschalten der Main Zone in/von Standby</li>
     <li><b>tone <on|bypass></b> - Schaltet die Klangsteuerung ein bzw. auf bypass</li>
-    <li><b>treble <-6 ... 6></b> - Hï¿½hen (treble) von -6dB bis + 6dB (funktioniert nur wenn tone = on und der ListeningMode es erlaubt)</li>
-    <li><b>up</b> - "Pfeiltaste nach oben". Fï¿½r die gleichen Eingangsquellen wie "play"</li>
-    <li><b>volume <0 ... 100></b> - Lautstï¿½rke der Main Zone in % der Maximallautstï¿½rke</li>
-    <li><b>volumeDown</b> - Lautstï¿½rke der Main Zone um 0.5dB verringern</li>
-    <li><b>volumeUp</b> - Lautstï¿½rke der Main Zone um 0.5dB erhï¿½hen</li>
-    <li><b>volumeStraight<-80.5 ... 12></b> - Direktes Einstellen der Lautstï¿½rke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
+    <li><b>treble <-6 ... 6></b> - Höhen (treble) von -6dB bis + 6dB (funktioniert nur wenn tone = on und der ListeningMode es erlaubt)</li>
+    <li><b>up</b> - "Pfeiltaste nach oben". Für die gleichen Eingangsquellen wie "play"</li>
+    <li><b>volume <0 ... 100></b> - Lautstärke der Main Zone in % der Maximallautstärke</li>
+    <li><b>volumeDown</b> - Lautstärke der Main Zone um 0.5dB verringern</li>
+    <li><b>volumeUp</b> - Lautstärke der Main Zone um 0.5dB erhöhen</li>
+    <li><b>volumeStraight<-80.5 ... 12></b> - Direktes Einstellen der Lautstärke der Main Zone mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
 
-    <li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;blink&gt;</code> ) werden unterstï¿½tzt</li>
+    <li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;blink&gt;</code> ) werden unterstützt</li>
    <br><br>
     Beispiel:
     <ul>
@@ -3880,8 +3880,8 @@ sub RC_layout_PioneerAVR() {
     <br>
     <code>set &lt;name&gt; reopen</code>
     <br><br>
-    Schlieï¿½t und ï¿½ffnet erneut die Datenverbindung von Fhem zum Pioneer AV Receiver.
-    Kann nï¿½tzlich sein, wenn die Datenverbindung nicht automatisch wieder hergestellt werden kann.
+    Schließt und öffnet erneut die Datenverbindung von Fhem zum Pioneer AV Receiver.
+    Kann nützlich sein, wenn die Datenverbindung nicht automatisch wieder hergestellt werden kann.
     <br><br>
   </ul>
 
@@ -3891,9 +3891,9 @@ sub RC_layout_PioneerAVR() {
   <ul>
     <code>get &lt;name&gt; raw &lt;Befehl&gt;</code>
     <br><br>
-    liefert bei diesem Modul keine Werte zurï¿½ck, sondern fragt den Pioneer AVR  nach dem aktuellen Status (z.B. der Lautstï¿½rke). Sobald der Pioneer AVR antwortet (die Zeit, bis der Pioneer AVR antwortet, ist nicht vorhersehbar), aktualisiert das Modul die Readings bzw. Internals des PioneerAVR devices.
-    Falls unten keine Beschreibung fï¿½r das "get-Kommando" angefï¿½hrt ist, siehe gleichnamiges "Set-Kommando"
-    <li><b>loadInputNames</b> - liest die Namen der Eingangsquellen vom Pioneer AV Receiver und ï¿½berprï¿½ft, ob sie aktiviert sind</li>
+    liefert bei diesem Modul keine Werte zurück, sondern fragt den Pioneer AVR  nach dem aktuellen Status (z.B. der Lautstärke). Sobald der Pioneer AVR antwortet (die Zeit, bis der Pioneer AVR antwortet, ist nicht vorhersehbar), aktualisiert das Modul die Readings bzw. Internals des PioneerAVR devices.
+    Falls unten keine Beschreibung für das "get-Kommando" angeführt ist, siehe gleichnamiges "Set-Kommando"
+    <li><b>loadInputNames</b> - liest die Namen der Eingangsquellen vom Pioneer AV Receiver und überprüft, ob sie aktiviert sind</li>
     <li><b>audioInfo</b> - Holt die aktuellen Audio Parameter vom Pioneer AV receiver (z.B. audioInputSignal, audioInputFormatXX, audioOutputFrequency)</li>
     <li><b>display</b> - Aktualisiert das reading 'display' und 'displayPrevious' mit der aktuellen Anzeige des Displays Pioneer AV Receiver</li>
     <li><b>bass</b> - aktualisiert das reading 'bass'</li>
@@ -3913,10 +3913,10 @@ sub RC_layout_PioneerAVR() {
     <li><b>signalSelect</b> - </li>
     <li><b>softwareVersion</b> - Fragt den Pioneer AV Receiver nach der aktuell im Receiver verwendeten Software Version und speichert diese als INTERNAL</li>
     <li><b>speakers</b> - </li>
-    <li><b>speakerSystem</b> - Fragt die aktuell verwendete Lautsprecheranwendung vom Pioneer AV Receiver ab. Mï¿½gliche Werte sind z.B. "ZONE 2", "Normal(SB/FH)", "5.1ch C+Surr Bi-Amp",...</li>
+    <li><b>speakerSystem</b> - Fragt die aktuell verwendete Lautsprecheranwendung vom Pioneer AV Receiver ab. Mögliche Werte sind z.B. "ZONE 2", "Normal(SB/FH)", "5.1ch C+Surr Bi-Amp",...</li>
     <li><b>tone</b> - </li>
     <li><b>tunerFrequency</b> - Fragt die aktuell eingestellte Frequenz des Tuners ab</li>
-    <li><b>tunerChannelNames</b> - Sollten fï¿½r die Tuner Presets Namen im Pioneer AV Receiver gespeichert sein, werden sie hiermit abgefragt</li>
+    <li><b>tunerChannelNames</b> - Sollten für die Tuner Presets Namen im Pioneer AV Receiver gespeichert sein, werden sie hiermit abgefragt</li>
     <li><b>treble</b> - </li>
     <li><b>volume</b> - </li>
   </ul>
@@ -3927,23 +3927,23 @@ sub RC_layout_PioneerAVR() {
   <br><br>
     <ul>
     <li>
-        <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pingt den Pioneer AV Receiver alle X Sekunden um den Datenverbindungsstatus zu ï¿½berprï¿½fen. Standard: 60 Sekunden.
+        <b>connectionCheck</b> &nbsp;&nbsp;1..120,off&nbsp;&nbsp; Pingt den Pioneer AV Receiver alle X Sekunden um den Datenverbindungsstatus zu überprüfen. Standard: 60 Sekunden.
     </li>
     <li>
         <b> timeout</b> &nbsp;&nbsp;1,2,3,4,5,7,10,15&nbsp;&nbsp;Zeit in Sekunden, innerhalb der der Pioneer AV Receiver auf einen Ping antwortet. Standard: 3 Sekunden.
     </li>
     <li>
         <b>statusUpdateStart &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) beim Start des Moduls. 
-           Mit "disable" lï¿½sst sich das Status Update abschalten, FHEM startet schneller, das Pioneer Modul zeigt eventuell nicht korrekte readings.
+           Mit "disable" lässt sich das Status Update abschalten, FHEM startet schneller, das Pioneer Modul zeigt eventuell nicht korrekte readings.
     </li>
     <li><b>statusUpdateReconnect &lt;enable|disable&gt;</b> - Ein-/Ausschalten des Status Updates (lesen aller Parameter vom Pioneer AV Receiver, dauert bis zu einer Minute) nach dem Wiederherstellen der Datenverbindung zum Pioneer AV Receiver.
-    Mit "disable" lï¿½sst sich das Status Update abschalten, FHEM bleibt reaktiver beim reconnect, das Pioneer Modul zeigt eventuell nicht korrekte readings.</li>
-    <li><b>logTraffic &lt;loglevel&gt;</b> - Ermï¿½glicht das Protokollieren ("Loggen") der Datenkommunikation vom/zum Pioneer AV Receiver.
-    Steuerzeichen werden angezeigt z.B. ein doppelter Rï¿½ckwï¿½rts-Schrï¿½gstrich wird als einfacher Rï¿½ckwï¿½rts-Schrï¿½gstrich angezeigt,
-    \n wird fï¿½r das Steuerzeichen "line feed" angezeigt, etc.</li>
-    <li><b><a href="#verbose">verbose</a></b> - Beeinflusst die Menge an Informationen, die dieses Modul protokolliert. 0: mï¿½glichst wenig in die Fhem Logdatei schreiben, 5: mï¿½glichst viel in die Fhem Logdatei schreiben</li>
-    <li><b>volumeLimit &lt;0 ... 100&gt;</b> -  beschrï¿½nkt die maximale Lautstï¿½rke (in %). Selbst wenn manuell am Pioneer AV Receiver eine hï¿½her Lautstï¿½rke eingestellt wird, regelt Fhem die Lautstï¿½rke auf volumeLimit zurï¿½ck.</li>
-    <li><b>volumeLimitStraight &lt; -80 ... 12&gt;</b> -  beschrï¿½nkt die maximale Lautstï¿½rke (Werte wie am Display des Pioneer AV Receiver angezeigt). Selbst wenn manuell am Pioneer AV Receiver eine hï¿½her Lautstï¿½rke eingestellt wird, regelt Fhem die Lautstï¿½rke auf volumeLimit zurï¿½ck.</li>
+    Mit "disable" lässt sich das Status Update abschalten, FHEM bleibt reaktiver beim reconnect, das Pioneer Modul zeigt eventuell nicht korrekte readings.</li>
+    <li><b>logTraffic &lt;loglevel&gt;</b> - Ermöglicht das Protokollieren ("Loggen") der Datenkommunikation vom/zum Pioneer AV Receiver.
+    Steuerzeichen werden angezeigt z.B. ein doppelter Rückwärts-Schrägstrich wird als einfacher Rückwärts-Schrägstrich angezeigt,
+    \n wird für das Steuerzeichen "line feed" angezeigt, etc.</li>
+    <li><b><a href="#verbose">verbose</a></b> - Beeinflusst die Menge an Informationen, die dieses Modul protokolliert. 0: möglichst wenig in die Fhem Logdatei schreiben, 5: möglichst viel in die Fhem Logdatei schreiben</li>
+    <li><b>volumeLimit &lt;0 ... 100&gt;</b> -  beschränkt die maximale Lautstärke (in %). Selbst wenn manuell am Pioneer AV Receiver eine höher Lautstärke eingestellt wird, regelt Fhem die Lautstärke auf volumeLimit zurück.</li>
+    <li><b>volumeLimitStraight &lt; -80 ... 12&gt;</b> -  beschränkt die maximale Lautstärke (Werte wie am Display des Pioneer AV Receiver angezeigt). Selbst wenn manuell am Pioneer AV Receiver eine höher Lautstärke eingestellt wird, regelt Fhem die Lautstärke auf volumeLimit zurück.</li>
   </ul>
   <br><br>
   <b>Generated Readings/Events:</b>
@@ -3962,11 +3962,11 @@ sub RC_layout_PioneerAVR() {
         <li><b>display</b> - Text, der aktuell im Display des Pioneer AV Receivers angezeigt wird</li>
         <li><b>displayPrevious</b> - Zuletzt im Display angezeigter Text</li>
         <li><b>eq</b> - Status des Equalizers des Pioneer AV Receivers (on|off)</li>
-        <li><b>hdmiOut</b> - welche HDMI-Ausgï¿½nge sind aktiviert?</li>
-        <li><b>input</b> - welcher Eingang ist ausgewï¿½hlt</li>
-        <li><b>inputsList</b> - Mit ":" getrennte Liste der aktivierten/verfï¿½gbaren Eingï¿½nge</li>
-        <li><b>listeningMode</b> - Welcher Hï¿½rmodus (Listening Mode) ist eingestellt</li>
-        <li><b>listeningModePlaying</b> - Welcher Hï¿½rmodus (Listening Mode) wird aktuell verwendet</li>
+        <li><b>hdmiOut</b> - welche HDMI-Ausgänge sind aktiviert?</li>
+        <li><b>input</b> - welcher Eingang ist ausgewählt</li>
+        <li><b>inputsList</b> - Mit ":" getrennte Liste der aktivierten/verfügbaren Eingänge</li>
+        <li><b>listeningMode</b> - Welcher Hörmodus (Listening Mode) ist eingestellt</li>
+        <li><b>listeningModePlaying</b> - Welcher Hörmodus (Listening Mode) wird aktuell verwendet</li>
         <li><b>mcaccMemory</b> - MCACC Voreinstellung</li>
         <li><b>mute</b> - Stummschaltung</li>
         <li><b>power</b> - Main Zone eingeschaltet oder in Standby?</li>
@@ -3975,31 +3975,31 @@ sub RC_layout_PioneerAVR() {
         <li><b>screenHirarchy</b> - Hierarchie des aktuell angezeigten On Screen Displays (OSD)</li>
         <li><b>screenLine01...08</b> - Inhalt der Zeile 01...08 des OSD</li>
         <li><b>screenLineHasFocus</b> - Welche Zeile des OSD hat den Fokus?</li>
-        <li><b>screenLineNumberFirst</b> - Lange Listen werden im OSD zu einzelnen Seiten mit je 8 Zeilen angezeigt. Die oberste Zeile im OSD reprï¿½sentiert welche Zeile in der gesamten Liste?</li>
-        <li><b>screenLineNumberLast</b> - Lange Listen werden im OSD zu einzelnen Seiten mit je 8 Zeilen angezeigt. Die unterste Zeile im OSD reprï¿½sentiert welche Zeile in der gesamten Liste?</li>
+        <li><b>screenLineNumberFirst</b> - Lange Listen werden im OSD zu einzelnen Seiten mit je 8 Zeilen angezeigt. Die oberste Zeile im OSD repräsentiert welche Zeile in der gesamten Liste?</li>
+        <li><b>screenLineNumberLast</b> - Lange Listen werden im OSD zu einzelnen Seiten mit je 8 Zeilen angezeigt. Die unterste Zeile im OSD repräsentiert welche Zeile in der gesamten Liste?</li>
         <li><b>screenLineNumbersTotal</b> - Wie viele Zeilen hat die im OSD anzuzeigende Liste insgesamt?</li>
         <li><b>screenLineNumbers</b> - Wie viele Zeilen hat das OSD</li>
         <li><b>screenLineType01...08</b> - Welchen Typs ist die Zeile 01...08? Z.B. "directory", "Now playing", "current Artist",...</li>
         <li><b>screenName</b> - Name des OSD</li>
-        <li><b>screenReturnKey</b> - Steht die "Return-Taste" in diesem OSD zur Verfï¿½gung?</li>
-        <li><b>screenTopMenuKey</b> - Steht die "Menu-Taste" in diesem OSD zur Verfï¿½gung?</li>
-        <li><b>screenToolsKey</b> - Steht die "Tools-Taste" (Menu, Edit, iPod control) in diesem OSD zur Verfï¿½gung?</li>
+        <li><b>screenReturnKey</b> - Steht die "Return-Taste" in diesem OSD zur Verfügung?</li>
+        <li><b>screenTopMenuKey</b> - Steht die "Menu-Taste" in diesem OSD zur Verfügung?</li>
+        <li><b>screenToolsKey</b> - Steht die "Tools-Taste" (Menu, Edit, iPod control) in diesem OSD zur Verfügung?</li>
         <li><b>screenType</b> - Typ des OSD, z.B. "message", "List", "playing(play)",...</li>
-        <li><b>speakerSystem</b> - Zeigt, wie die hinteren Surround-Lautsprecheranschlï¿½sse und die B-Lautsprecheranschlï¿½sse verwendet werden</li>
-        <li><b>speakers</b> - Welche Lautsprecheranschlï¿½sse sind aktiviert?</li>
-        <li><b>standingWave</b> - Einstellung der Steuerung stark resonanter tiefer Frequenzen im Hï¿½rraum</li>
+        <li><b>speakerSystem</b> - Zeigt, wie die hinteren Surround-Lautsprecheranschlüsse und die B-Lautsprecheranschlüsse verwendet werden</li>
+        <li><b>speakers</b> - Welche Lautsprecheranschlüsse sind aktiviert?</li>
+        <li><b>standingWave</b> - Einstellung der Steuerung stark resonanter tiefer Frequenzen im Hörraum</li>
         <li>
-          <b>state</b> - Wird beim Verbindungsaufbau von Fhem mit dem Pioneer AV Receiver gesetzt. Mï¿½gliche Werte sind disconnected, innitialized, off, on, opened
+          <b>state</b> - Wird beim Verbindungsaufbau von Fhem mit dem Pioneer AV Receiver gesetzt. Mögliche Werte sind disconnected, innitialized, off, on, opened
         </li>
         <li>
           <b>stateAV</b> - Status aus der Sicht des USers: Kombiniert die readings presence, power, mute und playStatus zu einem Status (on|off|absent|stopped|playing|paused|fast-forward|fast-rewind).
         </li>
         <li><b>tone</b> - Ist die Klangsteuerung eingeschalten?</li>
-        <li><b>treble</b> - Einstellung des Hï¿½henreglers</li>
+        <li><b>treble</b> - Einstellung des Höhenreglers</li>
         <li><b>tunerFrequency</b> - Tunerfrequenz</li>
-        <li><b>volume</b> - Eingestellte Lautstï¿½rke (0%-100%)</li>
-        <li><b>volumeStraight</b> - Eingestellte Lautstï¿½rke, so wie sie auch am Display des Pioneer AV Receivers angezeigt wird</li>
-        <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Aktiviert/deaktiviert alternative Lautst?eeinstellung fï¿½r Gerate, die keine direktes Setzen der Lautst?e zulassen (z.B. VSX-52x/VSX-82x)</li>
+        <li><b>volume</b> - Eingestellte Lautstärke (0%-100%)</li>
+        <li><b>volumeStraight</b> - Eingestellte Lautstärke, so wie sie auch am Display des Pioneer AV Receivers angezeigt wird</li>
+        <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Aktiviert/deaktiviert alternative Lautst?eeinstellung für Gerate, die keine direktes Setzen der Lautst?e zulassen (z.B. VSX-52x/VSX-82x)</li>
     </ul>
     <br/><br/>
 </ul>

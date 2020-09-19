@@ -350,11 +350,11 @@ PIONEERAVRZONE_Parse($$)
 				# APRX
 				# X = 0: Power on; X = 1: Power off
 				} elsif ( $msg =~ m/^APR(0|1)$/  ) {
-					if ($1 == "0") {
+					if ($1 eq '0') {
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Power: on";	
-						} elsif ($1 == "1") {
+						} elsif ($1 eq '1') {
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone2 - Power: off";
@@ -412,11 +412,11 @@ PIONEERAVRZONE_Parse($$)
 				# BPRX
 				# X = 0: Power on; X = 1: Power off
 				} elsif ( $msg =~ m/^BPR(0|1)$/  ) {
-					if ($1 == "0") {
+					if ($1 eq '0') {
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone3 - Power: on";	
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
-					} elsif ($1 == "1") {
+					} elsif ($1 eq '1') {
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: Zone3 - Power: off";	
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
@@ -453,11 +453,11 @@ PIONEERAVRZONE_Parse($$)
 				# ZEPX
 				# X = 0: Power on; X = 1: Power off
 				} elsif ( $msg =~ m/^ZEP(0|1)$/ ) {
-					if ($1 == "0") {
+					if ($1 eq '0') {
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Power: on";	
 						readingsBulkUpdate($hash, "power", "on" );
 						$state = "on";
-					} elsif ($1 == "1") {
+					} elsif ($1 eq '1') {
 						Log3 $hash,5,"PIONEERAVRZONE $name: ".dq($msg) ." interpreted as: hdZone - Power: off";	
 						readingsBulkUpdate($hash, "power", "off" );
 						$state = "off";
