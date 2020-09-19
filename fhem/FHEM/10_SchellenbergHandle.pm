@@ -166,7 +166,7 @@ sub SchellenbergHandle_ProcessMsg {
 		my $diff;
 		{	
 			use integer; 
-			$diff = (0x10000 + hex($mc) - $lastmc) & 0xFFFF;
+			$diff = (0x10000 +$mc -$lastmc) & 0xFFFF;
 		};
 		if ($diff == 0) {
 			return;
