@@ -35,7 +35,7 @@ use GPUtils qw(:all);
 
 use Time::HiRes qw(gettimeofday);
 use Time::Local qw(timelocal);
-use JSON qw(decode_json encode_json);
+use JSON qw(decode_json encode_json to_json);
 use Digest::SHA qw(hmac_sha256_hex sha1_hex);
 use Encode qw(encode_utf8);
 use MIME::Base64;
@@ -620,7 +620,7 @@ sub Set {
 
     # preferences
     elsif ( grep { $a[1] =~ /$_/x } @preferences ) {
-        my $item = $1;
+        my $item = $a[1];
         my %params;
 
         Log3( $name, 4, "BOTVAC set $name $arg" );
@@ -783,7 +783,7 @@ sub SendCommand {
     else {
         Log3( $name, 4, "BOTVAC $name: REQ $service/$cmd" );
     }
-    Log3( $name, 4, "BOTVAC $name: REQ option $option" )
+    Log3( $name, 4, "BOTVAC $name: REQ option " . (ref($option) eq 'HASH' ? to_json($option) : $option) )
       if ( defined($option) );
     LogSuccessors( $hash, @successor );
 
@@ -1858,14 +1858,8 @@ sub CheckRegistration {
         my @nextCmd = ( $service, $cmd, $option );
         unshift( @successor, [ $service, $cmd, $option ] );
 
-        my @succ_item;
-        my $msg = " successor:";
-        for ( my $i = 0 ; $i < @successor ; $i++ ) {
-            @succ_item = @{ $successor[$i] };
-            $msg .= " $i: ";
-            $msg .= join( ",", map { defined($_) ? $_ : '' } @succ_item );
-        }
-        Log3( $name, 4, "BOTVAC created" . $msg );
+        Log3( $name, 4, "BOTVAC $name: register account" );
+        LogSuccessors( $hash, @successor );
 
         SendCommand( $hash, "sessions", undef, undef, @successor )
           if ( ReadingsVal( $name, ".accessToken", "" ) eq "" );
@@ -2138,7 +2132,9 @@ sub LogSuccessors {
     for ( my $i = 0 ; $i < @successor ; $i++ ) {
         @succ_item = @{ $successor[$i] };
         $msg .= " $i: ";
-        $msg .= join( ",", map { defined($_) ? $_ : '' } @succ_item );
+        $msg .= join( ",",
+            map { defined($_) ? ( ref($_) eq 'HASH' ? to_json($_) : $_ ) : '' }
+              @succ_item );
     }
     Log3( $name, 4, $msg ) if ( @successor > 0 );
 
