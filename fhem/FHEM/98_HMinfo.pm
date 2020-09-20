@@ -65,7 +65,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."hmManualOper:0_auto,1_manual "
                        ."configDir configFilename configTempFile "
                        ."hmDefaults "
-                       ."verbCULHM:multiple,allSet,allGet,none "
+                       ."verbCULHM:multiple,none,allSet,allGet,allSetVerb,allGetVerb "
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
 }
@@ -1218,10 +1218,10 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
   $doAli = 0;#set default
-  Log3 $hash,3,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
-  if (@a && ($a[0] =~ m/^(-[dcasev]+)/)){# options provided
+  Log3 $hash,4,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
+  if (@a && ($a[0] =~ m/^(-[dcivpase2]+)/)){# options provided
     $opt = $1;
-    $a[0] =~ s/^(-[dcasev]*)//;
+    $a[0] =~ s/^(-[dcivpase2]*)//;
     $optEmpty = ($opt =~ m/e/)?1:0;
     shift @a if($a[0] || $a[0] =~ m/^[ ]*$/); #remove
   }
