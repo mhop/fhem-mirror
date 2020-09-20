@@ -1792,7 +1792,7 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                      ,threeStateSensor =>{ peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [actor|remote|both]"}
                      ,THSensor         =>{ peerChan       =>"0 -actChn- [({single})] [({set}|unset)] [actor|remote|both]"}
                      ,virtual          =>{ peerChan       =>"-btnNumber- -actChn- [({single}|dual|reverse)] [({set}|unset)] [(actor|remote|{both})]"
-                                          ,press          =>"[(long|{short})] [(noBurst)] [(-repCount-|{0})] [(-repDelay-|{0.25})]" 
+                                          ,press          =>"[(long|{short})] [(-peer-|{all})] [(noBurst|{Burst})] [(-repCount-|{0})] [(-repDelay-|{0.25})]" 
                                           ,postEvent      =>"-condition-"
                                          }
                      ,smokeDetector    =>{ peerChan       =>"-btnNumber- -actChn- [({single})] [({set}|unset)] [({actor})]"}
