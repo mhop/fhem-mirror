@@ -250,9 +250,20 @@ sub HMinfo_Notify(@){##########################################################
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
   if (grep /INITIALIZED/,@{$events}){
-    HMinfo_SetFn($hash,$name,"loadConfig") if ( substr(AttrVal($name, "autoLoadArchive", 0),0,1) ne 0);    
+    HMinfo_init();
   }
   return undef;
+}
+sub HMinfo_init(){#############################################################
+  RemoveInternalTimer("HMinfo_init");# just to be secure...
+  if (defined $modules{CUL_HM}{helper}{initDone} && $modules{CUL_HM}{helper}{initDone}){
+    my ($hm) = devspec2array("TYPE=HMinfo");
+    HMinfo_SetFn($defs{$hm},$hm,"loadConfig") if ( substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0);    
+    $modules{HMinfo}{helper}{initDone} = 1;
+  }
+  else{
+    InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
+  }
 }
 sub HMinfo_status($){##########################################################
   # - count defined HM entities, selected readings, errors on filtered readings
@@ -768,7 +779,7 @@ sub HMinfo_applTxt2Check($) { #################################################
   $ret =~ s/$_/$chkIds{$_}{txt}/g foreach(keys %chkIds); 
   return $ret;
 }
-sub HMinfo_getTxt2Check($) { #################################################
+sub HMinfo_getTxt2Check($) { ##################################################
   my $id = shift;
   if(defined $chkIds{$id}){
     return ($chkIds{$id}{Fkt}
@@ -1218,7 +1229,7 @@ sub HMinfo_GetFn($@) {#########################################################
   my ($opt,$optEmpty,$filter) = ("",1,"");
   my $ret;
   $doAli = 0;#set default
-  Log3 $hash,4,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
+  Log3 $hash,2,"HMinfo $name get:$cmd :".join(",",@a) if ($cmd && $cmd ne "?");
   if (@a && ($a[0] =~ m/^(-[dcivpase2]+)/)){# options provided
     $opt = $1;
     $a[0] =~ s/^(-[dcivpase2]*)//;
@@ -1413,19 +1424,22 @@ sub HMinfo_GetFn($@) {#########################################################
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
-
-    if ($hash->{CL}){
-      $defs{$name}{helper}{cfgChkResult} = "";
-      my $id = ++$hash->{nb}{cnt};
-      my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
-                            "HMinfo_bpPost", 30, 
-                            "HMinfo_bpAbort", "$name:0");
-      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-      $ret = "";
+    if($modules{HMinfo}{helper}{initDone}){
+      if ($hash->{CL}){
+        $defs{$name}{helper}{cfgChkResult} = "";
+        my $id = ++$hash->{nb}{cnt};
+        my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
+                              "HMinfo_bpPost", 30, 
+                              "HMinfo_bpAbort", "$name:0");
+        $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+        $ret = "";
+      }
+      else{
+        (undef,undef,undef,$ret) = split(";",HMinfo_configCheck (join(",",("$name;;",$opt,$filter))),4);
+        $ret = HMinfo_bpPost("$name;;;$ret");
+      }
     }
     else{
-      (undef,undef,undef,$ret) = split(";",HMinfo_configCheck (join(",",("$name;;",$opt,$filter))),4);
-      $ret = HMinfo_bpPost("$name;;;$ret");
     }
   }
   elsif($cmd eq "configChkResult"){##check peers and register------------------
@@ -2167,6 +2181,7 @@ sub HMinfo_loadConfig($$@) {####################################################
   my @rUpdate;
   my @tmplList = (); #collect template definitions
   
+  $modules{HMinfo}{helper}{initDone} = 0; #supress configCheck while loading
   my ($cntTStart,$cntDef,$cntSet,$cntEWT,$cntPBulk,$cntRBulk) = (0,0,0,0,0,0);
   while(<rFile>){
     chomp;
@@ -2263,6 +2278,15 @@ sub HMinfo_loadConfig($$@) {####################################################
   }
   
   close(rFile);
+  foreach ( @tmplList){
+    my @tmplCmd = split("=>",$_);
+    next if (!defined $tmplCmd[4]);
+    delete $HMConfig::culHmTpl{$tmplCmd[1]};
+    my $r = HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
+    $cntDef++;
+  }
+  $tmplDefChange = 0;# all changes are obsolete
+  $tmplUsgChange = 0;# all changes are obsolete
   foreach my $eN (keys %changes){
     foreach my $reg (keys %{$changes{$eN}}){
       $defs{$eN}{READINGS}{$reg}{VAL}  = $changes{$eN}{$reg}{d};
@@ -2279,15 +2303,6 @@ sub HMinfo_loadConfig($$@) {####################################################
   $ret .= "\nadded data:\n     "          .join("\n     ",@el)       if (scalar@el);
   $ret .= "\nfile data incomplete:\n     ".join("\n     ",@elincmpl) if (scalar@elincmpl);
   $ret .= "\nentries not defind:\n     "  .join("\n     ",@entryNF)  if (scalar@entryNF);
-  foreach ( @tmplList){
-    my @tmplCmd = split("=>",$_);
-    next if (!defined $tmplCmd[4]);
-    delete $HMConfig::culHmTpl{$tmplCmd[1]};
-    my $r = HMinfo_templateDef($tmplCmd[1],$tmplCmd[2],$tmplCmd[3],split(" ",$tmplCmd[4]));
-    $cntDef++;
-  }
-  $tmplDefChange = 0;# all changes are obsolete
-  $tmplUsgChange = 0;# all changes are obsolete
   foreach my $tmpN(devspec2array("TYPE=CUL_HM")){
     $defs{$tmpN}{helper}{tmplChg} = 0 if(!$defs{$tmpN}{helper}{role}{vrt});
     CUL_HM_setTmplDisp($defs{$tmpN});#set readings if desired    
@@ -2299,7 +2314,7 @@ sub HMinfo_loadConfig($$@) {####################################################
       }
     }
   }
-  Log3 $hash,4,"HMinfo load config file"
+  Log3 $hash,4,"HMinfo load config file:$fName"
                ."\n     templateReDefinition:$cntTStart"
                ."\n     templateDef:$cntDef"
                ."\n     templateSet:$cntSet"
@@ -2307,7 +2322,8 @@ sub HMinfo_loadConfig($$@) {####################################################
                ."\n     peerListUpdate:$cntPBulk"
                ."\n     regListUpdate:$cntRBulk"
                ;
-  HMinfo_GetFn($hash,$hash->{NAME},"templateChk");
+  $modules{HMinfo}{helper}{initDone} = 1; #enable configCheck again
+  HMinfo_GetFn($hash,$hash->{NAME},"configCheck");
   return $ret;
 }
 sub HMinfo_purgeConfig($) {####################################################
