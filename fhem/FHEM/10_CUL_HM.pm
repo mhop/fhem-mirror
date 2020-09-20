@@ -550,9 +550,8 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_setAssotiat($name);
   }
   delete $modules{CUL_HM}{helper}{updtCfgLst};
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  HMinfo_GetFn($defs{$hm},$hm,"configCheck") if(defined $hm && !$modules{CUL_HM}{helper}{hmManualOper});
-
+  $modules{CUL_HM}{helper}{initDone} = 1;# we made init once - now we are operational. Check with HMInfo as well
+  ## configCheck will be issues by HMInfo once
 }
 
 sub CUL_HM_Define($$) {##############################
@@ -3578,6 +3577,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
+          CUL_HM_cfgStateDelay($mhp->{cHash}{NAME});
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3601,6 +3601,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       
       if($data eq "00"){#update finished for mStp 05. Now update display
         CUL_HM_updtRegDisp($fHash,$list,$peerID);
+        CUL_HM_cfgStateDelay($fName);
       }
       else{
         my $regLNp = "RegL_".$list.".".$peer;
@@ -3633,7 +3634,10 @@ sub CUL_HM_parseCommon(@){#####################################################
             $shdwReg =~ s/ $a:..// if ($shdwReg);# confirmed: remove from shadow
           }
           CUL_HM_UpdtReadSingle($fHash,$regLN,$rCur,0);
-          CUL_HM_updtRegDisp($fHash,$list,$peerID) if ($mhp->{mStp} eq "04");
+          if ($mhp->{mStp} eq "04"){
+            CUL_HM_updtRegDisp($fHash,$list,$peerID);
+            CUL_HM_cfgStateDelay($fName);
+          }
         }
       }
       $ret= "parsed"; # send ACK 
@@ -7356,6 +7360,7 @@ sub CUL_HM_pushConfig($$$$$$$$@) {#generate messages to config data to register
     }
     #########
   }
+  CUL_HM_cfgStateDelay($hash->{NAME});
   if ($changed){
     CUL_HM_complConfig($hash->{NAME},1);
     CUL_HM_qAutoRead($hash->{NAME},3) ;
@@ -8718,7 +8723,10 @@ sub CUL_HMTmplSetParam($){
       my @pv = split(" ",$defs{$name}{helper}{tmpl}{$t});
       my $pCnt = 0;     #parameter count
       $t =~ s/[:>]/_/g; # replace illegal chars for command
+      next if(!defined $HMConfig::culHmTpl{$tn}||
+              !defined $HMConfig::culHmTpl{$tn}{p});
       my $tnH = $HMConfig::culHmTpl{$tn};
+      
       for my $pm (split(" ",$tnH->{p})){
         my ($reg1) = map{(my $foo = $_) =~ s/:.*//; $foo;}
                      grep/p$pCnt/,
@@ -8869,11 +8877,11 @@ sub CUL_HM_updtRegDisp($$$) {
     CUL_HM_SD_2($hash) if ($list == 0);
   }
 
-  CUL_HM_cfgStateDelay($name);
 }
 sub CUL_HM_cfgStateDelay($) {#update cfgState timer 
   my $name = shift;
   $name = CUL_HM_getDeviceName($name);
+#  stacktrace();
   RemoveInternalTimer("cfgStateUpdate:$name");
   if (InternalVal($name,"protCmdPend","none"   ) eq "none"){
     CUL_HM_cfgStateUpdate("cfgStateUpdate:$name");
@@ -8929,6 +8937,7 @@ sub CUL_HM_refreshRegs($){ # renew all register readings from Regl_
       delete $defs{$name}{READINGS}{$_};# peer for This List not found
     }
   }
+  CUL_HM_cfgStateDelay($name);
 }
 
 #############################
