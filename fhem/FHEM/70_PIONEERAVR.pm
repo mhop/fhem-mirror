@@ -1337,7 +1337,7 @@ sub PIONEERAVR_Undef {
     RemoveInternalTimer($hash);
 
     # deleting port for clients
-    foreach my $d ( sort keys %defs ) {
+    for my $d ( sort keys %defs ) {
         if (   defined( $defs{$d} )
             && defined( $defs{$d}{IODev} )
             && $defs{$d}{IODev} == $hash )
@@ -1399,7 +1399,7 @@ sub PIONEERAVR_Notify {
 
     # work on global events related to us
     if ( $devName eq "global" ) {
-        foreach my $change ( @{ $dev->{CHANGED} } ) {
+        for my $change ( @{ $dev->{CHANGED} } ) {
             if (   $change !~ /^(\w+)\s(\w+)\s?(\w*)\s?(.*)$/
                 || $2 ne $name )
             {
@@ -1441,7 +1441,7 @@ sub PIONEERAVR_Notify {
 
     readingsBeginUpdate($hash);
 
-    foreach my $change ( @{ $dev->{CHANGED} } ) {
+    for my $change ( @{ $dev->{CHANGED} } ) {
 
         # DISCONNECTED
         if ( $change eq "DISCONNECTED" ) {
@@ -1593,7 +1593,7 @@ sub PIONEERAVR_Set {
 
 # get all input names (preferable the aliasName) of the enabled inputs for the drop down list of "set <device> input xxx"
     my @listInputNames = ();
-    foreach my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
+    for my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
         if ( defined( $hash->{helper}{INPUTNAMES}->{$key}{enabled} ) ) {
             if ( $hash->{helper}{INPUTNAMES}->{$key}{enabled} eq "1" ) {
                 if ( $hash->{helper}{INPUTNAMES}{$key}{aliasName} ) {
@@ -1820,7 +1820,7 @@ sub PIONEERAVR_Set {
         }
         elsif ( $cmd eq "input" ) {
             Log3 $name, 5, "PIONEERAVR $name: set $cmd " . dq($arg);
-            foreach my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
+            for my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
                 if ( defined $hash->{helper}{INPUTNAMES}->{$key}{aliasName} ) {
                     if (
                         $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg )
@@ -1839,7 +1839,7 @@ sub PIONEERAVR_Set {
         }
         elsif ( $cmd eq "hdmiOut" ) {
             Log3 $name, 5, "PIONEERAVR $name: set $cmd " . dq($arg);
-            foreach my $key ( keys %{ $hash->{helper}{HDMIOUT} } ) {
+            for my $key ( keys %{ $hash->{helper}{HDMIOUT} } ) {
                 if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
                     Log3 $name, 5,
                         "PIONEERAVR $name: set $cmd "
@@ -1861,7 +1861,7 @@ sub PIONEERAVR_Set {
         }
         elsif ( $cmd eq "listeningMode" ) {
             Log3 $name, 5, "PIONEERAVR $name: set $cmd " . dq($arg);
-            foreach my $key ( keys %{ $hash->{helper}{LISTENINGMODES} } ) {
+            for my $key ( keys %{ $hash->{helper}{LISTENINGMODES} } ) {
                 if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
                     Log3 $name, 5,
                         "PIONEERAVR $name: set $cmd "
@@ -1916,11 +1916,11 @@ sub PIONEERAVR_Set {
             # PioneerAVR expects values between 000 - 185
         }
         elsif ( $cmd eq "volume" ) {
-            if ( AttrVal( $name, "volumeLimit", 100 ) < $arg ) {
+			if ( AttrVal( $name, "volumeLimit", 100 ) < $arg ) {
                 $arg = AttrVal( $name, "volumeLimit", 100 );
             }
             Log3 $name, 5, "PIONEERAVR $name: set $cmd " . dq($arg);
-            my $pioneerVol = sprintf "%d", $arg * 1.85;
+             my $pioneerVol = sprintf "%.0f", $arg * 1.85;
             if ( AttrVal( $name, "alternateVolumeControl", "disable" ) eq
                 "enable" )
             {
@@ -2177,7 +2177,7 @@ sub PIONEERAVR_Set {
             Log3 $name, 5,
 "PIONEERAVR $name: set $cmd for inputName: $arg new name: $arg2 !";
             my $inputToChange = undef;
-            foreach my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
+            for my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
                 if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
                     $inputToChange = sprintf "%02d", $key;
                 }
@@ -2201,7 +2201,7 @@ sub PIONEERAVR_Set {
             Log3 $name, 5,
               "PIONEERAVR $name: set $cmd for inputName: $arg skip: $arg2 !";
             my $inputToChange = undef;
-            foreach my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
+            for my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
                 if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
                     $inputToChange = sprintf "%02d", $key;
                 }
@@ -2308,7 +2308,7 @@ sub PIONEERAVR_Get {
     }
     elsif ( !defined( $hash->{helper}{GETS}{main}{$cmd} ) ) {
         my $gets = "";
-        foreach my $key ( keys %{ $hash->{helper}{GETS}{main} } ) {
+        for my $key ( keys %{ $hash->{helper}{GETS}{main} } ) {
             $gets .= $key . ":noArg ";
         }
         return
@@ -2395,7 +2395,7 @@ sub PIONEERAVR_Read {
             my $volume_st = $volume / 2 - 80.5;
             my $volume_vl = $volume / 1.85;
             readingsBulkUpdate( $hash, "volumeStraight", $volume_st );
-            readingsBulkUpdate( $hash, "volume", sprintf "%d", $volume_vl );
+            readingsBulkUpdate( $hash, "volume", sprintf "%.0f", $volume_vl );
             Log3 $name, 5,
                 "PIONEERAVR $name: "
               . dq($line)
@@ -2664,14 +2664,14 @@ m/^(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(
             $hash->{helper}{main}{CURINPUTNR} = $inputNr;
 
             # clear screen information on input change...
-            foreach my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
+            for my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
                 readingsBulkUpdate( $hash,
                     $hash->{helper}{CLEARONINPUTCHANGE}->{$key}, "" );
                 Log3 $hash, 5,
 "PIONEERAVR $name: Main Input change ... clear screen... reading:"
                   . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
             }
-            foreach my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
+            for my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
                 readingsBulkUpdate( $hash,
                     $hash->{helper}{CLEARONINPUTCHANGE}->{$key}, "" );
                 Log3 $hash, 5,
@@ -4193,8 +4193,8 @@ sub PIONEERAVR_statusUpdate {
 
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_statusUpdate()";
 
-    foreach my $zone ( keys %{ $hash->{helper}{GETS} } ) {
-        foreach my $key ( keys %{ $hash->{helper}{GETS}{$zone} } ) {
+    for my $zone ( keys %{ $hash->{helper}{GETS} } ) {
+        for my $key ( keys %{ $hash->{helper}{GETS}{$zone} } ) {
             PIONEERAVR_Write( $hash, $hash->{helper}{GETS}->{$zone}->{$key} );
             sleep(0.1);
         }

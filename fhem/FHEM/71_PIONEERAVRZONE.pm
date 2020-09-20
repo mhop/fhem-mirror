@@ -126,7 +126,7 @@ sub PIONEERAVRZONE_Set {
 
 # get all input names (preferable the aliasName) of the enabled inputs for the drop down list of "set <device> input xxx"
     my @listInputNames = ();
-    foreach my $key ( keys %{ $IOhash->{helper}{INPUTNAMES} } ) {
+    for my $key ( keys %{ $IOhash->{helper}{INPUTNAMES} } ) {
         if ( defined( $IOhash->{helper}{INPUTNAMES}->{$key}{enabled} ) ) {
             if ( $IOhash->{helper}{INPUTNAMES}->{$key}{enabled} eq "1" ) {
                 if ( $IOhash->{helper}{INPUTNAMES}{$key}{aliasName} ) {
@@ -201,7 +201,7 @@ sub PIONEERAVRZONE_Set {
         }
         elsif ( $cmd eq "statusRequest" ) {
             Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
-            foreach my $key ( keys %{ $IOhash->{helper}{GETS}{$zone} } ) {
+            for my $key ( keys %{ $IOhash->{helper}{GETS}{$zone} } ) {
                 IOWrite( $hash, $IOhash->{helper}{GETS}->{$zone}->{$key} );
             }
             return;
@@ -215,7 +215,7 @@ sub PIONEERAVRZONE_Set {
         if ( $cmd eq "input" ) {
 
             Log3 $name, 5, "PIONEERAVRZONE $name: set $cmd " . dq($arg);
-            foreach my $key ( keys %{ $IOhash->{helper}{INPUTNAMES} } ) {
+            for my $key ( keys %{ $IOhash->{helper}{INPUTNAMES} } ) {
                 if ( $IOhash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg )
                 {
                     if ( $zone eq "zone2" ) {
@@ -255,15 +255,15 @@ sub PIONEERAVRZONE_Set {
             }
             readingsBeginUpdate($hash);
             readingsBulkUpdate( $hash, "volumeStraight", $arg );
-            readingsBulkUpdate( $hash, "volume", sprintf "%d",
-                ( $a[2] + 80 ) / 0.8 );
+            readingsBulkUpdate( $hash, "volume", sprintf "%.0f",
+                ( $a[2] + 80 ) / 0.81 );
             readingsEndUpdate( $hash, 1 );
             return;
             ####Volume (0 - 100) in %
             ####according to http://www.fhemwiki.de/wiki/DevelopmentGuidelinesAV
         }
         elsif ( $cmd eq "volume" ) {
-            $zahl = sprintf "%d", $arg * 0.8;
+            $zahl = sprintf "%.0f", $arg * 0.81;
             if ( $zone eq "zone2" ) {
                 IOWrite( $hash, sprintf "%02dZV", $zahl );
             }
@@ -272,7 +272,7 @@ sub PIONEERAVRZONE_Set {
             }
             readingsBeginUpdate($hash);
             readingsBulkUpdate( $hash, "volumeStraight", $zahl - 80 );
-            readingsBulkUpdate( $hash, "volume", sprintf "%d", $a[2] );
+            readingsBulkUpdate( $hash, "volume", sprintf "%.0f", $a[2] );
             readingsEndUpdate( $hash, 1 );
             return;
             ####Mute (on|off|toggle)
@@ -318,7 +318,7 @@ sub PIONEERAVRZONE_Parse {
 
     #Debug "Trying to find a match for \"" . escapeLogLine($msg) ."\"";
     # walk over all clients
-    foreach my $d ( keys %defs ) {
+    for my $d ( keys %defs ) {
         my $hash = $defs{$d};
         if ( $hash->{TYPE} eq "PIONEERAVRZONE" && $hash->{IODev} eq $IOhash ) {
             my $zone = $hash->{helper}{ZONE};
@@ -338,8 +338,8 @@ sub PIONEERAVRZONE_Parse {
                       . $1
                       . " (raw volume data).";
                     readingsBulkUpdate( $hash, "volumeStraight", $1 - 81 );
-                    readingsBulkUpdate( $hash, "volume", sprintf "%d",
-                        $1 / 0.8 );
+                    readingsBulkUpdate( $hash, "volume", sprintf "%.0f",
+                        $1 / 0.81 );
                     push @matches, $d;
 
                     # Mute zone2
@@ -447,8 +447,8 @@ sub PIONEERAVRZONE_Parse {
                       . $1
                       . " (raw volume data).";
                     readingsBulkUpdate( $hash, "volumeStraight", $1 - 81 );
-                    readingsBulkUpdate( $hash, "volume", sprintf "%d",
-                        $1 / 0.8 );
+                    readingsBulkUpdate( $hash, "volume", sprintf "%.0f",
+                        $1 / 0.81 );
                     push @matches, $d;
 
                     # Mute zone3
