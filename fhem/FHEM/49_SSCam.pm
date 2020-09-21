@@ -2731,6 +2731,7 @@ sub _setrunView {                        ## no critic "not used"
       else {
           delete $hash->{HELPER}{VIEWOPENROOM};
       }
+      
       $hash->{HELPER}{OPENWINDOW} = 1;
       $hash->{HELPER}{WLTYPE}     = "link";    
       $hash->{HELPER}{ALIAS}      = "LiveView";
@@ -2751,6 +2752,7 @@ sub _setrunView {                        ## no critic "not used"
       else {
           delete $hash->{HELPER}{VIEWOPENROOM};
       }
+      
       $hash->{HELPER}{OPENWINDOW} = 1;
       $hash->{HELPER}{WLTYPE}     = "link"; 
       $hash->{HELPER}{ALIAS}      = "LastRecording";
@@ -2789,6 +2791,7 @@ sub _setrunView {                        ## no critic "not used"
       if(!IsCapHLS($hash)) {
           return qq{API "SYNO.SurveillanceStation.VideoStream" is not available or Reading "CamStreamFormat" is not "HLS". May be your API version is 2.8 or lower.};
       }
+      
       $hash->{HELPER}{OPENWINDOW} = 0;
       $hash->{HELPER}{WLTYPE}     = "hls"; 
       $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
@@ -9742,91 +9745,93 @@ sub prepareSendData {
    my @allsvs = devspec2array("TYPE=SSCam:FILTER=MODEL=SVS");
    
    for my $svs (@allsvs) {
-       my $svshash = $defs{$svs} if($defs{$svs});
-       next if(!$svshash || !AttrVal($svs, "snapEmailTxt", "") || !$svshash->{HELPER}{CANSENDSNAP});  # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
+       my $svshash;
+       $svshash = $defs{$svs} if($defs{$svs});
+       next if(!$svshash                          || 
+               !AttrVal($svs, "snapEmailTxt", "") ||
+               !$svshash->{HELPER}{ALLSNAPREF}    ||        
+               !$svshash->{HELPER}{CANSENDSNAP});                                                 # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
        
-       if($svshash->{HELPER}{ALLSNAPREF}) { 
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                                                   # Hashreferenz zum summarischen Snaphash
-           
-           for my $key (keys%{$asref}) {
-               if($key eq $name) {                                                                    # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
-                    if($type eq "internal") {
-                        
-                        for my $pkey (keys%{$dat}) {
-                            my $nkey = time()+int(rand(1000));
-                            
-                            $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};              # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};              # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};               # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            
-                            Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
-                        }
-                    } 
-                    else {
-                        # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-                        # Muster: {SENDSNAPS}{2222}{0}{imageData} 
-                        extractTIDfromCache ( { name  => $name,  
-                                                media => "SENDSNAPS",
-                                                mode  => "serial",
-                                                aref  => \@as
-                                              } 
-                                            );      
-                        my %seen;
-                        my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                           # distinct / unique the keys 
-
-                        for my $pkey (@unique) {
-                            next if(!cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
-                            my $nkey = time()+int(rand(1000));
-                            
-                            $asref->{$nkey.$pkey}{createdTm} = cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{imageData} = cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{fileName}  = cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            
-                            Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
-                        }               
-                    }                    
+       $asref = $svshash->{HELPER}{ALLSNAPREF};                                                   # Hashreferenz zum summarischen Snaphash
+       
+       for my $key (keys%{$asref}) {
+           if($key eq $name) {                                                                    # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
+                if($type eq "internal") {
                     
-                    delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
-                    delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
-               }
+                    for my $pkey (keys%{$dat}) {
+                        my $nkey = time()+int(rand(1000));
+                        
+                        $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};              # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};              # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};               # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                        
+                        Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                    }
+                } 
+                else {
+                    # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+                    # Muster: {SENDSNAPS}{2222}{0}{imageData} 
+                    extractTIDfromCache ( { name  => $name,  
+                                            media => "SENDSNAPS",
+                                            mode  => "serial",
+                                            aref  => \@as
+                                          } 
+                                        );      
+                    my %seen;
+                    my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                           # distinct / unique the keys 
+
+                    for my $pkey (@unique) {
+                        next if(!cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
+                        my $nkey = time()+int(rand(1000));
+                        
+                        $asref->{$nkey.$pkey}{createdTm} = cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{imageData} = cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{fileName}  = cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                        
+                        Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                    }               
+                }                    
+                
+                delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
+                delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
            }
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
-           
-           for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
-               if(!$asref->{$key}) {
-                   return;                                             # Bildhash noch nicht komplett                                 
-               }
-           }
-       
-           delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
-           $hash = $svshash;                                           # Hash durch SVS-Hash ersetzt
-           $name = $svshash->{NAME};                                   # Name des auslösenden SVS-Devices wird eingesetzt  
-           
-           Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
-           
-           my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
-           
-           if(!$cache || $cache eq "internal" ) {
-               delete $data{SSCam}{RS};           
-               for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
-                   $data{SSCam}{RS}{$key} = delete $asref->{$key};                     
-               }    
-               $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
-           } 
-           else {
-               cache($name, "c_clear"); 
-               for my $key (keys%{$asref}) {
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
-               }
-               $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
-           }
-           
-           $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
-           $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
-           last;                                                       # Schleife verlassen und mit Senden weiter
        }
+       $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
+       
+       for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
+           if(!$asref->{$key}) {
+               return;                                             # Bildhash noch nicht komplett                                 
+           }
+       }
+   
+       delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
+       $hash = $svshash;                                           # Hash durch SVS-Hash ersetzt
+       $name = $svshash->{NAME};                                   # Name des auslösenden SVS-Devices wird eingesetzt  
+       
+       Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
+       
+       my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
+       
+       if(!$cache || $cache eq "internal" ) {
+           delete $data{SSCam}{RS};           
+           for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
+               $data{SSCam}{RS}{$key} = delete $asref->{$key};                     
+           }    
+           $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
+       } 
+       else {
+           cache($name, "c_clear"); 
+           for my $key (keys%{$asref}) {
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
+           }
+           $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
+       }
+       
+       $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
+       $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
+       last;                                                       # Schleife verlassen und mit Senden weiter
    }
    
    my $sp       = AttrVal($name, "smtpPort", 25); 
