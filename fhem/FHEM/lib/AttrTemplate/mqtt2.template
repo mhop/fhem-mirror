@@ -3689,7 +3689,7 @@ setreading DEVICE attrTemplateVersion 20200628
 # source: https://forum.fhem.de/index.php/topic,105222.0.html
 name:wallpanel_app
 filter:TYPE=MQTT2_DEVICE
-desc:For use with Android-App WallPanel (https://thanksmister.com/wallpanel-android/)<br>NOTE: Experimental, please provide feedback!
+desc:For use with Android-App WallPanel (https://thanksmister.com/wallpanel-android/)<br>NOTE: Early version, might still be buggy, please provide feedback!
 order:X_15
 par:DEVNAME;name of this wallpanel;{ AttrVal("DEVICE","readingList","") =~ m,wallpanel/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to mqtt;{ AttrVal("DEVICE","icon","kindle") }
@@ -3708,15 +3708,15 @@ attr DEVICE setList alert:textField wallpanel/DEVNAME/command {"eval": "alert('$
   google:noArg wallpanel/DEVNAME/command {"url": "https://www.google.com"}\
   relaunch:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
   reload:noArg wallpanel/DEVNAME/command {"$EVTPART0": true}\
-  screenoff:noArg wallpanel/mywallpanel/command {"wake": false}\
-  screenon:select,60,600,3600,86400 wallpanel/wz_tablet/command {"wake": true, "wakeTime": $EVTPART1}\
+  screenoff:noArg wallpanel/DEVNAME/command {"wake": false}\
+  screenon:select,60,600,3600,86400 wallpanel/DEVNAME/command {"wake": true, "wakeTime": $EVTPART1}\
   speak:textField {"wallpanel/DEVNAME/command {'$EVTPART0': '".substr($EVENT,5)."'}"}\
   url:textField wallpanel/DEVNAME/command {"$EVTPART0": "$EVTPART1"}\
   volume:slider,0,1,100 wallpanel/DEVNAME/command {"$EVTPART0": $EVTPART1}
 attr DEVICE comment For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 farewell:template has been applied successfully. For further info on configuration and available commands see <a href="https://thanksmister.com/wallpanel-android/">project page</a>.
 attr DEVICE model wallpanel_app
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20200921
 
 name:weewx_weather_station
 filter:TYPE=MQTT2_DEVICE
