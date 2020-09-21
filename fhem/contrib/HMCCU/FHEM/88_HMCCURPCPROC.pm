@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.010
+#  Version 4.4.011
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.010';
+my $HMCCURPCPROC_VERSION = '4.4.011';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -151,7 +151,7 @@ sub HMCCURPCPROC_ProcessEvent ($$);
 # RPC information
 sub HMCCURPCPROC_GetDeviceDesc ($;$);
 sub HMCCURPCPROC_GetParamsetDesc ($;$);
-sub HMCCURPCPROC_GetPeers ($);
+sub HMCCURPCPROC_GetPeers ($;$);
 
 # RPC server control functions
 sub HMCCURPCPROC_CheckProcessState ($$);
@@ -519,11 +519,8 @@ sub HMCCURPCPROC_Attr ($@)
 		elsif ($attrname eq 'rpcPingCCU') {
 			HMCCU_Log ($hash, 1, "Attribute rpcPingCCU ignored. Please set it in I/O device");
 		}
-		elsif ($attrname eq 'ccuflags' && $attrval =~ /reconnect/) {
-			HMCCU_Log ($hash, 1, "Flag reconnect ignored. Please set it in I/O device");
-		}
-		elsif ($attrname eq 'ccuflags' && $attrval =~ /logPong/) {
-			HMCCU_Log ($hash, 1, "Flag logPong ignored. Please set it in I/O device");
+		elsif ($attrname eq 'ccuflags' && $attrval =~ /(reconnect|logPong)/) {
+			HMCCU_Log ($hash, 1, "Flag $1 ignored. Please set it in I/O device");
 		}
 	}
 	elsif ($cmd eq 'del') {
@@ -663,10 +660,7 @@ sub HMCCURPCPROC_Get ($@)
 		$result = "Event statistics for server $clkey\n";
 		$result .= "Average event delay = ".$hash->{hmccu}{rpc}{avgdelay}."\n"
 			if (defined ($hash->{hmccu}{rpc}{avgdelay}));
-		$result .= 
-			"========================================\n".
-			"ET Sent by RPC server   Received by FHEM\n".
-			"----------------------------------------\n";
+		$result .= ('=' x 40)."\nET Sent by RPC server   Received by FHEM\n".('-' x 40)."\n";
 		foreach my $et (@RPC_EVENT_TYPES) {
 			my $snd = exists ($hash->{hmccu}{rpc}{snd}{$et}) ?
 				sprintf ("%7d", $hash->{hmccu}{rpc}{snd}{$et}) : "    n/a"; 
@@ -676,10 +670,7 @@ sub HMCCURPCPROC_Get ($@)
 		}
 		if ($ccuflags =~ /statistics/ && exists ($hash->{hmccu}{stats}{rcv})) {
 			my $eh = HMCCU_MaxHashEntries ($hash->{hmccu}{stats}{rcv}, 3);
-			$result .= 
-				"========================================\n".
-				"Top Sender\n".
-				"========================================\n";
+			$result .= ('=' x 40)."\nTop Sender\n".('=' x 40)."\n";
 			for (my $i=0; $i<3; $i++) {
 				last if (!exists ($eh->{$i}));
 				my $dn = HMCCU_GetDeviceName ($ioHash, $eh->{$i}{k}, '?');
@@ -690,9 +681,7 @@ sub HMCCURPCPROC_Get ($@)
 	}
 	elsif ($opt eq 'rpcstate') {
 		my $clkey = HMCCURPCPROC_GetKey ($hash);
-		$result = 
-			"PID   RPC-Process        State   \n".
-			"--------------------------------\n";
+		$result = "PID   RPC-Process        State   \n".('-' x 32)."\n";
 		my $sid = defined ($hash->{hmccu}{rpc}{pid}) ? sprintf ("%5d", $hash->{hmccu}{rpc}{pid}) : "N/A  ";
 		my $sname = sprintf ("%-10s", $clkey);
 		my $cbport = defined ($hash->{hmccu}{rpc}{cbport}) ? $hash->{hmccu}{rpc}{cbport} : "N/A";
@@ -752,20 +741,14 @@ sub HMCCURPCPROC_Read ($)
 			$hash->{ccustate} = 'active' if ($hash->{ccustate} ne 'active');
 			
 			# Count events per device for statistics
-			if ($ccuflags =~ /statistics/) {
-				if (exists ($hash->{hmccu}{stats}{rcv}{$par[0]})) {
-					$hash->{hmccu}{stats}{rcv}{$par[0]}++;
-				}
-				else {
-					$hash->{hmccu}{stats}{rcv}{$par[0]} = 1;
-				}
-			}
+			$hash->{hmccu}{stats}{rcv}{$par[0]}++ if ($ccuflags =~ /statistics/);
 		}
 		elsif ($et eq 'EX') {
 			# I/O already cleaned up. Leave Read()
 			last;
 		}
-# 		elsif ($et eq 'ND') {
+		elsif ($et eq 'ND') {
+#			HMCCU_Log ($hash, 2, "ND: ".join(';', @par));
 # 			$devices{$par[0]}{flag}      = 'N';
 # 			$devices{$par[0]}{version}   = $par[3];
 # 			$devices{$par[0]}{paramsets} = $par[6];
@@ -777,16 +760,16 @@ sub HMCCURPCPROC_Read ($)
 # 				$devices{$par[0]}{children} = $par[10];
 # 			}
 # 			else {
-# 				$devices{$par[0]}{addtype}      = 'chn';
-# 				$devices{$par[0]}{usetype}      = $par[2];
-# 				$devices{$par[0]}{sourceroles}  = $par[7];
-# 				$devices{$par[0]}{targetroles}  = $par[8];
-# 				$devices{$par[0]}{direction}    = $par[9];
-# 				$devices{$par[0]}{parent}       = $par[11];
-# 				$devices{$par[0]}{aes}          = $par[12];
+# 				$devices{$par[0]}{addtype}     = 'chn';
+# 				$devices{$par[0]}{usetype}     = $par[2];
+# 				$devices{$par[0]}{sourceroles} = $par[7];
+# 				$devices{$par[0]}{targetroles} = $par[8];
+# 				$devices{$par[0]}{direction}   = $par[9];
+# 				$devices{$par[0]}{parent}      = $par[11];
+# 				$devices{$par[0]}{aes}         = $par[12];
 # 			}
 # 			$devcount++;
-# 		}
+		}
 		elsif ($et eq 'DD') {
 			$devices{$par[0]}{flag} = 'D';
 			$devcount++;
@@ -880,7 +863,7 @@ sub HMCCURPCPROC_ResetRPCState ($)
 {
 	my ($hash) = @_;
 
-	$hash->{RPCPID} = "0";
+	$hash->{RPCPID} = '0';
 	$hash->{hmccu}{rpc}{pid} = undef;
 	$hash->{hmccu}{rpc}{clkey} = undef;
 	$hash->{hmccu}{evtime} = 0;
@@ -916,17 +899,8 @@ sub HMCCURPCPROC_ProcessEvent ($$)
 
 	# Number of arguments in RPC events (without event type and clkey)
 	my %rpceventargs = (
-		'EV', 4,
-		'ND', 13,
-		'DD', 1,
-		'RD', 2,
-		'RA', 1,
-		'UD', 2,
-		'IN', 2,
-		'EX', 2,
-		'SL', 1,
-		'TO', 1,
-		'ST', 11
+		'EV', 4, 'ND', 13, 'DD', 1, 'RD', 2, 'RA', 1, 'UD', 2, 'IN', 2, 'EX', 2, 'SL', 1,
+		'TO', 1, 'ST', 11
 	);
 
 	return undef if (!defined ($event) || $event eq '');
@@ -1123,14 +1097,21 @@ sub HMCCURPCPROC_GetAttribute ($$$$)
 # Get links (sender and receiver) from CCU.
 ######################################################################
 
-sub HMCCURPCPROC_GetPeers ($)
+sub HMCCURPCPROC_GetPeers ($;$)
 {
-	my ($hash) = @_;
+	my ($hash, $address) = @_;
 	my $ioHash = $hash->{IODev};
 	my $c = 0;
 		
-	my $rd = HMCCURPCPROC_SendRequest ($hash, 'getLinks') //
-		return HMCCU_Log ($hash, 2, "Can't get peers", 0);
+	my $rd = defined($address) ?
+		HMCCURPCPROC_SendRequest ($hash, 'getLinks', $address) :
+		HMCCURPCPROC_SendRequest ($hash, 'getLinks');
+
+	if (!defined($rd)) {
+		my $msg = defined($address) ? "Can't get peers of device $address" :
+			"Can't get full list of peers";
+		return HMCCU_Log ($hash, 2, $msg, 0);
+	}
 
 	if (ref($rd) eq 'HASH' && exists($rd->{faultString})) {
 		return HMCCU_Log ($hash, 2, "Can't get peers. ".$rd->{faultString}, 0);
@@ -1154,18 +1135,11 @@ sub HMCCURPCPROC_GetDeviceDesc ($;$)
 {
 	my ($hash, $address) = @_;
 	my $ioHash = $hash->{IODev};
-	
-	my $rd;
 	my $c = 0;
 	
-	if (!defined($address)) {
-		# All devices
-		$rd = HMCCURPCPROC_SendRequest ($hash, 'listDevices');
-	}
-	else {
-		# Single device (or channel)
-		$rd = HMCCURPCPROC_SendRequest ($hash, 'getDeviceDescription', $address);
-	}
+	my $rd = defined($address) ?
+		HMCCURPCPROC_SendRequest ($hash, 'getDeviceDescription', $address) :
+		HMCCURPCPROC_SendRequest ($hash, 'listDevices');
 	
 	if (!defined($rd)) {
 		my $msg = defined($address) ? "Can't get description of device $address" :
@@ -1197,6 +1171,7 @@ sub HMCCURPCPROC_GetDeviceDesc ($;$)
 
 ######################################################################
 # Get RPC device paramset descriptions from CCU
+# Function is called recursively
 # Parameters:
 #   $address - Device or channel address. If not specified, all
 #     addresses known by IO device are used. 
@@ -1845,6 +1820,10 @@ sub HMCCURPCPROC_SendRequest ($@)
 	}
 }
 
+######################################################################
+# Send XML RPC request to CCU
+######################################################################
+
 sub HMCCURPCPROC_SendXMLRequest ($@)
 {
 	my ($hash, $ioHash, $port, $request, @param) = @_;
@@ -1907,6 +1886,10 @@ sub HMCCURPCPROC_SendXMLRequest ($@)
 	return $rc;
 }
 
+######################################################################
+# Send binary RPC request to CCU
+######################################################################
+
 sub HMCCURPCPROC_SendBINRequest ($@)
 {
 	my ($hash, $ioHash, $port, $request, @param) = @_;
@@ -1930,7 +1913,7 @@ sub HMCCURPCPROC_SendBINRequest ($@)
 	}
 
 	# create a connecting socket
-	my $socket = new IO::Socket::INET (PeerHost => $serveraddr, PeerPort => $port, Proto => 'tcp', Timeout => 3);
+	my $socket = IO::Socket::INET->new (PeerHost => $serveraddr, PeerPort => $port, Proto => 'tcp', Timeout => 3);
 	return HMCCU_Log ($hash, 2, "Can't create socket for $serveraddr:$port", undef) if (!$socket);
 
 	$socket->autoflush (1);
@@ -2365,7 +2348,6 @@ sub HMCCURPCPROC_Write ($$$$)
 		# Try to send events immediately. Put them in queue if send fails
 		my $rc = 0;
 		my $err = '';
-#		if ($et ne 'ND' && $server->{hmccu}{ccuflags} !~ /queueEvents/) {
 		if ($server->{hmccu}{ccuflags} !~ /queueEvents/) {
 			($rc, $err) = HMCCURPCPROC_SendData ($server->{hmccu}{sockparent}, $ev);
 			HMCCU_Log ($name, 3, "SendData $ev $err") if ($rc == 0);
@@ -2466,7 +2448,7 @@ sub HMCCURPCPROC_NewDevicesCB ($$$)
 	# Format:
 	# C/D|Address|Type|Version|Firmware|RxMode|Paramsets|
 	# LinkSourceRoles|LinkTargetRoles|Direction|Children|Parent|AESActive
-			
+
 	foreach my $dev (@$a) {
 		my $msg = '';
 		my $ps = ref($dev->{PARAMSETS}) eq 'ARRAY' ?
@@ -2998,6 +2980,7 @@ sub HMCCURPCPROC_DecStruct ($$)
 ######################################################################
 # Decode any type
 # Return (element, packetsize) or (undef, undef)
+# element could be a scalar, array ref or hash ref.
 ######################################################################
 
 sub HMCCURPCPROC_DecType ($$)
