@@ -17,6 +17,7 @@ sequence_Initialize($)
   $hash->{NotifyFn} = "sequence_Notify";
   no warnings 'qw';
   my @attrList = qw(
+    addStateEvent:1,0
     disable:0,1
     disabledForIntervals
     reportEvents:1,0
@@ -75,14 +76,17 @@ sequence_Notify($$)
 
   my $n = $dev->{NAME};
   my $re = $hash->{RE};
-  my $max = int(@{$dev->{CHANGED}});
+  my $events = deviceEvents($dev, AttrVal($ln, "addStateEvent", 0));
+  return if(!$events);
+  my $max = int(@{$events});
 
   for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
+    my $s = $events->[$i];
     $s = "" if(!defined($s));
     next if($n !~ m/^$re$/ && "$n:$s" !~ m/^$re$/);
 
     RemoveInternalTimer($ln);
+    $hash->{last_source} = $n;
 
     if($hash->{TS} > gettimeofday()) { # the delay stuff
       sequence_Trigger($ln, "abort");
@@ -103,7 +107,7 @@ sequence_Notify($$)
 
       Log3 $ln, 5, "sequence $ln $tt";
       setReadingsVal($hash, "state", "active", TimeNow());
-      $data{sequence_source} = $dev->{NAME};
+      $data{sequence_source} = $n;
       DoTrigger($ln, $tt);
       delete($data{sequence_source});
       $idx  = 0;
@@ -141,7 +145,12 @@ sequence_Trigger($$)
   $tt .= $hash->{EVENTS} if(AttrVal($ln, "reportEvents", undef));
   delete($hash->{EVENTS});
 
-  DoTrigger($ln, $tt) if(AttrVal($ln, "triggerPartial", undef));
+  if(AttrVal($ln, "triggerPartial", undef)) {
+    $data{sequence_source} = $hash->{last_source};
+    DoTrigger($ln, $tt);
+    delete($data{sequence_source});
+  }
+  delete($hash->{last_source});
 }
 
 sub
@@ -219,6 +228,7 @@ sequence_Undef($$)
   <a name="sequenceattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#addStateEvent">addStateEvent</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#showtime">showtime</a></li>
@@ -311,10 +321,12 @@ sequence_Undef($$)
   <a name="sequenceattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#addStateEvent">addStateEvent</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
     <li><a href="#showtime">showtime</a></li>
-    <li><a href="#triggerPartial">triggerPartial</a><br>
+
+    <li><a href="#sequencetriggerPartial">triggerPartial</a><br>
       Falls gesetzt (auf 1), und nicht alle erwarteten Events eingetroffen
       sind, dann wird ein partial_X Event generiert, wobei X durch Anzahl der
       eingetroffenen Events ersetzt wird. Beispiel:<br><code><ul>
@@ -327,7 +339,7 @@ sequence_Undef($$)
       gedr&uuml;ckt wurde.
       </li><br>
 
-    <li><a href="#reportEvents">reportEvents</a><br>
+    <li><a href="#sequencereportEvents">reportEvents</a><br>
       Falls gesetzt (auf 1), meldet trigger die empfangenen Events (Leerzeichen
       getrennt) nach dem "trigger" oder "partial_X" Schl&uuml;sselwort.
       Das kann verwendet werden, um generische sequence Instanzen zu definieren:
