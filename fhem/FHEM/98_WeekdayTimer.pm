@@ -87,7 +87,8 @@ sub WeekdayTimer_Define {
 
   addToDevAttrList($name, "weekprofile") if $def =~ m{weekprofile}xms;
   
-  return InternalTimer(time(), "WeekdayTimer_Start",$hash,0);
+  return InternalTimer(time(), "WeekdayTimer_Start",$hash,0) if !$init_done;
+  return WeekdayTimer_Start($hash);
 }
 
 ################################################################################
@@ -119,13 +120,17 @@ sub WeekdayTimer_Start {
 
   my @switchingtimes       = WeekdayTimer_gatherSwitchingTimes ($hash, \@arr);
   my $conditionOrCommand   = join (" ", @arr);
-
+  my @errors;
   # test if device is defined
-  Log3( $hash, 3, "[$name] device <$device> in fhem not defined, but accepted") if(!$defs{$device} );
-
+  if(!$defs{$device} ) { 
+    Log3( $hash, 3, "[$name] device <$device> in fhem not defined, but accepted") ;
+    if($init_done) { push @errors, qq(device <$device> in fhem not defined) };
+  }
   # wenn keine switchintime angegeben ist, dann Fehler
-  Log3( $hash, 3, "[$name] no valid Switchingtime found in <$conditionOrCommand>, check first parameter" ) if (@switchingtimes == 0);
-
+  if (@switchingtimes == 0) {
+    Log3( $hash, 3, "[$name] no valid Switchingtime found in <$conditionOrCommand>, check parameters or make sure weekprofile device exists and returns valid data." ) ;
+    if($init_done) { push @errors, qq(no valid switchingtime found in <$conditionOrCommand>, check parameters or make sure weekprofile device exists and returns valid data.) };
+  }
   $hash->{STILLDONETIME}  = 0;
   $hash->{SWITCHINGTIMES} = \@switchingtimes;
   $attr{$name}{verbose}   = 5 if (!defined $attr{$name}{verbose} && $name =~ m{\Atst.*}xms );
@@ -135,6 +140,12 @@ sub WeekdayTimer_Start {
 
   if($conditionOrCommand =~  m{\A\(.*\)\z}xms) {         #condition (*)
     $hash->{CONDITION} = $conditionOrCommand;
+    my %specials   = ( "%NAME" => $hash->{DEVICE}, "%EVENT" => "0");
+    my $r = perlSyntaxCheck(qq({$conditionOrCommand}),%specials);
+    if ($r) { 
+      Log3( $hash, 2, "[$name] check syntax of CONDITION <$conditionOrCommand>" ) ;
+      if($init_done) { push @errors, qq(check syntax of CONDITION <$conditionOrCommand>: $r) };
+    }
   } elsif(length($conditionOrCommand) > 0 ) {
     $hash->{COMMAND} = $conditionOrCommand;
   }
@@ -146,7 +157,12 @@ sub WeekdayTimer_Start {
   $attr{$name}{commandTemplate} =
      'set $NAME '. WeekdayTimer_isHeizung($hash) .' $EVENT' if (!defined $attr{$name}{commandTemplate});
 
-  return WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+  WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+  
+  return if !$init_done;
+  return join("\n", @errors) if(@errors); 
+  return;
+  
 }
 
 ################################################################################
@@ -764,13 +780,11 @@ sub WeekdayTimer_SetTimer {
     my $para        = $hash->{profil}{$idx}{PARA};
     my $overrulewday = $hash->{profil}{$idx}{WE_Override};
 
-    my $secondsToSwitch = $timToSwitch - $now;
-
     my $isActiveTimer = WeekdayTimer_isAnActiveTimer ($hash, $tage, $para, $overrulewday);
     readingsSingleUpdate ($hash,  "state",      "active",    1)
       if (!defined $hash->{SETTIMERATMIDNIGHT} && $isActiveTimer);
 
-    if ($secondsToSwitch>-5 || defined $hash->{SETTIMERATMIDNIGHT} ) {
+    if ( $timToSwitch - $now > -5 || defined $hash->{SETTIMERATMIDNIGHT} ) {
       if($isActiveTimer) {
         Log3( $hash, 4, "[$name] setTimer - timer seems to be active today: ".join("",@$tage)."|$time|$para" );
         WeekdayTimer_RemoveInternalTimer("$idx", $hash);
@@ -794,9 +808,11 @@ sub WeekdayTimer_SetTimer {
     Log3( $hash, 3, "[$name] can not compute past switching time" );
   }
 
-  readingsSingleUpdate ($hash,  "nextUpdate", FmtDateTime($nextTime), 1);
-  readingsSingleUpdate ($hash,  "nextValue",  $nextParameter,         1);
-  readingsSingleUpdate ($hash,  "currValue",  $aktParameter,          1); # HB
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "nextUpdate", FmtDateTime($nextTime));
+  readingsBulkUpdate ($hash, "nextValue",  $nextParameter);
+  readingsBulkUpdate ($hash, "currValue",  $aktParameter);
+  readingsEndUpdate  ($hash, 1);
 
   if ($switchInThePast && defined $aktTime) {
     # Fensterkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
@@ -970,7 +986,7 @@ sub WeekdayTimer_Update {
   readingsBulkUpdate ($hash,  "nextValue",  $nextParameter);
   readingsBulkUpdate ($hash,  "currValue",  $aktParameter); # HB
   readingsBulkUpdate ($hash,  "state",      $newParam )   if($activeTimerState);
-  readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
+  readingsEndUpdate  ($hash, 1);
 
   return 1;
 
@@ -985,7 +1001,7 @@ sub WeekdayTimer_isAnActiveTimer {
 
   my $condition  = WeekdayTimer_Condition ($hash, $tage, $overrulewday);
   my $tageAsHash = WeekdayTimer_tageAsHash($hash, $tage);
-  my $xPression  = "{".$tageAsHash.";;".$condition ."}";
+  my $xPression  = qq( { $tageAsHash ;; $condition } );
      $xPression  = EvalSpecials($xPression, %specials);
   Log3( $hash, 5, "[$name] condition: $xPression" );
 
@@ -1588,7 +1604,9 @@ sub WeekdayTimer_GetWeekprofileReadingTriplett {
    },
    "keywords" : [
       "heating",
-      "Heizung"
+      "Heizung",
+      "timer",
+      "weekprofile"
    ],
    "prereqs" : {
       "runtime" : {
