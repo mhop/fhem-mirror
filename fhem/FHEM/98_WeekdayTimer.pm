@@ -1187,7 +1187,7 @@ sub WeekdayTimer_Switch_Device {
 
   my $activeTimer = 1;
 
-  my $isHeating = defined $setModifier ? 1 : 0;
+  my $isHeating = $setModifier ? 1 : 0;
   my $aktParam  = ReadingsVal($hash->{DEVICE}, $setModifier, "");
      $aktParam  = sprintf("%.1f", $aktParam)   if ( $isHeating && $aktParam =~ m{\A[0-9]{1,3}\z}ixms );
      $newParam  = sprintf("%.1f", $newParam)   if ( $isHeating && $newParam =~ m{\A[0-9]{1,3}\z}ixms );
