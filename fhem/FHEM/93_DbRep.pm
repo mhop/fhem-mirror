@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 our %DbRep_vNotesIntern = (
+  "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament Forum: #114293, commandRef revised ",
   "8.40.7"  => "03.09.2020  rename getter dbValue to sqlCmdBlocking, consider attr timeout in function DbRep_sqlCmdBlocking (blocking function), commandRef revised ",
   "8.40.6"  => "27.08.2020  commandRef revised ",
   "8.40.5"  => "29.07.2020  fix crash if delEntries startet without any time limits, Forum:#113202 ",
@@ -6189,17 +6190,21 @@ sub sqlCmd_DoParse {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  my $sql = ($cmd =~ m/\;$/)?$cmd:$cmd.";";
+  $cmd =~ s/\;\;/ESC_ESC_ESC/gx;                                                     # ersetzen von escapeten ";" (;;)
+    
+  my $sql = ($cmd =~ m/\;$/) ? $cmd : $cmd.";";
   
   # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
   my $vars = AttrVal($name, "sqlCmdVars", "");
   if ($vars) {
-      @pms = split(";",$vars);           
-      foreach my $pm (@pms) {
+      @pms = split(";",$vars); 
+	  
+      for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
           }
           $pm = ltrim($pm).";";
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
           Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");    
           eval {$dbh->do($pm);};
           if ($@) {
@@ -6213,15 +6218,22 @@ sub sqlCmd_DoParse {
   
   # Abarbeitung von Session Variablen vor einem SQL-Statement
   # z.B. SET  @open:=NULL, @closed:=NULL; Select ...
-  if($cmd =~ /^\s*SET.*;/i) {   
-      @pms = split(";",$cmd);           
-      foreach my $pm (@pms) {
+  if($cmd =~ /^\s*SET.*;/i) {
+      @pms = split(";",$cmd); 
+      $sql = q{};
+ 	  
+      for my $pm (@pms) {
+          
           if($pm !~ /SET/i) {
-              $sql = $pm.";";
+              $sql .= $pm.";";
               next;
           }
+          
           $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");    
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          Log3($name, 4, "DbRep $name - Set SQL session variable: $pm");
+          
           eval {$dbh->do($pm);};
           if ($@) {
              $err = encode_base64($@,"");
@@ -6235,14 +6247,48 @@ sub sqlCmd_DoParse {
   # Abarbeitung aller Pragmas vor einem SQLite Statement, SQL wird extrahiert
   # wenn Pragmas im SQL vorangestellt sind
   if($cmd =~ /^\s*PRAGMA.*;/i) {   
-      @pms = split(";",$cmd);           
-      foreach my $pm (@pms) {
+      @pms = split(";",$cmd);
+      $sql = q{};
+	  
+      for my $pm (@pms) {
+          
           if($pm !~ /PRAGMA/i) {
-              $sql = $pm.";";
+              $sql .= $pm.";";
               next;
           }
+          
           $pm = ltrim($pm).";";
-          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");    
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          Log3($name, 4, "DbRep $name - Exec PRAGMA Statement: $pm");
+          
+          eval {$dbh->do($pm);};
+          if ($@) {
+             $err = encode_base64($@,"");
+             Log3 ($name, 2, "DbRep $name - ERROR - $@");
+             $dbh->disconnect;
+             return "$name|''|$opt|$sql|''|''|$err"; 
+          }      
+      }
+  }
+  
+  # Abarbeitung von PREPARE statement als Befehl als Bestandteil des SQL Forum: #114293
+  # z.B. PREPARE statement FROM @CMD
+  if($sql =~ /^\s*PREPARE.*;/i) {   
+      @pms = split(";",$sql);
+      $sql = q{}; 	  
+      for my $pm (@pms) {
+          
+          if($pm !~ /PREPARE/i) {
+              $sql .= $pm.";";
+              next;
+          }
+          
+          $pm = ltrim($pm).";";
+          $pm =~ s/ESC_ESC_ESC/;/gx;                                                # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+          
+          Log3($name, 4, "DbRep $name - Exec PREPARE statement: $pm");
+          
           eval {$dbh->do($pm);};
           if ($@) {
              $err = encode_base64($@,"");
@@ -6257,6 +6303,8 @@ sub sqlCmd_DoParse {
   $sql =~ s/§timestamp_begin§/'$runtime_string_first'/g;
   $sql =~ s/§timestamp_end§/'$runtime_string_next'/g;
   
+  $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
+  
   Log3($name, 4, "DbRep $name - SQL execute: $sql");        
 
   # SQL-Startzeit
@@ -6265,7 +6313,7 @@ sub sqlCmd_DoParse {
   my ($sth,$r);
   
   eval {$sth = $dbh->prepare($sql);
-        $r = $sth->execute();
+        $r   = $sth->execute();
        }; 
   
   if ($@) {
@@ -6278,7 +6326,7 @@ sub sqlCmd_DoParse {
   my (@rows,$row,@head);
   my $nrows = 0;
   if($sql =~ m/^\s*(explain|select|pragma|show)/is) {
-      @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};   # https://metacpan.org/pod/DBI#NAME1
+      @head = map { uc($sth->{NAME}[$_]) } keys @{$sth->{NAME}};                   # https://metacpan.org/pod/DBI#NAME1
       if (@head) {
           $row = join("$srs", @head);
           push(@rows, $row);
@@ -6295,6 +6343,7 @@ sub sqlCmd_DoParse {
           # Anzahl der Datensätze
           $nrows++;
       }
+  
   } else {
       $nrows = $sth->rows;
       eval {$dbh->commit() if(!$dbh->{AutoCommit});};
@@ -6312,17 +6361,16 @@ sub sqlCmd_DoParse {
   
   $sth->finish;
 
-  # SQL-Laufzeit ermitteln
-  my $rt = tv_interval($st);
+  my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
 
   $dbh->disconnect;
  
-  # Daten müssen als Einzeiler zurückgegeben werden
-  my $rowstring = join("§", @rows); 
-  $rowstring = encode_base64($rowstring,"");
-
-  # Background-Laufzeit ermitteln
-  my $brt = tv_interval($bst);
+  my $rowstring = join("§", @rows);                                                # Daten müssen als Einzeiler zurückgegeben werden
+  $rowstring    = encode_base64($rowstring,"");
+  
+  $cmd =~ s/ESC_ESC_ESC/;;/gx;                                                     # wiederherstellen der escapeten ";" -> ";;" 
+  
+  my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
 
   $rt = $rt.",".$brt;
  
@@ -12815,15 +12863,19 @@ return;
                                The used database user needs the ALTER, CREATE and INDEX privilege. <br>
                                    
                                </li> <br>
-                                 
-    <li><b> insert </b>       -  use it to insert data ito table "history" manually. Input values for Date, Time and Value are mandatory. The database fields for Type and Event will be filled in with "manual" automatically and the values of Device, Reading will be get from set <a href="#DbRepattr">attributes</a>.  <br><br>
+     
+    <a name="insert"></a>     
+    <li><b> insert </b>       -  data are inserted into table "history" manually. Input values for Date, Time and Value are 
+                                 mandatory. The database fields for Type and Event will be filled in with "manual" automatically. 
+                                 The values of <a href="#device">device</a>, <a href="#reading">reading</a> use the 
+                                 attribute settings .  <br><br>
                                  
                                  <ul>
                                  <b>input format: </b>   Date,Time,Value,[Unit]    <br>
-                                 # Unit is optional, attributes of device, reading must be set ! <br>
+                                 # Unit is optional, attributes <a href="#device">device</a>, <a href="#reading">reading</a> must be set ! <br>
                                  # If "Value=0" has to be inserted, use "Value = 0.0" to do it. <br><br>
                                  
-                                 <b>example:</b>         2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 <b>example:</b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>  <br>
                                  # Spaces are NOT allowed in fieldvalues ! <br>
                                  <br>
                                  
@@ -15430,16 +15482,18 @@ sub bdump {
                                Der verwendete Datenbank-Nutzer benötigt das ALTER, CREATE und INDEX Privileg. <br>
                                    
                                </li> <br>                                
-       
+    <a name="insert"></a>   
     <li><b> insert </b>       -  Manuelles Einfügen eines Datensatzes in die Tabelle "history". Obligatorisch sind Eingabewerte für Datum, Zeit und Value. 
-                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für Device, Reading aus den gesetzten  <a href="#DbRepattr">Attributen </a> genommen.  <br><br>
+                                 Die Werte für die DB-Felder Type bzw. Event werden mit "manual" gefüllt, sowie die Werte für 
+                                 <a href="#device">Device</a>, <a href="#reading">Reading</a> aus den gesetzten Attributen 
+                                 genommen.  <br><br>
                                  
                                  <ul>
                                  <b>Eingabeformat: </b>   Datum,Zeit,Value,[Unit]  <br>               
-                                 # Unit ist optional, Attribute "reading" und "device" müssen gesetzt sein  <br>
+                                 # Unit ist optional, Attribute <a href="#device">device</a>, <a href="#reading">reading</a> müssen gesetzt sein  <br>
                                  # Soll "Value=0" eingefügt werden, ist "Value = 0.0" zu verwenden. <br><br>
                                  
-                                 <b>Beispiel: </b>        2016-08-01,23:00:09,TestValue,TestUnit  <br>
+                                 <b>Beispiel: </b>  set &lt;name&gt; insert 2016-08-01,23:00:09,12.03,kW  <br>
                                  # Es sind KEINE Leerzeichen im Feldwert erlaubt !<br>
                                  <br>
                                  
