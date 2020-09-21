@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
   "9.7.20" => "20.09.2020  control parse function by the hparse hash step 3 (refactored getsnapinfo, getsnapgallery, runView Snap) ",
   "9.7.19" => "18.09.2020  control parse function by the hparse hash step 2 ",
   "9.7.18" => "16.09.2020  control parse function by the hparse hash ",
@@ -6688,6 +6689,9 @@ sub _parseSnap {                                        ## no critic "not used"
   } 
   else {
       Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+      closeTrans    ($hash);                                           # Transaktion beenden falls gestartet
+      delActiveToken($hash);
+      return;
   }
 
   my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
@@ -6712,6 +6716,7 @@ sub _parseSnap {                                        ## no critic "not used"
   }
 
   my ($slim,$ssize) = snapLimSize($hash);                              # Anzahl und Size für Schnappschußabruf bestimmen
+  
   if (AttrVal($name,"debugactivetoken",0)) {
       Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
   }
@@ -7421,105 +7426,31 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
   
   my $lang    = AttrVal("global","language","EN");
   
-  my ($cache,@as,$g,$snapid);
+  my @as;
   
   $paref->{aref} = \@as;
 
   Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
   
-  __saveLastSnap   ($paref);                                                                                 # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
-  __doSnapRotation ($paref);                                                                                 # Rotationsfeature
+  __saveLastSnap      ($paref);                                                                              # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
+  __doSnapRotation    ($paref);                                                                              # Rotationsfeature
+  __moveSnapCacheToOld($paref);                                                                              # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
+       
        
   #####   transaktionaler Versand der erzeugten Schnappschüsse #####
   ##################################################################                
   if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {         # es soll die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
       my $tac = openOrgetTrans($hash);                                                                       # Transaktion vorhandenen Code holen
-
-      __moveSnaphashToOld ($paref);                                                                          # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
       
-      my $i   = 0;
-      my $sn  = 0;  
-        
-      while ($data->{'data'}{'data'}[$i]) {
-          
-          if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
-              $i += 1;
-              next;
-          }
-          
-          $snapid = $data->{data}{data}[$i]{id};
-          my @t   = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
-          my @d   = split("-", $t[0]);
-          
-          my $createdTm;
-          
-          if($lang eq "DE") {
-              $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-          } 
-          else {
-              $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
-          }
-          
-          my $fileName  = $data->{data}{data}[$i]{fileName};
-          my $imageData = $data->{data}{data}[$i]{imageData};                                                    # Image data of snapshot in base64 format 
-        
-          # Schnappschuss Hash zum Versand wird erstellt
-          ##############################################
-          if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-              $cache = cache($name, "c_init");                                                                   # Cache initialisieren  
-              
-              Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-              
-              if(!$cache || $cache eq "internal" ) {
-                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
-                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
-                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
-                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
-              } 
-              else {
-                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{snapid}"    ,$snapid);
-                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{createdTm}" ,$createdTm);
-                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{fileName}"  ,$fileName); 
-                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);                             
-              }
-              
-              Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
-          }
-        
-          # Snaphash erstellen für Galerie
-          ################################
-          $cache = cache($name, "c_init");                                                                       # Cache initialisieren  
-          
-          Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-          
-          if(!$cache || $cache eq "internal" ) {
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
-          } 
-          else {
-              cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}"    ,$snapid);
-              cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}" ,$createdTm);
-              cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}"  ,$fileName);  
-              cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}" ,$imageData);                                
-          }
-          
-          Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                                                                         
-        
-          $sn += 1;
-          $i  += 1;
-        
-          undef $imageData;
-          undef $fileName;
-          undef $createdTm;
-      }
+      $paref->{tac} = $tac;
+      my $sn = __insertSnapsToCache ($paref);                                                                # neu erzeugte Snaps in SNAPHASH eintragen
 
       $paref->{sn} = $sn;
-      __copySnapsBackFromOld ($paref);                                                                           # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
+      __copySnapsBackFromOld ($paref);                                                                       # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
     
       # Schnappschüsse als Email / Telegram / SSChatBot versenden
       ###########################################################
+      my $cache = cache($name, "c_init");                                                                    # Cache initialisieren  
       if(!$cache || $cache eq "internal" ) { 
           prepareSendData ($hash, "getsnapgallery", $data{SSCam}{$name}{SENDSNAPS}{$tac});
       } 
@@ -7529,65 +7460,11 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
   } 
   else {
       # Schnappschußgalerie wird bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
-      # (Attr snapGalleryBoost=0)     ---   !!  kein Versand !!
+      # (Attr snapGalleryBoost=0)         !!  kein Versand !!
       #########################################################################################     
-      $hash->{HELPER}{TOTALCNT} = $data->{data}{total};                                                          # total Anzahl Schnappschüsse
+      $hash->{HELPER}{TOTALCNT} = $data->{data}{total};                                                   # total Anzahl Schnappschüsse
     
-      __moveSnaphashToOld ($paref);                                                                              # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
-    
-      my $i  = 0;
-      my $sn = 0;
-      
-      while ($data->{'data'}{'data'}[$i]) {
-          
-          if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
-              $i += 1;
-              next;
-          }   
-          
-          $snapid       = $data->{data}{data}[$i]{id};
-          my $createdTm = $data->{data}{data}[$i]{createdTm};
-          my $fileName  = $data->{data}{data}[$i]{fileName};
-          my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
-    
-          my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
-          my @d = split("-", $t[0]);
-          
-          if($lang eq "DE") {
-              $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-          } 
-          else {
-              $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
-          }
-        
-          # Snaphash erstellen für Galerie #
-          ##################################
-          $cache = cache($name, "c_init");                                                                 # Cache initialisieren  
-          
-          Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-          
-          if(!$cache || $cache eq "internal" ) {
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
-              $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
-          } 
-          else {
-              cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}",    $snapid   );
-              cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}", $createdTm);
-              cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}",  $fileName );  
-              cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}", $imageData);                                
-          }
-          
-          Log3($name, 4, "$name - Snap '$sn' added to gallery hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
-        
-          $sn += 1;
-          $i  += 1;
-        
-          undef $imageData;
-          undef $fileName;
-          undef $createdTm;
-      }
+      my $sn = __insertSnapsToCache ($paref);                                                             # neu erzeugte Snaps in SNAPHASH eintragen
     
       $paref->{sn} = $sn;
       __copySnapsBackFromOld ($paref);                                                                    # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
@@ -7613,7 +7490,6 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
 
   setReadingErrorNone( $hash, 1 );               
 
-  undef $g;
   delete $hash->{HELPER}{GETSNAPGALLERY};                               # Steuerbit getsnapgallery      
   delete $data{SSCam}{$name}{SNAPOLDHASH};
   
@@ -7720,7 +7596,7 @@ return;
 # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben 
 # und in SNAPHASH löschen
 ###############################################################################
-sub __moveSnaphashToOld {
+sub __moveSnapCacheToOld {
   my $paref = shift;
   my $name  = $paref->{name};
   my $aref  = $paref->{aref};
@@ -7770,7 +7646,110 @@ return;
 }
 
 ###############################################################################
-#     gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
+#                neu erzeugte Snaps in Cache eintragen
+#                SNAPHASH  = Anzeigehash im Cache für Galerie
+#                SENDSNAPS = zu versendende Snaps im Cache Hash
+###############################################################################
+sub __insertSnapsToCache {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};                                                                              # decodierte JSON Daten
+  my $camname = $paref->{camname};
+  my $tac     = $paref->{tac} // q{};
+
+  my $lang    = AttrVal("global","language","EN");
+  
+  my $i  = 0;
+  my $sn = 0;
+  
+  my $cache;
+
+  while ($data->{'data'}{'data'}[$i]) {
+      
+      if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
+          $i += 1;
+          next;
+      }   
+      
+      my $snapid    = $data->{data}{data}[$i]{id};
+      my $fileName  = $data->{data}{data}[$i]{fileName};
+      my $imageData = $data->{data}{data}[$i]{imageData};                                                    # Image data of snapshot in base64 format 
+
+      my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
+      my @d = split("-", $t[0]);
+      
+      my $createdTm;
+      if($lang eq "DE") {
+          $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+      } 
+      else {
+          $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+      }
+      
+      # Schnappschuss Hash zum Versand wird erstellt
+      ##############################################
+      if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
+          if($tac) {
+              $cache = cache($name, "c_init");                                                               # Cache initialisieren  
+              
+              Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+              
+              if(!$cache || $cache eq "internal" ) {
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
+              } 
+              else {
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{snapid}"    ,$snapid);
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{createdTm}" ,$createdTm);
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{fileName}"  ,$fileName); 
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);                             
+              }
+              
+              Log3($name,4, "$name - Snap '$sn' (tac: $tac) added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
+          }
+          else {
+              Log3($name, 1, "$name - ERROR - try to send snapshots without transaction. Send process is discarded.");
+          }
+      }
+  
+      # Snaphash erstellen für Galerie
+      ################################  
+      $cache = cache($name, "c_init");                                                                      # Cache initialisieren  
+      
+      Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+      
+      if(!$cache || $cache eq "internal" ) {
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
+      } 
+      else {
+          cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}",    $snapid   );
+          cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}", $createdTm);
+          cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}",  $fileName );  
+          cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}", $imageData);                                
+      }
+      
+      Log3($name, 4, "$name - Snap '$sn' added to gallery view hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
+    
+      $sn += 1;
+      $i  += 1;
+    
+      undef $imageData;
+      undef $fileName;
+      undef $createdTm;
+  }
+
+return $sn;
+}
+
+###############################################################################
+#     gesicherte Schnappschußdaten aus Cache SNAPOLDHASH an 
+#     Cache SNAPHASH anhängen
 ###############################################################################
 sub __copySnapsBackFromOld {
   my $paref = shift;
@@ -9606,8 +9585,9 @@ sub composeGallery {
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
   
   if(!$cache || $cache eq "internal" ) {
-      $count = scalar keys %{$data{SSCam}{$name}{SNAPHASH}} // 0;                                    # Anzahl Bilddaten im Cache
-      my $i  = 1;
+      $count     = scalar keys %{$data{SSCam}{$name}{SNAPHASH}} // 0;                                # Anzahl Bilddaten im Cache
+      $htmlCode  =~ s{_LIMIT_}{$count}xms;                                                           # Platzhalter Snapanzahl im Header mit realem Wert ersetzen
+      my $i      = 1;
       
       for my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
           if($i > $limit) {
@@ -9633,7 +9613,6 @@ sub composeGallery {
           $idata = "";
           $i++;
       }
-  
   } 
   else {
       my @as;
@@ -9641,10 +9620,12 @@ sub composeGallery {
           next if $ck !~ /\{SNAPHASH\}\{\d+\}\{.*\}/x;
           $ck =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/x;
           push @as,$ck if($ck =~ /^\d+$/x);
-      }      
+      }
+      
       my %seen;
       my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                         # distinct / unique the keys 
       $count     = scalar @unique // 0;                                                             # Anzahl Bilddaten im Cache
+      $htmlCode  =~ s{_LIMIT_}{$count}xms;                                                          # Platzhalter Snapanzahl im Header mit realem Wert ersetzen     
       my $i      = 1;
       
       for my $key (@unique) {
@@ -9689,9 +9670,7 @@ sub composeGallery {
       $htmlCode .= "</td>";
       $htmlCode .= "</tr>";
   }
-  
-  $htmlCode  =~ s{_LIMIT_}{$count}xms;                                                 # Platzhalter Snapanzahl im Header mit realem Wert ersetzen  
-  
+    
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
@@ -9758,23 +9737,29 @@ sub prepareSendData {
    # prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
    # Bilddaten jeder Kamera werden nach Erstellung dem zentralen Schnappshußhash hinzugefügt
    # Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
+   
    my $asref;
    my @allsvs = devspec2array("TYPE=SSCam:FILTER=MODEL=SVS");
-   for (@allsvs) {
-       my $svshash;
-       $svshash = $defs{$_} if($defs{$_});
-       next if(!$svshash || !AttrVal($_, "snapEmailTxt", "") || !$svshash->{HELPER}{CANSENDSNAP});  # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
+   
+   for my $svs (@allsvs) {
+       my $svshash = $defs{$svs} if($defs{$svs});
+       next if(!$svshash || !AttrVal($svs, "snapEmailTxt", "") || !$svshash->{HELPER}{CANSENDSNAP});  # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
+       
        if($svshash->{HELPER}{ALLSNAPREF}) { 
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                                          # Hashreferenz zum summarischen Snaphash
+           $asref = $svshash->{HELPER}{ALLSNAPREF};                                                   # Hashreferenz zum summarischen Snaphash
+           
            for my $key (keys%{$asref}) {
-               if($key eq $name) {                                                           # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
+               if($key eq $name) {                                                                    # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
                     if($type eq "internal") {
+                        
                         for my $pkey (keys%{$dat}) {
                             my $nkey = time()+int(rand(1000));
-                            $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                            
+                            $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};              # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};              # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                            $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};               # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                            
+                            Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
                         }
                     } 
                     else {
@@ -9787,22 +9772,26 @@ sub prepareSendData {
                                               } 
                                             );      
                         my %seen;
-                        my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
+                        my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                           # distinct / unique the keys 
 
                         for my $pkey (@unique) {
                             next if(!cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
                             my $nkey = time()+int(rand(1000));
+                            
                             $asref->{$nkey.$pkey}{createdTm} = cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
                             $asref->{$nkey.$pkey}{imageData} = cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
                             $asref->{$nkey.$pkey}{fileName}  = cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                            
+                            Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
                         }               
                     }                    
+                    
                     delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
                     delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
                }
            }
            $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
+           
            for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
                if(!$asref->{$key}) {
                    return;                                             # Bildhash noch nicht komplett                                 
@@ -9810,11 +9799,13 @@ sub prepareSendData {
            }
        
            delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
-           $hash   = $svshash;                                         # Hash durch SVS-Hash ersetzt
-           $name   = $svshash->{NAME};                                 # Name des auslösenden SVS-Devices wird eingesetzt  
+           $hash = $svshash;                                           # Hash durch SVS-Hash ersetzt
+           $name = $svshash->{NAME};                                   # Name des auslösenden SVS-Devices wird eingesetzt  
+           
            Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
            
            my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
+           
            if(!$cache || $cache eq "internal" ) {
                delete $data{SSCam}{RS};           
                for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
@@ -9840,34 +9831,42 @@ sub prepareSendData {
    
    my $sp       = AttrVal($name, "smtpPort", 25); 
    my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
+   
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
+   
+   my $date     = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time     = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
    
    my $sslfrominit = 0;
    my $smtpsslport = 465;
+   
    if(AttrVal($name,"smtpSSLPort",0)) {
        $sslfrominit = 1;
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
-   $tac = $hash->{HELPER}{TRANSACTION};                               # Code der laufenden Transaktion
+   $tac                                 = $hash->{HELPER}{TRANSACTION};         # Code der laufenden Transaktion
    
-   $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                          # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
-                                                                      # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe closeTrans)
+   $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                                    # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
+                                                                                # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe closeTrans)
+   
    Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
    
    ### Schnappschüsse als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
+   ######################################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANSENDSNAP}) {     
        delete $hash->{HELPER}{CANSENDSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt = delete $hash->{HELPER}{SMTPMSG};
        $mt    =~ s/['"]//xg;   
        
        my($subj,$body)   = split(",", $mt, 2);
        my($subjk,$subjt) = split("=>", $subj);
        my($bodyk,$bodyt) = split("=>", $body);
+       
        $subjk = trim($subjk);
        $subjt = trim($subjt);
        $subjt =~ s/\$CAM/$calias/gx;
@@ -9878,7 +9877,8 @@ sub prepareSendData {
        $bodyt =~ s/\$CAM/$calias/gx;
        $bodyt =~ s/\$DATE/$date/gx;
        $bodyt =~ s/\$TIME/$time/gx;
-       my %smtpmsg = ();
+       
+       my %smtpmsg      = ();
        $smtpmsg{$subjk} = "$subjt";
        $smtpmsg{$bodyk} = "$bodyt";
            
@@ -9893,21 +9893,26 @@ sub prepareSendData {
                                 'smtpsslport'  => $smtpsslport, 
                                 'tac'          => $tac,                                  
                                }
-                             );
+                       );
+                       
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
    
    ### Aufnahmen als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
+   ################################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANSENDREC}) {     
        delete $hash->{HELPER}{CANSENDREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
        $mt     =~ s/['"]//gx;   
        
        my($subj,$body)   = split(",", $mt, 2);
        my($subjk,$subjt) = split("=>", $subj);
        my($bodyk,$bodyt) = split("=>", $body);
+       
        $subjk = trim($subjk);
        $subjt = trim($subjt);
        $subjt =~ s/\$CAM/$calias/gx;
@@ -9918,7 +9923,8 @@ sub prepareSendData {
        $bodyt =~ s/\$CAM/$calias/gx;
        $bodyt =~ s/\$DATE/$date/gx;
        $bodyt =~ s/\$TIME/$time/gx;
-       my %smtpmsg = ();
+       
+       my %smtpmsg      = ();
        $smtpmsg{$subjk} = "$subjt";
        $smtpmsg{$bodyk} = "$bodyt";
             
@@ -9933,21 +9939,26 @@ sub prepareSendData {
                                 'smtpsslport'  => $smtpsslport,
                                 'tac'          => $tac,                                      
                                }
-                             );
+                       );
+                       
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
 
    ### Schnappschüsse mit Telegram versenden
+   #########################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANTELESNAP}) {     
        # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELESNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt = delete $hash->{HELPER}{TELEMSG};
        $mt    =~ s/['"]//gx;
              
        my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
+       
        my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
        ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
        ($peerk,$peert)            = split("=>", $peers  ) if($peers);
@@ -9958,6 +9969,7 @@ sub prepareSendData {
        $peerk = trim($peerk) if($peerk);
        $peert = trim($peert) if($peert);
        $subjk = trim($subjk) if($subjk);
+       
        if($subjt) {
            $subjt = trim($subjt);
            $subjt =~ s/\$CAM/$calias/gx;
@@ -9965,7 +9977,7 @@ sub prepareSendData {
            $subjt =~ s/\$TIME/$time/gx;
        }       
        
-       my %telemsg = ();
+       my %telemsg      = ();
        $telemsg{$tbotk} = "$tbott" if($tbott);
        $telemsg{$peerk} = "$peert" if($peert);
        $telemsg{$subjk} = "$subjt" if($subjt);
@@ -9979,21 +9991,26 @@ sub prepareSendData {
                                    'peers'        => $telemsg{$peerk},                                      
                                    'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                   }
-                                );
+                          );
+                          
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                
    }
 
    ### Aufnahmen mit Telegram versenden
+   ####################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANTELEREC}) {   
        # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELEREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt = delete $hash->{HELPER}{TELERECMSG};
        $mt    =~ s/['"]//gx;
              
        my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
+       
        my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
        ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
        ($peerk,$peert)            = split("=>", $peers  ) if($peers);
@@ -10004,6 +10021,7 @@ sub prepareSendData {
        $peerk = trim($peerk) if($peerk);
        $peert = trim($peert) if($peert);
        $subjk = trim($subjk) if($subjk);
+       
        if($subjt) {
            $subjt = trim($subjt);
            $subjt =~ s/\$CAM/$calias/gx;
@@ -10011,7 +10029,7 @@ sub prepareSendData {
            $subjt =~ s/\$TIME/$time/gx;
        }       
        
-       my %telemsg = ();
+       my %telemsg      = ();
        $telemsg{$tbotk} = "$tbott" if($tbott);
        $telemsg{$peerk} = "$peert" if($peert);
        $telemsg{$subjk} = "$subjt" if($subjt);
@@ -10025,21 +10043,26 @@ sub prepareSendData {
                                     'tac'          => $tac,                                         
                                     'MediaStream'  => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
                                    }
-                                ); 
+                           );
+                           
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                  
    }
    
    ### Schnappschüsse mit Synology Chat versenden
+   ##############################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANCHATSNAP}) {     
        # snapChatTxt aus $hash->{HELPER}{CHATMSG}
        # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
        delete $hash->{HELPER}{CANCHATSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt = delete $hash->{HELPER}{CHATMSG};
        $mt    =~ s/['"]//gx;
              
        my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt);
+       
        my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
        ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
        ($peerk,$peert)            = split("=>", $peers  ) if($peers);
@@ -10050,6 +10073,7 @@ sub prepareSendData {
        $peerk = trim($peerk) if($peerk);
        $peert = trim($peert) if($peert);
        $subjk = trim($subjk) if($subjk);
+       
        if($subjt) {
            $subjt = trim($subjt);
            $subjt =~ s/\$CAM/$calias/gx;
@@ -10057,7 +10081,7 @@ sub prepareSendData {
            $subjt =~ s/\$TIME/$time/gx;
        }       
        
-       my %chatmsg = ();
+       my %chatmsg      = ();
        $chatmsg{$cbotk} = "$cbott" if($cbott);
        $chatmsg{$peerk} = "$peert" if($peert);
        $chatmsg{$subjk} = "$subjt" if($subjt);
@@ -10069,11 +10093,13 @@ sub prepareSendData {
                                'chatbot'        => $chatmsg{$cbotk}, 
                                'peers'          => $chatmsg{$peerk},
                               }
-                            );
+                      );
+                      
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                
    }
    
    ### Aufnahmen mit Synology Chat versenden
+   #########################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANCHATREC}) {   
        # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
        # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
@@ -10085,7 +10111,8 @@ sub prepareSendData {
        my $mt = delete $hash->{HELPER}{CHATRECMSG};
        $mt    =~ s/['"]//gx;
          
-       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt);         
+       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt); 
+       
        my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
        ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
        ($peerk,$peert)            = split("=>", $peers  ) if($peers);
@@ -10096,6 +10123,7 @@ sub prepareSendData {
        $peerk = trim($peerk) if($peerk);
        $peert = trim($peert) if($peert);
        $subjk = trim($subjk) if($subjk);
+       
        if($subjt) {
            $subjt = trim($subjt);
            $subjt =~ s/\$CAM/$calias/gx;
@@ -10103,7 +10131,7 @@ sub prepareSendData {
            $subjt =~ s/\$TIME/$time/gx;
        }     
        
-       my %chatmsg = ();
+       my %chatmsg      = ();
        $chatmsg{$cbotk} = "$cbott" if($cbott);
        $chatmsg{$peerk} = "$peert" if($peert);
        $chatmsg{$subjk} = "$subjt" if($subjt);
@@ -10115,7 +10143,8 @@ sub prepareSendData {
                                'chatbot' => $chatmsg{$cbotk},
                                'peers'   => $chatmsg{$peerk},                         
                               }
-                            ); 
+                      );
+                      
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                  
    }
    
