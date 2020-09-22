@@ -778,9 +778,26 @@ sub HYDRAWISE_ReadingsBulkUpdateIfChanged {
       readingsBulkUpdate( $hash, $reading, $value);
       readingsEndUpdate($hash, 1);
     }else{
-      readingsBeginUpdate ($hash);
-      readingsDelete( $hash, $reading );
-      readingsEndUpdate($hash, 1);
+      # Value not set
+#      print "hydrawise READING: $reading -> value not set \n";
+      if ($reading =~ m/_next$/)
+      {
+        readingsBeginUpdate ($hash);
+        readingsBulkUpdate( $hash, $reading, "idle");
+        readingsEndUpdate($hash, 1);
+      }
+#      else if ($reading =~ m/_run_minutes$/)
+#      {
+#        readingsBeginUpdate ($hash);
+#        readingsBulkUpdate( $hash, $reading, "none");
+#        readingsEndUpdate($hash, 1);
+#      }
+      else
+      {
+        readingsBeginUpdate ($hash);
+        readingsDelete( $hash, $reading );
+        readingsEndUpdate($hash, 1);
+      }
     }
     return;
 }
