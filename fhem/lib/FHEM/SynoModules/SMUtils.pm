@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.5.0');
+use version; our $VERSION = version->declare('1.6.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -56,6 +56,7 @@ our @EXPORT_OK = qw(
                      logout
                      setActiveToken
                      delActiveToken
+                     delCallParts
 					 setReadingErrorNone
                    );
                      
@@ -634,12 +635,27 @@ sub delActiveToken {
                
    $hash->{HELPER}{ACTIVE} = "off";
    
+   delCallParts ($hash);
+   
    if (AttrVal($name,"debugactivetoken",0)) {
        Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
    }  
    
 return;
 } 
+
+#############################################################################################
+#                     lösche Helper der erstellten CALL / ACALL Teile
+#        CALL / ACALL werden bei auslösen einer Aktion durch Set/Get erstellt
+#############################################################################################
+sub delCallParts { 
+   my $hash = shift;
+
+   delete $hash->{HELPER}{CALL};
+   delete $hash->{HELPER}{ACALL};
+   
+return;
+}
 
 #############################################################################################
 #            Readings Error & Errorcode auf 
