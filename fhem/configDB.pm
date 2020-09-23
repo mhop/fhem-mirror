@@ -645,7 +645,7 @@ sub cfgDB_MigrationImport {
 		if(defined($defs{$fn}{HOLIDAYFILE})) {
            push @files, $defs{$fn}{HOLIDAYFILE};
 		} else {
-           push @files, "$modpath/FHEM/".$fn.".holiday";
+           push @files, "$modpath/FHEM/holiday/".$fn.".holiday";
 		}
 	}
 
