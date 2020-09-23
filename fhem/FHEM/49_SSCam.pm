@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils ",
   "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
   "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
   "9.7.20" => "20.09.2020  control parse function by the hparse hash step 3 (refactored getsnapinfo, getsnapgallery, runView Snap) ",
@@ -10856,7 +10857,7 @@ return;
 ####################################################################################################
 #                                 nichtblockierendes Send EMail
 ####################################################################################################
-sub __sendEmailblocking {
+sub __sendEmailblocking {                                                    ## no critic 'not used' 
   my ($paref)      = @_;                                        # der Referent wird in cleanData gelöscht
   my $name         = delete $paref->{name};
   my $cc           = delete $paref->{smtpCc};
@@ -11149,7 +11150,7 @@ return "$name|''|$ret";
 ####################################################################################################
 #                   Auswertungsroutine nichtblockierendes Send EMail
 ####################################################################################################
-sub __sendEmaildone {
+sub __sendEmaildone {                                                        ## no critic 'not used'
   my $string = shift;
   my @a      = split("\\|",$string);
   my $hash   = $defs{$a[0]};
@@ -11177,7 +11178,7 @@ return;
 ####################################################################################################
 #                               Abbruchroutine Send EMail
 ####################################################################################################
-sub __sendEmailto {
+sub __sendEmailto {                                                          ## no critic 'not used' 
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME}; 
   
@@ -11870,6 +11871,44 @@ sub wdpollcaminfo {
 
     InternalTimer(gettimeofday()+$watchdogtimer, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
     
+return;
+}
+
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub setVersionInfo {
+  my $hash  = shift;
+  my $notes = shift;
+
+  my $v                    = (sortVersion("desc",keys %{$notes}))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  $hash->{HELPER}{VERSION_API}      = FHEM::SynoModules::API->VERSION()      // "unused";
+  $hash->{HELPER}{VERSION_SMUtils}  = FHEM::SynoModules::SMUtils->VERSION()  // "unused";
+  $hash->{HELPER}{VERSION_ErrCodes} = FHEM::SynoModules::ErrCodes->VERSION() // "unused";
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
+      
+      if($modules{$type}{META}{x_version}) {                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
+      } else {
+          $modules{$type}{META}{x_version} = $v; 
+      }
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                         # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );          ## no critic 'VERSION'                                      
+      }
+  
+  } else {                                                                               # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;
+  }
+  
 return;
 }
 
