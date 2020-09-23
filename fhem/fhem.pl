@@ -2319,17 +2319,18 @@ CommandDeleteAttr($$)
       next;
     }
 
-    if(@a == 1) {
+    if(@a == 1) { # Delete all attributes of a device
       delete($attr{$sdev});
-      addStructChange("deleteAttr", $sdev, $sdev);
-      DoTrigger("global", "DELETEATTR $sdev", 1) if($init_done);
 
-    } else {
-      delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
-      addStructChange("deleteAttr", $sdev, join(" ", @a));
-      DoTrigger("global", "DELETEATTR $sdev $a[1]", 1) if($init_done);
+    } else { # delete specified attribute(s)
+      if(defined($attr{$sdev})) {
+        map { delete($attr{$sdev}{$_}) if($_ =~ m/^$a[1]$/) }
+            keys %{$attr{$sdev}};
+      }
 
     }
+    addStructChange("deleteAttr", $sdev, join(" ", @a));
+    DoTrigger("global", "DELETEATTR $sdev ".join(" ",@a), 1) if($init_done);
 
   }
 

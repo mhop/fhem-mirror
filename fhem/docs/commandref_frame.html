@@ -822,6 +822,8 @@ The following local attributes are used by a wider range of devices:
   or all attributes for a device (if no &lt;attrname&gt; is defined).
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.<br>
+  &lt;attrname&gt; is in fact a regexp, complemented with ^ and $ as usual, so
+  a range of attributes can be deleted with one command.<br>
   After deleting the attribute, the global event "DELETEATTR" will be generated.
   <br>
 
