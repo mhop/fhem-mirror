@@ -40,14 +40,13 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.6.0');
+use version; our $VERSION = version->declare('1.7.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
                      getClHash 
                      trim
                      sortVersion
-                     setVersionInfo
                      jboolmap
                      setCredentials
                      getCredentials
@@ -165,46 +164,6 @@ sub sortVersion {
   }
   
 return @sorted;
-}
-
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my $hash  = shift  // carp "got no hash value"         && return;
-  my $notes = shift  // carp "got no vNotesIntern value" && return;
-  my $name  = $hash->{NAME};
-
-  my $v                    = (sortVersion("desc",keys %{$notes}))[0];
-  my $type                 = $hash->{TYPE};
-  my $pack                 = (caller)[0];                                                # Package des Callers
-  $hash->{HELPER}{PACKAGE} = $pack;                                                      
-  $hash->{HELPER}{VERSION} = $v;
-  
-  $hash->{HELPER}{VERSION_API}      = FHEM::SynoModules::API->VERSION()      // "unused";
-  $hash->{HELPER}{VERSION_SMUtils}  = FHEM::SynoModules::SMUtils->VERSION()  // "unused";
-  $hash->{HELPER}{VERSION_ErrCodes} = FHEM::SynoModules::ErrCodes->VERSION() // "unused";
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
-      
-      if($modules{$type}{META}{x_version}) {                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-      
-      if($pack eq "FHEM::$type" || $pack eq $type) {                                     # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );          ## no critic 'VERSION Reused'                                      
-      }
-  
-  } else {                                                                               # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
-return;
 }
 
 ###############################################################################
