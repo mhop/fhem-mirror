@@ -164,7 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils ",
+  "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
   "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
   "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
   "9.7.20" => "20.09.2020  control parse function by the hparse hash step 3 (refactored getsnapinfo, getsnapgallery, runView Snap) ",
@@ -9636,39 +9636,21 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt = delete $hash->{HELPER}{SMTPMSG};
-       $mt    =~ s/['"]//xg;   
-       
-       my($subj,$body)   = split(",", $mt, 2);
-       my($subjk,$subjt) = split("=>", $subj);
-       my($bodyk,$bodyt) = split("=>", $body);
-       
-       $subjk = trim($subjk);
-       $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
-       $bodyk = trim($bodyk);
-       $bodyt = trim($bodyt);
-       $bodyt =~ s/\$CAM/$calias/gx;
-       $bodyt =~ s/\$DATE/$date/gx;
-       $bodyt =~ s/\$TIME/$time/gx;
-       
-       my %smtpmsg      = ();
-       $smtpmsg{$subjk} = "$subjt";
-       $smtpmsg{$bodyk} = "$bodyt";
+       my $mt      = delete $hash->{HELPER}{SMTPMSG};     
+       my $smtpmsg = _prepSendMail ($hash, $calias, $mt);
            
-       $ret = _sendEmail($hash, {'subject'      => $smtpmsg{subject},   
-                                'part1txt'     => $smtpmsg{body}, 
-                                'part2type'    => 'image/jpeg',
-                                'smtpport'     => $sp,
-                                'sdat'         => $dat,
-                                'opmode'       => $OpMode,
-                                'smtpnousessl' => $nousessl,
-                                'sslfrominit'  => $sslfrominit,
-                                'smtpsslport'  => $smtpsslport, 
-                                'tac'          => $tac,                                  
-                               }
+       $ret = _sendEmail($hash, {
+                                 'subject'      => $smtpmsg->{subject},   
+                                 'part1txt'     => $smtpmsg->{body}, 
+                                 'part2type'    => 'image/jpeg',
+                                 'smtpport'     => $sp,
+                                 'sdat'         => $dat,
+                                 'opmode'       => $OpMode,
+                                 'smtpnousessl' => $nousessl,
+                                 'sslfrominit'  => $sslfrominit,
+                                 'smtpsslport'  => $smtpsslport, 
+                                 'tac'          => $tac,                                  
+                                }
                         );
                        
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
@@ -9682,39 +9664,21 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
-       $mt     =~ s/['"]//gx;   
-       
-       my($subj,$body)   = split(",", $mt, 2);
-       my($subjk,$subjt) = split("=>", $subj);
-       my($bodyk,$bodyt) = split("=>", $body);
-       
-       $subjk = trim($subjk);
-       $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
-       $bodyk = trim($bodyk);
-       $bodyt = trim($bodyt);
-       $bodyt =~ s/\$CAM/$calias/gx;
-       $bodyt =~ s/\$DATE/$date/gx;
-       $bodyt =~ s/\$TIME/$time/gx;
-       
-       my %smtpmsg      = ();
-       $smtpmsg{$subjk} = "$subjt";
-       $smtpmsg{$bodyk} = "$bodyt";
+       my $mt      = delete $hash->{HELPER}{SMTPRECMSG};
+       my $smtpmsg = _prepSendMail ($hash, $calias, $mt);
             
-       $ret = _sendEmail($hash, {'subject'      => $smtpmsg{subject},   
-                                'part1txt'     => $smtpmsg{body}, 
-                                'part2type'    => 'video/mpeg',
-                                'smtpport'     => $sp,
-                                'vdat'         => $dat,
-                                'opmode'       => $OpMode,
-                                'smtpnousessl' => $nousessl,
-                                'sslfrominit'  => $sslfrominit,
-                                'smtpsslport'  => $smtpsslport,
-                                'tac'          => $tac,                                      
-                               }
+       $ret = _sendEmail($hash, {
+                                 'subject'      => $smtpmsg->{subject},   
+                                 'part1txt'     => $smtpmsg->{body}, 
+                                 'part2type'    => 'video/mpeg',
+                                 'smtpport'     => $sp,
+                                 'vdat'         => $dat,
+                                 'opmode'       => $OpMode,
+                                 'smtpnousessl' => $nousessl,
+                                 'sslfrominit'  => $sslfrominit,
+                                 'smtpsslport'  => $smtpsslport,
+                                 'tac'          => $tac,                                      
+                                }
                         );
                        
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
@@ -9730,43 +9694,19 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt = delete $hash->{HELPER}{TELEMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
-       
-       my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
-       ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $tbotk = trim($tbotk) if($tbotk);
-       $tbott = trim($tbott) if($tbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
-       
-       my %telemsg      = ();
-       $telemsg{$tbotk} = "$tbott" if($tbott);
-       $telemsg{$peerk} = "$peert" if($peert);
-       $telemsg{$subjk} = "$subjt" if($subjt);
+       my $mt      = delete $hash->{HELPER}{TELEMSG};
+       my $telemsg = _prepSendTelegram ($hash, $calias, $mt);
         
-       $ret = _sendTelegram($hash, {'subject'      => $telemsg{subject},
-                                   'part2type'    => 'image/jpeg',
-                                   'sdat'         => $dat,
-                                   'opmode'       => $OpMode,
-                                   'tac'          => $tac, 
-                                   'telebot'      => $telemsg{$tbotk}, 
-                                   'peers'        => $telemsg{$peerk},                                      
-                                   'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
-                                  }
+       $ret = _sendTelegram($hash, {
+                                    'subject'     => $telemsg->{subject},
+                                    'part2type'   => 'image/jpeg',
+                                    'sdat'        => $dat,
+                                    'opmode'      => $OpMode,
+                                    'tac'         => $tac, 
+                                    'telebot'     => $telemsg->{tbot}, 
+                                    'peers'       => $telemsg->{peers},                                      
+                                    'MediaStream' => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
+                                   }
                            );
                           
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                
@@ -9782,43 +9722,19 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt = delete $hash->{HELPER}{TELERECMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
-       
-       my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
-       ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $tbotk = trim($tbotk) if($tbotk);
-       $tbott = trim($tbott) if($tbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
-       
-       my %telemsg      = ();
-       $telemsg{$tbotk} = "$tbott" if($tbott);
-       $telemsg{$peerk} = "$peert" if($peert);
-       $telemsg{$subjk} = "$subjt" if($subjt);
+       my $mt      = delete $hash->{HELPER}{TELERECMSG};
+       my $telemsg = _prepSendTelegram ($hash, $calias, $mt);
        
        $vdat = $dat;  
-       $ret  = _sendTelegram($hash, {'subject'      => $telemsg{subject},
-                                    'vdat'         => $vdat,
-                                    'opmode'       => $OpMode, 
-                                    'telebot'      => $telemsg{$tbotk}, 
-                                    'peers'        => $telemsg{$peerk},
-                                    'tac'          => $tac,                                         
-                                    'MediaStream'  => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
-                                   }
+       $ret  = _sendTelegram($hash, {
+                                     'subject'     => $telemsg->{subject},
+                                     'vdat'        => $vdat,
+                                     'opmode'      => $OpMode, 
+                                     'telebot'     => $telemsg->{tbot}, 
+                                     'peers'       => $telemsg->{peers},
+                                     'tac'         => $tac,                                         
+                                     'MediaStream' => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
+                                    }
                             );
                            
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                  
@@ -9834,41 +9750,17 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt = delete $hash->{HELPER}{CHATMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt);
-       
-       my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
-       ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $cbotk = trim($cbotk) if($cbotk);
-       $cbott = trim($cbott) if($cbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
-       
-       my %chatmsg      = ();
-       $chatmsg{$cbotk} = "$cbott" if($cbott);
-       $chatmsg{$peerk} = "$peert" if($peert);
-       $chatmsg{$subjk} = "$subjt" if($subjt);
+       my $mt      = delete $hash->{HELPER}{CHATMSG};
+       my $chatmsg = _prepSendChat ($hash, $calias, $mt);
         
-       $ret = _sendChat($hash, {'subject'        => $chatmsg{subject},
-                               'opmode'         => $OpMode,
-                               'tac'            => $tac,
-                               'sdat'           => $dat,                                     
-                               'chatbot'        => $chatmsg{$cbotk}, 
-                               'peers'          => $chatmsg{$peerk},
-                              }
+       $ret = _sendChat($hash, {
+                                'subject' => $chatmsg->{subject},
+                                'opmode'  => $OpMode,
+                                'tac'     => $tac,
+                                'sdat'    => $dat,                                     
+                                'chatbot' => $chatmsg->{chatbot}, 
+                                'peers'   => $chatmsg->{peers},
+                               }
                        );
                       
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                
@@ -9884,41 +9776,17 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt = delete $hash->{HELPER}{CHATRECMSG};
-       $mt    =~ s/['"]//gx;
-         
-       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt); 
+       my $mt      = delete $hash->{HELPER}{CHATRECMSG};
+       my $chatmsg = _prepSendChat ($hash, $calias, $mt);
        
-       my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
-       ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $cbotk = trim($cbotk) if($cbotk);
-       $cbott = trim($cbott) if($cbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }     
-       
-       my %chatmsg      = ();
-       $chatmsg{$cbotk} = "$cbott" if($cbott);
-       $chatmsg{$peerk} = "$peert" if($peert);
-       $chatmsg{$subjk} = "$subjt" if($subjt);
-       
-       $ret = _sendChat($hash, {'subject' => $chatmsg{subject},
-                               'opmode'  => $OpMode, 
-                               'tac'     => $tac,  
-                               'vdat'    => $dat,
-                               'chatbot' => $chatmsg{$cbotk},
-                               'peers'   => $chatmsg{$peerk},                         
-                              }
+       $ret = _sendChat($hash, {
+                                'subject' => $chatmsg->{subject},
+                                'opmode'  => $OpMode, 
+                                'tac'     => $tac,  
+                                'vdat'    => $dat,
+                                'chatbot' => $chatmsg->{chatbot},
+                                'peers'   => $chatmsg->{peers},                         
+                               }
                        );
                       
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                  
@@ -9927,6 +9795,47 @@ sub prepareSendData {
    closeTrans($hash) if($hash->{HELPER}{TRANSACTION} eq "multiple_snapsend");     # Transaction Sammelversand (SVS) schließen, Daten bereinigen 
    
 return;
+}
+
+###############################################################################
+#                 Vorbereitung Versand Chatnachrichten
+###############################################################################
+sub _prepSendChat { 
+   my $hash   = shift;
+   my $calias = shift;
+   my $mt     = shift;
+   my $name   = $hash->{NAME};
+
+   my ($cbott,$peert,$subjt); 
+   
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   
+   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
+   
+   $mt =~ s/['"]//gx;
+   
+   my ($chatbot,$peers,$subj) =  split(",",  $mt, 3  );
+   $cbott                     = (split("=>", $chatbot))[1] if($chatbot);
+   $peert                     = (split("=>", $peers  ))[1] if($peers);
+   $subjt                     = (split("=>", $subj   ))[1] if($subj);
+
+   $cbott = trim($cbott) if($cbott);
+   $peert = trim($peert) if($peert);
+   
+   if($subjt) {
+       $subjt = trim($subjt);
+       $subjt =~ s/\$CAM/$calias/gx;
+       $subjt =~ s/\$DATE/$date/gx;
+       $subjt =~ s/\$TIME/$time/gx;
+   }     
+   
+   my %chatmsg       = ();
+   $chatmsg{chatbot} = "$cbott" if($cbott);
+   $chatmsg{peers}   = "$peert" if($peert);
+   $chatmsg{subject} = "$subjt" if($subjt);
+   
+return \%chatmsg;
 }
 
 #############################################################################################
@@ -10205,6 +10114,47 @@ sub __extractForChat {
   $subject =~ s/\$CTIME/$ct/gx;
  
 return ($subject,$fname);
+}
+
+###############################################################################
+#                 Vorbereitung Versand Telegramnachrichten
+###############################################################################
+sub _prepSendTelegram { 
+   my $hash   = shift;
+   my $calias = shift;
+   my $mt     = shift;
+   my $name   = $hash->{NAME};
+
+   my ($tbott,$peert,$subjt);
+   
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   
+   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
+   
+   $mt    =~ s/['"]//gx;
+   
+   my ($telebot,$peers,$subj) =  split(",",  $mt, 3  );
+   $tbott                     = (split("=>", $telebot))[1] if($telebot);
+   $peert                     = (split("=>", $peers  ))[1] if($peers);
+   $subjt                     = (split("=>", $subj   ))[1] if($subj);
+
+   $tbott = trim($tbott) if($tbott);
+   $peert = trim($peert) if($peert);
+   
+   if($subjt) {
+       $subjt = trim($subjt);
+       $subjt =~ s/\$CAM/$calias/gx;
+       $subjt =~ s/\$DATE/$date/gx;
+       $subjt =~ s/\$TIME/$time/gx;
+   }       
+   
+   my %telemsg       = ();
+   $telemsg{tbot}    = "$tbott" if($tbott);
+   $telemsg{peers}   = "$peert" if($peert);
+   $telemsg{subject} = "$subjt" if($subjt);
+   
+return \%telemsg;
 }
 
 #############################################################################################
@@ -10732,6 +10682,43 @@ sub __TBotIdentifyStream {
   return (-30,"mpg") if ( $msg =~ /^....\x66\x74\x79\x70\x69\x73\x6f\x6d/x );    # mp4     
 
 return (0,undef);
+}
+
+###############################################################################
+#                 Vorbereitung Versand Mail Nachrichten
+###############################################################################
+sub _prepSendMail { 
+   my $hash   = shift;
+   my $calias = shift;
+   my $mt     = shift;
+   my $name   = $hash->{NAME};
+   
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+   
+   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
+   
+   $mt =~ s/['"]//gx;   
+   
+   my($subj,$body) =  split(",", $mt, 2);
+   my $subjt       = (split("=>", $subj))[1];
+   my $bodyt       = (split("=>", $body))[1];
+   
+   $subjt = trim($subjt);
+   $subjt =~ s/\$CAM/$calias/gx;
+   $subjt =~ s/\$DATE/$date/gx;
+   $subjt =~ s/\$TIME/$time/gx;
+   
+   $bodyt = trim($bodyt);
+   $bodyt =~ s/\$CAM/$calias/gx;
+   $bodyt =~ s/\$DATE/$date/gx;
+   $bodyt =~ s/\$TIME/$time/gx;
+   
+   my %smtpmsg       = ();
+   $smtpmsg{subject} = "$subjt";
+   $smtpmsg{body}    = "$bodyt";
+   
+return \%smtpmsg;
 }
 
 #############################################################################################
