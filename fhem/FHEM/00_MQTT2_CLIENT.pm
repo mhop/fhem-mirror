@@ -220,10 +220,11 @@ MQTT2_CLIENT_Disco($;$$)
   delete($hash->{BUF});
 
   if($hash->{disconnectTimerHash}) {
-    readingsSingleUpdate($hash, "state", "disconnected", 1);
     RemoveInternalTimer($hash->{disconnectTimerHash});
     delete($hash->{disconnectTimerHash});
   }
+
+  readingsSingleUpdate($hash, "state", "disconnected", 1);
 }
 
 sub
@@ -318,12 +319,12 @@ sub
 MQTT2_CLIENT_Set($@)
 {
   my ($hash, @a) = @_;
-  my %sets = ( password=>2, publish=>2 );
+  my %sets = ( password=>2, publish=>2, connect=>0, disconnect=>0 );
   my $name = $hash->{NAME};
   shift(@a);
 
   return "Unknown argument ?, choose one of ".join(" ", keys %sets)
-        if(!$a[0] || !$sets{$a[0]});
+        if(!$a[0] || !defined($sets{$a[0]}));
 
   if($a[0] eq "publish") {
     shift(@a);
@@ -343,6 +344,12 @@ MQTT2_CLIENT_Set($@)
     delete($hash->{authError});
     setKeyValue($name, $a[1]); # will delete, if argument is empty
     MQTT2_CLIENT_Disco($hash) if($init_done);
+
+  } elsif($a[0] eq "connect") {
+    MQTT2_CLIENT_connect($hash) if(!$hash->{FD});
+
+  } elsif($a[0] eq "disconnect") {
+    MQTT2_CLIENT_Disco($hash, 1) if($hash->{FD});
 
   }
   return undef;
@@ -493,6 +500,11 @@ MQTT2_CLIENT_doPublish($@)
   }
   MQTT2_CLIENT_updateDisconnectTimer($hash);
 
+  if(!$hash->{FD}) {
+    Log3 $name, 4, "$name: publish to $topic while not connected";
+    return;
+  }
+
   my $hdr = 0x30;
   my $pi = "";
   $hdr += 1 if($retain);
@@ -639,6 +651,11 @@ MQTT2_CLIENT_getStr($$)
     <li>password &lt;password&gt; value<br>
       set the password, which is stored in the FHEM/FhemUtils/uniqueID file.
       If the argument is empty, the password will be deleted.
+      </li><br>
+    <li>connect<br>
+        disconnect<br>
+      manually connect or disconnect to the MQTT server.  Needed for some
+      strange embedded server.
       </li>
   </ul>
   <br>
