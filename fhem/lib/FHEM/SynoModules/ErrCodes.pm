@@ -32,16 +32,17 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.1.0');
+use version; our $VERSION = version->declare('1.2.0');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
-  SSCam     => {fnerrauth => "_errauthsscam", fnerr => "_errsscam"  },    
-  SSCal     => {fnerrauth => "_errauthsscal", fnerr => "_errsscal"  },
-  SSChatBot => {                              fnerr => "_errsschat" },
+  SSCam     => {fnerrauth => \&_errauthsscam,  fnerr => \&_errsscam  },    
+  SSCal     => {fnerrauth => \&_errauthsscal,  fnerr => \&_errsscal  },
+  SSChatBot => {                               fnerr => \&_errsschat },
+  SSFile    => {fnerrauth => \&_errauthssfile, fnerr => \&_errssfile },
 );
 
 # Standard Rückgabewert wenn keine Message zum Error Code / keine Rückgabefunktion gefunden wurde
@@ -173,6 +174,80 @@ my %errsschat = (                                                       # Standa
   900 => "malformed JSON string received from Synology Chat Server",
 );
 
+## SSFile ##
+my %errauthssfile = (                                                   # Authentification Error Codes der File Station API
+  400 => "No such account or incorrect password",
+  401 => "Account disabled",
+  402 => "Permission denied",
+  403 => "2-step verification code required",
+  404 => "Failed to authenticate 2-step verification code",
+);
+
+my %errssfile = (                                                       # Standard Error Codes der File Station API
+  100  => "Unknown error",
+  101  => "No parameter of API, method or version",
+  102  => "The requested API does not exist",
+  103  => "The requested method does not exist",
+  104  => "The requested version does not support the functionality",
+  105  => "The logged in session does not have permission",
+  106  => "Session timeout",
+  107  => "Session interrupted by duplicate login",
+  400  => "Invalid parameter of file operation",
+  401  => "Unknown error of file operation",
+  402  => "System is too busy",
+  403  => "Invalid user does this file operation",
+  404  => "Invalid group does this file operation",
+  405  => "Invalid user and group does this file operation",
+  406  => "Can’t get user/group information from the account server",
+  407  => "Operation not permitted",
+  408  => "No such file or directory",
+  409  => "Non-supported file system",
+  410  => "Failed to connect internet-based file system (ex: CIFS)",
+  411  => "Read-only file system",
+  412  => "Filename too long in the non-encrypted file system",
+  413  => "Filename too long in the encrypted file system",
+  414  => "File already exists",
+  415  => "Disk quota exceeded",
+  416  => "No space left on device",
+  417  => "Input/output error",
+  418  => "Illegal name or path",
+  419  => "Illegal file name",
+  420  => "Illegal file name on FAT file system",
+  421  => "Device or resource busy",
+  599  => "No such task of the file operation",
+  800  => "A folder path of favorite folder is already added to user’s favorites",
+  801  => "A name of favorite folder conflicts with an existing folder path in the user's favorites",
+  802  => "There are too many favorites to be added",
+  900  => "Failed to delete file(s)/folder(s). More information in <errors> object.",
+  1000 => "Failed to copy files/folders. More information in <errors> object.",
+  1001 => "Failed to move files/folders. More information in <errors> object.",
+  1002 => "An error occurred at the destination. More information in <errors> object",
+  1003 => "Cannot overwrite or skip the existing file because no overwrite parameter is given.",
+  1004 => "File cannot overwrite a folder with the same name, or folder cannot overwrite a file with the same name.",
+  1006 => "Cannot copy/move file/folder with special characters to a FAT32 file system.",
+  1007 => "Cannot copy/move a file bigger than 4G to a FAT32 file system.",
+  1100 => "Failed to create a folder. More information in <errors> object",
+  1101 => "The number of folders to the parent folder would exceed the system limitation",
+  1200 => "Failed to rename it. More information in <errors> object",
+  1300 => "Failed to compress files/folders",
+  1301 => "Cannot create the archive because the given archive name is too long",
+  1400 => "Failed to extract files.",
+  1401 => "Cannot open the file as archive",
+  1402 => "Failed to read archive data error",
+  1403 => "Wrong password",
+  1404 => "Failed to get the file and dir list in an archive",
+  1405 => "Failed to find the item ID in an archive file",
+  1800 => "There is no Content-Length information in the HTTP header or the received size doesn't match the value of Content-Length information in the HTTP header",
+  1801 => "Wait too long, no date can be received from client (Default maximum wait time is 3600 seconds)",
+  1802 => "No filename information in the last part of file content",
+  1803 => "Upload connection is cancelled",
+  1804 => "Failed to upload too big file to FAT file system",
+  1805 => "Can't overwrite or skip the existed file, if no overwrite parameter is given",
+  2000 => "Sharing link does not exist",
+  2001 => "Cannot generate sharing link because too many sharing links exist",
+  2002 => "Failed to access sharing links",
+);
+
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
 ##############################################################################
@@ -180,13 +255,11 @@ sub expErrorsAuth {
   my $hash      = shift // carp "got no hash value !"           && return;
   my $errorcode = shift // carp "got no error code to analyse"  && return;
   my $type      = $hash->{TYPE};
-  
-  no strict "refs";                                                      ## no critic 'NoStrict'  
+   
   if($hterr{$type} && defined &{$hterr{$type}{fnerrauth}}) {
       my $error = &{$hterr{$type}{fnerrauth}} ($errorcode);
       return $error;
   }
-  use strict "refs";
   
   carp $noauthfunc." ".$type;
 
@@ -200,13 +273,11 @@ sub expErrors {
   my $hash      = shift // carp "got no hash value !"           && return;
   my $errorcode = shift // carp "got no error code to analyse"  && return;
   my $type      = $hash->{TYPE};
-  
-  no strict "refs";                                                      ## no critic 'NoStrict'  
+   
   if($hterr{$type} && defined &{$hterr{$type}{fnerr}}) {
       my $error = &{$hterr{$type}{fnerr}} ($errorcode);
       return $error;
   }
-  use strict "refs";
   
   carp $nofunc." ".$type;
 
@@ -217,7 +288,7 @@ return q{};
 # Liefert Fehlertext für einen 
 # Authentification Error Code der Surveillance Station API
 ##############################################################################
-sub _errauthsscam {                                    ## no critic "not used"
+sub _errauthsscam {                                    
   my $errorcode = shift;
   
   my $error = $errauthsscam{"$errorcode"} // $nofound." ".$errorcode;
@@ -229,7 +300,7 @@ return $error;
 # Liefert Fehlertext für einen 
 # Standard Error Code der Surveillance Station API
 ##############################################################################
-sub _errsscam {                                        ## no critic "not used"
+sub _errsscam {           
   my $errorcode = shift;
   
   my $error = $errsscam{"$errorcode"} // $nofound." ".$errorcode;
@@ -241,7 +312,7 @@ return $error;
 # Liefert Fehlertext für einen 
 # Authentification Error Code der Calendar API
 ##############################################################################
-sub _errauthsscal {                                    ## no critic "not used"
+sub _errauthsscal {                     
   my $errorcode = shift;
   
   my $error = $errauthsscal{"$errorcode"} // $nofound." ".$errorcode;
@@ -253,10 +324,34 @@ return $error;
 # Liefert Fehlertext für einen 
 # Standard Error Code der Calendar API
 ##############################################################################
-sub _errsscal {                                        ## no critic "not used"
+sub _errsscal {                            
   my $errorcode = shift;
   
   my $error = $errsscal{"$errorcode"} // $nofound." ".$errorcode;
+
+return $error;
+}
+
+##############################################################################
+# Liefert Fehlertext für einen 
+# Authentification Error Code der File Station API
+##############################################################################
+sub _errauthssfile {                     
+  my $errorcode = shift;
+  
+  my $error = $errauthssfile{"$errorcode"} // $nofound." ".$errorcode;
+
+return $error;
+}
+
+##############################################################################
+# Liefert Fehlertext für einen 
+# Standard Error Code der der File Station API
+##############################################################################
+sub _errssfile {                            
+  my $errorcode = shift;
+  
+  my $error = $errssfile{"$errorcode"} // $nofound." ".$errorcode;
 
 return $error;
 }
