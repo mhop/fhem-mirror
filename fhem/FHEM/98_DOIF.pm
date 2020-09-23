@@ -3801,14 +3801,20 @@ sub DOIF_ExecTimer
   my $subname=${$timer}->{subname};
   my $count=${$timer}->{count};
   my $condition=${$timer}->{cond};
+  my $param=${$timer}->{param} if (defined ${$timer}->{param});
   my $cur_hs=$hs;
   $hs=$hash;
+  
   delete ($::defs{$name}{READINGS}{"timer_$timername"});
   if (defined ($condition) and !eval ($condition)) {
     $hs=$cur_hs;
     return (0);
   }
-  eval ("package DOIF;$subname");
+  if (!defined ($param)) {
+    eval ("package DOIF;$subname");
+  } else {
+    eval('package DOIF;no strict "refs";&{$subname}($param);use strict "refs"');
+  }
   if ($@) {
     ::Log3 ($hash->{NAME},1 , "$name error in $subname: $@");
     ::readingsSingleUpdate ($hash, "error", "in $subname: $@",1);
@@ -3828,7 +3834,11 @@ sub DOIF_ExecTimer
   my $next_time = $current+$seconds;
   ${$timer}->{time}=$next_time;
   if ($seconds > 0) {
-    ::readingsSingleUpdate ($hash,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
+    if (defined ($condition)) {
+      ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time))." $count",0);
+    } else {
+      ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0); 
+    }
   }
   ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",$timer, 0);
   $hs=$cur_hs;
@@ -3837,18 +3847,27 @@ sub DOIF_ExecTimer
 
 sub set_Exec
 {
-  my ($timername,$sec,$subname,$condition)=@_;
+  my ($timername,$sec,$subname,$param4,$param5)=@_;
   my $count=0;
+  if (defined $param5) {
+    $hs->{ptimer}{$timername}{cond}=$param5;
+    $hs->{ptimer}{$timername}{param}=$param4;
+  } elsif (defined $param4) {
+    if (!ref($param4)) {
+      $hs->{ptimer}{$timername}{cond}=$param4;
+    } else { 
+      $hs->{ptimer}{$timername}{param}=$param4;
+    }
+  }
   $hs->{ptimer}{$timername}{sec}=$sec;
   $hs->{ptimer}{$timername}{name}=$timername;
   $hs->{ptimer}{$timername}{subname}=$subname;
-  $hs->{ptimer}{$timername}{cond}=$condition if (defined $condition);
-  #$hs->{ptimer}{$timername}{param}=$param if (defined $param);
   $hs->{ptimer}{$timername}{count}=$count;
   $hs->{ptimer}{$timername}{hash}=$hs;
   ::RemoveInternalTimer(\$hs->{ptimer}{$timername});
-  if (defined ($condition)) {
-    my $cond=eval ($condition);
+
+  if (defined ($hs->{ptimer}{$timername}{cond})) {
+    my $cond=eval ($hs->{ptimer}{$timername}{cond});
     if ($@) {
       ::Log3 ($hs->{NAME},1,"$hs->{NAME} error eval condition: $@");
       ::readingsSingleUpdate ($hs, "error", "eval condition: $@",1);
@@ -3868,7 +3887,11 @@ sub set_Exec
   my $next_time = $current+$seconds;
   $hs->{ptimer}{$timername}{time}=$next_time;
   if ($seconds > 0) {
-    ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0);
+    if (defined ($hs->{ptimer}{$timername}{cond})) {
+      ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time))." $count",0);
+    } else {
+      ::readingsSingleUpdate ($hs,"timer_$timername",::strftime("%d.%m.%Y %H:%M:%S",localtime($next_time)),0); 
+    }
   }
   ::InternalTimer($next_time, "DOIF::DOIF_ExecTimer",\$hs->{ptimer}{$timername}, 0);       
 }
@@ -7021,11 +7044,12 @@ Die Readings "temperature" und "humidity" sollen in einem Eventblock mit dem zuv
 Mit Hilfe von Ausführungstimern können Perl-Anweisungen verzögert ein- oder mehrmalig ausgeführt werden. Im Gegensatz zum FHEM-Modus können beliebig viele Timer gleichzeitig genutzt werden.
 Ein Ausführungstimer wird mit einem Timer-Namen eindeutig definiert. Über den Timer-Namen kann die Restlaufzeit abgefragt werden, ebenfalls kann er vor seinem Ablauf gelöscht werden.<br>
 <a name="DOIF_set_Exec"></a><br>
-Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt, &lt;condition&gt)</code></b><br>
+Timer setzen: <code><b>set_Exec(&lt;timerName&gt;, &lt;seconds&gt;, &lt;perlCode&gt;, &lt;paramRef&gt;, &lt;condition&gt)</code></b><br>
 <br>
 <b>&lt;timerName&gt;</b>: beliebige Angabe, sie spezifiziert eindeutig einen Timer<br>
 <b>&lt;seconds&gt;</b>: Verzögerungszeit, sie wird per eval-Perlbefehl ausgewertet und kann daher Perlcode zur Bestimmung der Verzögerungszeit beinhalten<br>
 <b>&lt;perlCode&gt;</b>: Perl-Anweisung, die nach Ablauf der Verzögerungszeit per eval-Perlbefehl ausgeführt wird<br>
+<b>&lt;paramRef&gt;</b>: wird unter &lt;perlCode&gt; eine Perlfunktion angegeben, so kann optional hier eine Referenz auf den Übergabeparameter der Perlfunktion angegeben werden<br>
 <b>&lt;condition&gt;</b>: optionale Bedingung zur Wiederholung der Perl-Ausführung. Sie wird per eval-Perlbefehl vor dem Setzen des Timers und vor der Ausführung der Perl-Anweisung auf wahr geprüft.
 Bei falsch wird die Wiederholung der Ausführungskette beendet. Wird &lt;condition&gt; nicht angegeben, so erfolgt keine Wiederholung der Perl-Anweisung.<br> 
 <br> 
@@ -7035,17 +7059,23 @@ Timer holen: <code><b>get_Exec(&lt;timerName&gt;)</code></b>, Returnwert: 0, wen
 <a name="DOIF_del_Exec"></a><br>
 Laufenden Timer löschen: <code><b>del_Exec(&lt;timerName&gt;)</code></b><br>
 <br>
-Beispiel: Funktion namens "lamp" mit dem Übergabeparameter "on" 30 Sekunden verzögert aufrufen:<br>
+<u>Anwendungsbeispiele für einmalige verzögerte Ausführung</u><br>
+<br>
+Funktion namens "lamp" mit dem Übergabeparameter "on" 30 Sekunden verzögert aufrufen:<br>
 <br>
 <code>set_Exec("lamp_timer",30,'lamp("on")');</code><br>
 <br>
-Beispiel: Lampe verzögert um 30 Sekunden ausschalten:<br>
+Lampe verzögert um 30 Sekunden ausschalten:<br>
 <br>
 <code>set_Exec("off_timer",30,'fhem_set("lamp off")');</code><br>
 <br>
-Beispiel: Das Event "off" 30 Sekunden verzögert auslösen:<br>
+Das Event "off" 30 Sekunden verzögert auslösen:<br>
 <br>
-<code>set_Exec("off_Event",30,'set_Event("off")');</code><br>
+<code>set_Exec("Event_timer",30,'set_Event("off")');</code><br>
+<br>
+Funktion namens "check_shutters" wird mit einer Referenz auf ein zuvor definiertes Array namens "shutters" um 5 Sekunden verzögert ausgeführt:<br>
+<br>
+<code>set_Exec("check_timer",5,"check_shutters",\@shutters);</code><br>
 <br>
 <u>Anwendungsbeispiele mit bedingter Wiederholung einer Ausführung</u><br>
 <br>
