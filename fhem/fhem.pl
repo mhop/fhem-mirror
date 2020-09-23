@@ -5368,7 +5368,8 @@ addToWritebuffer($$@)
   if(!defined($hash->{FD})) {
     my $n = $hash->{NAME};
     Log 1, "ERROR: addToWritebuffer for $n without FD";
-    Log 1, "probably caused at ".$hash->{stacktrace} if($hash->{stacktrace});
+    Log 1, "callstack:".stacktraceAsString(1);
+    Log 1, "FD closed in ".$hash->{stacktrace} if($hash->{stacktrace});
     delete($defs{$n});
     delete($attr{$n});
     return;
