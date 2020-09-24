@@ -26,6 +26,7 @@
 # 29.12.2019 neues Protokoll 27: Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800
 # 09.02.2020 neues Protokoll 54: Regenmesser TFA Drop
 # 22.02.2020 Protokoll 58: neuer Sensor TFA 30.3228.02, FT007T Thermometer Sensor
+# 25.08.2020 Protokoll 27: neuer Sensor EFS-3110A
 
 package main;
 
@@ -187,8 +188,8 @@ sub SD_WS_Parse($$)
     	 	 },
 		27 =>
 			{
-				# Protokollbeschreibung: Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800
-				# -----------------------------------------------------------------------------------
+				# Protokollbeschreibung: Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800, EFS-3110A
+				# ------------------------------------------------------------------------------------
 				# 0    4    | 8    12   | 16   20   | 24   28   | 32   36   | 40   44
 				# 0000 1001 | 0001 0110 | 0001 0000 | 0000 0000 | 0100 1001 | 0100 0000
 				# ?ccc iiii | iiii iiii | bstt tttt | tttt ???? | hhhh hhhh | xxxx xxxx
@@ -199,11 +200,12 @@ sub SD_WS_Parse($$)
 				# t: 10 bit unsigned temperature, scaled by 10
 				# h:  8 bit relative humidity percentage (BCD)
 				# x:  8 bit CRC8
-				# ?: unknown (Bit 0, 28-31 always 0 ???)
+				# ?: unknown (Bit 0, 28-31, always 0000 by EFTH-800, 1000 by EFS-3110A)
 				# The sensor sends two messages at intervals of about 57-58 seconds
-				sensortype => 'EFTH-800',
+				sensortype => 'EFTH-800, EFS-3110A',
 				model      => 'SD_WS_27_TH',
-				prematch   => sub {my $rawData = shift; return 1 if ($rawData =~ /^[0-9A-F]{7}0[0-9]{2}[0-9A-F]{2}$/); },	# prematch 113C49A 0 47 AE
+				# prematch   => sub {my $rawData = shift; return 1 if ($rawData =~ /^[0-9A-F]{7}0[0-9]{2}[0-9A-F]{2}$/); },	# prematch 113C49A 0 47 AE (EFTH-800)
+				prematch   => sub {my $rawData = shift; return 1 if ($rawData =~ /^[0-9A-F]{7}0|8[0-9]{2}[0-9A-F]{2}$/); },	# prematch 3F94519 8 55 C7 (EFS-3110A)
 				channel    => sub {my (undef,$bitData) = @_; return (SD_WS_binaryToNumber($bitData,1,3) + 1 ); },
 				id         =>	sub {my (undef,$bitData) = @_; return substr($rawData,1,3); },
 				bat        => sub {my (undef,$bitData) = @_; return substr($bitData,16,1) eq "0" ? "ok" : "low";},
@@ -1217,7 +1219,7 @@ sub SD_WS_WH2SHIFT($){
     <li>Bresser 7009994</li>
     <li>BresserTemeo</li>
     <li>Conrad S522</li>
-	<li>EuroChron EFTH-800 (temperature and humidity sensor)</li>
+    <li>EuroChron EFTH-800, EFS-3110A (temperature and humidity sensor)</li>
     <li>NC-3911, NC-3912 refrigerator thermometer</li>
 		<li>Opus XT300</li>
     <li>PV-8644 infactory Poolthermometer</li>
@@ -1320,7 +1322,7 @@ sub SD_WS_WH2SHIFT($){
     <li>Bresser 7009994</li>
     <li>BresserTemeo</li>
     <li>Conrad S522</li>
-		<li>EuroChron EFTH-800 (Temperatur- und Feuchtigkeitssensor)</li>
+    <li>EuroChron EFTH-800, EFS-3110A (Temperatur- und Feuchtigkeitssensor)</li>
     <li>NC-3911, NC-3912 digitales Kuehl- und Gefrierschrank-Thermometer</li>
 		<li>Opus XT300</li>
     <li>PV-8644 infactory Poolthermometer</li>

@@ -69,7 +69,7 @@ package lib::SD_ProtocolData;
 	use strict;
 	use warnings;
 	
-	our $VERSION = '1.20';
+	our $VERSION = '1.21';
 	our %protocols = (
 		"0"	=>	## various weather sensors (500 | 9100)
 						# Mebus | Id:237 Ch:1 T: 1.9 Bat:low           MS;P0=-9298;P1=495;P2=-1980;P3=-4239;D=1012121312131313121313121312121212121212131212131312131212;CP=1;SP=0;R=223;O;m2;
@@ -409,7 +409,7 @@ package lib::SD_ProtocolData;
 						#	MU;P0=-96;P1=800;P2=-985;P3=485;P4=1421;P5=-8608;D=0123232323232323242324232324242324232324242324242324232323242324242323232324242424242424242424242424242424242424242424242424242424242424242424242424242424242324242424232323235;CP=4;R=0;
 			{
 				name						=> 'weather',
-				comment					=> 'Weatherstation WH1080, WH3080, CTW600',
+				comment					=> 'Weatherstation WH1080, WH3080, WH5300SE, CTW600',
 				id							=> '9',
 				knownFreqs			=> '433.92 | 868.35',
 				zero						=> [3,-2],
@@ -820,17 +820,18 @@ package lib::SD_ProtocolData;
 				length_min    => '40',
 				length_max    => '40',
 			},
-		"27"	=>	## Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800 (433 MHz)
+		"27"  =>  ## Temperatur-/Feuchtigkeitssensor EuroChron EFTH-800 (433 MHz) - https://github.com/RFD-FHEM/RFFHEM/issues/739
 							# SD_WS_27_TH_2 - T: 15.5 H: 48 - MU;P0=-224;P1=258;P2=-487;P3=505;P4=-4884;P5=743;P6=-718;D=0121212301212303030301212123012123012123030123030121212121230121230121212121212121230301214565656561212123012121230121230303030121212301212301212303012303012121212123012123012121212121212123030121;CP=1;R=53;
 							# SD_WS_27_TH_3 - T:  3.8 H: 76 - MU;P0=-241;P1=251;P2=-470;P3=500;P4=-4868;P5=743;P6=-718;D=012121212303030123012301212123012121212301212303012121212121230303012303012123030303012123014565656561212301212121230303012301230121212301212121230121230301212121212123030301230301212303030301212301;CP=1;R=23;
 							# SD_WS_27_TH_3 - T:  5.3 H: 75 - MU;P0=-240;P1=253;P2=-487;P3=489;P4=-4860;P5=746;P6=-725;D=012121212303030123012301212123012121212303012301230121212121230303012301230303012303030301214565656561212301212121230303012301230121212301212121230301230123012121212123030301230123030301230303030121;CP=1;R=19;
+							# Eurochron Zusatzsensor fuer EFS-3110A - https://github.com/RFD-FHEM/RFFHEM/issues/889
 							# short pulse of 244 us followed by a 488 us gap is a 0 bit
 							# long pulse of 488 us followed by a 244 us gap is a 1 bit
 							# sync preamble of pulse, gap, 732 us each, repeated 4 times
 							# sensor sends two messages at intervals of about 57-58 seconds
 			{
 				name            => 'EFTH-800',
-				comment         => 'EuroChron weatherstation EFTH-800',
+				comment         => 'EuroChron weatherstation EFTH-800, EFS-3110A',
 				id              => '27',
 				knownFreqs      => '433.92',
 				one             => [2,-1],
@@ -2676,6 +2677,29 @@ package lib::SD_ProtocolData;
 				preamble        => 'P104#',
 				length_min      => '16',
 				length_max      => '16',
+			},
+		"105"	=>	# Remote control BF-301 from Shenzhen BOFU Mechanic & Electronic Co., Ltd.
+							# Protocol description found on https://github.com/akirjavainen/markisol/blob/master/Markisol.ino
+							# original remotes repeat 8 (multi) or 10 (single) times by default
+							# https://github.com/RFD-FHEM/RFFHEM/issues/861 stsirakidis 2020-06-27
+							# BF_301_FAD0 down   MU;P0=-697;P1=5629;P2=291;P3=3952;P4=-2459;P5=1644;P6=-298;P7=689;D=34567676767676207620767620762020202076202020762020207620202020207676762076202020767614567676767676207620767620762020202076202020762020207620202020207676762076202020767614567676767676207620767620762020202076202020762020207620202020207676762076202020767614;CP=2;R=41;O;
+							# BF_301_FAD0 stop   MU;P0=5630;P1=3968;P2=-2458;P3=1642;P4=-285;P5=690;P6=282;P7=-704;D=12345454545454675467545467546767676754676767546754675467676767675454546754676767675402345454545454675467545467546767676754676767546754675467676767675454546754676767675402345454545454675467545467546767676754676767546754675467676767675454546754676767675402;CP=6;R=47;O;
+							# BF_301_FAD0 up     MU;P0=-500;P1=5553;P2=-2462;P3=1644;P4=-299;P5=679;P6=298;P7=-687;D=01234545454545467546754546754676767675467676767675454546767676767545454675467546767671234545454545467546754546754676767675467676767675454546767676767545454675467546767671234545454545467546754546754676767675467676767675454546767676767545454675467546767671;CP=6;R=48;O;
+			{
+				name            => 'BF-301',
+				comment         => 'Remote control',
+				id              => '105',
+				knownFreqs      => '433.92',
+				one             => [2,-1],       # 660,-330
+				zero            => [1,-2],       # 330,-660
+				start           => [17,-7,5,-1], # 5610,-2310,1650,-330
+				clockabs        => 330,
+				format          => 'twostate',
+				clientmodule    => 'SD_UT',
+				modulematch     => '^P105#',
+				preamble        => 'P105#',
+				length_min      => '40',
+				length_max      => '40',
 			},
 		########################################################################
 		#### ### old information from incomplete implemented protocols #### ####

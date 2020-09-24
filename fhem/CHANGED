@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+
+ - feature: 14_SD_WS: protocol 27 / new sensor EFS-3110A 
  - feature: 93_DbRep: sqlCmd supports PREPARE statement, Forum: #114293
  - bugfix:  70_BOTVAC: fix processing of set for preferences 
  - feature: 59_Twilight: remove dependencies to global lon/lat settings;
