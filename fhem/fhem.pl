@@ -4692,11 +4692,13 @@ evalStateFormat($)
     $st = $st->{VAL} if(defined($st));
 
   } elsif($sr =~ m/^{(.*)}$/s) {
+    $cmdFromAnalyze = $1;
     $st = eval $1;
     if($@) {
       $st = "Error evaluating $name stateFormat: $@";
       Log 1, $st;
     }
+    $cmdFromAnalyze = undef;
 
   } else {
     # Substitute reading names with their values, leave the rest untouched.
