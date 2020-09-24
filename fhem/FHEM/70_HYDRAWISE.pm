@@ -786,12 +786,12 @@ sub HYDRAWISE_ReadingsBulkUpdateIfChanged {
         readingsBulkUpdate( $hash, $reading, "idle");
         readingsEndUpdate($hash, 1);
       }
-#      else if ($reading =~ m/_run_minutes$/)
-#      {
-#        readingsBeginUpdate ($hash);
-#        readingsBulkUpdate( $hash, $reading, "none");
-#        readingsEndUpdate($hash, 1);
-#      }
+      elsif ($reading =~ m/_run_minutes$/)
+      {
+        readingsBeginUpdate ($hash);
+        readingsBulkUpdate( $hash, $reading, "none");
+        readingsEndUpdate($hash, 1);
+      }
       else
       {
         readingsBeginUpdate ($hash);
