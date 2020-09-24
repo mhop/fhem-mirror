@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.24" => "24.09.2020  optimize prepareSendData ",
   "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
   "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
   "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
@@ -4528,7 +4529,7 @@ sub __getCaminfoAll {
     
     RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
-    
+
     if(IsModelCam($hash)) {                                                               # Model ist CAM
         __getCapabilities ($hash);
         __getEventList    ($hash);
@@ -9636,8 +9637,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{SMTPMSG};     
-       my $smtpmsg = _prepSendMail ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{SMTPMSG};  
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $smtpmsg = _prepSendMail ($param);
            
        $ret = _sendEmail($hash, {
                                  'subject'      => $smtpmsg->{subject},   
@@ -9664,8 +9673,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{SMTPRECMSG};
-       my $smtpmsg = _prepSendMail ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{SMTPRECMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $smtpmsg = _prepSendMail ($param);
             
        $ret = _sendEmail($hash, {
                                  'subject'      => $smtpmsg->{subject},   
@@ -9694,8 +9711,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{TELEMSG};
-       my $telemsg = _prepSendTelegram ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{TELEMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $telemsg = _prepSendTelegram ($param);
         
        $ret = _sendTelegram($hash, {
                                     'subject'     => $telemsg->{subject},
@@ -9722,8 +9747,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{TELERECMSG};
-       my $telemsg = _prepSendTelegram ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{TELERECMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $telemsg = _prepSendTelegram ($param);
        
        $vdat = $dat;  
        $ret  = _sendTelegram($hash, {
@@ -9750,8 +9783,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{CHATMSG};
-       my $chatmsg = _prepSendChat ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{CHATMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $chatmsg = _prepSendChat ($param);
         
        $ret = _sendChat($hash, {
                                 'subject' => $chatmsg->{subject},
@@ -9776,8 +9817,16 @@ sub prepareSendData {
        
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
        
-       my $mt      = delete $hash->{HELPER}{CHATRECMSG};
-       my $chatmsg = _prepSendChat ($hash, $calias, $mt);
+       my $mt = delete $hash->{HELPER}{CHATRECMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $chatmsg = _prepSendChat ($param);
        
        $ret = _sendChat($hash, {
                                 'subject' => $chatmsg->{subject},
@@ -9801,17 +9850,15 @@ return;
 #                 Vorbereitung Versand Chatnachrichten
 ###############################################################################
 sub _prepSendChat { 
-   my $hash   = shift;
-   my $calias = shift;
-   my $mt     = shift;
-   my $name   = $hash->{NAME};
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
+   my $name   = $hash->{NAME}; 
 
-   my ($cbott,$peert,$subjt); 
-   
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   
-   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
+   my ($cbott,$peert,$subjt);
    
    $mt =~ s/['"]//gx;
    
@@ -10120,17 +10167,15 @@ return ($subject,$fname);
 #                 Vorbereitung Versand Telegramnachrichten
 ###############################################################################
 sub _prepSendTelegram { 
-   my $hash   = shift;
-   my $calias = shift;
-   my $mt     = shift;
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
    my $name   = $hash->{NAME};
 
    my ($tbott,$peert,$subjt);
-   
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   
-   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
    
    $mt    =~ s/['"]//gx;
    
@@ -10688,15 +10733,13 @@ return (0,undef);
 #                 Vorbereitung Versand Mail Nachrichten
 ###############################################################################
 sub _prepSendMail { 
-   my $hash   = shift;
-   my $calias = shift;
-   my $mt     = shift;
-   my $name   = $hash->{NAME};
-   
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   
-   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;  
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
+   my $name   = $hash->{NAME}; 
    
    $mt =~ s/['"]//gx;   
    
