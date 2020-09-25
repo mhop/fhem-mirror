@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.8.0');
+use version; our $VERSION = version->declare('1.9.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -58,6 +58,9 @@ our @EXPORT_OK = qw(
                      delCallParts
 					 setReadingErrorNone
 					 setReadingErrorState
+                     listSendqueue
+                     purgeSendqueue
+                     updQueueLength
                    );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -69,6 +72,7 @@ BEGIN {
       qw(
           AttrVal
           Log3
+          data
           defs
           modules
           CancelDelayedShutdown
@@ -650,6 +654,97 @@ sub setReadingErrorState {
     readingsBulkUpdateIfChanged ($hash, "Errorcode", $errcode);
     readingsBulkUpdate          ($hash, "state",     "Error");                    
     readingsEndUpdate           ($hash,1);
+
+return;
+}
+
+#############################################################################################
+#                       liefert aktuelle Einträge der Sendequeue zurück
+#############################################################################################
+sub listSendqueue {                 
+  my $paref = shift;
+  my $hash  = $paref->{hash} // carp "got no hash value" && return; 
+  my $name  = $paref->{name} // carp "got no name value" && return;
+  
+  my $type  = $hash->{TYPE};
+  
+  my $sub = sub { 
+      my $idx = shift;
+      my $ret;          
+      for my $key (reverse sort keys %{$data{$type}{$name}{sendqueue}{entries}{$idx}}) {
+          $ret .= ", " if($ret);
+          $ret .= $key."=>".$data{$type}{$name}{sendqueue}{entries}{$idx}{$key};
+      }
+      return $ret;
+  };
+        
+  if (!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+      return qq{SendQueue is empty.};
+  }
+  
+  my $sq;
+  for my $idx (sort{$a<=>$b} keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+      $sq .= $idx." => ".$sub->($idx)."\n";             
+  }
+      
+return $sq;
+}
+
+#############################################################################################
+#                       löscht Einträge aus der Sendequeue
+#############################################################################################
+sub purgeSendqueue {                 
+  my $paref = shift;
+  my $hash  = $paref->{hash} // carp "got no hash value"              && return; 
+  my $name  = $paref->{name} // carp "got no name value"              && return;
+  my $prop  = $paref->{prop} // carp "got no purgeSendqueue argument" && return;
+  
+  my $type  = $hash->{TYPE};
+  
+  if($prop eq "-all-") {
+      delete $hash->{OPIDX};
+      delete $data{$type}{$name}{sendqueue}{entries};
+      $data{$type}{$name}{sendqueue}{index} = 0;
+      return "All entries of SendQueue are deleted";
+  } 
+  elsif($prop eq "-permError-") {
+      for my $idx (keys %{$data{$type}{$name}{sendqueue}{entries}}) { 
+          delete $data{$type}{$name}{sendqueue}{entries}{$idx} 
+              if($data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend});            
+      }
+      return qq{All entries with state "permanent send error" are deleted};
+  } 
+  else {
+      delete $data{$type}{$name}{sendqueue}{entries}{$prop};
+      return qq{SendQueue entry with index "$prop" deleted};
+  }
+      
+return;
+}
+
+#############################################################################################
+#                        Länge Senedequeue updaten          
+#############################################################################################
+sub updQueueLength {
+  my $hash = shift // carp "got no hash value" && return; 
+  my $rst  = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $ql   = keys %{$data{$type}{$name}{sendqueue}{entries}};
+  
+  readingsBeginUpdate         ($hash);                                             
+  readingsBulkUpdateIfChanged ($hash, "QueueLenth", $ql);                          # Länge Sendqueue updaten
+  readingsEndUpdate           ($hash,1);
+  
+  my $head = "next planned SendQueue start:";
+  
+  if($rst) {                                                                       # resend Timer gesetzt
+      $hash->{RESEND} = $head." ".FmtDateTime($rst);
+  } 
+  else {
+      $hash->{RESEND} = $head." immediately by next entry";
+  }
 
 return;
 }
