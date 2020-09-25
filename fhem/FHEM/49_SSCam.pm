@@ -142,7 +142,7 @@ BEGIN {
           TelegramBot_Callback     
           TelegramBot_BinaryFileRead  
           FHEM::SSChatBot::formString          
-          FHEM::SSChatBot::addQueue
+          FHEM::SSChatBot::addSendqueue
           FHEM::SSChatBot::getApiSites
         )
   );
@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
   "9.7.24" => "24.09.2020  optimize prepareSendData ",
   "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
   "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
@@ -10020,7 +10021,7 @@ sub _sendChat {
                    channel    => "",
                    attachment => ""
                };
-               $ret = FHEM::SSChatBot::addQueue ($params); 
+               $ret = FHEM::SSChatBot::addSendqueue ($params); 
 
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
@@ -10092,7 +10093,7 @@ sub _sendChat {
                    channel    => "",
                    attachment => ""
                };
-               $ret = FHEM::SSChatBot::addQueue ($params);
+               $ret = FHEM::SSChatBot::addSendqueue ($params);
            
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
