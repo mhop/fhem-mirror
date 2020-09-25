@@ -82,18 +82,20 @@ sub Initialize {
     $hash->{AttrList} = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd offState "
       . "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 disabledForIntervals "
       . $readingFnAttributes;
+    $hash->{parseParams} = 1;
     return;
 }
 
 # regular Functions ##################################################################
 sub Define {
     my $hash = shift;
-    my $def = shift // return;
+    my $arr  = shift;
+    my $href = shift // return if !defined $arr;
 
     RemoveInternalTimer($hash);
     my ( $name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch,
         $variation )
-      = split m{\s+}xms, $def;
+      = @$arr;
 
     return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch> [<variations>]"
       if ( !defined $timeToSwitch );
@@ -211,14 +213,14 @@ sub Attr {
 }
 
 sub Set {
-    my ( $hash, @a ) = @_;
+    my ( $hash, $arr, $h ) = @_;
 
-    return "no set value specified" if ( int(@a) < 2 );
-    return "Unknown argument $a[1], choose one of execNow:noArg active:noArg inactive:noArg"
-      if ( $a[1] eq "?" );
+    return "no set value specified" if ( int(@$arr) < 2 );
+    return "Unknown argument @$arr[1], choose one of execNow:noArg active:noArg inactive:noArg"
+      if ( @$arr[1] eq "?" );
 
-    my $name = shift @a;
-    my $v = join( " ", @a );
+    my $name = shift @$arr;
+    my $v = join( " ", @$arr );
 
     if ( $v eq "execNow" ) {
         Log3( $hash, 3, "[$name] set $name $v" );
