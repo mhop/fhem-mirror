@@ -193,6 +193,7 @@ sub ElsnerWS_Read($) {
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
+  $hash->{PARTIAL} = '' if(length($hash->{PARTIAL}) > 203);
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   #Log3 $name, 5, "ElsnerWS $name received DATA: " . uc(unpack('H*', $buf));
   Log3 $name, 5, "ElsnerWS $name received DATA: $data";
@@ -1173,12 +1174,12 @@ sub ElsnerWS_Delete($$) {
           Priority of custom commands. If both the up and down command are triggered, only the prioritized command is executed.
         </li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-        <li><a name="ElsnerWS_signOfLife">signOfLife</a> off|on<br>
+        <li><a name="ElsnerWS_signOfLife">signOfLife</a> off|on,
           [signOfLife] = off|on, on is default.<br>
           Monitoring of the periodic telegrams from sensor.
         </li>
-        <li><a name="ElsnerWS_signOfLifeInterval">signOfLifeInterval</a> 1...15<br>
-          [signOfLifeInterval] = 1 ... 15 1/s, 3 is default.<br>
+        <li><a name="ElsnerWS_signOfLifeInterval">signOfLifeInterval</a> t/s,
+          [signOfLifeInterval] = 1 ... 15, 3 is default.<br>
           Monitoring period in seconds of the periodic telegrams from sensor.
         </li>
         <li><a name="ElsnerWS_timeEvent">timeEvent</a> no|yes,
@@ -1186,7 +1187,7 @@ sub ElsnerWS_Delete($$) {
           Update the reading time periodically.
         </li>
         <li><a name="ElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
-          [timeEvent] = no|yes, no is default.<br>
+          [updateGlobalAttr] = no|yes, no is default.<br>
           Update the global attributes latitude and longitude with the received GPS coordinates.
         </li>
         <li><a name="ElsnerWS_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
