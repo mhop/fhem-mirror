@@ -32,23 +32,16 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.2.0');
+use version; our $VERSION = version->declare('1.3.0');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
-my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
-  SSCam     => {fnerrauth => \&_errauthsscam,  fnerr => \&_errsscam  },    
-  SSCal     => {fnerrauth => \&_errauthsscal,  fnerr => \&_errsscal  },
-  SSChatBot => {                               fnerr => \&_errsschat },
-  SSFile    => {fnerrauth => \&_errauthssfile, fnerr => \&_errssfile },
-);
-
 # Standard Rückgabewert wenn keine Message zum Error Code / keine Rückgabefunktion gefunden wurde
 my $nofound    = qq{Message not found for error code:};
-my $noauthfunc = qq{No authentication error resolution function defined for module type:};
-my $nofunc     = qq{No error resolution function defined for module type:};
+my $noauthres  = qq{No authentication error resolution Hash defined for module type:};
+my $nores      = qq{No error resolution Hash defined for module type:};
 
 ##############################################################################
 #                             Error Code Hashes 
@@ -248,6 +241,13 @@ my %errssfile = (                                                       # Standa
   2002 => "Failed to access sharing links",
 );
 
+my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
+  SSCam     => {errauth => \%errauthsscam,  errh => \%errsscam  },    
+  SSCal     => {errauth => \%errauthsscal,  errh => \%errsscal  },
+  SSChatBot => {                            errh => \%errsschat },
+  SSFile    => {errauth => \%errauthssfile, errh => \%errssfile },
+);
+
 ##############################################################################
 #              Auflösung Errorcodes bei Login / Logout
 ##############################################################################
@@ -256,12 +256,13 @@ sub expErrorsAuth {
   my $errorcode = shift // carp "got no error code to analyse"  && return;
   my $type      = $hash->{TYPE};
    
-  if($hterr{$type} && defined &{$hterr{$type}{fnerrauth}}) {
-      my $error = &{$hterr{$type}{fnerrauth}} ($errorcode);
+  if($hterr{$type} && %{$hterr{$type}{errauth}}) {
+      my $errauth = $hterr{$type}{errauth};                               # der Error Kodierungshash
+      my $error   = $errauth->{$errorcode} // $nofound." ".$errorcode;
       return $error;
   }
   
-  carp $noauthfunc." ".$type;
+  carp $noauthres." ".$type;
 
 return q{};
 }
@@ -274,86 +275,15 @@ sub expErrors {
   my $errorcode = shift // carp "got no error code to analyse"  && return;
   my $type      = $hash->{TYPE};
    
-  if($hterr{$type} && defined &{$hterr{$type}{fnerr}}) {
-      my $error = &{$hterr{$type}{fnerr}} ($errorcode);
+  if($hterr{$type} && %{$hterr{$type}{errh}}) {
+	  my $errh  = $hterr{$type}{errh};                                    # der Error Kodierungshash
+	  my $error = $errh->{$errorcode} // $nofound." ".$errorcode;
       return $error;
   }
   
-  carp $nofunc." ".$type;
+  carp $nores." ".$type;
 
 return q{};
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Authentification Error Code der Surveillance Station API
-##############################################################################
-sub _errauthsscam {                                    
-  my $errorcode = shift;
-  
-  my $error = $errauthsscam{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Standard Error Code der Surveillance Station API
-##############################################################################
-sub _errsscam {           
-  my $errorcode = shift;
-  
-  my $error = $errsscam{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Authentification Error Code der Calendar API
-##############################################################################
-sub _errauthsscal {                     
-  my $errorcode = shift;
-  
-  my $error = $errauthsscal{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Standard Error Code der Calendar API
-##############################################################################
-sub _errsscal {                            
-  my $errorcode = shift;
-  
-  my $error = $errsscal{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Authentification Error Code der File Station API
-##############################################################################
-sub _errauthssfile {                     
-  my $errorcode = shift;
-  
-  my $error = $errauthssfile{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
-}
-
-##############################################################################
-# Liefert Fehlertext für einen 
-# Standard Error Code der der File Station API
-##############################################################################
-sub _errssfile {                            
-  my $errorcode = shift;
-  
-  my $error = $errssfile{"$errorcode"} // $nofound." ".$errorcode;
-
-return $error;
 }
 
 1;
