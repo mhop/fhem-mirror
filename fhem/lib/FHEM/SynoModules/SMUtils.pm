@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.7.0');
+use version; our $VERSION = version->declare('1.8.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -57,6 +57,7 @@ our @EXPORT_OK = qw(
                      delActiveToken
                      delCallParts
 					 setReadingErrorNone
+					 setReadingErrorState
                    );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -630,6 +631,25 @@ sub setReadingErrorNone {
   readingsBulkUpdate ($hash, "Errorcode", "none");
   readingsBulkUpdate ($hash, "Error"    , "none");
   readingsEndUpdate  ($hash, $evt);
+
+return;
+}
+
+####################################################################################
+#       zentrale Funktion Error State in Readings setzen
+#       $error   = Fehler als Text
+#       $errcode = Fehlercode
+####################################################################################
+sub setReadingErrorState {                   
+    my $hash    = shift // carp "got no hash value" && return;
+    my $error   = shift;
+    my $errcode = shift // "none";
+    
+    readingsBeginUpdate         ($hash); 
+    readingsBulkUpdateIfChanged ($hash, "Error",     $error);
+    readingsBulkUpdateIfChanged ($hash, "Errorcode", $errcode);
+    readingsBulkUpdate          ($hash, "state",     "Error");                    
+    readingsEndUpdate           ($hash,1);
 
 return;
 }
