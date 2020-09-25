@@ -31,12 +31,24 @@
 # Example of defining a Bot: define SynChatBot SSChatBot 192.168.2.20 [5000] [HTTP(S)]
 #
 
-package FHEM::SSChatBot;                                          ## no critic 'package'
+package FHEM::SSChatBot;                                                                                      ## no critic 'package'
 
 use strict;                           
 use warnings;
-use GPUtils qw(GP_Import GP_Export);                              # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-use Data::Dumper;                                                 # Perl Core module
+use GPUtils qw(GP_Import GP_Export);                                                                          # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+my $vAPI;
+use FHEM::SynoModules::SMUtils qw(jboolmap 
+                                  sortVersion 
+								  setReadingErrorNone 
+								  setReadingErrorState
+								 );  
+my $vSMUtils  = FHEM::SynoModules::SMUtils->VERSION();                                                        # Hilfsroutinen Modul
+
+use FHEM::SynoModules::ErrCodes qw(:all); 
+my $vErrCodes = FHEM::SynoModules::ErrCodes->VERSION();                                                       # Error Code Modul
+
+use Data::Dumper;                                                                                             # Perl Core module
 use MIME::Base64;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
@@ -106,6 +118,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.10.5" => "25.09.2020  get error Codes from FHEM::SynoModules::ErrCodes, unify setVersionInfo, integrate FHEM::SynoModules::SMUtils ",
+  "1.10.4" => "22.08.2020  minor code changes ",
   "1.10.3" => "20.08.2020  more code refactoring according PBP ",
   "1.10.2" => "19.08.2020  more code refactoring and little improvements ",
   "1.10.1" => "18.08.2020  more code changes according PBP ",
@@ -147,27 +161,13 @@ my %vHintsExt_de = (
 
 );
 
-my %errList = (
-  100 => "Unknown error",
-  101 => "Payload is empty",
-  102 => "API does not exist - may be the Synology Chat Server package is stopped",
-  117 => "illegal file name or path",
-  120 => "payload has wrong format",
-  404 => "bot is not legal - may be the bot is not active or the botToken is wrong",
-  407 => "record not valid",
-  409 => "exceed max file size",
-  410 => "message too long",
-  800 => "malformed or unsupported URL",
-  805 => "empty API data received - may be the Synology Chat Server package is stopped",
-  806 => "couldn't get Synology Chat API informations",
-  810 => "The botToken couldn't be retrieved",
-  900 => "malformed JSON string received from Synology Chat Server",
+my %hapi = (                                                                # Hash Template der API's
+    INFO     => { NAME => "SYNO.API.Info",     }, 
+    EXTERNAL => { NAME => "SYNO.Chat.External" },
 );
 
-my %hapi = (                                                                # Hash Template der API's
-    INFO     => { NAME => "SYNO.API.Info",     VER => 1, }, 
-    EXTERNAL => { NAME => "SYNO.Chat.External"           },
-);
+$hapi{INFO}{PATH} = "query.cgi";
+$hapi{INFO}{VER}  = 1;
 
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => "_setbotToken"         }, 
@@ -257,7 +257,7 @@ sub Define {
   CommandAttr(undef,"$name room Chat");
   
   $hash->{HELPER}{API}           = \%hapi;                                       # API Template in HELPER kopieren 
-  setVersionInfo($hash);                                                         # Versionsinformationen setzen
+  setVersionInfo ($hash, \%vNotesIntern);                                        # Versionsinformationen setzen
   getToken($hash,1,"botToken");                                                  # Token lesen
   $data{SSChatBot}{$name}{sendqueue}{index} = 0;                                 # Index der Sendequeue initialisieren
     
@@ -915,9 +915,9 @@ sub addQueue {
     my $paref      = shift;
     my $name       = $paref->{name}    // do {my $err = qq{internal ERROR -> name is empty}; Log 1, "SSChatBot - $err"; return};
     my $hash       = $defs{$name};
-    my $opmode     = $paref->{opmode}  // do {my $err = qq{internal ERROR -> opmode is empty}; Log3($name, 1, "$name - $err"); setErrorState ($hash, $err); return};
-    my $method     = $paref->{method}  // do {my $err = qq{internal ERROR -> method is empty}; Log3($name, 1, "$name - $err"); setErrorState ($hash, $err); return};
-    my $userid     = $paref->{userid}  // do {my $err = qq{internal ERROR -> userid is empty}; Log3($name, 1, "$name - $err"); setErrorState ($hash, $err); return};
+    my $opmode     = $paref->{opmode}  // do {my $err = qq{internal ERROR -> opmode is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
+    my $method     = $paref->{method}  // do {my $err = qq{internal ERROR -> method is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
+    my $userid     = $paref->{userid}  // do {my $err = qq{internal ERROR -> userid is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
     my $text       = $paref->{text};
     my $fileUrl    = $paref->{fileUrl};
     my $channel    = $paref->{channel};
@@ -927,7 +927,7 @@ sub addQueue {
         my $err = qq{can't add message to queue: "text" is empty};
         Log3($name, 2, "$name - ERROR - $err");
         
-        setErrorState ($hash, $err);      
+        setReadingErrorState ($hash, $err);      
 
         return;        
     }
@@ -989,20 +989,20 @@ sub checkRetry {
       return;  
   } 
   
-  if(!$retry) {                                                     # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
+  if(!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
       updQLength ($hash);
-      return getApiSites($name);                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      return getApiSites($name);                                                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
   
-  } else {                                                          # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
+  } else {                                                                                # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
       $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
       my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|117|120|407|409|410|800|900/x) {     # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
-          $forbidSend = expError($hash,$errorcode);       # Fehlertext zum Errorcode ermitteln
+      if($errorcode =~ /100|101|117|120|407|409|410|800|900/x) {                          # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
           $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
@@ -1010,9 +1010,9 @@ sub checkRetry {
           delete $hash->{OPIDX};
           delete $hash->{OPMODE};
           
-          updQLength ($hash);                             # updaten Länge der Sendequeue
+          updQLength ($hash);                                                             # updaten Länge der Sendequeue
           
-          return getApiSites($name);                      # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
+          return getApiSites($name);                                                      # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
       if(!$forbidSend) {
@@ -1027,8 +1027,8 @@ sub checkRetry {
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
           
-          my $rst = gettimeofday()+$rs;                        # resend Timer 
-          updQLength ($hash,$rst);                             # updaten Länge der Sendequeue mit resend Timer
+          my $rst = gettimeofday()+$rs;                                                  # resend Timer 
+          updQLength ($hash,$rst);                                                       # updaten Länge der Sendequeue mit resend Timer
           startQueue ($name,$rst);
       }
   }
@@ -1040,11 +1040,11 @@ return
 #              API Versionen und Pfade ermitteln
 ################################################################
 sub getApiSites {
-   my $name     = shift;
-   my $hash     = $defs{$name};
-   my $inaddr   = $hash->{INADDR};
-   my $inport   = $hash->{INPORT};
-   my $inprot   = $hash->{INPROT};  
+   my $name   = shift;
+   my $hash   = $defs{$name};
+   my $inaddr = $hash->{INADDR};
+   my $inport = $hash->{INPORT};
+   my $inprot = $hash->{INPROT};  
    
    my ($url,$param,$idxset,$ret);
   
@@ -1085,10 +1085,11 @@ sub getApiSites {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout: $httptimeout s");
 
    # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$inprot://$inaddr:$inport/webapi/query.cgi?api=$hash->{HELPER}{API}{INFO}{NAME}".
-                                                    "&method=Query".
-                                                    "&version=$hash->{HELPER}{API}{INFO}{VER}".
-                                                    "&query=$hash->{HELPER}{API}{EXTERNAL}{NAME}";
+   $url = "$inprot://$inaddr:$inport/webapi/$hash->{HELPER}{API}{INFO}{PATH}?".
+              "api=$hash->{HELPER}{API}{INFO}{NAME}".
+              "&method=Query".
+              "&version=$hash->{HELPER}{API}{INFO}{VER}".
+              "&query=$hash->{HELPER}{API}{EXTERNAL}{NAME}";
 
    Log3($name, 4, "$name - Call-Out: $url");
    
@@ -1125,8 +1126,8 @@ sub getApiSites_parse {
         # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - ERROR message: $err");
        
-        setErrorState ($hash, $err);              
-        checkRetry              ($name,1);
+        setReadingErrorState ($hash, $err);              
+        checkRetry           ($name,1);
         
         return;
         
@@ -1147,17 +1148,19 @@ sub getApiSites_parse {
         $success = $data->{'success'};
     
         if ($success) {
-            my $logstr;
+            my ($logp,$logv);
+            
+            my $pundef = "Path: undefined - Surveillance Station may be stopped";
+            my $vundef = "Version: undefined - Surveillance Station may be stopped";
                         
           # Pfad und Maxversion von "SYNO.Chat.External" ermitteln
             my $externalpath = $data->{'data'}->{$external}->{'path'};
             $externalpath    =~ tr/_//d if (defined($externalpath));
             my $externalver  = $data->{'data'}->{$external}->{'maxVersion'}; 
        
-            $logstr = defined($externalpath) ? "Path of $external selected: $externalpath" : "Path of $external undefined - Synology Chat Server may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($externalver) ? "MaxVersion of $external selected: $externalver" : "MaxVersion of $external undefined - Synology Chat Server may be stopped";
-            Log3($name, 4, "$name - $logstr");
+            $logp = defined($externalpath) ? "Path: $externalpath"   : $pundef;
+            $logv = defined($externalver)  ? "Version: $externalver" : $vundef;
+            Log3($name, 4, "$name - API $external -> $logp, $logv");
                    
             # ermittelte Werte in $hash einfügen
             if(defined($externalpath) && defined($externalver)) {
@@ -1166,25 +1169,22 @@ sub getApiSites_parse {
 
                 $hash->{HELPER}{API}{PARSET}         = 1;               # Webhook Hash values sind gesetzt               
        
-                readingsBeginUpdate         ($hash);
-                readingsBulkUpdateIfChanged ($hash,"Errorcode","none");
-                readingsBulkUpdateIfChanged ($hash,"Error",    "none");
-                readingsEndUpdate           ($hash,1);                
+                setReadingErrorNone($hash, 1);                
             
             } else {
                 $errorcode = "805";
-                $error = expError($hash,$errorcode);                   # Fehlertext zum Errorcode ermitteln
+                $error     = expErrors($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
             
-                setErrorState ($hash, $error, $errorcode);   
+                setReadingErrorState ($hash, $error, $errorcode);   
                 checkRetry              ($name,1);  
                 return;                
             }
                         
         } else {
             $errorcode = "806";
-            $error     = expError($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
+            $error     = expErrors($hash,$errorcode);                   # Fehlertext zum Errorcode ermitteln
             
-            setErrorState ($hash, $error, $errorcode);
+            setReadingErrorState ($hash, $error, $errorcode);
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
             
             checkRetry ($name,1);    
@@ -1213,9 +1213,9 @@ sub chatOp {
    my ($success, $token) = getToken($hash,0,"botToken");
    unless ($success) {
        $errorcode = "810";
-       $error     = expError($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
+       $error     = expErrors($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
        
-       setErrorState ($hash, $error, $errorcode);
+       setReadingErrorState ($hash, $error, $errorcode);
        Log3($name, 2, "$name - ERROR - $error"); 
        
        checkRetry ($name,1);
@@ -1300,7 +1300,7 @@ sub chatOp_parse {
        $errorcode = "none";
        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
-       setErrorState ($hash, $err, $errorcode);
+       setReadingErrorState ($hash, $err, $errorcode);
        checkRetry    ($name,1);        
        return;
    
@@ -1335,19 +1335,19 @@ sub chatOp_parse {
            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
            readingsBulkUpdateIfChanged ($hash, "Error",     "none"  );            
            readingsBulkUpdate          ($hash, "state",     "active");                    
-           readingsEndUpdate           ($hash,1); 
+           readingsEndUpdate           ($hash,1);
            
        } else {
            # die API-Operation war fehlerhaft
            # Errorcode aus JSON ermitteln
            $errorcode = $data->{'error'}->{'code'};
            $cherror   = $data->{'error'}->{'errors'};                       # vom Chat gelieferter Fehler
-           $error     = expError($hash,$errorcode);                         # Fehlertext zum Errorcode ermitteln
-           if ($error =~ /not\sfound/x) {
+           $error     = expErrors($hash,$errorcode);                        # Fehlertext zum Errorcode ermitteln
+           if ($error =~ /not\sfound\sfor\serror\scode:/x) {
                $error .= " New error: ".($cherror // "");
            }
             
-           setErrorState ($hash, $error, $errorcode);       
+           setReadingErrorState ($hash, $error, $errorcode);       
            Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
            checkRetry ($name,1);
@@ -1379,8 +1379,8 @@ sub _parseUsers {                        ## no critic "not used"
   $out   .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
 
   while ($data->{'data'}->{'users'}->[$i]) {
-      my $deleted = jBoolMap($data->{'data'}->{'users'}->[$i]->{'deleted'});
-      my $isdis   = jBoolMap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
+      my $deleted = jboolmap($data->{'data'}->{'users'}->[$i]->{'deleted'});
+      my $isdis   = jboolmap($data->{'data'}->{'users'}->[$i]->{'is_disabled'});
       if($deleted ne "true" && $isdis ne "true") {
           $un                   = $data->{'data'}->{'users'}->[$i]->{'username'};
           $ui                   = $data->{'data'}->{'users'}->[$i]->{'user_id'};
@@ -1447,7 +1447,7 @@ sub _parseChannels {                     ## no critic "not used"
   $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
     
   while ($data->{'data'}->{'channels'}->[$i]) {
-      my $cn = jBoolMap($data->{'data'}->{'channels'}->[$i]->{'name'});
+      my $cn = jboolmap($data->{'data'}->{'channels'}->[$i]->{'name'});
       if($cn) {
           $ci                     = $data->{'data'}->{'channels'}->[$i]->{'channel_id'};
           $cr                     = $data->{'data'}->{'channels'}->[$i]->{'creator_id'};
@@ -1512,69 +1512,12 @@ sub evalJSON {
   eval {decode_json($myjson)} or do {
           $success   = 0;
           $errorcode = "900";         
-          $error     = expError($hash,$errorcode);                     # Fehlertext zum Errorcode ermitteln
+          $error     = expErrors($hash,$errorcode);                     # Fehlertext zum Errorcode ermitteln
             
-          setErrorState ($hash, $error, $errorcode);
+          setReadingErrorState ($hash, $error, $errorcode);
   };
   
 return($hash,$success,$myjson);
-}
-
-###############################################################################
-#                       JSON Boolean Test und Mapping
-###############################################################################
-sub jBoolMap { 
-  my $bool = shift;
-  
-  if(JSON::is_bool($bool)) {
-      $bool = $bool?"true":"false";
-  }
-  
-return $bool;
-}
-
-
-##############################################################################
-#  Auflösung Errorcodes SVS API
-#  Übernahmewerte sind $hash, $errorcode
-##############################################################################
-sub expError {
-  my ($hash,$errorcode) = @_;
-  my $device = $hash->{NAME};
-  my $error;
-  
-  unless (exists($errList{"$errorcode"})) {
-      $error = "Value of errorcode \"$errorcode\" not found."; 
-      return ($error);
-  }
-
-  # Fehlertext aus Hash-Tabelle %errorlist ermitteln
-  $error = $errList{"$errorcode"};
-  
-return $error;
-}
-
-################################################################
-# sortiert eine Liste von Versionsnummern x.x.x
-# Schwartzian Transform and the GRT transform
-# Übergabe: "asc | desc",<Liste von Versionsnummern>
-################################################################
-sub sortVersion {
-  my ($sseq,@versions) = @_;
-
-  my @sorted = map {$_->[0]}
-               sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./x]} @versions;
-             
-  @sorted = map {join ".", unpack "C*", $_}
-            sort
-            map {pack "C*", split /\./x} @versions;
-  
-  if($sseq eq "desc") {
-      @sorted = reverse @sorted;
-  }
-  
-return @sorted;
 }
 
 ######################################################################################
@@ -1704,16 +1647,6 @@ return;
 }
 
 #############################################################################################
-#             Leerzeichen am Anfang / Ende eines strings entfernen           
-#############################################################################################
-sub trim {
-  my $str = shift;
-  $str =~ s/^\s+|\s+$//xg;
-
-return ($str);
-}
-
-#############################################################################################
 #                        Länge Senedequeue updaten          
 #############################################################################################
 sub updQLength {
@@ -1779,27 +1712,6 @@ sub formString {
   $txt =~ s/($pat)/$replacements{$1}/xg;   
   
 return ($txt);
-}
-
-####################################################################################
-#       zentrale Funktion Error State in Readings setzen
-#       $error = Fehler als Text
-#       $errc  = Fehlercode gemäß %errList
-####################################################################################
-sub setErrorState {                   
-    my $hash  = shift;
-    my $error = shift;
-    my $errc  = shift;
-    
-    my $errcode = $errc // "none";
-    
-    readingsBeginUpdate         ($hash); 
-    readingsBulkUpdateIfChanged ($hash, "Error",     $error);
-    readingsBulkUpdateIfChanged ($hash, "Errorcode", $errcode);
-    readingsBulkUpdate          ($hash, "state",     "Error");                    
-    readingsEndUpdate           ($hash,1);
-
-return;
 }
 
 #############################################################################################
@@ -1885,14 +1797,14 @@ sub plotToFile {
         $err = qq{SVG device "$svgdev" doesn't exist};
         Log3($name, 1, "$name - ERROR - $err !");
         
-        setErrorState ($hash, $err);
+        setReadingErrorState ($hash, $err);
         return $err;
     }
     
     open (my $FILE, ">", "$path/$file") or do {
                                                 $err = qq{>PlotToFile< can't open $path/$file for write access};
                                                 Log3($name, 1, "$name - ERROR - $err !");
-                                                setErrorState ($hash, $err);
+                                                setReadingErrorState ($hash, $err);
                                                 return $err;
                                               };
     binmode $FILE;
@@ -1900,41 +1812,6 @@ sub plotToFile {
     close   $FILE;
 
 return ($err, $file);
-}
-
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  my $v                    = (sortVersion("desc",keys %vNotesIntern))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-      # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SSChatBot}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );       ## no critic 'VERSION'                                      
-      }
-  } else {
-      # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
-return;
 }
 
 #############################################################################################
@@ -2463,6 +2340,44 @@ sub ___botCGIorder {
   }
                     
 return ($cr, $state);
+}
+
+#############################################################################################
+#                          Versionierungen des Moduls setzen
+#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#############################################################################################
+sub setVersionInfo {
+  my $hash  = shift;
+  my $notes = shift;
+
+  my $v                    = (sortVersion("desc",keys %{$notes}))[0];
+  my $type                 = $hash->{TYPE};
+  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
+  $hash->{HELPER}{VERSION} = $v;
+  
+  $hash->{HELPER}{VERSION_API}      = $vAPI      // "unused";
+  $hash->{HELPER}{VERSION_SMUtils}  = $vSMUtils  // "unused";
+  $hash->{HELPER}{VERSION_ErrCodes} = $vErrCodes // "unused";
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
+      
+      if($modules{$type}{META}{x_version}) {                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
+      } else {
+          $modules{$type}{META}{x_version} = $v; 
+      }
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      
+      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                         # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+          use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');            ## no critic 'VERSION'                                      
+      }
+  
+  } else {                                                                               # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;
+  }
+  
+return;
 }
 
 1;
