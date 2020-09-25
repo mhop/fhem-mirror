@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.09.25 v0.1.9
+# - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 2687
+#
 # 2020.05.06 v0.1.8
 # - BUG:     Zu viele Loginfos bei set "NPM_login refresh" 
 #
@@ -392,7 +395,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.8";
+my $ModulVersion     = "0.1.9";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -2683,68 +2686,69 @@ sub echodevice_Parse($$$) {
 	my $json = eval { JSON->new->utf8(0)->decode($data) };
 		
 	if($msgtype eq "activities") {
+		if (ref($json) eq "HASH") {
+			if(defined($json->{activities}) && ref($json->{activities}) eq "ARRAY") {
+				foreach my $card (@{$json->{activities}}) {
+					# Device ID herausfiltern
+					my $sourceDeviceIds = ""; 
+					foreach my $cards (@{$card->{sourceDeviceIds}}) {
+						next if (echodevice_getModel($cards->{deviceType}) eq "Echo Multiroom");
+						next if (echodevice_getModel($cards->{deviceType}) eq "Sonos Display");
+						next if (echodevice_getModel($cards->{deviceType}) eq "Echo Stereopaar");
+						next if (echodevice_getModel($cards->{deviceType}) eq "unbekannt");
+						$sourceDeviceIds = $cards->{serialNumber};
+					}
+				
+					# Informationen in das ECHO Device eintragen
+					if(defined($modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds})) {
+						my $echohash = $modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds};
+						#my $timestamp = int(time - ReadingsAge($echohash->{NAME},'voice',time))-5;
+						my $timestamp = int(ReadingsVal($echohash->{NAME},'voice_timestamp',time));
+						my $IgnoreVoiceCommand = AttrVal($name,"ignorevoicecommand","");
+						#Log3 $name, 3, "[$name] [echodevice_Parse] [" . $echohash->{NAME} . "] timestamp = $timestamp / " . int($card->{creationTimestamp});
+						#Log3 $name, 3, "[$name] [echodevice_Parse] echohash  = ".$echohash->{NAME};
+						
+						#next if($timestamp eq $card->{creationTimestamp});
+						next if($timestamp >= int($card->{creationTimestamp}));
+						#next if($timestamp >= int($card->{creationTimestamp}/1000));
+						next if($card->{description} !~ /firstUtteranceId/);
+						
+						#https://forum.fhem.de/index.php/topic,82631.msg906424.html#msg906424
+						next if($IgnoreVoiceCommand ne "" && $card->{description} =~ m/$IgnoreVoiceCommand/i);
 
-		if(defined($json->{activities}) && ref($json->{activities}) eq "ARRAY") {
-			foreach my $card (@{$json->{activities}}) {
-				# Device ID herausfiltern
-				my $sourceDeviceIds = ""; 
-				foreach my $cards (@{$card->{sourceDeviceIds}}) {
-					next if (echodevice_getModel($cards->{deviceType}) eq "Echo Multiroom");
-					next if (echodevice_getModel($cards->{deviceType}) eq "Sonos Display");
-					next if (echodevice_getModel($cards->{deviceType}) eq "Echo Stereopaar");
-					next if (echodevice_getModel($cards->{deviceType}) eq "unbekannt");
-					$sourceDeviceIds = $cards->{serialNumber};
+						
+						my $textjson = $card->{description};
+						$textjson =~ s/\\//g;
+						my $cardjson = eval { JSON->new->utf8(0)->decode($textjson) };
+
+						next if($@);
+						next if(!defined($cardjson->{summary}));
+						next if($cardjson->{summary} eq "");
+						
+						$echohash->{".updateTimestamp"} = FmtDateTime(int($card->{creationTimestamp}/1000));
+						readingsBeginUpdate($echohash);
+						readingsBulkUpdate($echohash, "voice", $cardjson->{summary}, 1);
+						readingsBulkUpdate($echohash, "voice_timestamp", $card->{creationTimestamp}, 1);
+						readingsEndUpdate($echohash,1);
+						$echohash->{CHANGETIME}[0] = FmtDateTime(int($card->{creationTimestamp}/1000));
+						#Log3 $name, 3, "[$name] [echodevice_Parse] [" . $echohash->{NAME} . "] Alexatext = ".$cardjson->{summary};
+					}	
 				}
-			
-				# Informationen in das ECHO Device eintragen
-				if(defined($modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds})) {
-					my $echohash = $modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds};
-					#my $timestamp = int(time - ReadingsAge($echohash->{NAME},'voice',time))-5;
-					my $timestamp = int(ReadingsVal($echohash->{NAME},'voice_timestamp',time));
-					my $IgnoreVoiceCommand = AttrVal($name,"ignorevoicecommand","");
-					#Log3 $name, 3, "[$name] [echodevice_Parse] [" . $echohash->{NAME} . "] timestamp = $timestamp / " . int($card->{creationTimestamp});
-					#Log3 $name, 3, "[$name] [echodevice_Parse] echohash  = ".$echohash->{NAME};
-					
-					#next if($timestamp eq $card->{creationTimestamp});
-					next if($timestamp >= int($card->{creationTimestamp}));
-					#next if($timestamp >= int($card->{creationTimestamp}/1000));
-					next if($card->{description} !~ /firstUtteranceId/);
-					
-					#https://forum.fhem.de/index.php/topic,82631.msg906424.html#msg906424
-					next if($IgnoreVoiceCommand ne "" && $card->{description} =~ m/$IgnoreVoiceCommand/i);
-
-					
-					my $textjson = $card->{description};
-					$textjson =~ s/\\//g;
-					my $cardjson = eval { JSON->new->utf8(0)->decode($textjson) };
-
-					next if($@);
-					next if(!defined($cardjson->{summary}));
-					next if($cardjson->{summary} eq "");
-					
-					$echohash->{".updateTimestamp"} = FmtDateTime(int($card->{creationTimestamp}/1000));
-					readingsBeginUpdate($echohash);
-					readingsBulkUpdate($echohash, "voice", $cardjson->{summary}, 1);
-					readingsBulkUpdate($echohash, "voice_timestamp", $card->{creationTimestamp}, 1);
-					readingsEndUpdate($echohash,1);
-					$echohash->{CHANGETIME}[0] = FmtDateTime(int($card->{creationTimestamp}/1000));
-					#Log3 $name, 3, "[$name] [echodevice_Parse] [" . $echohash->{NAME} . "] Alexatext = ".$cardjson->{summary};
-				}	
 			}
-		}
-		
-		# Timer für Realtime Check!
-		my $IntervalVoice = int(AttrVal($name,"intervalvoice",999999));
-		
-		if ($IntervalVoice != 999999 && $hash->{STATE} eq "connected" && AttrVal($name,"disable",0) == 0) {
-			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] refresh voice command IntervalVoice=$IntervalVoice ";
-			$hash->{helper}{echodevice_refreshvoice} = 1;
-			$hash->{helper}{echodevice_refreshvoice_lastdate} = time();
-			RemoveInternalTimer($hash, "echodevice_refreshvoice");
-			InternalTimer(gettimeofday() + $IntervalVoice , "echodevice_refreshvoice", $hash, 0);
-		}
-		else {
-			$hash->{helper}{echodevice_refreshvoice} = 0;
+			
+			# Timer für Realtime Check!
+			my $IntervalVoice = int(AttrVal($name,"intervalvoice",999999));
+			
+			if ($IntervalVoice != 999999 && $hash->{STATE} eq "connected" && AttrVal($name,"disable",0) == 0) {
+				Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] refresh voice command IntervalVoice=$IntervalVoice ";
+				$hash->{helper}{echodevice_refreshvoice} = 1;
+				$hash->{helper}{echodevice_refreshvoice_lastdate} = time();
+				RemoveInternalTimer($hash, "echodevice_refreshvoice");
+				InternalTimer(gettimeofday() + $IntervalVoice , "echodevice_refreshvoice", $hash, 0);
+			}
+			else {
+				$hash->{helper}{echodevice_refreshvoice} = 0;
+			}
 		}
 	} 
  
