@@ -49,9 +49,59 @@ name:----Fibaro-devices-section--------
 filter:TYPE=ZWave
 order:01Fibaro00000
 
-name:FGRM222
+name:FGRM222_Roller_Mode
 filter:TYPE=ZWave
 order:01Fibaro000005
+desc:Applies to Fibaro FGRM222 devices. This is for normal shutter mode. For other modes use different attrTemplates if available or manual configuration. 
+farewell:Things to be done manually: configure switch type (configSwitchType).
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith|model.*).*
+attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
+attr DEVICE webCmd dim:stop
+attr DEVICE cmdIcon stop:fts_shutter_manual
+attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
+set DEVICE configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
+set DEVICE configReportsType BlindPositionReportsSentToThe0
+option:{ CALLSPEECHRECOGN }  
+set DEVICE attrTemplate speechcontrol_type_blind
+#closing section
+option:{ 1 }  
+get DEVICE configAll
+get DEVICE associationAll
+setreading DEVICE attrTemplateVersion FGRM222_Roller_Mode_20200925
+
+
+name:FGRM222_Ventian_Blind_Mode
+filter:TYPE=ZWave
+order:01Fibaro000005a
+desc:Applies to Fibaro FGRM222 devices. This is for venetian blind mode. For other modes use differnt attrTemplates or manual configuration. Note: additional code needed - has to be downloaded seperately from svn.
+farewell:Things to be done manually: configure switch type (configSwitchType) and turning time for lamellas (configInVenetianBlindModeTheParameter12).
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
+attr DEVICE icon ICON
+deletereading -q DEVICE (?!associatedWith|model.*).*
+attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
+attr DEVICE webCmd dim:stop
+attr DEVICE cmdIcon stop:fts_shutter_manual
+attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
+attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_venetian_shutter($name,"FGRM222") }
+set DEVICE configRollerShutterOperatingModes 2VenetianBlindModeWith2
+set DEVICE configReportsType BlindPositionReportsSentToThe1
+set DEVICE configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
+attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0) =~ m,dim, ? ReadingsNum($name,"state",0) : ReadingsNum($name,"dim",0);; my $pos1 = ReadingsNum($name,"position",0);; $pos = $pos1 if ($pos > $pos1 +3 || $pos < $pos1 -3);; return $pos }, positionSlat:power..0.0.W {ReadingsVal($name,"position",0) =~ m,Slat.([0-9]+),?$1:undef}
+option:{ CALLSPEECHRECOGN }  
+set DEVICE attrTemplate speechcontrol_type_blind
+#closing section
+option:{ 1 }  
+get DEVICE configAll
+get DEVICE associationAll
+setreading DEVICE attrTemplateVersion FGRM222_Ventian_Blind_Mode_20200925
+
+name:FGRM222_Choice_demo
+filter:TYPE=ZWave
+order:01Fibaro000008
 desc:Applies to Fibaro FGRM222 devices. You can choose between normal shutter mode or venetian blind mode. For other modes use manual configuration. Note: additional code will be downloaded from svn.
 farewell:Things to be done manually: configure switch type (configSwitchType) and (for venetain mode only) turning time for lamellas (configInVenetianBlindModeTheParameter12).
 par:RADIO_ROLLER_MODE;Configure as normal shutter (no option to turn lamellas);{ undef }
@@ -65,25 +115,22 @@ attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim:stop
 attr DEVICE cmdIcon stop:fts_shutter_manual
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
-
 option:{ RADIO_ROLLER_MODE }
 set DEVICE configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
 set DEVICE configReportsType BlindPositionReportsSentToThe0
-
 option:{ RADIO_VENETIANBLIND_MODE }
 attr DEVICE devStateIcon { FHEM::attrT::ZWave::devStateIcon_venetian_shutter($name,"FGRM222") }
 set DEVICE configRollerShutterOperatingModes 2VenetianBlindModeWith2
 set DEVICE configReportsType BlindPositionReportsSentToThe1
 set DEVICE configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
 attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0) =~ m,dim, ? ReadingsNum($name,"state",0) : ReadingsNum($name,"dim",0);; my $pos1 = ReadingsNum($name,"position",0);; $pos = $pos1 if ($pos > $pos1 +3 || $pos < $pos1 -3);; return $pos }, positionSlat:power..0.0.W {ReadingsVal($name,"position",0) =~ m,Slat.([0-9]+),?$1:undef}
-
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
 option:{ 1 }  
 get DEVICE configAll
 get DEVICE associationAll
-setreading DEVICE attrTemplateVersion FGRM222_20200912
+setreading DEVICE attrTemplateVersion FGRM222_Choice_demo_20200912
 
 
 

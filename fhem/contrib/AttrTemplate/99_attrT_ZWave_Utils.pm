@@ -3,7 +3,7 @@
 #
 
 # packages ####################################################################
-package FHEM::attrT::ZWave;    ## no critic 'Package declaration'
+package FHEM::attrT_ZWave_Utils;    ## no critic 'Package declaration'
 
 use strict;
 use warnings;
@@ -41,6 +41,7 @@ sub devStateIcon_venetian_shutter {
   my $ret ="";
   my $slatlevel = 0;
   my $slatcommand_string = "dim ";
+  my $moving = 0;
   
   if ($model eq "FGR223") {
     my ($def,$defnr) = split(" ", InternalVal($levelname,"DEF",$levelname));
@@ -48,10 +49,12 @@ sub devStateIcon_venetian_shutter {
     my @slatnames = devspec2array("DEF=$def".'.'.$defnr);
     $slatname = shift @slatnames;
     $slatlevel= ReadingsNum($slatname,"state",0);
+	$moving = 1 if ReadingsNum($slatname,"power",0) > 0;
   } 
   if ($model eq "FGRM222") {
     $slatlevel= ReadingsNum($slatname,"positionSlat",0);
-	$slatcommand_string = "positionSlat "
+	$slatcommand_string = "positionSlat ";
+	$moving = 1 if ReadingsNum($slatname,"power",0) > 0;
   } 
 
   #levelicon
@@ -59,10 +62,8 @@ sub devStateIcon_venetian_shutter {
   my $command_string = "dim 99";
   $command_string = "dim 0" if $dimlevel > 50;
   $symbol_string .= int ((109 - $dimlevel)/10)*10;
-  $ret .= "<a href=\"/fhem?cmd.dummy=set $levelname $command_string&XHR=1\">" . FW_makeImage($symbol_string,"fts_shutter_10") . "</a> "; 
-
-  #stop
-  $ret .= "<a href=\"/fhem?cmd.dummy=set $levelname stop&XHR=1\">" . FW_makeImage("fts_shutter_shadding_stop","fts_shutter_shadding_stop") . "</a> "; 
+  $ret .= $moving ? "<a href=\"/fhem?cmd.dummy=set $levelname stop&XHR=1\">" . FW_makeImage("edit_settings","edit_settings") . "</a> " 
+                  : "<a href=\"/fhem?cmd.dummy=set $levelname $command_string&XHR=1\">" . FW_makeImage($symbol_string,"fts_shutter_10") . "</a> "; 
 
   #slat
   $symbol_string = "fts_blade_arc_close_";
@@ -79,6 +80,7 @@ sub devStateIcon_venetian_shutter {
 
 1;
 
+__END__
 =pod
 =begin html
 
