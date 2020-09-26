@@ -31,6 +31,7 @@ UnifiVideo_Initialize($)
   $hash->{GetFn}    = "UnifiVideo_Get";
   $hash->{AttrFn}   = "UnifiVideo_Attr";
   $hash->{AttrList} = "disable filePath apiKey ".
+                      "logfile ".
                       "sshUser ".
                       $readingFnAttributes;
 
