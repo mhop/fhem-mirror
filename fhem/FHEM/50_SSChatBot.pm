@@ -38,20 +38,23 @@ use warnings;
 use GPUtils qw(GP_Import GP_Export);                                                                          # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use FHEM::SynoModules::API qw(:all);                                                                          # API Modul
-my $vAPI = FHEM::SynoModules::API->VERSION();
 
-use FHEM::SynoModules::SMUtils qw(jboolmap 
-                                  sortVersion 
+use FHEM::SynoModules::SMUtils qw(                                                                            
+                                  jboolmap
+                                  moduleVersion
+                                  sortVersion
+                                  showModuleInfo                                  
 								  setReadingErrorNone 
 								  setReadingErrorState
+                                  addSendqueueEntry
                                   listSendqueue
                                   purgeSendqueue
                                   updQueueLength
-								 );  
-my $vSMUtils = FHEM::SynoModules::SMUtils->VERSION();                                                         # Hilfsroutinen Modul
+                                  getClHash
+                                  delClHash
+								 );                                                                           # Hilfsroutinen Modul                                                         
 
-use FHEM::SynoModules::ErrCodes qw(:all); 
-my $vErrCodes = FHEM::SynoModules::ErrCodes->VERSION();                                                       # Error Code Modul
+use FHEM::SynoModules::ErrCodes qw(:all);                                                                     # Error Code Modul                                                      
 
 use Data::Dumper;                                                                                             # Perl Core module
 use MIME::Base64;
@@ -123,8 +126,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.10.6" => "22.08.2020  use module FHEM::SynoModules::API ",
-  "1.10.5" => "25.09.2020  get error Codes from FHEM::SynoModules::ErrCodes, unify setVersionInfo, integrate FHEM::SynoModules::SMUtils ",
+  "1.10.7" => "26.09.2020  more subs to SMUtils and common optimization ",
+  "1.10.6" => "25.09.2020  use module FHEM::SynoModules::API ",
+  "1.10.5" => "25.09.2020  get error Codes from FHEM::SynoModules::ErrCodes, unify moduleVersion, integrate FHEM::SynoModules::SMUtils ",
   "1.10.4" => "22.08.2020  minor code changes ",
   "1.10.3" => "20.08.2020  more code refactoring according PBP ",
   "1.10.2" => "19.08.2020  more code refactoring and little improvements ",
@@ -196,7 +200,7 @@ my %hmodep = (                                                              # Ha
     sendItem        => { fn => \&_parseSendItem },
 );
 
-my %hrecbot = (                                                             # Hash für botCGI receice Slash-commands (/set, /get, /code)
+my %hrecbot = (                                                             # Hash für botCGI receive Slash-commands (/set, /get, /code)
     set => { fn => \&__botCGIrecSet }, 
     get => { fn => \&__botCGIrecGet },   
     cod => { fn => \&__botCGIrecCod },
@@ -263,7 +267,16 @@ sub Define {
   CommandAttr(undef,"$name room Chat");
   
   $hash->{HELPER}{API}           = \%hapi;                                       # API Template in HELPER kopieren 
-  setVersionInfo ($hash, \%vNotesIntern);                                        # Versionsinformationen setzen
+  
+  my $params = {
+      hash        => $hash,
+      notes       => \%vNotesIntern,
+      useAPI      => 1,
+      useSMUtils  => 1,
+      useErrCodes => 1
+  };
+  use version 0.77; our $VERSION = moduleVersion ($params);                      # Versionsinformationen setzen
+  
   getToken($hash,1,"botToken");                                                  # Token lesen
   $data{SSChatBot}{$name}{sendqueue}{index} = 0;                                 # Index der Sendequeue initialisieren
     
@@ -633,8 +646,8 @@ sub _getchatUserlist {
   my $name  = $paref->{name};
   
   # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-  delClhash ($name);
-  getClhash ($hash,1);
+  delClHash ($name);
+  getClHash ($hash,1);
 
   # Eintrag zur SendQueue hinzufügen
   my $params = { 
@@ -662,8 +675,8 @@ sub _getchatChannellist {
   my $name  = $paref->{name};
   
   # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
-  delClhash ($name);       
-  getClhash ($hash,1);
+  delClHash ($name);       
+  getClHash ($hash,1);
     
   # Eintrag zur SendQueue hinzufügen
   my $params = { 
@@ -687,91 +700,12 @@ return;
 ################################################################
 sub _getversionNotes {
   my $paref = shift;
-  my $arg   = $paref->{arg};
   
-  my $header  = "<b>Module release information</b><br>";
-  my $header1 = "<b>Helpful hints</b><br>";
-  my $ret     = "";
-  my %hs;
+  $paref->{hintextde} = \%vHintsExt_de;
+  $paref->{hintexten} = \%vHintsExt_en;
+  $paref->{notesext}  = \%vNotesExtern;
   
-  # Ausgabetabelle erstellen
-  my ($val0,$val1);
-  my $i = 0;
-  
-  $ret  = "<html>";
-  
-  # Hints
-  if(!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {
-      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
-      $ret .= "<table class=\"block wide internals\">";
-      $ret .= "<tbody>";
-      $ret .= "<tr class=\"even\">";  
-      if($arg && $arg =~ /[\d]+/x) {
-          my @hints = split(",",$arg);
-          for my $hint (@hints) {
-              if(AttrVal("global","language","EN") eq "DE") {
-                  $hs{$hint} = $vHintsExt_de{$hint};
-              } 
-              else {
-                  $hs{$hint} = $vHintsExt_en{$hint};
-              }
-          }                      
-      } 
-      else {
-          if(AttrVal("global","language","EN") eq "DE") {
-              %hs = %vHintsExt_de;
-          } 
-          else {
-              %hs = %vHintsExt_en; 
-          }
-      }          
-      $i = 0;
-      for my $key (sortVersion("desc",keys %hs)) {
-          $val0 = $hs{$key};
-          $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
-          $ret .= "</tr>";
-          $i++;
-          
-          if ($i & 1) {                                         # $i ist ungerade
-              $ret .= "<tr class=\"odd\">";
-          } 
-          else {
-              $ret .= "<tr class=\"even\">";
-          }
-      }
-      $ret .= "</tr>";
-      $ret .= "</tbody>";
-      $ret .= "</table>";
-      $ret .= "</div>";
-  }
-  
-  # Notes
-  if(!$arg || $arg =~ /rel/x) {
-      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-      $ret .= "<table class=\"block wide internals\">";
-      $ret .= "<tbody>";
-      $ret .= "<tr class=\"even\">";
-      $i = 0;
-      for my $key (sortVersion("desc",keys %vNotesExtern)) {
-          ($val0,$val1) = split(/\s/x, $vNotesExtern{$key},2);
-          $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-          $ret .= "</tr>";
-          $i++;
-          
-          if ($i & 1) {                                       # $i ist ungerade
-              $ret .= "<tr class=\"odd\">";
-          } 
-          else {
-              $ret .= "<tr class=\"even\">";
-          }
-      }
-      $ret .= "</tr>";
-      $ret .= "</tbody>";
-      $ret .= "</table>";
-      $ret .= "</div>";
-  }
-  
-  $ret .= "</html>";
+  my $ret = showModuleInfo ($paref);
                     
 return $ret;
 }
@@ -882,25 +816,19 @@ sub addSendqueue {
 
         return;        
     }
-   
-   $data{SSChatBot}{$name}{sendqueue}{index}++;
-   my $index = $data{SSChatBot}{$name}{sendqueue}{index};
-   
-   Log3($name, 5, "$name - Add Item to queue - Idx: $index, Opmode: $opmode, Text: $text, fileUrl: $fileUrl, attachment: $attachment, userid: $userid");
-   
-   my $pars = {'opmode'     => $opmode,   
-               'method'     => $method, 
-               'userid'     => $userid,
-               'channel'    => $channel,
-               'text'       => $text,
-               'attachment' => $attachment,
-               'fileUrl'    => $fileUrl,  
-               'retryCount' => 0               
-              };
-                      
-   $data{SSChatBot}{$name}{sendqueue}{entries}{$index} = $pars;  
-
-   updQueueLength ($hash);                                                       # update Länge der Sendequeue     
+      
+    my $entry = {
+                 'opmode'     => $opmode,   
+                 'method'     => $method, 
+                 'userid'     => $userid,
+                 'channel'    => $channel,
+                 'text'       => $text,
+                 'attachment' => $attachment,
+                 'fileUrl'    => $fileUrl,  
+                 'retryCount' => 0               
+                };
+              
+    addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen    
    
 return;
 }
@@ -998,8 +926,7 @@ sub getApiSites {
    my $inprot = $hash->{INPROT};  
    
    my ($url,$param,$idxset,$ret);
-  
-   # API-Pfade und MaxVersions ermitteln 
+
    Log3($name, 4, "$name - ####################################################"); 
    Log3($name, 4, "$name - ###            start Chat operation Send            "); 
    Log3($name, 4, "$name - ####################################################");
@@ -1380,7 +1307,7 @@ sub _parseUsers {
   # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
   # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
   asyncOutput   ($hash->{HELPER}{CL}{1},"$out");
-  InternalTimer (gettimeofday()+10.0, "FHEM::SSChatBot::delClhash", $name, 0); 
+  InternalTimer (gettimeofday()+10.0, "FHEM::SSChatBot::delClHash", $name, 0); 
       
 return;
 }
@@ -1428,7 +1355,7 @@ sub _parseChannels {
   # Ausgabe Popup der User-Daten (nach readingsEndUpdate positionieren sonst 
   # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
   asyncOutput  ($hash->{HELPER}{CL}{1},"$out");
-  InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClhash", $name, 0);
+  InternalTimer(gettimeofday()+5.0, "FHEM::SSChatBot::delClHash", $name, 0);
       
 return;
 }
@@ -1647,67 +1574,6 @@ sub formString {
   $txt =~ s/($pat)/$replacements{$1}/xg;   
   
 return ($txt);
-}
-
-#############################################################################################
-# Clienthash übernehmen oder zusammenstellen
-# Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
-#############################################################################################
-sub getClhash {      
-  my ($hash,$nobgd)= @_;
-  my $name  = $hash->{NAME};
-  my $ret;
-  
-  if($nobgd) {
-      # nur übergebenen CL-Hash speichern, 
-      # keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-      return;
-  }
-
-  if (!defined($hash->{CL})) {                                        # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
-      my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
-      my $i = 1;
-      for my $outdev (@webdvs) {
-          next if(!$defs{$outdev});
-          $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
-          $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
-          $hash->{HELPER}{CL}{$i}->{COMP} = 1;
-          $i++;               
-      }
-  } 
-  else {                                                              # übergebenen CL-Hash in Helper eintragen
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-  }
-      
-  # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz
-  if (defined($hash->{HELPER}{CL}{1})) {
-      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-          Log3($name, 4, "$name - Clienthash number: $k");
-          while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
-              $val = $val?$val:" ";
-              Log3($name, 4, "$name - Clienthash: $key -> $val");
-          }
-      }
-  } 
-  else {
-      Log3($name, 2, "$name - Clienthash was neither delivered nor created !");
-      $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for function.";
-  }
-  
-return ($ret);
-}
-
-#############################################################################################
-#            Clienthash löschen
-#############################################################################################
-sub delClhash {
-  my $name = shift;
-  my $hash = $defs{$name};
-  
-  delete($hash->{HELPER}{CL});
-  
-return;
 }
 
 ####################################################################################
@@ -2277,45 +2143,6 @@ sub ___botCGIorder {
 return ($cr, $state);
 }
 
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my $hash  = shift;
-  my $notes = shift;
-
-  my $v                    = (sortVersion("desc",keys %{$notes}))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
-  
-  $hash->{HELPER}{VERSION_API}      = $vAPI      // "unused";
-  $hash->{HELPER}{VERSION_SMUtils}  = $vSMUtils  // "unused";
-  $hash->{HELPER}{VERSION_ErrCodes} = $vErrCodes // "unused";
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
-      
-      if($modules{$type}{META}{x_version}) {                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } 
-      else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-      
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                         # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');            ## no critic 'VERSION'                                      
-      }
-  } 
-  else {                                                                                 # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
-return;
-}
-
 1;
 
 =pod
@@ -2445,10 +2272,19 @@ return;
         set &lt;Name&gt; asyncSendItem text="https://www.synology.com" [users="&lt;User&gt;"] <br>
         set &lt;Name&gt; asyncSendItem text="Check this! &lt;https://www.synology.com|Click here&gt; for details!" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
         set &lt;name&gt; asyncSendItem text="a funny picture" fileUrl="http://imgur.com/xxxxx" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
-        set &lt;Name&gt; asyncSendItem text="current plot file" svg="&lt;SVG-Device&gt;[,&lt;Zoom&gt;][,&lt;Offset&gt;]" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
         set &lt;Name&gt; asyncSendItem text="&lt;Message text&gt;" attachments="[{
                                             "callback_id": "&lt;Text for Reading recCallbackId&gt;", "text": "&lt;Heading of the button&gt;", 
-                                            "actions":[{"type": "button", "name": "&lt;text&gt;", "value": "&lt;value&gt;", "text": "&lt;text&gt;", "style": "&lt;color&gt;"}] }]" <br>      </ul>
+                                            "actions":[{"type": "button", "name": "&lt;text&gt;", "value": "&lt;value&gt;", "text": "&lt;text&gt;", "style": "&lt;color&gt;"}] }]" <br>      
+      </ul>
+      <br>
+      
+      Plot outputs from SVG devices can be sent directly: <br><br>
+      
+      <ul>
+        set &lt;Name&gt; asyncSendItem text="current plot file" svg="&lt;SVG-Device&gt;[,&lt;Zoom&gt;][,&lt;Offset&gt;]" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
+      </ul>
+      <br>
+      Further information is available in the <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers#verschiedene_Arten_Nachrichten_an_Chatempf.C3.A4nger_senden">Wiki</a>. 
   
       </li><br>
     </ul>
@@ -2770,13 +2606,21 @@ return;
         set &lt;Name&gt; asyncSendItem text="https://www.synology.com" [users="&lt;User&gt;"] <br>
         set &lt;Name&gt; asyncSendItem text="Überprüfen Sie dies!! &lt;https://www.synology.com|Click hier&gt; für Einzelheiten!" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
         set &lt;Name&gt; asyncSendItem text="ein lustiges Bild" fileUrl="http://imgur.com/xxxxx" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
-        set &lt;Name&gt; asyncSendItem text="aktuelles Plotfile" svg="&lt;SVG-Device&gt;[,&lt;Zoom&gt;][,&lt;Offset&gt;]" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
         set &lt;Name&gt; asyncSendItem text="&lt;Mitteilungstext&gt;" attachments="[{
                                             "callback_id": "&lt;Text für Reading recCallbackId&gt;", "text": "&lt;Überschrift des Buttons&gt;", 
                                             "actions":[{"type": "button", "name": "&lt;Text&gt;", "value": "&lt;Wert&gt;", "text": "&lt;Text&gt;", "style": "&lt;Farbe&gt;"}] }]" <br>
       </ul>
-  
+      <br>
+      
+      Es können Plotausgaben von SVG-Devices direkt versendet werden: <br><br>
+      
+      <ul>
+        set &lt;Name&gt; asyncSendItem text="aktuelles Plotfile" svg="&lt;SVG-Device&gt;[,&lt;Zoom&gt;][,&lt;Offset&gt;]" [users="&lt;User1&gt;,&lt;User2&gt;"] <br>
+      </ul>
+      <br>
+      Weitere Informationen dazu sind im <a href="https://wiki.fhem.de/wiki/SSChatBot_-_Integration_des_Synology_Chat_Servers#verschiedene_Arten_Nachrichten_an_Chatempf.C3.A4nger_senden">Wiki</a> ausgeführt. 
       </li><br>
+    
     </ul>
    
     <ul>
