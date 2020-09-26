@@ -49,12 +49,12 @@ sub devStateIcon_venetian_shutter {
     my @slatnames = devspec2array("DEF=$def".'.'.$defnr);
     $slatname = shift @slatnames;
     $slatlevel= ReadingsNum($slatname,"state",0);
-	$moving = 1 if ReadingsNum($slatname,"power",0) > 0;
+	$moving = 1 if ReadingsNum($levelname,"power",0) > 0;
   } 
   if ($model eq "FGRM222") {
-    $slatlevel= ReadingsNum($slatname,"positionSlat",0);
+    $slatlevel= ReadingsNum($levelname,"positionSlat",0);
 	$slatcommand_string = "positionSlat ";
-	$moving = 1 if ReadingsNum($slatname,"power",0) > 0;
+	$moving = 1 if ReadingsNum($levelname,"power",0) > 0;
   } 
 
   #levelicon
@@ -81,6 +81,7 @@ sub devStateIcon_venetian_shutter {
 1;
 
 __END__
+
 =pod
 =begin html
 
