@@ -164,6 +164,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
   "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
   "9.7.24" => "24.09.2020  optimize prepareSendData ",
   "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
@@ -660,7 +661,7 @@ my %vHintsExt_en = (
          "<br><br>",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
          "the used SSCam version was currently not tested or (partially) incompatible with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
-         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
+         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY. <br>".
          "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
          "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ".
          "<br><br>",
@@ -726,7 +727,7 @@ my %vHintsExt_de = (
          "<br><br>",
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
-         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.<br>".
          "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
          "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ".
          "<br><br>",
@@ -856,8 +857,14 @@ sub Define {
   $hash->{HELPER}{SNAPLIMIT}           = 0;                                      # abgerufene Anzahl Snaps
   $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
-  # Versionsinformationen setzen
-  setVersionInfo ($hash, \%vNotesIntern);
+  my $params = {
+      hash        => $hash,
+      notes       => \%vNotesIntern,
+      useAPI      => 1,
+      useSMUtils  => 1,
+      useErrCodes => 1
+  };
+  use version 0.77; our $VERSION = moduleVersion ($params);                      # Versionsinformationen setzen
   
   readingsBeginUpdate ($hash );
   readingsBulkUpdate  ($hash, "PollState", "Inactive");                          # es ist keine Gerätepolling aktiv  
@@ -4391,91 +4398,12 @@ return;
 ################################################################
 sub _getversionNotes {                   ## no critic "not used"
   my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $arg   = $paref->{arg};
   
-  my $header  = "<b>Module release information</b><br>";
-  my $header1 = "<b>Helpful hints</b><br>";
+  $paref->{hintextde} = \%vHintsExt_de;
+  $paref->{hintexten} = \%vHintsExt_en;
+  $paref->{notesext}  = \%vNotesExtern;
   
-  my $i = 0;
-  
-  my $ret = "<html>";
-  
-  if(!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {                                               # Hints
-      my %hs;
-      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
-      $ret .= "<table class=\"block wide internals\">";
-      $ret .= "<tbody>";
-      $ret .= "<tr class=\"even\">";  
-      
-      if($arg && $arg =~ /[\d]+/x) {
-          my @hints = split(",",$arg);
-          for (@hints) {
-              if(AttrVal("global","language","EN") eq "DE") {
-                  $hs{$_} = $vHintsExt_de{$_};
-              } 
-              else {
-                  $hs{$_} = $vHintsExt_en{$_};
-              }
-          }                      
-      } 
-      else {
-          if(AttrVal("global","language","EN") eq "DE") {
-              %hs = %vHintsExt_de;
-          } 
-          else {
-              %hs = %vHintsExt_en; 
-          }
-      }          
-      
-      $i = 0;
-      for my $key (sortVersion("desc",keys %hs)) {
-          my $val0 = $hs{$key};
-          $ret    .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
-          $ret    .= "</tr>";
-          $i++;
-          
-          if ($i & 1) {                                                                             # $i ist ungerade
-              $ret .= "<tr class=\"odd\">";
-          } 
-          else {
-              $ret .= "<tr class=\"even\">";
-          }
-      }
-      $ret .= "</tr>";
-      $ret .= "</tbody>";
-      $ret .= "</table>";
-      $ret .= "</div>";
-  }
-  
-  if(!$arg || $arg =~ /rel/x) {                                                                     # Notes
-      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-      $ret .= "<table class=\"block wide internals\">";
-      $ret .= "<tbody>";
-      $ret .= "<tr class=\"even\">";
-      $i = 0;
-      
-      for my $key (sortVersion("desc",keys %vNotesExtern)) {
-          my ($val0,$val1) = split(/\s/x,$vNotesExtern{$key},2);
-          $ret            .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-          $ret            .= "</tr>";
-          $i++;
-          
-          if ($i & 1) {                                                                             # $i ist ungerade
-              $ret .= "<tr class=\"odd\">";
-          } 
-          else {
-              $ret .= "<tr class=\"even\">";
-          }
-      }
-      
-      $ret .= "</tr>";
-      $ret .= "</tbody>";
-      $ret .= "</table>";
-      $ret .= "</div>";
-  }
-  
-  $ret .= "</html>";
+  my $ret = showModuleInfo ($paref);
                     
 return $ret; 
 }
@@ -11902,44 +11830,6 @@ sub wdpollcaminfo {
 
     InternalTimer(gettimeofday()+$watchdogtimer, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
     
-return;
-}
-
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my $hash  = shift;
-  my $notes = shift;
-
-  my $v                    = (sortVersion("desc",keys %{$notes}))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
-  
-  $hash->{HELPER}{VERSION_API}      = FHEM::SynoModules::API->VERSION()      // "unused";
-  $hash->{HELPER}{VERSION_SMUtils}  = FHEM::SynoModules::SMUtils->VERSION()  // "unused";
-  $hash->{HELPER}{VERSION_ErrCodes} = FHEM::SynoModules::ErrCodes->VERSION() // "unused";
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
-      
-      if($modules{$type}{META}{x_version}) {                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-      
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {                         # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );          ## no critic 'VERSION'                                      
-      }
-  
-  } else {                                                                               # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
 return;
 }
 
