@@ -40,13 +40,16 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.9.0');
+use version; our $VERSION = version->declare('1.10.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
-                     getClHash 
+                     getClHash
+                     delClHash
                      trim
+                     moduleVersion
                      sortVersion
+                     showModuleInfo
                      jboolmap
                      setCredentials
                      getCredentials
@@ -58,6 +61,7 @@ our @EXPORT_OK = qw(
                      delCallParts
 					 setReadingErrorNone
 					 setReadingErrorState
+                     addSendqueueEntry
                      listSendqueue
                      purgeSendqueue
                      updQueueLength
@@ -77,6 +81,7 @@ BEGIN {
           modules
           CancelDelayedShutdown
           devspec2array
+          FmtDateTime
           setKeyValue
           getKeyValue
           readingsSingleUpdate
@@ -89,12 +94,18 @@ BEGIN {
   );  
 };
 
+# Standardvariablen
+my $carpnohash = "got no hash value";
+my $carpnoname = "got no name value";
+my $carpnoctyp = "got no credentials type";
+my $carpnoapir = "got no API reference";
+
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
 # Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
 ###############################################################################
 sub getClHash {      
-  my $hash  = shift // carp "got no hash value" && return;
+  my $hash  = shift // carp $carpnohash && return;
   my $nobgd = shift;
   my $name  = $hash->{NAME};
   my $ret;
@@ -108,16 +119,16 @@ sub getClHash {
       my $outdev;
       my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
       my $i = 1;
-      for (@webdvs) {
-          $outdev = $_;
+      
+      for my $outdev (@webdvs) {
           next if(!$defs{$outdev});
           $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
           $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
           $hash->{HELPER}{CL}{$i}->{COMP} = 1;
           $i++;               
-      }
-      
-  } else {                                                          # übergebenen CL-Hash in Helper eintragen
+      }   
+  } 
+  else {                                                            # übergebenen CL-Hash in Helper eintragen
       $hash->{HELPER}{CL}{1} = $hash->{CL};
   }
       
@@ -129,13 +140,25 @@ sub getClHash {
               Log3 ($name, 4, "$name - Clienthash: $key -> $val");
           }
       }
-  
-  } else {
+  } 
+  else {
       Log3 ($name, 2, "$name - Clienthash was neither delivered nor created !");
       $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for function.";
   }
   
 return $ret;
+}
+
+####################################################################################
+#                            Clienthash löschen
+####################################################################################
+sub delClHash {
+  my $name = shift;
+  my $hash = $defs{$name};
+  
+  delete($hash->{HELPER}{CL});
+  
+return;
 }
 
 ###############################################################################
@@ -146,6 +169,58 @@ sub trim {
   $str    =~ s/^\s+|\s+$//gx;
 
 return $str;
+}
+
+#############################################################################################
+#     liefert die Versionierung des Moduls zurück
+#     Verwendung mit Packages:  use version 0.77; our $VERSION = moduleVersion ($params)
+#     Verwendung ohne Packages: moduleVersion ($params)
+#  
+#     Die Verwendung von Meta.pm und Packages wird berücksichtigt
+#
+#     Variablen $useAPI, $useSMUtils, $useErrCodes enthalten die Versionen von SynoModules
+#     wenn verwendet und sind in diesem Fall zu übergeben. 
+#############################################################################################
+sub moduleVersion {
+  my $paref       = shift; 
+  my $hash        = $paref->{hash}      // carp $carpnohash                          && return; 
+  my $notes       = $paref->{notes}     // carp "got no reference of a version hash" && return;
+  my $useAPI      = $paref->{useAPI};
+  my $useSMUtils  = $paref->{useSMUtils};
+  my $useErrCodes = $paref->{useErrCodes}; 
+
+  my $type        = $hash->{TYPE};
+  my $package     = (caller)[0];                                                         # das PACKAGE des aufrufenden Moduls          
+  
+  $hash->{HELPER}{VERSION_API}      = $useAPI      ? FHEM::SynoModules::API->VERSION()      : "unused";
+  $hash->{HELPER}{VERSION_SMUtils}  = $useSMUtils  ? FHEM::SynoModules::SMUtils->VERSION()  : "unused";
+  $hash->{HELPER}{VERSION_ErrCodes} = $useErrCodes ? FHEM::SynoModules::ErrCodes->VERSION() : "unused";
+
+  my $v                    = (sortVersion("desc",keys %{$notes}))[0];                    # die Modulversion aus Versionshash selektieren
+  $hash->{HELPER}{VERSION} = $v;
+  $hash->{HELPER}{PACKAGE} = $package;
+  
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {          # META-Daten sind vorhanden
+      $modules{$type}{META}{version} = "v".$v;                                           # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
+      
+      if($modules{$type}{META}{x_version}) {                                             # {x_version} nur gesetzt wenn $Id$ im Kopf komplett! vorhanden
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
+      } 
+      else {
+          $modules{$type}{META}{x_version} = $v; 
+      }
+      
+      FHEM::Meta::SetInternals($hash);                                                   # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+  } 
+  else {                                                                                 # herkömmliche Modulstruktur
+      $hash->{VERSION} = $v;                                                             # Internal VERSION setzen
+  }
+  
+  if($package =~ /FHEM::$type/x || $package eq $type) {                                  # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
+      return $v;         
+  }
+  
+return;
 }
 
 ################################################################
@@ -171,6 +246,106 @@ sub sortVersion {
 return @sorted;
 }
 
+#############################################################################################
+#                 gibt die angeforderten Hinweise / Release Notes als 
+#                 HTML-Tabelle zurück
+#############################################################################################
+sub showModuleInfo {                 
+  my $paref        = shift;
+  my $arg          = $paref->{arg};
+  my $vHintsExt_de = $paref->{hintextde};                       # Referenz zum deutschen Hinweis-Hash
+  my $vHintsExt_en = $paref->{hintexten};                       # Referenz zum englischen Hinweis-Hash
+  my $vNotesExtern = $paref->{notesext};                        # Referenz zum Hash der Modul Release Notes
+   
+  my $header  = "<b>Module release information</b><br>";
+  my $header1 = "<b>Helpful hints</b><br>";
+  my $ret     = "";
+  
+  my (%hs,$val0,$val1,$i);
+  
+  $ret = "<html>";
+  
+  # Hints
+  if(!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {
+      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
+      $ret .= "<table class=\"block wide internals\">";
+      $ret .= "<tbody>";
+      $ret .= "<tr class=\"even\">";  
+      
+      if($arg && $arg =~ /[\d]+/x) {
+          my @hints = split ",", $arg;
+          
+          for my $hint (@hints) {
+              if(AttrVal("global","language","EN") eq "DE") {
+                  $hs{$hint} = $vHintsExt_de->{$hint};
+              } 
+              else {
+                  $hs{$hint} = $vHintsExt_en->{$hint};
+              }
+          }                      
+      } 
+      else {
+          if(AttrVal("global","language","EN") eq "DE") {
+              %hs = %{$vHintsExt_de};
+          } 
+          else {
+              %hs = %{$vHintsExt_en}; 
+          }
+      }          
+      
+      $i = 0;
+      for my $key (sortVersion("desc",keys %hs)) {
+          $val0 = $hs{$key};
+          $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
+          $ret .= "</tr>";
+          $i++;
+          
+          if ($i & 1) {                                         # $i ist ungerade
+              $ret .= "<tr class=\"odd\">";
+          } 
+          else {
+              $ret .= "<tr class=\"even\">";
+          }
+      }
+      $ret .= "</tr>";
+      $ret .= "</tbody>";
+      $ret .= "</table>";
+      $ret .= "</div>";
+  }
+  
+  # Notes
+  if(!$arg || $arg =~ /rel/x) {
+      $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
+      $ret .= "<table class=\"block wide internals\">";
+      $ret .= "<tbody>";
+      $ret .= "<tr class=\"even\">";
+      
+      $i = 0;
+      for my $key (sortVersion("desc", keys %{$vNotesExtern})) {
+          ($val0,$val1) = split /\s/x, $vNotesExtern->{$key}, 2;
+          $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
+          $ret .= "</tr>";
+          $i++;
+          
+          if ($i & 1) {                                       # $i ist ungerade
+              $ret .= "<tr class=\"odd\">";
+          } 
+          else {
+              $ret .= "<tr class=\"even\">";
+          }
+      }
+      
+      $ret .= "</tr>";
+      $ret .= "</tbody>";
+      $ret .= "</table>";
+      $ret .= "</div>";
+  }
+  
+  $ret .= "</html>";
+                    
+return $ret;
+}
+
 ###############################################################################
 #                       JSON Boolean Test und Mapping
 ###############################################################################
@@ -192,10 +367,10 @@ return $bool;
 #   $ao = "SMTPcredentials" -> Credentials für Mailversand
 ######################################################################################
 sub setCredentials {
-    my $hash = shift // carp "got no hash value"       && return;
-    my $ao   = shift // carp "got no credentials type" && return;
-    my $user = shift // carp "got no user name"        && return;
-    my $pass = shift // carp "got no password"         && return;
+    my $hash = shift // carp $carpnohash        && return;
+    my $ao   = shift // carp $carpnoctyp        && return;
+    my $user = shift // carp "got no user name" && return;
+    my $pass = shift // carp "got no password"  && return;
     my $name = $hash->{NAME};
     
     my $success;
@@ -215,8 +390,8 @@ sub setCredentials {
     if ($retcode) { 
         Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
         $success = 0;
-    
-    } else {
+    } 
+    else {
         getCredentials($hash,1,$ao);                                                            # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
         $success = 1;
     }
@@ -230,9 +405,9 @@ return ($success);
 #   $ao = "SMTPcredentials" -> Credentials für Mailversand
 ######################################################################################
 sub getCredentials {
-    my $hash = shift // carp "got no hash value"       && return;
+    my $hash = shift // carp $carpnohash && return;
     my $boot = shift;
-    my $ao   = shift // carp "got no credentials type" && return;
+    my $ao   = shift // carp $carpnoctyp && return;
     my $name = $hash->{NAME};
     my ($success, $username, $passwd, $index, $retcode, $credstr);
     my (@key,$len,$i);
@@ -260,8 +435,8 @@ sub getCredentials {
                 $success                         = 1;                
             }
         }
-    
-    } else {                                                                # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+    } 
+    else {                                                                  # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
         if ($ao eq "credentials") {
             $credstr = $hash->{HELPER}{CREDENTIALS};
             $pp      = q{};
@@ -285,8 +460,8 @@ sub getCredentials {
             my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
         
             Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
-        
-        } else {
+        } 
+        else {
             Log3($name, 2, "$name - ".$pp."Credentials not set in RAM !");
         }
     
@@ -301,7 +476,7 @@ return ($success, $username, $passwd);
 #                        Test ob JSON-String vorliegt
 ###############################################################################
 sub evaljson { 
-  my $hash    = shift // carp "got no hash value"           && return;
+  my $hash    = shift // carp $carpnohash                   && return;
   my $myjson  = shift // carp "got no string for JSON test" && return;
   my $OpMode  = $hash->{OPMODE};
   my $name    = $hash->{NAME};
@@ -318,12 +493,13 @@ sub evaljson {
       if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
               $OpMode =~ m/^.*_hls$/x ) {                                                    # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
           Log3($name, 5, "$name - HLS-activation data return: $myjson");
+          
           if ($myjson =~ m/{"success":true}/x) {
               $success = 1;
               $myjson  = '{"success":true}';    
-          } 
-      
-      } else {
+          }
+      } 
+      else {
           $success = 0;
 
           readingsBeginUpdate ($hash);
@@ -342,8 +518,8 @@ return ($success,$myjson);
 #         $fret   = Rückkehrfunktion nach erfolgreichen Login
 ####################################################################################
 sub login {
-  my $hash         = shift  // carp "got no hash value"                && return;
-  my $apiref       = shift  // carp "got no API reference"             && return;
+  my $hash         = shift  // carp $carpnohash                        && return;
+  my $apiref       = shift  // carp $carpnoapir                        && return;
   my $fret         = shift  // carp "got no return function reference" && return;
   my $name         = $hash->{NAME};
   my $serveraddr   = $hash->{SERVERADDR};
@@ -386,8 +562,8 @@ sub login {
   if (AttrVal($name,"session","DSM") eq "DSM") {
       $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&format=$sid"; 
       $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&format=$sid";
-
-  } else {
+  } 
+  else {
       $url     = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
       $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
   }
@@ -461,8 +637,8 @@ sub loginReturn {
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
             
             return &$fret($hash);
-        
-        } else {          
+        } 
+        else {          
             my $errorcode = $data->{'error'}->{'code'};                           # Errorcode aus JSON ermitteln
             my $error     = expErrorsAuth($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
 
@@ -484,8 +660,8 @@ return login($hash,$apiref,$fret);
 #      Funktion logout
 ###################################################################################
 sub logout {
-   my $hash        = shift  // carp "got no hash value"                && return;
-   my $apiref      = shift  // carp "got no API reference"             && return;
+   my $hash        = shift  // carp $carpnohash && return;
+   my $apiref      = shift  // carp $carpnoapir && return;
    my $name        = $hash->{NAME};
    my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
@@ -503,9 +679,9 @@ sub logout {
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
    if (AttrVal($name,"session","DSM") eq "DSM") {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";
-       
-   } else {
+       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";    
+   } 
+   else {
        $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&session=SurveillanceStation&_sid=$sid";
    }
 
@@ -556,9 +732,9 @@ sub logoutReturn {
        $success = $data->{'success'};
 
        if ($success) {                                                                                        # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
-             
-       } else {
+           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");      
+       } 
+       else {
            my $errorcode = $data->{'error'}->{'code'};                                                        # Errorcode aus JSON ermitteln
            my $error     = expErrorsAuth($hash,$errorcode);                                                   # Fehlertext zum Errorcode ermitteln
 
@@ -579,7 +755,7 @@ return;
 #                                   Token setzen
 #############################################################################################
 sub setActiveToken { 
-   my $hash = shift // carp "got no hash value" && return;
+   my $hash = shift // carp $carpnohash && return;
    my $name = $hash->{NAME};
                
    $hash->{HELPER}{ACTIVE} = "on";
@@ -595,7 +771,7 @@ return;
 #                                   Token freigeben
 #############################################################################################
 sub delActiveToken { 
-   my $hash = shift // carp "got no hash value" && return;
+   my $hash = shift // carp $carpnohash && return;
    my $name = $hash->{NAME};
                
    $hash->{HELPER}{ACTIVE} = "off";
@@ -628,7 +804,7 @@ return;
 #            $evt: 1 -> Event, 0/nicht gesetzt -> kein Event
 #############################################################################################
 sub setReadingErrorNone {                     
-  my $hash = shift // carp "got no hash value" && return;
+  my $hash = shift // carp $carpnohash && return;
   my $evt  = shift;
   
   readingsBeginUpdate($hash);
@@ -645,7 +821,7 @@ return;
 #       $errcode = Fehlercode
 ####################################################################################
 sub setReadingErrorState {                   
-    my $hash    = shift // carp "got no hash value" && return;
+    my $hash    = shift // carp $carpnohash && return;
     my $error   = shift;
     my $errcode = shift // "none";
     
@@ -659,12 +835,34 @@ return;
 }
 
 #############################################################################################
+#                        fügt den Eintrag $entry zur Sendequeue hinzu
+#############################################################################################
+sub addSendqueueEntry {                 
+  my $hash  = shift // carp $carpnohash                             && return;
+  my $entry = shift // carp "got no entry for adding to send queue" && return;
+  my $name  = $hash->{NAME};
+  
+  my $type  = $hash->{TYPE};
+    
+  $data{$type}{$name}{sendqueue}{index}++;
+  my $index = $data{$type}{$name}{sendqueue}{index};
+    
+  Log3($name, 5, "$name - Add Item to queue - Index $index: \n".Dumper $entry);
+                      
+  $data{$type}{$name}{sendqueue}{entries}{$index} = $entry;  
+
+  updQueueLength ($hash);                                                       # update Länge der Sendequeue 
+      
+return;
+}
+
+#############################################################################################
 #                       liefert aktuelle Einträge der Sendequeue zurück
 #############################################################################################
 sub listSendqueue {                 
   my $paref = shift;
-  my $hash  = $paref->{hash} // carp "got no hash value" && return; 
-  my $name  = $paref->{name} // carp "got no name value" && return;
+  my $hash  = $paref->{hash} // carp $carpnohash && return; 
+  my $name  = $paref->{name} // carp $carpnoname && return;
   
   my $type  = $hash->{TYPE};
   
@@ -695,8 +893,8 @@ return $sq;
 #############################################################################################
 sub purgeSendqueue {                 
   my $paref = shift;
-  my $hash  = $paref->{hash} // carp "got no hash value"              && return; 
-  my $name  = $paref->{name} // carp "got no name value"              && return;
+  my $hash  = $paref->{hash} // carp $carpnohash                      && return; 
+  my $name  = $paref->{name} // carp $carpnoname                      && return;
   my $prop  = $paref->{prop} // carp "got no purgeSendqueue argument" && return;
   
   my $type  = $hash->{TYPE};
@@ -726,7 +924,7 @@ return;
 #                        Länge Senedequeue updaten          
 #############################################################################################
 sub updQueueLength {
-  my $hash = shift // carp "got no hash value" && return; 
+  my $hash = shift // carp $carpnohash && return; 
   my $rst  = shift;
   
   my $name = $hash->{NAME};
