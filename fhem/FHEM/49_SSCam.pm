@@ -564,6 +564,7 @@ my %hdt = (                                                                 # De
   __getCamInfo       => 2.0,
   __camAutocreate    => 2.1,
   __sessionOff       => 2.7,
+  __getApiInfo       => 2.7,
 );
 
 my %imc = (                                                                 # disbled String modellabhängig (SVS / CAM)
