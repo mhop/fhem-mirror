@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.10.0');
+use version; our $VERSION = version->declare('1.11.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -51,6 +51,8 @@ our @EXPORT_OK = qw(
                      sortVersion
                      showModuleInfo
                      jboolmap
+                     completeAPI
+                     showAPIinfo
                      setCredentials
                      getCredentials
                      evaljson
@@ -75,6 +77,7 @@ BEGIN {
   GP_Import( 
       qw(
           AttrVal
+          asyncOutput
           Log3
           data
           defs
@@ -98,7 +101,7 @@ BEGIN {
 my $carpnohash = "got no hash value";
 my $carpnoname = "got no name value";
 my $carpnoctyp = "got no credentials type";
-my $carpnoapir = "got no API reference";
+my $carpnoapir = "got no API Hash reference";
 
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
@@ -359,6 +362,67 @@ sub jboolmap {
   }
   
 return $bool;
+}
+
+###############################################################################
+#      vervollständige das übergebene API-Hash mit den Werten aus $data der 
+#      JSON-Antwort 
+#      $jdata:   Referenz zum $data-Hash der JSON-Antwort
+#      $apiref:  Referenz zum instanziierten API-Hash
+###############################################################################
+sub completeAPI { 
+  my $jdata  = shift // carp "got no data Hash reference" && return;
+  my $apiref = shift // carp $carpnoapir                  && return;
+  
+  for my $key (keys %{$apiref}) {
+      next if($key =~ /PARSET$/x); 
+      $apiref->{$key}{PATH} = $jdata->{data}{$apiref->{$key}{NAME}}{path}       // "undefined";
+      $apiref->{$key}{VER}  = $jdata->{data}{$apiref->{$key}{NAME}}{maxVersion} // 0;
+      $apiref->{$key}{MOD}  = "no";                                                       # MOD = Version nicht modifiziert
+  } 
+  
+return;
+}
+
+###############################################################################
+#      zeigt den Inhalt des verwendeten API Hash als Popup
+#      $apiref:  Referenz zum instanziierten API-Hash
+###############################################################################
+sub showAPIinfo { 
+  my $hash   = shift // carp $carpnohash  && return;
+  my $apiref = shift // carp $carpnoapir  && return;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+
+  my $out  = "<html>";
+  $out    .= "<b>Synology $type API Info</b> <br><br>";
+  $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
+  $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Changed</b> </td></tr>";
+  $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td> </td></tr>";
+
+  for my $key (sort keys %{$hash->{HELPER}{API}}) {
+      next if($key =~ /^PARSET$/x);
+      my $apiname = $apiref->{$key}{NAME};
+      my $apipath = $apiref->{$key}{PATH};
+      my $apiver  = $apiref->{$key}{VER};
+      my $apimod  = $apiref->{$key}{MOD};
+
+      $out .= "<tr>";
+      $out .= "<td> $apiname </td>";
+      $out .= "<td> $apipath </td>";
+      $out .= "<td style=\"text-align: center\"> $apiver  </td>";
+      $out .= "<td style=\"text-align: center\"> $apimod  </td>";
+      $out .= "</tr>";
+  }
+
+  $out .= "</table>";
+  $out .= "</html>";
+
+  asyncOutput($hash->{HELPER}{CL}{1},"$out");
+  delClHash  ($name);
+  
+return;
 }
 
 ######################################################################################
