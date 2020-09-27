@@ -88,7 +88,9 @@
 
 # - store roll code on setting of attribute
 # - no update of DEF anymore with rolling code (roll code and enc key will be removed)
-# - FIX: corrected of autostore rolling code (esp. restart)
+# - FIX: corrected autostore rolling code (esp. restart)
+# - FIX: DEBUG commands removed
+#
 #
 ###############################################################################
 #
@@ -1102,13 +1104,13 @@ sub SOMFY_getRollCode($;$)
       $storeRC = "0000" if ( $storeRC !~ /[0-9A-F]{4}/ );
       my $storeDec = hex( $storeRC );
       my $rollDec = hex( $rollingcode );
-      Debug "Store  hex: $storeRC    dec: $storeDec";
-      Debug "RollC  hex: $rollingcode    dec: $rollDec";
+#      Debug "Store  hex: $storeRC    dec: $storeDec";
+#      Debug "RollC  hex: $rollingcode    dec: $rollDec";
       
       if ( $storeDec > $rollDec ) {
         $rollingcode = $storeRC;
       }
-      Debug "Result Rolling code: $rollingcode";
+#      Debug "Result Rolling code: $rollingcode";
    }
 
    return $rollingcode;
