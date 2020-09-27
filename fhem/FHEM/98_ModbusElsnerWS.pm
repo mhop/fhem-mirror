@@ -4,6 +4,7 @@
 package main;
 use strict;
 use warnings;
+use DevIo;
 sub ModbusElsnerWS_Initialize($);
 
 my %ModbusElsnerWS_ParseInfo = (
@@ -42,7 +43,6 @@ my %ModbusElsnerWS_DeviceInfo = (
 
 sub ModbusElsnerWS_Initialize($) {
   my ($hash) = @_;
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
   LoadModule "Modbus";
 
   $hash->{parseInfo}  = \%ModbusElsnerWS_ParseInfo;  # defines registers, inputs, coils etc. for this Modbus Device
@@ -202,7 +202,7 @@ sub ModbusElsnerWS_Eval($$$) {
   $windSpeed = ModbusElsnerWS_readingsBulkUpdate($hash, "windSpeed", $windSpeed, 0.1, 0.3, "%0.1f");
   my @windStrength = (0.2, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 28.4, 32.6);
   my $windStrength = 0;
-  while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
+  while($windSpeed > $windStrength[$windStrength] && $windStrength < @windStrength) {
     $windStrength ++;
   }
   if ($hash->{INTERVAL} =~ m/^1$/ && (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60)) {
