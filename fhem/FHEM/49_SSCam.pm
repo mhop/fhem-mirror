@@ -39,9 +39,28 @@ use warnings;
 use GPUtils qw( GP_Import GP_Export );                                             # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use FHEM::SynoModules::API qw(:all);                                               # API Modul
-use FHEM::SynoModules::SMUtils qw(:all);                                           # Hilfsroutinen Modul
 use FHEM::SynoModules::ErrCodes qw(:all);                                          # Error Code Modul
-
+use FHEM::SynoModules::SMUtils qw(
+                                  getClHash
+                                  delClHash
+                                  trim
+                                  moduleVersion
+                                  sortVersion
+                                  showModuleInfo
+                                  jboolmap
+                                  completeAPI
+                                  showAPIinfo
+                                  setCredentials
+                                  getCredentials
+                                  evaljson
+                                  login
+                                  logout
+                                  setActiveToken
+                                  delActiveToken
+                                  delCallParts
+                                  setReadingErrorNone
+                                  setReadingErrorState
+                                 );                                                # Hilfsroutinen Modul
 use Data::Dumper;                                                                
 use MIME::Base64;
 use Time::HiRes qw( gettimeofday tv_interval );
@@ -164,6 +183,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
   "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
   "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
   "9.7.24" => "24.09.2020  optimize prepareSendData ",
@@ -250,6 +270,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.8.0"   => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it.  ", 
   "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
@@ -459,6 +480,7 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+  apiInfo           => { fn => "_getapiInfo",           needcred => 1 },  
   caminfo           => { fn => "_getcaminfo",           needcred => 1 },
   caminfoall        => { fn => "_getcaminfoall",        needcred => 1 },
   homeModeState     => { fn => "_gethomeModeState",     needcred => 1 },
@@ -1961,7 +1983,7 @@ sub _setsnapGallery {                    ## no critic "not used"
           }
       }
       
-      delete($hash->{HELPER}{CL});
+      delClHash  ($name);
   }
            
 return;
@@ -4062,40 +4084,37 @@ sub Get {
     my $arg  = shift @a;
     my $arg1 = shift @a;
     my $arg2 = shift @a;
-    my $getlist;
+    
+    my $getlist = "Unknown argument $opt, choose one of ";
 
     if(!$hash->{CREDENTIALS}) {
-        return;
-        
-    } elsif(IsModelCam($hash)) {                                                     # getlist für Cams
-        $getlist = "Unknown argument $opt, choose one of ".
-                   "caminfoall:noArg ".
-                   "caminfo:noArg ".
-                   ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
+        return;  
+    } 
+    elsif(IsModelCam($hash)) {                                                        # getlist für Cams
+        $getlist .= "caminfo:noArg ".
+                    ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
                        ? "snapGallery:noArg " : "snapGallery:$defSnum ").
-                   (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
-                   "snapinfo:noArg ".
-                   "svsinfo:noArg ".
-                   "saveRecording ".
-                   "snapfileinfo:noArg ".
-                   "eventlist:noArg ".
-                   "stmUrlPath:noArg ".
-                   "storedCredentials:noArg ".
-                   "scanVirgin:noArg ".
-                   "versionNotes " 
-                   ;
+                    (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
+                    "snapinfo:noArg ".
+                    "saveRecording ".
+                    "snapfileinfo:noArg ".
+                    "eventlist:noArg ".
+                    "stmUrlPath:noArg " 
+                    ;
     } 
     else {                                                                           # getlist für SVS Devices
-        $getlist = "Unknown argument $opt, choose one of ".
-                   "caminfoall:noArg ".
-                   ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
-                   "svsinfo:noArg ".
-                   "listLog ".
-                   "storedCredentials:noArg ".
-                   "scanVirgin:noArg ".
-                   "versionNotes "
-                   ;
+        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
+                    "listLog "
+                    ;
     }
+    
+    $getlist .= "caminfoall:noArg ".                                                 # Ergänzend für beiden Device Typen
+                "svsinfo:noArg ".
+                "scanVirgin:noArg ".
+                "storedCredentials:noArg ".
+                "versionNotes ".
+                "apiInfo:noArg "
+                ;
                   
     return if(IsDisabled($name)); 
 
@@ -4123,6 +4142,19 @@ sub Get {
     use strict "refs";     
         
 return $getlist;
+}
+
+################################################################
+#        Getter apiInfo - Anzeige die API Infos in Popup
+################################################################
+sub _getapiInfo {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  getClHash   ($hash,1);
+  __getApiInfo($hash);
+        
+return;
 }
 
 ################################################################
@@ -4300,7 +4332,7 @@ sub _getsnapGallery {                    ## no critic "not used"
           }
       }
       
-      delete($hash->{HELPER}{CL});
+      delClHash  ($name);
   }
         
 return;
@@ -4406,6 +4438,35 @@ sub _getversionNotes {                   ## no critic "not used"
   my $ret = showModuleInfo ($paref);
                     
 return $ret; 
+}
+
+###########################################################################
+#              API Infos abfragen und in einem Popup anzeigen
+###########################################################################
+sub __getApiInfo {
+    my $hash   = shift;
+    my $name   = $hash->{NAME};
+    
+    my $caller = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "apiInfo"; 
+        
+        return if(startOrShut($name));
+        
+        $hash->{HELPER}{API}{PARSET} = 0;                                                   # Abruf API Infos erzwingen
+        
+        setActiveToken ($hash);
+        getApiSites    ($hash, "", $hash);       
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
 }
 
 ###########################################################################
@@ -5098,7 +5159,7 @@ sub getApiSites {
      
    my @ak;
    for my $key (keys %{$hash->{HELPER}{API}}) {
-       next if($key =~ /^(?: PARSET | INFO)$/x);  
+       next if($key =~ /^PARSET$/x);  
        push @ak, $hash->{HELPER}{API}{$key}{NAME};
    }
    my $apis = join ",", @ak;
@@ -5130,36 +5191,15 @@ return;
 #                       Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_Parse {
-   my $param        = shift;
-   my $err          = shift;
-   my $myjson       = shift;
+   my $param  = shift;
+   my $err    = shift;
+   my $myjson = shift;
    
-   my $hash         = $param->{hash};
-   my $fret         = $param->{fret};
-   my $arg          = $param->{arg};
-   
-   my $name         = $hash->{NAME};
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $apiauth      = $hash->{HELPER}{API}{AUTH}{NAME};
-   my $apiextrec    = $hash->{HELPER}{API}{EXTREC}{NAME};
-   my $apiextevt    = $hash->{HELPER}{API}{EXTEVT}{NAME};
-   my $apicam       = $hash->{HELPER}{API}{CAM}{NAME};
-   my $apitakesnap  = $hash->{HELPER}{API}{SNAPSHOT}{NAME};
-   my $apiptz       = $hash->{HELPER}{API}{PTZ}{NAME};
-   my $apipreset    = $hash->{HELPER}{API}{PRESET}{NAME};
-   my $apisvsinfo   = $hash->{HELPER}{API}{SVSINFO}{NAME};
-   my $apicamevent  = $hash->{HELPER}{API}{CAMEVENT}{NAME};
-   my $apievent     = $hash->{HELPER}{API}{EVENT}{NAME};
-   my $apivideostm  = $hash->{HELPER}{API}{VIDEOSTM}{NAME};
-   my $apiaudiostm  = $hash->{HELPER}{API}{AUDIOSTM}{NAME};
-   my $apivideostms = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
-   my $apistm       = $hash->{HELPER}{API}{STM}{NAME};
-   my $apihm        = $hash->{HELPER}{API}{HMODE}{NAME};
-   my $apilog       = $hash->{HELPER}{API}{LOG}{NAME};
-   my $apirec       = $hash->{HELPER}{API}{REC}{NAME};
-   
-   my ($apicamver,$apicampath);
+   my $hash   = $param->{hash};
+   my $fret   = $param->{fret};
+   my $arg    = $param->{arg};
+   my $name   = $hash->{NAME};
+   my $opmode = $hash->{OPMODE};
   
     if ($err ne "") {                                                               # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
@@ -5170,115 +5210,28 @@ sub getApiSites_Parse {
         return;
         
     } elsif ($myjson ne "") {                                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
-        my ($success) = evaljson($hash,$myjson);
+        my $success = evaljson($hash,$myjson);
         
         if(!$success) {
             delActiveToken($hash);
             return;
         }
         
-        my $data = decode_json($myjson);
+        my $jdata = decode_json($myjson);
+        $success = $jdata->{success};
         
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);                    # Logausgabe decodierte JSON Daten
-   
-        $success = $data->{'success'};
+        Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);                    # Logausgabe decodierte JSON Daten
     
-        if ($success) {           
-            my $pundef = "Path: undefined - Surveillance Station may be stopped";
-            my $vundef = "Version: undefined - Surveillance Station may be stopped";
-                        
-          # Pfad und Version von "SYNO.API.Auth" ermitteln
-            my $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
-            $apiauthpath    =~ tr/_//d if(defined($apiauthpath));
-            my $apiauthver  = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
-       
-          # Pfad und Version von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
-            my $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
-            $apiextrecpath    =~ tr/_//d if (defined($apiextrecpath));
-            my $apiextrecver  = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
-       
-          # Pfad und Version von "SYNO.SurveillanceStation.Camera" ermitteln
-            $apicampath = $data->{'data'}->{$apicam}->{'path'};
-            $apicampath =~ tr/_//d if (defined($apicampath));
-            $apicamver  = $data->{'data'}->{$apicam}->{'maxVersion'};
-       
-          # Pfad und Version von "SYNO.SurveillanceStation.SnapShot" ermitteln  
-            my $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
-            $apitakesnappath    =~ tr/_//d if (defined($apitakesnappath));
-            my $apitakesnapver  = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
-
-          # Pfad und Version von "SYNO.SurveillanceStation.PTZ" ermitteln 
-            my $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
-            $apiptzpath    =~ tr/_//d if (defined($apiptzpath));
-            my $apiptzver  = $data->{'data'}->{$apiptz}->{'maxVersion'};
-
-          # Pfad und Version von "SYNO.SurveillanceStation.PTZ.Preset" ermitteln 
-            my $apipresetpath = $data->{'data'}->{$apipreset}->{'path'};
-            $apipresetpath    =~ tr/_//d if (defined($apipresetpath));
-            my $apipresetver  = $data->{'data'}->{$apipreset}->{'maxVersion'};        
-            
-          # Pfad und Version von "SYNO.SurveillanceStation.Info" ermitteln
-            my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
-            $apisvsinfopath    =~ tr/_//d if (defined($apisvsinfopath));
-            my $apisvsinfover  = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
-                        
-          # Pfad und Version von "SYNO.Surveillance.Camera.Event" ermitteln    
-            my $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
-            $apicameventpath =~ tr/_//d if (defined($apicameventpath));
-            my $apicameventver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
-                        
-          # Pfad und Version von "SYNO.Surveillance.Event" ermitteln     
-            my $apieventpath = $data->{'data'}->{$apievent}->{'path'};
-            $apieventpath    =~ tr/_//d if (defined($apieventpath));
-            my $apieventver  = $data->{'data'}->{$apievent}->{'maxVersion'};
-                        
-          # Pfad und Version von "SYNO.Surveillance.VideoStream" ermitteln
-            my $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
-            $apivideostmpath    =~ tr/_//d if (defined($apivideostmpath));
-            my $apivideostmver  = $data->{'data'}->{$apivideostm}->{'maxVersion'};
-                        
-          # Pfad und Version von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
-            my $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
-            $apiextevtpath    =~ tr/_//d if (defined($apiextevtpath));
-            my $apiextevtver  = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
-                        
-          # Pfad und Version von "SYNO.SurveillanceStation.Streaming" ermitteln
-            my $apistmpath = $data->{'data'}->{$apistm}->{'path'};
-            $apistmpath    =~ tr/_//d if (defined($apistmpath));
-            my $apistmver  = $data->{'data'}->{$apistm}->{'maxVersion'}; 
-
-          # Pfad und Version von "SYNO.SurveillanceStation.HomeMode" ermitteln
-            my $apihmpath = $data->{'data'}->{$apihm}->{'path'};
-            $apihmpath    =~ tr/_//d if (defined($apihmpath));
-            my $apihmver  = $data->{'data'}->{$apihm}->{'maxVersion'}; 
-        
-          # Pfad und Version von "SYNO.SurveillanceStation.Log" ermitteln
-            my $apilogpath = $data->{'data'}->{$apilog}->{'path'};
-            $apilogpath    =~ tr/_//d if (defined($apilogpath));
-            my $apilogver  = $data->{'data'}->{$apilog}->{'maxVersion'}; 
-            
-          # Pfad und Version von "SYNO.SurveillanceStation.AudioStream" ermitteln
-            my $apiaudiostmpath = $data->{'data'}->{$apiaudiostm}->{'path'};
-            $apiaudiostmpath    =~ tr/_//d if (defined($apiaudiostmpath));
-            my $apiaudiostmver  = $data->{'data'}->{$apiaudiostm}->{'maxVersion'}; 
-            
-          # Pfad und Version von "SYNO.SurveillanceStation.VideoStream" ermitteln
-            my $apivideostmspath = $data->{'data'}->{$apivideostms}->{'path'};
-            $apivideostmspath    =~ tr/_//d if (defined($apivideostmspath));
-            my $apivideostmsver  = $data->{'data'}->{$apivideostms}->{'maxVersion'}; 
-            
-          # Pfad und Version von "SYNO.SurveillanceStation.Recording" ermitteln
-            my $apirecpath = $data->{'data'}->{$apirec}->{'path'};
-            $apirecpath    =~ tr/_//d if (defined($apirecpath));
-            my $apirecver  = $data->{'data'}->{$apirec}->{'maxVersion'}; 
-        
+        if ($success) {                                       
+            completeAPI ($jdata, $hash->{HELPER}{API});                              # übergibt Referenz zum instanziierten API-Hash
+         
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
             my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // "";
             my $small = $hash->{HELPER}{SVSVERSION}{SMALL} // "";
             my $build = $hash->{HELPER}{SVSVERSION}{BUILD} // "";
             my $actvs = $major.$minor.$small.$build;
-            my $avsc  = $major.$minor.$small;                                # Variable zum Version Kompatibilitätscheck
+            
             Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
             if(AttrVal($name,"simu_SVSversion",0)) {
@@ -5289,119 +5242,82 @@ sub getApiSites_Parse {
                 $actvs .= "-simu";
             }
             
-            # Downgrades für nicht kompatible API-Versionen
-            # hier nur nutzen wenn API zentral downgraded werden soll
-            # In den neueren API-Upgrades werden nur einzelne Funktionen auf eine höhere API-Version gezogen
-            # -> diese Steuerung erfolgt in den einzelnen Funktionsaufrufen in camOp            
+            # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            #$apiptzver = 4;
-            #Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");
-            #$apicamver = 8;
-            #Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
+            my @sims;
+            
+            # push @sims, "CAM:8";
+            # push @sims, "PTZ:4";
+            
+            for my $esim (@sims) {
+                my($k,$v) = split ":", $esim;
+                $hash->{HELPER}{API}{$k}{VER} = $v;
+                $hash->{HELPER}{API}{$k}{MOD} = "yes";
+                Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+            }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
                                     
-            # Simulation anderer SVS-Versionen
+            # Simulation älterer SVS-Versionen
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
             
             if (AttrVal($name, "simu_SVSversion", undef)) {
+                my @mods;
                 Log3($name, 4, "$name - SVS version $actvs will be simulated");
+                
                 if ($actvs =~ /^71/x) {
-                    $apicamver = 8;
-                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
-                    $apiauthver = 4;
-                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
-                    $apiextrecver = 2;
-                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
-                    $apiptzver    = 4;
-                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");
-                
-                } elsif ($actvs =~ /^72/x) {
-                    $apicamver = 8;
-                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
-                    $apiauthver = 6;
-                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
-                    $apiextrecver = 3;
-                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
-                    $apiptzver    = 5;
-                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
-                
-                } elsif ($actvs =~ /^800/x) {
-                    $apicamver = 9;
-                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
-                    $apiauthver = 6;
-                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
-                    $apiextrecver = 3;
-                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
-                    $apiptzver    = 5;
-                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
-                
-                } elsif ($actvs =~ /^815/x) {
-                    $apicamver = 9;
-                    Log3($name, 4, "$name - Version of $apicam adapted to: $apicamver");
-                    $apiauthver = 6;
-                    Log3($name, 4, "$name - Version of $apiauth adapted to: $apiauthver");
-                    $apiextrecver = 3;
-                    Log3($name, 4, "$name - Version of $apiextrec adapted to: $apiextrecver");
-                    $apiptzver    = 5;
-                    Log3($name, 4, "$name - Version of $apiptz adapted to: $apiptzver");                               
-                
-                } elsif ($actvs =~ /^820/x) {
+                    push @mods, "CAM:8";
+                    push @mods, "AUTH:4";
+                    push @mods, "EXTREC:2";
+                    push @mods, "PTZ:4";           
+                } 
+                elsif ($actvs =~ /^72/x) {
+                    push @mods, "CAM:8";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^800/x) {
+                    push @mods, "CAM:9";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^815/x) {
+                    push @mods, "CAM:9";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^820/x) {
                     # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
                     # "SYNO.SurveillanceStation.Streaming" mehr enthalten
-                    $apivideostmsver = 0;
-                    Log3($name, 4, "$name - Version of $apivideostms adapted to: $apivideostmsver");
-                    $apiaudiostmver = 0;
-                    Log3($name, 4, "$name - Version of $apiaudiostm adapted to: $apiaudiostmver");                              
+                    push @mods, "VIDEOSTMS:0";
+                    push @mods, "AUDIOSTM:0";
+                }
+                
+                for my $elem (@mods) {
+                    my($k,$v) = split ":", $elem;
+                    $hash->{HELPER}{API}{$k}{VER} = $v;
+                    $hash->{HELPER}{API}{$k}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
                 }
             } 
-            else {
-                Log3($name, 4, "$name - no simulations done !");
-            } 
+            
             Log3($name, 4, "$name - ------- End of simulation section -------");  
-                   
-            # ermittelte Werte in $hash einfügen
-            $hash->{HELPER}{API}{AUTH}{PATH}      = $apiauthpath;
-            $hash->{HELPER}{API}{AUTH}{VER}       = $apiauthver;
-            $hash->{HELPER}{API}{EXTREC}{PATH}    = $apiextrecpath;
-            $hash->{HELPER}{API}{EXTREC}{VER}     = $apiextrecver;
-            $hash->{HELPER}{API}{CAM}{PATH}       = $apicampath;
-            $hash->{HELPER}{API}{CAM}{VER}        = $apicamver;
-            $hash->{HELPER}{API}{SNAPSHOT}{PATH}  = $apitakesnappath;
-            $hash->{HELPER}{API}{SNAPSHOT}{VER}   = $apitakesnapver;
-            $hash->{HELPER}{API}{PTZ}{PATH}       = $apiptzpath;
-            $hash->{HELPER}{API}{PTZ}{VER}        = $apiptzver;
-            $hash->{HELPER}{API}{PRESET}{PATH}    = $apipresetpath;
-            $hash->{HELPER}{API}{PRESET}{VER}     = $apipresetver;
-            $hash->{HELPER}{API}{SVSINFO}{PATH}   = $apisvsinfopath;
-            $hash->{HELPER}{API}{SVSINFO}{VER}    = $apisvsinfover;
-            $hash->{HELPER}{API}{CAMEVENT}{PATH}  = $apicameventpath;
-            $hash->{HELPER}{API}{CAMEVENT}{VER}   = $apicameventver;
-            $hash->{HELPER}{API}{EVENT}{PATH}     = $apieventpath;
-            $hash->{HELPER}{API}{EVENT}{VER}      = $apieventver;
-            $hash->{HELPER}{API}{VIDEOSTM}{PATH}  = $apivideostmpath;
-            $hash->{HELPER}{API}{VIDEOSTM}{VER}   = $apivideostmver;
-            $hash->{HELPER}{API}{AUDIOSTM}{PATH}  = $apiaudiostmpath ? $apiaudiostmpath : "undefinded";
-            $hash->{HELPER}{API}{AUDIOSTM}{VER}   = $apiaudiostmver  ? $apiaudiostmver  : 0;
-            $hash->{HELPER}{API}{EXTEVT}{PATH}    = $apiextevtpath;
-            $hash->{HELPER}{API}{EXTEVT}{VER}     = $apiextevtver;
-            $hash->{HELPER}{API}{STM}{PATH}       = $apistmpath;
-            $hash->{HELPER}{API}{STM}{VER}        = $apistmver;
-            $hash->{HELPER}{API}{HMODE}{PATH}     = $apihmpath;
-            $hash->{HELPER}{API}{HMODE}{VER}      = $apihmver;
-            $hash->{HELPER}{API}{LOG}{PATH}       = $apilogpath;
-            $hash->{HELPER}{API}{LOG}{VER}        = $apilogver;
-            $hash->{HELPER}{API}{VIDEOSTMS}{PATH} = $apivideostmspath ? $apivideostmspath : "undefinded";
-            $hash->{HELPER}{API}{VIDEOSTMS}{VER}  = $apivideostmsver  ? $apivideostmsver  : 0;
-            $hash->{HELPER}{API}{REC}{PATH}       = $apirecpath;
-            $hash->{HELPER}{API}{REC}{VER}        = $apirecver;
             
             setReadingErrorNone( $hash, 1 ); 
             
             $hash->{HELPER}{API}{PARSET} = 1;                                       # API Hash values sind gesetzt
             
-            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});                
+            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API}); 
+
+            if ($opmode eq "apiInfo") {                                             # API Infos in Popup anzeigen                            
+                showAPIinfo   ($hash, $hash->{HELPER}{API});                        # übergibt Referenz zum instanziierten API-Hash)              
+                delActiveToken($hash);                                              # Freigabe Funktionstoken
+                return;
+            }            
         } 
         else {
             my $error = "couldn't call API-Infosite";
@@ -6245,7 +6161,7 @@ sub _parsegetsvslog {                                   ## no critic "not used"
 
   # Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
   asyncOutput($hash->{HELPER}{CL}{1},"$log");
-  delete($hash->{HELPER}{CL});
+  delClHash  ($name);
                 
 return;
 }
@@ -6360,7 +6276,7 @@ sub _parsegetPresets {                                  ## no critic "not used"
   # Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
   # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
   asyncOutput($hash->{HELPER}{CL}{1},"$enum");
-  delete($hash->{HELPER}{CL});
+  delClHash  ($name);
                 
 return;
 }
@@ -7188,7 +7104,7 @@ sub _parsegetsnapgallery {                              ## no critic "not used"
           }
           
           delete($data{SSCam}{$name}{SNAPHASH});                        # Snaphash Referenz löschen
-          delete($hash->{HELPER}{CL});
+          delClHash  ($name);
       }
   }
 
@@ -12817,6 +12733,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   With SSCam the properties of SVS and defined Cameras could be retrieved. <br>
   The specified get-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
   They can be selected in the drop-down-menu of the particular device. <br><br>
+  
+  <ul>
+  <a name="apiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Retrieves the API information of the Synology Surveillance Station and open a popup window with its data.
+  <br>
+  </li><br>
+  </ul>
 
   <ul>
   <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> 
@@ -14786,6 +14711,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Mit SSCam können die Eigenschaften der Surveillance Station und der Kameras abgefragt werden. <br>
   Die aufgeführten get-Befehle sind für CAM/SVS-Devices oder nur für CAM-Devices bzw. nur für SVS-Devices gültig. Sie stehen im 
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
+  
+  <ul>
+  <a name="apiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Ruft die API Informationen der Synology Surveillance Station ab und öffnet ein Popup mit diesen Informationen.
+  <br>
+  </li><br>
+  </ul>
   
   <ul>
   <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li>
