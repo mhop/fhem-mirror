@@ -43,7 +43,9 @@ use FHEM::SynoModules::SMUtils qw(
                                   jboolmap
                                   moduleVersion
                                   sortVersion
-                                  showModuleInfo                                  
+                                  showModuleInfo
+                                  completeAPI
+                                  showAPIinfo                                  
 								  setReadingErrorNone 
 								  setReadingErrorState
                                   addSendqueueEntry
@@ -126,6 +128,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.0" => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
   "1.10.7" => "26.09.2020  more subs to SMUtils and common optimization ",
   "1.10.6" => "25.09.2020  use module FHEM::SynoModules::API ",
   "1.10.5" => "25.09.2020  get error Codes from FHEM::SynoModules::ErrCodes, unify moduleVersion, integrate FHEM::SynoModules::SMUtils ",
@@ -153,7 +156,8 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
-  "1.7.0"  => "26.05.2020 Now it is possible to send SVG plots very easily with the command asyncSendItem ",
+  "1.11.0" => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it. ", 
+  "1.7.0"  => "26.05.2020 It is possible to send SVG plots very easily with the command asyncSendItem ",
   "1.4.0"  => "15.03.2020 Command '1_sendItem' renamed to 'asyncSendItem' because of Aesthetics ",
   "1.3.0"  => "13.03.2020 The set command 'sendItem' was renamed to '1_sendItem' to avoid changing the botToken by chance. ".
                           "Also attachments are allowed now in the '1_sendItem' command. ",
@@ -192,6 +196,7 @@ my %hget = (                                                                # Ha
     chatUserlist    => { fn => \&_getchatUserlist    },   
     chatChannellist => { fn => \&_getchatChannellist },
     versionNotes    => { fn => \&_getversionNotes    },
+    apiInfo         => { fn => \&_getapiInfo         },
 );
 
 my %hmodep = (                                                              # Hash für Opmode Parse
@@ -593,6 +598,7 @@ sub Get {
     } 
     else {
         $getlist = "Unknown argument $opt, choose one of ".
+                   "apiInfo:noArg ".
                    "storedToken:noArg ".
                    "chatUserlist:noArg ".
                    "chatChannellist:noArg ".
@@ -635,6 +641,38 @@ sub _getstoredToken {
          qq{=========================================\n}.
          qq{$token \n}
          ; 
+}
+
+
+################################################################
+#        Getter apiInfo - Anzeige die API Infos in Popup
+################################################################
+sub _getapiInfo {                        
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+  delClHash ($name);
+  getClHash ($hash,1);
+  
+  $hash->{HELPER}{API}{PARSET} = 0;                                # erzwinge Abruf API
+
+  # Eintrag zur SendQueue hinzufügen
+  my $params = { 
+      name       => $name,
+      opmode     => "apiInfo",
+      method     => "",
+      userid     => "",
+      text       => "",
+      fileUrl    => "",
+      channel    => "",
+      attachment => ""
+  };
+  addSendqueue($params);
+  getApiSites ($name);
+  
+return;
 }
 
 ################################################################
@@ -808,7 +846,7 @@ sub addSendqueue {
     my $channel    = $paref->{channel};
     my $attachment = $paref->{attachment};
     
-    if(!$text && $opmode !~ /chatUserlist|chatChannellist/x) {
+    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo/x) {
         my $err = qq{can't add message to queue: "text" is empty};
         Log3($name, 2, "$name - ERROR - $err");
         
@@ -970,7 +1008,7 @@ sub getApiSites {
      
    my @ak;
    for my $key (keys %{$hash->{HELPER}{API}}) {
-       next if($key =~ /^(?: PARSET | INFO)$/x);  
+       next if($key =~ /^PARSET$/x);  
        push @ak, $hash->{HELPER}{API}{$key}{NAME};
    }
    my $apis = join ",", @ak;
@@ -1007,6 +1045,7 @@ sub getApiSites_parse {
    
    my $hash     = $param->{hash};
    my $name     = $hash->{NAME};
+   my $opmode   = $hash->{OPMODE};
    my $inaddr   = $hash->{INADDR};
    my $inport   = $hash->{INPORT};
    
@@ -1014,17 +1053,15 @@ sub getApiSites_parse {
 
    my ($error,$errorcode,$success);
   
-    if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    if ($err ne "") {                                                                # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - ERROR message: $err");
        
         setReadingErrorState ($hash, $err);              
         checkRetry           ($name,1);
         
         return;
-        
-    } elsif ($myjson ne "") {          
-        # Evaluiere ob Daten im JSON-Format empfangen wurden
+    } 
+    elsif ($myjson ne "") {                                                          # Evaluiere ob Daten im JSON-Format empfangen wurden
         ($hash, $success) = evalJSON($hash,$myjson);
         unless ($success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
@@ -1032,42 +1069,30 @@ sub getApiSites_parse {
             return;
         }
         
-        my $data = decode_json($myjson);
+        my $jdata = decode_json($myjson);
         
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+        Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);
    
-        $success = $data->{'success'};
+        $success = $jdata->{'success'};
     
-        if ($success) {                        
-          # Pfad und Maxversion von "SYNO.Chat.External" ermitteln
-            my $externalpath = $data->{'data'}->{$external}->{'path'};
-            $externalpath    =~ tr/_//d if (defined($externalpath));
-            my $externalver  = $data->{'data'}->{$external}->{'maxVersion'};
-                   
-            # ermittelte Werte in $hash einfügen
-            if(defined($externalpath) && defined($externalver)) {
-                $hash->{HELPER}{API}{EXTERNAL}{PATH} = $externalpath;
-                $hash->{HELPER}{API}{EXTERNAL}{VER}  = $externalver;
+        if ($success) {
+            completeAPI ($jdata, $hash->{HELPER}{API});                              # übergibt Referenz zum instanziierten API-Hash            
 
-                $hash->{HELPER}{API}{PARSET}         = 1;               # API Hash values sind gesetzt
-
-                Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});                 
-       
-                setReadingErrorNone($hash, 1);
-            } 
-            else {
-                $errorcode = "805";
-                $error     = expErrors($hash,$errorcode);               # Fehlertext zum Errorcode ermitteln
+            setReadingErrorNone($hash, 1);
             
-                setReadingErrorState ($hash, $error, $errorcode);   
-                checkRetry           ($name,1);  
-                return;                
-            }                
+            $hash->{HELPER}{API}{PARSET} = 1;                                        # API Hash values sind gesetzt
+
+            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});   
+
+            if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
+                showAPIinfo ($hash, $hash->{HELPER}{API});                           # übergibt Referenz zum instanziierten API-Hash)
+                checkRetry  ($name,0);
+                return;
+            }     
         } 
         else {
             $errorcode = "806";
-            $error     = expErrors($hash,$errorcode);                   # Fehlertext zum Errorcode ermitteln
+            $error     = expErrors($hash,$errorcode);                                # Fehlertext zum Errorcode ermitteln
             
             setReadingErrorState ($hash, $error, $errorcode);
             Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
@@ -2341,6 +2366,15 @@ return ($cr, $state);
   <b>Get </b>
   <br><br>
   <ul>
+  
+    <ul>
+      <a name="apiInfo"></a>
+      <li><b> apiInfo </b> <br>
+  
+      Retrieves the API information of the Synology Chat Server and open a popup window with its data.
+      <br>
+      </li><br>
+    </ul>
     
     <ul>
       <a name="chatChannellist"></a>
@@ -2675,6 +2709,15 @@ return ($cr, $state);
   <b>Get </b>
   <br><br>
   <ul>
+  
+    <ul>
+      <a name="apiInfo"></a>
+      <li><b> apiInfo </b> <br>
+  
+      Ruft die API Informationen des Synology Chat Servers ab und öffnet ein Popup mit diesen Informationen.
+      <br>
+      </li><br>
+    </ul>
     
     <ul>
       <a name="chatChannellist"></a>
