@@ -257,7 +257,7 @@ sub ElsnerWS_Read($) {
     $windSpeed = ElsnerWS_readingsBulkUpdate($hash, "windSpeed", $windSpeed, 0.1, 0.7, "%0.1f");
     my @windStrength = (0.2, 1.5, 3.3, 5.4, 7.9, 10.7, 13.8, 17.1, 20.7, 24.4, 28.4, 32.6);
     my $windStrength = 0;
-    while($windSpeed > $windStrength[$windStrength] && $windStrength <= @windStrength + 1) {
+    while($windSpeed > $windStrength[$windStrength] && $windStrength < @windStrength) {
       $windStrength ++;
     }
     my $isSunny = ElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes');
