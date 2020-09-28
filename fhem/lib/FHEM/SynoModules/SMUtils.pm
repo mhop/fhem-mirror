@@ -889,11 +889,11 @@ sub setReadingErrorState {
     my $error   = shift;
     my $errcode = shift // "none";
     
-    readingsBeginUpdate         ($hash); 
-    readingsBulkUpdateIfChanged ($hash, "Error",     $error);
-    readingsBulkUpdateIfChanged ($hash, "Errorcode", $errcode);
-    readingsBulkUpdate          ($hash, "state",     "Error");                    
-    readingsEndUpdate           ($hash,1);
+    readingsBeginUpdate($hash); 
+    readingsBulkUpdate ($hash, "Error",     $error);
+    readingsBulkUpdate ($hash, "Errorcode", $errcode);
+    readingsBulkUpdate ($hash, "state",     "Error");                    
+    readingsEndUpdate  ($hash,1);
 
 return;
 }
