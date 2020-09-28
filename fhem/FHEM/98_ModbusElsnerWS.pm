@@ -4,6 +4,7 @@
 package main;
 use strict;
 use warnings;
+use Time::Local;
 use DevIo;
 sub ModbusElsnerWS_Initialize($);
 
@@ -41,6 +42,24 @@ my %ModbusElsnerWS_DeviceInfo = (
 	 }
 );
 
+# trigger values for down and up commands
+my %customCmdTrigger = ('dayNight' => ['night', 'day'],
+                        'isRaining' => ['no', 'yes'],
+                        'isStormy' => ['no', 'yes'],
+                        'isSunny' => ['yes', 'no'],
+                        'isSunnyEast' => ['yes', 'no'],
+                        'isSunnySouth' => ['yes', 'no'],
+                        'isSunnyWest' => ['yes', 'no'],
+                        'isWindy' => ['no', 'yes']);
+my %customCmdPeriod =(once => -1,
+                      threeTimes => -3,
+                      3 => 3,
+                      10 => 10,
+                      180 => 180,
+                      600 => 600);
+my %specials;
+my @weekday = ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
+
 sub ModbusElsnerWS_Initialize($) {
   my ($hash) = @_;
   LoadModule "Modbus";
@@ -49,22 +68,29 @@ sub ModbusElsnerWS_Initialize($) {
   $hash->{deviceInfo} = \%ModbusElsnerWS_DeviceInfo; # defines properties of the device like defaults and supported function codes
   ModbusLD_Initialize($hash); # Generic function of the Modbus module does the rest
 
-  $hash->{DefFn}            = "ModbusElsnerWS_Define";
-  $hash->{UndefFn}          = "ModbusElsnerWS_Undef";
-  $hash->{DeleteFn}         = "ModbusElsnerWS_Delete";
-  $hash->{SetFn}            = "ModbusElsnerWS_Set";
-  $hash->{GetFn}            = "ModbusElsnerWS_Get";
-  $hash->{NotifyFn}         = "ModbusElsnerWS_Notify";
+  $hash->{DefFn} = "ModbusElsnerWS_Define";
+  $hash->{UndefFn} = "ModbusElsnerWS_Undef";
+  $hash->{DeleteFn} = "ModbusElsnerWS_Delete";
+  $hash->{SetFn} = "ModbusElsnerWS_Set";
+  $hash->{GetFn} = "ModbusElsnerWS_Get";
+  $hash->{NotifyFn} = "ModbusElsnerWS_Notify";
   $hash->{ModbusReadingsFn} = "ModbusElsnerWS_Eval";
-  $hash->{AttrFn}           = "ModbusElsnerWS_Attr";
-  $hash->{AttrList}        .= ' ' .
-                              #$hash->{ObjAttrList} . ' ' . $hash->{DevAttrList}.
-                              ' brightnessDayNight brightnessDayNightDelay' .
-                              ' brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast' .
-                              ' brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay' .
-                              ' poll-.* polldelay-.* timeEvent:no,yes updateGlobalAttr:no,yes' .
-                              ' windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay ' .
-                              $readingFnAttributes;
+  $hash->{AttrFn} = "ModbusElsnerWS_Attr";
+  $hash->{AttrList} .= ' ' .
+                       #$hash->{ObjAttrList} . ' ' . $hash->{DevAttrList}.
+                       ' brightnessDayNight brightnessDayNightDelay' .
+                       ' brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast' .
+                       ' brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay' .
+                       ' customCmdAlarmOff:textField-long customCmdAlarmOn:textField-long' .
+                       ' customCmdDown:textField-long customCmdDownPeriod:select,' . join(",", sort keys %customCmdPeriod) .
+                       ' customCmdDownTrigger:multiple-strict,' . join(",", sort keys %customCmdTrigger) .
+                       ' customCmdPriority:select,down,up' .
+                       ' customCmdUp:textField-long customCmdUpPeriod:select,' . join(",", sort keys %customCmdPeriod) .
+                       ' customCmdUpTrigger:multiple-strict,' . join(",", sort keys %customCmdTrigger) .
+                       ' signOfLife:select,off,on signOfLifeInterval:slider,1,1,15' .
+                       ' poll-.* polldelay-.* timeEvent:select,no,yes updateGlobalAttr:select,no,yes' .
+                       ' windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay ' .
+                       $readingFnAttributes;
   $hash->{parseParams}      = 1;
   $hash->{NotifyOrderPrefix} = "55-";
   return;
@@ -173,7 +199,7 @@ sub ModbusElsnerWS_Eval($$$) {
   my $name = $hash->{NAME};
   my $ctrl = 1;
   my ($temperature, $sunSouth, $sunWest, $sunEast, $brightness, $windSpeed, $gps, $isRaining, $date, $time, $sunAzimuth, $sunElevation, $latitude, $longitude) = split(' ', $readingVal);
-  my ($windAvg2min, $windGust10min, $windGustCurrent, $windPeak10min);
+  my ($twilightFlag, $weekday, $windAvg2min, $windGust10min, $windGustCurrent, $windPeak10min) = ('', '', '', '', '', '');
   if ($hash->{INTERVAL} =~ m/^1$/) {
     $hash->{helper}{wind}{windSpeedNumArrayElements} = ModubusElsnerWS_updateArrayElement($hash, 'windSpeed', $windSpeed, 'wind', 600);
     my ($windAvg10min, $windSpeedMin10min, $windSpeedMax10min) = ModubusElsnerWS_SMA($hash, 'windSpeed', $windSpeed, 'windAvg10min', 'windSpeedMax10min', 'windSpeedMin10min', 'wind', 600);
@@ -186,6 +212,10 @@ sub ModbusElsnerWS_Eval($$$) {
     $hash->{helper}{wind}{windGustNumArrayElements} = ModubusElsnerWS_updateArrayElement($hash, 'windGust', $windGust20s, 'wind', 600);
     my ($windGustAvg10min, $windGustMin10min, $windGustMax10min) = ModubusElsnerWS_SMA($hash, 'windGust', $windGust20s, 'windGustAvg10min', 'windGustMax10min', 'windGustMin10min', 'wind', 600);
     $windGust10min = $windGustMax10min >= 5.144 ? $windGustMax10min : $windAvg2min;
+    $windAvg2min = sprintf("%0.1f", $windAvg2min);
+    $windGust10min = sprintf("%0.1f", $windGust10min);
+    $windGustCurrent = sprintf("%0.1f", $windGustCurrent);
+    $windPeak10min =  sprintf("%0.1f", $windPeak10min);
   }
   my @sunlight = ($sunSouth, $sunWest, $sunEast);
   my ($sunMin, $sunMax) = (sort {$a <=> $b} @sunlight)[0,-1];
@@ -195,6 +225,7 @@ sub ModbusElsnerWS_Eval($$$) {
   $brightness = ($sunMax > 0) ? $sunMax : $brightness;
   readingsBeginUpdate($hash);
   $temperature = ModbusElsnerWS_readingsBulkUpdate($hash, "temperature", $temperature, 0.025, undef,  "%0.1f");
+  $twilightFlag = ModbusElsnerWS_swayCtrl($hash, "dayNight", $brightness, "brightnessDayNight", "brightnessDayNightDelay", 10, 20, 600, 600, 'night', 'day');
   $sunSouth = ModbusElsnerWS_readingsBulkUpdate($hash, "sunSouth", $sunSouth, 0.1, 0.7, "%d");
   $sunWest = ModbusElsnerWS_readingsBulkUpdate($hash, "sunWest", $sunWest, 0.1, 0.7, "%d");
   $sunEast = ModbusElsnerWS_readingsBulkUpdate($hash, "sunEast", $sunEast, 0.1, 0.7, "%d");
@@ -205,49 +236,66 @@ sub ModbusElsnerWS_Eval($$$) {
   while($windSpeed > $windStrength[$windStrength] && $windStrength < @windStrength) {
     $windStrength ++;
   }
+
+  my $isSunny = ModbusElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes');
+  my $isSunnySouth = ModbusElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes');
+  my $isSunnyWest = ModbusElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes');
+  my $isSunnyEast = ModbusElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes');
+  my $isStormy = ModbusElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes');
+  my $isWindy = ModbusElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes');
+
   if ($hash->{INTERVAL} =~ m/^1$/ && (!exists($hash->{helper}{timer}{lastUpdate}) || $hash->{helper}{timer}{lastUpdate} < gettimeofday() - 60)) {
     # update every 60 sec
-    readingsBulkUpdateIfChanged($hash, "windAvg2min", sprintf("%0.1f", $windAvg2min));
-    readingsBulkUpdateIfChanged($hash, "windGust10min", sprintf("%0.1f", $windGust10min));
-    readingsBulkUpdateIfChanged($hash, "windGustCurrent", sprintf("%0.1f", $windGustCurrent));
-    readingsBulkUpdateIfChanged($hash, "windPeak10min", sprintf("%0.1f", $windPeak10min));
+    readingsBulkUpdateIfChanged($hash, "windAvg2min", $windAvg2min);
+    readingsBulkUpdateIfChanged($hash, "windGust10min", $windGust10min);
+    readingsBulkUpdateIfChanged($hash, "windGustCurrent", $windGustCurrent);
+    readingsBulkUpdateIfChanged($hash, "windPeak10min", $windPeak10min);
     $hash->{helper}{timer}{lastUpdate} = gettimeofday();
   }
   if (exists $hash->{helper}{timer}{heartbeat}) {
     readingsBulkUpdateIfChanged($hash, "isRaining", $isRaining);
     readingsBulkUpdateIfChanged($hash, "windStrength", $windStrength);
-    readingsBulkUpdateIfChanged($hash, "dayNight", ModbusElsnerWS_swayCtrl($hash, "dayNight", $brightness, "brightnessDayNight", "brightnessDayNightDelay", 10, 20, 600, 600, 'night', 'day'));
-    readingsBulkUpdateIfChanged($hash, "isSunny", ModbusElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdateIfChanged($hash, "isSunnySouth", ModbusElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdateIfChanged($hash, "isSunnyWest", ModbusElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdateIfChanged($hash, "isSunnyEast", ModbusElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdateIfChanged($hash, "isStormy", ModbusElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
-    readingsBulkUpdateIfChanged($hash, "isWindy", ModbusElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
+    readingsBulkUpdateIfChanged($hash, "dayNight", $twilightFlag);
+    readingsBulkUpdateIfChanged($hash, "isSunny", $isSunny);
+    readingsBulkUpdateIfChanged($hash, "isSunnySouth", $isSunnySouth);
+    readingsBulkUpdateIfChanged($hash, "isSunnyWest", $isSunnyWest);
+    readingsBulkUpdateIfChanged($hash, "isSunnyEast", $isSunnyEast);
+    readingsBulkUpdateIfChanged($hash, "isStormy", $isStormy);
+    readingsBulkUpdateIfChanged($hash, "isWindy", $isWindy);
   } else {
     readingsBulkUpdate($hash, "isRaining", $isRaining);
     readingsBulkUpdate($hash, "windStrength", $windStrength);
     readingsBulkUpdate($hash, "dayNight", ModbusElsnerWS_swayCtrl($hash, "dayNight", $brightness, "dayNightSwitch", "dayNightSwitchDelay", 10, 20, 600, 600, 'night', 'day'));
-    readingsBulkUpdate($hash, "isSunny", ModbusElsnerWS_swayCtrl($hash, "isSunny", $brightness, "brightnessSunny", "brightnessSunnyDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdate($hash, "isSunnySouth", ModbusElsnerWS_swayCtrl($hash, "isSunnySouth", $sunSouth, "brightnessSunnySouth", "brightnessSunnySouthDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdate($hash, "isSunnyWest", ModbusElsnerWS_swayCtrl($hash, "isSunnyWest", $sunWest, "brightnessSunnyWest", "brightnessSunnyWestDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdate($hash, "isSunnyEast", ModbusElsnerWS_swayCtrl($hash, "isSunnyEast", $sunEast, "brightnessSunnyEast", "brightnessSunnyEastDelay", 20000, 40000, 120, 30, 'no', 'yes'));
-    readingsBulkUpdate($hash, "isStormy", ModbusElsnerWS_swayCtrl($hash, "isStormy", $windSpeed, "windSpeedStormy", "windSpeedStormyDelay", 13.9, 17.2, 60, 3, 'no', 'yes'));
-    readingsBulkUpdate($hash, "isWindy", ModbusElsnerWS_swayCtrl($hash, "isWindy", $windSpeed, "windSpeedWindy", "windSpeedWindyDelay", 1.6, 3.4, 60, 3, 'no', 'yes'));
+    readingsBulkUpdate($hash, "isSunny", $isSunny);
+    readingsBulkUpdate($hash, "isSunnySouth", $isSunnySouth);
+    readingsBulkUpdate($hash, "isSunnyWest", $isSunnyWest);
+    readingsBulkUpdate($hash, "isSunnyEast", $isSunnyEast);
+    readingsBulkUpdate($hash, "isStormy", $isStormy);
+    readingsBulkUpdate($hash, "isWindy", $isWindy);
   }
   readingsBulkUpdateIfChanged($hash, "state", "T: " . $temperature .
                                              " B: " . $brightness .
                                              " W: " . $windSpeed .
                                             " IR: " . $isRaining);
+  my $hemisphere = $latitude < 0 ? "south" : "north";
+  my $timeZone = 'UTC';
+  my $twilight = '';
   if ($gps == 1) {
     readingsBulkUpdateIfChanged($hash, "date", $date);
-    readingsBulkUpdateIfChanged($hash, "timeZone", 'UTC');
+    my ($year, $month, $day) = split('-', $date);
+    my $timeUTC = timegm(0, 0, 0, $day, $month - 1, $year);
+    $weekday = (localtime $timeUTC)[6];
+    $weekday = $weekday[$weekday];
+    readingsBulkUpdateIfChanged($hash, "weekday", $weekday);
+    readingsBulkUpdateIfChanged($hash, "timeZone", $timeZone);
     $hash->{GPS_TIME} = $time;
     readingsBulkUpdateIfChanged($hash, "sunAzimuth", $sunAzimuth);
-    my $twilight = ($sunElevation + 12) / 18 * 100;
+    $twilight = ($sunElevation + 12) / 18 * 100;
     $twilight = 0 if ($twilight < 0);
     $twilight = 100 if ($twilight > 100);
+    $twilight = int($twilight);
     readingsBulkUpdateIfChanged($hash, "sunElevation", $sunElevation);
-    readingsBulkUpdateIfChanged($hash, "twilight", int($twilight));
+    readingsBulkUpdateIfChanged($hash, "twilight", $twilight);
     readingsBulkUpdateIfChanged($hash, "longitude", $longitude);
     if (AttrVal($name, "updateGlobalAttr", 'no') eq 'yes') {
       $attr{global}{longitude} = $longitude;
@@ -256,7 +304,7 @@ sub ModbusElsnerWS_Eval($$$) {
     if (AttrVal($name, "updateGlobalAttr", 'no') eq 'yes') {
       $attr{global}{latitude} = $latitude;
     }
-    readingsBulkUpdateIfChanged($hash, "hemisphere", $latitude < 0 ? "south" : "north");
+    readingsBulkUpdateIfChanged($hash, "hemisphere", $hemisphere);
   } else {
     delete $hash->{GPS_TIME};
     readingsDelete($hash, 'date');
@@ -268,21 +316,185 @@ sub ModbusElsnerWS_Eval($$$) {
     readingsDelete($hash, 'time');
     readingsDelete($hash, 'timeZone');
     readingsDelete($hash, 'twilight');
+    readingsDelete($hash, 'weekday');
   }
   readingsEndUpdate($hash, 1);
   readingsSingleUpdate($hash, 'time', $hash->{GPS_TIME}, AttrVal($name, 'timeEvent', 'no') eq 'yes' ? 1 : 0) if (exists $hash->{GPS_TIME});
-  readingsDelete($hash, 'alarm');
-  RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
-  @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, 0);
-  InternalTimer(gettimeofday() + $hash->{INTERVAL} * 1.5, 'ModbusElsnerWS_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+
+  # custom command exec
+  %specials = ("%NAME"  => $name,
+               "%TYPE"  => $hash->{TYPE},
+               "%BRIGHTNESS"  => $brightness,
+               "%DATE"  => $date,
+               "%DAYNIGHT"  => $twilightFlag,
+               "%HEMISPHERE"  => $hemisphere,
+               "%ISRAINING"  => $isRaining,
+               "%ISSTORMY"  => $isStormy,
+               "%ISSUNNY"  => $isSunny,
+               "%ISSUNNYEAST"  => $isSunnyEast,
+               "%ISSUNNYSOUTH"  => $isSunnySouth,
+               "%ISSUNNYWEST"  => $isSunnyWest,
+               "%ISWINDY"  => $isWindy,
+               "%LATITUDE"  => $latitude,
+               "%LONGITUDE"  => $longitude,
+               "%SUNAZIMUTH"  => $sunAzimuth,
+               "%SUNEAST"  => $sunEast,
+               "%SUNELAVATION"  => $sunElevation,
+               "%SUNSOUTH"  => $sunSouth,
+               "%SUNWEST"  => $sunWest,
+               "%TEMPERATURE"  => $temperature,
+               "%TIME"  => $time,
+               "%TIMEZONE"  => $timeZone,
+               "%TWILIGHT"  => $twilight,
+               "%WEEKDAY"  => $weekday,
+               "%WINDAVG2MIN"  => $windAvg2min,
+               "%WINDGUST10MIN"  => $windGust10min,
+               "%WINDGUSTCURRNT"  => $windGustCurrent,
+               "%WINDPEAK10MIN"  => $windPeak10min,
+               "%WINDSPEED"  => $windSpeed,
+               "%WINDSTENGTH"  => $windStrength);
+  my $customCmdDown = AttrVal($name, "customCmdDown", undef);
+  my $customCmdDownPeriod = AttrVal($name, "customCmdDownPeriod", 'once');
+  my $customCmdDownTrigger = AttrVal($name, 'customCmdDownTrigger', undef);
+  my $customCmdUp = AttrVal($name, "customCmdUp", undef);
+  my $customCmdUpPeriod = AttrVal($name, "customCmdUpPeriod", 'once');
+  my $customCmdUpTrigger = AttrVal($name, 'customCmdUpTrigger', undef);
+
+  if (defined ReadingsVal($name, 'alarm', undef)) {
+    my $customCmdAlarmOff = AttrVal($name, 'customCmdAlarmOff', undef);
+    if (defined $customCmdAlarmOff) {
+      $hash->{helper}{customCmdAlarmOff}{do} = 1;
+      ModbusElsnerWS_CustomCmdDo($hash, 'customCmdAlarmOff', $customCmdAlarmOff, 'once');
+    }
+    readingsDelete($hash, 'alarm');
+  }
+  delete $hash->{helper}{customCmdAlarmOff};
+
+  if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+    RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+    @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, 0);
+    my $signOfLifeInterval = AttrVal($name, 'signOfLifeInterval', 3);
+    $signOfLifeInterval = $hash->{INTERVAL} if ($signOfLifeInterval < $hash->{INTERVAL});
+    InternalTimer(gettimeofday() + $signOfLifeInterval + 0.5, 'ModbusElsnerWS_AlarmOn', $hash->{helper}{timer}{alarm}, 0);
+  }
+
   if (!exists $hash->{helper}{timer}{heartbeat}) {
     @{$hash->{helper}{timer}{heartbeat}} = ($hash, 'heartbeat');
     RemoveInternalTimer($hash->{helper}{timer}{heartbeat});
     InternalTimer(gettimeofday() + 600, 'ModbusElsnerWS_cdmClearTimer', $hash->{helper}{timer}{heartbeat}, 0);
     #Log3 $hash->{NAME}, 3, "ModbusElsnerWS $hash->{NAME} ModbusElsnerWS_readingsBulkUpdate heartbeat executed.";
   }
+
+  if (defined($customCmdDown) || defined($customCmdUp)) {
+    ModbusElsnerWS_CustomCmdDoTrigger($hash, 'customCmdDown', $customCmdDown, AttrVal($name, 'customCmdDownTrigger', undef), 0);
+    ModbusElsnerWS_CustomCmdDoTrigger($hash, 'customCmdUp', $customCmdUp, AttrVal($name, 'customCmdUpTrigger', undef), 1);
+
+    if (exists($hash->{helper}{customCmdDown}{do}) && exists($hash->{helper}{customCmdUp}{do})) {
+      if (AttrVal($name, 'customCmdPriority', 'up') eq 'up') {
+        # up command has prority
+        delete $hash->{helper}{customCmdDown} if (defined $customCmdDownTrigger);
+      } else {
+        # down command has prority
+        delete $hash->{helper}{customCmdUp} if (defined $customCmdUpTrigger);
+      }
+    }
+    ModbusElsnerWS_CustomCmdDo($hash, 'customCmdDown', $customCmdDown, $customCmdDownPeriod);
+    ModbusElsnerWS_CustomCmdDo($hash, 'customCmdUp', $customCmdUp, $customCmdUpPeriod);
+  }
+
   #Log3 $hash->{NAME}, 2, "ModbusElsnerWS_Eval $hash->{NAME} $readingName = $readingVal received";
   return $ctrl;
+}
+
+sub ModbusElsnerWS_CustomCmdDoTrigger($$$$$) {
+  # set do trigger
+  my ($hash, $customCmdName, $customCmdVal, $customCmdTrigger, $element) = @_;
+  my $readingName;
+  if (defined($customCmdVal)) {
+    if (defined $customCmdTrigger) {
+      for (split(',', $customCmdTrigger)) {
+        $readingName = "%" . uc($_);
+        #Log3 $hash->{NAME}, 3, "ModbusElsnerWS $hash->{NAME} $customCmdName Reading: $_ = " . $specials{$readingName} . " <=> " . $customCmdTrigger{$_}[$element];
+        if ($customCmdTrigger{$_}[$element] eq $specials{$readingName}) {
+          $hash->{helper}{$customCmdName}{do} = 1;
+          last;
+        } else {
+          delete $hash->{helper}{$customCmdName}{do};
+        }
+      }
+      # reset trigger
+      if (!exists $hash->{helper}{$customCmdName}{do}) {
+        delete $hash->{helper}{$customCmdName}{Count};
+        delete $hash->{helper}{$customCmdName}{Period};
+        delete $hash->{helper}{$customCmdName};
+      }
+    } else {
+      # custom command always executed
+      $hash->{helper}{$customCmdName}{Count} = -1;
+      $hash->{helper}{$customCmdName}{Period} = -1;
+      $hash->{helper}{$customCmdName}{do} = 1;
+    }
+  } else {
+    # no custom command
+    delete $hash->{helper}{$customCmdName}{Count};
+    delete $hash->{helper}{$customCmdName}{do};
+    delete $hash->{helper}{$customCmdName}{Period};
+    delete $hash->{helper}{$customCmdName};
+  }
+  return;
+}
+
+sub ModbusElsnerWS_CustomCmdDo($$$$) {
+  my ($hash, $customCmdName, $customCmd, $customCmdPeriod) = @_;
+  my $name = $hash->{NAME};
+  #Log3 $name, 3, "ModbusElsnerWS $name $customCmdName do: $hash->{helper}{$customCmdName}{do} Count: $hash->{helper}{$customCmdName}{Count}";
+  #Log3 $name, 3, "ModbusElsnerWS $name $customCmdName Count: $hash->{helper}{$customCmdName}{Count} Period: $hash->{helper}{$customCmdName}{Period} <> $customCmdPeriod{$customCmdPeriod}";
+  if (exists $hash->{helper}{$customCmdName}{do}) {
+    if (!exists($hash->{helper}{$customCmdName}{Period}) || $hash->{helper}{$customCmdName}{Period} != $customCmdPeriod{$customCmdPeriod}) {
+      $hash->{helper}{$customCmdName}{Period} = $customCmdPeriod{$customCmdPeriod};
+      $hash->{helper}{$customCmdName}{Count} = $customCmdPeriod{$customCmdPeriod};
+    }
+    #Log3 $name, 3, "ModbusElsnerWS $name $customCmdName Count: $hash->{helper}{$customCmdName}{Count}";
+    if ($hash->{helper}{$customCmdName}{Count} < -1) {
+      $hash->{helper}{$customCmdName}{Count} ++;
+    } elsif ($hash->{helper}{$customCmdName}{Count} == -1) {
+      $hash->{helper}{$customCmdName}{Count} = 0;
+    } elsif ($hash->{helper}{$customCmdName}{Count} == 0) {
+      delete $hash->{helper}{$customCmdName}{do};
+    } elsif ($hash->{helper}{$customCmdName}{Count} == $customCmdPeriod{$customCmdPeriod}) {
+      $hash->{helper}{$customCmdName}{Count} --;
+    } elsif ($hash->{helper}{$customCmdName}{Count} > 1) {
+      $hash->{helper}{$customCmdName}{Count} --;
+      delete $hash->{helper}{$customCmdName}{do};
+    } elsif ($hash->{helper}{$customCmdName}{Count} == 1) {
+      $hash->{helper}{$customCmdName}{Count} = $customCmdPeriod{$customCmdPeriod};
+      delete $hash->{helper}{$customCmdName}{do};
+    } else {
+      delete $hash->{helper}{$customCmdName}{do};
+    }
+    if (exists $hash->{helper}{$customCmdName}{do}) {
+      $customCmd = EvalSpecials($customCmd, %specials);
+      my $ret = AnalyzeCommandChain(undef, $customCmd);
+      Log3 $name, 2, "ModbusElsnerWS $name $customCmdName ERROR: $ret" if($ret);
+    }
+  }
+  return;
+}
+
+sub ModbusElsnerWS_AlarmOn($) {
+  my ($readingParam) = @_;
+  my ($hash, $readingName, $readingVal, $ctrl, $log, $clear) = @$readingParam;
+  if (defined $hash) {
+    my $customCmdAlarmOn = AttrVal($hash->{NAME}, 'customCmdAlarmOn', undef);
+    if (defined $customCmdAlarmOn) {
+      $hash->{helper}{customCmdAlarmOn}{do} = 1;
+      ModbusElsnerWS_CustomCmdDo($hash, 'customCmdAlarmOn', $customCmdAlarmOn, 'once');
+      delete $hash->{helper}{customCmdAlarmOn};
+    }
+    readingsSingleUpdate($hash, $readingName, $readingVal, $ctrl) ;
+    Log3 $hash->{NAME}, $log, " ModbusElsnerWS " . $hash->{NAME} . " EVENT $readingName: $readingVal" if ($log);
+  }
+  return;
 }
 
 sub ModbusElsnerWS_Attr(@) {
@@ -292,7 +504,27 @@ sub ModbusElsnerWS_Attr(@) {
   return undef if (!$init_done);
   my $err;
 
-  if ($attrName =~ m/^brightness(DayNight|Sunny).*$/) {
+  if ($attrName =~ m/^.*Delay$/) {
+    my ($attrVal0, $attrVal1) = split(':', $attrVal);
+    if (!defined $attrVal1) {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+$/ || $attrVal0 + 0 > 3600) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    } elsif ($attrVal1 !~ m/^[+]?\d+$/ || $attrVal1 + 0 > 3600) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    } else {
+      if (!defined $attrVal0) {
+
+      } elsif ($attrVal0 !~ m/^[+]?\d+$/ || $attrVal0 + 0 > 3600) {
+        $err = "attribute-value [$attrName] = $attrVal wrong";
+        CommandDeleteAttr(undef, "$name $attrName");
+      }
+    }
+  } elsif ($attrName =~ m/^brightness(DayNight|Sunny).*$/) {
     if (!defined $attrVal) {
 
     } else {
@@ -313,6 +545,39 @@ sub ModbusElsnerWS_Attr(@) {
           CommandDeleteAttr(undef, "$name $attrName");
         }
       }
+    }
+  } elsif ($attrName =~ m/^customCmd(Down|Up)Period$/) {
+    my $attrValStr = join("|", keys %customCmdPeriod);
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^($attrValStr)$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+  } elsif ($attrName =~ m/^customCmd(Down|Up)Trigger$/) {
+    my $attrValStr = join("|", keys %customCmdTrigger);
+    if (defined $attrVal) {
+      for (split(',', $attrVal)) {
+        if ($_ !~ m/^($attrValStr)$/) {
+          $err = "attribute-value [$attrName] = $attrVal wrong";
+          CommandDeleteAttr(undef, "$name $attrName");
+          last;
+        }
+      }
+    }
+  } elsif ($attrName eq "signOfLife") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^off|on$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+  } elsif ($attrName eq "signOfLifeInterval") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^\d+$/ || $attrVal + 0 < 1 || $attrVal + 0 > 15) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
     }
   } elsif ($attrName eq "timeEvent") {
     if (!defined $attrVal) {
@@ -622,7 +887,7 @@ sub ModbusElsnerWS_Delete($$) {
     It read the modbus holding registers for the different values and process
     them in a periodic interval. It evaluates the received weather data and based on adjustable thresholds and delay
     times it generates up/down signals for blinds according to wind, rain and sun. This way blinds can be pilot-controlled
-    and protected against thunderstorms. The GPS function of the sensor provides the current values of the date, time,
+    and protected against thunderstorms. The GPS function of the sensor provides the current values of the date, time, weekday,
     sun azimuth, sun elevation, longitude and latitude.<br>
     As an alternative to the module for the Elsner Modbus sensors, sensors with the manufacturer-specific serial
     RS485 protocol can also be used. The <a href="#ElsnerWS">ElsnerWS</a> module is available for this purpose. EnOcean profiles
@@ -641,6 +906,11 @@ sub ModbusElsnerWS_Delete($$) {
       <li>Adjustable switching thresholds and delay times</li>
       <li>Day/night signal</li>
       <li>Display of date, time, sun azimuth, sun elevation, longitude and latitude</li>
+      <li>Execution of custom alarm commands, see <a href="#ModbusElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> and
+      <a href="#ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a></li>
+      <li>Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
+      isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> and
+      <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a></li>
     </ul><br>
 
     <b>Prerequisites</b>
@@ -659,7 +929,7 @@ sub ModbusElsnerWS_Delete($$) {
         More information about the sensor, see
         <a href="https://www.elsner-elektronik.de/shop/de/fileuploader/download/download/?d=1&file=custom%2Fupload%2F30146-30147_P033-Modbus_P033-Modbus-GPS_Datenblatt2-0_19Mar18_DBEEA6010.pdf">P03/3-Modbus(GPS) User Guide</a>.<br>
         The USB adapters
-        <a href="https://www.digitus.info/produkte/computer-zubehoer-und-komponenten/computer-zubehoer/seriell-und-parallel-adapter/da-70157/">Digitus DA-70157</a>,
+        <a href="https://www.digitus.info/produkte/computer-und-office-zubehoer/computer-zubehoer/usb-komponenten-und-zubehoer/schnittstellen-adapter/da-70157/">Digitus DA-70157</a>,
         <a href="https://shop.in-circuit.de/product_info.php?cPath=33&products_id=81">In-Circuit USB-RS485-Bridge</a>
         and <a href="http://www.dsdtech-global.com/2018/01/sh-u10-spp.html">DSD TECH SH-U10 USB to RS485 converter</a>
         are successfully tested at a Raspberry PI in conjunction with the weather sensor.
@@ -701,7 +971,7 @@ sub ModbusElsnerWS_Delete($$) {
           Set switching thresholds for reading dayNight based on the reading brightness.
         </li>
         <li><a name="ModbusElsnerWS_brightnessDayNightDelay">brightnessDayNightDelay</a> t_reset/s:t_set/s,
-          [brightnessDayNightDelay] = 0...99000:0...99000, 600:600 is default.<br>
+          [brightnessDayNightDelay] = 0...3600:0...3600, 600:600 is default.<br>
           Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
@@ -710,63 +980,137 @@ sub ModbusElsnerWS_Delete($$) {
           Set switching thresholds for reading isSunny based on the reading brightness.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnyDelay">brightnessSunnyDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunny based on the reading brightness. The reading isSunny is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnyEast] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyEast based on the reading sunEast.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyEastDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnySouth] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnySouthDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnyWest] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyWest based on the reading sunWest.
         </li>
         <li><a name="ModbusElsnerWS_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...99000:0...99000, 120:30 is default.<br>
+          [brightnessSunnyWestDelay] = 0...99000:0...99000, 120:30 is default.<br>
           Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
+        <li><a name="ModbusElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> &lt;command&gt;<br>
+          <a name="ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a> &lt;command&gt;<br>
+          Command being executed if an alarm is set (on) or deleted (off).  If &lt;command&gt; is enclosed in {},
+          then it is a perl expression, if it is enclosed in "", then it is a shell command,
+          else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
+          and the current readings<br>
+          $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
+          is available as a local variable in perl, as environment variable for shell
+          scripts, and will be textually replaced for Fhem commands.<br>
+          The alarm commands have a higher priority than the up and down commands.
+        </li>
+        <li><a name="ModbusElsnerWS_customCmdDown">customCmdDown</a> &lt;command&gt;<br>
+          <a name="ModbusElsnerWS_customCmdUp">customCmdUp</a> &lt;command&gt;<br>
+          The command is executed if the Up or Down command is triggered, see <a href="#ModbusElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> or
+          <a href="#ModbusElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a>. If &lt;command&gt; is enclosed in {},
+          then it is a perl expression, if it is enclosed in "", then it is a shell command,
+          else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
+          and the current readings<br>
+          $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
+          is available as a local variable in perl, as environment variable for shell
+          scripts, and will be textually replaced for Fhem commands.<br>
+          The alarm commands have a higher priority than the up and down commands.
+        </li>
+        <li><a name="ModbusElsnerWS_customCmdDownPeriod">customCmdDownPeriod</a> once|threeTimes|3|10|180|600<br>
+          <a name="ModbusElsnerWS_customCmdUpPeriod">customCmdUpPeriod</a> once|threeTimes|3|10|180|600<br>
+          [customCmdDownPeriod] = once|threeTimes|3|10|180|600, once is default.<br>
+          Number or period of custom command to be executed.
+        </li>
+        <li><a name="ModbusElsnerWS_customCmdDownTrigger">customCmdDownTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> are executed if one of the selected readings is triggered as follows:
+          <ul>
+            <li>[dayNight] = night</li>
+            <li>[isRaining] = no</li>
+            <li>[isStormy] = no</li>
+            <li>[isSunny] = yes</li>
+            <li>[isSunnyEast] = yes</li>
+            <li>[isSunnySouth] = yes</li>
+            <li>[isSunnyWest] = yes</li>
+            <li>[isWindy] = no</li>
+           </ul>
+          The commands in the attribute <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> are executed periodically every second if the attribute is not set.
+        </li>
+        <li><a name="ModbusElsnerWS_customCmdUpTrigger">customCmdUpTrigger</a> dayNight|isRaining|isStormy|isSunny|isSunnyEast|isSunnySouth|isSunnyWest|isWindy<br>
+          The commands in the attribute <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a> are executed if one of the selected readings is triggered as follows:
+          <ul>
+             <li>[dayNight] = day</li>
+              <li>[isRaining] = yes</li>
+              <li>[isStormy] = yes</li>
+              <li>[isSunny] = no</li>
+              <li>[isSunnyEast] = no</li>
+              <li>[isSunnySouth] = no</li>
+              <li>[isSunnyWest] = no</li>
+              <li>[isWindy] = yes</li>
+           </ul>
+          The commands in the attribute <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a> are executed periodically every second if the attribute is not set.
+        </li>
+        <li><a name="ModbusElsnerWS_customCmdPriority">customCmdPriority</a> down|up,
+          [customCmdPriority] = down|up, up is default.<br>
+          Priority of custom commands. If both the up and down command are triggered, only the prioritized command is executed.
+        </li>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <li><a name="ModbusElsnerWS_signOfLife">signOfLife</a> off|on,
+          [signOfLife] = off|on, on is default.<br>
+          Monitoring of the periodic telegrams from sensor.
+        </li>
+        <li><a name="ModbusElsnerWS_signOfLifeInterval">signOfLifeInterval</a> t/s,
+          [signOfLifeInterval] = 1 ... 15, 3 is default.<br>
+          Monitoring period in seconds of the periodic telegrams from sensor.
+        </li>
         <li><a name="ModbusElsnerWS_timeEvent">timeEvent</a> no|yes,
           [timeEvent] = no|yes, no is default.<br>
           Update the reading time periodically.
         </li>
+        <li><a name="ModbusElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
+          [updateGlobalAttr] = no|yes, no is default.<br>
+          Update the global attributes latitude and longitude with the received GPS coordinates.
+        </li>
         <li><a name="ModbusElsnerWS_windSpeedStormy">windSpeedStormy</a> v_min/m/s:v_max/m/s,
-          [windSpeedStormy] = 0...35:0...35, 13.9:17.2 is default.<br>
+          [windSpeedStormy] = 0...35:0...35, 13.9:17.2 (windStrength = 7 B - 8 B) is default.<br>
           Set switching thresholds for reading isStormy based on the reading windSpeed.
         </li>
         <li><a name="ModbusElsnerWS_windSpeedStormyDelay">windSpeedStormyDelay</a> t_reset/s:t_set/s,
-          [windSpeedStormyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+          [windSpeedStormyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isStormy based on the reading windSpeed. The reading isStormy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ModbusElsnerWS_windSpeedWindy">windSpeedWindy</a> v_min/m/s:v_max/m/s,
-          [windSpeedWindy] = 0...35:0...35, 1.6:3.4 is default.<br>
+          [windSpeedWindy] = 0...35:0...35, 1.6:3.4 (windStrength = 2 B - 3 B) is default.<br>
           Set switching thresholds for reading isWindy based on the reading windSpeed.
         </li>
         <li><a name="ModbusElsnerWS_windSpeedWindyDelay">windSpeedWindyDelay</a> t_reset/s:t_set/s,
-          [windSpeedWindyDelay] = 0...99000:0...99000, 60:3 is default.<br>
+          [windSpeedWindyDelay] = 0...3600:0...3600, 60:3 is default.<br>
           Set switching delay for reading isWindy based on the reading windSpeed. The reading isWindy is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
-        </li>
-        <li><a name="ModbusElsnerWS_updateGlobalAttr">updateGlobalAttr</a> no|yes,
-          [timeEvent] = no|yes, no is default.<br>
-          Update the global attributes latitude and longitude with the received GPS coordinates.
         </li>
       </ul>
     </ul><br>
@@ -776,6 +1120,7 @@ sub ModbusElsnerWS_Delete($$) {
   <ul>
     <ul>
       <li>T: t/&#176C B: E/lx W: v/m/s IR: no|yes</li>
+      <li>alarm: dead_sensor</li>
       <li>brightness: E/lx (Sensor Range: E = 0 lx ... 99000 lx)</li>
       <li>date: JJJJ-MM-TT</li>
       <li>dayNight: day|night</li>
@@ -798,6 +1143,7 @@ sub ModbusElsnerWS_Delete($$) {
       <li>time: hh:mm:ss</li>
       <li>timeZone: CET|CEST|UTC</li>
       <li>twilight: T/% (Sensor Range: T = 0 % ... 100 %)</li>
+      <li>weekday: Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday</li>
       <li>windAvg2min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windGust10min: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
       <li>windGustCurrent: v/m/s (Sensor Range: v = 0 m/s ... 70 m/s)</li>
