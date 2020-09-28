@@ -213,6 +213,7 @@ TcpServer_Close($@)
     delete($hash->{CD}); 
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
+    %ntfyHash = ();
     if($dodel) {
       delete $attr{$name};
       delete $defs{$name};
