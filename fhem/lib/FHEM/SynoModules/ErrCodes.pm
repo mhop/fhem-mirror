@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.1');
+use version; our $VERSION = version->declare('1.3.2');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
@@ -63,7 +63,6 @@ my %errauthsscam = (                                                    # Authen
   409  => "Password Expired",
   410  => "Password must change (when first time use or after reset password by admin)",
   411  => "Account Locked (when account max try exceed)",
-  9000 => "malformed JSON string received",
 );
 
 my %errsscam = (                                                       # Standard Error Codes der Surveillance Station API                 
@@ -94,7 +93,9 @@ my %errsscam = (                                                       # Standar
   439  => "Too many items selected",
   502  => "Camera disconnected",
   600  => "Presetname and PresetID not found in Hash",
+  806  => "couldn't get Synology Surveillance Station API informations",
   9000 => "malformed JSON string received",
+  9001 => "API keys and values not completed",
 );
 
 ## SSCal ##
@@ -104,7 +105,6 @@ my %errauthsscal = (                                                   # Authent
   402  => "Permission denied",
   403  => "2-step verification code required",
   404  => "Failed to authenticate 2-step verification code",
-  9000 => "malformed JSON string received",
 );
 
 my %errsscal = (                                                       # Standard Error Codes der Calendar API 
@@ -146,11 +146,12 @@ my %errsscal = (                                                       # Standar
   599  => "No such task of the file operation",
   800  => "malformed or unsupported URL",
   805  => "empty API data received - may be the Synology cal Server package is stopped",
-  806  => "couldn't get Synology cal API information",
+  806  => "couldn't get Synology calendar API informations",
   810  => "The credentials couldn't be retrieved",
   900  => "malformed JSON string received from Synology Calendar Server",
   910  => "Wrong timestamp definition. Check attributes \"cutOlderDays\", \"cutLaterDays\". ",
   9000 => "malformed JSON string received",
+  9001 => "API keys and values not completed",
 );
 
 ## SSChatBot ##
@@ -169,6 +170,7 @@ my %errsschat = (                                                       # Standa
   806  => "couldn't get Synology Chat API informations",
   810  => "The botToken couldn't be retrieved",
   9000 => "malformed JSON string received",
+  9001 => "API keys and values not completed",
 );
 
 ## SSFile ##
@@ -178,7 +180,6 @@ my %errauthssfile = (                                                   # Authen
   402  => "Permission denied",
   403  => "2-step verification code required",
   404  => "Failed to authenticate 2-step verification code",
-  9000 => "malformed JSON string received",
 );
 
 my %errssfile = (                                                       # Standard Error Codes der File Station API
@@ -245,6 +246,7 @@ my %errssfile = (                                                       # Standa
   2001 => "Cannot generate sharing link because too many sharing links exist",
   2002 => "Failed to access sharing links",
   9000 => "malformed JSON string received",
+  9001 => "API keys and values not completed",
 );
 
 my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
