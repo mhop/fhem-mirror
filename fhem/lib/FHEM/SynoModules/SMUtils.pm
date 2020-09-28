@@ -40,7 +40,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.11.0');
+use version; our $VERSION = version->declare('1.11.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -566,10 +566,10 @@ sub evaljson {
       else {
           $success = 0;
 
-          readingsBeginUpdate ($hash);
-          readingsBulkUpdate  ($hash, "Errorcode", "none");
-          readingsBulkUpdate  ($hash, "Error",     "malformed JSON string received");
-          readingsEndUpdate   ($hash, 1);  
+          my $errorcode = "9000";         
+          my $error     = expErrors($hash,$errorcode);                                          # Fehlertext zum Errorcode ermitteln
+            
+          setReadingErrorState ($hash, $error, $errorcode);  
       }
   };
   
