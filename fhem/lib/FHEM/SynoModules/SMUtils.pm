@@ -370,18 +370,20 @@ return $bool;
 #      $jdata:   Referenz zum $data-Hash der JSON-Antwort
 #      $apiref:  Referenz zum instanziierten API-Hash
 ###############################################################################
-sub completeAPI { 
+sub completeAPI {  
   my $jdata  = shift // carp "got no data Hash reference" && return;
   my $apiref = shift // carp $carpnoapir                  && return;
   
   for my $key (keys %{$apiref}) {
-      next if($key =~ /PARSET$/x); 
-      $apiref->{$key}{PATH} = $jdata->{data}{$apiref->{$key}{NAME}}{path}       // "undefined";
-      $apiref->{$key}{VER}  = $jdata->{data}{$apiref->{$key}{NAME}}{maxVersion} // 0;
+      next if($key =~ /^PARSET$/x); 
+      $apiref->{$key}{PATH} = $jdata->{data}{$apiref->{$key}{NAME}}{path}       // return;
+      $apiref->{$key}{VER}  = $jdata->{data}{$apiref->{$key}{NAME}}{maxVersion} // return;
       $apiref->{$key}{MOD}  = "no";                                                       # MOD = Version nicht modifiziert
-  } 
+  }
+
+  $apiref->{PARSET} = 1;                                                                  # alle API Hash values erfolgreich gesetzt
   
-return;
+return 1;
 }
 
 ###############################################################################
