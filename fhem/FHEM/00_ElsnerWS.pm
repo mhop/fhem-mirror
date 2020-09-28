@@ -1081,29 +1081,29 @@ sub ElsnerWS_Delete($$) {
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyEast">brightnessSunnyEast</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnyEast] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyEast based on the reading sunEast.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyEastDelay">brightnessSunnyEastDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
+          [brightnessSunnyEastDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyEast based on the reading sunEast. The reading isSunnyEast is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ElsnerWS_brightnessSunnySouth">brightnessSunnySouth</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnySouth] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnySouth based on the reading sunSouth.
         </li>
         <li><a name="ElsnerWS_brightnessSunnySouthDelay">brightnessSunnySouthDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
+          [brightnessSunnySouthDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnySouth based on the reading sunSouth. The reading isSunnySouth is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyWest">brightnessSunnyWest</a> E_min/lx:E_max/lx,
-          [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
+          [brightnessSunnyWest] = 0...99000:0...99000, 20000:40000 is default.<br>
           Set switching thresholds for reading isSunnyWest based on the reading sunWest.
         </li>
         <li><a name="ElsnerWS_brightnessSunnyWestDelay">brightnessSunnyWestDelay</a> t_reset/s:t_set/s,
-          [brightnessSunnyDelay] = 0...3600:0...3600, 120:30 is default.<br>
+          [brightnessSunnyWestDelay] = 0...3600:0...3600, 120:30 is default.<br>
           Set switching delay for reading isSunnyWest based on the reading sunWest. The reading isSunnyWest is reset or set
           if the thresholds are permanently undershot or exceed during the delay time.
         </li>
