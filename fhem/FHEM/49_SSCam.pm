@@ -183,6 +183,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
   "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
   "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
   "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
@@ -5192,15 +5193,17 @@ return;
 #                       Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_Parse {
-   my $param  = shift;
-   my $err    = shift;
-   my $myjson = shift;
+    my $param  = shift;
+    my $err    = shift;
+    my $myjson = shift;
    
-   my $hash   = $param->{hash};
-   my $fret   = $param->{fret};
-   my $arg    = $param->{arg};
-   my $name   = $hash->{NAME};
-   my $opmode = $hash->{OPMODE};
+    my $hash   = $param->{hash};
+    my $fret   = $param->{fret};
+    my $arg    = $param->{arg};
+    my $name   = $hash->{NAME};
+    my $opmode = $hash->{OPMODE};
+   
+    my ($error,$errorcode,$success);
   
     if ($err ne "") {                                                               # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
@@ -5211,7 +5214,7 @@ sub getApiSites_Parse {
         return;
         
     } elsif ($myjson ne "") {                                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
-        my $success = evaljson($hash,$myjson);
+        ($success) = evaljson($hash,$myjson);
         
         if(!$success) {
             delActiveToken($hash);
@@ -5224,8 +5227,23 @@ sub getApiSites_Parse {
         Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);                    # Logausgabe decodierte JSON Daten
     
         if ($success) {                                       
-            completeAPI ($jdata, $hash->{HELPER}{API});                              # übergibt Referenz zum instanziierten API-Hash
+            my $completed = completeAPI ($jdata, $hash->{HELPER}{API});              # übergibt Referenz zum instanziierten API-Hash
          
+            if(!$completed) {
+                $errorcode = "9001";
+                $error     = expErrors($hash,$errorcode);                            # Fehlertext zum Errorcode ermitteln
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate ($hash, "Error",     $error    );
+                readingsEndUpdate  ($hash, 1);
+            
+                Log3($name, 2, "$name - ERROR - $error");                    
+                  
+                delActiveToken($hash);                                               # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+                return;               
+            }
+            
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
             my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // "";
@@ -5308,9 +5326,7 @@ sub getApiSites_Parse {
             
             Log3($name, 4, "$name - ------- End of simulation section -------");  
             
-            setReadingErrorNone( $hash, 1 ); 
-            
-            $hash->{HELPER}{API}{PARSET} = 1;                                       # API Hash values sind gesetzt
+            setReadingErrorNone( $hash, 1 );
             
             Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API}); 
 
@@ -5321,14 +5337,15 @@ sub getApiSites_Parse {
             }            
         } 
         else {
-            my $error = "couldn't call API-Infosite";
+            $errorcode = "806";
+            $error     = expErrors($hash,$errorcode);                                # Fehlertext zum Errorcode ermitteln
        
             readingsBeginUpdate($hash);
-            readingsBulkUpdate ($hash,"Errorcode","none");
-            readingsBulkUpdate ($hash,"Error",    $error);
+            readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate ($hash, "Error",     $error    );
             readingsEndUpdate  ($hash, 1);
 
-            Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
+            Log3($name, 2, "$name - ERROR - $error");                    
                         
             delActiveToken($hash);                                                  # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             return;
