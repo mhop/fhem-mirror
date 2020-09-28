@@ -45,16 +45,17 @@ use FHEM::SynoModules::SMUtils qw(
                                   sortVersion
                                   showModuleInfo
                                   completeAPI
-                                  showAPIinfo                                  
-								  setReadingErrorNone 
-								  setReadingErrorState
+                                  showAPIinfo
+                                  evaljson                                
+                                  setReadingErrorNone 
+                                  setReadingErrorState
                                   addSendqueueEntry
                                   listSendqueue
                                   purgeSendqueue
                                   updQueueLength
                                   getClHash
                                   delClHash
-								 );                                                                           # Hilfsroutinen Modul                                                         
+                                 );                                                                           # Hilfsroutinen Modul                                                         
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                                                     # Error Code Modul                                                      
 
@@ -128,6 +129,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.1" => "28.09.2020  use evaljson from SMUtils ",
   "1.11.0" => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
   "1.10.7" => "26.09.2020  more subs to SMUtils and common optimization ",
   "1.10.6" => "25.09.2020  use module FHEM::SynoModules::API ",
@@ -489,7 +491,9 @@ sub _setasyncSendItem {
   my $aref  = $paref->{aref};
   
   delete $hash->{HELPER}{RESENDFORCE};                                                      # Option 'force' löschen (könnte durch restartSendqueue gesetzt sein)      
-  return if(!$hash->{HELPER}{USERFETCHED});
+  if(!$hash->{HELPER}{USERFETCHED}) {
+      return qq{The registered Synology Chat users are unknown. Please retrieve them first with "get $name chatUserlist".};
+  }
   
   my ($text,$users,$svg);
   
@@ -655,8 +659,6 @@ sub _getapiInfo {
   # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
   delClHash ($name);
   getClHash ($hash,1);
-  
-  $hash->{HELPER}{API}{PARSET} = 0;                                # erzwinge Abruf API
 
   # Eintrag zur SendQueue hinzufügen
   my $params = { 
@@ -871,36 +873,47 @@ sub addSendqueue {
 return;
 }
 
-################################################################
-#                asynchrone Queue starten
-#                $rst = resend Timer
-################################################################
-sub startQueue {                   
-  my $name = shift // return;
-  my $rst  = shift // return;
-  my $hash = $defs{$name};
+#############################################################################################
+#     asynchrone Queue starten
+#     $rst     = restart Timer
+#     $startfn = Funktion deren Timer gelöscht und  neu gestartet werdene soll 
+#     $arg     = Argument für die Timer Funktion
+#############################################################################################
+sub startSendqueue {                   
+  my $name    = shift // return;
+  my $rst     = shift // return;
+  my $startfn = shift // return;
+  my $arg     = shift // return;
+  
+  my $hash    = $defs{$name};
 
-  RemoveInternalTimer ($hash, "FHEM::SSChatBot::getApiSites");
-  InternalTimer       ($rst,  "FHEM::SSChatBot::getApiSites", "$name", 0);   
+  RemoveInternalTimer ($hash, $startfn);
+  InternalTimer       ($rst,  $startfn, $arg, 0);   
                     
 return;
 }
 
 #############################################################################################
-#              Erfolg einer Rückkehrroutine checken und ggf. Send-Retry ausführen
-#              bzw. den SendQueue-Eintrag bei Erfolg löschen
-#              $name  = Name des Chatbot-Devices
-#              $retry = 0 -> Opmode erfolgreich (DS löschen), 
-#                       1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
-#                            eventuell verzögert wiederholen)
+#      Erfolg einer Rückkehrroutine checken und ggf. Send-Retry ausführen
+#      bzw. den SendQueue-Eintrag bei Erfolg löschen
+#      $name       =   Name des Chatbot-Devices
+#      $retry      =   0 -> Opmode erfolgreich (DS löschen), 
+#                      1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
+#                           eventuell verzögert wiederholen)
+#      $startfnref = Referenz zur Funktion die nach Check ggf. gestartet werden soll
 #############################################################################################
 sub checkRetry {  
-  my ($name,$retry) = @_;
-  my $hash          = $defs{$name};  
-  my $idx           = $hash->{OPIDX};
-  my $forbidSend    = "";
+  my $name       = shift;
+  my $retry      = shift;
+  my $startfn    = shift;
+  my $hash       = $defs{$name};  
+  my $idx        = $hash->{OPIDX};
+  my $type       = $hash->{TYPE};
   
-  if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
+  my $forbidSend = "";
+  my $startfnref = \&{$startfn};
+  
+  if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
       updQueueLength ($hash);
       return;  
@@ -908,19 +921,23 @@ sub checkRetry {
   
   if(!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
-      delete $data{SSChatBot}{$name}{sendqueue}{entries}{$idx};
+      delete $data{$type}{$name}{sendqueue}{entries}{$idx};
       Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
       updQueueLength ($hash);
-      return getApiSites($name);                                                          # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      
+      if(keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+          Log3($name, 4, "$name - Start next SendQueue entry..."); 
+          return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      }  
   } 
   else {                                                                                  # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
-      $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
-      my $rc = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{retryCount};
+      $data{$type}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
+      my $rc = $data{$type}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|117|120|407|409|410|800|900/x) {                          # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      if($errorcode =~ /100|101|117|120|407|409|410|800/x) {                              # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
           $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
-          $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
+          $data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
           Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
           
@@ -929,7 +946,7 @@ sub checkRetry {
           
           updQueueLength ($hash);                                                         # updaten Länge der Sendequeue
           
-          return getApiSites($name);                                                      # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
+          return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
       }
       
       if(!$forbidSend) {
@@ -946,7 +963,7 @@ sub checkRetry {
           
           my $rst = gettimeofday()+$rs;                                                  # resend Timer 
           updQueueLength ($hash,$rst);                                                   # updaten Länge der Sendequeue mit resend Timer
-          startQueue     ($name,$rst);
+          startSendqueue ($name, $rst, $startfn, $name);
       }
   }
 
@@ -965,11 +982,6 @@ sub getApiSites {
    
    my ($url,$param,$idxset,$ret);
 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###            start Chat operation Send            "); 
-   Log3($name, 4, "$name - ####################################################");
-   Log3($name, 4, "$name - Send Queue force option is set, send also messages marked as 'forbidSend'") if($hash->{HELPER}{RESENDFORCE});
-
    if(!keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
        $ret = "Sendqueue is empty. Nothing to do ...";
        Log3($name, 4, "$name - $ret"); 
@@ -986,10 +998,19 @@ sub getApiSites {
        }               
    }
    
+   Log3($name, 4, "$name - ####################################################"); 
+   Log3($name, 4, "$name - ###         start Chat operation $hash->{OPMODE}    "); 
+   Log3($name, 4, "$name - ####################################################");
+   Log3($name, 4, "$name - Send Queue force option is set, send also messages marked as 'forbidSend'") if($hash->{HELPER}{RESENDFORCE});
+   
    if(!$idxset) {
        $ret = "Only entries with \"forbidSend\" are in Sendqueue. Escaping ...";
        Log3($name, 4, "$name - $ret"); 
        return $ret; 
+   }
+   
+   if ($hash->{OPMODE} eq "apiInfo") {
+       $hash->{HELPER}{API}{PARSET} = 0;                                                  # erzwinge Abruf API 
    }
    
    if ($hash->{HELPER}{API}{PARSET}) {                                                    # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
@@ -1047,9 +1068,7 @@ sub getApiSites_parse {
    my $name     = $hash->{NAME};
    my $opmode   = $hash->{OPMODE};
    my $inaddr   = $hash->{INADDR};
-   my $inport   = $hash->{INPORT};
-   
-   my $external = $hash->{HELPER}{API}{EXTERNAL}{NAME};   
+   my $inport   = $hash->{INPORT}; 
 
    my ($error,$errorcode,$success);
   
@@ -1057,15 +1076,16 @@ sub getApiSites_parse {
         Log3($name, 2, "$name - ERROR message: $err");
        
         setReadingErrorState ($hash, $err);              
-        checkRetry           ($name,1);
+        checkRetry           ($name,1,"FHEM::SSChatBot::getApiSites");
         
         return;
     } 
     elsif ($myjson ne "") {                                                          # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = evalJSON($hash,$myjson);
-        unless ($success) {
+        ($success) = evaljson($hash,$myjson);
+        
+        if (!$success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-            checkRetry ($name,1);       
+            checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");       
             return;
         }
         
@@ -1076,17 +1096,26 @@ sub getApiSites_parse {
         $success = $jdata->{'success'};
     
         if ($success) {
-            completeAPI ($jdata, $hash->{HELPER}{API});                              # übergibt Referenz zum instanziierten API-Hash            
+            my $completed = completeAPI ($jdata, $hash->{HELPER}{API});              # übergibt Referenz zum instanziierten API-Hash            
 
-            setReadingErrorNone($hash, 1);
+            if(!$completed) {
+                $errorcode = "9001";
+                $error     = expErrors($hash,$errorcode);                            # Fehlertext zum Errorcode ermitteln
+                
+                setReadingErrorState ($hash, $error, $errorcode);
+                Log3($name, 2, "$name - ERROR - $error");                    
+                
+                checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");    
+                return;                
+            }
             
-            $hash->{HELPER}{API}{PARSET} = 1;                                        # API Hash values sind gesetzt
+            setReadingErrorNone($hash, 1);
 
-            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API});   
+            Log3 ($name, 4, "$name - API completed:\n".Dumper $hash->{HELPER}{API});   
 
             if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
                 showAPIinfo ($hash, $hash->{HELPER}{API});                           # übergibt Referenz zum instanziierten API-Hash)
-                checkRetry  ($name,0);
+                checkRetry  ($name,0,"FHEM::SSChatBot::getApiSites");
                 return;
             }     
         } 
@@ -1095,9 +1124,9 @@ sub getApiSites_parse {
             $error     = expErrors($hash,$errorcode);                                # Fehlertext zum Errorcode ermitteln
             
             setReadingErrorState ($hash, $error, $errorcode);
-            Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
+            Log3($name, 2, "$name - ERROR - $error");                    
             
-            checkRetry ($name,1);    
+            checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");    
             return;
         }
     }
@@ -1128,7 +1157,7 @@ sub chatOp {
        setReadingErrorState ($hash, $error, $errorcode);
        Log3($name, 2, "$name - ERROR - $error"); 
        
-       checkRetry ($name,1);
+       checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");
        return;
    }
       
@@ -1212,16 +1241,16 @@ sub chatOp_parse {
        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
        setReadingErrorState ($hash, $err, $errorcode);
-       checkRetry    ($name,1);        
+       checkRetry           ($name,1,"FHEM::SSChatBot::getApiSites");        
        return;
    
    } elsif ($myjson ne "") {    
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        # Evaluiere ob Daten im JSON-Format empfangen wurden 
-       ($hash,$success) = evalJSON ($hash,$myjson);        
+       ($success) = evaljson ($hash,$myjson);        
        unless ($success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
-           checkRetry ($name,1);       
+           Log3       ($name, 4, "$name - Data returned: ".$myjson);
+           checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");       
            return;
        }
         
@@ -1238,7 +1267,7 @@ sub chatOp_parse {
                &{$hmodep{$opmode}{fn}} ($hash, $data); 
            }                
 
-           checkRetry ($name,0);
+           checkRetry ($name,0,"FHEM::SSChatBot::getApiSites");
 
            readingsBeginUpdate         ($hash);
            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
@@ -1259,7 +1288,7 @@ sub chatOp_parse {
            setReadingErrorState ($hash, $error, $errorcode);       
            Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
-           checkRetry ($name,1);
+           checkRetry ($name,1,"FHEM::SSChatBot::getApiSites");
        }
             
        undef $data;
@@ -1406,27 +1435,6 @@ sub _parseSendItem {
   readingsEndUpdate   ($hash,1); 
       
 return;
-}
-
-###############################################################################
-#   Test ob JSON-String empfangen wurde
-###############################################################################
-sub evalJSON { 
-  my ($hash,$myjson) = @_;
-  my $OpMode  = $hash->{OPMODE};
-  my $name    = $hash->{NAME};
-  my $success = 1;
-  my ($error,$errorcode);
-  
-  eval {decode_json($myjson)} or do {
-          $success   = 0;
-          $errorcode = "900";         
-          $error     = expErrors($hash,$errorcode);                     # Fehlertext zum Errorcode ermitteln
-            
-          setReadingErrorState ($hash, $error, $errorcode);
-  };
-  
-return($hash,$success,$myjson);
 }
 
 ######################################################################################
@@ -1857,8 +1865,8 @@ sub __botCGIcheckToken {
           channel    => "",
           attachment => ""
       };
-      addSendqueue($params);
-      startQueue  ($name, $rst);
+      addSendqueue   ($params);
+      startSendqueue ($name,$rst,"FHEM::SSChatBot::getApiSites",$name);
           
       return ("text/plain; charset=utf-8", "400 Bad Request");          
   }  
@@ -1886,8 +1894,8 @@ sub __botCGIcheckPayload {
   my $h    = shift;
   my $name = $hash->{NAME};
 
-      my $pldata           = $h->{payload};
-      my (undef, $success) = evalJSON($hash,$pldata);
+      my $pldata    = $h->{payload};
+      my ($success) = evaljson($hash,$pldata);
       
       if (!$success) {
           Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
@@ -2009,7 +2017,7 @@ sub __botCGIdataInterprete {
   }
   
   if($do) {                                                                  # Wenn Kommando ausgeführt wurde -> Queue übertragen
-      startQueue ($name, $rst);       
+      startSendqueue ($name,$rst,"FHEM::SSChatBot::getApiSites",$name);       
   }  
    
 return ($command, $cr, $text);
