@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22573 2020-08-10 16:02:32Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.5.0"  => "29.09.2020  retrieve liveData in _getLiveData from Dashboard instead of homemanager site ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
   "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
                            "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
@@ -1184,7 +1185,7 @@ sub _getLiveData {                       ## no critic "not used"
   
   ($errstate,$state,$reread,$retry) = __dispatchGet ({ name     => $name,
                                                        ua       => $ua,
-                                                       call     => 'https://www.sunnyportal.com/homemanager?t='.$time,
+                                                       call     => 'https://www.sunnyportal.com/Dashboard?t='.$time,
                                                        tag      => "liveData",
                                                        state    => $state, 
                                                        fnaref   => [ qw( extractLiveData ) ],
@@ -2870,12 +2871,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22573 2020-08-10 16:02:32Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22573 2020-08-10 16:02:32Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
