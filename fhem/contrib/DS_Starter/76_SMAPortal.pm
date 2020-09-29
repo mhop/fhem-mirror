@@ -137,7 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.5.0"  => "29.09.2020  retrieve liveData in _getLiveData from Dashboard instead of homemanager site ",
+  "3.5.0"  => "29.09.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
+                           "extract OperationHealth key ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
   "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
                            "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
@@ -1172,20 +1173,25 @@ return 0;
 sub _getLiveData {                       ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $ua    = $paref->{ua};                     # LWP Useragent
+  my $ua    = $paref->{ua};                                         # LWP Useragent
   my $state = $paref->{state};                  
-  my $daref = $paref->{daref};                  # Referenz zum Datenarray
+  my $daref = $paref->{daref};                                      # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0);
   
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-  my $cts      = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
-  my $offset   = fhemTzOffset($cts);
-  my $time     = int(($cts + $offset) * 1000);     # add Timestamp in Millisekunden and UTC 
+  my $cts    = fhemTimeLocal(0, 0, 0, $mday, $mon, $year);
+  my $offset = fhemTzOffset($cts);
+  my $time   = int(($cts + $offset) * 1000);                        # add Timestamp in Millisekunden and UTC 
+  my $call   = 'https://www.sunnyportal.com/homemanager?t=';
+  
+  if (AttrVal($name, "noHomeManager", 0)) {                         # Dashboard Seite abfragen wenn kein Home Manager vorhanden ist
+      $call = 'https://www.sunnyportal.com/Dashboard?t=';
+  }
   
   ($errstate,$state,$reread,$retry) = __dispatchGet ({ name     => $name,
                                                        ua       => $ua,
-                                                       call     => 'https://www.sunnyportal.com/Dashboard?t='.$time,
+                                                       call     => $call.$time,
                                                        tag      => "liveData",
                                                        state    => $state, 
                                                        fnaref   => [ qw( extractLiveData ) ],
@@ -2214,10 +2220,17 @@ sub extractLiveData {                  ## no critic 'complexity'
       push @$daref, "${lv}_DirectConsumptionQuote:"  .$live->{DirectConsumptionQuote}." %" if(defined $live->{DirectConsumptionQuote});
       
       push @$daref, "${lv}_ModuleTemperature:"       .$live->{ModuleTemperature}.""        if(defined $live->{ModuleTemperature});
-      push @$daref, "${lv}_OperationHealth:"         .$live->{OperationHealth}.""          if(defined $live->{OperationHealth});
       push @$daref, "${lv}_Insolation:"              .$live->{Insolation}.""               if(defined $live->{Insolation});
       push @$daref, "${lv}_WindSpeed:"               .$live->{WindSpeed}.""                if(defined $live->{WindSpeed});
       push @$daref, "${lv}_EnvironmentTemperature:"  .$live->{EnvironmentTemperature}.""   if(defined $live->{EnvironmentTemperature});
+      
+      if($live->{OperationHealth}) {
+          my $o = "Ok: "     .$live->{OperationHealth}{Ok};
+          my $w = "Warning: ".$live->{OperationHealth}{Warning};
+          my $e = "Error: "  .$live->{OperationHealth}{Error};
+          my $u = "Unknown: ".$live->{OperationHealth}{Unknown};
+          push @$daref, "${lv}_OperationHealth: $o, $w, $e, $u";
+      }
       
       if($live->{ErrorMessages}[0]) {
           my @em;
