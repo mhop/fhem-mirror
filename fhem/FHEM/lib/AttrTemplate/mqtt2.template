@@ -451,7 +451,7 @@ attr DEVICE setList \
   on:noArg $\DEVICETOPIC/l1/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/l1/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/l1/set {"state":"TOGGLE"}
-attr DEVICE setStateList on off
+attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE_CH2 setList \
@@ -463,7 +463,7 @@ deletereading -q DEVICE_CH2 (?!associatedWith).*
 attr DEVICE_CH2 jsonMap state_l1:0 state_l2:state state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200904
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200929
 
 # zigbee2mqtt 2 channel device with buttons, forum #102866
 name:zigbee2mqtt_2channel_split_w_buttons

@@ -39,11 +39,12 @@ name:zwave_showcase_show_main_and_channel_devices_2
 filter:TYPE=ZWave
 desc:example template just to identify all main and channel devices for a 2-channel device like Fibaro FGs-223
 order:000003
-par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); return $parent ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : undef }
-#par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); $parent ne "0" ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : return undef; my @children = split(",", InternalVal("DEVICE","endpointChildren",0)); return if !$children[0]; $children[0]}
-#par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ my $parent = InternalVal("DEVICE","endpointParent",0); $parent = $parent ? $parent : InternalVal("DEVICE","endpointChildren",0) ? "DEVICE" : return undef; my @children = split(",", InternalVal("DEVICE","endpointChildren",0)); return if !$children[0]; $children[1]}
-show MAINCHANNEL
-#show MAINCHANNEL,CHANNEL01,CHANNEL02
+par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",0) }
+par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",1) }
+par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
+show MAINCHANNEL,CHANNEL01,CHANNEL02
+#{ fhem "trigger $FW_wname JS:location.href='$FW_ME?show=MAINCHANNEL,CHANNEL01,CHANNEL02'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
+#http://192.168.2.72:8083/fhem?room=%23devspec%3dZWave%5fSWITCH%5fMULTILEVEL%5f8%2cJalousie%5fWZ%2cZWave%5fSWITCH%5fMULTILEVEL%5f8%2e02&fw_id=15253
 
 name:----Fibaro-devices-section--------
 filter:TYPE=ZWave
@@ -58,6 +59,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
 attr DEVICE icon ICON
 deletereading -q DEVICE (?!associatedWith|model.*).*
+attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGRM222") }
 attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim:stop
 attr DEVICE cmdIcon stop:fts_shutter_manual
@@ -86,7 +88,7 @@ attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim:stop
 attr DEVICE cmdIcon stop:fts_shutter_manual
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
-attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_venetian_shutter($name,"FGRM222") }
+attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGRM222","venetian") }
 set DEVICE configRollerShutterOperatingModes 2VenetianBlindModeWith2
 set DEVICE configReportsType BlindPositionReportsSentToThe1
 set DEVICE configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
