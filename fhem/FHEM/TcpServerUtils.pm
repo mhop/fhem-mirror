@@ -214,18 +214,20 @@ TcpServer_Close($@)
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
     %ntfyHash = ();
-    if($dodel) {
-      delete $attr{$name};
-      delete $defs{$name};
-    } else {
-      $hash->{stacktrace} = stacktraceAsString(1);
-    }
   }
+
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});
     $name = $name . "." . $hash->{PORT};
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
+  }
+
+  if($dodel) {
+    delete $attr{$name};
+    delete $defs{$name};
+  } else {
+    $hash->{stacktrace} = stacktraceAsString(1);
   }
   return undef;
 }
