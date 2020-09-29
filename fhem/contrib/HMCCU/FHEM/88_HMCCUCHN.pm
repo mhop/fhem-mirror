@@ -224,9 +224,13 @@ sub HMCCUCHN_Attr ($@)
 			return 'Device is read only' if ($hash->{readonly} eq 'yes');
 		}
 		elsif ($attrname eq 'statedatapoint') {
+			return "Datapoint $attrval is not valid" if ($init_done &&
+				!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr}, $attrval, 1));
 			$hash->{hmccu}{state}{dpt} = $attrval;
 		}
 		elsif ($attrname eq 'controldatapoint') {
+			return "Datapoint $attrval is not valid" if ($init_done &&
+				!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr}, $attrval, 2));
 			$hash->{hmccu}{control}{dpt} = $attrval;
 		}
 	}

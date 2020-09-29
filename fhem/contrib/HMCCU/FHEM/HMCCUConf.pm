@@ -99,30 +99,32 @@ use vars qw(%HMCCU_SCRIPTS);
 # Add or rename readings
 # SC# = Placeholder for state channel
 # CC# = Placeholder for control channel
+# DEFAULT should not be used, if a HMCCUDEV device has multiple
+# channels with identical datapoints (i.e. LEVEL)
 ######################################################################
 
 %HMCCU_READINGS = (
 	'BLIND' =>
-		'(SC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
 	'BLIND_VIRTUAL_RECEIVER' =>
-		'(SC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
 	'DIMMER' =>
-		'(SC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
 	'DIMMER_VIRTUAL_RECEIVER' =>
-		'(SC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
 	'WEATHER_TRANSMIT' =>
 		'(SC#\.)?TEMPERATURE$:+measured-temp', 
 	'THERMALCONTROL_TRANSMIT' =>
 		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?SET_TEMPERATURE$:+desired-temp;'.
+		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
 		'(CC#\.)?SET_TEMPERATURE$:+desired-temp',
 	'CLIMATECONTROL_RT_TRANSCEIVER' =>
 		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?SET_TEMPERATURE$:+desired-temp;'.
+		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
 		'(CC#\.)?SET_TEMPERATURE$:+desired-temp',
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
 		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?SET_POINT_TEMPERATURE$:+desired-temp;'.
+		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
 		'(CC#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
 	'DEFAULT' =>
 		'([0-9]{1,2}\.)?LEVEL$:+pct;'.
@@ -209,12 +211,16 @@ use vars qw(%HMCCU_SCRIPTS);
 		'pct' => 'V:LEVEL:?level V:ON_TIME:?time=0.0 V:RAMP_TIME:?ramp=0.5',
 		'on' => 'V:LEVEL:100',
 		'off' => 'V:LEVEL:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?duration V:STATE:1',
 		'stop' => 'V:RAMP_STOP:1'
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
 		'pct' => 'V:LEVEL:?level V:ON_TIME:?time V:RAMP_TIME:?ramp',
 		'on' => 'V:LEVEL:100',
-		'off' => 'V:LEVEL:0'
+		'off' => 'V:LEVEL:0',
+		'on-for-timer' => 'V:ON_TIME:?duration V:STATE:1',
+		'on-till' => 'V:ON_TIME:?duration V:STATE:1'
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		'desired-temp' => 'V:SET_TEMPERATURE:?temperature',

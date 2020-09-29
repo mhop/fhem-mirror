@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.011
+#  Version 4.4.012
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.011';
+my $HMCCURPCPROC_VERSION = '4.4.012';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -66,7 +66,7 @@ my $HMCCURPCPROC_TIMEOUT_CONNECTION = 1;
 my $HMCCURPCPROC_TIMEOUT_WRITE = 0.001;
 
 # Timeout for reading from Socket
-my $HMCCURPCPROC_TIMEOUT_READ = 0.25;
+my $HMCCURPCPROC_TIMEOUT_READ = 0.005;
 
 # Timeout for accepting incoming connections in seconds (0 = default)
 my $HMCCURPCPROC_TIMEOUT_ACCEPT = 1;
@@ -510,7 +510,7 @@ sub HMCCURPCPROC_Attr ($@)
 	my $hash = $defs{$name};
 	
 	if ($cmd eq 'set') {
-		if (($attrname eq 'rpcAcceptTimeout' || $attrname eq 'rpcMaxEvents') && $attrval == 0) {
+		if ($attrname =~ /^(rpcAcceptTimeout|rpcReadTimeout|rpcWriteTimeout)$/ && $attrval == 0) {
 			return "HMCCURPCPROC: [$name] Value for attribute $attrname must be greater than 0";
 		}
 		elsif ($attrname eq 'rpcServerAddr') {
@@ -3218,7 +3218,7 @@ sub HMCCURPCPROC_DecodeResponse ($)
 	   	<b>rpcMaxEvents</b>. Default value is 500.
 	   </li><br/>
 		<li><b>rpcReadTimeout &lt;seconds&gt;</b><br/>
-			Wait the specified time for socket to become readable. Default value is 0.25 seconds.
+			Wait the specified time for socket to become readable. Default value is 0.005 seconds.
 		</li>
 	   <li><b>rpcServerAddr &lt;ip-address&gt;</b><br/>
 	   	Set local IP address of RPC servers on FHEM system. If attribute is missing the

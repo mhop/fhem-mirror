@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCU.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.048
+#  Version 4.4.050
 #
 #  Module for communication between FHEM and Homematic CCU2/3.
 #
@@ -55,9 +55,9 @@ my %HMCCU_CUST_CHN_DEFAULTS;
 my %HMCCU_CUST_DEV_DEFAULTS;
 
 # HMCCU version
-my $HMCCU_VERSION = '4.4.048';
+my $HMCCU_VERSION = '4.4.049';
 
-# Timeout for CCU requests
+# Timeout for CCU requests (seconds)
 my $HMCCU_TIMEOUT_REQUEST = 4;
 
 # ReGa Ports
@@ -385,7 +385,7 @@ sub HMCCU_Define ($$)
 {
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
-	my $usage = "Usage: define $name HMCCU {NameOrIP} [{ccunum}] [sync] ccudelay={time} waitforccu={time} delayedinit={time}";
+	my $usage = "Usage: define $name HMCCU {NameOrIP} [{ccunum}] [nosync] ccudelay={time} waitforccu={time} delayedinit={time}";
 
 	return $usage if (scalar(@$a) < 3);
 
@@ -403,7 +403,7 @@ sub HMCCU_Define ($$)
 	$hash->{hmccu}{ccu}{delay}   = $h->{ccudelay}   // $HMCCU_CCU_BOOT_DELAY;
 	$hash->{hmccu}{ccu}{timeout} = $h->{waitforccu} // $HMCCU_CCU_PING_TIMEOUT;
 	$hash->{hmccu}{ccu}{delayed} = 0;
-	$hash->{hmccu}{ccu}{sync}    = 0;
+	$hash->{hmccu}{ccu}{sync}    = 1;
 	
 	if (exists($h->{delayedinit}) && $h->{delayedinit} > 0) {
 		if (!$init_done) {
@@ -439,8 +439,8 @@ sub HMCCU_Define ($$)
 			return 'CCU number must be in range 1-9' if ($$a[$i] < 1 || $$a[$i] > 9);
 			$hash->{CCUNum} = $$a[$i];
 		}
-		elsif ($$a[$i] eq 'sync') {
-			$hash->{hmccu}{ccu}{sync} = 1;
+		elsif ($$a[$i] eq 'nosync') {
+			$hash->{hmccu}{ccu}{sync} = 0;
 		}
 		else {
 			return $usage;
@@ -512,12 +512,9 @@ sub HMCCU_InitDevice ($)
 		}
 	}
 
-# 	my $ifNum = HMCCU_GetInterfaceList ($hash);
-# 	if ($ifNum > 0) {
 	my ($devcnt, $chncnt, $ifcount, $prgcount, $gcount) = HMCCU_GetDeviceList ($hash);
 	if ($ifcount > 0) {
 		$attr{$name}{userattr} = 'rpcinterfaces:multiple-strict,'.$hash->{ccuinterfaces};
-# 		addToDevAttrList ($name, 'rpcinterfaces:multiple-strict,'.$hash->{ccuinterfaces});
 
 		HMCCU_Log ($hash, 1, [
 			"Read $devcnt devices with $chncnt channels from CCU $host",
@@ -530,7 +527,6 @@ sub HMCCU_InitDevice ($)
 			# Force sync with CCU during interactive device definition
 			if ($hash->{hmccu}{ccu}{sync} == 1) {
  				HMCCU_Log ($hash, 1, 'Reading device config from CCU. This may take a couple of seconds ...');
-# 				my ($devcnt, $chncnt, $ifcount, $prgcount, $gcount) = HMCCU_GetDeviceList ($hash);
 				my ($cDev, $cPar, $cLnk) = HMCCU_GetDeviceConfig ($hash);
 				HMCCU_Log ($hash, 2, "Read RPC device configuration: devices/channels=$cDev parametersets=$cPar links=$cLnk");
 			}
@@ -559,16 +555,9 @@ sub HMCCU_PostInit ($)
 		my $rpcServer = AttrVal ($hash->{NAME}, 'rpcserver', 'off');
 
 		HMCCU_Log ($hash, 1, 'Reading device config from CCU. This may take a couple of seconds ...');
-# 		my ($devcnt, $chncnt, $ifcount, $prgcount, $gcount) = HMCCU_GetDeviceList ($hash);
-# 		HMCCU_Log ($hash, 1, [
-# 			"Read $devcnt devices with $chncnt channels from CCU $host",
-# 			"Read $ifcount interfaces from CCU $host",
-# 			"Read $prgcount programs from CCU $host",
-# 			"Read $gcount virtual groups from CCU $host"
-# 		]);
 		my ($cDev, $cPar, $cLnk) = HMCCU_GetDeviceConfig ($hash);
 		HMCCU_Log ($hash, 2, "Read device configuration: devices/channels=$cDev parametersets=$cPar links=$cLnk");
-	
+		
 		HMCCU_StartExtRPCServer ($hash) if ($rpcServer eq 'on');
 	}
 	else {
@@ -1614,8 +1603,8 @@ sub HMCCU_Get ($@)
 	$opt = lc($opt);
 
 	my $options = "create defaults:noArg exportDefaults dutycycle:noArg vars update".
-		" updateCCU deviceDesc paramsetDesc firmware rpcEvents:noArg rpcState:noArg deviceInfo".
-		" ccuMsg:alarm,service ccuConfig:noArg";
+		" updateCCU paramsetDesc firmware rpcEvents:noArg rpcState:noArg deviceInfo".
+		" ccuMsg:alarm,service ccuConfig:noArg ccuDevices:noArg";
 
 	my $usage = "HMCCU: Unknown argument $opt, choose one of $options";
 
@@ -1648,10 +1637,29 @@ sub HMCCU_Get ($@)
 		HMCCU_UpdateClients ($hash, $devexp, $ccuget, ($opt eq 'updateccu') ? 1 : 0);
 		return HMCCU_SetState ($hash, 'OK');
 	}
+	elsif ($opt eq 'ccudevices') {
+		my $devTable = '<html><table border="1">'.
+			'<tr><th>Name</th><th>Model</th><th>Interface</th><th>Address</th><th>Channels</th></tr>';
+		foreach my $di (sort keys %{$hash->{hmccu}{device}}) {
+			foreach my $da (sort keys %{$hash->{hmccu}{device}{$di}}) {
+				next if ($hash->{hmccu}{device}{$di}{$da}{_addtype} ne 'dev');
+				my $chn = exists($hash->{hmccu}{dev}{$da}) ? $hash->{hmccu}{dev}{$da}{channels} : '?';
+				$devTable .= "<tr>".
+					"<td>$hash->{hmccu}{device}{$di}{$da}{_name}</td>".
+					"<td>$hash->{hmccu}{device}{$di}{$da}{_model}</td>".
+					"<td>$di</td><td>$da</td><td>$chn</td>".
+					"</tr>\n";
+			}
+		}
+		$devTable .= '</table></html>';
+		return $devTable;
+	}
 	elsif ($opt eq 'deviceinfo') {
 		my $device = shift @$a // return HMCCU_SetError ($hash, "Usage: get $name $opt {device}");
-		return HMCCU_SetError ($hash, -1) if (!HMCCU_IsValidDeviceOrChannel ($hash, $device, $HMCCU_FL_ALL));
-		return HMCCU_ExecuteGetDeviceInfoCommand ($hash, $hash, $device);
+		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hash, $device,
+			$HMCCU_FLAG_FULLADDR);
+		return HMCCU_SetError ($hash, -1) if (!($flags & $HMCCU_FLAG_ADDRESS));
+		return HMCCU_ExecuteGetDeviceInfoCommand ($hash, $hash, $add);
 	}
 	elsif ($opt eq 'rpcevents') {
 		$result = '';
@@ -1832,16 +1840,6 @@ sub HMCCU_Get ($@)
 		}
 
 		return HMCCU_SetState ($hash, 'OK', $ccureadings ? undef : $result);
-	}
-	elsif ($opt eq 'devicedesc') {
-		$usage = "Usage: get $name $opt {device|channel}";
-		my $ccuobj = shift @$a // return HMCCU_SetError ($hash, $usage);
-		my ($int, $add, $chn, $dpt, $nam, $flags) = HMCCU_ParseObject ($hash, $ccuobj,
-			$HMCCU_FLAG_FULLADDR);
-		return HMCCU_SetError ($hash, 'Invalid device or address')
-			if (!($flags & $HMCCU_FLAG_ADDRESS));
-		$result = HMCCU_DeviceDescToStr ($hash, $add);
-		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device description");
 	}
 	elsif ($opt eq 'paramsetdesc') {
 		$usage = "Usage: get $name $opt {device|channel}";
@@ -2187,26 +2185,27 @@ sub HMCCU_GetReadingName ($$$$$$$;$)
 	my @rnlist;
 
 	$rf //= HMCCU_GetAttrReadingFormat ($hash, $ioHash);
-	my $role = HMCCU_GetChannelRole ($hash, $c);
-	my $sr = $role eq '' ? $HMCCU_READINGS->{DEFAULT} : $HMCCU_READINGS->{$role};
-	$sr =~ s/SC#\./$hash->{hmccu}{state}{chn}\./g if (exists($hash->{hmccu}{state}{chn}));
-	$sr =~ s/CC#\./$hash->{hmccu}{control}{chn}\./g if (exists($hash->{hmccu}{control}{chn}));
-	
-# 	my $sr = '([0-9]{1,2}\.)?LEVEL$:+pct;'.
-# 		'([0-9]{1,2}\.)?SET_TEMPERATURE$:+desired-temp;'.
-# 		'([0-9]{1,2}\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-# 		'([0-9]{1,2}\.)?SET_POINT_TEMPERATURE$:+desired-temp;'.
-# 		'([0-9]{1,2}\.)?ACTUAL_HUMIDITY$:+humidity';
-# 	if (exists($hash->{hmccu}{control}{chn}) && $hash->{hmccu}{control}{chn} ne '' &&
-# 		exists($hash->{hmccu}{control}{dpt}) && $hash->{hmccu}{control}{dpt} eq $d) {
-# 		$sr =~ s/\(\[0-9\]\{1,2\}\\\.\)\?$d/\($hash->{hmccu}{control}{chn}\\\.\)\?$d/g;
-# 	}
-# 	elsif (exists($hash->{hmccu}{state}{chn}) && $hash->{hmccu}{state}{chn} ne '' &&
-# 		exists($hash->{hmccu}{state}{dpt}) && $hash->{hmccu}{state}{dpt} eq $d) {
-# 		$sr =~ s/\(\[0-9\]\{1,2\}\\\.\)\?$d/\($hash->{hmccu}{state}{chn}\\\.\)\?$d/g;
-# 	}
-	my $asr = AttrVal ($name, 'ccureadingname', '');
-	$sr .= ';'.$asr if ($asr ne '');
+
+	my @srl = ();
+	my $crn = AttrVal ($name, 'ccureadingname', '');
+	push @srl, $crn if ($crn ne '');
+	if (exists($hash->{hmccu}{control}{chn}) && "$c" eq $hash->{hmccu}{control}{chn}) {
+		my $role = HMCCU_GetChannelRole ($hash, $c);
+		if ($role ne '' && exists($HMCCU_READINGS->{$role})) {
+			$crn = $HMCCU_READINGS->{$role};
+			$crn =~ s/CC#\./$c\./g;
+			push @srl, $crn;
+		}
+	}
+	if (exists($hash->{hmccu}{state}{chn}) && "$c" eq $hash->{hmccu}{state}{chn}) {
+		my $role = HMCCU_GetChannelRole ($hash, $c);
+		if ($role ne '' && exists($HMCCU_READINGS->{$role})) {
+			$crn = $HMCCU_READINGS->{$role};
+			$crn =~ s/SC#\./$c\./g;
+			push @srl, $crn;
+		}
+	}
+	my $sr = join (';', @srl);
 	
 	HMCCU_Trace ($hash, 2, "sr=$sr");
 	
@@ -3372,8 +3371,8 @@ sub HMCCU_GetChannelRole ($;$)
 
 sub HMCCU_GetDeviceConfig ($)
 {
-	my ($ioHash) = @_;
-	 
+	my ($ioHash, $ifaceExpr) = @_;
+	
 	my ($cDev, $cPar, $cLnk) = (0, 0, 0);
 	my $c = 0;
 	
@@ -3401,7 +3400,7 @@ sub HMCCU_GetDeviceConfig ($)
 	}
 
 	# Get defined FHEM devices	
-	my @devList = HMCCU_FindClientDevices ($ioHash, "(HMCCUDEV|HMCCUCHN)");
+	my @devList = HMCCU_FindClientDevices ($ioHash, '(HMCCUDEV|HMCCUCHN)');
 	foreach my $d (@devList) {
 		my $clHash = $defs{$d};
 		if (exists($clHash->{ccuaddr}) && exists($clHash->{ccuif})) {
@@ -5255,10 +5254,10 @@ sub HMCCU_GetDatapointList ($;$$)
 		my $dcdp = "$devc.$dptn";
 		$devt = "CUX-".$devt if ($iface eq 'CUxD');
 		$devt = "HVL-".$devt if ($iface eq 'HVL');
-		$hash->{hmccu}{dp}{$devt}{spc}{ontime}   = $dcdp if ($dptn eq 'ON_TIME');
-		$hash->{hmccu}{dp}{$devt}{spc}{ramptime} = $dcdp if ($dptn eq 'RAMP_TIME');
-		$hash->{hmccu}{dp}{$devt}{spc}{submit}   = $dcdp if ($dptn eq 'SUBMIT');
-		$hash->{hmccu}{dp}{$devt}{spc}{level}    = $dcdp if ($dptn eq 'LEVEL');		
+# 		$hash->{hmccu}{dp}{$devt}{spc}{ontime}   = $dcdp if ($dptn eq 'ON_TIME');
+# 		$hash->{hmccu}{dp}{$devt}{spc}{ramptime} = $dcdp if ($dptn eq 'RAMP_TIME');
+# 		$hash->{hmccu}{dp}{$devt}{spc}{submit}   = $dcdp if ($dptn eq 'SUBMIT');
+# 		$hash->{hmccu}{dp}{$devt}{spc}{level}    = $dcdp if ($dptn eq 'LEVEL');		
 		$hash->{hmccu}{dp}{$devt}{ch}{$devc}{$dptn}{type} = $dptt;
 		$hash->{hmccu}{dp}{$devt}{ch}{$devc}{$dptn}{oper} = $dpto;
 		if (exists($hash->{hmccu}{dp}{$devt}{cnt}{$dptn})) {
@@ -8707,15 +8706,17 @@ sub HMCCU_MaxHashEntries ($$)
    <a name="HMCCUdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
-      <code>define &lt;name&gt; HMCCU [&lt;Protocol&gt;://]&lt;HostOrIP&gt; [&lt;ccu-number&gt;] [sync]
+      <code>define &lt;name&gt; HMCCU [&lt;Protocol&gt;://]&lt;HostOrIP&gt; [&lt;ccu-number&gt;] [nosync]
       [waitforccu=&lt;timeout&gt;] [ccudelay=&lt;delay&gt;] [delayedinit=&lt;delay&gt;]</code>
       <br/><br/>
       Example:<br/>
       <code>define myccu HMCCU https://192.168.1.10 sync ccudelay=180</code>
       <br/><br/>
-      The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU2 or CCU3. Optionally
+      The parameter <i>HostOrIP</i> is the hostname or IP address of a Homematic CCU. Optionally
       the <i>protocol</i> 'http' or 'https' can be specified. Default protocol is 'http'.<br/>
       If you have more than one CCU you can specifiy a unique CCU number with parameter <i>ccu-number</i>.
+      The option<i>nosync</i> prevents reading CCU config during interactive device definition. This
+      option is ignored during FHEM start.<br/>
       With option <i>waitforccu</i> HMCCU will wait for the specified time if CCU is not reachable.
       Parameter <i>timeout</i> should be a multiple of 20 in seconds. Warning: This option will 
       block the start of FHEM for <i>timeout</i> seconds.<br/>
@@ -8735,11 +8736,6 @@ sub HMCCU_MaxHashEntries ($$)
       </ul><br/>
       Then start with the definition of client devices using modules HMCCUDEV (CCU devices)
       and HMCCUCHN (CCU channels) or with command 'get devicelist create'.<br/>
-      Maybe it's helpful to set the following FHEM standard attributes for the HMCCU I/O
-      device:<br/><br/>
-      <ul>
-      <li>Shortcut for RPC server control: eventMap /rpcserver on:on/rpcserver off:off/</li>
-      </ul>
    </ul>
    <br/>
    
@@ -8821,14 +8817,17 @@ sub HMCCU_MaxHashEntries ($$)
       <li><b>get &lt;name&gt; aggregation {&lt;rule&gt;|all}</b><br/>
       	Process aggregation rule defined with attribute ccuaggregate.
       </li><br/>
-      <li><b>get &lt;name&gt; ccuconfig</b><br/>
+      <li><b>get &lt;name&gt; ccuConfig</b><br/>
          Read configuration of CCU (devices, channels, programs). This command is executed automatically
          after the definition of an I/O device. It must be executed manually after
          module HMCCU is reloaded or after devices have changed in CCU (added, removed or
-         renamed). 
+         renamed).<br/>
          If a RPC server is running HMCCU will raise events "<i>count</i> devices added in CCU" or
          "<i>count</i> devices deleted in CCU". It's recommended to set up a notification
          which reacts with execution of command 'get devicelist' on these events.
+      </li><br/>
+      <li><b>get &lt;name&gt; ccuDevices</b><br/>
+      	Show table of CCU devices.
       </li><br/>
       <li><b>get &lt;name&gt; ccumsg {service|alarm}</b><br/>
       	Query active service or alarm messages from CCU. Generate FHEM event for each message.
@@ -8836,11 +8835,8 @@ sub HMCCU_MaxHashEntries ($$)
       <li><b>get &lt;name&gt; defaults</b><br/>
       	List device types and channels with default attributes available.
       </li><br/>
-      <li><b>get &lt;name&gt; deviceDesc {&lt;device&gt;|&lt;channel&gt;}</b><br/>
-         Get description of CCU device or channel.
-      </li><br/>
-      <li><b>get &lt;name&gt; deviceinfo &lt;device-name&gt;</b><br/>
-         List device channels and datapoints. 
+      <li><b>get &lt;name&gt; deviceinfo &lt;device-name-or-address&gt;</b><br/>
+         List device channels, datapoints and the device description. 
       </li><br/>
       <li><b>get &lt;name&gt; create &lt;devexp&gt; [t={chn|<u>dev</u>|all}]
       	[p=&lt;prefix&gt;] [s=&lt;suffix&gt;] [f=&lt;format&gt;] [defattr]  
