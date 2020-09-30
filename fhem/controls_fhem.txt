@@ -1,4 +1,4 @@
-REV 22881
+REV 22889
 DIR unused
 UPD 2020-09-28_07:45:03 351019 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
@@ -497,7 +497,7 @@ UPD 2020-06-22_07:45:03 25785 FHEM/98_ModbusTrovis5576.pm
 UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
-UPD 2020-09-26_07:45:02 34221 FHEM/98_RandomTimer.pm
+UPD 2020-09-30_07:45:02 34183 FHEM/98_RandomTimer.pm
 UPD 2020-09-01_07:45:03 95845 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
@@ -584,7 +584,7 @@ UPD 2015-07-28_14:05:31 11758 FHEM/SHC_parser.pm
 UPD 2019-04-18_07:45:03 6435 FHEM/SetExtensions.pm
 UPD 2017-05-21_07:45:02 7416 FHEM/SubProcess.pm
 UPD 2017-11-16_07:45:02 3372 FHEM/TR064Utils.pm
-UPD 2020-09-29_07:45:02 9368 FHEM/TcpServerUtils.pm
+UPD 2020-09-30_07:45:02 9358 FHEM/TcpServerUtils.pm
 UPD 2016-02-22_07:45:12 27613 FHEM/TimeSeries.pm
 UPD 2020-02-10_07:45:02 59907 FHEM/UConv.pm
 UPD 2019-06-14_07:45:02 140767 FHEM/Unit.pm
@@ -637,10 +637,10 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-09-27_07:45:02 270105 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-09-30_07:45:02 270112 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
-UPD 2020-09-26_07:45:02 8158 FHEM/lib/AttrTemplate/zwave.template
+UPD 2020-09-30_07:45:02 8028 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -739,8 +739,8 @@ UPD 2020-09-29_07:45:06 4378175 docs/commandref.html
 UPD 2020-09-28_07:45:10 2719781 docs/commandref_DE.html
 UPD 2020-09-24_07:45:02 80860 docs/commandref_frame.html
 UPD 2020-09-24_07:45:02 90475 docs/commandref_frame_DE.html
-UPD 2020-09-29_07:45:10 234683 docs/commandref_modular.html
-UPD 2020-09-29_07:45:12 245403 docs/commandref_modular_DE.html
+UPD 2020-09-30_07:45:10 234683 docs/commandref_modular.html
+UPD 2020-09-30_07:45:11 245403 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
