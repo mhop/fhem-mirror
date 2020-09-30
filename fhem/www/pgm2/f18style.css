@@ -290,3 +290,5 @@ body.commandref div#menu { top:15px; left:40px; }
 body.commandref div#menu a { margin-left:20px; }
 body.commandref div#menu br { display:none; }
 body.commandref div#menu h3 { display:none; }
+
+.SVGplot { position:relative;} 

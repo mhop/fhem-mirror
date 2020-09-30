@@ -355,12 +355,7 @@ sv_menu(evt, embed)
     }
 
     $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
-    var yd = Math.floor(yRaw / 20)*20;
-
-    if(embed)
-      yd += embedOffsetY-90;
-    else 
-      yd += $(svg).offset().top-90;
+    var yd = Math.floor(yRaw / 20)*20 - 50;
 
     $(par.div).html(ts+" "+y)
               .css({ left:xRaw-20, top:yd });
