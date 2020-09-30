@@ -138,7 +138,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "3.5.0"  => "29.09.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
-                           "extract OperationHealth key ",
+                           "extract OperationHealth key, new attr cookieDelete ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
   "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
                            "set getData command, update button in header of PortalAsHtml, minor code changes according PBP",
@@ -215,8 +215,8 @@ my %vNotesIntern = (
 # Voreinstellungen
 my $maxretries   = 6;                      # max. Anzahl Wiederholungen in einem Abruf-Zyklus
 my $thold        = int($maxretries/2);     # Schwellenwert nicht erfolgreicher Leseversuche in einem Zyklus mit dem gleichen Cookie, Standard: int($maxretries/2)
-my $sleepretry   = 60;                     # Sleep zwischen Data Call Retries (ohne Threshold Überschreitung)
-my $sleepexc     = 90;                     # Sleep vor neuem Datencall nach Überschreitung Threshold (neues Cookie wird angelegt)
+my $sleepretry   = 60;                     # Sleep zwischen Data Call Retries
+my $sleepexc     = 90;                     # Sleep vor neuem Cycle
 my $defmaxcycles = 10;                     # Standard max. Anzahl Datenabrufzyklen
 
 my %statkeys = (                           # Statistikdaten auszulesende Schlüssel
@@ -302,6 +302,7 @@ sub Initialize {
                            "balanceMonth ".
                            "balanceYear ".
                            "cookieLocation ".
+                           "cookieDelete:auto,afterRun,afterCycle,afterAttempt ".
                            "disable:0,1 ".
                            "interval ".
                            "noHomeManager:1,0 ".
@@ -748,9 +749,8 @@ return;
 #               Hauptschleife BlockingCall
 #   $hash->{HELPER}{GETTER} -> Flag für get Informationen
 #   $hash->{HELPER}{SETTER} -> Parameter für set-Befehl
-#   $nc = 1 wenn Cycle Zähler nicht zurückgesetzt werden soll
-#   $nr = 1 wenn Retry Zähler nicht zurückgesetzt werden soll
-#
+#   $nc = 1 weiterer Cycle (Cycle Zähler nicht zurücksetzten)
+#   $nr = 1 weiterer Retry (Zähler nicht zurücksetzten)
 ################################################################
 sub CallInfo {                         ## no critic 'complexity'
   my ($hash,$nc,$nr) = @_;
@@ -822,11 +822,19 @@ sub CallInfo {                         ## no critic 'complexity'
           }
       }
       
-      if(!$nc) {
+      if(!$nc) {                                                               # kein weiterer Cycle, d.h. erster Cycle
           $hash->{HELPER}{ACTCYCLE}   = 1;
           $hash->{HELPER}{CYCLEBTIME} = (gettimeofday())[0];
       }
-      $hash->{HELPER}{RETRIES} = 1 if(!$nr);
+      else {                                                                   # es ist ein weiterer Cycle
+          if(AttrVal($name, "cookieDelete", "auto") eq "afterCycle") {
+              delcookiefile ($hash);
+          }
+      }
+      
+      if(!$nr) {                                                               # es ist keine weiterer Attempt, d.h. erster Attempt                                                              
+          $hash->{HELPER}{RETRIES} = 1;
+      }
       
       my $ac = $hash->{HELPER}{ACTCYCLE};
       
@@ -1010,15 +1018,23 @@ sub GetSetData {                       ## no critic 'complexity'
           
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
-              if($retc == $thold) {                                                                # Schwellenwert Leseversuche erreicht -> Cookie File löschen
-                  Log3 ($name, 3, qq{$name - Threshold reached, delete cookie and retry in $sleepretry seconds ...}); 
-                  sleep $sleepexc;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
+              my $cd = AttrVal($name, "cookieDelete", "auto");
+			  
+			  if($retc == $thold || $cd eq "afterAttempt") {                                       # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+                  my $msg = qq{$name - Threshold reached, delete cookie file before retry...};
+				  
+				  if($cd eq "afterAttempt") {
+				      $msg = qq{$name - force delete cookie file before retry...};
+				  }
+				  
+				  Log3 ($name, 3, $msg); 
+                  sleep $sleepretry;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
                   return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
               }
               
-              sleep $sleepretry;                                                     
+			  sleep $sleepretry;                                                     
               goto &GetSetData;
           }  
 
@@ -1031,13 +1047,20 @@ sub GetSetData {                       ## no critic 'complexity'
               return "$name|$exceed|$newcycle|$errstate|$getp|$setp";          
           }    
       }
+      
+      if(!@da) {
+          $state = "Warning - empty data received, values not current";
+          if(AttrVal("global","language","EN") eq "DE") {
+             $state = "Warnung - leere Daten empfangen, Werte nicht aktuell";
+          }
+      }
   }
 
   # Daten müssen als Einzeiler zurückgegeben werden
-  $st  = encode_base64 ( $state, "");
+  $st  = encode_base64 ($state, "");
   if(@da) {
       $lc = join "###", @da;
-      $lc = encode_base64 ( $lc, ""); 
+      $lc = encode_base64 ($lc, ""); 
       Log3 ($name, 3, "$name - data retrieved successfully.");
   }
 
@@ -2032,13 +2055,13 @@ sub ParseData {                                                    ## no critic 
   my $name   = $hash->{NAME};
   my @da     = ();
   
-  my ($errstate,$newcycle,$getp,$setp,$state,$exceed,$lc);
+  my $lc;
   
-  $exceed      = $a[1];
-  $newcycle    = $a[2];
-  $errstate    = $a[3];
-  $getp        = $a[4];
-  $setp        = $a[5];  
+  my $exceed    = $a[1];
+  my $newcycle  = $a[2];
+  my $errstate  = $a[3];
+  my $getp      = $a[4];
+  my $setp      = $a[5];  
   
   my $ac        = $hash->{HELPER}{ACTCYCLE};
   my $maxcycles = (controlParams $name)[1];
@@ -2068,7 +2091,7 @@ sub ParseData {                                                    ## no critic 
   my $cycles = $hash->{HELPER}{ACTCYCLE};
   my $ctime  = int(($etime - $btime) / $cycles);               # durchschnittliche Laufzeit für einen Zyklus
   
-  $state = decode_base64($a[6]);
+  my $state  = decode_base64($a[6]);
   
   if($a[7]) {
       $lc = decode_base64($a[7]);
@@ -2146,13 +2169,16 @@ return;
 ################################################################
 sub finalCleanup {
   my $hash = shift;
-
+  my $name = $hash->{NAME};
+  
   delete($hash->{HELPER}{RUNNING_PID});
   
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
   
-  #delcookiefile ($hash);
+  if(AttrVal($name, "cookieDelete", "auto") eq "afterRun") {
+    delcookiefile ($hash);
+  }
   
 return;
 }
@@ -2936,7 +2962,10 @@ sub deleteData {
       }
       
       for my $prl (keys %{$subs{$name}}) {                                     # Provider die abgerufen wurden
-          my $lvl  = $subs{$name}{$prl}{level} if($subs{$name}{$prl}{doit});   # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
+          my $lvl;
+          if($subs{$name}{$prl}{doit}) {
+              $lvl = $subs{$name}{$prl}{level};                                # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
+          }
           if ($lvl) {
               $pbl .= "|^".$lvl."_";
           }
@@ -4397,6 +4426,24 @@ return;
          attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
         </ul> 
        </li><br>
+       
+       <a name="cookieDelete"></a>
+       <li><b>cookieDelete </b><br>
+       Legt die Methode der Cookie Verwaltung (Löschung) fest. <br>
+       (default: auto)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>auto</b>          </td><td>- Cookie Files werden nach einem internen Verfahren verwaltet                   </td></tr>
+          <tr><td> <b>afterAttempt</b>  </td><td>- Cookie Files werden nach jedem einzelnen Leseversuch gelöscht                 </td></tr>
+          <tr><td> <b>afterCycle</b>    </td><td>- Cookie Files werden nach jedem Lesezyklus gelöscht (umfasst mehrere Versuche) </td></tr>
+          <tr><td> <b>afterRun</b>      </td><td>- Cookie Files werden nach jedem Durchlauf eines Datenabrufs gelöscht           </td></tr>
+       </table>
+       </ul> 
+       
+       </li><br> 
        
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
