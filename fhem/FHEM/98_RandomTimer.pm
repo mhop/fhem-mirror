@@ -82,20 +82,18 @@ sub Initialize {
     $hash->{AttrList} = "onCmd offCmd switchmode disable:0,1 disableCond disableCondCmd:none,offCmd,onCmd offState "
       . "runonce:0,1 keepDeviceAlive:0,1 forceStoptimeSameDay:0,1 disabledForIntervals "
       . $readingFnAttributes;
-    $hash->{parseParams} = 1;
     return;
 }
 
 # regular Functions ##################################################################
 sub Define {
     my $hash = shift;
-    my $arr  = shift;
-    my $href = shift // return if !defined $arr;
+    my $def = shift // return;
 
     RemoveInternalTimer($hash);
     my ( $name, $type, $timespec_start, $device, $timespec_stop, $timeToSwitch,
         $variation )
-      = @$arr;
+      = split m{\s+}xms, $def;
 
     return "wrong syntax: define <name> RandomTimer <timespec_start> <device> <timespec_stop> <timeToSwitch> [<variations>]"
       if ( !defined $timeToSwitch );
@@ -172,7 +170,8 @@ sub Define {
 
 sub Undef {
 
-    my ( $hash, $arg ) = @_;
+    my $hash = shift;
+    my $arg  = shift // return;
 
     RmInternalTimer( "RT_SetTimer", $hash );
     RmInternalTimer( "RT_Exec",     $hash );
@@ -213,14 +212,14 @@ sub Attr {
 }
 
 sub Set {
-    my ( $hash, $arr, $h ) = @_;
+    my ( $hash, @arr ) = @_;
 
-    return "no set value specified" if ( int(@$arr) < 2 );
-    return "Unknown argument @$arr[1], choose one of execNow:noArg active:noArg inactive:noArg"
-      if ( @$arr[1] eq "?" );
+    return "no set value specified" if ( int(@arr) < 2 );
+    return "Unknown argument $arr[1], choose one of execNow:noArg active:noArg inactive:noArg"
+      if ( $arr[1] eq "?" );
 
-    my $name = shift @$arr;
-    my $v = join( " ", @$arr );
+    my $name = shift @arr;
+    my $v = join( " ", @arr );
 
     if ( $v eq "execNow" ) {
         Log3( $hash, 3, "[$name] set $name $v" );
