@@ -31,6 +31,7 @@ use strict;
 use warnings;
 use utf8;
 use MIME::Base64;
+use Time::HiRes qw(gettimeofday);
 eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no critic 'eval'
 use Data::Dumper;
 
@@ -40,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.11.1');
+use version; our $VERSION = version->declare('1.13.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -51,6 +52,7 @@ our @EXPORT_OK = qw(
                      sortVersion
                      showModuleInfo
                      jboolmap
+                     plotPngToFile
                      completeAPI
                      showAPIinfo
                      setCredentials
@@ -65,6 +67,8 @@ our @EXPORT_OK = qw(
 					 setReadingErrorState
                      addSendqueueEntry
                      listSendqueue
+                     startFunctionDelayed
+                     checkSendRetry
                      purgeSendqueue
                      updQueueLength
                    );
@@ -76,6 +80,7 @@ BEGIN {
   # Import from main::
   GP_Import( 
       qw(
+          attr
           AttrVal
           asyncOutput
           Log3
@@ -87,6 +92,10 @@ BEGIN {
           FmtDateTime
           setKeyValue
           getKeyValue
+          InternalTimer
+          plotAsPng
+          RemoveInternalTimer
+          ReadingsVal
           readingsSingleUpdate
           readingsBeginUpdate
           readingsBulkUpdate
@@ -98,10 +107,11 @@ BEGIN {
 };
 
 # Standardvariablen
-my $carpnohash = "got no hash value";
-my $carpnoname = "got no name value";
-my $carpnoctyp = "got no credentials type";
-my $carpnoapir = "got no API Hash reference";
+my $carpnohash  = "got no hash value";
+my $carpnoname  = "got no name value";
+my $carpnoctyp  = "got no credentials type";
+my $carpnoapir  = "got no API Hash reference";
+my $carpnotfarg = "got no Timer function argument";
 
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
@@ -364,6 +374,44 @@ sub jboolmap {
 return $bool;
 }
 
+####################################################################################
+#       Ausgabe der SVG-Funktion "plotAsPng" in eine Datei schreiben
+#       Die Datei wird im Verzeichnis "/opt/fhem/www/images" erstellt
+####################################################################################
+sub plotPngToFile {
+    my $name   = shift;
+    my $svg    = shift;
+    my $hash   = $defs{$name};
+    my $file   = $name."_SendPlot.png";
+    my $path   = $attr{global}{modpath}."/www/images";
+    my $err    = "";
+    
+    my @options = split ",", $svg;
+    my $svgdev  = $options[0];
+    my $zoom    = $options[1];
+    my $offset  = $options[2];
+    
+    if(!$defs{$svgdev}) {
+        $err = qq{SVG device "$svgdev" doesn't exist};
+        Log3($name, 1, "$name - ERROR - $err !");
+        
+        setReadingErrorState ($hash, $err);
+        return $err;
+    }
+    
+    open (my $FILE, ">", "$path/$file") or do {
+                                                $err = qq{>PlotToFile< can't open $path/$file for write access};
+                                                Log3($name, 1, "$name - ERROR - $err !");
+                                                setReadingErrorState ($hash, $err);
+                                                return $err;
+                                              };
+    binmode $FILE;
+    print   $FILE plotAsPng(@options);
+    close   $FILE;
+
+return ($err, $file);
+}
+
 ###############################################################################
 #      vervollständige das übergebene API-Hash mit den Werten aus $data der 
 #      JSON-Antwort 
@@ -400,10 +448,10 @@ sub showAPIinfo {
   my $out  = "<html>";
   $out    .= "<b>Synology $type API Info</b> <br><br>";
   $out    .= "<table class=\"roomoverview\" style=\"text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;\">";
-  $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Changed</b> </td></tr>";
+  $out    .= "<tr><td> <b>API</b> </td><td> <b>Path</b> </td><td> <b>Version</b> </td><td> <b>Modified</b> </td></tr>";
   $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td> </td></tr>";
 
-  for my $key (sort keys %{$hash->{HELPER}{API}}) {
+  for my $key (sort keys %{$apiref}) {
       next if($key =~ /^PARSET$/x);
       my $apiname = $apiref->{$key}{NAME};
       my $apipath = $apiref->{$key}{PATH};
@@ -952,6 +1000,101 @@ sub listSendqueue {
   }
       
 return $sq;
+}
+
+#############################################################################################
+#     Funktion Zeitplan löschen und neu planen
+#     $rst     = restart Timer
+#     $startfn = Funktion deren Timer gelöscht und  neu gestartet werdene soll 
+#     $arg     = Argument für die Timer Funktion
+#############################################################################################
+sub startFunctionDelayed {                   
+  my $name    = shift // carp $carpnoname                      && return;
+  my $rst     = shift // carp "got no restart Timer value"     && return;
+  my $startfn = shift // carp $carpnotfarg                     && return;
+  my $arg     = shift // carp "got no Timer function argument" && return;
+
+  RemoveInternalTimer ($arg, $startfn);
+  InternalTimer       ($rst,  $startfn, $arg, 0);   
+                    
+return;
+}
+
+#############################################################################################
+#      Erfolg der Abarbeitung eines Queueeintrags checken und ggf. Retry ausführen
+#      bzw. den SendQueue-Eintrag bei Erfolg löschen
+#      $name       =   Name des Chatbot-Devices
+#      $retry      =   0 -> Opmode erfolgreich (DS löschen), 
+#                      1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
+#                           eventuell verzögert wiederholen)
+#      $startfnref = Referenz zur Funktion die nach Check ggf. gestartet werden soll
+#############################################################################################
+sub checkSendRetry {  
+  my $name       = shift // carp $carpnoname        && return;
+  my $retry      = shift // carp "got opmode state" && return;
+  my $startfn    = shift // carp $carpnotfarg       && return;
+  my $hash       = $defs{$name};  
+  my $idx        = $hash->{OPIDX};
+  my $type       = $hash->{TYPE};
+  
+  my $forbidSend = "";
+  my $startfnref = \&{$startfn};
+  
+  if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+      Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
+      updQueueLength ($hash);
+      return;  
+  } 
+  
+  if(!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
+      delete $hash->{OPIDX};
+      delete $data{$type}{$name}{sendqueue}{entries}{$idx};
+      Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
+      updQueueLength ($hash);
+      
+      if(keys %{$data{$type}{$name}{sendqueue}{entries}}) {
+          Log3($name, 4, "$name - Start next SendQueue entry..."); 
+          return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer)
+      }  
+  } 
+  else {                                                                                  # Befehl nicht erfolgreich, (verzögertes) Senden einplanen
+      $data{$type}{$name}{sendqueue}{entries}{$idx}{retryCount}++;
+      my $rc = $data{$type}{$name}{sendqueue}{entries}{$idx}{retryCount};
+  
+      my $errorcode = ReadingsVal($name, "Errorcode", 0);
+      if($errorcode =~ /100|101|117|120|407|409|410|800/x) {                              # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+          $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
+          $data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
+          
+          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
+          
+          delete $hash->{OPIDX};
+          delete $hash->{OPMODE};
+          
+          updQueueLength ($hash);                                                         # updaten Länge der Sendequeue
+          
+          return &$startfnref ($name);                                                    # nächsten Eintrag abarbeiten (wenn SendQueue nicht leer);
+      }
+      
+      if(!$forbidSend) {
+          my $rs = 0;
+          $rs = $rc <= 1 ? 5 
+              : $rc <  3 ? 20
+              : $rc <  5 ? 60
+              : $rc <  7 ? 1800
+              : $rc < 30 ? 3600
+              : 86400
+              ;
+          
+          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
+          
+          my $rst = gettimeofday()+$rs;                                                  # resend Timer 
+          updQueueLength       ($hash,$rst);                                             # updaten Länge der Sendequeue mit resend Timer
+          startFunctionDelayed ($name, $rst, $startfn, $name);
+      }
+  }
+
+return
 }
 
 #############################################################################################
