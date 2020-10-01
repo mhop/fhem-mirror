@@ -2262,6 +2262,7 @@ CommandDelete($$)
       next;
     }
     delete $defs{$sdev}->{CL};
+    removeFromNtfyHash($sdev);
 
 
     # Delete releated hashes
@@ -2391,7 +2392,6 @@ CommandDeleteReading($$)
   eval { "" =~ m/$a[1]/ };
   return "Bad regexp $a[1]: $@" if($@);
 
-  %ntfyHash = ();
   my @rets;
   foreach my $sdev (devspec2array($a[0],$cl)) {
 
@@ -5399,6 +5399,22 @@ addToWritebuffer($$@)
   return 1; # success
 }
 
+# Faster than createNtfyHash
+sub
+removeFromNtfyHash($)
+{
+  my ($toDel) = @_;
+  return if(!$defs{$toDel} ||
+            !$defs{$toDel}{TYPE} ||
+            !$modules{$defs{$toDel}{TYPE}}{NotifyFn});
+  foreach my $d ( keys %ntfyHash) {
+    my @a = grep { $_ !~ m/^$toDel$/ } @{$ntfyHash{$d}};
+    $ntfyHash{$d} = \@a;
+  }
+}
+
+
+# Note: always executed after ntfyHash = (); slow for large installations!
 sub
 createNtfyHash()
 {
@@ -5488,7 +5504,7 @@ FileRead($)
   $forceType = "" if(!defined($forceType));
   if(ref($param) eq "HASH") {
     $fileName = $param->{FileName};
-    $forceType = lc($param->{ForceType});
+    $forceType = lc($param->{ForceType}) if($param->{ForceType});
   } else {
     $fileName = $param;
   }
