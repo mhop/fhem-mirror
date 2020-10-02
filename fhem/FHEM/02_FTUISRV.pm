@@ -75,7 +75,7 @@
 #   doc change on ftui-if
 
 #   FIX: changed replaceSetmagic to hand over real device hash
-#   
+#   FIX: $result might be undefined in some cases for loop/if
 #   
 ################################################################
 #TODO:
@@ -852,6 +852,8 @@ sub FTUISRV_handleLoopInc( $$$$$$ ) {
 
     # Evaluate expression as command to get list of entries for loop ???
     my $result = AnalyzeCommand(undef, $expr);     
+
+    $result = "" if ( ! $result );
     
     # Identify split char ???
     
