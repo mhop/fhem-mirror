@@ -1618,6 +1618,9 @@ HUEDevice_Parse($$)
 
       #Heiman Gassensor HS1CG
       $readings{carbonmonoxide} = $state->{carbonmonoxide} if( defined($state->{carbonmonoxide}) );
+
+      #Aqara Cube
+      $readings{gesture} = $state->{gesture} if( defined($state->{gesture}) );
     }
 
     $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
