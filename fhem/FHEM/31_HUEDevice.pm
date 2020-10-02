@@ -186,6 +186,7 @@ sub HUEDevice_Initialize($)
                       "setList:textField-long ".
                       "configList:textField-long ".
                       "subType:extcolordimmer,colordimmer,ctdimmer,dimmer,switch,blind ".
+                      "readingList ".
                       $readingFnAttributes;
 
   #$hash->{FW_summaryFn} = "HUEDevice_summaryFn";
@@ -1621,6 +1622,12 @@ HUEDevice_Parse($$)
 
       #Aqara Cube
       $readings{gesture} = $state->{gesture} if( defined($state->{gesture}) );
+
+      if( my $entries = $hash->{helper}{readingList} ) {
+        foreach my $entry (@{$entries}) {
+          $readings{$entry} = $state->{$entry} if( defined($state->{$entry}) );
+        }
+      }
     }
 
     $hash->{lastupdated} = ReadingsVal( $name, '.lastupdated', '' ) if( !$hash->{lastupdated} );
@@ -1882,6 +1889,15 @@ HUEDevice_Attr($$$;$)
         }
       }
     }
+
+  } elsif( $attrName eq 'readingList' ) {
+    my $hash = $defs{$name};
+    delete $hash->{helper}{$attrName};
+    return "$name is not a sensor device" if( $hash->{helper}->{devtype} ne 'S' );
+    if( $cmd eq "set" && $attrVal ) {
+      my @a = split("[ ,]+", $attrVal);
+      $hash->{helper}{$attrName} = \@a;
+    }
   }
 
   return;
@@ -2055,6 +2071,8 @@ absent:{&lt;json&gt;}</code></li>
       The list of know config commands for sensor type devices. one command per line, eg.: <code><br>
 attr mySensor mode:{&lt;json&gt;}\<br>
 /heatsetpoint (.*)/:perl:{'{"heatsetpoint":'. $VALUE1 * 100 .'}'}</code></li>
+    <li>readingList<br>
+      The list of readings that should be created from the sensor state object. Space or comma separated.</li>
     <li>subType<br>
       extcolordimmer -> device has rgb and color temperatur control<br>
       colordimmer -> device has rgb controll<br>
