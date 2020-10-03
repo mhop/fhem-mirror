@@ -41,12 +41,13 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.13.0');
+use version; our $VERSION = version->declare('1.14.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
                      getClHash
                      delClHash
+                     delReadings
                      trim
                      moduleVersion
                      sortVersion
@@ -96,22 +97,30 @@ BEGIN {
           plotAsPng
           RemoveInternalTimer
           ReadingsVal
+          ReadingsTimestamp
           readingsSingleUpdate
           readingsBeginUpdate
           readingsBulkUpdate
 		  readingsBulkUpdateIfChanged
           readingsEndUpdate
+          readingsDelete
           HttpUtils_NonblockingGet
         )
   );  
 };
 
 # Standardvariablen
+my $splitdef    = ":";                                 # Standard Character für split ...
+
 my $carpnohash  = "got no hash value";
 my $carpnoname  = "got no name value";
-my $carpnoctyp  = "got no credentials type";
+my $carpnoctyp  = "got no Credentials type code";
 my $carpnoapir  = "got no API Hash reference";
+my $carpnotfn   = "got no function name";
 my $carpnotfarg = "got no Timer function argument";
+my $carpnoaddr  = "got no server address from hash";
+my $carpnoport  = "got no server port from hash";
+my $carpnoprot  = "got no protocol from hash";
 
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
@@ -174,12 +183,46 @@ sub delClHash {
 return;
 }
 
+####################################################################################
+#    alle Readings außer excludierte löschen
+#    $respts -> Respect Timestamp 
+#               wenn gesetzt, wird Reading nicht gelöscht
+#               wenn Updatezeit identisch zu "lastUpdate"
+####################################################################################
+sub delReadings {      
+  my $name   = shift // carp $carpnoname && return;
+  my $respts = shift;
+  
+  my $hash   = $defs{$name};
+  my $type   = $hash->{TYPE};
+  
+  my ($lu,$rts,$excl);
+  
+  $excl  = "Error|Errorcode|QueueLength|state|nextUpdate";            # Blacklist
+  $excl .= "|lastUpdate" if($respts);
+  
+  my @allrds = keys%{$defs{$name}{READINGS}};
+  for my $key(@allrds) {
+      if($respts) {
+          $lu  = $data{$type}{$name}{lastUpdate};
+          $rts = ReadingsTimestamp($name, $key, $lu);
+          next if($rts eq $lu);
+      }
+      readingsDelete($hash, $key) if($key !~ m/^$excl$/x);
+  }
+  
+return;
+}
+
 ###############################################################################
 #             Leerzeichen am Anfang / Ende eines strings entfernen           
 ###############################################################################
 sub trim {
   my $str = shift;
-  $str    =~ s/^\s+|\s+$//gx;
+  
+  return if(!$str);
+  
+  $str =~ s/^\s+|\s+$//gx;
 
 return $str;
 }
@@ -192,7 +235,16 @@ return $str;
 #     Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #
 #     Variablen $useAPI, $useSMUtils, $useErrCodes enthalten die Versionen von SynoModules
-#     wenn verwendet und sind in diesem Fall zu übergeben. 
+#     wenn verwendet und sind in diesem Fall zu übergeben.
+#
+#     Beispiel für Übergabe Parameter:
+#     my $params = {
+#         hash        => $hash,
+#         notes       => \%vNotesIntern,
+#         useAPI      => 1,
+#         useSMUtils  => 1,
+#         useErrCodes => 1
+#    };
 #############################################################################################
 sub moduleVersion {
   my $paref       = shift; 
@@ -361,14 +413,21 @@ return $ret;
 
 ###############################################################################
 #                       JSON Boolean Test und Mapping
+#   $var  = Variante der boolean Auswertung:
+#           "char": Rückgabe von true / false für wahr / falsch
+#           "bin" : Rückgabe von 1 / 0 für wahr / falsch
 ###############################################################################
 sub jboolmap { 
   my $bool = shift // carp "got no value to check if bool" && return;
+  my $var  = shift // "char";
+  
+  my $true  = ($var eq "char") ? "true"  : 1;
+  my $false = ($var eq "char") ? "false" : 0;
   
   my $is_boolean = JSON::is_bool($bool);
   
   if($is_boolean) {
-      $bool = $bool ? "true" : "false";
+      $bool = $bool ? $true : $false;
   }
   
 return $bool;
@@ -477,19 +536,21 @@ return;
 
 ######################################################################################
 #                            Username / Paßwort speichern
-#   $ao = "credentials"     -> Standard Credentials
-#   $ao = "SMTPcredentials" -> Credentials für Mailversand
+#   $ctc  = "credentials"     -> Standard Credentials
+#   $ctc  = "SMTPcredentials" -> Credentials für Mailversand
+#   $sep  = Separator zum Split des $credstr, default ":"
 ######################################################################################
 sub setCredentials {
     my $hash = shift // carp $carpnohash        && return;
-    my $ao   = shift // carp $carpnoctyp        && return;
+    my $ctc  = shift // carp $carpnoctyp        && return;
     my $user = shift // carp "got no user name" && return;
     my $pass = shift // carp "got no password"  && return;
+    my $sep  = shift // $splitdef;
     my $name = $hash->{NAME};
     
     my $success;
     
-    my $credstr = encode_base64 ("$user:$pass");
+    my $credstr = encode_base64 ($user.$sep.$pass);
     
     # Beginn Scramble-Routine
     my @key = qw(1 3 4 5 6 3 2 1 9);
@@ -498,7 +559,7 @@ sub setCredentials {
     $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
     # End Scramble-Routine    
        
-    my $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
+    my $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ctc;
     my $retcode = setKeyValue($index, $credstr);
     
     if ($retcode) { 
@@ -506,7 +567,7 @@ sub setCredentials {
         $success = 0;
     } 
     else {
-        getCredentials($hash,1,$ao);                                                            # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
+        getCredentials($hash,1,$ctc,$sep);                                         # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
         $success = 1;
     }
 
@@ -515,76 +576,115 @@ return ($success);
 
 ######################################################################################
 #                             Username / Paßwort abrufen
-#   $ao = "credentials"     -> Standard Credentials
-#   $ao = "SMTPcredentials" -> Credentials für Mailversand
+#   $boot = 1 beim erstmaligen laden
+#   $ctc  = "credentials"     -> Standard Credentials
+#   $ctc  = "SMTPcredentials" -> Credentials für Mailversand
+#   $sep  = Separator zum Split des $credstr, default ":"
 ######################################################################################
 sub getCredentials {
     my $hash = shift // carp $carpnohash && return;
     my $boot = shift;
-    my $ao   = shift // carp $carpnoctyp && return;
+    my $ctc  = shift // carp $carpnoctyp && return;
+    my $sep  = shift // $splitdef;
     my $name = $hash->{NAME};
-    my ($success, $username, $passwd, $index, $retcode, $credstr);
-    my (@key,$len,$i);
     
-    my $pp;
+    my ($success, $username, $passwd, $index, $retcode, $credstr,$pp,$err);
     
-    if ($boot) {                                                            # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
-        $index               = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
+    if ($boot) {                                                                           # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
+        $index               = $hash->{TYPE}."_".$hash->{NAME}."_".$ctc;
         ($retcode, $credstr) = getKeyValue($index);
     
         if ($retcode) {
-            Log3($name, 2, "$name - Unable to read password from file: $retcode");
+            Log3($name, 2, "$name - ERROR - Unable to read Credentials from file: $retcode");
             $success = 0;
         }  
 
-        if ($credstr) {
-            if($ao eq "credentials") {                                      # beim Boot scrambled Credentials in den RAM laden
+        if ($credstr) {       
+            ($username, $passwd) = split "$sep", decode_base64( descramble($credstr) );
+           
+            if(!$username || !$passwd) {
+                ($err,$pp) = getCredentialsFromHash ($hash, $ctc);                        # nur Error und Credetials Shortcut lesen !
+                $err       = $err ? $err : qq{possible problem in splitting with separator "$sep"};
+                Log3($name, 2, "$name - ERROR - ".$pp."Credentials not successfully decoded ! $err");
+                return 0;
+            }
+
+            if($ctc eq "credentials") {                                                   # beim Boot scrambled Credentials in den RAM laden
                 $hash->{HELPER}{CREDENTIALS} = $credstr;
-                $hash->{CREDENTIALS}         = "Set";                       # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $success                     = 1;
-            
-            } elsif ($ao eq "SMTPcredentials") {                            # beim Boot scrambled Credentials in den RAM laden
+                $hash->{CREDENTIALS}         = "Set";                                     # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
+                $success                     = 1;            
+            } 
+            elsif ($ctc eq "SMTPcredentials") {                                           # beim Boot scrambled Credentials in den RAM laden
                 $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
-                $hash->{SMTPCREDENTIALS}         = "Set";                   # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $success                         = 1;                
+                $hash->{SMTPCREDENTIALS}         = "Set";                                 # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung                
+                $success                         = 1;
             }
         }
     } 
-    else {                                                                  # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
-        if ($ao eq "credentials") {
-            $credstr = $hash->{HELPER}{CREDENTIALS};
-            $pp      = q{};
+    else {                                                                                # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+        ($err,$pp,$credstr) = getCredentialsFromHash ($hash, $ctc);
         
-        } elsif ($ao eq "SMTPcredentials") {
-            $pp      = q{SMTP};
-            $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
-        }
-        
-        if($credstr) {
-            # Beginn Descramble-Routine
-            @key = qw(1 3 4 5 6 3 2 1 9); 
-            $len = scalar @key;  
-            $i = 0;  
-            $credstr = join "",  
-            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;    ## no critic 'Map blocks';  
-            # Ende Descramble-Routine
+        if(!$err && $credstr) {            
+            ($username, $passwd) = split "$sep", decode_base64( descramble($credstr) );
             
-            ($username, $passwd) = split ":",decode_base64($credstr);
+            if(!$username || !$passwd) {
+                $err = qq{possible problem in splitting with separator "$sep"};
+                Log3($name, 2, "$name - ERROR - ".$pp."Credentials not successfully decoded ! $err");
+                delete $hash->{CREDENTIALS};
+            }
             
-            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
+            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd // "" : "********";
         
             Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
         } 
         else {
-            Log3($name, 2, "$name - ".$pp."Credentials not set in RAM !");
+            Log3($name, 2, "$name - ERROR - ".$pp."Credentials not set in RAM ! $err");
         }
     
-        $success = (defined $passwd) ? 1 : 0;
+        $success = ($username && $passwd) ? 1 : 0;
     }
 
 return ($success, $username, $passwd);        
 }
 
+###############################################################################
+#             entpackt einen mit enscramble behandelten String
+###############################################################################
+sub descramble { 
+  my $sstr = shift // carp "got no string to descramble" && return;
+    
+  my @key = qw(1 3 4 5 6 3 2 1 9); 
+  my $len = scalar @key;  
+  my $i = 0;  
+  my $dstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $sstr;    ## no critic 'Map blocks';  
+
+return $dstr;
+}
+
+###############################################################################
+#   liefert Kürzel eines Credentials und den Credetialstring aus dem Hash 
+#   $ctc = Credentials Type Code
+###############################################################################
+sub getCredentialsFromHash {
+  my $hash = shift // carp $carpnohash                    && return;    
+  my $ctc  = shift // carp "got no Credentials type code" && return;
+    
+  my $credstr = q{}; 
+  my $pp      = q{};
+  my $err     = "no shortcut found for Credential type code: $ctc";
+  
+  if ($ctc eq "credentials") {
+      $credstr = $hash->{HELPER}{CREDENTIALS};
+      $err     = q{};
+  } 
+  elsif ($ctc eq "SMTPcredentials") {
+      $pp      = q{SMTP};
+      $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
+      $err     = q{};
+}
+        
+return ($err,$pp,$credstr);
+}
 
 ###############################################################################
 #                        Test ob JSON-String vorliegt
@@ -628,20 +728,25 @@ return ($success,$myjson);
 
 ####################################################################################  
 #         Login wenn keine oder ungültige Session-ID vorhanden ist
-#         $apiref = Referenz zum API Hash
-#         $fret   = Rückkehrfunktion nach erfolgreichen Login
+#    $apiref  = Referenz zum API Hash
+#    $fret    = Referenz zur Rückkehrfunktion nach erfolgreichen Login
+#    $fretarg = Argument für Rückkehrfunktion, default: $hash
+#    $sep     = Separator für split Credentials in getCredentials, default ":"
 ####################################################################################
 sub login {
-  my $hash         = shift  // carp $carpnohash                        && return;
-  my $apiref       = shift  // carp $carpnoapir                        && return;
-  my $fret         = shift  // carp "got no return function reference" && return;
+  my $hash         = shift               // carp $carpnohash                        && return;
+  my $apiref       = shift               // carp $carpnoapir                        && return;
+  my $fret         = shift               // carp "got no return function reference" && return;
+  my $fretarg      = shift               // $hash;
+  my $sep          = shift               // $splitdef;
+  
+  my $serveraddr   = $hash->{SERVERADDR} // carp $carpnoaddr                        && return;
+  my $serverport   = $hash->{SERVERPORT} // carp $carpnoport                        && return;
+  my $proto        = $hash->{PROTOCOL}   // carp $carpnoprot                        && return;
   my $name         = $hash->{NAME};
-  my $serveraddr   = $hash->{SERVERADDR};
-  my $serverport   = $hash->{SERVERPORT};
   my $apiauth      = $apiref->{AUTH}{NAME};
   my $apiauthpath  = $apiref->{AUTH}{PATH};
   my $apiauthver   = $apiref->{AUTH}{VER};
-  my $proto        = $hash->{PROTOCOL};
   my $type         = $hash->{TYPE};
 
   my ($url,$param,$urlwopw);
@@ -650,10 +755,10 @@ sub login {
     
   Log3($name, 4, "$name - --- Begin Function login ---");
   
-  my ($success, $username, $password) = getCredentials($hash,0,"credentials");                      # Credentials abrufen
+  my ($success, $username, $password) = getCredentials($hash,0,"credentials",$sep);                      # Credentials abrufen
   
   if (!$success) {
-      Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
+      Log3($name, 2, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});
       delActiveToken($hash) if($type eq "SSCam");      
       return;
   }
@@ -669,6 +774,7 @@ sub login {
   my $timeout     = AttrVal($name,"timeout",60);                                            # Kompatibilität zu Modulen die das Attr "timeout" verwenden
   my $httptimeout = AttrVal($name,"httptimeout",$timeout);
   $httptimeout    = 60 if($httptimeout < 60);
+  
   Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");                                                                             
   
   my $sid = AttrVal($name, "noQuotesForSID", 0) ? "sid" : qq{"sid"};                        # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
@@ -692,7 +798,9 @@ sub login {
       timeout  => $httptimeout,
       hash     => $hash,
       user     => $username,
-      funcret  => $fret,
+      fret     => $fret,
+      fretarg  => $fretarg,
+      sep      => $sep,
 	  apiref   => $apiref,
       method   => "GET",
       header   => "Accept: application/json",
@@ -709,9 +817,12 @@ sub loginReturn {
   my $err      = shift;
   my $myjson   = shift;
   my $hash     = $param->{hash};
+  
   my $name     = $hash->{NAME};
   my $username = $param->{user};
-  my $fret     = $param->{funcret};
+  my $fret     = $param->{fret};
+  my $fretarg  = $param->{fretarg};
+  my $sep      = $param->{sep};  
   my $apiref   = $param->{apiref};
   my $type     = $hash->{TYPE};
   
@@ -722,10 +833,11 @@ sub loginReturn {
         
       readingsSingleUpdate($hash, "Error", $err, 1);                               
         
-      return login($hash,$apiref,$fret);
+      return login($hash,$apiref,$fret,$fretarg,$sep);
    
    } elsif ($myjson ne "") {                                                       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
         ($success) = evaljson($hash,$myjson);                                      # Evaluiere ob Daten im JSON-Format empfangen wurden
+        
         if (!$success) {
             Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
             delActiveToken($hash) if($type eq "SSCam");
@@ -744,53 +856,78 @@ sub loginReturn {
             $hash->{HELPER}{SID} = $sid;                                           # Session ID in hash eintragen
        
             readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash,"Errorcode","none");
-            readingsBulkUpdate  ($hash,"Error","none");
+            readingsBulkUpdate  ($hash, "Errorcode", "none");
+            readingsBulkUpdate  ($hash, "Error",     "none");
             readingsEndUpdate   ($hash, 1);
        
             Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
             
-            return &$fret($hash);
+            return &$fret($fretarg);
         } 
         else {          
             my $errorcode = $data->{'error'}->{'code'};                           # Errorcode aus JSON ermitteln
             my $error     = expErrorsAuth($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
-
+            
             readingsBeginUpdate ($hash);
-            readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate  ($hash,"Error",$error);
+            readingsBulkUpdate  ($hash, "Errorcode", $errorcode   );
+            readingsBulkUpdate  ($hash, "Error",     $error       );
+            readingsBulkUpdate  ($hash, "state",     "login Error");
             readingsEndUpdate   ($hash, 1);
        
             Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
              
-            return login($hash,$apiref,$fret);
+            return login($hash,$apiref,$fret,$fretarg,$sep);
        }
    }
    
-return login($hash,$apiref,$fret);
+return login($hash,$apiref,$fret,$fretarg,$sep);
 }
 
 ###################################################################################  
 #      Funktion logout
+#    $apiref  = Referenz zum API Hash
+#    $sep     = Separator für split Credentials in getCredentials, default ":"
 ###################################################################################
 sub logout {
    my $hash        = shift  // carp $carpnohash && return;
    my $apiref      = shift  // carp $carpnoapir && return;
+   my $sep         = shift  // $splitdef;
+   
    my $name        = $hash->{NAME};
    my $serveraddr  = $hash->{SERVERADDR};
    my $serverport  = $hash->{SERVERPORT};
+   my $proto       = $hash->{PROTOCOL};
+   my $type        = $hash->{TYPE};
+   
    my $apiauth     = $apiref->{AUTH}{NAME};
    my $apiauthpath = $apiref->{AUTH}{PATH};
    my $apiauthver  = $apiref->{AUTH}{VER};
-   my $sid         = $hash->{HELPER}{SID};
-   my $proto       = $hash->{PROTOCOL};
+   
+   my $sid         = delete $hash->{HELPER}{SID} // q{};
    
    my $url;
      
    Log3($name, 4, "$name - --- Start Synology logout ---");
+   
+   my ($success, $username) = getCredentials($hash,0,"credentials",$sep);
+   
+   if(!$sid) {
+       Log3($name, 2, qq{$name - User "$username" has no valid session, logout is cancelled});
+
+       readingsBeginUpdate ($hash);
+       readingsBulkUpdate  ($hash, "Errorcode", "none");
+       readingsBulkUpdate  ($hash, "Error",     "none");
+       readingsBulkUpdate  ($hash, "state",     "logout done");
+       readingsEndUpdate   ($hash, 1);
+
+       delActiveToken        ($hash) if($type eq "SSCam");                                                   # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
+       CancelDelayedShutdown ($name);
+       return;
+   }
     
-   my $httptimeout = AttrVal($name,"httptimeout",4);
-   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
+   my $timeout = AttrVal($name,"timeout",60);
+   $timeout    = 60 if($timeout < 60);
+   Log3($name, 5, "$name - Call logout will be done with timeout value: $timeout s");
   
    if (AttrVal($name,"session","DSM") eq "DSM") {
        $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthver&method=Logout&_sid=$sid";    
@@ -801,8 +938,10 @@ sub logout {
 
    my $param = {
        url      => $url,
-       timeout  => $httptimeout,
+       timeout  => $timeout,
        hash     => $hash,
+       sid      => $sid,
+       username => $username,
        method   => "GET",
        header   => "Accept: application/json",
        callback => \&logoutReturn
@@ -814,15 +953,15 @@ return;
 }
 
 sub logoutReturn {  
-   my $param  = shift;
-   my $err    = shift;
-   my $myjson = shift;
-   my $hash   = $param->{hash};
-   my $name   = $hash->{NAME};
-   my $sid    = $hash->{HELPER}{SID};
-   my $type   = $hash->{TYPE};
+   my $param    = shift;
+   my $err      = shift;
+   my $myjson   = shift;
+   my $hash     = $param->{hash};
+   my $sid      = $param->{sid};
+   my $username = $param->{username};
    
-   my ($success, $username) = getCredentials($hash,0,"credentials");
+   my $name     = $hash->{NAME};
+   my $type     = $hash->{TYPE};
   
    if ($err ne "") {                                                                                          # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
@@ -831,11 +970,11 @@ sub logoutReturn {
    } elsif ($myjson ne "") {                                                                                  # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        Log3($name, 4, "$name - URL-Call: ".$param->{url});
         
-       ($success) = evaljson($hash,$myjson);                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+       my ($success) = evaljson($hash,$myjson);                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
         
        if (!$success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);
-           delActiveToken($hash) if($type eq "SSCam");
+           delActiveToken ($hash) if($type eq "SSCam");
            return;
        }
         
@@ -846,21 +985,24 @@ sub logoutReturn {
        $success = $data->{'success'};
 
        if ($success) {                                                                                        # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");      
+           readingsBeginUpdate ($hash);
+           readingsBulkUpdate  ($hash, "Errorcode", "none");
+           readingsBulkUpdate  ($hash, "Error",     "none");
+           readingsBulkUpdate  ($hash, "state",     "logout done");
+           readingsEndUpdate   ($hash, 1);
+           
+           Log3($name, 2, qq{$name - Session of User "$username" terminated - session ID "$sid" deleted});      
        } 
        else {
            my $errorcode = $data->{'error'}->{'code'};                                                        # Errorcode aus JSON ermitteln
            my $error     = expErrorsAuth($hash,$errorcode);                                                   # Fehlertext zum Errorcode ermitteln
 
-           Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
+           Log3($name, 2, qq{$name - ERROR - Logout of User $username was not successful, however SID: "$sid" has been deleted. Errorcode: $errorcode - $error});
        }
-   }   
+   }
    
-   delete $hash->{HELPER}{SID};                                                                               # Session-ID aus Helper-hash löschen
-   
-   delActiveToken($hash);                                                                                     # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   
-   CancelDelayedShutdown($name);
+   delActiveToken        ($hash) if($type eq "SSCam");                                                        # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
+   CancelDelayedShutdown ($name);
    
 return;
 }
@@ -919,7 +1061,7 @@ return;
 #############################################################################################
 sub setReadingErrorNone {                     
   my $hash = shift // carp $carpnohash && return;
-  my $evt  = shift;
+  my $evt  = shift // 0;
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash, "Errorcode", "none");
@@ -1004,18 +1146,18 @@ return $sq;
 
 #############################################################################################
 #     Funktion Zeitplan löschen und neu planen
-#     $rst     = restart Timer
-#     $startfn = Funktion deren Timer gelöscht und  neu gestartet werdene soll 
+#     $rst     = Zeit für Funktionseinplanung
+#     $startfn = Funktion (Name incl. Paket) deren Timer gelöscht und neu gestartet wird
 #     $arg     = Argument für die Timer Funktion
 #############################################################################################
 sub startFunctionDelayed {                   
-  my $name    = shift // carp $carpnoname                      && return;
-  my $rst     = shift // carp "got no restart Timer value"     && return;
-  my $startfn = shift // carp $carpnotfarg                     && return;
-  my $arg     = shift // carp "got no Timer function argument" && return;
+  my $name    = shift // carp $carpnoname                  && return;
+  my $rst     = shift // carp "got no restart Timer value" && return;
+  my $startfn = shift // carp $carpnotfn                   && return;
+  my $arg     = shift // carp $carpnotfarg                 && return;
 
   RemoveInternalTimer ($arg, $startfn);
-  InternalTimer       ($rst,  $startfn, $arg, 0);   
+  InternalTimer       ($rst, $startfn, $arg, 0);   
                     
 return;
 }
@@ -1023,22 +1165,24 @@ return;
 #############################################################################################
 #      Erfolg der Abarbeitung eines Queueeintrags checken und ggf. Retry ausführen
 #      bzw. den SendQueue-Eintrag bei Erfolg löschen
-#      $name       =   Name des Chatbot-Devices
+#      $name       =   Name des Devices
 #      $retry      =   0 -> Opmode erfolgreich (DS löschen), 
 #                      1 -> Opmode nicht erfolgreich (Abarbeitung nach ckeck errorcode
 #                           eventuell verzögert wiederholen)
-#      $startfnref = Referenz zur Funktion die nach Check ggf. gestartet werden soll
+#      $startfn    = Funktion (Name incl. Paket) die nach Check ggf. gestartet werden soll
 #############################################################################################
 sub checkSendRetry {  
-  my $name       = shift // carp $carpnoname        && return;
-  my $retry      = shift // carp "got opmode state" && return;
-  my $startfn    = shift // carp $carpnotfarg       && return;
+  my $name       = shift // carp $carpnoname           && return;
+  my $retry      = shift // carp "got no opmode state" && return;
+  my $startfn    = shift // carp $carpnotfn            && return;
   my $hash       = $defs{$name};  
   my $idx        = $hash->{OPIDX};
   my $type       = $hash->{TYPE};
   
-  my $forbidSend = "";
+  my $forbidSend = q{};
   my $startfnref = \&{$startfn};
+  
+  my @forbidlist = qw(100 101 103 117 120 407 409 410 800 900);                           # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
   
   if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
@@ -1062,11 +1206,16 @@ sub checkSendRetry {
       my $rc = $data{$type}{$name}{sendqueue}{entries}{$idx}{retryCount};
   
       my $errorcode = ReadingsVal($name, "Errorcode", 0);
-      if($errorcode =~ /100|101|117|120|407|409|410|800/x) {                              # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+      
+      if($errorcode =~ /119/x) {                                                          # Session wird neu requestet und Queue-Eintrag wiederholt
+          delete $hash->{HELPER}{SID};
+      }
+      
+      if(grep { $_ eq $errorcode } @forbidlist) {                              
           $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
           $data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
-          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. It seems to be a permanent error. Exclude it from new send attempt !");
+          Log3($name, 2, qq{$name - ERROR - "$hash->{OPMODE}" SendQueue index "$idx" not executed. It seems to be a permanent error. Exclude it from new send attempt !});
           
           delete $hash->{OPIDX};
           delete $hash->{OPMODE};
@@ -1086,7 +1235,7 @@ sub checkSendRetry {
               : 86400
               ;
           
-          Log3($name, 2, "$name - ERROR - \"$hash->{OPMODE}\" SendQueue index \"$idx\" not executed. Restart SendQueue in $rs seconds (retryCount $rc).");
+          Log3($name, 2, qq{$name - ERROR - "$hash->{OPMODE}" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
           
           my $rst = gettimeofday()+$rs;                                                  # resend Timer 
           updQueueLength       ($hash,$rst);                                             # updaten Länge der Sendequeue mit resend Timer
@@ -1140,18 +1289,15 @@ sub updQueueLength {
   my $type = $hash->{TYPE};
   my $ql   = keys %{$data{$type}{$name}{sendqueue}{entries}};
   
+  readingsDelete ($hash, "QueueLenth");                                            # entferne Reading mit Typo
+  
   readingsBeginUpdate         ($hash);                                             
-  readingsBulkUpdateIfChanged ($hash, "QueueLenth", $ql);                          # Länge Sendqueue updaten
+  readingsBulkUpdateIfChanged ($hash, "QueueLength", $ql);                         # Länge Sendqueue updaten
   readingsEndUpdate           ($hash,1);
   
-  my $head = "next planned SendQueue start:";
-  
-  if($rst) {                                                                       # resend Timer gesetzt
-      $hash->{RESEND} = $head." ".FmtDateTime($rst);
-  } 
-  else {
-      $hash->{RESEND} = $head." immediately by next entry";
-  }
+  my $head        = "next planned SendQueue start:";
+   
+  $hash->{RESEND} = $rst ? $head." ".FmtDateTime($rst) : $head." immediately by next entry";
 
 return;
 }
