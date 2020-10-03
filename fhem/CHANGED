@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  57_SSCal: integrate SMUtils lib, minor fixes
  - bugfix:  02_FTUISRV: fix empty loop includes results 
  - feature: 31_HUEDevice: added gesture reading for Aqara Cube
                           added readingList attribute
