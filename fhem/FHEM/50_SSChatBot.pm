@@ -47,7 +47,9 @@ use FHEM::SynoModules::SMUtils qw(
                                   plotPngToFile
                                   completeAPI
                                   showAPIinfo
-                                  evaljson                                
+                                  evaljson
+                                  getCredentials
+                                  showStoredCredentials                                  
                                   setReadingErrorNone 
                                   setReadingErrorState
                                   addSendqueueEntry
@@ -131,6 +133,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.3" => "04.10.2020  use showStoredCredentials from SMUtils ",
   "1.11.2" => "01.10.2020  move startFunctionDelayed, checkSendRetry to SMUtils ",
   "1.11.1" => "28.09.2020  use evaljson from SMUtils ",
   "1.11.0" => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
@@ -277,7 +280,7 @@ sub Define {
   };
   use version 0.77; our $VERSION = moduleVersion ($params);                      # Versionsinformationen setzen
   
-  getToken($hash,1,"botToken");                                                  # Token lesen
+  getCredentials($hash, 1, "botToken");                                          # Token lesen
   $data{SSChatBot}{$name}{sendqueue}{index} = 0;                                 # Index der Sendequeue initialisieren
     
   readingsBeginUpdate         ($hash);                                             
@@ -629,15 +632,13 @@ sub _getstoredToken {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   
-  if (!$hash->{TOKEN}) {return qq{Token of $name is not set - make sure you've set it with "set $name botToken <TOKEN>"};}
- 
-  my ($success, $token) = getToken($hash,0,"botToken");                                        # Token abrufen
-  unless ($success) {return qq{Token couldn't be retrieved successfully - see logfile}};
-
-  return qq{Stored Token to act as Synology Chat Bot:\n}.
-         qq{=========================================\n}.
-         qq{$token \n}
-         ; 
+  if (!$hash->{TOKEN}) {
+      return qq{Token of $name is not set - make sure you've set it with "set $name botToken <TOKEN>"};
+  }
+  
+  my $out = showStoredCredentials ($hash, 4);
+  
+return $out;
 }
 
 
@@ -1043,8 +1044,9 @@ sub chatOp {
    my ($url,$httptimeout,$param,$error,$errorcode);
    
    # Token abrufen
-   my ($success, $token) = getToken($hash,0,"botToken");
-   unless ($success) {
+   my ($success, $token) = getCredentials($hash, 0, "botToken");
+   
+   if(!$success) {
        $errorcode = "810";
        $error     = expErrors($hash,$errorcode);                  # Fehlertext zum Errorcode ermitteln
        
@@ -1357,66 +1359,10 @@ sub setToken {
         $success = 0;
     } 
     else {
-        ($success, $token) = getToken($hash,1,$ao);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
+        ($success, $token) = getCredentials($hash,1,$ao);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
     }
 
 return $success;
-}
-
-######################################################################################
-#                             botToken lesen
-######################################################################################
-sub getToken {
-    my ($hash,$boot, $ao) = @_;
-    my $name               = $hash->{NAME};
-    my ($success, $token, $index, $retcode, $credstr);
-    my (@key,$len,$i);
-    
-    if ($boot) {
-        # mit $boot=1 botToken von Platte lesen und als scrambled-String in RAM legen
-        $index               = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-        ($retcode, $credstr) = getKeyValue($index);
-    
-        if ($retcode) {
-            Log3($name, 2, "$name - Unable to read botToken from file: $retcode");
-            $success = 0;
-        }  
-
-        if ($credstr) {
-            # beim Boot scrambled botToken in den RAM laden
-            $hash->{HELPER}{TOKEN} = $credstr;
-    
-            # "TOKEN" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-            $hash->{TOKEN} = "Set";
-            $success = 1;
-        }
-    } 
-    else {
-        # boot = 0 -> botToken aus RAM lesen, decoden und zurückgeben
-        $credstr = $hash->{HELPER}{TOKEN};
-        
-        if($credstr) {
-            # Beginn Descramble-Routine
-            @key = qw(1 3 4 5 6 3 2 1 9); 
-            $len = scalar @key;  
-            $i = 0;  
-            $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //x, $credstr;   ## no critic 'Map blocks' 
-            # Ende Descramble-Routine
-            
-            $token = decode_base64($credstr);
-            
-            my $logtok = AttrVal($name, "showTokenInLog", "0") == 1 ? $token : "********";
-        
-            Log3($name, 4, "$name - botToken read from RAM: $logtok");
-        } 
-        else {
-            Log3($name, 2, "$name - botToken not set in RAM !");
-        }
-    
-        $success = (defined($token)) ? 1 : 0;
-    }
-
-return ($success, $token);        
 }
 
 #############################################################################################
