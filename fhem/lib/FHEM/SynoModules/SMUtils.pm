@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.14.0');
+use version; our $VERSION = version->declare('1.15.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -58,6 +58,7 @@ our @EXPORT_OK = qw(
                      showAPIinfo
                      setCredentials
                      getCredentials
+                     showStoredCredentials
                      evaljson
                      login
                      logout
@@ -546,20 +547,15 @@ sub setCredentials {
     my $user = shift // carp "got no user name" && return;
     my $pass = shift // carp "got no password"  && return;
     my $sep  = shift // $splitdef;
+    
     my $name = $hash->{NAME};
+    my $type = $hash->{TYPE};
     
     my $success;
     
-    my $credstr = encode_base64 ($user.$sep.$pass);
-    
-    # Beginn Scramble-Routine
-    my @key = qw(1 3 4 5 6 3 2 1 9);
-    my $len = scalar @key;  
-    my $i   = 0;  
-    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
-    # End Scramble-Routine    
+    my $credstr =  _enscramble( encode_base64 ($user.$sep.$pass) );    
        
-    my $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ctc;
+    my $index   = $type."_".$name."_".$ctc;
     my $retcode = setKeyValue($index, $credstr);
     
     if ($retcode) { 
@@ -577,8 +573,10 @@ return ($success);
 ######################################################################################
 #                             Username / Paßwort abrufen
 #   $boot = 1 beim erstmaligen laden
-#   $ctc  = "credentials"     -> Standard Credentials
-#   $ctc  = "SMTPcredentials" -> Credentials für Mailversand
+#   $ctc  = Credentials type code:
+#           "credentials"     -> Standard Credentials
+#           "SMTPcredentials" -> Credentials für Mailversand
+#           "botToken"        -> gespeicherten Token abfragen
 #   $sep  = Separator zum Split des $credstr, default ":"
 ######################################################################################
 sub getCredentials {
@@ -586,71 +584,175 @@ sub getCredentials {
     my $boot = shift;
     my $ctc  = shift // carp $carpnoctyp && return;
     my $sep  = shift // $splitdef;
-    my $name = $hash->{NAME};
     
-    my ($success, $username, $passwd, $index, $retcode, $credstr,$pp,$err);
+    my $name = $hash->{NAME};
+    my $type = $hash->{TYPE};
+    
+    my ($success, $username, $passwd, $index, $credstr,$sc,$err);
     
     if ($boot) {                                                                           # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
-        $index               = $hash->{TYPE}."_".$hash->{NAME}."_".$ctc;
-        ($retcode, $credstr) = getKeyValue($index);
-    
-        if ($retcode) {
-            Log3($name, 2, "$name - ERROR - Unable to read Credentials from file: $retcode");
-            $success = 0;
-        }  
-
-        if ($credstr) {       
-            ($username, $passwd) = split "$sep", decode_base64( descramble($credstr) );
-           
-            if(!$username || !$passwd) {
-                ($err,$pp) = getCredentialsFromHash ($hash, $ctc);                        # nur Error und Credetials Shortcut lesen !
-                $err       = $err ? $err : qq{possible problem in splitting with separator "$sep"};
-                Log3($name, 2, "$name - ERROR - ".$pp."Credentials not successfully decoded ! $err");
-                return 0;
-            }
-
-            if($ctc eq "credentials") {                                                   # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{CREDENTIALS} = $credstr;
-                $hash->{CREDENTIALS}         = "Set";                                     # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $success                     = 1;            
-            } 
-            elsif ($ctc eq "SMTPcredentials") {                                           # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
-                $hash->{SMTPCREDENTIALS}         = "Set";                                 # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung                
-                $success                         = 1;
-            }
+        $index           = $type."_".$name."_".$ctc;
+        ($err, $credstr) = getKeyValue($index);
+        
+        if($err) {
+            Log3($name, 2, "$name - ERROR - Unable to read $ctc from file: $err");
+            return;
         }
+        
+        if(!$credstr) {
+            Log3($name, 2, qq{$name - ERROR - The stored value of "$index" is empty});
+            return;
+        }
+        
+        if($ctc eq "botToken") {                                                           # beim Boot scrambled botToken in den RAM laden
+            $hash->{HELPER}{TOKEN} = $credstr;
+            $hash->{TOKEN}         = "Set";
+            
+            return 1;
+        }  
+       
+        ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) );
+       
+        if(!$username || !$passwd) {
+            ($err,$sc) = _getCredentialsFromHash ($hash, $ctc);                           # nur Error und Credetials Shortcut lesen !
+            $err       = $err ? $err : qq{possible problem in splitting with separator "$sep"};
+            Log3($name, 2, "$name - ERROR - ".$sc." not successfully decoded ! $err");
+            return;
+        }
+
+        if($ctc eq "credentials") {                                                       # beim Boot scrambled Credentials in den RAM laden
+            $hash->{HELPER}{CREDENTIALS} = $credstr;
+            $hash->{CREDENTIALS}         = "Set";                                         # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung          
+        } 
+        elsif ($ctc eq "SMTPcredentials") {                                               # beim Boot scrambled Credentials in den RAM laden
+            $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
+            $hash->{SMTPCREDENTIALS}         = "Set";                                     # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung                
+        }
+        else {
+            Log3($name, 2, "$name - ERROR - no shortcut found for Credential type code: $ctc");
+            return;
+        }
+        
+        return 1;
     } 
     else {                                                                                # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
-        ($err,$pp,$credstr) = getCredentialsFromHash ($hash, $ctc);
+        ($err,$sc,$credstr) = _getCredentialsFromHash ($hash, $ctc);
         
-        if(!$err && $credstr) {            
-            ($username, $passwd) = split "$sep", decode_base64( descramble($credstr) );
-            
-            if(!$username || !$passwd) {
-                $err = qq{possible problem in splitting with separator "$sep"};
-                Log3($name, 2, "$name - ERROR - ".$pp."Credentials not successfully decoded ! $err");
-                delete $hash->{CREDENTIALS};
-            }
-            
-            my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd // "" : "********";
-        
-            Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
-        } 
-        else {
-            Log3($name, 2, "$name - ERROR - ".$pp."Credentials not set in RAM ! $err");
+        if($err) {
+            Log3($name, 2, "$name - ERROR - ".$sc." not set in RAM ! $err");
+            return;
         }
+        
+        if($ctc eq "botToken") {
+            my $token  = decode_base64( _descramble($credstr) );
+            my $logtok = AttrVal($name, "showTokenInLog", "0") == 1 ? $token : "********";
+        
+            Log3($name, 4, "$name - botToken read from RAM: $logtok");
+            
+            return (1, $token);
+        }
+        
+        ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) );
+        
+        if(!$username || !$passwd) {
+            $err = qq{possible problem in splitting with separator "$sep"};
+            Log3($name, 2, "$name - ERROR - ".$sc." not successfully decoded ! $err");
+            delete $hash->{CREDENTIALS};
+            return;
+        }
+        
+        my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd // "" : "********";
     
-        $success = ($username && $passwd) ? 1 : 0;
-    }
+        Log3($name, 4, "$name - ".$sc." read from RAM: $username $logpw");
 
-return ($success, $username, $passwd);        
+        return (1, $username, $passwd);
+    }    
+}
+
+######################################################################################
+#                 gespeicherte Credentials dekodiert anzeigen
+#
+#      $coc      = Wert der anzuzeigenden Credentials (Code of Credentials)
+#                  Wert 1 : Credentials Synology (default)
+#                  Wert 2 : SMTP Credentials
+#                  Wert 4 : Token
+#
+#      $splitstr = String zum Splitten innerhalb getCredentials, default ":"
+######################################################################################
+sub showStoredCredentials {
+  my $hash     = shift // carp $carpnohash && return;
+  my $coc      = shift // 1;
+  my $splitstr = shift // $splitdef;
+  
+  my $out;
+  
+  my $tokval  = 4;
+  my $smtpval = 2;
+  my $credval = 1;
+  
+  my $dotok   = int(  $coc                                      /$tokval  );
+  my $dosmtp  = int( ($coc-($dotok*$tokval))                    /$smtpval );
+  my $docred  = int( ($coc-($dotok*$tokval)-($dosmtp*$smtpval)) /$credval );
+  
+  if($docred) {
+      my ($success, $username, $passwd) = getCredentials($hash, 0, "credentials", $splitstr);               # Credentials
+
+      my $cd = $success ? 
+               "Username: $username, Password: $passwd" : 
+               "Credentials are not set or couldn't be read";
+                  
+      $out  .= "Stored Credentials for access the Synology System:\n".
+               "==================================================\n".
+               "$cd \n";
+  }
+  
+  if($dosmtp) {
+      my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash, 0 , "SMTPcredentials", $splitstr);   # SMTP-Credentials
+      
+      my $csmtp = $smtpsuccess ? 
+                  "SMTP-Username: $smtpuname, SMTP-Password: $smtpword" : 
+                  "SMTP credentials are not set or couldn't be read";
+                  
+      $out     .= "\n".
+                  "Stored Credentials for access the SMTP Server:\n".
+                  "==============================================\n".
+                  "$csmtp \n";
+  }
+  
+  if($dotok) {
+      my ($toksuccess, $token) = getCredentials($hash, 0 ,"botToken");                                      # Token 
+      
+      my $ctok  = $toksuccess ? 
+                  $token : 
+                  "Token is not set or couldn't be read";
+                  
+      $out     .= "\n".
+                  "Stored Token:\n".
+                  "=============\n".
+                  "$ctok \n";
+  }
+
+return $out;
 }
 
 ###############################################################################
-#             entpackt einen mit enscramble behandelten String
+#                    verscrambelt einen String
 ###############################################################################
-sub descramble { 
+sub _enscramble { 
+  my $sstr = shift // carp "got no string to scramble" && return;
+    
+  my @key = qw(1 3 4 5 6 3 2 1 9);
+  my $len = scalar @key;  
+  my $i   = 0;  
+  my $dstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $sstr;   ## no critic 'Map blocks';
+
+return $dstr;
+}
+
+###############################################################################
+#             entpackt einen mit _enscramble behandelten String
+###############################################################################
+sub _descramble { 
   my $sstr = shift // carp "got no string to descramble" && return;
     
   my @key = qw(1 3 4 5 6 3 2 1 9); 
@@ -664,26 +766,41 @@ return $dstr;
 ###############################################################################
 #   liefert Kürzel eines Credentials und den Credetialstring aus dem Hash 
 #   $ctc = Credentials Type Code
+#   $sc  = Kürzel / Shortcut
 ###############################################################################
-sub getCredentialsFromHash {
+sub _getCredentialsFromHash {
   my $hash = shift // carp $carpnohash                    && return;    
   my $ctc  = shift // carp "got no Credentials type code" && return;
     
   my $credstr = q{}; 
-  my $pp      = q{};
+  my $sc      = q{};
+  my $found   = 0;
   my $err     = "no shortcut found for Credential type code: $ctc";
   
   if ($ctc eq "credentials") {
-      $credstr = $hash->{HELPER}{CREDENTIALS};
       $err     = q{};
+      $found   = 1;
+      $sc      = q{Credentials};
+      $credstr = $hash->{HELPER}{CREDENTIALS};
   } 
   elsif ($ctc eq "SMTPcredentials") {
-      $pp      = q{SMTP};
-      $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
       $err     = q{};
-}
+      $found   = 1;
+      $sc      = q{SMTP-Credentials};
+      $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
+  }
+  elsif ($ctc eq "botToken") {
+      $err     = q{};
+      $found   = 1;
+      $sc      = q{Token};
+      $credstr = $hash->{HELPER}{TOKEN};
+  }
+
+  if($found && !$credstr) {
+      $err = "empty value";
+  }
         
-return ($err,$pp,$credstr);
+return ($err,$sc,$credstr);
 }
 
 ###############################################################################
