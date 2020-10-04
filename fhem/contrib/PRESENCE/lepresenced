@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+# vim: set softtabstop=2 shiftwidth=2 expandtab :
 
 ##############################################################################
 # $Id$
@@ -31,6 +32,7 @@
 
 use strict;
 use warnings;
+use Readonly;
 
 use threads;
 use threads::shared;
@@ -45,47 +47,67 @@ use Sys::Syslog qw(:standard :macros);
 use Time::HiRes qw(usleep);
 use Net::Server::Daemonize qw(daemonize);
 
-use constant RETRY_SLEEP                => 1;
-use constant INET_RECV_BUFFER           => 1024;
-use constant MAINLOOP_SLEEP_US          => 250 * 1000;
+use Data::Dumper;
 
-use constant CLEANUP_INTERVAL           => 15 * 60;
-use constant CLEANUP_MAX_AGE            => 30 * 60;
-use constant STATS_INTERVAL             =>  5 * 60;
-use constant DUMP_INTERVAL              => 10;
+Readonly my $RETRY_SLEEP                          => 1;
+Readonly my $INET_RECV_BUFFER                     => 1024;
+Readonly my $MAINLOOP_SLEEP_US                    => 250 * 1000;
+Readonly my $BATTERY_TASK_SETTLE_PRE_SLEEP        => 1;
+Readonly my $BATTERY_TASK_SETTLE_POST_SLEEP       => 2;
 
-use constant DEFAULT_RSSI_THRESHOLD     => 10;
-use constant RSSI_WINDOW                => 10;
+Readonly my $KILL_SIGNAL                          => 2; #SIGINT
 
-use constant ME                         => 'lepresenced';
-use constant VERSION                    => '0.92';
+Readonly my $CLEANUP_INTERVAL                     => 15 * 60;
+Readonly my $CLEANUP_MAX_AGE                      => 30 * 60;
+Readonly my $STATS_INTERVAL_INFO                  =>  5 * 60;
+Readonly my $STATS_INTERVAL_DEBUG                 =>  1 * 60;
+Readonly my $DUMP_INTERVAL                        => 10;
+Readonly my $DEFAULT_BATTERY_INTERVAL_H           =>  6;
+Readonly my $SHORT_BATTERY_INTERVAL_S             =>  2 * 60;
 
-use constant PIDFILE                    => '/var/run/' . ME . '.pid';
+Readonly my $DEFAULT_RSSI_THRESHOLD               => 10;
+Readonly my $RSSI_WINDOW                          => 10;
 
-use constant {
-  HCIDUMP_STATE_NONE                    => 0,
-  HCIDUMP_STATE_LE_META_EVENT           => 1,
-  HCIDUMP_STATE_LE_ADVERTISING_REPORT   => 2,
-  HCIDUMP_STATE_ADV_INT                 => 3,
-  HCIDUMP_STATE_SCAN_RSP                => 4,
-};
+Readonly my $ME                                   => 'lepresenced';
+Readonly my $VERSION                              => '0.93';
+
+Readonly my $PIDFILE                              => "/var/run/$ME.pid";
+
+Readonly my $BATTERY_LEVEL_CHARACTERISTIC_UUID    => '00002a19-0000-1000-8000-00805f9b34fb';
+Readonly my $BATTERY_MAX_AGE_FACTOR               => 4;
+
+Readonly my $HCIDUMP_STATE_NONE                   => 0;
+Readonly my $HCIDUMP_STATE_LE_META_EVENT          => 1;
+Readonly my $HCIDUMP_STATE_LE_ADVERTISING_REPORT  => 2;
+Readonly my $HCIDUMP_STATE_ADV_INT                => 3;
+Readonly my $HCIDUMP_STATE_SCAN_RSP               => 4;
+
+Readonly my $THREAD_COMMAND_RUN                   => 0;
+Readonly my $THREAD_COMMAND_STOP                  => 1;
+Readonly my $THREAD_COMMAND_RESTART               => 2;
 
 my %devices :shared;
 my @clients = ();
 my ($log_level, $log_target);
 my $debug;
 my ($beacons_hcitool, $beacons_hcidump) : shared = (0, 0);
-my $restart_hcitool :shared;
+
+my %thread_commands :shared = (
+  'bluetooth_scan_thread' => $THREAD_COMMAND_RUN,
+  'bluetooth_dump_thread' => $THREAD_COMMAND_RUN,
+);
+my ($next_dump_time, $next_stats_time, $next_cleanup_time, $next_battery_time);
+$next_battery_time = time() + $SHORT_BATTERY_INTERVAL_S;
 
 sub syslogw {
-  return if (scalar(@_) < 2);
+  my ($priority, @args) = @_;
+  return if (scalar(@args) < 1);
   my $logmessage;
-  my $priority = shift();
-  if (scalar(@_)==1) {
-    my ($message) = @_;
+  if (scalar(@args)==1) {
+    my ($message) = @args;
     $logmessage = sprintf("[tid:%i] %s: $message", threads->self()->tid(), (caller(1))[3] // 'main');
   } else {
-    my ($format, @args) = @_;
+    my ($format, @args) = @args;
     $logmessage = sprintf("[tid:%i] %s: $format", threads->self()->tid(), (caller(1))[3] // 'main', @args);
   }
   if ($log_level >= $priority) {
@@ -96,21 +118,22 @@ sub syslogw {
     }
   }
   printf("%s\n", $logmessage) if ($debug);
+  return();
 }
 
 sub error_exit {
-  my $exit_code = shift();
-  syslogw(LOG_ERR, @_);
+  my ($exit_code, @args) = @_;
+  syslogw(LOG_ERR, @args);
   foreach my $thread (threads->list()) {
     $thread->exit(0);
   }
   exit ($exit_code);
 }
 
-sub usage_exit() {
+sub usage_exit {
   print("usage:\n");
-  printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --logtarget <log target> --daemon\n", ME);
-  printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -t <log target> -d\n", ME);
+  printf("\t%s --bluetoothdevice <bluetooth device> --listenaddress <listen address> --listenport <listen port> --loglevel <log level> --logtarget <log target> --daemon\n", $ME);
+  printf("\t%s -b <bluetooth device> -a <listen address> -p <listen port> -l <log level> -t <log target> -d\n", $ME);
   print("valid log levels:\n");
   print("\tLOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO, LOG_DEBUG. Default: LOG_INFO\n");
   print("valid log targets:\n");
@@ -118,15 +141,41 @@ sub usage_exit() {
   print("optional arguments:\n");
   print("\t--debug - print extensive debug output to stdout (mutually exclusive with --daemon).\n");
   print("\t--legacymode - legacy mode without rssi detection. Use if you do not have hcidump installed.\n");
-  printf("\t--rssithreshold - rssi deviation to trigger an update. Minimum value: 5, default: %s\n", DEFAULT_RSSI_THRESHOLD);
+  printf("\t--rssithreshold - rssi deviation to trigger an update. Minimum value: 5, default: %s.\n", $DEFAULT_RSSI_THRESHOLD);
+  printf("\t--batteryinterval - interval for battery checks in hours, default: %s.\n", $DEFAULT_BATTERY_INTERVAL_H);
   print("examples:\n");
-  printf("\t%s --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon\n", ME);
-  printf("\t%s --loglevel LOG_DEBUG --daemon\n", ME);
+  printf("\t%s --bluetoothdevice hci0 --listenaddress 127.0.0.1 --listenport 5333 --daemon\n", $ME);
+  printf("\t%s --loglevel LOG_DEBUG --daemon\n", $ME);
   closelog();
   exit(1);
 }
 
-sub parse_options() {
+sub parse_log_level {
+  my ($log_level_str) = @_;
+  $log_level_str = uc($log_level_str);
+
+  return  ( $log_level_str eq 'LOG_EMERG'   ? LOG_EMERG
+          : $log_level_str eq 'LOG_ALERT'   ? LOG_ALERT
+          : $log_level_str eq 'LOG_CRIT'    ? LOG_CRIT
+          : $log_level_str eq 'LOG_ERR'     ? LOG_ERR
+          : $log_level_str eq 'LOG_WARNING' ? LOG_WARNING
+          : $log_level_str eq 'LOG_NOTICE'  ? LOG_NOTICE
+          : $log_level_str eq 'LOG_INFO'    ? LOG_INFO
+          : $log_level_str eq 'LOG_DEBUG'   ? LOG_DEBUG
+          : usage_exit()
+          );
+}
+
+sub humanize_thread_command {
+  my ($command) = @_;
+  return  ( $command eq $THREAD_COMMAND_RUN     ? 'THREAD_COMMAND_RUN'
+          : $command eq $THREAD_COMMAND_STOP    ? 'THREAD_COMMAND_STOP'    
+          : $command eq $THREAD_COMMAND_RESTART ? 'THREAD_COMMAND_RESTART'
+          : '?'
+          );
+}
+
+sub parse_options {
   my $device                      = "hci0";
   my $daemonize                   = 0;
   my $listen_address              = "0.0.0.0";
@@ -135,7 +184,8 @@ sub parse_options() {
   my $log_level                   = "LOG_INFO";
   my $debug                       = 0;
   my $legacy_mode                 = 0;
-  my $rssi_threshold              = DEFAULT_RSSI_THRESHOLD;
+  my $rssi_threshold              = $DEFAULT_RSSI_THRESHOLD;
+  my $battery_interval_h          = $DEFAULT_BATTERY_INTERVAL_H;
   
   GetOptions(
     'bluetoothdevice|device|b=s'  => \$device,
@@ -147,32 +197,34 @@ sub parse_options() {
     'debug!'                      => \$debug,
     'legacymode|legacy!'          => \$legacy_mode,
     'rssithreshold=i'             => \$rssi_threshold,
+    'batteryinterval=i'           => \$battery_interval_h,
   ) or usage_exit();
   
   usage_exit() if ($rssi_threshold < 5);
+  usage_exit() if ($battery_interval_h < 1);
   
   $listen_address =~ m/^\d+\.\d+\.\d+\.\d+$/ or usage_exit();
-  $log_level =~ m/^LOG_(EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)$/ or usage_exit();
   $log_target =~ m/^(syslog|stdout)$/ or usage_exit();
-  $log_level = eval($log_level);
+  $log_level = parse_log_level($log_level);
   $daemonize = 0 if ($debug);
   
-  return ($device, $daemonize, $listen_address, $listen_port, $log_level, $log_target, $debug, $legacy_mode, $rssi_threshold);
+  return ($device, $daemonize, $listen_address, $listen_port, $log_level, $log_target, $debug, $legacy_mode, $rssi_threshold, $battery_interval_h);
 }
 
-sub sanity_check($) {
+sub sanity_check {
   my ($legacy_mode) = @_;
 
   error_exit(3, "ERROR: lepresenced is already running. Exiting.") if (!flock DATA, LOCK_EX | LOCK_NB);
 
   # log md5 digest of lepresenced
-  open (my $me, "<$0");
+  open (my $me, '<', $0);
   binmode ($me);
-  syslogw(LOG_INFO, "md5 digest of '%s' is: %s.", $0, Digest::MD5->new->addfile($me)->hexdigest());
-
+  syslogw(LOG_INFO, "md5 digest of '%s' is: '%s'.", $0, Digest::MD5->new->addfile($me)->hexdigest());
+  close($me);
+  
   # check if necessary external binaries exist
   my $ok = 1;
-  foreach my $binary ($legacy_mode ? qw/hciconfig hcitool/ : qw/hciconfig hcitool hcidump/) {
+  foreach my $binary ($legacy_mode ? qw/hciconfig hcitool gatttool/ : qw/hciconfig hcitool gatttool hcidump/) {
     my $binpath = `which $binary 2>/dev/null`;
     chomp($binpath);
     if ($? == 0) {
@@ -183,10 +235,11 @@ sub sanity_check($) {
     }
   }
   error_exit(4, "ERROR: Exiting due to missing binaries.") if (!$ok);
+  return();
 }
 
-sub update_device($$$) {
-  my ($mac, $name, $rssi) = @_;
+sub update_device {
+  my ($mac, $name, $rssi, $address_type) = @_;
   $mac = lc($mac);
   {
     lock(%devices);
@@ -201,127 +254,160 @@ sub update_device($$$) {
     $devices{$mac}{'rssi'} = $rssi;
     $devices{$mac}{'reported_rssi'} = $rssi if (!defined($devices{$mac}{'reported_rssi'}));
     $devices{$mac}{'prevtimestamp'} = $devices{$mac}{'timestamp'};
+    $devices{$mac}{'address_type'} = lc($address_type);
     $devices{$mac}{'timestamp'} = time();
   }
+  return();
 }
 
-sub bluetooth_scan_thread($$) {
+sub set_thread_command {
+  my ($thread, $command) = @_;
+  syslogw(LOG_DEBUG, "Setting thread command of thread '%s' to '%s'.", $thread, humanize_thread_command($command));
+  $thread_commands{$thread} = $command;
+  return();
+}
+
+sub bluetooth_scan_thread {
   my ($device, $legacy_mode) = @_;
   my $hcitool;
-  $restart_hcitool = 0;
+
   for(;;) {
-    ($beacons_hcitool, $beacons_hcidump) = (0, 0);
-    my $pid = open($hcitool, "-|", "stdbuf -oL hcitool -i " . $device . " lescan --duplicates 2>&1") || die('Unable to start scanning. Please make sure hcitool and stdbuf are installed!');
-    while (<$hcitool>) {
-      if ($restart_hcitool) {
-        $restart_hcitool = 0;
-        last();
-      }
-      chomp($_);
-      if ($_ eq 'LE Scan ...') {
-        syslogw(LOG_INFO, "Received '%s'.", $_);
-      } elsif (my ($fbmac, $fbname) = $_ =~ /^([\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2})\s(.*)$/i) {
-        $beacons_hcitool++;
-        if ($legacy_mode) {
-          #syslogw(LOG_DEBUG, "Received advertisement from bluetooth mac address '%s' with name '%s'.", $fbmac, $fbname);
-          update_device($fbmac, $fbname, 'unknown');
+    #syslogw(LOG_DEBUG, "Thread command: '%s'.", $thread_commands{bluetooth_scan_thread});
+    if ($thread_commands{bluetooth_scan_thread} != $THREAD_COMMAND_STOP) {
+      ($beacons_hcitool, $beacons_hcidump) = (0, 0);
+      my $pid = open($hcitool, "-|", "stdbuf -oL hcitool -i " . $device . " lescan --duplicates 2>&1") || die('Unable to start scanning. Please make sure hcitool and stdbuf are installed!');
+      while (<$hcitool>) {
+        #syslogw(LOG_DEBUG, "Thread command: '%s'.", $thread_commands{bluetooth_scan_thread}) if ($thread_commands{bluetooth_scan_thread} != $THREAD_COMMAND_RUN);
+        last() if ($thread_commands{bluetooth_scan_thread} != $THREAD_COMMAND_RUN);
+        chomp($_);
+        if ($_ eq 'LE Scan ...') {
+          syslogw(LOG_INFO, "Received '%s'.", $_);
+        } elsif (my ($fbmac, $fbname) = $_ =~ /^([\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2}:[\da-f]{2})\s(.*)$/i) {
+          $beacons_hcitool++;
+          if ($legacy_mode) {
+            update_device($fbmac, $fbname, 'unknown', undef);
+          }
+        } elsif (
+            $_ =~ m/^Set scan parameters failed: Input\/output error$/ ||
+            $_ =~ m/^Invalid device: Network is down$/
+          ) {
+          syslogw(LOG_WARNING, "Received '%s', resetting...", $_);
+          system(sprintf('hciconfig %s reset', $device));
+        } else {
+          syslogw(LOG_WARNING, "Received unknown output: '%s'!", $_);
         }
-      } elsif (
-          $_ =~ m/^Set scan parameters failed: Input\/output error$/ ||
-          $_ =~ m/^Invalid device: Network is down$/
-        ) {
-        syslogw(LOG_WARNING, "Received '%s', resetting...", $_);
-        system(sprintf('hciconfig %s reset', $device));
-      } else {
-        syslogw(LOG_WARNING, "Received unknown output: '%s'!", $_);
       }
+      kill($KILL_SIGNAL, $pid);
+      close($hcitool);
+      syslogw(LOG_WARNING, 
+          $thread_commands{bluetooth_scan_thread} == $THREAD_COMMAND_STOP     ? "hcitool was stopped."
+        : $thread_commands{bluetooth_scan_thread} == $THREAD_COMMAND_RESTART  ? "restarting hcitool..."
+        : "hcitool exited, retrying..."
+      );
+      set_thread_command('bluetooth_scan_thread', $THREAD_COMMAND_RUN) if ($thread_commands{bluetooth_scan_thread} == $THREAD_COMMAND_RESTART);
     }
-    syslogw(LOG_WARNING, "hcitool exited, retrying...");
-    close($hcitool);
-    sleep(RETRY_SLEEP);
+    sleep($RETRY_SLEEP);
   }
+  return();
 }
 
-sub bluetooth_dump_thread($) {
+sub bluetooth_dump_thread {
   my ($device) = @_;
   my $hcidump;
   my %rssitable;
 
   for(;;) {
-    my $pid = open($hcidump, "-|", "hcidump -i " . $device) || die('Unable to start scanning. Please make sure hcidump is installed or use legacy mode (--legacymode)!');
-    my $state = HCIDUMP_STATE_NONE;
-    my $current_mac = '';
-    my $current_rssi = '';
-    my $current_name = '';
-    
-    while (<$hcidump>) {
-      chomp($_);
-    if ($_ =~ m/^< HCI Command: / && $beacons_hcitool > 0) { # Ignore initial settings, i. e. before first beacon
-      # https://forum.fhem.de/index.php/topic,75559.msg1007719.html#msg1007719
-      syslogw(LOG_WARNING, "Received '%s', telling hcidump to restart...", $_);
-      $state = HCIDUMP_STATE_NONE;
-      $restart_hcitool = 1;
-    } elsif ($_ =~ m/^>/) {
-        if ($current_mac) {
-          #printf("DEBUG: mac: %s, name: '%s', rssi: %s\n", $current_mac, $current_name, $current_rssi);
-          
-          # update rssi queue
-          unless (exists $rssitable{$current_mac}) {
-            $rssitable{$current_mac} = [];
+    #syslogw(LOG_DEBUG, "Thread command: '%s'.", $thread_commands{bluetooth_dump_thread});
+    if ($thread_commands{bluetooth_dump_thread} != $THREAD_COMMAND_STOP) {
+      ($beacons_hcitool, $beacons_hcidump) = (0, 0);
+      my $pid = open($hcidump, "-|", "hcidump -i " . $device . " 2>&1") || die('Unable to start scanning. Please make sure hcidump is installed or use legacy mode (--legacymode)!');
+      my $state = $HCIDUMP_STATE_NONE;
+      my $current_mac = '';
+      my $current_rssi = '';
+      my $current_name = '';
+      my $current_address_type = '';
+      
+      while (<$hcidump>) {
+        #syslogw(LOG_DEBUG, "Thread command: '%s'.", $thread_commands{bluetooth_dump_thread}) if ($thread_commands{bluetooth_dump_thread} != $THREAD_COMMAND_RUN);
+        last() if ($thread_commands{bluetooth_dump_thread} != $THREAD_COMMAND_RUN);
+        chomp($_);
+        if ($_ =~ m/^< HCI Command: /) {
+          if ($beacons_hcitool > 0) { # Ignore initial settings, i. e. before first beacon
+            # https://forum.fhem.de/index.php/topic,75559.msg1007719.html#msg1007719
+            syslogw(LOG_WARNING, "Received '%s', telling hcidump and hcitool to restart...", $_);
+            set_thread_command('bluetooth_scan_thread', $THREAD_COMMAND_RESTART);
+            set_thread_command('bluetooth_dump_thread', $THREAD_COMMAND_RESTART);
           }
-          if ($current_rssi) {
-            shift(@{$rssitable{$current_mac}}) if(scalar(@{$rssitable{$current_mac}}) >= RSSI_WINDOW);
-            push(@{$rssitable{$current_mac}}, $current_rssi);
+        } elsif ($_ =~ m/^>/) {
+          if ($current_mac) {
+            # update rssi queue
+            unless (exists $rssitable{$current_mac}) {
+              $rssitable{$current_mac} = [];
+            }
+            if ($current_rssi) {
+              shift(@{$rssitable{$current_mac}}) if(scalar(@{$rssitable{$current_mac}}) >= $RSSI_WINDOW);
+              push(@{$rssitable{$current_mac}}, $current_rssi);
+            }
+            my $mean_rssi = 0;
+            foreach my $rssi (@{$rssitable{$current_mac}}) {
+              $mean_rssi += $rssi;
+            }
+            $mean_rssi = int($mean_rssi / scalar(@{$rssitable{$current_mac}}));
+            #printf("DEBUG: mac: %s, rssi count: %i, rssis: %s, mean: %s\n", $current_mac, scalar(@{$rssitable{$current_mac}}), join(',', @{$rssitable{$current_mac}}), $mean_rssi);
+            update_device($current_mac, $current_name, $mean_rssi, $current_address_type);
+          } 
+          $current_mac = '';
+          $current_rssi = '';
+          $current_name = '';
+          $current_address_type = '';
+          if ($_ =~ m/^> HCI Event: LE Meta Event \(0x3e\) plen \d+$/) {
+            $state = $HCIDUMP_STATE_LE_META_EVENT;
+          } else {
+            $state = $HCIDUMP_STATE_NONE;
           }
-          my $mean_rssi = 0;
-          foreach my $rssi (@{$rssitable{$current_mac}}) {
-            $mean_rssi += $rssi;
+        } elsif (
+            $state == $HCIDUMP_STATE_LE_META_EVENT &&
+            $_ eq '    LE Advertising Report'
+          ) {
+            $state = $HCIDUMP_STATE_LE_ADVERTISING_REPORT;
+        } elsif ($state == $HCIDUMP_STATE_LE_ADVERTISING_REPORT) {
+          if (
+            $_ eq '      ADV_IND - Connectable undirected advertising (0)' ||
+            $_ eq '      ADV_NONCONN_IND - Non connectable undirected advertising (3)'
+          ) {
+            $state = $HCIDUMP_STATE_ADV_INT;
+          } elsif ($_ eq '      SCAN_RSP - Scan Response (4)') {
+            $state = $HCIDUMP_STATE_SCAN_RSP;
           }
-          $mean_rssi = int($mean_rssi / scalar(@{$rssitable{$current_mac}}));
-          #printf("DEBUG: mac: %s, rssi count: %i, rssis: %s, mean: %s\n", $current_mac, scalar(@{$rssitable{$current_mac}}), join(',', @{$rssitable{$current_mac}}), $mean_rssi);
-
-          update_device($current_mac, $current_name, $mean_rssi);
-        } 
-        $current_mac = '';
-        $current_rssi = '';
-        $current_name = '';
-        if ($_ =~ m/^> HCI Event: LE Meta Event \(0x3e\) plen \d+$/) {
-          $state = HCIDUMP_STATE_LE_META_EVENT;
-        } else {
-          $state = HCIDUMP_STATE_NONE;
-        }
-      } elsif (
-          $state == HCIDUMP_STATE_LE_META_EVENT &&
-          $_ eq '    LE Advertising Report'
-        ) {
-          $state = HCIDUMP_STATE_LE_ADVERTISING_REPORT;
-      } elsif ($state == HCIDUMP_STATE_LE_ADVERTISING_REPORT) {
-        if (
-          $_ eq '      ADV_IND - Connectable undirected advertising (0)' ||
-          $_ eq '      ADV_NONCONN_IND - Non connectable undirected advertising (3)'
-        ) {
-          $state = HCIDUMP_STATE_ADV_INT;
-        } elsif ($_ eq '      SCAN_RSP - Scan Response (4)') {
-          $state = HCIDUMP_STATE_SCAN_RSP;
-        }
-      } elsif ($state == HCIDUMP_STATE_SCAN_RSP || $state == HCIDUMP_STATE_ADV_INT) {
-        if  ($_ =~ m/^      bdaddr ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) \((Public|Random)\)$/) {
-          $beacons_hcidump++;
-          $current_mac = $1;
-        } elsif ($_ =~ m/^      Complete local name: '(.*)'$/) {
-          $current_name = $1;
-        } elsif ($_ =~ m/^      RSSI: (-\d+)$/) {
-          $current_rssi = $1;
+        } elsif ($state == $HCIDUMP_STATE_SCAN_RSP || $state == $HCIDUMP_STATE_ADV_INT) {
+          if  ($_ =~ m/^      bdaddr ([0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}) \((Public|Random)\)$/) {
+            $beacons_hcidump++;
+            $current_mac = $1;
+            $current_address_type = $2;
+          } elsif ($_ =~ m/^      Complete local name: '(.*)'$/) {
+            $current_name = $1;
+          } elsif ($_ =~ m/^      RSSI: (-\d+)$/) {
+            $current_rssi = $1;
+          }
+        } elsif ($_ !~ m/^ /) {
+          syslogw(LOG_DEBUG, 'Received \'%s\'.', $_);
         }
       }
+      kill($KILL_SIGNAL, $pid);
+      close($hcidump);
+      syslogw(LOG_WARNING, 
+          $thread_commands{bluetooth_dump_thread} == $THREAD_COMMAND_STOP     ? "hcidump was stopped."
+        : $thread_commands{bluetooth_dump_thread} == $THREAD_COMMAND_RESTART  ? "restarting hcidump..."
+        : "hcidump exited, retrying..."
+      );
+      set_thread_command('bluetooth_dump_thread', $THREAD_COMMAND_RUN) if ($thread_commands{bluetooth_dump_thread} == $THREAD_COMMAND_RESTART);
     }
-    syslogw(LOG_WARNING, "hcidump exited, retrying...");
-    close($hcidump);
-    sleep(RETRY_SLEEP);
+    sleep($RETRY_SLEEP);
   }
+  return();
 }
 
-sub handle_command($$) {
+sub handle_command {
   my ($buf, $current_client) = @_;
   if (my ($mac, undef, $interval) = $buf =~ m/^\s*(([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s*\|\s*(\d+)\s*$/) {
     $mac = lc($mac);
@@ -345,6 +431,7 @@ sub handle_command($$) {
     foreach my $client (grep { $_->{'handle'} == $current_client } @clients) {
       $client->{'next_check'} = 0; #now
     }
+    $next_battery_time = time() + $SHORT_BATTERY_INTERVAL_S;
     print $current_client "command accepted\n"
   } elsif ($buf =~ m/^\s*ping\s*$/) {
       syslogw(LOG_DEBUG, "Received ping command from client %s:%i.", $current_client->peerhost(), $current_client->peerport());
@@ -362,7 +449,7 @@ sub handle_command($$) {
   return(0);
 }
 
-sub gather_stats() {
+sub gather_stats {
   my ($min_age, $max_age, $devices);
   {
     lock(%devices);
@@ -376,34 +463,40 @@ sub gather_stats() {
   return($min_age, $max_age, $devices);
 }
 
-sub stats_task() {
+sub stats_task {
   my ($min_age, $max_age, $devices) = gather_stats();
   syslogw(LOG_INFO, "Active clients: %i, known devices: %i (min/max age: %s/%s), received beacons (hcitool/hcidump/difference): %i/%i/%i",
     scalar(@clients), $devices, $min_age // '%', $max_age // '%', $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
+  return();
 }
 
-sub dump_task() {
+sub dump_task {
   printf("Known devices (%i):\n", scalar(keys(%devices)));
   foreach my $mac (sort keys(%devices)) {
-    printf("\tmac: %s, ages: %2s/%2s, rssi: %s, name: %s\n",
+    printf("\tmac: %s, ages: %2s/%2s, rssi: %s, name: %s, battery: %s\n",
       $mac,
       time() - $devices{$mac}{'timestamp'},
       $devices{$mac}{'prevtimestamp'} ? time() - $devices{$mac}{'prevtimestamp'} : '%',
       $devices{$mac}{'rssi'},
-      $devices{$mac}{'name'}
+      $devices{$mac}{'name'},
+      exists($devices{$mac}{'battery_level'}) ? sprintf("%s (age: %ss)", $devices{$mac}{'battery_level'}, time() - $devices{$mac}{'battery_time'}) : 'unknown'
     );
   }
   printf("Received beacons (hcitool/hcidump): %i/%i, difference: %i\n", $beacons_hcitool, $beacons_hcidump, abs($beacons_hcitool - $beacons_hcidump));
+  return();
 }
 
-sub cleanup_task() {
+sub cleanup_task {
   my $start_time = time();
   my $deleted_items = 0;
   {
     lock(%devices);
     foreach my $mac (keys(%devices)) {
       my $age = time() - $devices{$mac}{'timestamp'};
-      if ($age > CLEANUP_MAX_AGE) {
+      if (
+        $age > $CLEANUP_MAX_AGE &&
+        scalar(grep { $_->{'mac'} eq $mac } @clients) == 0
+      ) {
         $deleted_items++;
         syslogw(LOG_DEBUG, "Deleting device %s.", $mac);
         delete($devices{$mac});
@@ -411,30 +504,103 @@ sub cleanup_task() {
     }
   }
   syslogw(LOG_INFO, "Cleanup finished, deleted %i devices in %i seconds.", $deleted_items, time() - $start_time);
+  return();
+}
+sub get_battery_level {
+  my ($device, $mac) = @_;
+  my $address_type = $devices{$mac}{'address_type'} // 'public';
+  open(my $gatttool, "-|", "gatttool -i $device -b $mac -t $address_type --char-read --uuid=$BATTERY_LEVEL_CHARACTERISTIC_UUID 2>&1") || die('Error executing gatttool!');
+  
+  my $result = 'unknown';
+  while (<$gatttool>) {
+    chomp($_);
+    syslogw(LOG_DEBUG, "gatttool (mac: %s, address type: '%s'): '%s'", $mac, $address_type, $_);
+    if ($_ =~ m/^handle:\s[0-9A-Fa-fx]+\s+value:\s([0-9a-f]+)\s*$/) {
+      # Success: 'handle: 0x0028 	 value: 64'
+      $result = hex($1);
+    } elsif ($_ =~ m/^Read characteristics by UUID failed: No attribute found within the given range$/) {
+      # Unsupported: 'Read characteristics by UUID failed: No attribute found within the given range'
+      $result = 'unknown (unsupported)';
+      printf
+    } elsif ($_ =~ m/^connect error: Connection refused \(111\)$/) {
+      # Unreachable (after 40s): 'connect error: Connection refused (111)'
+      # Shouldn't happen very often because we try to query only reachable clients
+      $result = 'unknown (timeout)';
+    }
+  }
+  close($gatttool);  
+  return($result);
+}
+sub battery_task {
+  my ($device) = @_;
+  my @present_clients;
+  foreach my $client (@clients) {
+    push(@present_clients, $client) if (is_present($client));
+  }
+  
+  if (scalar(@present_clients) > 0) {
+    syslogw(LOG_INFO, "Starting battery task, %i reachable device(s) to query...", scalar(@present_clients));
+
+    set_thread_command('bluetooth_dump_thread', $THREAD_COMMAND_STOP);
+    set_thread_command('bluetooth_scan_thread', $THREAD_COMMAND_STOP);
+    sleep($BATTERY_TASK_SETTLE_PRE_SLEEP);
+    
+    foreach my $client (@present_clients) {
+      my $battery_level = get_battery_level($device, $client->{'mac'});
+      syslogw(LOG_INFO, "Battery level for mac %s is %s.", $client->{'mac'}, $battery_level);
+      # Don't overwrite a valid battery level with unknown
+      if(defined($devices{$client->{'mac'}}) && $battery_level !~ m/^unknown/) {
+        lock(%devices);
+        $devices{$client->{'mac'}}{'battery_level'} = $battery_level;
+        $devices{$client->{'mac'}}{'battery_time'} = time();
+        # allow present clients a full interval to recover after scan stop
+        $client->{'next_check'} = time() + $client->{'interval'}; 
+      }
+    }
+    
+    sleep($BATTERY_TASK_SETTLE_POST_SLEEP);
+    set_thread_command('bluetooth_scan_thread', $THREAD_COMMAND_RUN);
+    set_thread_command('bluetooth_dump_thread', $THREAD_COMMAND_RUN);
+    
+    syslogw(LOG_INFO, "Battery task completed.");
+  } else {
+    syslogw(LOG_INFO, "Skipping battery task, no devices to query.");
+  }
+  return();
 }
 
-openlog(ME, 'pid', LOG_USER);
-(my $device, my $daemonize, my $listen_address, my $listen_port, $log_level, $log_target, $debug, my $legacy_mode, my $rssi_threshold) = parse_options();
+sub is_present {
+  my ($client) = @_;
+  return(
+    defined($devices{$client->{'mac'}}) &&
+    time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'} && 
+    defined($devices{$client->{'mac'}}{prevtimestamp}) && time()-$devices{$client->{'mac'}}{prevtimestamp} <= $client->{'interval'}
+  );
+}
+
+openlog($ME, 'pid', LOG_USER);
+(my $device, my $daemonize, my $listen_address, my $listen_port, $log_level, $log_target, $debug, my $legacy_mode, my $rssi_threshold, my $battery_interval_h) = parse_options();
 
 local $SIG{INT} = local $SIG{TERM} = local $SIG{HUP} = sub {
   syslogw(LOG_NOTICE, "Caught signal, cleaning up and exiting...");
-  unlink(PIDFILE) if (-e PIDFILE);
+  unlink($PIDFILE) if (-e $PIDFILE);
   closelog();
   exit(1);
 };
 
-syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, legacy mode: %i, rssi threshold: %i, log level: %i, debug: %i).",
-  VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $log_level, $debug);
+syslogw(LOG_NOTICE, "Version %s started (device: %s, listen addr: %s, listen port: %s, daemonize: %i, legacy mode: %i, rssi threshold: %i, battery interval: %i, log level: %i, debug: %i).",
+  $VERSION, $device, $listen_address, $listen_port, $daemonize, $legacy_mode, $rssi_threshold, $battery_interval_h, $log_level, $debug);
 
 sanity_check($legacy_mode);
-daemonize('root', 'root', PIDFILE) if $daemonize;
+daemonize('root', 'root', $PIDFILE) if $daemonize;
 
-my $bluetooth_scan_thread = threads->new(\&bluetooth_scan_thread, $device, $legacy_mode)->detach();
-my $bluetooth_dump_thread = threads->new(\&bluetooth_dump_thread, $device)->detach() if (!$legacy_mode);
+my ($bluetooth_dump_thread, $bluetooth_scan_thread);
+$bluetooth_scan_thread = threads->new(\&bluetooth_scan_thread, $device, $legacy_mode)->detach();
+$bluetooth_dump_thread = threads->new(\&bluetooth_dump_thread, $device)->detach() if (!$legacy_mode);
 
 my $current_client;
-$| = 1;
-my $server_socket = new IO::Socket::INET (
+local $| = 1;
+my $server_socket = IO::Socket::INET->new(
   LocalHost => $listen_address,
   LocalPort => $listen_port,
   Proto => 'tcp',
@@ -444,11 +610,11 @@ my $server_socket = new IO::Socket::INET (
 $server_socket or error_exit(2, "ERROR: Unable to create TCP server: $!, Exiting.");
 my $select = IO::Select->new($server_socket) or error_exit(1, "ERROR: Unable to select: $!, Exiting.");
 
-my $next_stats_time = time() + STATS_INTERVAL;
-my $next_dump_time = time() + DUMP_INTERVAL if ($debug);
-my $next_cleanup_time = time() + CLEANUP_INTERVAL;
+$next_stats_time = time() + $STATS_INTERVAL_DEBUG;
+$next_dump_time = time() + $DUMP_INTERVAL if ($debug);
+$next_cleanup_time = time() + $CLEANUP_INTERVAL;
 
-$SIG{PIPE} = sub {
+local $SIG{PIPE} = sub {
   syslogw(LOG_INFO, "SIGPIPE received!");
 };
 
@@ -460,7 +626,7 @@ for(;;) {
       $select->add($client_socket);
       syslogw(LOG_INFO, "Connection from %s:%s. Connected clients: %i.", $client_socket->peerhost(), $client_socket->peerport(), $select->count()-1);
     } else {
-      sysread ($current_client, my $buf, INET_RECV_BUFFER);
+      sysread ($current_client, my $buf, $INET_RECV_BUFFER);
       my $disconnect;
       if ($buf) {
         chomp($buf);
@@ -490,21 +656,33 @@ for(;;) {
       }
     }
   }
-    
+   
   # Check for due client updates, cleanup, stats
   # For performance reasons, a maximum of one task is performed per loop
   if (my @due_clients = grep { time() >= $_->{'next_check'} } @clients) {
     foreach my $client (@due_clients) {
-      if (
-          defined($devices{$client->{'mac'}}) &&
-          time()-$devices{$client->{'mac'}}{timestamp} <= $client->{'interval'} && 
-          defined($devices{$client->{'mac'}}{prevtimestamp}) && time()-$devices{$client->{'mac'}}{prevtimestamp} <= $client->{'interval'}
-        ) {
-        syslogw(LOG_DEBUG, "Sending update for mac address %s, ages: %i/%i, max age: %i, rssi: %i, result: present.", $client->{'mac'}, time()-$devices{$client->{'mac'}}{'timestamp'}, time()-$devices{$client->{'mac'}}{'prevtimestamp'}, $client->{'interval'}, $devices{$client->{'mac'}}{'rssi'});
-        printf {$client->{'handle'}} "present;device_name=%s;rssi=%s;model=lan-lepresenced;daemon=%s V%s\n", $devices{$client->{'mac'}}{name}, $devices{$client->{'mac'}}{'rssi'}, ME, VERSION;
+      if (is_present($client)) {
+        my $battery_age = exists($devices{$client->{'mac'}}{'battery_time'}) ? int((time() - $devices{$client->{'mac'}}{'battery_time'})/3600) : 'unknown';
+        my $send_battery = defined($devices{$client->{'mac'}}{'battery_level'}) && $battery_age ne 'unknown' && $battery_age <= $battery_interval_h * $BATTERY_MAX_AGE_FACTOR;
+        syslogw(LOG_DEBUG, "Sending update for mac address %s, ages: %i/%i, max age: %i, rssi: %i, battery level: %s (age: %s)%s, result: present.",
+          $client->{'mac'},
+          time()-$devices{$client->{'mac'}}{'timestamp'},
+          time()-$devices{$client->{'mac'}}{'prevtimestamp'},
+          $client->{'interval'},
+          $devices{$client->{'mac'}}{'rssi'},
+          $devices{$client->{'mac'}}{'battery_level'} // 'unknown',
+          $battery_age,
+          $send_battery ? '' : ' (ignored)'
+        );
+        printf {$client->{'handle'}} "present;device_name=%s;rssi=%s%s;model=lan-lepresenced;daemon=%s V%s\n",
+          $devices{$client->{'mac'}}{'name'},
+          $devices{$client->{'mac'}}{'rssi'},
+          $send_battery ? sprintf(";batteryPercent=%s;batteryPercentAge=%s", $devices{$client->{'mac'}}{'battery_level'} // 'unknown', $battery_age) : '',
+          $ME, $VERSION
+        ;
       } else {
         syslogw(LOG_DEBUG, "Sending update for mac address %s, max age: %i, result: absence.", $client->{'mac'}, $client->{'interval'});
-        printf {$client->{'handle'}} "absence;rssi=unreachable;model=lan-lepresenced;daemon=%s V%s\n", ME, VERSION;
+        printf {$client->{'handle'}} "absence;rssi=unreachable;model=lan-lepresenced;daemon=%s V%s\n", $ME, $VERSION;
       }
       if (defined($devices{$client->{'mac'}})) {
         lock(%devices);
@@ -514,16 +692,18 @@ for(;;) {
     }
   } elsif (time() > $next_cleanup_time) {
     cleanup_task();
-    $next_cleanup_time = time() + CLEANUP_INTERVAL;
+    $next_cleanup_time = time() + $CLEANUP_INTERVAL;
   } elsif (time() > $next_stats_time) {
     stats_task();
-    $next_stats_time = time() + STATS_INTERVAL;
+    $next_stats_time = time() + ($log_level == LOG_DEBUG ? $STATS_INTERVAL_DEBUG : $STATS_INTERVAL_INFO);
   } elsif ($debug && time() > $next_dump_time) {
     dump_task();
-    $next_dump_time = time() + DUMP_INTERVAL;
+    $next_dump_time = time() + $DUMP_INTERVAL;
+  } elsif (time() > $next_battery_time) {
+    battery_task($device);
+    $next_battery_time = time() + $battery_interval_h * 60 * 60;
   }
-
-  usleep(MAINLOOP_SLEEP_US);
+  usleep($MAINLOOP_SLEEP_US);
 }
 $server_socket->close();
 
