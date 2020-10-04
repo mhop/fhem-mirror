@@ -536,9 +536,11 @@ return;
 }
 
 ######################################################################################
-#                            Username / Paßwort speichern
-#   $ctc  = "credentials"     -> Standard Credentials
-#   $ctc  = "SMTPcredentials" -> Credentials für Mailversand
+#                            Credentials speichern
+#   $ctc  = Credentials type code:
+#           "credentials"     -> Standard Credentials
+#           "SMTPcredentials" -> Credentials für Mailversand
+#           "botToken"        -> einen Token speichern
 #   $sep  = Separator zum Split des $credstr, default ":"
 ######################################################################################
 sub setCredentials {
@@ -567,11 +569,11 @@ sub setCredentials {
         $success = 1;
     }
 
-return ($success);
+return $success;
 }
 
 ######################################################################################
-#                             Username / Paßwort abrufen
+#                          gespeicherte Credentials laden/abrufen
 #   $boot = 1 beim erstmaligen laden
 #   $ctc  = Credentials type code:
 #           "credentials"     -> Standard Credentials
@@ -600,7 +602,6 @@ sub getCredentials {
         }
         
         if(!$credstr) {
-            Log3($name, 2, qq{$name - ERROR - The stored value of "$index" is empty});
             return;
         }
         
@@ -643,6 +644,10 @@ sub getCredentials {
             return;
         }
         
+        if(!$credstr) {
+            return;
+        }       
+        
         if($ctc eq "botToken") {
             my $token  = decode_base64( _descramble($credstr) );
             my $logtok = AttrVal($name, "showTokenInLog", "0") == 1 ? $token : "********";
@@ -651,7 +656,7 @@ sub getCredentials {
             
             return (1, $token);
         }
-        
+
         ($username, $passwd) = split "$sep", decode_base64( _descramble($credstr) );
         
         if(!$username || !$passwd) {
@@ -666,7 +671,9 @@ sub getCredentials {
         Log3($name, 4, "$name - ".$sc." read from RAM: $username $logpw");
 
         return (1, $username, $passwd);
-    }    
+    }
+    
+return;
 }
 
 ######################################################################################
@@ -771,6 +778,8 @@ return $dstr;
 sub _getCredentialsFromHash {
   my $hash = shift // carp $carpnohash                    && return;    
   my $ctc  = shift // carp "got no Credentials type code" && return;
+  
+  my $name = $hash->{NAME};
     
   my $credstr = q{}; 
   my $sc      = q{};
@@ -797,7 +806,7 @@ sub _getCredentialsFromHash {
   }
 
   if($found && !$credstr) {
-      $err = "empty value";
+      Log3($name, 5, qq{$name - The stored value of $ctc is empty});
   }
         
 return ($err,$sc,$credstr);
@@ -1029,7 +1038,9 @@ sub logout {
    my ($success, $username) = getCredentials($hash,0,"credentials",$sep);
    
    if(!$sid) {
-       Log3($name, 2, qq{$name - User "$username" has no valid session, logout is cancelled});
+       if($username) {
+           Log3($name, 2, qq{$name - User "$username" has no valid session, logout is cancelled});
+       }
 
        readingsBeginUpdate ($hash);
        readingsBulkUpdate  ($hash, "Errorcode", "none");
