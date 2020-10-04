@@ -52,6 +52,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   showAPIinfo
                                   setCredentials
                                   getCredentials
+                                  showStoredCredentials
                                   evaljson
                                   login
                                   logout
@@ -183,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
   "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
   "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
@@ -4270,27 +4272,9 @@ sub _getstoredCredentials {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   
-  my ($success, $username, $password) = getCredentials($hash,0,"credentials");                 # Credentials abrufen
-  if (!$success) {return "Credentials couldn't be retrieved successfully - see logfile"};
-
-  my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash,0,"SMTPcredentials");
+  my $out = showStoredCredentials ($hash, 3);
   
-  my $so;
-  
-  if($smtpsuccess) {
-      $so = "SMTP-Username: $smtpuname, SMTP-Password: $smtpword";
-  } 
-  else {
-      $so = "SMTP credentials are not set";
-  }
-  
-return "Stored Credentials to access surveillance station or DSM:\n".
-       "=========================================================\n".
-       "Username: $username, Password: $password\n".
-       "\n".
-       "Stored Credentials to access SMTP server:\n".
-       "=========================================\n".
-       "$so\n";
+return $out;
 }
 
 ################################################################
