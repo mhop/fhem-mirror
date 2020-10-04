@@ -662,7 +662,11 @@ sub getCredentials {
         if(!$username || !$passwd) {
             $err = qq{possible problem in splitting with separator "$sep"};
             Log3($name, 2, "$name - ERROR - ".$sc." not successfully decoded ! $err");
-            delete $hash->{CREDENTIALS};
+            
+            if($ctc eq "credentials") {
+                delete $hash->{CREDENTIALS};
+            }
+            
             return;
         }
         
