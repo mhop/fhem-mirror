@@ -3849,6 +3849,7 @@ sub set_Exec
 {
   my ($timername,$sec,$subname,$param4,$param5)=@_;
   my $count=0;
+  my $hash=$hs;
   if (defined $param5) {
     $hs->{ptimer}{$timername}{cond}=$param5;
     $hs->{ptimer}{$timername}{param}=$param4;
@@ -5495,7 +5496,7 @@ Das Format lautet: [:MM] MM sind Minutenangaben zwischen 00 und 59.<br>
 <a name="DOIF_Relative_Zeitangaben_nach_Zeitraster_ausgerichtet"></a><br>
 <b>Relative Zeitangaben nach Zeitraster ausgerichtet</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 1 und 59.<br>
+Das Format lautet: [+:MM] MM sind Minutenangaben zwischen 00 und 59.<br>
 <br>
 <u>Anwendungsbeispiel</u>: Gong alle fünfzehn Minuten um XX:00 XX:15 XX:30 XX:45<br>
 <br>
@@ -5508,7 +5509,7 @@ attr di_gong do always</code><br>
 <a name="DOIF_Zeitangaben_nach_Zeitraster_ausgerichtet_alle_X_Stunden"></a><br>
 <b>Zeitangaben nach Zeitraster ausgerichtet alle X Stunden</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 2 und 23 und MM Minuten zwischen 00 und 59<br>
+Format: [+[h]:MM] mit: h sind Stundenangaben zwischen 1 und 23 und MM Minuten zwischen 00 und 59<br>
 <br>
 <u>Anwendungsbeispiel</u>: Es soll immer fünf Minuten nach einer vollen Stunde alle 2 Stunden eine Pumpe eingeschaltet werden, die Schaltzeiten sind 00:05, 02:05, 04:05 usw.<br>
 <br>
@@ -5879,6 +5880,8 @@ Diese Angaben können ebenfalls bei folgenden Attributen gemacht werden: cmdpaus
 Beispiel:<br>
 <br>
 <code>attr my_doif wait 1:[mydummy:state]*3:rand(600)+100,Attr("mydevice","myattr","")</code><br>
+<br>
+Im Perl-Modus werden Verzögerungen mit Hilfe der Funktion <a href="#DOIF_set_Exec">set_Exec</a> realisiert.<br>
 <br>
 </li><li><a name="DOIF_timerWithWait"></a>
 <b>Verzögerungen von Timern</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
