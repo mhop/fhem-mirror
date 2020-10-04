@@ -36,11 +36,9 @@ use warnings;
 eval "use JSON;1;" or my $SSCalMM = "JSON";                       ## no critic 'eval' # Debian: apt-get install libjson-perl
 use Data::Dumper;                                                 # Perl Core module
 use GPUtils qw(GP_Import GP_Export);                              # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
-
 use FHEM::SynoModules::API qw(apistatic);                         # API Modul
 
-use FHEM::SynoModules::SMUtils qw(           
-                                   completeAPI
+use FHEM::SynoModules::SMUtils qw( completeAPI
                                    showAPIinfo
                                    showModuleInfo
                                    addSendqueueEntry
@@ -54,6 +52,7 @@ use FHEM::SynoModules::SMUtils qw(
                                    delReadings
                                    setCredentials
                                    getCredentials
+                                   showStoredCredentials
                                    setReadingErrorState
                                    setReadingErrorNone 
                                    login
@@ -65,8 +64,6 @@ use FHEM::SynoModules::SMUtils qw(
                                  );                               # Hilfsroutinen Modul 
 
 use FHEM::SynoModules::ErrCodes qw(expErrors);                    # Error Code Modul                                                      
-
-
 use MIME::Base64;
 use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
@@ -142,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.3"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "2.4.2"  => "03.10.2020  get from SMUtils: completeAPI showAPIinfo evaljson setReadingErrorState setReadingErrorNone showModuleInfo ".
                            "login logout getClHash delClHash trim moduleVersion updQueueLength delReadings checkSendRetry startFunctionDelayed ".
                            "minor fix in periodicCall ",
@@ -203,6 +201,14 @@ my %hset = (                                                                # Ha
   purgeSendqueue     => { fn => \&purgeSendqueue,          needcred => 0 },
   restartSendqueue   => { fn => \&_setrestartSendqueue,    needcred => 1 },
   cleanCompleteTasks => { fn => \&_setcleanCompleteTasks,  needcred => 1 },
+);
+
+my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+  apiInfo           => { fn => \&_getapiInfo,              needcred => 1 },                     
+  calAsHtml         => { fn => \&_getcalAsHtml,            needcred => 0 },
+  getCalendars      => { fn => \&_getgetCalendars,         needcred => 1 },
+  storedCredentials => { fn => \&_getstoredCredentials,    needcred => 1 },
+  versionNotes      => { fn => \&_getversionNotes,         needcred => 0 },
 );
 
 # Versions History extern
@@ -831,15 +837,13 @@ return;
 ######################################################################################
 #                                      Getter
 ######################################################################################
-sub Get {                                                    ## no critic 'complexity'
+sub Get {                                                   
     my ($hash, @a) = @_;
     return "\"get X\" needs at least an argument" if ( @a < 2 );
     my $name = shift @a;
     my $opt  = shift @a;
     my $arg  = shift @a;
-    my $arg1 = shift @a;
-    my $arg2 = shift @a;
-    my $ret = "";
+
     my $getlist;
 
     if(!$hash->{CREDENTIALS}) {
@@ -855,61 +859,105 @@ sub Get {                                                    ## no critic 'compl
                    ;
     }
           
-    return if(IsDisabled($name));             
-              
-    if ($opt eq "storedCredentials") {                                                ## no critic 'Cascading'
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials <CREDENTIALS>\"";}
-        # Credentials abrufen
-        my ($success, $username, $passwd) = getCredentials($hash, 0, "credentials", $splitstr);
-        
-        if (!$success) {
-            return "Credentials couldn't be retrieved successfully - see logfile";
-        }
-        
-        return "Stored Credentials:\n".
-               "===================\n".
-               "Username: $username, Password: $passwd \n"
-               ;
-    } 
-    elsif ($opt eq "apiInfo") {                                                         # Liste aller Kalender abrufen
-        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        delClHash ($name);
-        getClHash ($hash,1);
+    return if(IsDisabled($name));  
 
-        # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
-        addSendqueue ($name,"apiInfo","","","");            
-        getApiSites  ($name);
-    } 
-    elsif ($opt eq "getCalendars") {                                                    # Liste aller Kalender abrufen
-        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        delClHash ($name);
-        getClHash ($hash,1);
-        
-        addSendqueue ($name,"listcal","CAL","list","&is_todo=true&is_evt=true");            
-        getApiSites  ($name);
-    } 
-    elsif ($opt eq "calAsHtml") {                                                    
-        my $out = calAsHtml($name);
-        return $out;
-    } 
-    elsif ($opt =~ /versionNotes/x) {
-        my $paref = {
-            arg  => $arg,
-        };
-        
-        $paref->{hintextde} = \%vHintsExt_de;
-        $paref->{hintexten} = \%vHintsExt_en;
-        $paref->{notesext}  = \%vNotesExtern;
-         
-        $ret = showModuleInfo ($paref);
-                            
-        return $ret;  
-    } 
-    else {
-        return "$getlist";
+    my $params = {
+        hash  => $hash,
+        name  => $name,
+        opt   => $opt,
+        arg   => $arg,
+    };
+  
+    if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
+        my $ret = q{};
+      
+        if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {                
+            return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"};
+        }
+  
+        $ret = &{$hget{$opt}{fn}} ($params);
+      
+        return $ret;
     }
 
-return $ret;                                                        # not generate trigger out of command
+return $getlist;
+}
+
+######################################################################################
+#                             Getter storedCredentials
+######################################################################################
+sub _getstoredCredentials {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $out = showStoredCredentials ($hash, 1, $splitstr);
+  
+return $out;
+}
+
+######################################################################################
+#                             Getter apiInfo
+#           Informationen der verwendeten API abrufen und anzeigen 
+######################################################################################
+sub _getapiInfo {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  delClHash ($name);
+  getClHash ($hash,1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+
+  # Schema: <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
+  addSendqueue ($name,"apiInfo","","","");            
+  getApiSites  ($name);
+
+return;
+}
+
+######################################################################################
+#                             Getter getCalendars
+#                   Liste aller Kalender abrufen und anzeigen
+######################################################################################
+sub _getgetCalendars {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  delClHash ($name);
+  getClHash ($hash,1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
+
+  # Schema: <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
+  addSendqueue ($name,"listcal","CAL","list","&is_todo=true&is_evt=true");            
+  getApiSites  ($name);
+
+return;
+}
+
+######################################################################################
+#                             Getter calAsHtml
+######################################################################################
+sub _getcalAsHtml {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  my $out = calAsHtml($name);
+  
+return $out;
+}
+
+######################################################################################
+#                             Getter versionNotes
+######################################################################################
+sub _getversionNotes {
+  my $paref = shift;
+
+  $paref->{hintextde} = \%vHintsExt_de;
+  $paref->{hintexten} = \%vHintsExt_en;
+  $paref->{notesext}  = \%vNotesExtern;
+ 
+  my $ret = showModuleInfo ($paref);
+                    
+return $ret;
 }
 
 ######################################################################################
