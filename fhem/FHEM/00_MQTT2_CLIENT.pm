@@ -323,7 +323,8 @@ MQTT2_CLIENT_Set($@)
   my $name = $hash->{NAME};
   shift(@a);
 
-  return "Unknown argument ?, choose one of ".join(" ", keys %sets)
+  return "Unknown argument ?, choose one of ".
+        join(" ", map { $sets{$_} ? $_ : "$_:noArg" } keys %sets)
         if(!$a[0] || !defined($sets{$a[0]}));
 
   if($a[0] eq "publish") {
