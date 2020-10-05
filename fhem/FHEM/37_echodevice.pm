@@ -2753,6 +2753,9 @@ sub echodevice_Parse($$$) {
 				$hash->{helper}{echodevice_refreshvoice} = 0;
 			}
 		}
+		else {
+			Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
+		}
 	} 
  
   	elsif($msgtype eq "account") {
@@ -3561,6 +3564,9 @@ sub echodevice_Parse($$$) {
 					}
 				}
 			}
+		}
+		else {
+			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
 		}
 	}
 	
