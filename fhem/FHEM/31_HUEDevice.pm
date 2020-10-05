@@ -442,6 +442,8 @@ HUEDevice_Define($$) {
 
     $hash->{helper}{mode} = '';
 
+    $hash->{helper}{lastupdated} = '';
+
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
     my $icon_path = AttrVal("WEB", "iconPath", "default:fhemSVG:openautomation" );
@@ -1510,10 +1512,16 @@ HUEDevice_Parse($$)
   $hash->{manufacturername} = $result->{manufacturername} if( defined($result->{manufacturername}) );
   $hash->{luminaireuniqueid} = $result->{luminaireuniqueid} if( defined($result->{luminaireuniqueid}) );
 
+  #https://github.com/dresden-elektronik/deconz-rest-plugin/issues/2590
+  #$hash->{lastseen} = $result->{lastseen} if( defined($result->{lastseen}) );
+  $hash->{lastannounced} = $result->{lastannounced} if( defined($result->{lastannounced}) );
+
   $hash->{power} = $result->{power} if( defined($result->{power}) );
 
   if( $hash->{helper}->{devtype} eq 'S' ) {
     my %readings;
+
+    $readings{lastseen} = $result->{lastseen} if( defined($result->{lastseen}) );
 
     if( my $config = $result->{config} ) {
       $hash->{on} = $config->{on}?1:0 if( defined($config->{on}) );
@@ -1770,6 +1778,9 @@ HUEDevice_Parse($$)
   my $mode   = undef;
      $mode   = $state->{mode} if( defined($state->{mode}) && ($hash->{helper}{mode} || $state->{mode} ne 'homeautomation') );
 
+  my $lastupdated = undef;
+     $lastupdated = $result->{lastupdated} if( defined($result->{lastupdated}) );
+
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
   if( defined($ct) && $ct != $hash->{helper}{ct} ) {
@@ -1793,6 +1804,8 @@ HUEDevice_Parse($$)
   if( defined($battery) && $battery ne $hash->{helper}{battery} ) {readingsBulkUpdate($hash,'batteryPercent',$battery);}
 
   if( defined($mode) && $mode ne $hash->{helper}{mode} ) {readingsBulkUpdate($hash,"mode",$mode);}
+
+  if( defined($lastupdated) && $lastupdated ne $hash->{helper}{lastupdated} ) {readingsBulkUpdate($hash,"lastupdated",$lastupdated);}
 
   my $s = '';
   my $pct = -1;
