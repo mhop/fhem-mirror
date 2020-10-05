@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.10.05 v0.2.0
+# - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 3532
+#
 # 2020.09.25 v0.1.9
 # - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 2687
 #
@@ -395,7 +398,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.1.9";
+my $ModulVersion     = "0.2.0";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -3529,31 +3532,33 @@ sub echodevice_Parse($$$) {
 	}
 	
 	elsif($msgtype eq "devicesstate") {
-		if(!defined($json->{devices})) {}
-		elsif (ref($json->{devices}) ne "ARRAY") {}
-		else {
-			foreach my $device (@{$json->{devices}}) {
-				my $devicehash = $modules{$hash->{TYPE}}{defptr}{"$device->{serialNumber}"};
-				next if( !defined($devicehash) );
-	
-				$devicehash->{model} = echodevice_getModel($device->{deviceType});#$device->{deviceType};
+		if (ref($json) eq "HASH") {
+			if(!defined($json->{devices})) {}
+			elsif (ref($json->{devices}) ne "ARRAY") {}
+			else {
+				foreach my $device (@{$json->{devices}}) {
+					my $devicehash = $modules{$hash->{TYPE}}{defptr}{"$device->{serialNumber}"};
+					next if( !defined($devicehash) );
+		
+					$devicehash->{model} = echodevice_getModel($device->{deviceType});#$device->{deviceType};
 
-				readingsBeginUpdate($devicehash);
-				readingsBulkUpdate($devicehash, "model", $devicehash->{model}, 1);
-				readingsBulkUpdate($devicehash, "presence", ($device->{online}?"present":"absent"), 1);
-				#readingsBulkUpdate($devicehash, "state", "absent", 1) if(!$device->{online});
-				readingsBulkUpdate($devicehash, "version", $device->{softwareVersion}, 1);
-				readingsEndUpdate($devicehash,1);
-				$devicehash->{helper}{".SERIAL"} = $device->{serialNumber};
-				$devicehash->{helper}{DEVICETYPE} = $device->{deviceType};
-				$devicehash->{helper}{NAME} = $device->{accountName};
-				$devicehash->{helper}{FAMILY} = $device->{deviceFamily};
-				$devicehash->{helper}{VERSION} = $device->{softwareVersion};
-				$devicehash->{helper}{".CUSTOMER"} = $device->{deviceOwnerCustomerId};
+					readingsBeginUpdate($devicehash);
+					readingsBulkUpdate($devicehash, "model", $devicehash->{model}, 1);
+					readingsBulkUpdate($devicehash, "presence", ($device->{online}?"present":"absent"), 1);
+					#readingsBulkUpdate($devicehash, "state", "absent", 1) if(!$device->{online});
+					readingsBulkUpdate($devicehash, "version", $device->{softwareVersion}, 1);
+					readingsEndUpdate($devicehash,1);
+					$devicehash->{helper}{".SERIAL"} = $device->{serialNumber};
+					$devicehash->{helper}{DEVICETYPE} = $device->{deviceType};
+					$devicehash->{helper}{NAME} = $device->{accountName};
+					$devicehash->{helper}{FAMILY} = $device->{deviceFamily};
+					$devicehash->{helper}{VERSION} = $device->{softwareVersion};
+					$devicehash->{helper}{".CUSTOMER"} = $device->{deviceOwnerCustomerId};
 
-				if ($device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT") {
-					$hash->{helper}{".SERIAL"} = $device->{serialNumber};
-					$hash->{helper}{DEVICETYPE} = $device->{deviceType};
+					if ($device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT") {
+						$hash->{helper}{".SERIAL"} = $device->{serialNumber};
+						$hash->{helper}{DEVICETYPE} = $device->{deviceType};
+					}
 				}
 			}
 		}
