@@ -429,6 +429,11 @@ HttpUtils_Connect($)
             delete($selectlist{$hash});
 
             RemoveInternalTimer(\%timerHash);
+            if(!$hash->{conn}) {
+              Log 1, "ERROR in HttpUtils: directWriteFn called without conn.";
+              map { Log 1, "   $_=$hash->{$_}" } sort keys %{$hash};
+              return;
+            }
             my $packed = getsockopt($hash->{conn}, SOL_SOCKET, SO_ERROR);
             my $errno = unpack("I",$packed);
             if($errno) {
