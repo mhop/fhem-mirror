@@ -48,6 +48,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   completeAPI
                                   showAPIinfo
                                   evaljson
+                                  setCredentials
                                   getCredentials
                                   showStoredCredentials                                  
                                   setReadingErrorNone 
@@ -133,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.4" => "05.10.2020  use setCredentials from SMUtils ",
   "1.11.3" => "04.10.2020  use showStoredCredentials from SMUtils ",
   "1.11.2" => "01.10.2020  move startFunctionDelayed, checkSendRetry to SMUtils ",
   "1.11.1" => "28.09.2020  use evaljson from SMUtils ",
@@ -182,6 +184,9 @@ my %vHintsExt_en = (
 my %vHintsExt_de = (
 
 );
+
+# Standardvariablen
+my $queueStartFn = "FHEM::SSChatBot::getApiSites";                          # Startfunktion zur Queue-Abarbeitung
 
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => \&_setbotToken         }, 
@@ -340,7 +345,8 @@ return 0;
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 #################################################################
 sub Delete {
-  my ($hash, $arg) = @_;
+  my $hash  = shift;
+  my $arg   = shift;
   my $name  = $hash->{NAME};
   my $index = $hash->{TYPE}."_".$hash->{NAME}."_botToken";
   
@@ -377,7 +383,7 @@ sub Attr {
     
         readingsBeginUpdate($hash); 
         readingsBulkUpdate ($hash, "state", $val);                    
-        readingsEndUpdate  ($hash,1); 
+        readingsEndUpdate  ($hash, 1); 
     }
     
     if ($cmd eq "set") {
@@ -456,14 +462,14 @@ sub _setbotToken {
   my $prop  = $paref->{prop};
   
   return qq{The command "$opt" needs an argument.} if (!$prop);         
-  my ($success) = setToken($hash, $prop, "botToken");
+  my ($success) = setCredentials($hash, "botToken", $prop);
   
   if($success) {
       CommandGet(undef, "$name chatUserlist");                      # Chatuser Liste abrufen
-      return qq{botToken saved successfully};
+      return qq{Token saved successfully};
   } 
   else {
-      return qq{Error while saving botToken - see logfile for details};
+      return qq{Error while saving the Token - see logfile for details};
   }
 
 return;
@@ -551,6 +557,7 @@ sub _setasyncSendItem {
           channel    => "",
           attachment => $attachment
       };
+      
       addSendqueue ($params);
   }
    
@@ -577,7 +584,10 @@ sub _setrestartSendqueue {
   
   my $ret = getApiSites($name);
   
-return $ret if($ret);
+  if($ret) {
+      return $ret;
+  }
+  
 return qq{The SendQueue has been restarted.};
 }
 
@@ -723,6 +733,7 @@ sub _getchatChannellist {
       channel    => "",
       attachment => ""
   };
+  
   addSendqueue($params);
   getApiSites ($name);
         
@@ -852,15 +863,15 @@ sub addSendqueue {
     }
       
     my $entry = {
-                 'opmode'     => $opmode,   
-                 'method'     => $method, 
-                 'userid'     => $userid,
-                 'channel'    => $channel,
-                 'text'       => $text,
-                 'attachment' => $attachment,
-                 'fileUrl'    => $fileUrl,  
-                 'retryCount' => 0               
-                };
+        'opmode'     => $opmode,   
+        'method'     => $method, 
+        'userid'     => $userid,
+        'channel'    => $channel,
+        'text'       => $text,
+        'attachment' => $attachment,
+        'fileUrl'    => $fileUrl,  
+        'retryCount' => 0             
+    };
               
     addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen    
    
@@ -957,13 +968,13 @@ return;
 #      Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_parse {
-   my $param    = shift;
-   my $err      = shift;
-   my $myjson   = shift;
+   my $param  = shift;
+   my $err    = shift;
+   my $myjson = shift;
    
-   my $hash     = $param->{hash};
-   my $name     = $hash->{NAME};
-   my $opmode   = $hash->{OPMODE};
+   my $hash   = $param->{hash};
+   my $name   = $hash->{NAME};
+   my $opmode = $hash->{OPMODE};
 
    my ($error,$errorcode,$success);
   
@@ -971,7 +982,7 @@ sub getApiSites_parse {
         Log3($name, 2, "$name - ERROR message: $err");
        
         setReadingErrorState ($hash, $err);              
-        checkSendRetry       ($name,1,"FHEM::SSChatBot::getApiSites");
+        checkSendRetry       ($name, 1, $queueStartFn);
         
         return;
     } 
@@ -980,7 +991,7 @@ sub getApiSites_parse {
         
         if (!$success) {
             Log3($name, 4, "$name - Data returned: ".$myjson);
-            checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");       
+            checkSendRetry ($name, 1, $queueStartFn);    
             return;
         }
         
@@ -1000,7 +1011,7 @@ sub getApiSites_parse {
                 setReadingErrorState ($hash, $error, $errorcode);
                 Log3($name, 2, "$name - ERROR - $error");                    
                 
-                checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");    
+                checkSendRetry ($name, 1, $queueStartFn);  
                 return;                
             }
             
@@ -1010,7 +1021,7 @@ sub getApiSites_parse {
 
             if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
                 showAPIinfo    ($hash, $hash->{HELPER}{API});                           # übergibt Referenz zum instanziierten API-Hash)
-                checkSendRetry ($name,0,"FHEM::SSChatBot::getApiSites");
+                checkSendRetry ($name, 0, $queueStartFn);
                 return;
             }     
         } 
@@ -1021,7 +1032,7 @@ sub getApiSites_parse {
             setReadingErrorState ($hash, $error, $errorcode);
             Log3($name, 2, "$name - ERROR - $error");                    
             
-            checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");    
+            checkSendRetry ($name, 1, $queueStartFn);  
             return;
         }
     }
@@ -1053,7 +1064,7 @@ sub chatOp {
        setReadingErrorState ($hash, $error, $errorcode);
        Log3($name, 2, "$name - ERROR - $error"); 
        
-       checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");
+       checkSendRetry ($name, 1, $queueStartFn);
        return;
    }
       
@@ -1101,13 +1112,13 @@ sub chatOp {
    }
    
    $param = {
-            url      => $url,
-            timeout  => $httptimeout,
-            hash     => $hash,
-            method   => "GET",
-            header   => "Accept: application/json",
-            callback => \&chatOp_parse
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&chatOp_parse
+   };
    
    HttpUtils_NonblockingGet ($param);   
 
@@ -1137,16 +1148,17 @@ sub chatOp_parse {
        $errorcode = "800" if($err =~ /:\smalformed\sor\sunsupported\sURL$/xs);
 
        setReadingErrorState ($hash, $err, $errorcode);
-       checkSendRetry       ($name,1,"FHEM::SSChatBot::getApiSites");        
+       checkSendRetry       ($name, 1, $queueStartFn);        
        return;
-   
-   } elsif ($myjson ne "") {    
+   } 
+   elsif ($myjson ne "") {    
        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
        # Evaluiere ob Daten im JSON-Format empfangen wurden 
        ($success) = evaljson ($hash,$myjson);        
-       unless ($success) {
+       
+       if(!$success) {
            Log3           ($name, 4, "$name - Data returned: ".$myjson);
-           checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");       
+           checkSendRetry ($name, 1, $queueStartFn);
            return;
        }
         
@@ -1157,13 +1169,13 @@ sub chatOp_parse {
    
        $success = $data->{'success'};
 
-       if ($success) {  
+       if($success) {  
 
            if($hmodep{$opmode} && defined &{$hmodep{$opmode}{fn}}) {
                &{$hmodep{$opmode}{fn}} ($hash, $data); 
            }                
 
-           checkSendRetry ($name,0,"FHEM::SSChatBot::getApiSites");
+           checkSendRetry ($name, 0, $queueStartFn);
 
            readingsBeginUpdate         ($hash);
            readingsBulkUpdateIfChanged ($hash, "Errorcode", "none"  );
@@ -1184,7 +1196,7 @@ sub chatOp_parse {
            setReadingErrorState ($hash, $error, $errorcode);       
            Log3($name, 2, "$name - ERROR - Operation $opmode was not successful. Errorcode: $errorcode - $error");
             
-           checkSendRetry ($name,1,"FHEM::SSChatBot::getApiSites");
+           checkSendRetry ($name, 1, $queueStartFn);
        }
             
        undef $data;
@@ -1321,6 +1333,7 @@ sub _parseSendItem {
   my $postid = "";
   my $idx    = $hash->{OPIDX};
   my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
+  
   if($data->{data}{succ}{user_id_post_map}{$uid}) {
       $postid = $data->{data}{succ}{user_id_post_map}{$uid};   
   }                
@@ -1331,38 +1344,6 @@ sub _parseSendItem {
   readingsEndUpdate   ($hash,1); 
       
 return;
-}
-
-######################################################################################
-#                            botToken speichern
-######################################################################################
-sub setToken {
-    my ($hash, $token, $ao) = @_;
-    my $name           = $hash->{NAME};
-    my ($success, $credstr, $index, $retcode);
-    my (@key,$len,$i);   
-    
-    $credstr = encode_base64($token);
-    
-    # Beginn Scramble-Routine
-    @key = qw(1 3 4 5 6 3 2 1 9);
-    $len = scalar @key;  
-    $i = 0;  
-    $credstr = join "", map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //x, $credstr;  ## no critic 'Map blocks'
-    # End Scramble-Routine    
-       
-    $index   = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-    $retcode = setKeyValue($index, $credstr);
-    
-    if ($retcode) { 
-        Log3($name, 2, "$name - Error while saving Token - $retcode");
-        $success = 0;
-    } 
-    else {
-        ($success, $token) = getCredentials($hash,1,$ao);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
-    }
-
-return $success;
 }
 
 #############################################################################################
@@ -1695,27 +1676,27 @@ sub __botCGIcheckPayload {
   my $h    = shift;
   my $name = $hash->{NAME};
 
-      my $pldata    = $h->{payload};
-      my ($success) = evaljson($hash,$pldata);
-      
-      if (!$success) {
-          Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
-          return ("text/plain; charset=utf-8", "invalid JSON data received");
-      }
-      
-      my $data = decode_json ($pldata);
-      Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
-      
-      $h->{token}       = $data->{token};
-      $h->{post_id}     = $data->{post_id};
-      $h->{user_id}     = $data->{user}{user_id};
-      $h->{username}    = $data->{user}{username};
-      $h->{callback_id} = $data->{callback_id};
-      $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
-                          "name: ".$data->{actions}[0]{name}.", ". 
-                          "value: ".$data->{actions}[0]{value}.", ". 
-                          "text: ".$data->{actions}[0]{text}.", ". 
-                          "style: ".$data->{actions}[0]{style};
+  my $pldata    = $h->{payload};
+  my ($success) = evaljson($hash,$pldata);
+  
+  if (!$success) {
+      Log3($name, 1, "$name - ERROR - invalid JSON data received:\n".Dumper $pldata); 
+      return ("text/plain; charset=utf-8", "invalid JSON data received");
+  }
+  
+  my $data = decode_json ($pldata);
+  Log3($name, 5, "$name - interactive object data (JSON decoded):\n". Dumper $data);
+  
+  $h->{token}       = $data->{token};
+  $h->{post_id}     = $data->{post_id};
+  $h->{user_id}     = $data->{user}{user_id};
+  $h->{username}    = $data->{user}{username};
+  $h->{callback_id} = $data->{callback_id};
+  $h->{actions}     = "type: ".$data->{actions}[0]{type}.", ". 
+                      "name: ".$data->{actions}[0]{name}.", ". 
+                      "value: ".$data->{actions}[0]{value}.", ". 
+                      "text: ".$data->{actions}[0]{text}.", ". 
+                      "style: ".$data->{actions}[0]{style};
            
 return;
 }
@@ -1771,6 +1752,7 @@ sub __botCGIdataInterprete {
           channel    => "",
           attachment => ""
       };
+      
       addSendqueue ($params);                                 
   }
                           
