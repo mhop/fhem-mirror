@@ -7,6 +7,9 @@ use strict;
 use warnings;
 use Blocking;
 
+my $speedtest_hasJSON = 1;
+
+
 sub
 speedtest_Initialize($)
 {
@@ -17,8 +20,12 @@ speedtest_Initialize($)
   $hash->{SetFn}    = "speedtest_Set";
   $hash->{AttrList} = "checks-till-disable ".
                       "disable:0,1 ".
+                      "ookla:1,0 ".
                       "path ".
                        $readingFnAttributes;
+
+  eval "use JSON";
+  $speedtest_hasJSON = 0 if($@);
 }
 
 #####################################
@@ -123,19 +130,35 @@ speedtest_DoSpeedtest($)
   my ($string) = @_;
   my ($name, $server) = split("\\|", $string);
 
-  my $cmd = AttrVal($name, "path", "/usr/local/speedtest-cli" );
-  $cmd .= "/speedtest-cli --simple";
-  $cmd .= " --server $server" if( $server );
+  my $ookla = AttrVal($name, "ookla", undef);
+
+  my $cmd;
+  if( $ookla ) {
+    $cmd = AttrVal($name, "path", "/usr/local/bin" );
+    $cmd .= "/speedtest --accept-license --accept-gdpr -f json";
+    $cmd .= " -s $server" if( $server );
+
+  } else {
+    $cmd = AttrVal($name, "path", "/usr/local/speedtest-cli" );
+    $cmd .= "/speedtest-cli --simple";
+    $cmd .= " --server $server" if( $server );
+
+  }
 
   Log3 $name, 5, "starting speedtest";
   my $speedstr = qx($cmd);
   Log3 $name, 5, "speedtest done";
+
+  if( $ookla ) {
+    $speedstr =~ s/\n//g;
+    return "$name|$speedstr";
+  }
+
   my @speedarr = split(/\n/, $speedstr);
 
-  for( my $i = 0; $i < 3; ++$i )
-    {
+  for( my $i = 0; $i < 3; ++$i ) {
       $speedarr[$i] = $1 if( $speedarr[$i] && $speedarr[$i] =~ m/^\w+: (.*)/i );
-    }
+  }
 
   return "$name|$speedarr[0]|$speedarr[1]|$speedarr[2]";
 }
@@ -143,17 +166,49 @@ sub
 speedtest_SpeedtestDone($)
 {
   my ($string) = @_;
-
   return unless(defined($string));
 
   my @a = split("\\|",$string);
-  my $hash = $defs{$a[0]};
+  my $name = $a[0];
+  my $hash = $defs{$name};
 
   delete($hash->{helper}{RUNNING_PID});
 
   return if($hash->{helper}{DISABLED});
 
   Log3 $hash, 5, "speedtest_SpeedtestDone: $string";
+
+  if( $a[1] =~ m/^\{.*\}$/ ) {
+    if( !$speedtest_hasJSON ) {
+      Log3 $name, 1, "json needed for ookla speedtest";
+      return;
+    }
+
+    my $decoded = eval { decode_json($a[1]) };
+
+    readingsBeginUpdate($hash);
+    if( $decoded->{message} ) {
+      readingsBulkUpdate($hash,"state", "failed" );
+      readingsBulkUpdate($hash,"lastError", $decoded->{message}  );
+
+    } else {
+      readingsBulkUpdate($hash,"ping",$decoded->{ping}{latency}) if( defined( $decoded->{ping}) );
+      readingsBulkUpdate($hash,"upload",round($decoded->{upload}{bandwidth}*8/1024/1024,1)) if( defined( $decoded->{upload}) );
+      readingsBulkUpdate($hash,"download",round($decoded->{download}{bandwidth}*8/1024/1024,1)) if( defined( $decoded->{download}) );
+
+      readingsBulkUpdate($hash,"packetLoss",$decoded->{packetLoss}) if( defined( $decoded->{packetLoss}) );
+
+      readingsBulkUpdate($hash,"id",$decoded->{server}{id}) if( defined( $decoded->{server}) );
+      readingsBulkUpdate($hash,"name",$decoded->{server}{name}) if( defined( $decoded->{server}) );
+      readingsBulkUpdate($hash,"location",$decoded->{server}{location}) if( defined( $decoded->{server}) );
+
+      readingsBulkUpdate($hash,"state","ok");
+
+    }
+    readingsEndUpdate($hash,1);
+
+    return;
+  }
 
   if( $a[1] eq "Invalid server ID" ) {
     readingsSingleUpdate($hash,"state", "failed", 1);
@@ -242,6 +297,9 @@ speedtest_SpeedtestAborted($)
       how often the speedtest should be run before it is automaticaly set to disabled. the value will be decreased by 1 for every run.</li>
     <li>disable<br>
       set to 1 to disable the test.</li>
+
+    <li>ookla<br>
+      set to 1 to use the official ookla speedtest cli binary. will be searched in /usr/local/bin if path is not set.</li>
   </ul>
 </ul>
 
