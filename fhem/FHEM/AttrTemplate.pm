@@ -358,6 +358,7 @@ AttrTemplate_Set($$@)
         }
 
       } elsif($option) {
+        $cmd =~ s/##.*//; #114109
         my $r = AnalyzeCommand($cl, $cmd);
         push(@ret, $r) if($r);
 
