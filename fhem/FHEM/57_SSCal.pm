@@ -41,7 +41,7 @@ use FHEM::SynoModules::API qw(apistatic);                         # API Modul
 use FHEM::SynoModules::SMUtils qw( completeAPI
                                    showAPIinfo
                                    showModuleInfo
-                                   addSendqueueEntry
+                                   addSendqueue
                                    listSendqueue
                                    purgeSendqueue
                                    checkSendRetry
@@ -139,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.4"  => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "2.4.3"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "2.4.2"  => "03.10.2020  get from SMUtils: completeAPI showAPIinfo evaljson setReadingErrorState setReadingErrorNone showModuleInfo ".
                            "login logout getClHash delClHash trim moduleVersion updQueueLength delReadings checkSendRetry startFunctionDelayed ".
@@ -579,7 +580,15 @@ sub _setcredentials {
   my ($success) = setCredentials($hash, "credentials", $prop, $prop1, $splitstr);
   
   if($success) {
-      addSendqueue ($name,"listcal","CAL","list","&is_todo=true&is_evt=true");            
+      my $params = { 
+          name   => $name,
+          opmode => "listcal",
+          api    => "CAL",
+          method => "list",
+          params => "&is_todo=true&is_evt=true",
+      };
+      
+      addSendqueue ($params);            
       getApiSites  ($name);
       return "credentials saved successfully";
   } 
@@ -667,7 +676,16 @@ sub _setcalUpdate {
       }   
 
       my $lr = AttrVal($name,"showRepeatEvent", "true");
-      addSendqueue ($name,"eventlist","EVENT","list","&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr"); 
+      
+      my $params = { 
+          name   => $name,
+          opmode => "eventlist",
+          api    => "EVENT",
+          method => "list",
+          params => "&cal_id_list=[$oids]&start=$tstart&end=$tend&list_repeat=$lr",
+      };
+      
+      addSendqueue ($params); 
       getApiSites  ($name);
   } 
   else {                                                                                     # Modell Aufgabenliste
@@ -676,7 +694,15 @@ sub _setcalUpdate {
       my $filterdue      = AttrVal($name,"filterDueTask", 3);                                # show tasks with and without due time
       my $filtercomplete = AttrVal($name,"filterCompleteTask", 3);                           # show completed and not completed tasks
       
-      addSendqueue ($name,"todolist","TODO","list","&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete"); 
+      my $params = { 
+          name   => $name,
+          opmode => "todolist",
+          api    => "TODO",
+          method => "list",
+          params => "&cal_id_list=[$oids]&limit=$limit&offset=$offset&filter_due=$filterdue&filter_complete=$filtercomplete",
+      };
+      
+      addSendqueue ($params); 
       getApiSites  ($name);      
   }
       
@@ -738,7 +764,15 @@ sub _setcleanCompleteTasks {
   Log3($name, 5, "$name - Calendar selection for add queue: $cals");
   
   # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
-  addSendqueue ($name,"cleanCompleteTasks","TODO","clean_complete","&cal_id_list=[$oids]"); 
+  my $params = { 
+      name   => $name,
+      opmode => "cleanCompleteTasks",
+      api    => "TODO",
+      method => "clean_complete",
+      params => "&cal_id_list=[$oids]",
+  };
+  
+  addSendqueue ($params); 
   getApiSites  ($name);
 
 return;
@@ -755,8 +789,7 @@ sub _setdeleteEventId {
   
   my $eventid = $prop;
   
-  # Blocknummer ermitteln
-  my $bnr;
+  my $bnr;                                                                            # Blocknummer ermitteln
   my @allrds = keys%{$defs{$name}{READINGS}};
   
   for my $key(@allrds) {
@@ -770,21 +803,26 @@ sub _setdeleteEventId {
       return "The blocknumber of specified event id could not be identified. Make sure you have specified a valid event id.";
   }
 
-  # die Summary zur Event Id ermitteln
-  my $sum = ReadingsVal($name, $bnr."_01_Summary", "");
-
-  # Kalendername und dessen id und Typ ermitteln 
-  my $calname = ReadingsVal($name, $bnr."_90_calName", "");
+  my $sum = ReadingsVal($name, $bnr."_01_Summary", "");                              # die Summary zur Event Id ermitteln
+ 
+  my $calname = ReadingsVal($name, $bnr."_90_calName", "");                          # Kalendername und dessen id und Typ ermitteln
   my $calid   = $hash->{HELPER}{CALENDARS}{"$calname"}{id};
   my $caltype = $hash->{HELPER}{CALENDARS}{"$calname"}{type};
   
-  # Kalender-API in Abhängigkeit des Kalendertyps wählen
-  my $api = ($caltype eq "Event") ? "EVENT" : "TODO";
+  my $api = ($caltype eq "Event") ? "EVENT" : "TODO";                                # Kalender-API in Abhängigkeit des Kalendertyps wählen
   
   Log3($name, 3, qq{$name - The event "$sum" with id "$eventid" will be deleted in calendar "$calname".});
   
   # <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
-  addSendqueue ($name,"deleteEventId",$api,"delete","&evt_id=$eventid"); 
+  my $params = { 
+      name   => $name,
+      opmode => "deleteEventId",
+      api    => $api,
+      method => "delete",
+      params => "delete","&evt_id=$eventid",
+  };
+  
+  addSendqueue ($params); 
   getApiSites  ($name);
 
 return;
@@ -908,7 +946,15 @@ sub _getapiInfo {
   getClHash ($hash,1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
 
   # Schema: <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
-  addSendqueue ($name,"apiInfo","","","");            
+  my $params = { 
+      name   => $name,
+      opmode => "apiInfo",
+      api    => "",
+      method => "",
+      params => "",
+  };
+  
+  addSendqueue ($params);            
   getApiSites  ($name);
 
 return;
@@ -927,7 +973,15 @@ sub _getgetCalendars {
   getClHash ($hash,1);                                                # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
 
   # Schema: <Name, operation mode, API (siehe $data{SSCal}{$name}{calapi}), auszuführende API-Methode, spezifische API-Parameter>
-  addSendqueue ($name,"listcal","CAL","list","&is_todo=true&is_evt=true");            
+  my $params = { 
+      name   => $name,
+      opmode => "listcal",
+      api    => "CAL",
+      method => "list",
+      params => "&is_todo=true&is_evt=true",
+  };
+  
+  addSendqueue ($params);            
   getApiSites  ($name);
 
 return;
@@ -1037,37 +1091,6 @@ sub periodicCall {
   InternalTimer($new, "FHEM::SSCal::periodicCall", $name, 0);
     
 return;  
-}
-
-######################################################################################
-#                            Eintrag zur SendQueue hinzufügen
-#    $name   = Name Kalenderdevice
-#    $opmode = operation mode
-#    $api    = API (siehe $data{SSCal}{$name}{calapi})
-#    $method = auszuführende API-Methode 
-#    $params = spezifische API-Parameter 
-#
-######################################################################################
-sub addSendqueue {
-   my $name   = shift;
-   my $opmode = shift;
-   my $api    = shift;
-   my $method = shift;
-   my $params = shift;
-   
-   my $hash   = $defs{$name};
-   
-   my $entry = {
-       'opmode'     => $opmode, 
-       'api'        => $api,   
-       'method'     => $method, 
-       'params'     => $params,
-       'retryCount' => 0               
-   };
-                      
-   addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
-   
-return;
 }
 
 ####################################################################################
@@ -1622,22 +1645,22 @@ sub extractEventlist {                                    ## no critic 'complexi
                   if ($p1 eq "FREQ") {
                       $freq = $p2;
                   } 
-                  elsif ($p1 eq "COUNT") {                                      # Event endet automatisch nach x Wiederholungen
+                  if ($p1 eq "COUNT") {                                         # Event endet automatisch nach x Wiederholungen
                       $count = $p2;                                             
                   } 
-                  elsif ($p1 eq "INTERVAL") {                                   # Wiederholungsintervall         
+                  if ($p1 eq "INTERVAL") {                                      # Wiederholungsintervall         
                       $interval = $p2;
                   } 
-                  elsif ($p1 eq "UNTIL") {                                      # festes Intervallende angegeben        
+                  if ($p1 eq "UNTIL") {                                         # festes Intervallende angegeben        
                       $until = $p2;
                       $until =~ s/[-:]//gx;
                       $uets  = (explodeDateTime ($hash, $until, 0, 0, 0))[4];
                   } 
-                  elsif ($p1 eq "BYMONTHDAY") {                                 # Wiederholungseigenschaft -> Tag des Monats z.B. 13 (Tag 13)    
+                  if ($p1 eq "BYMONTHDAY") {                                    # Wiederholungseigenschaft -> Tag des Monats z.B. 13 (Tag 13)    
                       $bymonthday = $p2;
                   } 
-                  elsif ($p1 eq "BYDAY") {                                      # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
-                          $byday = $p2;
+                  if ($p1 eq "BYDAY") {                                         # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
+                      $byday = $p2;
                   } 
               }
               
