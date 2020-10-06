@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.16.0');
+use version; our $VERSION = version->declare('1.17.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -67,7 +67,7 @@ our @EXPORT_OK = qw(
                      delCallParts
 					 setReadingErrorNone
 					 setReadingErrorState
-                     addSendqueueEntry
+                     addSendqueue
                      listSendqueue
                      startFunctionDelayed
                      checkSendRetry
@@ -1262,10 +1262,116 @@ sub setReadingErrorState {
 return;
 }
 
+######################################################################################
+#                       Eintrag an SendQueue des Modultyps anhängen
+#       die Unterroutinen werden in Abhängigkeit des auslösenden Moduls angesprungen
+######################################################################################
+sub addSendqueue {
+   my $paref = shift;
+   my $name  = $paref->{name} // carp $carpnoname && return;
+   
+   my $hash  = $defs{$name};
+   my $type  = $hash->{TYPE};                                               
+                                                       
+   if($type eq "SSCal") {
+       _addSendqueueSimple ($paref);
+   }
+   elsif ($type eq "SSChatBot") {
+       _addSendqueueExtended ($paref);
+   }
+   else {
+       Log3($name, 1, qq{$name - ERROR - no module specific add Sendqueue handler for type "$type" found});
+   }
+   
+return;
+}
+
+######################################################################################
+#                    Eintrag zur SendQueue hinzufügen (Standard Parametersatz)
+#    $name   = Name (Kalender)device
+#    $opmode = operation mode
+#    $api    = API-Referenz (z.B. $data{SSCal}{$name}{calapi})
+#    $method = auszuführende API-Methode 
+#    $params = spezifische API-Parameter 
+#
+######################################################################################
+sub _addSendqueueSimple {
+   my $paref  = shift;
+   my $name   = $paref->{name};
+   my $opmode = $paref->{opmode};
+   my $api    = $paref->{api};
+   my $method = $paref->{method};
+   my $params = $paref->{params};
+   
+   my $hash   = $defs{$name};
+   
+   my $entry = {
+       'opmode'     => $opmode, 
+       'api'        => $api,   
+       'method'     => $method, 
+       'params'     => $params,
+       'retryCount' => 0               
+   };
+                      
+   __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
+   
+return;
+}
+
+######################################################################################
+#               Eintrag zur SendQueue hinzufügen (erweiterte Parameter)
+#
+# ($userid,$text,$fileUrl,$channel,$attachment)
+#    $name    = Name des Devices
+#    $opmode  = operation Mode
+#    $method  = auszuführende API-Methode 
+#    $userid  = ID des (Chat)users
+#    $text    = zu übertragender Text
+#    $fileUrl = opt. zu übertragendes File
+#    $channel = opt. Channel
+#
+######################################################################################
+sub _addSendqueueExtended {
+    my $paref      = shift;
+    my $name       = $paref->{name};
+    my $hash       = $defs{$name};
+    my $opmode     = $paref->{opmode}  // do {my $err = qq{internal ERROR -> opmode is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
+    my $method     = $paref->{method}  // do {my $err = qq{internal ERROR -> method is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
+    my $userid     = $paref->{userid}  // do {my $err = qq{internal ERROR -> userid is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
+    my $text       = $paref->{text};
+    my $fileUrl    = $paref->{fileUrl};
+    my $channel    = $paref->{channel};
+    my $attachment = $paref->{attachment};
+    
+    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo/x) {
+        my $err = qq{can't add message to queue: "text" is empty};
+        Log3($name, 2, "$name - ERROR - $err");
+        
+        setReadingErrorState ($hash, $err);      
+
+        return;        
+    }
+      
+    my $entry = {
+        'opmode'     => $opmode,   
+        'method'     => $method, 
+        'userid'     => $userid,
+        'channel'    => $channel,
+        'text'       => $text,
+        'attachment' => $attachment,
+        'fileUrl'    => $fileUrl,  
+        'retryCount' => 0             
+    };
+              
+    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen    
+   
+return;
+}
+
 #############################################################################################
 #                        fügt den Eintrag $entry zur Sendequeue hinzu
 #############################################################################################
-sub addSendqueueEntry {                 
+sub __addSendqueueEntry {                 
   my $hash  = shift // carp $carpnohash                             && return;
   my $entry = shift // carp "got no entry for adding to send queue" && return;
   my $name  = $hash->{NAME};
