@@ -53,7 +53,7 @@ use FHEM::SynoModules::SMUtils qw(
                                   showStoredCredentials                                  
                                   setReadingErrorNone 
                                   setReadingErrorState
-                                  addSendqueueEntry
+                                  addSendqueue
                                   listSendqueue
                                   startFunctionDelayed
                                   checkSendRetry
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.5" => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "1.11.4" => "05.10.2020  use setCredentials from SMUtils ",
   "1.11.3" => "04.10.2020  use showStoredCredentials from SMUtils ",
   "1.11.2" => "01.10.2020  move startFunctionDelayed, checkSendRetry to SMUtils ",
@@ -833,48 +834,6 @@ sub initOnBoot {
       InternalTimer(gettimeofday()+3, "FHEM::SSChatBot::initOnBoot", $hash, 0);
   }
   
-return;
-}
-
-######################################################################################
-#                            Eintrag zur SendQueue hinzufügen
-#
-# ($name,$opmode,$method,$userid,$text,$fileUrl,$channel,$attachment)
-######################################################################################
-sub addSendqueue {
-    my $paref      = shift;
-    my $name       = $paref->{name}    // do {my $err = qq{internal ERROR -> name is empty}; Log 1, "SSChatBot - $err"; return};
-    my $hash       = $defs{$name};
-    my $opmode     = $paref->{opmode}  // do {my $err = qq{internal ERROR -> opmode is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
-    my $method     = $paref->{method}  // do {my $err = qq{internal ERROR -> method is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
-    my $userid     = $paref->{userid}  // do {my $err = qq{internal ERROR -> userid is empty}; Log3($name, 1, "$name - $err"); setReadingErrorState ($hash, $err); return};
-    my $text       = $paref->{text};
-    my $fileUrl    = $paref->{fileUrl};
-    my $channel    = $paref->{channel};
-    my $attachment = $paref->{attachment};
-    
-    if(!$text && $opmode !~ /chatUserlist|chatChannellist|apiInfo/x) {
-        my $err = qq{can't add message to queue: "text" is empty};
-        Log3($name, 2, "$name - ERROR - $err");
-        
-        setReadingErrorState ($hash, $err);      
-
-        return;        
-    }
-      
-    my $entry = {
-        'opmode'     => $opmode,   
-        'method'     => $method, 
-        'userid'     => $userid,
-        'channel'    => $channel,
-        'text'       => $text,
-        'attachment' => $attachment,
-        'fileUrl'    => $fileUrl,  
-        'retryCount' => 0             
-    };
-              
-    addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen    
-   
 return;
 }
 
