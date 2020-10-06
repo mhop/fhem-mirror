@@ -33,6 +33,8 @@ use SetExtensions;
 use Time::Local qw(timegm_nocheck);
 use Time::HiRes qw(gettimeofday);
 use GPUtils qw(:all);
+use FHEM::Meta;
+
 
 sub main::MYSENSORS_DEVICE_Initialize { goto &Initialize };
     
@@ -97,7 +99,7 @@ sub Initialize {
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
   main::LoadModule("MYSENSORS");
-  return;
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 
@@ -224,6 +226,7 @@ my %static_mappings = (
 sub Define {
     my $hash = shift;
     my $def  = shift // return;
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
     my ($name, $type, $radioId) = split m{\s+}xms, $def; # split("[ \t]+", $def);
     return "requires 1 parameter!" if (!defined $radioId || $radioId eq "");
     $hash->{radioId} = $radioId;
@@ -837,21 +840,29 @@ sub onSetMessage {
     my $msg  = shift // return;
     my $name = $hash->{NAME};
     if (defined $msg->{payload}) {
+      readingsBeginUpdate($hash);
       eval {
         my ($reading,$value) = rawToMappedReading($hash,$msg->{subType},$msg->{childId},$msg->{payload});
-        readingsSingleUpdate($hash, $reading, $value, 1);
-        if ((defined ($hash->{setcommands}->{$value}) && $hash->{setcommands}->{$value}->{var} eq $reading)) { #$msg->{childId}
+      
+        readingsBulkUpdate($hash, $reading, $value);
+        if ( defined ($hash->{setcommands}->{$value}) && $hash->{setcommands}->{$value}->{var} eq $reading ) { #$msg->{childId}
            if ($hash->{SetExtensionsCommand} && AttrVal($name, "setExtensionsEvent", undef)) { 
-             readingsSingleUpdate($hash,"state",$hash->{SetExtensionsCommand},1) ;  
+             readingsBulkUpdate($hash,"state",$hash->{SetExtensionsCommand}) ;  
            } else {
-             readingsSingleUpdate($hash,"state","$value",1);
-             SetExtensionsCancel($hash) unless $msg->{ack};
+             readingsBulkUpdate($hash,"state","$value");
+             SetExtensionsCancel($hash) if !$msg->{ack};
            }
          }
       };
-      Log3 ($hash->{NAME}, 4, "MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message ".GP_Catch($@)) if $@;
+      if ( $msg->{ack} ) {
+         #readingsBulkUpdate($hash,"heartbeat","alive") ;
+         refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+         refreshInternalMySTimer($hash,"Ack") if $hash->{timeoutAck};
+      }
+      readingsEndUpdate( $hash, 1 );
+      Log3 ($hash, 4, "MYSENSORS_DEVICE $name: ignoring C_SET-message ".GP_Catch($@)) if $@;
     } else {
-      Log3 ($hash->{NAME}, 5, "MYSENSORS_DEVICE $hash->{NAME}: ignoring C_SET-message without payload");
+      Log3 ($hash, 5, "MYSENSORS_DEVICE $name: ignoring C_SET-message without payload");
     }
     return;
 }
@@ -942,7 +953,7 @@ sub onInternalMessage {
     }
     
     if ($type == I_HEARTBEAT_RESPONSE) {
-        readingsSingleUpdate($hash, "heartbeat", "alive",1);
+        refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
         if($hash->{asyncGet} && "heartbeat" eq $hash->{asyncGet}{reading}) {
           my $duration = sprintf( "%.1f", (gettimeofday() - $hash->{asyncGet}{start})*1000);
           RemoveInternalTimer($hash->{asyncGet});
@@ -950,7 +961,7 @@ sub onInternalMessage {
           delete($hash->{asyncGet});
         }
         
-        refreshInternalMySTimer($hash,"Alive") if $hash->{timeoutAlive};
+        
         if ($hash->{nowSleeping}) {
           $hash->{nowSleeping} = 0 ;
           sendRetainedMessages($hash);
@@ -1255,6 +1266,7 @@ sub refreshInternalMySTimer {
           readingsSingleUpdate($hash,"heartbeat","alive",1);
       }
     } elsif ($calltype eq "Ack") {
+      readingsSingleUpdate($hash,"heartbeat","alive",1) if $heart eq "NACK" and @{$hash->{IODev}->{messagesForRadioId}->{$hash->{radioId}}->{messages}} == 0;
       RemoveInternalTimer($hash,"MYSENSORS::DEVICE::timeoutAck");
       my $nextTrigger = gettimeofday() + $hash->{timeoutAck};
       InternalTimer($nextTrigger, "MYSENSORS::DEVICE::timeoutAck",$hash);
