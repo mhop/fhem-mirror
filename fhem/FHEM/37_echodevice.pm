@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.10.07 v0.2.1
+# - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 2975
+#
 # 2020.10.05 v0.2.0
 # - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 3532
 #
@@ -398,7 +401,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.0";
+my $ModulVersion     = "0.2.1";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -2971,232 +2974,233 @@ sub echodevice_Parse($$$) {
 		my $TimerReTime = 99999999 ;
 		my $iFrom ;
 		my $HelperNotifyID ;
-		
-		foreach my $device (@{$json->{notifications}}) {
-			
-			#next if ($device->{status} eq "OFF" && (lc($device->{type}) ne "reminder" || lc($device->{type}) ne "timer"));
 
-			$HelperNotifyID = $device->{notificationIndex};
-			
-			my $ncstring ;
+		if (ref($json) eq "HASH") {	
+			foreach my $device (@{$json->{notifications}}) {
 				
-			if(lc($device->{type}) eq "reminder") {
-				$ncstring  = $device->{type} . "_" . FmtDateTime($device->{alarmTime}/1000) . "_";
-				$ncstring .= $device->{recurringPattern} . "_" if (defined($device->{recurringPattern}));
-				$ncstring .= $device->{reminderLabel} ;
-			}
-			elsif(lc($device->{type}) eq "timer") {
-				$ncstring = $device->{type} . "_" . $device->{remainingTime}
-			}
-			else {
-				$ncstring = $device->{type} . "_" . $device->{originalTime} ;			
-			}
-			$hash->{helper}{"notifications"}{$device->{deviceSerialNumber}}{$device->{notificationIndex}} = $ncstring;
-			
-			#Reading anlegen
-			my $echohash = $modules{$hash->{TYPE}}{defptr}{$device->{deviceSerialNumber}};
-			
-			if (!defined($hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}})) {
-				$NotifiCount = 1;
-			}
-			else {
-				$NotifiCount = int($hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}}) + 1
-			}
-			
-			next if(!defined($echohash));
-			
-			readingsBeginUpdate($echohash);
-			if(lc($device->{type}) eq "reminder") {
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_alarmtime"  , FmtDateTime($device->{alarmTime}/1000), 1 );
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_alarmticks"  , $device->{alarmTime}/1000, 1 );
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring"  , $device->{recurringPattern},1) if (defined($device->{recurringPattern}));
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring"  , 0,1) if (!defined($device->{recurringPattern}));
-			}
-			elsif(lc($device->{type}) eq "timer") {
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_remainingtime"  , int($device->{remainingTime} / 1000), 1 );
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
+				#next if ($device->{status} eq "OFF" && (lc($device->{type}) ne "reminder" || lc($device->{type}) ne "timer"));
+
+				$HelperNotifyID = $device->{notificationIndex};
 				
-				if (int($device->{remainingTime} / 1000) < $TimerReTime) {
-					$TimerReTime = int($device->{remainingTime} / 1000);
-					readingsBulkUpdate( $echohash, lc($device->{type}) . "_remainingtime"  , int($device->{remainingTime} / 1000), 1 );
-					readingsBulkUpdate( $echohash, lc($device->{type}) . "_id"  , $device->{notificationIndex},1);
+				my $ncstring ;
+					
+				if(lc($device->{type}) eq "reminder") {
+					$ncstring  = $device->{type} . "_" . FmtDateTime($device->{alarmTime}/1000) . "_";
+					$ncstring .= $device->{recurringPattern} . "_" if (defined($device->{recurringPattern}));
+					$ncstring .= $device->{reminderLabel} ;
 				}
-				
-				if ($TimerReTime <$NotifiReTime) {$NotifiReTime = $TimerReTime;}
-			}
-			else {
-
-				$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID} = ();
-				
-				if ($device->{musicEntity} eq "") {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicEntity"} = "null";
+				elsif(lc($device->{type}) eq "timer") {
+					$ncstring = $device->{type} . "_" . $device->{remainingTime}
 				}
 				else {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicEntity"} = '"'.$device->{musicEntity}.'"';
+					$ncstring = $device->{type} . "_" . $device->{originalTime} ;			
 				}
-
-				if ($device->{musicAlarmId} eq "") {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicAlarmId"} = "null";
+				$hash->{helper}{"notifications"}{$device->{deviceSerialNumber}}{$device->{notificationIndex}} = $ncstring;
+				
+				#Reading anlegen
+				my $echohash = $modules{$hash->{TYPE}}{defptr}{$device->{deviceSerialNumber}};
+				
+				if (!defined($hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}})) {
+					$NotifiCount = 1;
 				}
 				else {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicAlarmId"} = '"'.$device->{musicAlarmId}.'"';
+					$NotifiCount = int($hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}}) + 1
 				}
 				
-				if ($device->{recurringPattern} eq "") {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"recurringPattern"} = "null";
+				next if(!defined($echohash));
+				
+				readingsBeginUpdate($echohash);
+				if(lc($device->{type}) eq "reminder") {
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_alarmtime"  , FmtDateTime($device->{alarmTime}/1000), 1 );
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_alarmticks"  , $device->{alarmTime}/1000, 1 );
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring"  , $device->{recurringPattern},1) if (defined($device->{recurringPattern}));
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring"  , 0,1) if (!defined($device->{recurringPattern}));
+				}
+				elsif(lc($device->{type}) eq "timer") {
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_remainingtime"  , int($device->{remainingTime} / 1000), 1 );
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
+					
+					if (int($device->{remainingTime} / 1000) < $TimerReTime) {
+						$TimerReTime = int($device->{remainingTime} / 1000);
+						readingsBulkUpdate( $echohash, lc($device->{type}) . "_remainingtime"  , int($device->{remainingTime} / 1000), 1 );
+						readingsBulkUpdate( $echohash, lc($device->{type}) . "_id"  , $device->{notificationIndex},1);
+					}
+					
+					if ($TimerReTime <$NotifiReTime) {$NotifiReTime = $TimerReTime;}
 				}
 				else {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"recurringPattern"} = $device->{recurringPattern};
+
+					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID} = ();
+					
+					if ($device->{musicEntity} eq "") {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicEntity"} = "null";
+					}
+					else {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicEntity"} = '"'.$device->{musicEntity}.'"';
+					}
+
+					if ($device->{musicAlarmId} eq "") {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicAlarmId"} = "null";
+					}
+					else {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"musicAlarmId"} = '"'.$device->{musicAlarmId}.'"';
+					}
+					
+					if ($device->{recurringPattern} eq "") {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"recurringPattern"} = "null";
+					}
+					else {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"recurringPattern"} = $device->{recurringPattern};
+					}
+					
+					if ($device->{provider} eq "") {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"provider"} = "null";
+					}
+					else {
+						$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"provider"} = '"'.$device->{provider}.'"';
+					}
+
+					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"remainingTime"}    = $device->{remainingTime};
+					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"alarmTime"}        = $device->{alarmTime};
+					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"originalDate"}     = $device->{originalDate};
+					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"originalTime"}     = $device->{originalTime};
+					
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_originalTime"  , $device->{originalTime}, 1 );
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_originalDate"  , $device->{originalDate}, 1 );
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_status"  , lc($device->{status}),1);
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring" , $device->{recurringPattern},1) if (defined($device->{recurringPattern}));
+					readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring" , 0,1) if (!defined($device->{recurringPattern}));
+					
+				}
+				# Infos im Hash hinterlegen
+				$hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}} = $NotifiCount;
+				$hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{lc($device->{type})."_aktiv"} = 1;
+				readingsEndUpdate($echohash,1);
+			}
+
+			# Notifications Counter setzen
+			foreach my $DeviceID (sort keys %{$modules{$hash->{TYPE}}{defptr}}) { 
+				foreach my $NotifyCounter (sort keys %{$hash->{helper}{"notifications"}{"_".$DeviceID}}) { 
+					if ($NotifyCounter =~ m/count/ ) { 
+						my $echohash = $modules{$hash->{TYPE}}{defptr}{$DeviceID};
+						readingsSingleUpdate($echohash, lc((split ("_", $NotifyCounter))[1]). "_count" ,$hash->{helper}{"notifications"}{"_".$DeviceID}{$NotifyCounter} , 1);
+					}
+				}
+			}
+
+			# Timer neu setzen wenn der Timer gleich abläuft
+			if ($NotifiReTime < 60 && $NotifiReTime > 0) {InternalTimer(gettimeofday() + $NotifiReTime , "echodevice_GetSettings", $hash, 0);}
+			
+			# Readings bereinigen
+			my $nextupdate = int(AttrVal($name,"intervalsettings",60));
+			
+			foreach my $DeviceID (sort keys %{$modules{$hash->{TYPE}}{defptr}}) {
+
+				next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Echo Multiroom");
+				next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Sonos Display");
+				next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Echo Stereopaar");
+				next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "unbekannt");
+			
+				my $DeviceName = $modules{$hash->{TYPE}}{defptr}{$DeviceID}{NAME};
+				my $echohash   = $modules{$hash->{TYPE}}{defptr}{$DeviceID};
+				readingsBeginUpdate($echohash);
+
+				# Timer auswerten
+				my $TimerAktiv = 0;
+				foreach my $i (1..20) {
+					my $ReadingAge = int(ReadingsAge($DeviceName, "timer_" . sprintf("%02d",$i) . "_remainingtime", 2000));
+					
+					if ($ReadingAge == 2000){last;} 
+					elsif ($ReadingAge > $nextupdate) {
+						readingsDelete($echohash, "timer_" . sprintf("%02d",$i) . "_id") ;
+						readingsDelete($echohash, "timer_" . sprintf("%02d",$i) . "_remainingtime") ;
+					}
+					else {$TimerAktiv=1;}
 				}
 				
-				if ($device->{provider} eq "") {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"provider"} = "null";
+				if ($TimerAktiv == 0) {
+					readingsBulkUpdate( $echohash, "timer_count"  , 0,1);
+					readingsBulkUpdate( $echohash, "timer_id"  , "-",1);
+					readingsBulkUpdate( $echohash, "timer_remainingtime"  , 0,1);
+				}
+
+				# Erinnerungen auswerten			
+				my $ReminderAktiv = 0;
+				$ReminderAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"}));
+			
+				if ($ReminderAktiv eq "0") {
+					readingsBulkUpdate( $echohash, "reminder_count"  , 0,1);
 				}
 				else {
-					$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"provider"} = '"'.$device->{provider}.'"';
+					$hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"} = 0
 				}
 
-				$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"remainingTime"}    = $device->{remainingTime};
-				$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"alarmTime"}        = $device->{alarmTime};
-				$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"originalDate"}     = $device->{originalDate};
-				$hash->{helper}{$device->{type}}{$device->{deviceSerialNumber}}{$HelperNotifyID}{"originalTime"}     = $device->{originalTime};
+				$iFrom = int(ReadingsVal($DeviceName, "reminder_count", 0)) +1 ;
 				
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_originalTime"  , $device->{originalTime}, 1 );
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_originalDate"  , $device->{originalDate}, 1 );
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_id"  , $device->{notificationIndex},1);
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_status"  , lc($device->{status}),1);
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring" , $device->{recurringPattern},1) if (defined($device->{recurringPattern}));
-				readingsBulkUpdate( $echohash, lc($device->{type}) . "_" . sprintf("%02d",$NotifiCount) . "_recurring" , 0,1) if (!defined($device->{recurringPattern}));
-				
-			}
-			# Infos im Hash hinterlegen
-			$hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{"count_" . $device->{type}} = $NotifiCount;
-			$hash->{helper}{"notifications"}{"_".$device->{deviceSerialNumber}}{lc($device->{type})."_aktiv"} = 1;
-			readingsEndUpdate($echohash,1);
-		}
-
-		# Notifications Counter setzen
-		foreach my $DeviceID (sort keys %{$modules{$hash->{TYPE}}{defptr}}) { 
-			foreach my $NotifyCounter (sort keys %{$hash->{helper}{"notifications"}{"_".$DeviceID}}) { 
-				if ($NotifyCounter =~ m/count/ ) { 
-					my $echohash = $modules{$hash->{TYPE}}{defptr}{$DeviceID};
-					readingsSingleUpdate($echohash, lc((split ("_", $NotifyCounter))[1]). "_count" ,$hash->{helper}{"notifications"}{"_".$DeviceID}{$NotifyCounter} , 1);
+				foreach my $i ($iFrom..20) {
+					
+					if (ReadingsVal($DeviceName, "reminder_" . sprintf("%02d",$i) . "_alarmticks", "none") ne "none"){
+						readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_id") ;
+						readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_alarmticks") ;
+						readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_alarmtime") ;
+						readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_recurring") ;
+					}
+					else {last;}
 				}
-			}
-		}
-
-		# Timer neu setzen wenn der Timer gleich abläuft
-		if ($NotifiReTime < 60 && $NotifiReTime > 0) {InternalTimer(gettimeofday() + $NotifiReTime , "echodevice_GetSettings", $hash, 0);}
-		
-		# Readings bereinigen
-		my $nextupdate = int(AttrVal($name,"intervalsettings",60));
-		
-		foreach my $DeviceID (sort keys %{$modules{$hash->{TYPE}}{defptr}}) {
-
-			next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Echo Multiroom");
-			next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Sonos Display");
-			next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "Echo Stereopaar");
-			next if (echodevice_getModel($modules{$hash->{TYPE}}{defptr}{$DeviceID}{model}) eq "unbekannt");
-		
-			my $DeviceName = $modules{$hash->{TYPE}}{defptr}{$DeviceID}{NAME};
-			my $echohash   = $modules{$hash->{TYPE}}{defptr}{$DeviceID};
-			readingsBeginUpdate($echohash);
-
-			# Timer auswerten
-			my $TimerAktiv = 0;
-			foreach my $i (1..20) {
-				my $ReadingAge = int(ReadingsAge($DeviceName, "timer_" . sprintf("%02d",$i) . "_remainingtime", 2000));
 				
-				if ($ReadingAge == 2000){last;} 
-				elsif ($ReadingAge > $nextupdate) {
-					readingsDelete($echohash, "timer_" . sprintf("%02d",$i) . "_id") ;
-					readingsDelete($echohash, "timer_" . sprintf("%02d",$i) . "_remainingtime") ;
+				# Alarm auswerten
+				my $AlarmAktiv = 0;
+				$AlarmAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"}));
+			
+				if ($AlarmAktiv eq "0") {
+					readingsBulkUpdate( $echohash, "alarm_count"  , 0,1);
 				}
-				else {$TimerAktiv=1;}
-			}
-			
-			if ($TimerAktiv == 0) {
-				readingsBulkUpdate( $echohash, "timer_count"  , 0,1);
-				readingsBulkUpdate( $echohash, "timer_id"  , "-",1);
-				readingsBulkUpdate( $echohash, "timer_remainingtime"  , 0,1);
-			}
+				else {
+					$hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"} = 0
+				}
 
-			# Erinnerungen auswerten			
-			my $ReminderAktiv = 0;
-			$ReminderAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"}));
-		
-			if ($ReminderAktiv eq "0") {
-				readingsBulkUpdate( $echohash, "reminder_count"  , 0,1);
-			}
-			else {
-				$hash->{helper}{"notifications"}{"_".$DeviceID}{"reminder_aktiv"} = 0
-			}
-
-			$iFrom = int(ReadingsVal($DeviceName, "reminder_count", 0)) +1 ;
-			
-			foreach my $i ($iFrom..20) {
+				$iFrom = int(ReadingsVal($DeviceName, "alarm_count", 0)) +1 ;
 				
-				if (ReadingsVal($DeviceName, "reminder_" . sprintf("%02d",$i) . "_alarmticks", "none") ne "none"){
-					readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_id") ;
-					readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_alarmticks") ;
-					readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_alarmtime") ;
-					readingsDelete($echohash, "reminder_" . sprintf("%02d",$i) . "_recurring") ;
+				foreach my $i ($iFrom..20) {
+					
+					if (ReadingsVal($DeviceName, "alarm_" . sprintf("%02d",$i) . "_id", "none") ne "none"){
+						readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_id") ;
+						readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_originalTime") ;
+						readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_originalDate") ;
+						readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_status") ;
+						readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_recurring") ;
+					}
+					else {last;}
 				}
-				else {last;}
-			}
-			
-			# Alarm auswerten
-			my $AlarmAktiv = 0;
-			$AlarmAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"}));
-		
-			if ($AlarmAktiv eq "0") {
-				readingsBulkUpdate( $echohash, "alarm_count"  , 0,1);
-			}
-			else {
-				$hash->{helper}{"notifications"}{"_".$DeviceID}{"alarm_aktiv"} = 0
-			}
-
-			$iFrom = int(ReadingsVal($DeviceName, "alarm_count", 0)) +1 ;
-			
-			foreach my $i ($iFrom..20) {
 				
-				if (ReadingsVal($DeviceName, "alarm_" . sprintf("%02d",$i) . "_id", "none") ne "none"){
-					readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_id") ;
-					readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_originalTime") ;
-					readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_originalDate") ;
-					readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_status") ;
-					readingsDelete($echohash, "alarm_" . sprintf("%02d",$i) . "_recurring") ;
-				}
-				else {last;}
-			}
+				# Musikalarm auswerten
+				my $MusikAlarmAktiv = 0;
+				$MusikAlarmAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"musikalarm_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"musicalarm_aktiv"}));
 			
-			# Musikalarm auswerten
-			my $MusikAlarmAktiv = 0;
-			$MusikAlarmAktiv = $hash->{helper}{"notifications"}{"_".$DeviceID}{"musikalarm_aktiv"} if (defined($hash->{helper}{"notifications"}{"_".$DeviceID}{"musicalarm_aktiv"}));
-		
-			if ($MusikAlarmAktiv eq "0") {
-				readingsBulkUpdate( $echohash, "musicalarm_count"  , 0,1);
-			}
-			else {
-				$hash->{helper}{"notifications"}{"_".$DeviceID}{"musicalarm_aktiv"} = 0
-			}
+				if ($MusikAlarmAktiv eq "0") {
+					readingsBulkUpdate( $echohash, "musicalarm_count"  , 0,1);
+				}
+				else {
+					$hash->{helper}{"notifications"}{"_".$DeviceID}{"musicalarm_aktiv"} = 0
+				}
 
-			$iFrom = int(ReadingsVal($DeviceName, "musicalarm_count", 0)) +1 ;
-			
-			foreach my $i ($iFrom..20) {
+				$iFrom = int(ReadingsVal($DeviceName, "musicalarm_count", 0)) +1 ;
 				
-				if (ReadingsVal($DeviceName, "musicalarm_" . sprintf("%02d",$i) . "_id", "none") ne "none"){
-					readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_id") ;
-					readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_originalTime") ;
-					readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_originalDate") ;
-					readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_status") ;
-					readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_recurring") ;
+				foreach my $i ($iFrom..20) {
+					
+					if (ReadingsVal($DeviceName, "musicalarm_" . sprintf("%02d",$i) . "_id", "none") ne "none"){
+						readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_id") ;
+						readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_originalTime") ;
+						readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_originalDate") ;
+						readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_status") ;
+						readingsDelete($echohash, "musicalarm_" . sprintf("%02d",$i) . "_recurring") ;
+					}
+					else {last;}
 				}
-				else {last;}
+				readingsEndUpdate($echohash,1);
 			}
-			
-			readingsEndUpdate($echohash,1);
 		}
 	} 
 		
