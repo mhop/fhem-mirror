@@ -35,6 +35,7 @@ package FHEM::SSChatBot;                                                        
 
 use strict;                           
 use warnings;
+use utf8;
 use GPUtils qw(GP_Import GP_Export);                                                                          # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use FHEM::SynoModules::API qw(apistatic);                                                                     # API Modul
@@ -534,6 +535,7 @@ sub _setasyncSendItem {
   
   return qq{Your sendstring is incorrect. It must contain at least text with the "text=" tag like text="..."\nor only some text like "this is a test" without the "text=" tag.} if(!$text);
   
+  $text  = decode("utf8", $text);
   $text  = formString($text, "text");
   
   $users = AttrVal($name,"defaultPeer", "") if(!$users);
@@ -1359,13 +1361,16 @@ sub formString {
   
   if($func ne "attachement") {
       %replacements = (
-          '"'              => "´",                  # doppelte Hochkomma sind im Text nicht erlaubt
-          " H"             => "%20H",               # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-          "#"              => "%23",                # Hashtags sind im Text nicht erlaubt und wird encodiert
-          "&"              => "%26",                # & ist im Text nicht erlaubt und wird encodiert    
-          "%"              => "%25",                # % ist nicht erlaubt und wird encodiert
-          "+"              => "%2B",
-          "\\x{c3}\\x{85}" => "%C3%85",
+          '"'       => "´",                         # doppelte Hochkomma sind im Text nicht erlaubt
+          " H"      => "%20H",                      # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+          "#"       => "%23",                       # Hashtags sind im Text nicht erlaubt und wird encodiert
+          "&"       => "%26",                       # & ist im Text nicht erlaubt und wird encodiert    
+          "%"       => "%25",                       # % ist nicht erlaubt und wird encodiert
+          "+"       => "%2B",
+          "\\x{c3}" => "%C3",
+          "\\x{85}" => "%85",
+          "\\x{bc}" => "%BC",
+          "\\x{9c}" => "%9C",
       );
   } 
   else {
@@ -1386,9 +1391,9 @@ sub formString {
   
   $pat = join '|', map { quotemeta; } keys(%replacements);
   
-  $txt =~ s/($pat)/$replacements{$1}/xg;   
+  $txt =~ s/($pat)/$replacements{$1}/xg;  
   
-return ($txt);
+return $txt;
 }
 
 #############################################################################################
