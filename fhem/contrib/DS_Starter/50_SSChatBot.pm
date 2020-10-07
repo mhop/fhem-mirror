@@ -35,7 +35,7 @@ package FHEM::SSChatBot;                                                        
 
 use strict;                           
 use warnings;
-use utf8;
+# use utf8;
 use GPUtils qw(GP_Import GP_Export);                                                                          # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use FHEM::SynoModules::API qw(apistatic);                                                                     # API Modul
@@ -535,7 +535,8 @@ sub _setasyncSendItem {
   
   return qq{Your sendstring is incorrect. It must contain at least text with the "text=" tag like text="..."\nor only some text like "this is a test" without the "text=" tag.} if(!$text);
   
-  $text  = decode("utf8", $text);
+  # $text  = decode("utf8", $text);
+  # $text  = formString($text, decode("utf8", $text));
   $text  = formString($text, "text");
   
   $users = AttrVal($name,"defaultPeer", "") if(!$users);
