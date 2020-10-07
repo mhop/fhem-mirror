@@ -64,13 +64,13 @@ attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim
 attr DEVICE cmdIcon stop:fts_shutter_manual
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
-set DEVICE configByte 10 1 ##configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
-set DEVICE configByte  3 0 ##configReportsType BlindPositionReportsSentToThe0
+set DEVICE configByte 10 1 ## configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
+set DEVICE configByte  3 0 ## configReportsType BlindPositionReportsSentToThe0
 set DEVICE configByte 14 SWITCHTYPE
 option:{ RADIO_SCENES_ACTIVATION }
-set DEVICE configByte 50 1 ##configScenesAssociationsActivation ScenesActivation
+set DEVICE configByte 50 1 ## configScenesAssociationsActivation ScenesActivation
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
-set DEVICE configByte 50 0 ##configScenesAssociationsActivation AssociationsActivation
+set DEVICE configByte 50 0 ## configScenesAssociationsActivation AssociationsActivation
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
@@ -96,15 +96,15 @@ attr DEVICE webCmd dim
 attr DEVICE cmdIcon stop:fts_shutter_manual
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
 attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGRM222","venetian") }
-set DEVICE configByte 10 2 ##configRollerShutterOperatingModes 2VenetianBlindModeWith2
-set DEVICE configByte  3 1 ##configReportsType BlindPositionReportsSentToThe1
-set DEVICE configByte 13 0 ##configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
+set DEVICE configByte 10 2 ## configRollerShutterOperatingModes 2VenetianBlindModeWith2
+set DEVICE configByte  3 1 ## configReportsType BlindPositionReportsSentToThe1
+set DEVICE configByte 13 0 ## configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
 set DEVICE configByte 14 SWITCHTYPE
 attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0) =~ m,dim, ? ReadingsNum($name,"state",0) : ReadingsNum($name,"dim",0);; my $pos1 = ReadingsNum($name,"position",0);; $pos = $pos1 if ($pos > $pos1 +3 || $pos < $pos1 -3);; return $pos }, positionSlat:power..0.0.W {ReadingsVal($name,"position",0) =~ m,Slat.([0-9]+),?$1:undef}
 option:{ RADIO_SCENES_ACTIVATION }
-set DEVICE configByte 50 1 ##configScenesAssociationsActivation ScenesActivation
+set DEVICE configByte 50 1 ## configScenesAssociationsActivation ScenesActivation
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
-set DEVICE configByte 50 0 ##configScenesAssociationsActivation AssociationsActivation
+set DEVICE configByte 50 0 ## configScenesAssociationsActivation AssociationsActivation
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
@@ -166,17 +166,17 @@ attr CHANNEL01 eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr CHANNEL01 webCmd dim
 attr CHANNEL01 widgetOverride dim:colorpicker,BRI,0,1,99
 attr CHANNEL01 userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,"reportedState",0):ReadingsNum($name,"state",0)}
-set MAINCHANNEL configByte 65 10 ##configEnergyReportsOnChange 10
+set MAINCHANNEL configByte 65 10 ## configEnergyReportsOnChange 10
 option:{ RADIO_SCENES_ACTIVATION }
-set MAINCHANNEL configByte 40 15 ##configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
-set MAINCHANNEL configByte 41 15 ##configS2SwitchScenesSent 15
+set MAINCHANNEL configByte 40 15 ## configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
+set MAINCHANNEL configByte 41 15 ## configS2SwitchScenesSent 15
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
-set MAINCHANNEL configByte 40 0 ##configS1SwitchScenesSent 0
-set MAINCHANNEL configByte 41 0 ##configS2SwitchScenesSent 0
+set MAINCHANNEL configByte 40 0  ## configS1SwitchScenesSent 0
+set MAINCHANNEL configByte 41 0  ## configS2SwitchScenesSent 0
 option:{ 1 }
 set MAINCHANNEL configByte 20 SWITCHTYPE
-set MAINCHANNEL configByte 151 1 ##configOperatingMode RollerBlind
-set MAINCHANNEL configByte 150 2 ##configForceCalibration ForceDeviceCalibration
+set MAINCHANNEL configByte 151 1 ## configOperatingMode RollerBlind
+set MAINCHANNEL configByte 150 2 ## configForceCalibration ForceDeviceCalibration
 option:{ CALLSPEECHRECOGN }  
 set CHANNEL01 attrTemplate speechcontrol_type_blind
 #closing section
@@ -207,15 +207,15 @@ attr CHANNEL01 widgetOverride dim:colorpicker,BRI,0,1,99
 attr CHANNEL01 userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,"reportedState",0):ReadingsNum($name,"state",0)}
 set MAINCHANNEL configEnergyReportsOnChange 10
 option:{ RADIO_SCENES_ACTIVATION }
-set MAINCHANNEL configByte 40 15 ##configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
-set MAINCHANNEL configByte 41 15 ##configS2SwitchScenesSent 15
+set MAINCHANNEL configByte 40 15 ## configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
+set MAINCHANNEL configByte 41 15 ## configS2SwitchScenesSent 15
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
-set MAINCHANNEL configByte 40 0 ##configS1SwitchScenesSent 0
-set MAINCHANNEL configByte 41 0 ##configS2SwitchScenesSent 0
+set MAINCHANNEL configByte 40 0  ## configS1SwitchScenesSent 0
+set MAINCHANNEL configByte 41 0  ## configS2SwitchScenesSent 0
 option:{ 1 }
 set MAINCHANNEL configByte 20 SWITCHTYPE
-set MAINCHANNEL configByte 151 2 ##configOperatingMode VenetianBlind
-set MAINCHANNEL configByte 150 2 ##configForceCalibration ForceDeviceCalibration
+set MAINCHANNEL configByte 151 2 ## configOperatingMode VenetianBlind
+set MAINCHANNEL configByte 150 2 ## configForceCalibration ForceDeviceCalibration
 option:{ CALLSPEECHRECOGN }  
 set CHANNEL01 attrTemplate speechcontrol_type_blind
 #closing section
@@ -240,14 +240,14 @@ par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be ident
 par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",1) }
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",3) }
-set MAINCHANNEL associationAdd 1 1
-set MAINCHANNEL configGroup1Interval 60
-set MAINCHANNEL configGroup1Reports 14337
-set MAINCHANNEL configGroup2Interval 60
-set MAINCHANNEL configGroup2Reports 1792
-set MAINCHANNEL configGroup3Interval 600
-set MAINCHANNEL configGroup3Reports 4128780
-set MAINCHANNEL configSelectiveReporting Enable
+#set MAINCHANNEL associationAdd 1 1
+set MAINCHANNEL configByte 111 60      ## configGroup1Interval 60
+set MAINCHANNEL configWord 111 14337   ## configGroup1Reports 14337
+set MAINCHANNEL configByte 112 60      ## configGroup2Interval 60
+set MAINCHANNEL configWord 102 1792    ## configGroup2Reports 1792
+set MAINCHANNEL configWord 113 600     ## configGroup3Interval 600
+set MAINCHANNEL configLong 103 4128780 ## configGroup3Reports 4128780
+set MAINCHANNEL configByte   3 1       ## configSelectiveReporting Enable
 attr MAINCHANNEL,CHANNEL01,CHANNEL02,CHANNEL03 stateFormat energy_kWh
 attr MAINCHANNEL,CHANNEL01,CHANNEL02,CHANNEL03 userReadings energy_kWh:energy:.* monotonic {ReadingsNum("$name","energy",0)}
 #closing section
@@ -264,16 +264,16 @@ order:03AEOTEC0000ZW100
 desc:Applies to AEON Labs ZW100 MultiSensor 6 when battery powered.<br>NOTE: early version!<br>The template is based on this <a href="https://forum.fhem.de/index.php/topic,114538.0.html">forum thread</a>, manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/folders/6000149641">here</a>. Having an up-to-date firmware is highly recommended!
 par:RADIO_REPORT_UV;Send also UV values;{ undef }
 par:RADIO_NO_UV_REPORT;Do not send UV values;{ undef }
-set DEVICE configGroup1Interval 3600
-set DEVICE configByte 40 0 ##configReportOnlyOnThresholds Disabled
+set DEVICE configWord 111 3600 ## configGroup1Interval 3600
+set DEVICE configByte 40 0     ## configReportOnlyOnThresholds Disabled
 option:{ RADIO_REPORT_UV}
-set DEVICE configLong 101 241 ##configGroup1Reports 241 (1+16+32+64+128)
+set DEVICE configByte 101 241  ## configGroup1Reports 241 (1+16+32+64+128)
 option:{ RADIO_NO_UV_REPORT }
-set DEVICE configLong 101 225 ##configGroup1Reports 225 (1+32+64+128)
+set DEVICE configByte 101 225  ## configGroup1Reports 225 (1+32+64+128)
 option:{ 1 }  
-get DEVICE config 111 ##configGroup1Interval
-get DEVICE config  40 ##configReportOnlyOnThresholds
-get DEVICE config 101 ##configGroup1Reports
+get DEVICE config 111          ## configGroup1Interval
+get DEVICE config  40          ## configReportOnlyOnThresholds
+get DEVICE config 101          ## configGroup1Reports
 setreading DEVICE attrTemplateVersion ZW100_Multisensor_Battery_20201007
 
 
@@ -283,13 +283,12 @@ order:03AEOTEC0000ZW100a
 desc:Applies to AEON Labs ZW100 MultiSensor 6 when powered over USB.<br>NOTE: early version!<br>The template is based on this <a href="https://forum.fhem.de/index.php/topic,114538.0.html">forum thread</a>, manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/folders/6000149641">here</a> Having an up-to-date firmware is highly recommended!
 par:RADIO_REPORT_UV;Send also UV values;{ undef }
 par:RADIO_NO_UV_REPORT;Do not send UV values;{ undef }
-set DEVICE configGroup1Interval 30
-set DEVICE configByte 40 1 ##configReportOnlyOnThresholds Enabled
-#configReportOnlyOnThresholds Enabled
+set DEVICE configByte 111 30  ## configGroup1Interval 30
+set DEVICE configByte 40 1    ## configReportOnlyOnThresholds Enabled
 option:{ RADIO_REPORT_UV}
-set DEVICE configLong 101 240 ##configGroup1Reports 240 (16+32+64+128)
+set DEVICE configByte 101 240 ## configGroup1Reports 240 (16+32+64+128)
 option:{ RADIO_NO_UV_REPORT }
-set DEVICE configLong 101 224 ##configGroup1Reports 224 (32+64+128)
+set DEVICE configByte 101 224 ## configGroup1Reports 224 (32+64+128)
 #closing section
 option:{ 1 }  
 get DEVICE configAll
