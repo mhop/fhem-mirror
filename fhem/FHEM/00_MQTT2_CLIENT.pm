@@ -131,6 +131,7 @@ MQTT2_CLIENT_doinit($)
       pack("C",0x10).
       MQTT2_CLIENT_calcRemainingLength(length($msg)).$msg, 1, 1); # Forum #92946
     RemoveInternalTimer($hash);
+    $hash->{waitingForConnack} = 1;
     if($keepalive) {
       InternalTimer(gettimeofday()+$keepalive,"MQTT2_CLIENT_keepalive",$hash,0);
     }
@@ -182,10 +183,13 @@ MQTT2_CLIENT_keepalive($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  if($hash->{waitingForConnack}) {
+    Log3 $name, 2, "$hash->{NAME}: No CONNACK, disconnecting";
+    return  MQTT2_CLIENT_Disco($hash);
+  }
   if($hash->{waitingForPingRespSince}) {
     Log3 $name, 2, "$hash->{NAME}: No PINGRESP for last PINGREQ (".
             "at $hash->{waitingForPingRespSince}), disconnecting";
-    delete $hash->{waitingForPingRespSince};
     return  MQTT2_CLIENT_Disco($hash);
   }
   my $keepalive = AttrVal($name, "keepaliveTimeout", 30);
@@ -223,6 +227,9 @@ MQTT2_CLIENT_Disco($;$$)
     RemoveInternalTimer($hash->{disconnectTimerHash});
     delete($hash->{disconnectTimerHash});
   }
+
+  delete $hash->{waitingForConnack};
+  delete $hash->{waitingForPingRespSince};
 
   readingsSingleUpdate($hash, "state", "disconnected", 1);
 }
@@ -418,6 +425,7 @@ MQTT2_CLIENT_Read($@)
 
   ####################################
   if($cpt eq "CONNACK")  {
+    delete($hash->{waitingForConnack});
     my $rc = ord(substr($pl,1,1));
     if($rc == 0) {
       MQTT2_CLIENT_doinit($hash);
