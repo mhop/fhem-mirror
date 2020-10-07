@@ -723,7 +723,7 @@ while (1) {
     $errcount++;
 
     # Handling "Bad file descriptor". This is a programming error.
-    if($err == 9) {  # BADF, don't want to "use errno.ph"
+    if($err == 9 || $err == 10038) {  # BADF, don't want to "use errno.ph"
       my $nbad = 0;
       foreach my $p (keys %selectlist) {
         my ($tin, $tout) = ('', '');
