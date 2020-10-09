@@ -10,7 +10,7 @@
 #
 #
 ##############################################################################
-# Release 13 / 2020-04-25
+# Release 14 / 2020-10-01
 
 
 package main;
@@ -52,8 +52,8 @@ my %device_types = (  0 => "User related",
 
 my %device_models = (  1 => { 1 => "Smart Scale", 2 => "Wireless Scale", 3 => "Smart Kid Scale", 4 => "Smart Body Analyzer", 5 => "WiFi Body Scale", 6 => "Cardio Scale", 7 => "Body Scale", },
                        2 => { 21 => "Smart Baby Monitor", 22 => "Home", 23 => "Home v2", },
-                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM Core", },
-                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", },
+                       4 => { 41 => "iOS Blood Pressure Monitor", 42 => "Wireless Blood Pressure Monitor", 43 => "BPM", 44 => "BPM Core", 45 => "BPM Connect"},
+                      16 => { 51 => "Pulse Ox", 52 => "Activite", 53 => "Activite v2", 54 => "Go", 55 => "Steel HR", 58 => "Pulse HR", 59 => "Steel HR Sport", 90 => "Move", 91 => "Move ECG", 93 => "ScanWatch", },
                       32 => { 60 => "Aura", 61 => "Sleep Sensor", 62 => "Aura v2", 63 => "Sleep", },
                       64 => { 70 => "Thermo", }, );
 
@@ -95,7 +95,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       39 => { name => "Intensity", reading => "intensity", }, #intraday only #vasistas
                       40 => { name => "Distance (m)", reading => "distance", dailyreading => "dailyDistance", },  #aggregate #measure #vasistas
                       41 => { name => "Descent (m)", reading => "descent", dailyreading => "dailyDescent", }, #descent #aggregate #measure ??sleepreading! #vasistas
-                      42 => { name => "Activity Type", reading => "activityType", }, #intraday only 1:walk 2:run #vasistas
+                      42 => { name => "Activity Type", reading => "activityType", }, #intraday only 1:walk 2:run #vasistas scanwatch activity
                       43 => { name => "Duration (s)", reading => "duration", }, #intraday only #vasistas
                       44 => { name => "Sleep State", reading => "sleepstate", }, #intraday #aura mat #vasistas
                       45 => { name => "unknown 45", reading => "unknown45", },#vasistas
@@ -112,7 +112,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       56 => { name => "Ambient light (lux)", reading => "light", },  # aura device #getmeashf
                       57 => { name => "Respiratory rate", reading => "breathing", }, # aura mat #measure #vasistas
                       58 => { name => "Air Quality (ppm)", reading => "voc", }, # Home Air Quality #getmeashf
-                      59 => { name => "unknown 59", reading => "unknown59", }, # activity #vasistas
+                      59 => { name => "unknown 59", reading => "unknown59", }, # activity #vasistas activity scanwatch
                       60 => { name => "PIM movement", reading => "movementPIM", }, # aura mat #measure vasistas 20-200 peak 800 #vasistas
                       61 => { name => "Maximum movement", reading => "movementMaximum", }, # aura mat #measure vasistas 10-60 peak 600 #vasistas
                       62 => { name => "unknown 62", reading => "unknown62", }, # aura mat #measure vasistas 20-100 #vasistas
@@ -123,10 +123,10 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       67 => { name => "unknown 67", reading => "unknown67", }, # aura mat #measure vasistas 0-100 peak 500 #vasistas
                       68 => { name => "unknown 68", reading => "unknown68", }, # aura mat #measure vasistas 0-800 peak 2000 #vasistas
                       69 => { name => "unknown 69", reading => "unknown69", }, # aura mat #measure vasistas 0-5000 peak 10000 #vasistas
-                      70 => { name => "unknown 70", reading => "unknown70", }, #? #vasistas
+                      70 => { name => "unknown 70", reading => "unknown70", }, #? #vasistas activity scanwatch
                       71 => { name => "Body Temperature (&deg;C)", reading => "bodyTemperature", }, #thermo
                       72 => { name => "GPS Speed", reading => "speedGPS", }, #vasistas
-                      73 => { name => "Skin Temperature (&deg;C)", reading => "skinTemperature", }, #thermo #vasistas
+                      73 => { name => "Skin Temperature (&deg;C)", reading => "skinTemperature", }, #thermo #vasistas scanwatch meas
                       76 => { name => "Muscle Mass (kg)", reading => "muscleMass", }, # cardio scale
                       77 => { name => "Water Mass (kg)", reading => "waterMass", }, # cardio scale
                       78 => { name => "unknown 78", reading => "unknown78", }, # cardio scale
@@ -135,8 +135,8 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                       86 => { name => "unknown 86", reading => "unknown86", }, # body scale
                       87 => { name => "Active Calories (kcal)", reading => "caloriesActive", dailyreading => "dailyCaloriesActive", }, # measures list sleepreading! #vasistas
                       88 => { name => "Bone Mass (kg)", reading => "boneMassWeight", },
-                      89 => { name => "unknown 89", reading => "unknown89", }, #vasistas
-                      90 => { name => "unknown 90", reading => "unknown90", }, #pulse #vasistas
+                      89 => { name => "unknown 89", reading => "unknown89", }, #vasistas scanwatch meas w/ spo2
+                      90 => { name => "unknown 90", reading => "unknown90", }, #pulse #vasistas activity scanwatch
                       91 => { name => "Pulse Wave Velocity (m/s)", reading => "pulseWave", },
                       93 => { name => "Muscle Mass (%)", reading => "muscleRatio", }, # cardio scale
                       94 => { name => "Bone Mass (%)", reading => "boneRatio", }, # cardio scale
@@ -165,7 +165,7 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      117 => { name => "unknown 117", reading => "unknown117", }, #?
                      118 => { name => "unknown 118", reading => "unknown118", }, #?
                      119 => { name => "unknown 119", reading => "unknown119", }, #?
-                     120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas
+                     120 => { name => "unknown 120", reading => "unknown120", }, #pulse, vasistas, scanwatch activity
                      121 => { name => "Snoring", reading => "snoring", }, # sleep #vasistas
                      122 => { name => "Lean Mass (%)", reading => "fatFreeRatio", },
                      123 => { name => "unknown 123", reading => "unknown123", },#
@@ -174,20 +174,20 @@ my %measure_types = (  1 => { name => "Weight (kg)", reading => "weight", },
                      126 => { name => "unknown 126", reading => "unknown126", },#
                      127 => { name => "unknown 127", reading => "unknown127", },#
                      128 => { name => "unknown 128", reading => "unknown128", },#vasistas invalid for trackers from 2020/09
-                     129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep
+                     129 => { name => "unknown 129", reading => "unknown129", },#vasistas sleep, scanwatch *
                      130 => { name => "ECG", reading => "heartECG", },#bpm core
                      131 => { name => "Heart Sounds", reading => "heartSounds", },#bpm core
-                     132 => { name => "unknown 132", reading => "unknown132", },#vasistas
-                     133 => { name => "unknown 133", reading => "unknown133", },#
+                     132 => { name => "unknown 132", reading => "unknown132", },#vasistas, scanwatch
+                     133 => { name => "unknown 133", reading => "unknown133", },# scanwatch
                      134 => { name => "unknown 134", reading => "unknown134", },#
-                     135 => { name => "unknown 135", reading => "unknown135", },#
-                     136 => { name => "unknown 136", reading => "unknown136", },#
-                     137 => { name => "unknown 137", reading => "unknown137", },#
-                     138 => { name => "unknown 138", reading => "unknown138", },#
-                     139 => { name => "unknown 139", reading => "unknown139", },#
+                     135 => { name => "ecgQRS", reading => "ecgQRS", },# scanwatch ecg
+                     136 => { name => "ecgPR", reading => "ecgPR", },# scanwatch ecg
+                     137 => { name => "ecgQT", reading => "ecgQT", },# scanwatch ecg
+                     138 => { name => "ecgQTc", reading => "ecgQTc", },# scanwatch ecg
+                     139 => { name => "unknown 139", reading => "unknown139", },# scanwatch
                      140 => { name => "unknown 140", reading => "unknown140", },#
-                     141 => { name => "unknown 141", reading => "unknown141", },#
-                     142 => { name => "unknown 142", reading => "unknown142", },#
+                     141 => { name => "unknown 141", reading => "unknown141", },# scanwatch meas
+                     142 => { name => "unknown 142", reading => "unknown142", },# scanwatch meas
                      143 => { name => "unknown 143", reading => "unknown143", },#
                      144 => { name => "unknown 144", reading => "unknown144", },#
                      145 => { name => "unknown 145", reading => "unknown145", },#
@@ -335,16 +335,22 @@ my %sleep_readings = (  'lightsleepduration' => { name => "Light Sleep", reading
                         'apnea_hypopnea_index' => { name => "Apnea/Hypopnea Index", reading => "apneaIndex", unit => 0, },
                         'pause_duration' => { name => "Pause Duration", reading => "pauseDuration", unit => "s", },
 
-                        # 'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
-                        # 'steps' => { name => "Steps", reading => "steps", unit => 0, },
-                        # 'calories' => { name => "Calories", reading => "calories", unit => 0, },
-                        # 'metcumul' => { name => "metcumul", reading => "metcumul", unit => 0, },
-                        # 'manual_calories' => { name => "Manual Calories", reading => "manual_calories", unit => 0, },
-                        # 'intensity' => { name => "Intensity", reading => "intensity", unit => 0, },
-                        # 'effduration' => { name => "Effective Duration", reading => "effduration", unit => 0, },
-                        # 'distance' => { name => "Distance", reading => "distance", unit => 0, },
-                        # 'steps' => { name => "Steps", reading => "steps", unit => 0, },
-                        );
+                        #'manual_distance' => { name => "Manual Distance", reading => "manual_distance", unit => 0, },
+                        #'steps' => { name => "Steps", reading => "steps", unit => 0, },
+                        #'calories' => { name => "Calories", reading => "calories", unit => 0, },
+                        #'metcumul' => { name => "metcumul", reading => "metcumul", unit => 0, },
+                        #'manual_calories' => { name => "Manual Calories", reading => "manual_calories", unit => 0, },
+                        #'effduration' => { name => "Effective Duration", reading => "effduration", unit => 0, },
+                        'intensity' => { name => "Intensity", reading => "intensity", unit => 0, },
+                        'distance' => { name => "Distance", reading => "workoutDistance", unit => "m", },
+                        'elevation' => { name => "Elevation", reading => "workoutElevation", unit => "m", },
+                        'hr_zone_0' => { name => "HR Zone 0", reading => "heartrateZoneLight", unit => "s", },
+                        'hr_zone_1' => { name => "HR Zone 1", reading => "heartrateZoneModerate", unit => "s", },
+                        'hr_zone_2' => { name => "HR Zone 2", reading => "heartrateZoneIntense", unit => "s", },
+                        'hr_zone_3' => { name => "HR Zone 3", reading => "heartrateZonePeak", unit => "s", },
+                        'device_startdate' => { name => "Start", reading => "deviceStartDate", unit => "m", },
+                        'device_enddate' => { name => "End", reading => "deviceEndDate", unit => "m", },
+                         );
 
 my %alarm_sound = (  0 => "Unknown",
                       1 => "Cloud Flakes",
@@ -1868,7 +1874,7 @@ sub withings_getUserReadingsSleep($) {
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,57,59,87,121,129', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,39,41,43,44,54,57,59,73,87,89,120,121,129,132,133,141,142', startdate => int($lastupdate), enddate => int($enddate), devicetype => '32', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
       hash => $hash,
       type => 'userReadingsSleep',
       enddate => int($enddate),
@@ -1942,7 +1948,7 @@ sub withings_getUserReadingsActivity($) {
     url => "https://scalews.withings.com/cgi-bin/v2/measure",
     timeout => 60,
     noshutdown => 1,
-    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '36,37,38,39,40,41,42,43,44,59,70,87,90,120,132', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
+    data => {sessionid => $hash->{IODev}->{SessionKey}, userid=> $hash->{User}, meastype => '11,36,37,38,39,40,41,42,43,44,54,59,70,73,87,89,90,120,132,133,141,142', startdate => int($lastupdate), enddate => int($enddate), devicetype => '16', appname => 'hmw', appliver => $hash->{IODev}->{helper}{appliver}, apppfm => 'web', action => 'getvasistas'},
     hash => $hash,
     type => 'userReadingsActivity',
     enddate => int($enddate),
@@ -4009,6 +4015,27 @@ sub withings_DbLog_splitFn($) {
     $reading = 'heartPulse';
     $unit = 'bpm';
   }
+  elsif($event =~ m/ecgQRS/)
+  {
+    $reading = 'ecgQRS';
+    $unit = 'ms';
+  }
+  elsif($event =~ m/ecgPR/)
+  {
+    $reading = 'ecgPR';
+    $unit = 'ms';
+  }
+  elsif($event =~ m/ecgQTc/)
+  {
+    $reading = 'ecgQTc';
+    $unit = 'ms';
+  }
+  elsif($event =~ m/ecgQT/)
+  {
+    $reading = 'ecgQT';
+    $unit = 'ms';
+  }
+
   elsif($event =~ m/pulseWaveRaw/)
   {
     $reading = 'pulseWaveRaw';

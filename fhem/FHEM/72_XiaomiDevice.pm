@@ -3950,7 +3950,10 @@ sub XiaomiDevice_DbLog_splitFn($) {
 <a name="XiaomiDevice"></a>
 <h3>XiaomiDevice</h3>
 <ul>
-  This modul connects to the Xiaomi Vacuums, Air Purifiers, Humidifiers, Fans and a few other devices.<br/>
+  This modul connects to the Xiaomi Vacuums, Air Purifiers, Humidifiers, Fans and a few other devices.<br/><br/>
+  <u>Required Perl Libraries:</u><br/>
+  Via the package manager, install <i>libjson-perl, libdigest-md5-perl, libcrypt-cbc-perl, libcrypt-ecb-perl</i><br/>
+  Via CPAN install Crypt::Cipher::AES <u>or</u> Crypt::Rijndael_PP
   <br/><br/>
   <b>Define</b>
   <ul>
