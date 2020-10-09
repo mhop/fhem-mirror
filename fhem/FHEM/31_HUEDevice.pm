@@ -442,7 +442,7 @@ HUEDevice_Define($$) {
 
     $hash->{helper}{mode} = '';
 
-    $hash->{helper}{lastupdated} = '';
+    $hash->{helper}{lastseen} = '';
 
     $attr{$name}{devStateIcon} = '{(HUEDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$name}{devStateIcon} ) );
 
@@ -1778,8 +1778,8 @@ HUEDevice_Parse($$)
   my $mode   = undef;
      $mode   = $state->{mode} if( defined($state->{mode}) && ($hash->{helper}{mode} || $state->{mode} ne 'homeautomation') );
 
-  my $lastupdated = undef;
-     $lastupdated = $result->{lastupdated} if( defined($result->{lastupdated}) );
+  my $lastseen = undef;
+     $lastseen = $result->{lastseen} if( defined($result->{lastseen}) );
 
   if( defined($colormode) && $colormode ne $hash->{helper}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{helper}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -1805,7 +1805,7 @@ HUEDevice_Parse($$)
 
   if( defined($mode) && $mode ne $hash->{helper}{mode} ) {readingsBulkUpdate($hash,"mode",$mode);}
 
-  if( defined($lastupdated) && $lastupdated ne $hash->{helper}{lastupdated} ) {readingsBulkUpdate($hash,"lastupdated",$lastupdated);}
+  if( defined($lastseen) && $lastseen ne $hash->{helper}{lastseen} ) {readingsBulkUpdate($hash,"lastseen",$lastseen);}
 
   my $s = '';
   my $pct = -1;
