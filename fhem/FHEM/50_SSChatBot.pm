@@ -69,7 +69,7 @@ use Data::Dumper;                                                               
 use MIME::Base64;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
-use Encode;   
+use Encode;
 eval "use JSON;1;"                                                    or my $SSChatBotMM = "JSON";            ## no critic 'eval' # Debian: apt-get install libjson-perl
 eval "use FHEM::Meta;1"                                               or my $modMetaAbsent = 1;               ## no critic 'eval'
 eval "use Net::Domain qw(hostname hostfqdn hostdomain domainname);1"  or my $SSChatBotNDom = "Net::Domain";   ## no critic 'eval'
@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.6" => "08.10.2020  add urlEncode of character codes like \x{c3}\x{85} to formString  ",
   "1.11.5" => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "1.11.4" => "05.10.2020  use setCredentials from SMUtils ",
   "1.11.3" => "04.10.2020  use showStoredCredentials from SMUtils ",
@@ -167,6 +168,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "1.11.6" => "08.10.2020 Hexadecimal codes of characters like \x{c3}\x{85} can now be used or processed in the asyncSendItem command. ",
   "1.11.0" => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it. ", 
   "1.7.0"  => "26.05.2020 It is possible to send SVG plots very easily with the command asyncSendItem ",
   "1.4.0"  => "15.03.2020 Command '1_sendItem' renamed to 'asyncSendItem' because of Aesthetics ",
@@ -187,7 +189,8 @@ my %vHintsExt_de = (
 );
 
 # Standardvariablen
-my $queueStartFn = "FHEM::SSChatBot::getApiSites";                          # Startfunktion zur Queue-Abarbeitung
+my $queueStartFn = "FHEM::SSChatBot::getApiSites";                                                   # Startfunktion zur Queue-Abarbeitung
+my $enctourl     = { map { sprintf("\\x{%02x}", $_) => sprintf( "%%%02X", $_ ) } ( 0 ... 255 ) };    # Standard Hex Codes zu UrlEncode, z.B. \x{c2}\x{b6} -> %C2%B6 -> ¶
 
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => \&_setbotToken         }, 
@@ -1354,22 +1357,24 @@ return;
 sub formString {
   my $txt  = shift;
   my $func = shift;
-  my (%replacements,$pat);
-  
+  my ($replacements,$pat);
+    
   if($func ne "attachement") {
-      %replacements = (
-          '"'  => "´",                              # doppelte Hochkomma sind im Text nicht erlaubt
-          " H" => "%20H",                           # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-          "#"  => "%23",                            # Hashtags sind im Text nicht erlaubt und wird encodiert
-          "&"  => "%26",                            # & ist im Text nicht erlaubt und wird encodiert    
-          "%"  => "%25",                            # % ist nicht erlaubt und wird encodiert
-          "+"  => "%2B",
-      );
+      $replacements = {
+          '"'       => "´",                         # doppelte Hochkomma sind im Text nicht erlaubt
+          " H"      => "%20H",                      # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
+          "#"       => "%23",                       # Hashtags sind im Text nicht erlaubt und wird encodiert
+          "&"       => "%26",                       # & ist im Text nicht erlaubt und wird encodiert    
+          "%"       => "%25",                       # % ist nicht erlaubt und wird encodiert
+          "+"       => "%2B",
+      };
+      
+	  %$replacements = (%$replacements, %$enctourl);
   } 
   else {
-      %replacements = (
+      $replacements = {
           " H" => "%20H"                            # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      );    
+      };    
   }
   
   $txt    =~ s/\n/ESC_newline_ESC/xg;
@@ -1382,11 +1387,11 @@ sub formString {
       $txt .= $line;
   }
   
-  $pat = join '|', map { quotemeta; } keys(%replacements);
+  $pat = join '|', map { quotemeta; } keys(%$replacements);
   
-  $txt =~ s/($pat)/$replacements{$1}/xg;   
+  $txt =~ s/($pat)/$replacements->{$1}/xg;
   
-return ($txt);
+return $txt;
 }
 
 #############################################################################################
