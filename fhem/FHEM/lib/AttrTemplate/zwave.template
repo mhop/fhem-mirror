@@ -47,6 +47,8 @@ par:CHANNEL02;Second channel of the device - do not proceed if it can't be ident
 name:----Fibaro-devices-section--------
 filter:TYPE=ZWave
 order:01Fibaro00000
+desc:Templates for Fibaro devices. <br>Manufacturer info (manuals) can be found <a href="https://manuals.fibaro.com/">here</a>. <br>Unfortunately, firmware updates are only offered when using their home center hardware...
+
 
 name:FGRM222_Roller_Mode
 filter:TYPE=ZWave
@@ -64,8 +66,8 @@ attr DEVICE eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr DEVICE webCmd dim
 attr DEVICE cmdIcon stop:fts_shutter_manual
 attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
-set DEVICE configByte 10 1 ## configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
-set DEVICE configByte  3 0 ## configReportsType BlindPositionReportsSentToThe0
+set DEVICE configByte 10 1     ## configRollerShutterOperatingModes 1RollerBlindModeWithPositioning
+set DEVICE configByte  3 0     ## configReportsType BlindPositionReportsSentToThe0
 set DEVICE configByte 14 SWITCHTYPE
 option:{ RADIO_SCENES_ACTIVATION }
 set DEVICE configByte 50 1 ## configScenesAssociationsActivation ScenesActivation
@@ -98,7 +100,7 @@ attr DEVICE widgetOverride dim:colorpicker,BRI,0,1,99
 attr DEVICE devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGRM222","venetian") }
 set DEVICE configByte 10 2 ## configRollerShutterOperatingModes 2VenetianBlindModeWith2
 set DEVICE configByte  3 1 ## configReportsType BlindPositionReportsSentToThe1
-set DEVICE configByte 13 0 ## configSetLamellasBackToPrevious13 0LamellasReturnToPreviouslySet0
+set DEVICE configByte 13 0 ## configSetSlatsBackToPreviousPosition OnlyInCaseOfTheMainController0
 set DEVICE configByte 14 SWITCHTYPE
 attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0) =~ m,dim, ? ReadingsNum($name,"state",0) : ReadingsNum($name,"dim",0);; my $pos1 = ReadingsNum($name,"position",0);; $pos = $pos1 if ($pos > $pos1 +3 || $pos < $pos1 -3);; return $pos }, positionSlat:power..0.0.W {ReadingsVal($name,"position",0) =~ m,Slat.([0-9]+),?$1:undef}
 option:{ RADIO_SCENES_ACTIVATION }
@@ -159,6 +161,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",0) }
 par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",1) }
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
+par:IO_DEV_ID;Decimal value of the IO node ID - do not proceed if it can't be identified!;{ my $id = hex(InternalVal(AttrVal("DEVICE","IODev","unknown"),"nodeIdHex",0));  $id ? $id : undef }
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
 attr MAINCHANNEL,CHANNEL01,CHANNEL02 icon ICON
 attr CHANNEL01 devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGR223") }
@@ -166,6 +169,10 @@ attr CHANNEL01 eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr CHANNEL01 webCmd dim
 attr CHANNEL01 widgetOverride dim:colorpicker,BRI,0,1,99
 attr CHANNEL01 userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,"reportedState",0):ReadingsNum($name,"state",0)}
+set MAINCHANNEL associationDel 1 IO_DEV_ID  ## just like for FGS-223 (module-internal setting)
+set MAINCHANNEL mcaAdd 1 0 IO_DEV_ID 0      ## needs to be veryfied!
+set MAINCHANNEL mcaAdd 2 0 IO_DEV_ID 1
+set MAINCHANNEL mcaAdd 3 0 IO_DEV_ID 2
 set MAINCHANNEL configByte 65 10 ## configEnergyReportsOnChange 10
 option:{ RADIO_SCENES_ACTIVATION }
 set MAINCHANNEL configByte 40 15 ## configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
@@ -198,6 +205,7 @@ par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attribu
 par:MAINCHANNEL;Main channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",0) }
 par:CHANNEL01;First channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",1) }
 par:CHANNEL02;Second channel of the device - do not proceed if it can't be identified!;{ FHEM::attrT_ZWave_Utils::identify_channel_devices("DEVICE",2) }
+par:IO_DEV_ID;Decimal value of the IO node ID - do not proceed if it can't be identified!;{ my $id = hex(InternalVal(AttrVal("DEVICE","IODev","unknown"),"nodeIdHex",0));  $id ? $id : undef }
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
 attr MAINCHANNEL,CHANNEL01,CHANNEL02 icon ICON
 attr CHANNEL01 devStateIcon { FHEM::attrT_ZWave_Utils::devStateIcon_shutter($name,"FGR223","venetian") }
@@ -205,6 +213,10 @@ attr CHANNEL01 eventMap { usr=>{'dim.100'=>'dim 99' } }
 attr CHANNEL01 webCmd dim
 attr CHANNEL01 widgetOverride dim:colorpicker,BRI,0,1,99
 attr CHANNEL01 userReadings dim:(dim|reportedState).* {$1 =~ /reportedState/ ? ReadingsNum($name,"reportedState",0):ReadingsNum($name,"state",0)}
+set MAINCHANNEL associationDel 1 IO_DEV_ID  ## just like for FGS-223 (module-internal setting)
+set MAINCHANNEL mcaAdd 1 0 IO_DEV_ID 0      ## needs to be veryfied!
+set MAINCHANNEL mcaAdd 2 0 IO_DEV_ID 1
+set MAINCHANNEL mcaAdd 3 0 IO_DEV_ID 2
 set MAINCHANNEL configEnergyReportsOnChange 10
 option:{ RADIO_SCENES_ACTIVATION }
 set MAINCHANNEL configByte 40 15 ## configS1SwitchScenesSent 15 (=1+2+4+8=all keypress types)
@@ -229,7 +241,7 @@ setreading DEVICE attrTemplateVersion FGR223_Venetian_Mode_20201007
 name:----AEOTEC-devices-section--------
 filter:TYPE=ZWave
 order:03AEOTEC00000
-desc:Templates for AEOTEC/AEON Labs devices.Manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/6000084017">here</a>. firmware updates are available for some devices, but for updating, you have to use a separate Windows machine.
+desc:Templates for AEOTEC/AEON Labs devices. <br>Manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/6000084017">here</a>. <br>firmware updates are available for some devices, but for updating, you have to use a separate Windows machine.
 
 #AEON Labs ZW095 Home Energy Meter Gen5
 name:ZW095_Home_Energy_Meter
