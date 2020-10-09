@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  59_Twilight: get weather-dependend data by NotifyFn.
+                         Existent DEF may be changed automatically!
  - feature: 32_speedtest: added ookla attribute
  - feature: 31_HUEDevice: added lastseen attribute
  - change:  57_SSCal: integrate SMUtils lib, minor fixes
