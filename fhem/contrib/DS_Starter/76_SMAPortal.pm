@@ -137,7 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.5.0"  => "29.09.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
+  "3.6.0"  => "10.10.2020  new arguments for attr balanceDaydata ",
+  "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
   "3.4.0"  => "09.08.2020  attr balanceDay, balanceMonth, balanceYear for data provider balanceDayData, balanceMonthData, balanceYearData ".
@@ -302,7 +303,7 @@ sub Initialize {
                            "balanceMonth ".
                            "balanceYear ".
                            "cookieLocation ".
-                           "cookieDelete:auto,afterRun,afterCycle,afterAttempt ".
+                           "cookieDelete:auto,afterRun,afterCycle,afterAttempt,afterAttempt&Run ".
                            "disable:0,1 ".
                            "interval ".
                            "noHomeManager:1,0 ".
@@ -1020,15 +1021,15 @@ sub GetSetData {                       ## no critic 'complexity'
               $hash->{HELPER}{RETRIES}++;
               my $cd = AttrVal($name, "cookieDelete", "auto");
 			  
-			  if($retc == $thold || $cd eq "afterAttempt") {                                       # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+			  if($retc == $thold || $cd =~ /Attempt/x) {                                           # Schwellenwert Leseversuche erreicht -> Cookie File löschen
                   my $msg = qq{$name - Threshold reached, delete cookie file before retry...};
 				  
-				  if($cd eq "afterAttempt") {
+				  if($cd =~ /Attempt/x) {
 				      $msg = qq{$name - force delete cookie file before retry...};
 				  }
 				  
 				  Log3 ($name, 3, $msg); 
-                  sleep $sleepretry;                                                                 # Threshold exceed  -> Retry mit Cookie löschen
+                  sleep $sleepretry;                                                               # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
                   return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
@@ -1520,9 +1521,8 @@ sub _getBalanceDayData {                 ## no critic "not used"
   for my $bal (@bd) {
       my ($y,$m,$d);
       my $addon = "Day";
-      $addon   .= "_".$bal;
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y,$m,$d) = $bal =~ /(\d{4})-(\d{2})-(\d{2})/x;
           
           if(!$y || !$m || !$d) {
@@ -1530,11 +1530,16 @@ sub _getBalanceDayData {                 ## no critic "not used"
               next;
           }
           
+          $addon .= "_".$bal;
+          
           $y -= 1900;
           $m -= 1;
       
       } else {
-          (undef,undef,undef,$d,$m,$y) = localtime(time);
+          my $time = subDays ($bal);
+          (undef,undef,undef,$d,$m,$y) = localtime($time);
+          
+          $addon .= "_".($y+1900)."-".sprintf("%02d",($m+1))."-".sprintf("%02d",$d);
       }  
  
       eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1961,7 +1966,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
   my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again in $sleepretry seconds... ($act of $maxretries)";   # Log vorbereiten
+  my $attstr     = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";   # Log vorbereiten
   
   my $wm1e = qq{Updating of the live data was interrupted};
   my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
@@ -2176,8 +2181,9 @@ sub finalCleanup {
   $hash->{HELPER}{GETTER} = "all";
   $hash->{HELPER}{SETTER} = "none";
   
-  if(AttrVal($name, "cookieDelete", "auto") eq "afterRun") {
-    delcookiefile ($hash);
+  if(AttrVal($name, "cookieDelete", "auto") =~ /Run/x) {
+      Log3 ($name, 3, "$name - force delete cookie file");
+      delcookiefile ($hash);
   }
   
 return;
@@ -2966,6 +2972,7 @@ sub deleteData {
           if($subs{$name}{$prl}{doit}) {
               $lvl = $subs{$name}{$prl}{level};                                # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
           }
+          
           if ($lvl) {
               $pbl .= "|^".$lvl."_";
           }
@@ -2973,8 +2980,11 @@ sub deleteData {
       $bl .= $pbl;                                                             # Blacklist ergänzen
 
       for my $key(@allrds) {
-          delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
-          delete $defs{$name}{READINGS}{$key}  if($key =~ /^$pblvl/x);         # Logbuchreadings immer löschen       
+          delete $defs{$name}{READINGS}{$key} if($key !~ /$bl/x);
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);          # Logbuchreadings immer löschen
+          if($key =~ /^$stpl{balanceDayData}{level}/x) {                       # balanceDayData Readings immer löschen wegen möglicher Relativverschiebung    
+            delete $defs{$name}{READINGS}{$key};  
+          }          
       }
       
       return;
@@ -2985,6 +2995,20 @@ sub deleteData {
   }
 
 return;
+}
+
+################################################################
+#        Anzahl Tagesverschiebungen ermitteln und 
+#        effektive Zeit zurückliefern
+#        $rel = Relativzeit: current current-1 current-3
+################################################################
+sub subDays {
+  my $rel = shift;
+
+  my $mp   = (split "-", $rel)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
+  my $time = time - ($mp * 86400);
+
+return $time;
 }
 
 ################################################################
@@ -4129,6 +4153,25 @@ return;
         </ul> 
        </li><br>
        
+       <a name="cookieDelete"></a>
+       <li><b>cookieDelete </b><br>
+       Defines the method of cookie management (deletion). <br>
+       (default: auto)
+       <br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>auto</b>             </td><td>- Cookie file is managed according to an internal procedure                                     </td></tr>
+          <tr><td> <b>afterAttempt</b>     </td><td>- Cookie file is deleted after each failed read attempt                                         </td></tr>
+          <tr><td> <b>afterCycle</b>       </td><td>- Cookie file is deleted after each read cycle (covers several attempts)                        </td></tr>
+          <tr><td> <b>afterRun</b>         </td><td>- Cookie file is deleted after each pass of a data retrieval                                    </td></tr>
+          <tr><td> <b>afterAttempt&Run</b> </td><td>- Cookie file is deleted after each failed read attempt <b>and</b> run through a data retrieval </td></tr>
+       </table>
+       </ul> 
+       
+       </li><br>
+       
        <a name="cookieLocation"></a>
        <li><b>cookieLocation &lt;Pfad/File&gt; </b><br>
        The path and filename of received Cookies. <br>
@@ -4436,10 +4479,11 @@ return;
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>auto</b>          </td><td>- Cookie Files werden nach einem internen Verfahren verwaltet                   </td></tr>
-          <tr><td> <b>afterAttempt</b>  </td><td>- Cookie Files werden nach jedem einzelnen Leseversuch gelöscht                 </td></tr>
-          <tr><td> <b>afterCycle</b>    </td><td>- Cookie Files werden nach jedem Lesezyklus gelöscht (umfasst mehrere Versuche) </td></tr>
-          <tr><td> <b>afterRun</b>      </td><td>- Cookie Files werden nach jedem Durchlauf eines Datenabrufs gelöscht           </td></tr>
+          <tr><td> <b>auto</b>             </td><td>- Cookie File wird nach einem internen Verfahren verwaltet                                             </td></tr>
+          <tr><td> <b>afterAttempt</b>     </td><td>- Cookie File wird nach jedem fehlerhaften Leseversuch gelöscht                                        </td></tr>
+          <tr><td> <b>afterCycle</b>       </td><td>- Cookie File wird nach jedem Lesezyklus gelöscht (umfasst mehrere Versuche)                           </td></tr>
+          <tr><td> <b>afterRun</b>         </td><td>- Cookie File wird nach jedem Durchlauf eines Datenabrufs gelöscht                                     </td></tr>
+          <tr><td> <b>afterAttempt&Run</b> </td><td>- Cookie File wird nach jedem fehlerhaften Leseversuch <b>und</b> Durchlauf eines Datenabrufs gelöscht </td></tr>
        </table>
        </ul> 
        
