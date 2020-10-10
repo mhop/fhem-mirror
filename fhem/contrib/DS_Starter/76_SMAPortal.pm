@@ -1536,7 +1536,7 @@ sub _getBalanceDayData {                 ## no critic "not used"
           $m -= 1;
       
       } else {
-          my $mp   = (split "-", $rel)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
+          my $mp   = (split "-", $bal)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
           my $time = time - ($mp * 86400);
           (undef,undef,undef,$d,$m,$y) = localtime($time);
           
