@@ -1536,7 +1536,8 @@ sub _getBalanceDayData {                 ## no critic "not used"
           $m -= 1;
       
       } else {
-          my $time = subDays ($bal);
+          my $mp   = (split "-", $rel)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
+          my $time = time - ($mp * 86400);
           (undef,undef,undef,$d,$m,$y) = localtime($time);
           
           $addon .= "_".($y+1900)."-".sprintf("%02d",($m+1))."-".sprintf("%02d",$d);
@@ -2995,20 +2996,6 @@ sub deleteData {
   }
 
 return;
-}
-
-################################################################
-#        Anzahl Tagesverschiebungen ermitteln und 
-#        effektive Zeit zurückliefern
-#        $rel = Relativzeit: current current-1 current-3
-################################################################
-sub subDays {
-  my $rel = shift;
-
-  my $mp   = (split "-", $rel)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
-  my $time = time - ($mp * 86400);
-
-return $time;
 }
 
 ################################################################
