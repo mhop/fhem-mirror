@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SMAPortal: new attribute cookieDelete
  - feature: 32_withings: added ecg reading types for scanwatch
  - change:  59_Twilight: get weather-dependend data by NotifyFn.
                          Existent DEF may be changed automatically!
