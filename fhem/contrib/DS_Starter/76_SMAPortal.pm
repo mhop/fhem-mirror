@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.6.0"  => "10.10.2020  new arguments for attr balanceDaydata ",
+  "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
@@ -1353,7 +1353,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
   
   # Energiedaten aktueller Tag
-  Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+  Log3 ($name, 4, "$name - getting consumer energy data of current day");
   Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
   Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
   
@@ -1406,7 +1406,7 @@ sub _getConsumerMonthData {             ## no critic "not used"
   my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
 
   # Energiedaten aktueller Monat
-  Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+  Log3 ($name, 4, "$name - getting consumer energy data of current month");
   Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
   Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
  
@@ -1461,7 +1461,7 @@ sub _getConsumerYearData {              ## no critic "not used"
   my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
 
   # Energiedaten aktuelles Jahr
-  Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+  Log3 ($name, 4, "$name - getting consumer energy data of current year");
   Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
   Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
   
@@ -1531,16 +1531,17 @@ sub _getBalanceDayData {                 ## no critic "not used"
           }
           
           $addon .= "_".$bal;
-          
-          $y -= 1900;
-          $m -= 1;
-      
-      } else {
-          my $mp   = (split "-", $bal)[1] // 0;                                   # Multiplikator: z.B. current-1 -> 1       
-          my $time = time - ($mp * 86400);
+          $y     -= 1900;
+          $m     -= 1;
+      } 
+      else {
+          my $mp                       = (split "-", $bal)[1] // 0;               # Multiplikator: z.B. current-1 -> 1       
+          my $time                     = time - ($mp * 86400);
           (undef,undef,undef,$d,$m,$y) = localtime($time);
           
           $addon .= "_".($y+1900)."-".sprintf("%02d",($m+1))."-".sprintf("%02d",$d);
+          
+          Log3 ($name, 4, qq{$name - retrieve relative balanceDayData "$addon"});
       }  
  
       eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1592,9 +1593,8 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   for my $bal (@bd) {
       my ($y,$m);
       my $addon = "Month";
-      $addon   .= "_".$bal;
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y,$m) = $bal =~ /^(\d{4})-(\d{2})$/x;
           
           if(!$y || !$m) {
@@ -1602,12 +1602,30 @@ sub _getBalanceMonthData {                 ## no critic "not used"
               next;
           }
           
-          $y -= 1900;
-          $m -= 1;
-      
-      } else {
-          $m = (localtime(time))[4];
-          $y = (localtime(time))[5];
+          $addon .= "_".$bal;  
+          $y     -= 1900;
+          $m     -= 1;
+      } 
+      else {
+          my $mp = (split "-", $bal)[1] // 0;
+          my $yc = int($mp/12);                                      # Anzahl der Jahre
+          my $mc = $mp % 12;                                         # Anzahl Restmonate
+          
+          $y  = (localtime(time))[5];
+          $y -= $yc;
+          $m  = (localtime(time))[4];
+          
+          if($m-$mc < 1) {
+              $m = 12-abs($m-$mc);
+              $y--;
+          }
+          else {
+              $m = $m-$mc;
+          }
+          
+          $addon .= "_".($y+1900)."-".sprintf("%02d",($m+1));
+          
+          Log3 ($name, 4, qq{$name - retrieve relative balanceMonthData "$addon"});
       }  
  
       eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1659,9 +1677,8 @@ sub _getBalanceYearData {                 ## no critic "not used"
   for my $bal (@bd) {
       my $y;
       my $addon = "Year";
-      $addon   .= "_".$bal;
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y) = $bal =~ /^(\d{4})$/x;
           
           if(!$y) {
@@ -1669,9 +1686,16 @@ sub _getBalanceYearData {                 ## no critic "not used"
               next;
           }
           
-          $y  -= 1900;
-      } else {
-          $y = (localtime(time))[5];
+          $addon .= "_".$bal;
+          $y     -= 1900;
+      } 
+      else {
+          my $mp  = (split "-", $bal)[1] // 0;
+          $y      = (localtime(time))[5];
+          $y     -= $mp;
+          $addon .= "_".($y+1900);
+          
+          Log3 ($name, 4, qq{$name - retrieve relative balanceYearData "$addon"});
       }
       
       eval { timelocal(0, 0, 0, 1, 1, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1887,7 +1911,7 @@ sub ___getData {
   
   my $cont;   
 
-  Log3 ($name, 4, "$name - Getting $tag"); 
+  Log3 ($name, 4, "$name - getting $tag"); 
   
   if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
@@ -1927,7 +1951,7 @@ sub ___postData {
   
   my $cont;   
 
-  Log3 ($name, 4, "$name - Getting $tag");
+  Log3 ($name, 4, "$name - getting $tag");
   
   if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
@@ -2948,7 +2972,11 @@ sub deleteData {
  
   my $bl     = "state|lastCycleTime|Counter|loginState";                       # Blacklist
   
-  my $pblvl = $stpl{plantLogbook}{level};                                      # Logbuch Level
+  my $pblvl  = $stpl{plantLogbook}{level};                                     # Logbuch Level
+  
+  my $ballvl = $stpl{balanceDayData}{level}  ."|".                             # Level von balanceDayData, balanceMonthData, balanceYearData
+               $stpl{balanceMonthData}{level}."|".
+               $stpl{balanceYearData}{level};
   
   if(!$subs{$name}{forecastData}{doit}) {                                      # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
       my $fclvl = $stpl{forecastData}{level};
@@ -2983,9 +3011,7 @@ sub deleteData {
       for my $key(@allrds) {
           delete $defs{$name}{READINGS}{$key} if($key !~ /$bl/x);
           delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);          # Logbuchreadings immer löschen
-          if($key =~ /^$stpl{balanceDayData}{level}/x) {                       # balanceDayData Readings immer löschen wegen möglicher Relativverschiebung    
-            delete $defs{$name}{READINGS}{$key};  
-          }          
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$ballvl/x);         # balance(Day|Month)Data Readings immer löschen wegen möglicher Relativverschiebung           
       }
       
       return;
@@ -4105,38 +4131,44 @@ return;
      <ul>
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
-       Defines the days from which the data provider "balanceDayData" delivers the data. The day specifications are separated by 
-       spaces, current = current day. <br>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current current-x &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Defines from which days the data provider "balanceDayData" delivers the data.
+       In the relative specification <b>current-x</b> is <b>x</b> the number of days that are subtracted from the current day.        
+       The days are separated by spaces, current = current day. <br>
        (default: current day) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br> 
+         attr &lt;name&gt; balanceDay current current-1 current-2              <br>         
         </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
-       Defines from which months the data provider "balanceMonthData" delivers the data. The month specifications are separated by 
-       spaces, current = current month. <br>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current current-x &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Defines from which months the data provider "balanceMonthData" delivers the data. 
+       In the relative specification <b>current-x</b> is <b>x</b> the number of months subtracted from the current month.
+       The month data is separated by spaces, current = current month. <br>
        (default: current month) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br> 
+         attr &lt;name&gt; balanceMonth current current-12 current-24   <br>          
         </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
-       Defines the years from which the data provider "balanceYearData" delivers the data. The year specifications are separated by 
-       spaces, current = current year. <br>
+       <li><b>balanceYear &lt;YYYY&gt; [current current-x &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Defines from which years the data provider "balanceYearData" delivers the data. 
+       In the relative specification <b>current-x</b>, <b>x</b> is the number of years that are subtracted from the current year.
+       The years are separated by spaces, current = current year. <br>
        (default: current year) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017        <br> 
+         attr &lt;name&gt; balanceYear current current-1 current-2   <br>         
         </ul> 
        </li><br>
        
@@ -4422,38 +4454,44 @@ return;
      <ul>      
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
-       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert. Die Tagesangaben werden durch Leerzeichen 
-       getrennt, current = aktueller Tag. <br>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current current-x &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert.
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Tage die vom aktuellen Tag subtrahiert werden.        
+       Die Tagesangaben werden durch Leerzeichen getrennt, current = aktueller Tag. <br>
        (default: aktueller Tag) <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br> 
+         attr &lt;name&gt; balanceDay current current-1 current-2              <br>         
         </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
-       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. Die Monatsangaben werden durch Leerzeichen 
-       getrennt, current = aktueller Monat. <br>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current current-x &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. 
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Monate die vom aktuellen Monat subtrahiert werden.
+       Die Monatsangaben werden durch Leerzeichen getrennt, current = aktueller Monat. <br>
        (default: aktueller Monat) <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br> 
+         attr &lt;name&gt; balanceMonth current current-12 current-24   <br>          
         </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
-       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. Die Jahresangaben werden durch Leerzeichen 
-       getrennt, current = aktuelles Jahr. <br>
+       <li><b>balanceYear &lt;YYYY&gt; [current current-x &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. 
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Jahre die vom aktuellen Jahr subtrahiert werden.
+       Die Jahresangaben werden durch Leerzeichen getrennt, current = aktuelles Jahr. <br>
        (default: aktuelles Jahr)  <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017        <br> 
+         attr &lt;name&gt; balanceYear current current-1 current-2   <br>         
         </ul> 
        </li><br>
        
