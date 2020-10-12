@@ -879,7 +879,7 @@ sub WriteReadings {
                               if ( ref( $v->{ip} ) ne 'HASH' );
                             readingsBulkUpdateIfChanged( $hash,
                                 'ethernet_status-isconnected',
-                                $v->{isconnected} );
+                                $v->{isConnected} );
                         }
                         elsif ( $decode_json->{abilities}[0]{properties}
                             [$properties]{name} eq 'wifi_status' )
@@ -892,7 +892,7 @@ sub WriteReadings {
                                 'wifi_status-ip', $v->{ip} )
                               if ( ref( $v->{ip} ) ne 'HASH' );
                             readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-isconnected', $v->{isconnected} );
+                                'wifi_status-isconnected', $v->{isConnected} );
                             readingsBulkUpdateIfChanged( $hash,
                                 'wifi_status-signal', $v->{signal} );
                         }
@@ -1376,7 +1376,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.2",
+  "version": "v2.0.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
