@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.17.0');
+use version; our $VERSION = version->declare('1.17.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -111,7 +111,7 @@ BEGIN {
 };
 
 # Standardvariablen
-my $splitdef    = ":";                                 # Standard Character für split ...
+my $splitdef    = ":";                                                      # Standard Character für split ...
 
 my $carpnohash  = "got no hash value";
 my $carpnoname  = "got no name value";
@@ -122,6 +122,12 @@ my $carpnotfarg = "got no Timer function argument";
 my $carpnoaddr  = "got no server address from hash";
 my $carpnoport  = "got no server port from hash";
 my $carpnoprot  = "got no protocol from hash";
+
+my %hasqhandler = (                                                         # Hash addSendqueue Handler
+  SSCal     => { fn => \&_addSendqueueSimple,   },                     
+  SSFile    => { fn => \&_addSendqueueSimple,   },
+  SSChatBot => { fn => \&_addSendqueueExtended, },
+);
 
 ###############################################################################
 # Clienthash übernehmen oder zusammenstellen
@@ -1271,17 +1277,14 @@ sub addSendqueue {
    my $name  = $paref->{name} // carp $carpnoname && return;
    
    my $hash  = $defs{$name};
-   my $type  = $hash->{TYPE};                                               
-                                                       
-   if($type eq "SSCal") {
-       _addSendqueueSimple ($paref);
-   }
-   elsif ($type eq "SSChatBot") {
-       _addSendqueueExtended ($paref);
-   }
-   else {
-       Log3($name, 1, qq{$name - ERROR - no module specific add Sendqueue handler for type "$type" found});
-   }
+   my $type  = $hash->{TYPE}; 
+
+   if($hasqhandler{$type}) {
+       &{$hasqhandler{$type}{fn}} ($paref);
+       return;
+   }   
+      
+   Log3($name, 1, qq{$name - ERROR - no module specific add Sendqueue handler for type "$type" found});
    
 return;
 }
