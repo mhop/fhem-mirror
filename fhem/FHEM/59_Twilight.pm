@@ -237,7 +237,7 @@ sub Twilight_Notify {
             my $last = ReadingsNum($name, "cloudCover", -1);
             return if abs ($last - $extWeather) < 6;
             my ($cond, $condText) = [-1,"not known"];
-            my $dispatch = defined $hash->{helper}{extWeather} ? 1 : 0; 
+            my $dispatch = defined $hash->{helper}{extWeather} && defined $hash->{helper}{extWeather}{dispatch} ? 1 : 0; 
             $cond = ReadingsNum($hash->{helper}{extWeather}{Device}, $hash->{helper}{extWeather}{dispatch}{cond_code},-2) if $dispatch;
             $condText = ReadingsVal($hash->{helper}{extWeather}{Device}, $hash->{helper}{extWeather}{dispatch}{cond_text},"unknown") if $dispatch;
  
@@ -549,7 +549,7 @@ sub Twilight_TwilightTimes {
     for my $ereignis ( keys %{ $hash->{TW} } ) {
         next if ( $whitchTimes eq "weather" && !( $ereignis =~ m/weather/ ) );
         readingsBulkUpdate( $hash, $ereignis,
-            $hash->{TW}{$ereignis}{TIME} == 0
+            !defined $hash->{TW}{$ereignis}{TIME} || $hash->{TW}{$ereignis}{TIME} == 0
             ? "undefined"
             : FmtTime( $hash->{TW}{$ereignis}{TIME} ) );
     }
@@ -583,7 +583,7 @@ sub Twilight_TwilightTimes {
         next if ( $whitchTimes eq "weather" && !( $ereignis =~ m/weather/ ) );
 
         Twilight_RemoveInternalTimer( $ereignis, $hash );  # if(!$jetztIstMitternacht);
-        if ( $hash->{TW}{$ereignis}{TIME} > 0 ) {
+        if ( defined $hash->{TW}{$ereignis}{TIME} && $hash->{TW}{$ereignis}{TIME} > 0 ) {
             $myHash = Twilight_InternalTimer( $ereignis, $hash->{TW}{$ereignis}{TIME},
                 \&Twilight_fireEvent, $hash, 0 );
             map { $myHash->{$_} = $hash->{TW}{$ereignis}{$_} } @keyListe;
@@ -871,7 +871,7 @@ sub Twilight_sunpos {
         my $extDev = $hash->{helper}{extWeather}{Device};
         my $extReading = $hash->{helper}{extWeather}{Reading};
         #my ( $extDev, $extReading ) = split( ":", $ExtWeather );
-        my $extWeatherHorizont = ReadingsVal($extDev ,$extReading , -1 );
+        my $extWeatherHorizont = ReadingsNum($extDev ,$extReading , -1 );
         if ( $extWeatherHorizont >= 0 ) {
             $extWeatherHorizont = min (100, $extWeatherHorizont);
             Log3( $hash, 5,
