@@ -29,12 +29,14 @@
 # - fixed:   74_UnifiSwitch: Log-Messages
 # V 0.0.97
 # - fixed:   74_UnifiSwitch: new readings for general_temperature, overheating, fan_level, cpu and mem
+# V 1.0.00
+# - fixed:   74_UnifiSwitch: supports UDM-Switch
 # 
 # TODOs:
 # - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
-my $version="0.0.97";
+my $version="1.0.00";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;
@@ -292,7 +294,7 @@ sub UnifiSwitch_Parse($$) {
         # Nachricht für $hash verarbeiten
         my $apRef = decode_json($message_json);
         $hash->{usw} = $apRef;
-        if( $apRef->{type} eq 'usw' ){
+        if( $apRef->{type} eq 'usw' || $apRef->{type} eq 'udm' ){
           if ($apRef->{state} eq "1"){
             $hash->{STATE} = "connected";
           }elsif($apRef->{state} eq "2"){

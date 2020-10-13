@@ -75,10 +75,12 @@
 #  - fixed:   74_Unifi: fixed AP-Readingnames (use makeReadingName())
 # V 3.4.0
 #  - feature: 74_Unifi: new setter to start RF-Scan
+# V 3.5.0
+#  - feature: 74_Unifi: support UDM
 
 
 package main;
-my $version="3.4.0";
+my $version="3.5.0";
 # Default für clientReadings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -184,7 +186,8 @@ sub Unifi_Initialize($$) {
                          ."eventPeriod "
                          ."voucherCache "
                          ."customClientReadings:textField-long "
-						 ."customClientNames "
+						             ."customClientNames "
+                         ."isUDM:0,1 "
 	#					 ."readClientInsights "
                          .$readingFnAttributes;
                          
@@ -210,6 +213,8 @@ sub Unifi_Define($$) {
             eventPeriod => int(AttrVal($name,"eventPeriod",24)),
             interval    => $a[6] || 30,
             url         => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
+            ucurl       => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
+            udmurl      => "https://".$a[2].(($a[3] == 443) ? '' : ':'.$a[3]).'/proxy/network/api/s/'.(($a[7]) ? $a[7] : 'default').'/',
         },
     );
     $hash->{httpParams} = {
@@ -277,36 +282,6 @@ sub Unifi_Notify($$) {
 	if($dev->{NAME} eq "global"){ #INITIALIZED|REREADCFG
 		$hash->{unifi}->{customClientReadings}->{attr_value} = AttrVal($name,"customClientReadings",$defaultClientReadings); 
 		Unifi_initCustomClientReadings($hash);
-		
-		
-		# TODO: der folgende Block kann Ende 2019 entfernt werden. Es ist der alte Restore-Mechanismus
-		# Dieser wurde ersetzt durch de restore von mac-Adressen und anschließendem updateClient in doUpdate()
-		#for my $readingName (keys %{$hash->{READINGS}}) {
-		#	#Log3 $name, 1, "$name ($self) - checking 1 $readingName";
-		#	if($readingName =~ m/\..*_id$/){
-		#		#Log3 $name, 1, "$name ($self) - found 1 $readingName";
-		#		my $readingValue=ReadingsVal($name,$readingName,"");
-		#		if($readingValue =~ m/^[a-fA-F0-9]*$/g){
-		#			my $clientName=substr($readingName,1,index($readingName,"_id")-1);
-		#			$hash->{clients}->{$readingValue}->{name} = $clientName;
-		#			Log3 $name, 5, "$name ($self) - restored client $clientName with ID $readingValue";
-		#		}
-		#	}
-		#}
-		#for my $clientID (keys %{$hash->{clients}}) {
-		#	my $clientName=$hash->{clients}->{$clientID}->{name}."_";
-		#	# TODO: Prüfen, ob es für $clientName ein UnifiClient-Devices gibt und die Werte aus den Readings des UnifiClients wiederherstellen.
-		#	for my $readingName (keys %{$hash->{READINGS}}) {
-		#		#Log3 $name, 1, "$name ($self) - checking 2 $readingName for $clientName";
-		#		if($readingName =~ m/^$clientName.*/){
-		#			#Log3 $name, 1, "$name ($self) - found 2 $readingName";
-		#			my $readingValue=ReadingsVal($name,$readingName,"");
-		#			my $readingName=substr($readingName,length($clientName));
-		#			$hash->{clients}->{$clientID}->{$readingName} = $readingValue;
-		#			Log3 $name, 5, "$name ($self) - restored internal $readingName = $readingValue for client $clientName";
-		#		}
-		#	}
-		#}
 	}
 	
     return undef;
@@ -783,6 +758,14 @@ sub Unifi_Attr(@) {
         }
         elsif($attr_name eq "customClientNames") {
             $hash->{unifi}->{customClientNames}->{attr_value} = $attr_value;
+        }
+        elsif($attr_name eq "isUDM") {
+            $hash->{unifi}->{isUDM}->{attr_value} = $attr_value;
+            if($attr_value==1){
+              $hash->{unifi}->{url} = $hash->{unifi}->{udmurl};
+            }else{ 
+              $hash->{unifi}->{url} = $hash->{unifi}->{ucurl};
+            }
         } 
         #elsif($attr_name eq "readClientInsights") {
         #    if (!looks_like_number($attr_value) || int($attr_value) < 1 || int($attr_value) > 365) {
@@ -813,6 +796,10 @@ sub Unifi_Attr(@) {
         }
         elsif($attr_name eq "customClientNames") {
             $hash->{unifi}->{customClientNames}->{attr_value} = $customClientName;
+        }
+        elsif($attr_name eq "isUDM") {
+            $hash->{unifi}->{isUDM}->{attr_value} = 0;
+            $hash->{unifi}->{url} = $hash->{unifi}->{ucurl};
         }
         #elsif($attr_name eq "readClientInsights") {
         #    $hash->{unifi}->{readClientInsights} = undef;
@@ -849,6 +836,8 @@ sub Unifi_DoUpdate($@) {
     my ($hash,$manual) = @_;
     my ($name,$self) = ($hash->{NAME},Unifi_Whoami());
     Log3 $name, 5, "$name ($self) - executed.";
+    
+    $hash->{VERSION}=$version;
     
     if (Unifi_CONNECTED($hash) eq "disabled") {
         Log3 $name, 5, "$name ($self) - Device '$name' is disabled, End now...";
@@ -899,13 +888,18 @@ sub Unifi_Login_Send($) {
     my $password = $hash->{helper}{password};
     $user = Unifi_decrypt( $user );
     $password = Unifi_decrypt( $password );
-    ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
-    $logindata = '{"username":"'.$user.'", "password":"'.$password.'"}';
+    if(int(AttrVal($name,"isUDM",0) == 1)){
+      ( $loginurl = $hash->{unifi}->{url} ) =~ s/proxy\/network\/api\/s.+/api\/auth\/login/;
+    }else{
+      ( $loginurl = $hash->{unifi}->{url} ) =~ s/api\/s.+/api\/login/;
+    }
+    $logindata = '{"username":"'.$user.'", "password":"'.$password.'", "rememberMe":true}';
     
     HttpUtils_NonblockingGet( {
                  %{$hash->{httpParams}},
         url      => $loginurl,
         data     => $logindata,
+        header   => "Content-Type: application/json",
         callback => \&Unifi_Login_Receive
     } );
     return undef;
@@ -922,7 +916,7 @@ sub Unifi_Login_Receive($) {
         if ($param->{code} == 200 || $param->{code} == 400 || $param->{code} == 401 || $param->{code} == 200) {
             eval { $data = decode_json($data); 1; } or do { $data = { meta => {rc => 'error.decode_json', msg => $@} }; };
             
-            if ($data->{meta}->{rc} eq "ok") { 
+            if ($data->{meta}->{rc} eq "ok" || $data->{username} ne '') { 
                 Log3 $name, 5, "$name ($self) - state=ok";
                 $hash->{httpParams}->{header} = '';
                 for (split("\r\n",$param->{httpheader})) {
@@ -1335,6 +1329,7 @@ sub Unifi_GetUnarchivedAlerts_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."list/alarm",
         callback => $hash->{updateDispatch}->{$self}[2],
+        method   => "GET",
         data     => "{\"_sort\":\"-time\", \"archived\":false}",
     } );
     return undef;
@@ -1375,6 +1370,7 @@ sub Unifi_GetEvents_Send($) {
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."stat/event",
         callback => $hash->{updateDispatch}->{$self}[2],
+        method   => "GET",
         data     => "{\"_sort\":\"-time\", \"within\":".$hash->{unifi}->{eventPeriod}."}",    # last 24 hours
     } );
     return undef;
@@ -1416,6 +1412,7 @@ sub Unifi_GetAccesspoints_Send($) { # TODO Umbenennen in Unifi_GetDevices_Send. 
                  %{$hash->{httpParams}},
         url      => $hash->{unifi}->{url}."stat/device",
         callback => $hash->{updateDispatch}->{$self}[2],
+        method   => "GET",
         data     => "{\"_depth\":2, \"test\":0}",
     } );
     return undef;
@@ -1438,8 +1435,8 @@ sub Unifi_GetAccesspoints_Receive($) {# TODO Umbenennen in Unifi_GetDevices_Rece
                 for my $h (@{$data->{data}}) {
                     $hash->{accespoints}->{$h->{_id}} = $h;
                     #TODO: Switch-Modelle anders festlegen ? Oder passt usw?
-                    if (defined $h->{model} && $h->{type} eq "usw"){
-                        my $usw_name="";
+                   if (defined $h->{type} && (($h->{type} eq "usw") || ($h->{type} eq "udm"))){
+                         my $usw_name="";
                         if (defined $h->{name}){
                           $usw_name=makeDeviceName($h->{name});
                         }else{
@@ -2655,8 +2652,13 @@ Or you can use the other readings or set and get features to control your unifi-
           You can find the site-ID by selecting the site in the UniFi web interface.<br>
           e.g. https://192.168.12.13:8443/manage/s/foobar the siteId you must use is: foobar.<br>
           default: default</code><br>
-    </ul> <br>
-
+    </ul>
+    UDM?
+    <ul>
+    <code>If you use an UDM as Controller:<br>
+          Additionally set Attribute isUDM to 1.</code><br>
+    </ul>
+    <br>
 </ul>
 <h4>Examples</h4>
 <ul>
@@ -2814,6 +2816,10 @@ Or you can use the other readings or set and get features to control your unifi-
           <li>hostname of the client</li>
        </ol>
     </li>
+    <br>
+    <li>attr isUDM <0,1><br>
+    Informs the module that the Unifi-Controller API is provided by an UDM if set to 1.<br>
+    <code>default: 0</code></li>
     <br>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
