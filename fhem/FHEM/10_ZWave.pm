@@ -649,6 +649,10 @@ my %zwave_cmdArgs = (
   }
 );
 
+my %zwave_setListFns = (
+  "sml_.*"=> { fmt=>"ZWave_multilevelSet('%s')", id=>"31", unshiftCmd=>1 }
+);
+
 use vars qw(%zwave_parseHook);
 #my %zwave_parseHook; # nodeId:regexp => fn, used by assocRequest
 my %zwave_modelConfig;
@@ -751,6 +755,7 @@ ZWave_Initialize($)
     noWakeupForApplicationUpdate:noArg
     secure_classes
     setExtensionsEvent:1,0
+    setList
     showtime:noArg
     vclasses
     useMultiCmd:noArg
@@ -1024,6 +1029,13 @@ ZWave_Cmd($$@)
     $cmdList{neighborList}{fmt} = "x" if($type eq "get"); # Add meta command
   }
 
+  if($type eq "set" && !$cmdList{$cmd}) {
+    foreach my $slc (split(",", AttrVal($name, "setList", ""))) {
+      my @re = grep { $slc =~ m/$_/ } keys %zwave_setListFns;
+      $cmdList{$slc} = $zwave_setListFns{$re[0]};
+    }
+  }
+
   if($type eq "set" && $cmd eq "rgb") {
      if($a[0] && $a[0] =~ m/^[0-9A-F]+$/i && $a[0] =~ /^(..)(..)(..)$/) {
        @a = (hex($1), hex($2), hex($3));
@@ -1070,6 +1082,7 @@ ZWave_Cmd($$@)
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
+  unshift @a, $cmd if($cmdList{$cmd}{unshiftCmd});
   # 0x05=AUTO_ROUTE+ACK, 0x20: ExplorerFrames
 
   my $nArg = 0;
@@ -1964,11 +1977,7 @@ ZWave_versionClassAllGet($@)
   return !$hash->{asyncGet}; # "veto" for parseHook/getAll
 }
 
-sub
-ZWave_multilevelParse($$$)
-{
-  my ($type,$fl,$arg) = @_;
-  my %ml_tbl = (
+my %zwave_ml_tbl = (
    '01' => { n => 'temperature',          st => ['C', 'F'] },
    '02' => { n => 'generalPurpose',       st => ['%', ''] },
    '03' => { n => 'luminance',            st => ['%', 'Lux'] },
@@ -2024,18 +2033,54 @@ ZWave_multilevelParse($$$)
    '31' => { n => 'totalBodyWater',       st => ['Kg'] },
    '32' => { n => 'basicMetabolicRate',   st => ['J'] },
    '33' => { n => 'bodyMassIndex',        st => ['BMI'] },
-  );
+);
+
+sub
+ZWave_multilevelParse($$$)
+{
+  my ($type,$fl,$arg) = @_;
 
   my $pr = (hex($fl)>>5)&0x07; # precision
   my $sc = (hex($fl)>>3)&0x03; # scale
   my $bc = (hex($fl)>>0)&0x07; # bytecount
+
   $arg = substr($arg, 0, 2*$bc);
   my $msb = (hex($arg)>>8*$bc-1); # most significant bit  ( 0 = pos, 1 = neg )
   my $val = $msb ? -( 2 ** (8 * $bc) - hex($arg) ) : hex($arg); # 2's complement
-  my $ml = $ml_tbl{$type};
+  my $ml = $zwave_ml_tbl{$type};
   return "UNKNOWN multilevel type: $type fl: $fl arg: $arg" if(!$ml);
   return sprintf("%s:%.*f %s", $ml->{n}, $pr, $val/(10**$pr),
        int(@{$ml->{st}}) > $sc ? $ml->{st}->[$sc] : "");
+}
+
+sub
+ZWave_multilevelSet($)
+{
+  my ($arg) = @_;
+  my @a = split(" ",$arg);
+
+  if($a[0] eq "?") {
+    my %r;
+    map { $r{"sml_".$zwave_ml_tbl{$_}{n}} = 1 } keys %zwave_ml_tbl;
+    return \%r;
+  }
+
+  my @idx = grep { "sml_".$zwave_ml_tbl{$_}{n} eq $a[0] } keys %zwave_ml_tbl;
+  return "$a[0]: numeric parameter missing" if(@a<2||!looks_like_number($a[1]));
+  my $sc = 0;
+  if(@a >= 3) {
+    my $e = $zwave_ml_tbl{$idx[0]};
+    ($sc) = grep { $a[2] eq $e->{st}->[$_] } (0..@{$e->{st}}-1);
+    return "Unknown scale $a[2] for $a[0], available scales are: ".
+                join(", ",@{$e->{st}}) if(!defined($sc));
+  }
+  my $pr = ($a[1] =~ m/\.(.*)/) ? length($1) : 0;
+  $pr = 7 if($pr > 7);
+  my $bc = 4;
+  my $val = int($a[1]*(10**$pr));
+  $val += 2**(8*$bc) if($val < 0);
+  
+  return ("", sprintf("05%02x%02x%08x", $idx[0],($pr<<5)+($sc<<3)+$bc, $val));
 }
 
 sub
@@ -5417,6 +5462,21 @@ ZWave_Attr(@)
            ReadingsVal($devName, "SECURITY", "") eq "ENABLED");
     $hash->{useCRC16} = 1;
     return undef;
+
+  } elsif($attrName eq "setList") {
+    return undef if($type eq "del");
+    my %sl;
+    for my $re (keys %zwave_setListFns) {
+      my $cmd = sprintf($zwave_setListFns{$re}{fmt}, '?');
+      my $l = eval $cmd;
+      %sl = (%sl, %{$l});
+    }
+    for my $sle (split(",",$param)) {
+      if(!$sl{$sle}) {
+        return "setList: unknown value $sle, use one of ".
+                join(" ", sort keys %sl);
+      }
+    }
   }
 
   return undef;
@@ -7163,6 +7223,19 @@ ZWave_firmwareUpdateParse($$$)
     <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
       If set, the event will contain the command implemented by SetExtensions
       (e.g. on-for-timer 10), else the executed command (e.g. on).</li><br>
+
+    <li><a name="ZWavesetList">setList</a><br>
+      Some devices interpret SENSOR_MULTILEVEL events, e.g. to react to an
+      external temperature sensor. To enable FHEM to send such messages,
+      specify the list of the desired readings, comma separated, with an sml_
+      prefix. Example:
+      <ul>
+      attr DEV setList sml_temperature<br>
+      set DEV sml_temperature -12.2 C
+      </ul>
+      The list of available scales can be retreived by specifying ? as scale.
+      If no scale is specified, the first one from this list is used.
+      </li><br>
 
     <li><a href="#showtime">showtime</a></li>
     <li><a name="vclasses">vclasses</a><br>
