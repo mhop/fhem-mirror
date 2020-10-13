@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 76_SMAPortal: new relative time arguments for attr balanceDay,
+                          balanceMonth, balanceYear, new attribute 
+                          useRelativeNames
  - bugfix:  73_GardenaSmartBridge: change isconnected to isConnected
  - feature: 76_SMAPortal: new attribute cookieDelete
  - feature: 32_withings: added ecg reading types for scanwatch

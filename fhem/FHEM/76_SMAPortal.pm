@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
@@ -311,6 +312,7 @@ sub Initialize {
                            "providerLevel:multiple-strict,".$prov." ".
                            "showPassInLog:1,0 ".
                            "userAgent ".
+                           "useRelativeNames:1,0 ".
                            "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
                            $readingFnAttributes;
 
@@ -386,7 +388,8 @@ sub Set {                             ## no critic 'complexity'
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials "
                  ;  
-  } else {
+  } 
+  else {
       # erweiterte Setlist wenn Credentials gesetzt
       $setlist = "Unknown argument $opt, choose one of ".
                  "credentials ".
@@ -413,9 +416,9 @@ sub Set {                             ## no critic 'complexity'
       # Verbraucher schalten
       $hash->{HELPER}{GETTER} = "none";
       $hash->{HELPER}{SETTER} = "$opt:$prop";
-      CallInfo($hash);
-        
-  } else {
+      CallInfo($hash);      
+  } 
+  else {
       my $params = {
           hash  => $hash,
           name  => $name,
@@ -457,8 +460,8 @@ sub _setCredentials {                    ## no critic "not used"
       delcookiefile ($hash);
       CallInfo($hash);
       return "Username and Password saved successfully";
-  
-  } else {
+  } 
+  else {
        return "Error while saving Username / Password - see logfile for details";
   }
 
@@ -497,22 +500,26 @@ sub _setCreatePortalGraphic {            ## no critic "not used"
       $type    = 'pv';        
       $c       = "SMA Sunny Portal Graphics - Forecast Generation";
       $color2  = "000000";                                                          # zweite Farbe als schwarz setzen
-  } elsif ($prop eq "Consumption") {
+  } 
+  elsif ($prop eq "Consumption") {
       $htmldev = "SPG2.$name";                                                      # Grafiktyp Consumption (Verbrauch)
       $type    = 'co';    
       $c       = "SMA Sunny Portal Graphics - Forecast Consumption"; 
       $color2  = "000000";                                                          # zweite Farbe als schwarz setzen          
-  } elsif ($prop eq "Generation_Consumption") {
+  } 
+  elsif ($prop eq "Generation_Consumption") {
       $htmldev = "SPG3.$name";                                                      # Grafiktyp Generation_Consumption (Erzeugung und Verbrauch)
       $type    = 'pvco'; 
       $c       = "SMA Sunny Portal Graphics - Forecast Generation & Consumption";
       $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen          
-  } elsif ($prop eq "Differential") {
+  } 
+  elsif ($prop eq "Differential") {
       $htmldev = "SPG4.$name";                                                      # Grafiktyp Differential (Differenzanzeige)
       $type    = 'diff';   
       $c       = "SMA Sunny Portal Graphics - Forecast Differential";   
       $color2  = "FF5C82";                                                          # zweite Farbe als rot setzen           
-  } else {
+  } 
+  else {
       return "Invalid portal graphic devicetype ! Use one of \"Generation\", \"Consumption\", \"Generation_Consumption\", \"Differential\". "
   }
 
@@ -580,8 +587,8 @@ sub Get {
      $hash->{HELPER}{SETTER} = "none";
      
      CallInfo($hash);
- 
- } elsif ($opt eq "storedCredentials") {
+ } 
+ elsif ($opt eq "storedCredentials") {
         if(!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials &lt;username&gt; &lt;password&gt;\"";}
         # Credentials abrufen
         my ($success, $username, $password) = getcredentials($hash,0);
@@ -590,9 +597,9 @@ sub Get {
         return "Stored Credentials to access SMA Portal:\n".
                "========================================\n".
                "Username: $username, Password: $password\n".
-               "\n";
-                
- } else {
+               "\n";               
+ } 
+ else {
      return "$getlist";
  } 
  
@@ -638,8 +645,9 @@ sub setcredentials {
     if ($retcode) { 
         Log3($name, 1, "$name - Error while saving the Credentials - $retcode");
         $success = 0;
-    } else {
-        getcredentials($hash,1);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
+    } 
+    else {
+        getcredentials($hash,1);                                                               # Credentials nach Speicherung lesen und in RAM laden ($boot=1)
         $success = 1;
     }
 
@@ -670,7 +678,8 @@ sub getcredentials {
             $hash->{CREDENTIALS} = "Set";                                               # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
             $success = 1;
         }
-    } else {                                                                            # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
+    } 
+    else {                                                                              # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
         $credstr = $hash->{HELPER}{".CREDENTIALS"} // $hash->{HELPER}{CREDENTIALS};     # Kompatibilität zu Versionen vor 2.6.1 
         
         if($credstr) {
@@ -687,8 +696,8 @@ sub getcredentials {
             my $logpw = AttrVal($name, "showPassInLog", 0) ? $passwd : "********";
         
             Log3($name, 4, "$name - Credentials read from RAM: $username $logpw");
-        
-        } else {
+        } 
+        else {
             Log3($name, 1, "$name - Credentials not set in RAM !");
         }
         
@@ -722,7 +731,8 @@ sub Attr {
             delcookiefile ($hash); 
             delete $hash->{MODE};
             RemoveInternalTimer($hash);                      
-        } else {
+        } 
+        else {
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }
         
@@ -770,7 +780,8 @@ sub CallInfo {                         ## no critic 'complexity'
       
       if(!$interval) {
           $hash->{MODE} = "Manual";
-      } else {
+      } 
+      else {
           $new = gettimeofday()+$interval; 
           InternalTimer($new, "FHEM::SMAPortal::CallInfo", $hash, 0);          # Wiederholungsintervall
           $hash->{MODE} = "Automatic - next polltime: ".FmtTime($new);
@@ -983,7 +994,8 @@ sub GetSetData {                       ## no critic 'complexity'
           $state = "ok - switched consumer $d to $op";
           BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
           BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
-      } else {
+      } 
+      else {
           $state = "Error - couldn't switch consumer $d to $op";
       }
   } 
@@ -1110,8 +1122,8 @@ sub _doLogin {
               Log3($name, 1, qq{$name - Credentials couldn't be retrieved successfully - make sure you've set it with "set $name credentials <username> <password>"});   
               $state       = "Credentials couldn't be read";
               $errstate = 1;
-          
-          } else {
+          } 
+          else {
               my $usernameField = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$txtUserName";
               my $passwordField = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$txtPassword";
               my $mempasswd     = "ctl00\$ContentPlaceHolder1\$Logincontrol1\$MemorizePassword";
@@ -1134,9 +1146,9 @@ sub _doLogin {
               if(__isLoggedIn ($name,$username,$loginp)) {                                  # Login erfolgeich(Landing Pages können im Portal eingestellt werden!)
                   handleCounter ($name, "dailyIssueCookieCounter");                         # Cookie Ausstellungszähler setzen
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "oldlogintime:".(gettimeofday())[0] ], 1);
-                  $errstate = 0;                             
-              
-              } else {
+                  $errstate = 0;
+              } 
+              else {
                   Log3 ($name, 2, "$name - ERROR - Login into SMA-Portal failed !");
                   $state       = "login failed";
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
@@ -1144,8 +1156,8 @@ sub _doLogin {
               }              
           }         
       }
-  
-  } elsif ($loginp->is_redirect) {
+  } 
+  elsif ($loginp->is_redirect) {
       $retcode  = $loginp->code;
       $location = $loginp->header('Location') // "";
       Log3 ($name, 3, "$name - User is already logged in.");      
@@ -1157,8 +1169,8 @@ sub _doLogin {
       
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:successful", "NULL" ], 1);
       $errstate = 0;
-  
-  } else {
+  } 
+  else {
       $errstate = 1;
       $state       = $loginp->status_line;
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "loginState:failed", "NULL" ], 1);
@@ -1352,7 +1364,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
   
   # Energiedaten aktueller Tag
-  Log3 ($name, 4, "$name - Getting consumer energy data of current day");
+  Log3 ($name, 4, "$name - getting consumer energy data of current day");
   Log3 ($name, 4, "$name - Request date -> start: $dds, end: $dde");
   Log3 ($name, 5, "$name - Request consumer current day data string ->\n$ccdd");
   
@@ -1405,7 +1417,7 @@ sub _getConsumerMonthData {             ## no critic "not used"
   my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
 
   # Energiedaten aktueller Monat
-  Log3 ($name, 4, "$name - Getting consumer energy data of current month");
+  Log3 ($name, 4, "$name - getting consumer energy data of current month");
   Log3 ($name, 4, "$name - Request date -> start: $mds, end: $mde"); 
   Log3 ($name, 5, "$name - Request consumer current month data string ->\n$ccmd");
  
@@ -1460,7 +1472,7 @@ sub _getConsumerYearData {              ## no critic "not used"
   my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
 
   # Energiedaten aktuelles Jahr
-  Log3 ($name, 4, "$name - Getting consumer energy data of current year");
+  Log3 ($name, 4, "$name - getting consumer energy data of current year");
   Log3 ($name, 4, "$name - Request date -> start: $yds, end: $yde"); 
   Log3 ($name, 5, "$name - Request consumer current year data string ->\n$ccyd");
   
@@ -1507,22 +1519,22 @@ return ($errstate,$state,$reread,$retry);
 #            (anchorTime beachten !)
 ################################################################
 sub _getBalanceDayData {                 ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                                                       # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0); 
   
-  my @bd = split /\s+/x ,AttrVal($name, "balanceDay", "current");
+  my @bd  = split /\s+/x ,AttrVal($name, "balanceDay", "current");
+  my $tag = "balanceDayData";
 
   for my $bal (@bd) {
       my ($y,$m,$d);
-      my $addon = "Day";
-      $addon   .= "_".$bal;
+      my $addon = "Day_";
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y,$m,$d) = $bal =~ /(\d{4})-(\d{2})-(\d{2})/x;
           
           if(!$y || !$m || !$d) {
@@ -1530,11 +1542,26 @@ sub _getBalanceDayData {                 ## no critic "not used"
               next;
           }
           
-          $y -= 1900;
-          $m -= 1;
-      
-      } else {
-          (undef,undef,undef,$d,$m,$y) = localtime(time);
+          $addon .= $bal;
+          $y     -= 1900;
+          $m     -= 1;
+      } 
+      else {
+          my $mp                       = (split "-", $bal)[1] // 0;               # Multiplikator: z.B. current-1 -> 1       
+          my $time                     = time - ($mp * 86400);
+          (undef,undef,undef,$d,$m,$y) = localtime($time);
+          
+          my $addon1 = ($y+1900)."-".(sprintf "%02d", $m+1)."-".sprintf "%02d",$d;
+          
+          my $params = {
+              name   => $name,
+              bal    => $bal,
+              tag    => $tag,
+              daref  => $daref,
+              addon  => $addon,
+              addon1 => $addon1,
+          };        
+          $addon = createDateAddon ($params);
       }  
  
       eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1542,10 +1569,12 @@ sub _getBalanceDayData {                 ## no critic "not used"
                                                       Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceDay' detected: $state");
                                                       return ($errstate,$state,$reread,$retry);
                                                    };
+                                                   
+      Log3 ($name, 4, "$name - retrieve $tag ".($y+1900)."-".(sprintf "%02d", $m+1)."-".sprintf "%02d",$d );
    
-      my $cts      = fhemTimeLocal(0, 0, 0, $d, $m, $y);
-      my $offset   = fhemTzOffset($cts);
-      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+      my $cts     = fhemTimeLocal(0, 0, 0, $d, $m, $y);
+      my $offset  = fhemTzOffset($cts);
+      my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
       my $tab     = 1;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
       my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
@@ -1554,15 +1583,14 @@ sub _getBalanceDayData {                 ## no critic "not used"
       ($errstate,$state) = __dispatchPost ({ name     => $name,
                                              ua       => $ua,
                                              call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                             tag      => "balanceDayData",
+                                             tag      => $tag,
                                              state    => $state, 
                                              fnaref   => [ qw( extractStatisticData ) ],
                                              fields   => \%fields,
                                              content  => $cont,
                                              addon    => $addon,
                                              daref    => $daref
-                                          });                                     
-      
+                                          });
       }
   
 return ($errstate,$state,$reread,$retry); 
@@ -1573,22 +1601,22 @@ return ($errstate,$state,$reread,$retry);
 #            (anchorTime beachten !)
 ################################################################
 sub _getBalanceMonthData {                 ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                                          # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                                       # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
-  my @bd = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
+  my @bd  = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
+  my $tag = "balanceMonthData";
 
   for my $bal (@bd) {
       my ($y,$m);
-      my $addon = "Month";
-      $addon   .= "_".$bal;
+      my $addon = "Month_";
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y,$m) = $bal =~ /^(\d{4})-(\d{2})$/x;
           
           if(!$y || !$m) {
@@ -1596,12 +1624,38 @@ sub _getBalanceMonthData {                 ## no critic "not used"
               next;
           }
           
-          $y -= 1900;
-          $m -= 1;
-      
-      } else {
-          $m = (localtime(time))[4];
-          $y = (localtime(time))[5];
+          $addon .= $bal;  
+          $y     -= 1900;
+          $m     -= 1;
+      } 
+      else {
+          my $mp = (split "-", $bal)[1] // 0;
+          my $yc = int($mp/12);                                      # Anzahl der Jahre
+          my $mc = $mp % 12;                                         # Anzahl Restmonate
+          
+          $y     = (localtime(time))[5];
+          $y    -= $yc;
+          $m     = (localtime(time))[4];
+          
+          if($m-$mc < 1) {
+              $m = 12-abs($m-$mc);
+              $y--;
+          }
+          else {
+              $m = $m-$mc;
+          }
+          
+          my $addon1 = ($y+1900)."-".sprintf "%02d", $m+1;
+          
+          my $params = {
+              name   => $name,
+              bal    => $bal,
+              tag    => $tag,
+              daref  => $daref,
+              addon  => $addon,
+              addon1 => $addon1,
+          };        
+          $addon = createDateAddon ($params);
       }  
  
       eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1610,9 +1664,11 @@ sub _getBalanceMonthData {                 ## no critic "not used"
                                                      return ($errstate,$state,$reread,$retry);
                                                    };
                                                    
-      my $cts      = fhemTimeLocal(0, 0, 0, 1, $m, $y);
-      my $offset   = fhemTzOffset($cts);
-      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+      Log3 ($name, 4, "$name - retrieve $tag ".($y+1900)."-".sprintf "%02d", $m+1);
+                                                   
+      my $cts     = fhemTimeLocal(0, 0, 0, 1, $m, $y);
+      my $offset  = fhemTzOffset($cts);
+      my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
       my $tab     = 2;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
       my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
@@ -1621,15 +1677,14 @@ sub _getBalanceMonthData {                 ## no critic "not used"
       ($errstate,$state) = __dispatchPost ({ name     => $name,
                                              ua       => $ua,
                                              call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                             tag      => "balanceMonthData",
+                                             tag      => $tag,
                                              state    => $state, 
                                              fnaref   => [ qw( extractStatisticData ) ],
                                              fields   => \%fields,
                                              content  => $cont,
                                              addon    => $addon,
                                              daref    => $daref
-                                          });                                     
-      
+                                          });
   }
   
 return ($errstate,$state,$reread,$retry); 
@@ -1640,22 +1695,22 @@ return ($errstate,$state,$reread,$retry);
 #            (anchorTime beachten !)
 ################################################################
 sub _getBalanceYearData {                 ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                                                      # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
-  my @bd = split /\s+/x ,AttrVal($name, "balanceYear", "current");
+  my @bd  = split /\s+/x ,AttrVal($name, "balanceYear", "current");
+  my $tag = "balanceYearData";
 
   for my $bal (@bd) {
       my $y;
-      my $addon = "Year";
-      $addon   .= "_".$bal;
+      my $addon = "Year_";
       
-      if($bal ne "current") {
+      if($bal !~ /current/ixms) {
           ($y) = $bal =~ /^(\d{4})$/x;
           
           if(!$y) {
@@ -1663,9 +1718,24 @@ sub _getBalanceYearData {                 ## no critic "not used"
               next;
           }
           
-          $y  -= 1900;
-      } else {
-          $y = (localtime(time))[5];
+          $addon .= $bal;
+          $y     -= 1900;
+      } 
+      else {
+          my $mp     = (split "-", $bal)[1] // 0;
+          $y         = (localtime(time))[5];
+          $y        -= $mp;
+          my $addon1 = $y+1900;
+          
+          my $params = {
+              name   => $name,
+              bal    => $bal,
+              tag    => $tag,
+              daref  => $daref,
+              addon  => $addon,
+              addon1 => $addon1,
+          };        
+          $addon = createDateAddon ($params);          
       }
       
       eval { timelocal(0, 0, 0, 1, 1, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1673,10 +1743,12 @@ sub _getBalanceYearData {                 ## no critic "not used"
                                                     Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceYear' detected: $state");
                                                     return ($errstate,$state,$reread,$retry);
                                                   };
+                                                  
+      Log3 ($name, 4, "$name - retrieve $tag ".($y+1900));
                                                    
-      my $cts      = fhemTimeLocal(0, 0, 0, 1, 1, $y);
-      my $offset   = fhemTzOffset($cts);
-      my $anchort  = int($cts + $offset);                                         # anchorTime in UTC -> abzurufendes Datum
+      my $cts     = fhemTimeLocal(0, 0, 0, 1, 1, $y);
+      my $offset  = fhemTzOffset($cts);
+      my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
       my $tab     = 3;                                                            # Tab 1 -> Tag , 2->Monat, 3->Jahr, 4->Gesamt
       my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
@@ -1685,7 +1757,7 @@ sub _getBalanceYearData {                 ## no critic "not used"
       ($errstate,$state) = __dispatchPost ({ name     => $name,
                                              ua       => $ua,
                                              call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/GetLegendWithValues',
-                                             tag      => "balanceYearData",
+                                             tag      => $tag,
                                              state    => $state, 
                                              fnaref   => [ qw( extractStatisticData ) ],
                                              fields   => \%fields,
@@ -1881,7 +1953,7 @@ sub ___getData {
   
   my $cont;   
 
-  Log3 ($name, 4, "$name - Getting $tag"); 
+  Log3 ($name, 4, "$name - getting $tag"); 
   
   if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
@@ -1921,7 +1993,7 @@ sub ___postData {
   
   my $cont;   
 
-  Log3 ($name, 4, "$name - Getting $tag");
+  Log3 ($name, 4, "$name - getting $tag");
   
   if($verbose == 5 && $v5d =~ /$tag/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
@@ -2027,8 +2099,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
               }
           }
       }
-  
-  } else {
+  } 
+  else {
       my $njdat = encode("utf8", $ad->as_string); 
       
       if($njdat =~ /401\s-\sUnauthorized/x) {
@@ -2487,7 +2559,7 @@ sub extractStatisticData {
   my $name      = $hash->{NAME};
   my $sd;
   
-  Log3 ($name, 4, "$name - ##### extracting balance data #### ");
+  Log3 ($name, 4, "$name - extracting balance data ");
   
   $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
@@ -2539,7 +2611,8 @@ sub extractPlantMasterData {
       Log3 ($name, 4, "$name - Plant ID: ".$plantOid);
       $hash->{HELPER}{PLANTOID} = $plantOid;
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "PLANTOID:$plantOid"], 1);      
-  } else {
+  } 
+  else {
       Log3 ($name, 4, "$name - Plant ID  not set !");
   }
   
@@ -2665,16 +2738,20 @@ sub extractConsumerPlanData {
                my $rb  = "${lv}_${cn}_PlannedOpTimeBegin"; 
                my $re  = "${lv}_${cn}_PlannedOpTimeEnd";
                my $rp  = "${lv}_${cn}_Planned";
+               
                if($pos) {              
                    push @$daref, "$rb:$pos";
                    push @$daref, "$rp:yes";                   
-               } else {
+               } 
+               else {
                    push @$daref, "$rb:undefined";  
                    push @$daref, "$rp:no";
                }   
+               
                if($poe) {             
                    push @$daref, "$re:$poe";              
-               } else {
+               } 
+               else {
                    push @$daref, "$re:undefined"; 
                }                  
           }
@@ -2784,11 +2861,14 @@ sub extractConsumerCurrentdata {
           
           if(!$GriSwStt && $GriSwAuto) {
               $res = "off (automatic)";
-          } elsif (!$GriSwStt && !$GriSwAuto) {
+          } 
+          elsif (!$GriSwStt && !$GriSwAuto) {
               $res = "off";         
-          } elsif ($GriSwStt) {
+          } 
+          elsif ($GriSwStt) {
               $res = "on";           
-          } else {
+          } 
+          else {
               $res = "undefined";            
           }
           
@@ -2913,7 +2993,8 @@ sub setVersionInfo {
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
       if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
+      } 
+      else {
           $modules{$type}{META}{x_version} = $v; 
       }
       return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
@@ -2922,7 +3003,8 @@ sub setVersionInfo {
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
           use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          ## no critic 'VERSION'                                      
       }
-  } else {
+  } 
+  else {
       # herkömmliche Modulstruktur
       $hash->{VERSION} = $v;
   }
@@ -2942,7 +3024,11 @@ sub deleteData {
  
   my $bl     = "state|lastCycleTime|Counter|loginState";                       # Blacklist
   
-  my $pblvl = $stpl{plantLogbook}{level};                                      # Logbuch Level
+  my $pblvl  = $stpl{plantLogbook}{level};                                     # Logbuch Level
+  
+  my $ballvl = $stpl{balanceDayData}{level}  ."|".                             # Level von balanceDayData, balanceMonthData, balanceYearData
+               $stpl{balanceMonthData}{level}."|".
+               $stpl{balanceYearData}{level};
   
   if(!$subs{$name}{forecastData}{doit}) {                                      # wenn forecastData nicht abgerufen werden sollen -> Wetterdaten im HELPER löschen
       my $fclvl = $stpl{forecastData}{level};
@@ -2967,6 +3053,7 @@ sub deleteData {
           if($subs{$name}{$prl}{doit}) {
               $lvl = $subs{$name}{$prl}{level};                                # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990
           }
+          
           if ($lvl) {
               $pbl .= "|^".$lvl."_";
           }
@@ -2974,8 +3061,9 @@ sub deleteData {
       $bl .= $pbl;                                                             # Blacklist ergänzen
 
       for my $key(@allrds) {
-          delete($defs{$name}{READINGS}{$key}) if($key !~ /$bl/x);
-          delete $defs{$name}{READINGS}{$key}  if($key =~ /^$pblvl/x);         # Logbuchreadings immer löschen       
+          delete $defs{$name}{READINGS}{$key} if($key !~ /$bl/x);
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$pblvl/x);          # Logbuchreadings immer löschen
+          delete $defs{$name}{READINGS}{$key} if($key =~ /^$ballvl/x);         # balance(Day|Month)Data Readings immer löschen wegen möglicher Relativverschiebung           
       }
       
       return;
@@ -2986,6 +3074,31 @@ sub deleteData {
   }
 
 return;
+}
+
+################################################################
+#    erstelle addon als relative oder reale Datumangabe
+################################################################
+sub createDateAddon {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $bal    = $paref->{bal};
+  my $tag    = $paref->{tag};
+  my $daref  = $paref->{daref};
+  my $addon  = $paref->{addon};
+  my $addon1 = $paref->{addon1};
+
+  if(AttrVal($name,"useRelativeNames", 0)) {                              # current-x verwenden statt effektives Datum
+      $addon .= $bal;
+      my $lv  = $stpl{$tag}{level};
+      
+      push @$daref, "${lv}_${addon}_Date:$addon1";  
+  }
+  else {
+      $addon .= $addon1;
+  }
+
+return $addon;
 }
 
 ################################################################
@@ -3031,11 +3144,14 @@ sub setFromBlocking {
   
   if($helper ne "NULL") {
       my ($hnam,$k1,$k2,$k3) = split ":", $helper, 4;
+      
       if(defined $k3) {
           $hash->{HELPER}{"$hnam"}{"$k1"}{"$k2"} = $k3;
-      } elsif (defined $k2) {
+      } 
+      elsif (defined $k2) {
           $hash->{HELPER}{"$hnam"}{"$k1"} = $k2;
-      } else {
+      } 
+      else {
           $hash->{HELPER}{"$hnam"} = $k1;
       }
   }
@@ -3077,7 +3193,8 @@ sub TimeAdjust {
   if(lc($tkind) =~ /unspecified/x) {
       if($isdst) {
           $epoch = $epoch - 7200;
-      } else {
+      } 
+      else {
           $epoch = $epoch - 3600;
       }
   }
@@ -3089,7 +3206,8 @@ sub TimeAdjust {
   
   if(AttrVal("global","language","EN") eq "DE") {
       return (sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,$rest));
-  } else {
+  } 
+  else {
       return (sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,$rest));
   }
 }
@@ -3149,13 +3267,17 @@ sub PortalAsHtml {                                                              
       $ret   .= "<td>";
       if(!$hash) {                                                                      ## no critic "Cascading"
           $ret .= "Device \"$name\" doesn't exist !";
-      } elsif (!defined($defs{$wlname})) {
+      } 
+      elsif (!defined($defs{$wlname})) {
           $ret .= "Graphic device \"$wlname\" doesn't exist !";
-      } elsif (!$fdo) {
+      } 
+      elsif (!$fdo) {
           $ret .= qq{The attribute "providerLevel" of device "$name" must contain the level "forecastData" and data must be retrieved !};
-      } elsif (!defined $pv0) {
+      } 
+      elsif (!defined $pv0) {
           $ret .= "Awaiting minor level forecast data ...";
-      } elsif (!defined $pv1) {
+      } 
+      elsif (!defined $pv1) {
           $ret .= "Awaiting major level forecast data ...";
       }
 
@@ -3188,18 +3310,21 @@ sub PortalAsHtml {                                                              
           my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
           if($swstate eq "off") {
               $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
-          } elsif ($swstate eq "on") {
+          } 
+          elsif ($swstate eq "on") {
               $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
-          } elsif ($swstate =~ /off.*automatic.*/ix) {
+          } 
+          elsif ($swstate =~ /off.*automatic.*/ix) {
               $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
           }
           
           if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
               $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '.$swicon.'&nbsp;&nbsp;'; 
-          } else {
+          } 
+          else {
               my (undef,$co) = split('\@',$im);
-              $co = '#cccccc' if (!$co);                                                           # Farbe per default
-              $legend_txt .= '<font color=\''.$co.'\'>'.$txt.'</font> '.$swicon.'&nbsp;&nbsp;';    # hier auch Umbruch erlauben
+              $co            = '#cccccc' if (!$co);                                                # Farbe per default
+              $legend_txt   .= '<font color=\''.$co.'\'>'.$txt.'</font> '.$swicon.'&nbsp;&nbsp;';  # hier auch Umbruch erlauben
           }
       }
   }
@@ -3255,7 +3380,8 @@ sub PortalAsHtml {                                                              
       $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
       $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
       $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
-  } else {
+  } 
+  else {
       $co4h .= "&nbsp;Wh";
       $coRe .= "&nbsp;Wh";
       $coTo .= "&nbsp;Wh";
@@ -3296,7 +3422,8 @@ sub PortalAsHtml {                                                              
           
           if(AttrVal("global","language","EN") eq "DE") {
              $lup = "$day.$month.$year&nbsp;$time"; 
-          } else {
+          } 
+          else {
              $lup = "$year-$month-$day&nbsp;$time"; 
           }
 
@@ -3311,9 +3438,11 @@ sub PortalAsHtml {                                                              
           
           if ($upstate =~ /ok/ix) {
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
-          } elsif ($upstate =~ /running/ix) {
+          } 
+          elsif ($upstate =~ /running/ix) {
               $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
-          } else {
+          } 
+          else {
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
           }
   
@@ -3355,7 +3484,8 @@ sub PortalAsHtml {                                                              
 
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name,"${fmin}_ThisHour_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-  } else {
+  } 
+  else {
       (undef,undef,undef,$t{0}) = ReadingsVal($name,"${fmin}_ThisHour_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   }
   
@@ -3376,7 +3506,8 @@ sub PortalAsHtml {                                                              
           if(AttrVal("global","language","EN") eq "DE") {
               (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
               (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'00.00.0000 24')   =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-          } else {
+          } 
+          else {
               (undef,undef,undef,$start) = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeBegin",'0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
               (undef,undef,undef,$end)   = ReadingsVal($name,"${fmaj}_".$itemName."_PlannedOpTimeEnd",'0000-00-00 24')   =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
           }
@@ -3389,19 +3520,21 @@ sub PortalAsHtml {                                                              
           if ($start < $t{0}) {                                         # consumption seems to be tomorrow
               $start = 24-$t{0}+$start;
               $flag  = 1;
-          } else { 
+          } 
+          else { 
               $start -= $t{0};          
           }
 
           if ($flag) {                                                  # consumption seems to be tomorrow
               $end = 24-$t{0}+$end;
-          } else { 
+          } 
+          else { 
               $end -= $t{0}; 
           }
 
           $_ .= ":".$start.":".$end;
-
-      } else { 
+      } 
+      else { 
           $_ .= ":24:24"; 
       } 
       Log3($name, 4, "$name - Consumer planned data: $_");
@@ -3428,7 +3561,8 @@ sub PortalAsHtml {                                                              
 
      if(AttrVal("global","language","EN") eq "DE") {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-     } else {
+     } 
+     else {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"${fmaj}_NextHour".sprintf("%02d",$i)."_Time",'0') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
      }
 
@@ -3475,7 +3609,8 @@ sub PortalAsHtml {                                                              
               $val  ='<b>???<b/>' if ($val eq $icon_name);         # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
               $ret .= "<td class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
           
-          } else {                                                 # Kein Ertrag oder show_night = 0
+          } 
+          else {                                                 # Kein Ertrag oder show_night = 0
               $ret .= "<td></td>"; $we{$i} = undef; 
           } 
           # mit $we{$i} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
@@ -3509,12 +3644,12 @@ sub PortalAsHtml {                                                              
       if ($type eq 'co') { 
           $he = int(($maxCon-$co{$i})/$maxCon*$height) + $fsize;             # he - freier der Raum über den Balken.
           $z3 = int($height + $fsize - $he);                                 # Resthöhe
-      
-      } elsif ($type eq 'pv') {
+      } 
+      elsif ($type eq 'pv') {
           $he = int(($maxVal-$pv{$i})/$maxVal*$height) + $fsize;
           $z3 = int($height + $fsize - $he);
-      
-      } elsif ($type eq 'pvco') {
+      } 
+      elsif ($type eq 'pvco') {
           # Berechnung der Zonen
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
           # z2 - der Ertrag ggf mit Icon
@@ -3525,7 +3660,8 @@ sub PortalAsHtml {                                                              
 
           if ($pv{$i} > $co{$i}) {                                           # pv oben , co unten
               $z2 = $pv{$i}; $z3 = $co{$i}; 
-          } else {                                                           # tauschen, Verbrauch ist größer als Ertrag
+          } 
+          else {                                                           # tauschen, Verbrauch ist größer als Ertrag
               $z3 = $pv{$i}; $z2 = $co{$i}; 
           }
 
@@ -3536,9 +3672,9 @@ sub PortalAsHtml {                                                              
           
           if ($z3 < int($fsize/2)) {                                         # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3; $z3 = 0; 
-          }                  
-      
-      } else {                                                               # Typ dif
+          }
+      } 
+      else {                                                                 # Typ dif
           # Berechnung der Zonen
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
@@ -3551,16 +3687,18 @@ sub PortalAsHtml {                                                              
           if ($maxPV) {                                                      # Feste Aufteilung +/- , jeder 50 % bei maxPV = 0
               $px_pos = int($height/2);
               $px_neg = $height - $px_pos;                                   # Rundungsfehler vermeiden
-          
-          } else {                                                           # Dynamische hoch/runter Verschiebung der Null-Linie        
+          } 
+          else {                                                             # Dynamische hoch/runter Verschiebung der Null-Linie        
               if  ($minDif >= 0 ) {                                          # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
                   $px_neg = 0;
                   $px_pos = $height;
-              } else {
+              } 
+              else {
                   if ($maxDif > 0) {
                       $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));     # Wieviel % entfallen auf unten ?
                       $px_pos = $height-$px_neg;                                            # der Rest ist oben
-                  } else {                                                   # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
+                  } 
+                  else {                                                                    # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
                       $px_neg = $height;
                       $px_pos = 0;
                   }
@@ -3570,7 +3708,8 @@ sub PortalAsHtml {                                                              
           if ($di{$i} >= 0) {                                                # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $di{$i};
               $z3 = abs($minDif);
-          } else {
+          } 
+          else {
               $z2 = $maxDif;
               $z3 = abs($di{$i}); # Nur Betrag ohne Vorzeichen
           }
@@ -3618,9 +3757,9 @@ sub PortalAsHtml {                                                              
               $ret .= consinject($hash,$i,@pgCDev) if($ret);
               
               $ret .= "</td></tr>";
-         }           
-         
-      } elsif ($type eq 'pvco') { 
+         }   
+      } 
+      elsif ($type eq 'pvco') { 
           my ($color1, $color2, $style1, $style2);
 
           $ret .="<table width='100%' height='100%'>\n";                      # mit width=100% etwas bessere Füllung der Balken
@@ -3639,8 +3778,7 @@ sub PortalAsHtml {                                                              
                   $color2  = $colorc;
                   $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
                   $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
-              }
-          
+              } 
           } else {
               $val     = formatVal6($co{$i},$kw,$we{$i});
               $color1  = $colorc;
@@ -3669,8 +3807,8 @@ sub PortalAsHtml {                                                              
              $ret .= "<tr class='odd' style='height:".$z3."px'>";
              $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
          }
-      
-      } else {                                                              # Type dif
+      } 
+      else {                                                              # Type dif
           my $style  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
           $ret .="<table width='100%' border='0'>\n";                       # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
@@ -3690,8 +3828,8 @@ sub PortalAsHtml {                                                              
               $ret .= "<td align='center' class='smaportal' ".$style.">";
               $ret .= $is{$i} if (defined $is{$i});
               $ret .="</td></tr>";
-          
-          } else {                                                          # ohne Farbe
+          } 
+          else {                                                            # ohne Farbe
               $z2 = 2 if ($di{$i} == 0);                                    # Sonderfall, hier wird die 0 gebraucht !
               if ($z2 && $val) {                                            # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
                   $ret .= "<tr class='even' style='height:".$z2."px'>";
@@ -3703,8 +3841,8 @@ sub PortalAsHtml {                                                              
               $style .= (defined($colorc)) ? " background-color:#$colorc\"" : '"';   # mit Farbe 2 colorc füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='smaportal' ".$style."></td></tr>";
-          
-          } elsif ($z3) {                                                            # ohne Farbe
+          } 
+          elsif ($z3) {                                                              # ohne Farbe
               $ret .="<tr class='even' style='height:".$z3."px'>";
               $ret .="<td class='smaportal'></td></tr>";
           }
@@ -3797,15 +3935,19 @@ sub formatVal6 {
       if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
           if(!$v) { 
               return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
-          } elsif ($v < 10) { 
+          } 
+          elsif ($v < 10) { 
               return '&nbsp;&nbsp;'.$n.$v.'&nbsp;&nbsp;'; 
-          } else { 
+          } 
+          else { 
               return '&nbsp;&nbsp;'.$n.$v.'&nbsp;'; 
           }
-      } else {                                              # mit Nachkommastelle -> zwei Zeichen mehr .X
+      } 
+      else {                                                # mit Nachkommastelle -> zwei Zeichen mehr .X
           if ($v < 10) { 
               return '&nbsp;'.$n.$v.'&nbsp;'; 
-          } else { 
+          } 
+          else { 
               return $n.$v.'&nbsp;'; 
           }
       }
@@ -3895,7 +4037,8 @@ sub SPGRefresh {
   if (ref $hash ne "HASH") {
       ($name,$pload,$lpollspg) = split ",",$hash;
       $hash = $defs{$name};
-  } else {
+  } 
+  else {
       $name = $hash->{NAME};
   }
   my $fpr = 0;
@@ -3915,11 +4058,13 @@ sub SPGRefresh {
           my $room = $_;
           { map { FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }   ## no critic 'void context';
       }
-  } elsif ($pload && (!$hash->{HELPER}{SPGROOM} || $hash->{HELPER}{SPGDETAIL})) {
+  } 
+  elsif ($pload && (!$hash->{HELPER}{SPGROOM} || $hash->{HELPER}{SPGDETAIL})) {
       # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
       # SMAPortalSPG-Attribut "forcePageRefresh" erzwungen wird
       { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                            ## no critic 'void context';
-  } else {
+  } 
+  else {
       if($fpr) {
           { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                        ## no critic 'void context';
       }
@@ -4095,38 +4240,44 @@ return;
      <ul>
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
-       Defines the days from which the data provider "balanceDayData" delivers the data. The day specifications are separated by 
-       spaces, current = current day. <br>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current current-x &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Defines from which days the data provider "balanceDayData" delivers the data.
+       In the relative specification <b>current-x</b> is <b>x</b> the number of days that are subtracted from the current day.        
+       The days are separated by spaces, current = current day. <br>
        (default: current day) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br> 
+         attr &lt;name&gt; balanceDay current current-1 current-2              <br>         
         </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
-       Defines from which months the data provider "balanceMonthData" delivers the data. The month specifications are separated by 
-       spaces, current = current month. <br>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current current-x &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Defines from which months the data provider "balanceMonthData" delivers the data. 
+       In the relative specification <b>current-x</b> is <b>x</b> the number of months subtracted from the current month.
+       The month data is separated by spaces, current = current month. <br>
        (default: current month) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br> 
+         attr &lt;name&gt; balanceMonth current current-12 current-24   <br>          
         </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
-       Defines the years from which the data provider "balanceYearData" delivers the data. The year specifications are separated by 
-       spaces, current = current year. <br>
+       <li><b>balanceYear &lt;YYYY&gt; [current current-x &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Defines from which years the data provider "balanceYearData" delivers the data. 
+       In the relative specification <b>current-x</b>, <b>x</b> is the number of years that are subtracted from the current year.
+       The years are separated by spaces, current = current year. <br>
        (default: current year) <br><br>
        
         <ul>
-         <b>Example:</b><br>
-         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+         <b>Examples:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017        <br> 
+         attr &lt;name&gt; balanceYear current current-1 current-2   <br>         
         </ul> 
        </li><br>
        
@@ -4245,6 +4396,13 @@ return;
          attr &lt;name&gt; userAgent Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:65.0) Gecko/20100101 Firefox/65.0 <br>    
         </ul>           
        </li><br> 
+       
+       <a name="useRelativeNames"></a>
+       <li><b>useRelativeNames </b><br>
+       When using relative dates <b>current-x</b> (see balance.* attributes) the created reading name contains
+       also the relative instead of the real date. <br>
+       (default: real date)       
+       </li><br>
 
        <a name="verbose5Data"></a>
        <li><b>verbose5Data </b><br>
@@ -4412,38 +4570,44 @@ return;
      <ul>      
 
        <a name="balanceDay"></a>
-       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
-       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert. Die Tagesangaben werden durch Leerzeichen 
-       getrennt, current = aktueller Tag. <br>
+       <li><b>balanceDay &lt;YYYY-MM-DD&gt; [current current-x &lt;YYYY-MM-DD&gt; &lt;YYYY-MM-DD&gt; ...] </b><br>
+       Legt fest, von welchen Tagen der Datenprovider "balanceDayData" die Daten liefert.
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Tage die vom aktuellen Tag subtrahiert werden.        
+       Die Tagesangaben werden durch Leerzeichen getrennt, current = aktueller Tag. <br>
        (default: aktueller Tag) <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceDay current 2020-08-07 2020-08-06 2020-08-05 <br> 
+         attr &lt;name&gt; balanceDay current current-1 current-2              <br>         
         </ul> 
        </li><br>
        
        <a name="balanceMonth"></a>
-       <li><b>balanceMonth &lt;YYYY-MM&gt; [current &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
-       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. Die Monatsangaben werden durch Leerzeichen 
-       getrennt, current = aktueller Monat. <br>
+       <li><b>balanceMonth &lt;YYYY-MM&gt; [current current-x &lt;YYYY-MM&gt; &lt;YYYY-MM&gt; ...] </b><br>
+       Legt fest, von welchen Monaten der Datenprovider "balanceMonthData" die Daten liefert. 
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Monate die vom aktuellen Monat subtrahiert werden.
+       Die Monatsangaben werden durch Leerzeichen getrennt, current = aktueller Monat. <br>
        (default: aktueller Monat) <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceMonth current 2019-07 2019-06 2019-05 <br> 
+         attr &lt;name&gt; balanceMonth current current-12 current-24   <br>          
         </ul> 
        </li><br>
        
        <a name="balanceYear"></a>
-       <li><b>balanceYear &lt;YYYY&gt; [current &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
-       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. Die Jahresangaben werden durch Leerzeichen 
-       getrennt, current = aktuelles Jahr. <br>
+       <li><b>balanceYear &lt;YYYY&gt; [current current-x &lt;YYYY&gt; &lt;YYYY&gt; &lt;YYYY&gt; ...] </b><br>
+       Legt fest, von welchen Jahren der Datenprovider "balanceYearData" die Daten liefert. 
+       In der Relativangabe <b>current-x</b> ist <b>x</b> die Anzahl Jahre die vom aktuellen Jahr subtrahiert werden.
+       Die Jahresangaben werden durch Leerzeichen getrennt, current = aktuelles Jahr. <br>
        (default: aktuelles Jahr)  <br><br>
        
         <ul>
-         <b>Beispiel:</b><br>
-         attr &lt;name&gt; balanceYear current 2019 2018 2017 <br>    
+         <b>Beispiele:</b><br>
+         attr &lt;name&gt; balanceYear current 2019 2018 2017        <br> 
+         attr &lt;name&gt; balanceYear current current-1 current-2   <br>         
         </ul> 
        </li><br>
        
@@ -4565,6 +4729,13 @@ return;
         </ul>   
         
        </li><br> 
+       
+       <a name="useRelativeNames"></a>
+       <li><b>useRelativeNames </b><br>
+       Bei Verwendung von relativen Datumangaben <b>current-x</b> (siehe balance.*-Attribute) enthält der erstellte Readingname
+       ebenfalls die relative anstatt der realen Datumangabe. <br>
+       (default: reale Datumangabe)       
+       </li><br>
 
        <a name="verbose5Data"></a>
        <li><b>verbose5Data </b><br>
