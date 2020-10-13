@@ -2059,11 +2059,8 @@ ZWave_multilevelSet($)
   my ($arg) = @_;
   my @a = split(" ",$arg);
 
-  if($a[0] eq "?") {
-    my %r;
-    map { $r{"sml_".$zwave_ml_tbl{$_}{n}} = 1 } keys %zwave_ml_tbl;
-    return \%r;
-  }
+  return [map {"sml_".$zwave_ml_tbl{$_}{n}} keys %zwave_ml_tbl] # list of cmds
+        if($a[0] eq "?");
 
   my @idx = grep { "sml_".$zwave_ml_tbl{$_}{n} eq $a[0] } keys %zwave_ml_tbl;
   return "$a[0]: numeric parameter missing" if(@a<2||!looks_like_number($a[1]));
@@ -5467,9 +5464,7 @@ ZWave_Attr(@)
     return undef if($type eq "del");
     my %sl;
     for my $re (keys %zwave_setListFns) {
-      my $cmd = sprintf($zwave_setListFns{$re}{fmt}, '?');
-      my $l = eval $cmd;
-      %sl = (%sl, %{$l});
+      map { $sl{$_} = 1 } @{eval sprintf($zwave_setListFns{$re}{fmt}, '?')};
     }
     for my $sle (split(",",$param)) {
       if(!$sl{$sle}) {
