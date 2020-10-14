@@ -306,3 +306,42 @@ option:{ 1 }
 get DEVICE configAll
 setreading DEVICE attrTemplateVersion ZW100_Multisensor_USB_20201007
 
+
+name:----Eurotronic-devices-section--------
+filter:TYPE=ZWave
+order:04EUROTRONIC00000
+desc:Templates for Eurotronics devices. <br>Note: Manufacturer does not provide free updates; functionality is less than advertised!
+
+
+# Eurotronic Spirit ZWave version
+name:Eurotronic_Spirit
+desc: First version, see <a href="https://forum.fhem.de/index.php/topic,112955.0.html">Forum Thread</a> for details
+order:04EUROTRONIC00001
+filter:TYPE=ZWave
+par:RADIO_NO_EXTERNAL_TEMP;Use internal temperature sensor for regulation;{ undef }
+par:RADIO_ZWAVE_EXTERNAL_TEMP;Use an external Zwave temperature sensor. Association has to be set seperately!;{ undef }
+par:RADIO_NONZWAVE_EXTERNAL_TEMP;Use an external (non-Zwave) temperature sensor. Make sure, sensor data is regularly updated!;{ undef }
+par:RADIO_DIRECT_VALVE_CONTROL;Change mode to direct valve control (needs additional logic, e.g. provided by PID20 FHEM module.;{ undef }
+par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
+attr DEVICE icon ICON
+set DEVICE configByte  4 1  ## should set "send battery reports once a day"
+option:{ RADIO_NONZWAVE_EXTERNAL_TEMP + RADIO_ZWAVE_EXTERNAL_TEMP + RADIO_NO_EXTERNAL_TEMP }
+set DEVICE configByte  6 5  ## should set valve reports to 5% delta
+option:{ RADIO_DIRECT_VALVE_CONTROL }
+set DEVICE configByte 64 31 ## should set "manufacturer specific"
+option:{ RADIO_NO_EXTERNAL_TEMP }
+set DEVICE configByte  8 0  ## note: no offset!
+deleteattr DEVICE setList
+option:{ RADIO_ZWAVE_EXTERNAL_TEMP }
+set DEVICE configByte  8 128  ## note: disables internal sensor, make sure to associate one (ZWave type)
+deleteattr DEVICE setList
+option:{ RADIO_NONZWAVE_EXTERNAL_TEMP }
+set DEVICE configByte  8 128  ## disables internal sensor, make sure to regularly update, e.g. using notify like  n_extTemp notify EG_sz_sensor:temperature:.* set DEVICE  sml_temperature $EVTPART1 C
+attr DEVICE setList sml_temperature
+#closing section
+option:{ 1 }  
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+get  DEVICE configAll
+set DEVICE attrTemplate speechcontrol_type_thermostat
+setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201014

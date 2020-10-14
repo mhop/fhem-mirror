@@ -715,6 +715,37 @@ deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE attrTemplateVersion 20200904
 
 
+# Eurotronic Spirit ZigBee version
+name:zigbee2mqtt_eurotronic_spirit
+desc: First version for <a href="https://www.zigbee2mqtt.io/devices/SPZB0001.html">Eurotronic SPZB0001</a> via zigbee2mqtt <br>Not yet tested... <br>tbd (?): map eurotronic_system_mode to readings (userReadings?)
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE setList \
+  boost:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"boost": $EVTPART1 }}\
+  child_protection:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
+  daytemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"occupied_heating_setpoint": $EVTPART1 }\
+  nighttemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"unoccupied_heating_setpoint": $EVTPART1 }\
+  window_open:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"window_open": $EVTPART1 }}\
+  boost:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"boost": $EVTPART1 }}\
+  x_mirror_display:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"mirror_display": $EVTPART1 }}
+attr DEVICE stateFormat Measured: measured-temp Battery: battery %
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp current_heating_setpoint:desired-temp local_temperature:measured-temp
+attr DEVICE setStateList on off
+attr DEVICE model zigbee2mqtt_eurotronic_spirit
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith).*
+setreading DEVICE attrTemplateVersion 20201014
+
+
 ###########################################
 # TASMOTA
 # The regexp must handle
