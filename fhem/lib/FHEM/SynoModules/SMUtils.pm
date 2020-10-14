@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.17.3');
+use version; our $VERSION = version->declare('1.18.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -53,6 +53,7 @@ our @EXPORT_OK = qw(
                      sortVersion
                      showModuleInfo
                      jboolmap
+                     smUrlEncode
                      plotPngToFile
                      completeAPI
                      showAPIinfo
@@ -438,6 +439,30 @@ sub jboolmap {
   }
   
 return $bool;
+}
+
+#############################################################################################
+#             Zeichen URL encoden
+#             $str  : der zu formatierende String
+#############################################################################################
+sub smUrlEncode {
+  my $str = shift // carp "got no string for URL encoding" && return;
+  
+  my $hextourl     = { map { sprintf("\\x{%02x}", $_) => sprintf( "%%%02X", $_ ) } ( 0 ... 255 ) };    # Standard Hex Codes zu UrlEncode, z.B. \x{c2}\x{b6} -> %C2%B6 -> ¶
+    
+  my $replacements = {
+      "#"       => "%23",
+      "&"       => "%26",
+      "%"       => "%25",
+      "+"       => "%2B",
+  };
+  
+  %$replacements = (%$replacements, %$hextourl);
+  my $pat        = join '|', map { quotemeta; } keys(%$replacements);
+  
+  $str =~ s/($pat)/$replacements->{$1}/xg;
+  
+return $str;
 }
 
 ####################################################################################
@@ -980,7 +1005,7 @@ sub login {
 	  apiref   => $apiref,
       method   => "GET",
       header   => "Accept: application/json",
-      callback => \&loginReturn
+      callback => \&_loginReturn
   };
   
   HttpUtils_NonblockingGet ($param);
@@ -988,7 +1013,7 @@ sub login {
 return;
 }
 
-sub loginReturn {
+sub _loginReturn {
   my $param    = shift;
   my $err      = shift;
   my $myjson   = shift;
@@ -1122,7 +1147,7 @@ sub logout {
        username => $username,
        method   => "GET",
        header   => "Accept: application/json",
-       callback => \&logoutReturn
+       callback => \&_logoutReturn
    };
    
    HttpUtils_NonblockingGet ($param);
@@ -1130,7 +1155,7 @@ sub logout {
 return;
 }
 
-sub logoutReturn {  
+sub _logoutReturn {  
    my $param    = shift;
    my $err      = shift;
    my $myjson   = shift;
@@ -1463,9 +1488,10 @@ sub checkSendRetry {
   my $forbidSend = q{};
   my $startfnref = \&{$startfn};
   
-  my @forbidlist = qw(100 101 103 117 120 401 407 408 409 410 418 419 420 800 900 1000
-                      1001 1002 1003 1004 1006 1007 1100 1101 1200 1300 1301 1400 1401 
-                      1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001 2002);  # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+  my @forbidlist = qw(100 101 103 117 120 400 401 407 408 409 410 418 419 420 800 900
+                      1000 1001 1002 1003 1004 1006 1007 1100 1101 1200 1300 1301 1400
+                      1401 1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001    
+                      2002);                                                              # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
   
   if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
