@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.17.2');
+use version; our $VERSION = version->declare('1.17.3');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1463,7 +1463,9 @@ sub checkSendRetry {
   my $forbidSend = q{};
   my $startfnref = \&{$startfn};
   
-  my @forbidlist = qw(100 101 103 117 120 407 408 409 410 800 900);                       # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
+  my @forbidlist = qw(100 101 103 117 120 401 407 408 409 410 418 419 420 800 900 1000
+                      1001 1002 1003 1004 1006 1007 1100 1101 1200 1300 1301 1400 1401 
+                      1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001 2002);  # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
   
   if(!keys %{$data{$type}{$name}{sendqueue}{entries}}) {
       Log3($name, 4, "$name - SendQueue is empty. Nothing to do ..."); 
