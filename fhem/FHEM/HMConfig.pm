@@ -1838,7 +1838,7 @@ $culHmSubTypeSets{motionAndBtn}         = $culHmSubTypeSets{threeStateSensor};
                      ,"HM-TC-IT-WM-W-EU" =>{ inhibit        =>"[(on|{off})]"}
                      ,"HM-SEC-SD"        =>{ statusRequest  =>""}
                      ,"HM-SEC-SD-2"      =>{ statusRequest  =>""}
-                     ,"HM-LC-JA1PBU-FM"  =>{ pctSlat        =>"(0-100|old|noChng)"
+                     ,"HM-LC-JA1PBU-FM"  =>{ pctSlat        =>"(-slatValue-|old|noChng)"
                                             ,pctLvlSlat     =>"(-value-|old|noChng) (-slatValue-|old|noChng)"
                                            }
                      ,"ACTIONDETECTOR"   =>{ clear          =>"(readings|all)"
@@ -1915,13 +1915,13 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                      ,"HM-TC-IT-WM-W-EU02"   =>{ controlMode    =>"(auto|manual|boost|day|night)"
                                                 ,controlManu    =>"(on|off|5.0..30.0;0.5)"
                                                 ,controlParty   =>"-temp- -startDate- -startTime- -endDate- -endTime-"
-                                                ,tempListSat    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListSun    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListMon    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListTue    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListThu    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListWed    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
-                                                ,tempListFri    =>"[(prep|{exec})] (p1|p2|p3) -HH:MM- -temp- [...]"
+                                                ,tempListSat    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListSun    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListMon    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListTue    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListThu    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListWed    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
+                                                ,tempListFri    =>"[(prep|{exec})] [({p1}|p2|p3)] -HH:MM- -temp- [...]"
                                                 ,"desired-temp" =>"(on|off|5.0..30.0;0.5)"
                                                 ,tempListTmpl   =>"[({verify}|restore)] [[-file-:]-templateName-]"
                                                 ,tempTmplSet    =>"-tempTmpl-"
