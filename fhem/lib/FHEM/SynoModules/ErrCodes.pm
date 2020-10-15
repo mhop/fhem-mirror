@@ -32,7 +32,7 @@ use warnings;
 use utf8;
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.3.2');
+use version; our $VERSION = version->declare('1.3.3');
 
 use Exporter ('import');
 our @EXPORT_OK   = qw(expErrorsAuth expErrors);                 
@@ -247,6 +247,7 @@ my %errssfile = (                                                       # Standa
   2002 => "Failed to access sharing links",
   9000 => "malformed JSON string received",
   9001 => "API keys and values not completed",
+  9002 => "File not found",
 );
 
 my %hterr = (                                                           # Hash der TYPE Error Code Spezifikationen
