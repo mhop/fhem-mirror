@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.18.0');
+use version; our $VERSION = version->declare('1.18.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1330,6 +1330,7 @@ sub _addSendqueueSimple {
    my $api    = $paref->{api};
    my $method = $paref->{method};
    my $params = $paref->{params};
+   my $dest   = $paref->{dest};
    
    my $hash   = $defs{$name};
    
@@ -1340,6 +1341,8 @@ sub _addSendqueueSimple {
        'params'     => $params,
        'retryCount' => 0               
    };
+   
+   $entry->{dest} = $dest if($dest);
                       
    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
    
