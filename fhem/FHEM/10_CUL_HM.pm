@@ -6349,20 +6349,20 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "condition $a[3] out of range. limit to 0..255" if ($a[3]<0 || $a[3]>255);
     }
     my @peers = ();
-    foreach my $peer (grep/$peer/,split",",InternalVal($name,"peerList","")){
-      if($defs{$peer}{helper}{role}{vrt}){
+    foreach my $peerItem (grep/$peer/,split",",InternalVal($name,"peerList","")){
+      if($defs{$peerItem}{helper}{role}{vrt}){
       }
-      elsif($defs{$peer}{helper}{role}{chn}){
-        push @peers,$peer;  
+      elsif($defs{$peerItem}{helper}{role}{chn}){
+        push @peers,$peerItem;  
       }
-      elsif($defs{$peer}{helper}{role}{dev}){
-        push @peers,CUL_HM_getAssChnNames($peer);  
+      elsif($defs{$peerItem}{helper}{role}{dev}){
+        push @peers,CUL_HM_getAssChnNames($peerItem);  
       }
     }
     my $peerCnt = 0;
     foreach my $peerSet(@peers){
       next if (!defined($peerSet) || !defined($defs{$peerSet}) );
-      next if (!defined $defs{$peer}{helper}{cmds}{cmdLst}{press});
+      next if (!defined $defs{$peerSet}{helper}{cmds}{cmdLst}{press});
       if($trig eq "Event"){CUL_HM_Set($defs{$peerSet},$peerSet,"event$type",$name,$a[3]);}
       else                {CUL_HM_Set($defs{$peerSet},$peerSet,"press$type",$name);}
       $peerCnt++;
