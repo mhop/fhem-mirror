@@ -1149,6 +1149,8 @@ sub WeatherCheckOptions($@) {
     <li>disable: disables the retrieval of weather data - the timer runs according to schedule,
     though no data is requested from the API.</li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>forecast - every/hourly/daily/off, show of forecast data. All, only hour forecast, only day forecast, none.</li>
+    <li>forecastLimit - Number of forecast data records which should be written as a reading.</li>
   </ul>
   <br>
 </ul>
@@ -1371,7 +1373,7 @@ sub WeatherCheckOptions($@) {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.1.3",
+  "version": "v2.1.4",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
