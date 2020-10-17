@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  TimeSeries: fix for calculation of standard deviation
  - feature: 76_SMAPortal: new relative time arguments for attr balanceDay,
                           balanceMonth, balanceYear, new attribute 
                           useRelativeNames
