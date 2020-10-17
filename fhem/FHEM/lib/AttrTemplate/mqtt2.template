@@ -21,6 +21,7 @@ name:MQTT2_CLIENT_general_bridge
 filter:TYPE=MQTT2_DEVICE
 desc:recommended to use this as general bridgeing device when using MQTT2_CLIENT as IO to get around missing CID info for distinguishing different popular devices<br>NOTE:<br>This might create a new MQTT2-device or change existing ones, especially destroy readingList attributes!
 order:000001
+farewell:As you are using MQTT2_CLIENT, you should consider also setting an appropriate ignoreRegexp attribute to the MQTT2_CLIENT device! See attrTemplate MQTT2_IO_ignoreRegexp_basic for details.
 #par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal("DEVICE","IODev",""),"clientId","mosquitto") eq InternalVal("DEVICE","DEF","mosquitto") ? "MQTT2_GeneralBridge" : InternalVal("DEVICE","DEF","mosquitto")}
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
@@ -725,7 +726,7 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devi
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   boost:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"boost": $EVTPART1 }}\
   child_protection:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\

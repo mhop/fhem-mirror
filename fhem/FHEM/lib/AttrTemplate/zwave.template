@@ -76,7 +76,7 @@ set DEVICE configByte 50 0 ## configScenesAssociationsActivation AssociationsAct
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
-option:{ 1 }  
+option:global
 get DEVICE configAll
 get DEVICE associationAll
 setreading DEVICE attrTemplateVersion FGRM222_Roller_Mode_20201007
@@ -110,7 +110,7 @@ set DEVICE configByte 50 0 ## configScenesAssociationsActivation AssociationsAct
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
-option:{ 1 }  
+option:global 
 get DEVICE configAll
 get DEVICE associationAll
 setreading DEVICE attrTemplateVersion FGRM222_Ventian_Blind_Mode_20201007
@@ -144,7 +144,7 @@ attr DEVICE userReadings dim:power..0.0.W {my $pos = ReadingsVal($name,"state",0
 option:{ CALLSPEECHRECOGN }  
 set DEVICE attrTemplate speechcontrol_type_blind
 #closing section
-option:{ 1 }  
+option:global
 get DEVICE configAll
 get DEVICE associationAll
 setreading DEVICE attrTemplateVersion FGRM222_Choice_demo_20201002
@@ -180,14 +180,14 @@ set MAINCHANNEL configByte 41 15 ## configS2SwitchScenesSent 15
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
 set MAINCHANNEL configByte 40 0  ## configS1SwitchScenesSent 0
 set MAINCHANNEL configByte 41 0  ## configS2SwitchScenesSent 0
-option:{ 1 }
+option:global
 set MAINCHANNEL configByte 20 SWITCHTYPE
 set MAINCHANNEL configByte 151 1 ## configOperatingMode RollerBlind
 set MAINCHANNEL configByte 150 2 ## configForceCalibration ForceDeviceCalibration
 option:{ CALLSPEECHRECOGN }  
 set CHANNEL01 attrTemplate speechcontrol_type_blind
 #closing section
-option:{ 1 }
+option:global
 get MAINCHANNEL configAll
 get MAINCHANNEL associationAll
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?room=%23devspec%3dMAINCHANNEL,CHANNEL01,CHANNEL02'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
@@ -224,14 +224,14 @@ set MAINCHANNEL configByte 41 15 ## configS2SwitchScenesSent 15
 option:{ RADIO_ASSOCIATIONS_ACTIVATION }
 set MAINCHANNEL configByte 40 0  ## configS1SwitchScenesSent 0
 set MAINCHANNEL configByte 41 0  ## configS2SwitchScenesSent 0
-option:{ 1 }
+option:global
 set MAINCHANNEL configByte 20 SWITCHTYPE
 set MAINCHANNEL configByte 151 2 ## configOperatingMode VenetianBlind
 set MAINCHANNEL configByte 150 2 ## configForceCalibration ForceDeviceCalibration
 option:{ CALLSPEECHRECOGN }  
 set CHANNEL01 attrTemplate speechcontrol_type_blind
 #closing section
-option:{ 1 }  
+option:global
 get MAINCHANNEL configAll
 get MAINCHANNEL associationAll
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?room=%23devspec%3dMAINCHANNEL,CHANNEL01,CHANNEL02'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
@@ -263,7 +263,7 @@ set MAINCHANNEL configByte   3 1       ## configSelectiveReporting Enable
 attr MAINCHANNEL,CHANNEL01,CHANNEL02,CHANNEL03 stateFormat energy_kWh
 attr MAINCHANNEL,CHANNEL01,CHANNEL02,CHANNEL03 userReadings energy_kWh:energy:.* monotonic {ReadingsNum("$name","energy",0)}
 #closing section
-option:{ 1 }  
+option:global
 get MAINCHANNEL configAll
 get MAINCHANNEL associationAll
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?room=%23devspec%3dMAINCHANNEL,CHANNEL01,CHANNEL02,CHANNEL03'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
@@ -282,7 +282,7 @@ option:{ RADIO_REPORT_UV}
 set DEVICE configByte 101 241  ## configGroup1Reports 241 (1+16+32+64+128)
 option:{ RADIO_NO_UV_REPORT }
 set DEVICE configByte 101 225  ## configGroup1Reports 225 (1+32+64+128)
-option:{ 1 }  
+option:global
 get DEVICE config 111          ## configGroup1Interval
 get DEVICE config  40          ## configReportOnlyOnThresholds
 get DEVICE config 101          ## configGroup1Reports
@@ -302,7 +302,7 @@ set DEVICE configByte 101 240 ## configGroup1Reports 240 (16+32+64+128)
 option:{ RADIO_NO_UV_REPORT }
 set DEVICE configByte 101 224 ## configGroup1Reports 224 (32+64+128)
 #closing section
-option:{ 1 }  
+option:global
 get DEVICE configAll
 setreading DEVICE attrTemplateVersion ZW100_Multisensor_USB_20201007
 
@@ -331,17 +331,17 @@ option:{ RADIO_DIRECT_VALVE_CONTROL }
 set DEVICE configByte 64 31 ## should set "manufacturer specific"
 option:{ RADIO_NO_EXTERNAL_TEMP }
 set DEVICE configByte  8 0  ## note: no offset!
-deleteattr DEVICE setList
+#deleteattr DEVICE setList
 option:{ RADIO_ZWAVE_EXTERNAL_TEMP }
 set DEVICE configByte  8 128  ## note: disables internal sensor, make sure to associate one (ZWave type)
-deleteattr DEVICE setList
+#deleteattr DEVICE setList
 option:{ RADIO_NONZWAVE_EXTERNAL_TEMP }
 set DEVICE configByte  8 128  ## disables internal sensor, make sure to regularly update, e.g. using notify like  n_extTemp notify EG_sz_sensor:temperature:.* set DEVICE  sml_temperature $EVTPART1 C
 attr DEVICE setList sml_temperature
 #closing section
-option:{ 1 }  
+option:global
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
 get  DEVICE configAll
 set DEVICE attrTemplate speechcontrol_type_thermostat
-setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201014
+setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201017
