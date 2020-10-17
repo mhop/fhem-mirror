@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 1.41
+#  89_FULLY.pm 2.0
 #
 #  $Id$
 #
@@ -16,6 +16,7 @@ package main;
 use strict;
 use warnings;
 use HttpUtils;
+use JSON;
 use SetExtensions;
 
 # Declare functions
@@ -33,11 +34,13 @@ sub FULLY_ExecuteNB ($$$$);
 sub FULLY_ExecuteCB ($$$);
 sub FULLY_ScreenOff ($);
 sub FULLY_GetDeviceInfo ($);
-sub FULLY_ProcessDeviceInfo ($$);
 sub FULLY_UpdateReadings ($$);
+sub FULLY_Encrypt ($);
+sub FULLY_Decrypt ($);
 sub FULLY_Ping ($$);
+sub FULLY_SetPolling ($$;$);
 
-my $FULLY_VERSION = '1.41';
+my $FULLY_VERSION = '2.0';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -47,7 +50,7 @@ my $FULLY_POLL_INTERVAL = 3600;
 my @FULLY_POLL_RANGE = (10, 86400);
 
 # Minimum version of Fully app
-my $FULLY_REQUIRED_VERSION = 1.27;
+my $FULLY_REQUIRED_VERSION = 1.42;
 
 # Default protocol and port for Fully requests
 my $FULLY_DEFAULT_PROT = 'http';
@@ -85,8 +88,8 @@ sub FULLY_Initialize ($)
 	$hash->{FW_detailFn} = "FULLY_Detail";
 	$hash->{parseParams} = 1;
 
-	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval requestTimeout repeatCommand:0,1,2 " .
-		"disable:0,1 expert:0,1 waitAfterPing:0,1,2" .
+	$hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval:slider,10,10,86400 requestTimeout:slider,1,1,20 repeatCommand:0,1,2 " .
+		"disable:0,1 expert:0,1 waitAfterPing:0,1,2 updateAfterCommand:0,1 " .
 		$readingFnAttributes;
 }
 
@@ -98,14 +101,10 @@ sub FULLY_Define ($$)
 {
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
-	my $rc = 0;
 	my $host = '';
 	
-	return "Usage: define devname [http|https]://IP_or_Hostname password [poll-interval]"
-		if (@$a < 4);
-	return "FULLY: polling interval must be in range ".$FULLY_POLL_RANGE[0]."-".$FULLY_POLL_RANGE[1]
-		if (@$a == 5 &&
-		   ($$a[4] !~ /^[1-9][0-9]+$/ || $$a[4] < $FULLY_POLL_RANGE[0] || $$a[4] > $FULLY_POLL_RANGE[1]));
+	return "Usage: define devname FULLY [http|https]://IP_or_Hostname [password] [poll-interval]"
+		if (@$a < 3);
 
 	if ($$a[2] =~ /^(https?):\/\/(.+)/) {
 		$hash->{prot} = $1;
@@ -127,22 +126,37 @@ sub FULLY_Define ($$)
 
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
-	$hash->{fully}{password} = $$a[3];
 	$hash->{fully}{schedule} = 0;
-
-	Log3 $name, 1, "FULLY: [$name] Version $FULLY_VERSION Opening device ".$hash->{host};
 	
-	FULLY_GetDeviceInfo ($name);
-
-	if (@$a == 5) {
-		$attr{$name}{'pollInterval'} = $$a[4];
-		$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$$a[4]);
-		InternalTimer (gettimeofday()+$$a[4], "FULLY_UpdateDeviceInfo", $hash, 0);
+	my $interval = 0;
+	if (@$a == 4) {
+		if ($$a[3] =~ /^[0-9]+$/) {
+			$interval = $$a[3];
+		}
+		else {
+			$hash->{fully}{password} = $$a[3];
+		}
 	}
-	else {
-		$hash->{nextUpdate} = 'off';
+	elsif (@$a == 5) {
+		$hash->{fully}{password} = $$a[3];
+		$interval = $$a[4];
 	}
 
+	if (!exists($hash->{fully}{password})) {
+		my ($errpass, $encpass) = getKeyValue ($name.'_password');	
+		$hash->{fully}{password} = FULLY_Decrypt ($encpass) if (!defined($errpass) && defined($encpass));
+	}
+
+	if (!$init_done || exists($hash->{fully}{password})) {
+		FULLY_Log ($hash, 1, "Version $FULLY_VERSION Opening device ".$hash->{host});
+		FULLY_GetDeviceInfo ($name);
+		FULLY_SetPolling ($hash, 1, $interval);
+	}
+	
+	if ($init_done && !exists($hash->{fully}{password}) && exists($hash->{CL})) {
+		asyncOutput ($hash->{CL}, "Please use command 'set $name authentication' to set the Fully password");
+	}
+	
 	return undef;
 }
 
@@ -158,17 +172,10 @@ sub FULLY_Attr ($@)
 	if ($cmd eq 'set') {
 		if ($attrname eq 'pollInterval') {
 			if ($attrval >= $FULLY_POLL_RANGE[0]  && $attrval <= $FULLY_POLL_RANGE[1]) {
-				my $curval = AttrVal ($name, 'pollInterval', $FULLY_POLL_INTERVAL);
-				if ($attrval != $curval) {
-					Log3 $name, 2, "FULLY: [$name] Polling interval set to $attrval";
-					RemoveInternalTimer ($hash);
-					$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$attrval);
-					InternalTimer (gettimeofday()+$attrval, "FULLY_UpdateDeviceInfo", $hash, 0);
-				}
+				FULLY_SetPolling ($hash, 1, $attrval);
 			}
 			elsif ($attrval == 0) {
-				RemoveInternalTimer ($hash);
-				$hash->{nextUpdate} = 'off';
+				FULLY_SetPolling ($hash, 0);
 			}
 			else {
 				return "FULLY: Polling interval must be in range ".$FULLY_POLL_RANGE[0]."-".$FULLY_POLL_RANGE[1];
@@ -177,15 +184,56 @@ sub FULLY_Attr ($@)
 		elsif ($attrname eq 'requestTimeout') {
 			return "FULLY: Timeout must be greater than 0" if ($attrval < 1);
 		}
+		elsif ($attrname eq 'disable') {
+			if ($attrval eq '0') {
+				# Set the polling interval to default or the value specified in pollInterval
+				FULLY_Log ($hash, 2, "Device activated");
+				FULLY_SetPolling ($hash, 1);
+			}
+			elsif ($attrval eq '1') {
+				FULLY_SetPolling ($hash, 0);
+				FULLY_Log ($hash, 2, "Device deactivated");
+			}
+		}
 	}
 	elsif ($cmd eq 'del') {
 		if ($attrname eq 'pollInterval') {
-				RemoveInternalTimer ($hash);
-				$hash->{nextUpdate} = 'off';			
+			# Set the polling interval to default
+			FULLY_SetPolling ($hash, 1);
+		}
+		elsif ($attrname eq 'disable') {
+			# Set the polling interval to default or the value specified in pollInterval
+			FULLY_Log ($hash, 2, "Device activated");
+			FULLY_SetPolling ($hash, 1);
 		}
 	}
 	
 	return undef;
+}
+
+######################################################################
+# Set polling on or off
+######################################################################
+
+sub FULLY_SetPolling ($$;$)
+{
+	my ($hash, $mode, $interval) = @_;
+	my $name = $hash->{NAME};
+	$interval //= AttrVal ($name, 'pollInterval', $FULLY_POLL_INTERVAL);
+	
+	if ($mode == 0 || $interval == 0) {
+		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
+		$hash->{nextUpdate} = 'off';			
+		FULLY_Log ($hash, 2, "Polling deactivated");
+	}
+	elsif ($mode == 1) {
+		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
+		$interval = $FULLY_POLL_RANGE[0] if ($interval < $FULLY_POLL_RANGE[0]);
+		$interval = $FULLY_POLL_RANGE[1] if ($interval > $FULLY_POLL_RANGE[1]);
+		$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$interval);
+		InternalTimer (gettimeofday()+$interval, "FULLY_UpdateDeviceInfo", $hash, 0);
+		FULLY_Log ($hash, 2, "Polling activated");
+	}
 }
 
 ######################################################################
@@ -246,10 +294,11 @@ sub FULLY_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a;
-	my $options = "brightness photo:noArg clearCache:noArg exit:noArg foreground:noArg lock:noArg ".
-		"motionDetection:on,off off:noArg on:noArg on-for-timer playSound restart:noArg screenOffTimer ".
-		"screenSaver:start,stop screenSaverTimer screenSaverURL speak startURL stopSound:noArg ".
-		"unlock:noArg url volume";
+	my $options = "brightness:slider,0,1,255 photo:noArg clearCache:noArg exit:noArg foreground:noArg lock:noArg ".
+		"motionDetection:on,off off:noArg on:noArg on-for-timer playSound playVideo restart:noArg ".
+		"screenOffTimer screenSaver:start,stop screenSaverTimer screenSaverURL speak startURL ".
+		"stopSound:noArg stopVideo:noArg lockKiosk:noArg unlockKiosk:noArg unlock:noArg url ".
+		"volume overlayMessage authentication";
 	
 	# Fully commands without argument
 	my %cmds = (
@@ -259,20 +308,42 @@ sub FULLY_Set ($@)
 		"restart" => "restartApp",
 		"on" => "screenOn", "off" => "screenOff",
 		"lock" => "enabledLockedMode", "unlock" => "disableLockedMode",
+		"lockKiosk" => "lockKiosk", "unlockKiosk" => "unlockKiosk",
 		"stopSound" => "stopSound",
+		"stopVideo" => "stopVideo",
 		"foreground" => "toForeground"
 	);
 	
 	my @c = ();
 	my @p = ();
 	
-	my $disable = AttrVal ($name, 'disable', 0);
-	return undef if ($disable);
+	return "Device disabled" if (AttrVal ($name, 'disable', 0) == 1);
+	return "No password defined for Fully access" if (!exists($hash->{fully}{password}));
+	
 	my $expert = AttrVal ($name, 'expert', 0);
 	$options .= " setStringSetting setBooleanSetting" if ($expert);
+	my $updateAfterCommand = AttrVal ($name, 'updateAfterCommand', 0);
 	
 	if (exists ($cmds{$opt})) {
 		push (@c, $cmds{$opt});
+	}
+	elsif ($opt eq 'authentication') {
+		my $password = shift @$a;
+
+		if (!defined($password)) {
+			setKeyValue ($name."_password", undef);
+			return 'Password for FULLY authentication deleted';
+		}		
+
+		my $encpass = FULLY_Encrypt ($password);
+		return 'Encryption of password failed' if ($encpass eq '');
+		
+		my $err = setKeyValue ($name."_password", $encpass);
+		return "Can't store credentials. $err" if (defined($err));
+		
+		$hash->{fully}{password} = $password;
+		
+		return 'Password for FULLY authentication stored';		
 	}
 	elsif ($opt eq 'on-for-timer') {
 		my $par = shift @$a // "forever";
@@ -338,13 +409,14 @@ sub FULLY_Set ($@)
 	}
 	elsif ($opt eq 'speak') {
 		my $text = shift @$a // return 'Usage: set $name speak "{Text}"';
-		while ($text =~ /\[(.+):(.+)\]/) {
-			my ($device, $reading) = ($1, $2);
-			my $value = ReadingsVal ($device, $reading, '');
-			$text =~ s/\[$device:$reading\]/$value/g;
-		}
-		my $enctext = urlEncode ($text);
+		my $enctext = FULLY_SubstDeviceReading ($text);
 		push (@c, "textToSpeech");
+		push (@p, { "text" => "$enctext" });
+	}
+	elsif ($opt eq 'overlayMessage') {
+		my $text = shift @$a // return 'Usage: set $name overlayMessage "{Text}"';
+		my $enctext = FULLY_SubstDeviceReading ($text);
+		push (@c, "setOverlayMessage");
 		push (@p, { "text" => "$enctext" });
 	}
 	elsif ($opt eq 'playSound') {
@@ -353,6 +425,17 @@ sub FULLY_Set ($@)
 		$loop = defined ($loop) ? 'true' : 'false';
 		push (@c, "playSound");
 		push (@p, { "url" => "$url", "loop" => "$loop"});
+	}
+	elsif ($opt eq 'playVideo') {
+		my $url = shift @$a // return "Usage: set $name playVideo {url} [showControls] [exitOnTouch] [exitOnCompletion] [loop]";
+		my %pvo = ('loop' => 0, 'showControls' => 0, 'exitOnTouch' => 0, 'exitOnCompletion' => 0);
+		while (my $pvf = shift @$a) {
+			return "Illegal option $pvf" if (!exists($pvo{$pvf}));
+			$pvo{$pvf} = 1;
+		}
+		$pvo{'url'} = $url;
+		push (@c, "playVideo");
+		push (@p, \%pvo);
 	}
 	elsif ($opt eq 'volume') {
 		my $level = shift @$a;
@@ -385,6 +468,10 @@ sub FULLY_Set ($@)
 	}
 	
 	# Execute command requests
+	if ($updateAfterCommand) {
+		push (@c, 'deviceInfo');
+		push (@p, undef);
+	}
 	FULLY_ExecuteNB ($hash, \@c, \@p, 1) if (scalar (@c) > 0);
 	
 	return undef;
@@ -400,39 +487,19 @@ sub FULLY_Get ($@)
 	my $name = shift @$a;
 	my $opt = shift @$a;
 	my $options = "info:noArg stats:noArg update:noArg";
-	my $response;
 	
-	my $disable = AttrVal ($name, 'disable', 0);
-	return undef if ($disable);
+	return "Device disabled" if (AttrVal ($name, 'disable', 0) == 1);
+	return "No password defined for Fully access" if (!exists($hash->{fully}{password}));
 	
 	if ($opt eq 'info') {
-		my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1);
-		if (!defined ($result) || $result eq '') {
-			Log3 $name, 2, "FULLY: [$name] Command failed";
-			return "FULLY: Command failed";
-		}
-		elsif ($result =~ /Wrong password/) {
-			Log3 $name, 2, "FULLY: [$name] Wrong password";
-			return "FULLY: Wrong password";
-		}
-
-		$response = '';
-		while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>(.*?)<\/td>/g) {
-			my ($in, $iv) = ($1, $2);
-			if ($iv =~ /^<a .*?>(.*?)<\/a>/) {
-				$iv = $1;
-			}
-			elsif ($iv =~ /(.*?)</) {
-				$iv = $1;
-			}
-			$iv =~ s/[ ]+$//;
-			$response .= "$in = $iv<br/>\n";
-		}
-		
-		return $response;
+		my $result = FULLY_Execute ($hash, 'deviceInfo', undef, 1) //
+			return FULLY_Log ($hash, 2, 'Command deviceInfo failed');
+		return FULLY_Log ($hash, 2, $result->{'statustext'} // $result->{'status'})
+			if (exists($result->{'status'}));
+		return join ("\n", map { "$_ = $result->{$_}" } sort keys %$result);
 	}
 	elsif ($opt eq 'stats') {
-		return "FULLY: Command not implemented";
+		return FULLY_Log ($hash, 2, 'Command stats not implemented');
 	}
 	elsif ($opt eq 'update') {
 		FULLY_GetDeviceInfo ($name);
@@ -445,7 +512,21 @@ sub FULLY_Get ($@)
 }
 
 ######################################################################
-# Execute Fully command
+# Write error message to FHEM log and return specified value
+######################################################################
+
+sub FULLY_Log ($$$;$)
+{
+	my ($hash, $level, $message, $retval) = @_;
+	$retval //= $message;
+	my $name = $hash->{NAME};
+	
+	Log3 $name, $level, "FULLY: [$name] $message";
+	return $retval;
+}
+
+######################################################################
+# Execute Fully command (blocking)
 ######################################################################
 
 sub FULLY_Execute ($$$$)
@@ -453,6 +534,12 @@ sub FULLY_Execute ($$$$)
 	my ($hash, $command, $param, $doping) = @_;
 	my $name = $hash->{NAME};
 
+	if (!exists($hash->{fully}{password})) {
+		asyncOutput ($hash->{CL}, "Please use command 'set $name authentication' to set the Fully password")
+			if (exists($hash->{CL}));
+		return undef;
+	}
+	
 	# Get attributes
 	my $timeout = AttrVal ($name, 'requestTimeout', $FULLY_TIMEOUT);
 	my $repeatCommand = minNum (AttrVal ($name, 'repeatCommand', 0), 2);
@@ -463,7 +550,7 @@ sub FULLY_Execute ($$$$)
 	
 	if (defined ($param)) {
 		foreach my $parname (keys %$param) {
-			if (defined ($param->{$parname})) {
+			if (defined($param->{$parname})) {
 				$url .= "&$parname=".$param->{$parname};
 			}
 		}
@@ -474,16 +561,33 @@ sub FULLY_Execute ($$$$)
 	
 	my $i = 0;
 	while ($i <= $repeatCommand && (!defined ($response) || $response eq '')) {
-		$response = GetFileFromURL ("$url&password=".$hash->{fully}{password}, $timeout);
-		Log3 $name, 4, "FULLY: [$name] HTTP response empty" if (defined ($response) && $response eq '');
+		$response = GetFileFromURL ("$url&password=".$hash->{fully}{password}.'&type=json', $timeout);
+		FULLY_Log ($hash, 4, "HTTP response empty") if (defined($response) && $response eq '');
 		$i++;
 	}
 	
-	return $response;
+	return (defined($response) && $response ne '') ? decode_json ($response) : undef;
 }
 
 ######################################################################
-# Execute Fully commands non blocking
+# Substitute device readings in string
+######################################################################
+
+sub FULLY_SubstDeviceReading ($)
+{
+	my ($text) = @_;
+	 
+	while ($text =~ /\[(.+):(.+)\]/) {
+		my ($device, $reading) = ($1, $2);
+		my $value = ReadingsVal ($device, $reading, '');
+		$text =~ s/\[$device:$reading\]/$value/g;
+	}
+	
+	return (urlEncode ($text));
+}
+
+######################################################################
+# Execute Fully commands (non blocking)
 ######################################################################
 
 sub FULLY_ExecuteNB ($$$$)
@@ -509,8 +613,8 @@ sub FULLY_ExecuteNB ($$$$)
 			}
 		}
 		
-		Log3 $name, 4, "FULLY: [$name] Pushing $url on command stack";
-		push (@urllist, "$url&password=".$hash->{fully}{password});
+		FULLY_Log ($hash, 4, "Pushing $url on command stack");
+		push (@urllist, "$url&password=".$hash->{fully}{password}."&type=json");
 	}
 
 	# Ping tablet device
@@ -530,7 +634,7 @@ sub FULLY_ExecuteNB ($$$$)
 		callback => \&FULLY_ExecuteCB
 	};
 
-	Log3 $name, 4, "FULLY: [$name] Executing command ".$urllist[0];
+	FULLY_Log ($hash, 4, "Executing command ".$urllist[0]);
 	HttpUtils_NonblockingGet ($reqpar);
 }
 
@@ -545,17 +649,33 @@ sub FULLY_ExecuteCB ($$$)
 	my $name = $hash->{NAME};
 
 	if ($err eq '') {
-		if ($param->{cmdno} == $param->{cmdcnt}) {
-			# Last request, update readings
-			Log3 $name, 4, "FULLY: [$name] Last command executed. Processing results";
-			Log3 $name, 5, "FULLY: [$name] $data";
-			my $result = FULLY_ProcessDeviceInfo ($name, $data);
-			Log3 $name, 4, "FULLY: [$name] $result";
-			if (!FULLY_UpdateReadings ($hash, $result)) {
-				Log3 $name, 2, "FULLY: [$name] Command failed";
-			}
+		# Process response
+		FULLY_Log ($hash, 5, $data, 0);
+		my $result = decode_json ($data);
+		if (!exists($result->{status})) {
+			$result->{status} = 'OK';
+			$result->{statustext} //= 'N/A';
+		}
+		$result->{execstate} = $result->{status};
+		if (exists($result->{statustext})) {
+			$result->{statustext} =~ s/password=[^&]+//;
+			$result->{execstate} .= " $result->{statustext}";
 		}
 		else {
+			$result->{statustext} = 'N/A';
+		}
+		FULLY_UpdateReadings ($hash, $result);
+		
+		if ($result->{status} =~ /^Error/i) {
+			FULLY_Log ($hash, 2, "Command $param->{orgurl} failed: $result->{status} $result->{statustext}");
+		}
+		else {
+			$hash->{lastUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time)
+				if ($param->{orgurl} =~ /deviceInfo/);
+			FULLY_Log ($hash, 4, "Command $param->{orgurl} executed: $result->{status} $result->{statustext}");
+		}
+
+		if ($param->{cmdno} < $param->{cmdcnt}) {
 			# Execute next request
 			my @urllist = @{$param->{urllist}};
 			my $reqpar = {
@@ -572,8 +692,12 @@ sub FULLY_ExecuteCB ($$$)
 				callback => \&FULLY_ExecuteCB
 			};
 
-			Log3 $name, 4, "FULLY: [$name] Executing command ".$urllist[$param->{cmdno}];
+			FULLY_Log ($hash, 4, "Executing command ".$urllist[$param->{cmdno}]);
 			HttpUtils_NonblockingGet ($reqpar);
+		}
+		else {
+			FULLY_Log ($hash, 4, 'Last command executed.');
+			return;
 		}
 	}
 	else {
@@ -593,12 +717,16 @@ sub FULLY_ExecuteCB ($$$)
 				callback => \&FULLY_ExecuteCB
 			};
 
-			Log3 $name, 4, "FULLY: [$name] Repeating command ".$param->{orgurl};
+			FULLY_Log ($hash, 4, "Repeating command ".$param->{orgurl});
 			HttpUtils_NonblockingGet ($reqpar);
 		}
 		else {
-			readingsSingleUpdate ($hash, "execState", "error", 1);
-			Log3 $name, 2, "FULLY: [$name] Error during request. $err";
+			FULLY_UpdateReadings ($hash, {
+				"status" => "Error",
+				"statustext" => "$err",
+				"execstate" => "Error $err"
+			});
+			FULLY_Log ($hash, 2, "Error during request $param->{orgurl}. $err");
 		}
 	}
 }
@@ -624,24 +752,11 @@ sub FULLY_ScreenOff ($)
 sub FULLY_UpdateDeviceInfo ($)
 {
 	my ($hash) = @_;
-	my $name = $hash->{NAME};
 
-	my $disable = AttrVal ($name, 'disable', 0);
-	return if ($disable);
+	return if (AttrVal ($hash->{NAME}, 'disable', 0) == 1);
 	
-	my $pollInterval = AttrVal ($name, 'pollInterval', $FULLY_POLL_INTERVAL);
-
-	my @c = ("deviceInfo");
-	
-	FULLY_ExecuteNB ($hash, \@c, undef, 1);
-
-	if ($pollInterval > 0) {
-		$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$pollInterval);
-		InternalTimer (gettimeofday()+$pollInterval, "FULLY_UpdateDeviceInfo", $hash, 0);
-	}
-	else {
-		$hash->{nextUpdate} = "none";
-	}
+	FULLY_ExecuteNB ($hash, ['deviceInfo'], undef, 1);
+	FULLY_SetPolling ($hash, 1);
 }
 
 ######################################################################
@@ -653,68 +768,7 @@ sub FULLY_GetDeviceInfo ($)
 	my ($name) = @_;
 	my $hash = $defs{$name};
 	
-	my @c = ("deviceInfo");
-	FULLY_ExecuteNB ($hash, \@c, undef, 1);
-}
-
-######################################################################
-# Extract parameters from HTML code
-######################################################################
-
-sub FULLY_ProcessDeviceInfo ($$)
-{
-	my ($name, $result) = @_;
-
-	return "$name|0|state=failed" if (!defined ($result) || $result eq '');
-	return "$name|0|state=wrong password" if ($result =~ /Wrong password/);
-	
-	# HTML code format
-	# <td class='table-cell'>Kiosk mode</td><td class='table-cell'>off</td>
-	
-	my $parameters = "$name|1";
-	while ($result =~ /table-cell.>([^<]+)<\/td><td class=.table-cell.>(.*?)<\/td>/g) {
-		my $rn = lc($1);
-		my $rv = $2;
-		
-		if ($rv =~ /^<a .*?>(.*?)<\/a>/) {
-			$rv = $1;
-		}
-		elsif ($rv =~ /(.*?)</) {
-			$rv = $1;
-		}
-		$rv =~ s/[ ]+$//;
-		
-		$rv =~ s/\s+$//;
-		$rn =~ s/\:/\./g;
-		$rn =~ s/[^A-Za-z\d_\.-]+/_/g;
-		$rn =~ s/[_]+$//;
-		next if ($rn eq 'webview_ua');
-		if ($rn eq 'battery_level') {
-			if ($rv =~ /^([0-9]+)% \(([^\)]+)\)$/) {
-				$parameters .= "|$rn=$1|power=$2";
-				next;
-			}
-		}
-		elsif ($rn eq 'screen_brightness') {
-			$rn = "brightness";
-		}
-		elsif ($rn eq 'screen_status') {
-			$parameters .= "|state=$rv";
-		}
-		elsif ($rn eq 'fully_version') {
-			if ($rv =~ /^([0-9]\.[0-9]+).*/) {
-				my $cv = $1;
-				Log3 $name, 1, "FULLY: [$name] Version of fully browser is $rv. Version $FULLY_REQUIRED_VERSION is required."
-					if ($cv < $FULLY_REQUIRED_VERSION);
-			}
-			else {
-				Log3 $name, 2, "FULLY: [$name] Cannot detect version of fully browser.";
-			}
-		}
-		$parameters .= "|$rn=$rv";
-	}
-	
-	return $parameters;
+	FULLY_ExecuteNB ($hash, ['deviceInfo'], undef, 1);
 }
 
 ######################################################################
@@ -724,34 +778,97 @@ sub FULLY_ProcessDeviceInfo ($$)
 sub FULLY_UpdateReadings ($$)
 {
 	my ($hash, $result) = @_;
-	my $name = $hash->{NAME};
-	my $rc = 1;
-
-	if (!defined ($result) || $result eq '') {
-		Log3 $name, 2, "FULLY: [$name] empty response";
-		return 0;
-	}
 	
-	my @parameters = split ('\|', $result);
-	if (scalar (@parameters) == 0) {
-		Log3 $name, 2, "FULLY: [$name] empty response";
-		return 0;
-	}
-	
-	if ($parameters[0] eq $name) {
-		my $n = shift @parameters;
-		$rc = shift @parameters;
-	}
+	my %readings = (
+		'isdeviceadmin' => 'bool',
+		'isdeviceowner' => 'bool',
+		'isindaydream' => 'bool',
+		'isinforcedsleep' => 'bool',
+		'isinscreensaver' => 'bool',
+		'islicensed' => 'bool',
+		'ismenuopen' => 'bool',
+		'ismobiledataenabled' => 'bool',
+		'isplugged' => 'bool',
+		'isrooted' => 'bool',
+		'keyguardlocked' => 'bool',
+		'kiosklocked' => 'bool',
+		'kioskmode' => 'bool',
+		'maintenancemode' => 'bool',
+		'motiondetectorstatus' => 'bool',
+		'mqttconnected' => 'bool',
+		'plugged' => 'bool',
+		'screenlocked' => 'bool',
+		'screenon' => 'bool',
+		'webviewua' => 'ignore'
+	);
 	
 	readingsBeginUpdate ($hash);
-	foreach my $parval (@parameters) {
-		my ($rn, $rv) = split ('=', $parval);
-		readingsBulkUpdate ($hash, $rn, $rv);
+	foreach my $rn (keys %$result) {
+		my $key = lc($rn);
+		next if (exists($readings{$key}) && $readings{$key} eq 'ignore');
+		readingsBulkUpdate ($hash, $key, exists($readings{$key}) && $readings{$key} eq 'bool' ?
+			($result->{$rn} eq '0' ? 'no' : 'yes') : $result->{$rn});
 	}
-	readingsBulkUpdate ($hash, "execState", "success");
-	readingsEndUpdate ($hash, 1);
 	
-	return $rc;	
+	my $screenOn = $result->{isScreenOn} // $result->{screenOn}; 
+	readingsBulkUpdate ($hash, 'state', defined($screenOn) ? ($screenOn eq '0' ? 'off' : 'on') : 'unknown');
+	if (exists($result->{appVersionName}) && $result->{appVersionName} =~ /^([0-9]\.[0-9]+).*/) {
+		if ($1 < $FULLY_REQUIRED_VERSION && !exists($hash->{fully}{versionWarn})) {
+			FULLY_Log ($hash, 1, "Version of fully browser is $1. Version $FULLY_REQUIRED_VERSION is required.");
+			$hash->{fully}{versionWarn} = 1;
+		}
+	}
+	readingsEndUpdate ($hash, 1);
+}
+
+######################################################################
+# Encrypt string with FHEM unique ID
+######################################################################
+
+sub FULLY_Encrypt ($)
+{
+	my ($istr) = @_;
+	my $ostr = '';
+	
+	my $id = getUniqueId() // '';
+	return '' if ($id eq '');
+	
+	my $key = $id;
+	foreach my $c (split //, $istr) {
+		my $k = chop($key);
+		if ($k eq '') {
+			$key = $id;
+			$k = chop($key);
+		}
+		$ostr .= sprintf ("%.2x",ord($c)^ord($k));
+	}
+
+	return $ostr;	
+}
+
+######################################################################
+# Decrypt string with FHEM unique ID
+######################################################################
+
+sub FULLY_Decrypt ($)
+{
+	my ($istr) = @_;
+	my $ostr = '';
+
+	my $id = getUniqueId() // '';
+	return '' if ($id eq '');
+
+	my $key = $id;
+	for my $c (map { pack('C', hex($_)) } ($istr =~ /(..)/g)) {
+		my $k = chop($key);
+		if ($k eq '') {
+			$key = $id;
+			$k = chop($key);
+		}
+		$ostr .= chr(ord($c)^ord($k));
+	}
+
+	return $ostr;
 }
 
 ######################################################################
@@ -770,7 +887,7 @@ sub FULLY_Ping ($$)
 	my $waitAfterPing = minNum (AttrVal ($name, 'waitAfterPing', 0), 2);
 	
 	my $os = $^O;
-	Log3 $name, 4, "FULLY: [$name] Sending $count ping request(s) to tablet $host. OS=$os";
+	FULLY_Log ($hash, 4, "Sending $count ping request(s) to tablet $host. OS=$os");
 	
 	if ($^O =~ m/(Win|cygwin)/) {
 		$temp = qx(ping -n $count -4 $host >nul);
@@ -806,20 +923,26 @@ sub FULLY_Ping ($$)
    must be enabled in Fully app. Requires Fully app version 1.27 or later.
    </br></br>
    
-   <a name="HMCCUdefine"></a>
+   <a name="FULLYdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
-      <code>define &lt;name&gt; FULLY [&lt;Protocol&gt;://]&lt;HostOrIP&gt;[:&lt;Port&gt;] &lt;password&gt; [&lt;poll-interval&gt;]</code>
+      <code>define &lt;name&gt; FULLY [&lt;Protocol&gt;://]&lt;HostOrIP&gt;[:&lt;Port&gt;] [&lt;password&gt;] [&lt;poll-interval&gt;]</code>
       <br/><br/>
 	  The parameter <i>password</i> is the password set in Fully browser. Parameter <i>Protocol</i> is
 	  optional. Valid protocols are 'http' and 'https'. Default protocol is 'http'. 
-	  Default <i>Port</i> is 2323.
+	  Default <i>Port</i> is 2323.<br/>
+	  The password is optional. If you don't want the password to appear in the device definition,
+	  set the password by using command 'set authentication'.
    </ul>
    <br/>
    
    <a name="FULLYset"></a>
    <b>Set</b><br/><br/>
    <ul>
+   	<li><b>set &lt;name&gt; authentication [&lt;password&gt;]</b><br/>
+   		Set Fully password. This password is used for each Fully opteration.
+   		If no password is specified, the current password is deleted.
+		</li><br/>
 		<li><b>set &lt;name&gt; brightness 0-255</b><br/>
 			Adjust screen brightness.
 		</li><br/>
@@ -831,6 +954,9 @@ sub FULLY_Ping ($$)
 		</li><br/>
 		<li><b>set &lt;name&gt; foreground</b><br/>
 			Bring fully app to foreground.
+		</li><br/>
+		<li><b>set &lt;name&gt; lockKiosk</b><br/>
+			Lock kiosk mode.
 		</li><br/>
 		<li><b>set &lt;name&gt; motionDetection { on | off }</b><br/>
 			Turn motion detection by camera on or off.
@@ -844,12 +970,19 @@ sub FULLY_Ping ($$)
 		<li><b>set &lt;name&gt; on-for-timer [{ &lt;Seconds&gt; | <u>forever</u> | off }]</b><br/>
 			Set timer for display. Default is forever.
 		</li><br/>
+		<li><b>set &lt;name&gt; overlayMessage { text }</b><br/>
+			Show overlay message. Placeholders in format [device:reading] are supported and will
+			be substituted by the corresponding reading value.
+		</li><br/>
 		<li><b>set &lt;name&gt; photo</b><br/>
 			Take a picture with device cam. Setting motion detection must be enabled. Picture
 			can be viewed in remote admin interface under device info.
 		</li><br/>
 		<li><b>set &lt;name&gt; playSound &lt;url&gt; [loop]</b><br/>
 			Play sound from URL.
+		</li><br/>
+		<li><b>set &lt;name&gt; playVideo &lt;url&gt; [loop] [showControls] [exitOnTouch] [exitOnCompletion]</b><br/>
+			Play video from URL.
 		</li><br/>
 		<li><b>set &lt;name&gt; restart</b><br/>
 			Restart Fully.
@@ -884,6 +1017,12 @@ sub FULLY_Ping ($$)
 		<li><b>set &lt;name&gt; stopSound</b><br/>
 			Stop playback of sound if playback has been started with option <i>loop</i>.
 		</li><br/>
+		<li><b>set &lt;name&gt; stopVideo</b><br/>
+			Stop playback of video if playback has been started with option <i>loop</i>.
+		</li><br/>
+		<li><b>set &lt;name&gt; unlockKiosk</b><br/>
+			Unlock kiosk mode.
+		</li><br/>
 		<li><b>set &lt;name&gt; url [&lt;URL&gt;]</b><br/>
 			Navigate to <i>URL</i>. If no URL is specified navigate to start URL.
 		</li><br/>
@@ -901,7 +1040,7 @@ sub FULLY_Ping ($$)
       	Display Fully information. This is command blocks FHEM until completion.
       </li><br/>
       <li><b>get &lt;name&gt; stats</b><br/>
-      	Show Fully statistics.
+      	Show Fully statistics. Will be implemented later.
       </li><br/>
       <li><b>get &lt;name&gt; update</b><br/>
       	Update readings.
@@ -933,7 +1072,11 @@ sub FULLY_Ping ($$)
          is 0 (do not repeat commands).
       </li><br/>
       <li><b>requestTimeout &lt;seconds&gt;</b><br/>
-         Set timeout for http requests. Default is 5 seconds.
+         Set timeout for http requests. Default is 5 seconds. Increase this value if commands
+         are failing with a timeout error.
+      </li><br/>
+      <li><b>updateAfterCommand &lt;0 | 1&gt;</b><br/>
+      	When set to 1 update readings after a set command. Default is 0.
       </li><br/>
       <li><b>waitAfterPing &lt;Seconds&gt;</b><br/>
       	Wait specified amount of time after sending ping request to tablet device. Valid
