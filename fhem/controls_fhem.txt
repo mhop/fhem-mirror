@@ -1,4 +1,4 @@
-REV 22976
+REV 22978
 DIR unused
 UPD 2020-10-14_07:45:07 351853 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
@@ -637,10 +637,10 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-10-15_07:45:06 272471 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-10-17_07:45:02 272680 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
-UPD 2020-10-15_07:45:06 23276 FHEM/lib/AttrTemplate/zwave.template
+UPD 2020-10-17_07:45:02 23274 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -739,8 +739,8 @@ UPD 2020-10-14_07:45:11 4381904 docs/commandref.html
 UPD 2020-10-14_07:45:13 2722509 docs/commandref_DE.html
 UPD 2020-09-24_07:45:02 80860 docs/commandref_frame.html
 UPD 2020-09-24_07:45:02 90475 docs/commandref_frame_DE.html
-UPD 2020-10-16_07:45:11 234726 docs/commandref_modular.html
-UPD 2020-10-16_07:45:12 245446 docs/commandref_modular_DE.html
+UPD 2020-10-17_07:45:10 234726 docs/commandref_modular.html
+UPD 2020-10-17_07:45:11 245446 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
