@@ -349,7 +349,7 @@ AttrTemplate_Set($$@)
       $cmd .= $_;
       if($cmd =~ m/^option:(.*)$/s) {
         my $optVal = $1;
-        if($optVal =~ m/^{.*}$/) {
+        if($optVal =~ m/^\s*{.*}\s*$/) {
           $option = (AnalyzePerlCommand(undef, $optVal) eq "1");
 
         } else {
