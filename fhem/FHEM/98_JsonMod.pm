@@ -1365,7 +1365,7 @@ sub get {
 	my $rex = join('|', @operators);
 	$rex = qr/^($rex)/;
 
-	while (my $c = substr($filter, 0, 1)) {
+	while (defined(my $c = substr($filter, 0, 1))) {
 		if ($c eq q{'}) {
 			$delim ^= 1;
 			#substr($filter, 0, 1, '');
