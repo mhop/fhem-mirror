@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.18.1');
+use version; our $VERSION = version->declare('1.19.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1324,15 +1324,16 @@ return;
 #
 ######################################################################################
 sub _addSendqueueSimple {
-   my $paref  = shift;
-   my $name   = $paref->{name};
-   my $opmode = $paref->{opmode};
-   my $api    = $paref->{api};
-   my $method = $paref->{method};
-   my $params = $paref->{params};
-   my $dest   = $paref->{dest};
+   my $paref   = shift;
+   my $name    = $paref->{name};
+   my $opmode  = $paref->{opmode};
+   my $api     = $paref->{api};
+   my $method  = $paref->{method};
+   my $params  = $paref->{params};
+   my $dest    = $paref->{dest};
+   my $reqtype = $paref->{reqtype};
    
-   my $hash   = $defs{$name};
+   my $hash    = $defs{$name};
    
    my $entry = {
        'opmode'     => $opmode, 
@@ -1342,7 +1343,10 @@ sub _addSendqueueSimple {
        'retryCount' => 0               
    };
    
-   $entry->{dest} = $dest if($dest);
+   # optionale Zusatzfelder 
+   $entry->{dest}    = $dest    if($dest);
+   $entry->{reqtype} = $reqtype if($reqtype);
+   
                       
    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
    
