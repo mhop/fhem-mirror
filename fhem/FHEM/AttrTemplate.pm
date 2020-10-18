@@ -334,6 +334,8 @@ AttrTemplate_Set($$@)
 
   my $cmdlist = join("\n",@{$h->{cmds}});
   $repl{DEVICE} = $name;
+  Log3 $name, 5, "AttrTemplate replace ".
+                        join(",", map { "$_=>$repl{$_}" } sort keys %repl);
   map { $cmdlist =~ s/(?<!\\)$_/$repl{$_}/g; } sort keys %repl;
   map { $cmdlist =~ s/\\$_/$_/g; } sort keys %repl;
   my $cl = $hash->{CL};
@@ -359,8 +361,12 @@ AttrTemplate_Set($$@)
 
       } elsif($option) {
         $cmd =~ s/##.*//; #114109
+        Log3 $name, 5, "AttrTemplate exec $cmd";
         my $r = AnalyzeCommand($cl, $cmd);
         push(@ret, $r) if($r);
+
+      } else {
+        Log3 $name, 5, "AttrTemplate skip $cmd";
 
       }
       $cmd = "";
