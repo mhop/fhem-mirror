@@ -950,8 +950,9 @@ sub WeekdayTimer_Update {
   #Log3 $hash, 3, "[$name] $idx ". $time . " " . $newParam . " " . join("",@$tage);
 
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
-  if (WeekdayTimer_FensterOffen($hash, $newParam, $idx)) {
-    readingsSingleUpdate ($hash,  "state", "open window", 1);
+  my $winopen = WeekdayTimer_FensterOffen($hash, $newParam, $idx);
+  if ($winopen) {
+    readingsSingleUpdate ($hash,  "state", ($winopen == 1 or lc($winopen) eq "true") ? "open window" : $winopen, 1);
     return;
   }
 
@@ -1095,7 +1096,7 @@ sub WeekdayTimer_FensterOffen {
     WeekdayTimer_RemoveInternalTimer("$time",  $hash);
     WeekdayTimer_InternalTimer      ("$time",  $nextRetry, "$hash->{TYPE}_Update", $hash, 0);
     $hash->{VERZOEGRUNG} = 1;
-    return 1;
+    return $verzoegerteAusfuehrung;
   }
 
   my %contacts =  ( "CUL_FHTTK"       => { "READING" => "Window",          "STATUS" => "(Open)",        "MODEL" => "r" },
@@ -1560,7 +1561,7 @@ sub WeekdayTimer_GetWeekprofileReadingTriplett {
     attr wd delayedExecutionCond isDelayed("$WEEKDAYTIMER","$TIME","$NAME","$EVENT")
     </pre>
     the parameter $WEEKDAYTIMER(timer name) $TIME $NAME(device name) $EVENT are replaced at runtime by the correct value.
-    <br><br>
+    <br><br>Note: If the function returns "1" or "true", state of the WeekdayTimer will be "open window", other return values will be used as values for state.<br>
     <b>Example of a function:</b>
     <pre>
     sub isDelayed($$$$) {
