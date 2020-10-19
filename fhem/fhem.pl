@@ -5945,6 +5945,11 @@ makeReadingName($) # Convert non-valid characters to _
     $name =~ s/\s/_/g;
     return $name;
   }
+  my %umlaut = ( '\xc3\xa4'=>'ae',
+                 '\xc3\xb6'=>'oe',
+                 '\xc3\xbc'=>'ue',
+                 '\xc3\x9f'=>'ss');
+  map { $name =~ s/$_/$umlaut{$_}/g } keys %umlaut;
   $name =~ s/[^a-z0-9._\-\/]/_/gi;
   return $name;
 }
