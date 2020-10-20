@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 2.0
+#  89_FULLY.pm 2.01
 #
 #  $Id$
 #
@@ -40,7 +40,7 @@ sub FULLY_Decrypt ($);
 sub FULLY_Ping ($$);
 sub FULLY_SetPolling ($$;$);
 
-my $FULLY_VERSION = '2.0';
+my $FULLY_VERSION = '2.01';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -223,16 +223,18 @@ sub FULLY_SetPolling ($$;$)
 	
 	if ($mode == 0 || $interval == 0) {
 		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
-		$hash->{nextUpdate} = 'off';			
-		FULLY_Log ($hash, 2, "Polling deactivated");
+		FULLY_Log ($hash, 2, "Polling deactivated")
+			if (!exists($hash->{nextUpdate}) || $hash->{nextUpdate} ne 'off');		
+		$hash->{nextUpdate} = 'off';
 	}
 	elsif ($mode == 1) {
 		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
 		$interval = $FULLY_POLL_RANGE[0] if ($interval < $FULLY_POLL_RANGE[0]);
 		$interval = $FULLY_POLL_RANGE[1] if ($interval > $FULLY_POLL_RANGE[1]);
+		FULLY_Log ($hash, 2, "Polling activated")
+			if (exists($hash->{nextUpdate}) && $hash->{nextUpdate} eq 'off');
 		$hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$interval);
 		InternalTimer (gettimeofday()+$interval, "FULLY_UpdateDeviceInfo", $hash, 0);
-		FULLY_Log ($hash, 2, "Polling activated");
 	}
 }
 
