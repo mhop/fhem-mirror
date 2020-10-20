@@ -1054,7 +1054,8 @@ sub _cfgDB_Search {
 	push @result, "search result for$text: $search in version: $searchversion";
 	push @result, "--------------------------------------------------------------------------------";
 	while (@line = $sth->fetchrow_array()) {
-		$row = "$line[0] $line[1] $line[2] $line[3]";
+		$row  = "$line[0] $line[1] $line[2]";
+        $row .= " $line[3]" if defined($line[3]);
 		Log 5,"configDB: $row";
 		push @result, "$row" unless ($line[0] eq 'setuuid');
 	}
