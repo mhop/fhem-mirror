@@ -4015,6 +4015,11 @@ sub withings_DbLog_splitFn($) {
     $reading = 'heartPulse';
     $unit = 'bpm';
   }
+  elsif($event =~ m/sleepstate/)
+  {
+    $reading = 'sleepstate';
+    $unit = '';
+  }
   elsif($event =~ m/ecgQRS/)
   {
     $reading = 'ecgQRS';
