@@ -452,6 +452,7 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 
 	my ($internal) = shift;
 	$internal = defined($internal) ? $internal : 0;
+	my $c = "configdb";
 	my @dontSave = qw(configdb:rescue configdb:nostate configdb:loadversion 
 	                  global:configfile global:version);
 	my (%devByNr, @rowList, %comments, $t, $out);
@@ -483,8 +484,9 @@ sub cfgDB_SaveCfg { ## prototype used in fhem.pl
 		foreach my $a (sort keys %{$configDB{attr}}) {
 			my $val = $configDB{attr}{$a};
 			next unless $val;
+			next if grep {$_ eq "$c:$a";} @dontSave;
 			$val =~ s/;/;;/g;
-			push @rowList, "attr configdb $a $val";
+			push @rowList, "attr $c $a $val";
 		}
 
 # Insert @rowList into database table
