@@ -179,15 +179,20 @@
 #   check command handing for channels
 #   remove keyboard after favorite confirm
 #   replyKeyboardRemove - #msg592808
-
 #   replace single semicolons in favorites (with double semicolons) - msg1078989
 #   FIX: answercallback always if querydata is set
+
+#   Add new sendformat video to set - cmd sendVideo / silentVideo
+#   Recognize stream of video format (esp. mp4 - needs testing)
+#   recognize stream isMedia with negative numbers
+#   document video commands
+#SVN 21.10.2020
 #   
 #   
 ##############################################################################
 # TASKS 
 #   
-#   
+#   change doc to have "a name" on attributes to allow inline help
 #   
 #   
 #   
@@ -259,6 +264,7 @@ my %sets = (
   "silentDocument" => "textField",
   "silentLocation" => "textField",
   "silentVoice" => "textField",
+  "silentVideo" => "textField",
 
   "msgDelete" => "textField",
 
@@ -275,6 +281,8 @@ my %sets = (
   "sendDocument" => "textField",
   "sendMedia" => "textField",
   "sendVoice" => "textField",
+  
+  "sendVideo" => "textField",
   
   "sendLocation" => "textField",
 
@@ -578,6 +586,8 @@ sub TelegramBot_Set($@)
       $sendType = 2;
     } elsif ( ($cmd eq 'sendDocument') || ($cmd eq 'sendMedia')  || ($cmd eq 'silentDocument') ) {
       $sendType = 3;
+    } elsif ( ($cmd eq 'sendVideo') || ($cmd eq 'silentVideo') ) {
+      $sendType = 4;
     } elsif ( ($cmd eq 'msgEdit') || ($cmd eq 'queryEditInline') )  {
       $sendType = 10;
     } elsif ( ($cmd eq 'sendLocation') || ($cmd eq 'silentLocation') )  {
@@ -614,8 +624,8 @@ sub TelegramBot_Set($@)
       $msg = shift @args;
       $msg = $1 if ( $msg =~ /^\"(.*)\"$/ );
 
-      if ( $sendType == 1 ) {
-        # for Photos a caption can be given
+      if ( ( $sendType == 1 ) || ( $sendType == 4 ) ) {
+        # for Photos and Videos a caption can be given (all content after file)
         $addPar = join(" ", @args ) if ( int(@args) > 0 );
       } else {
         return "TelegramBot_Set: Command $cmd, extra parameter specified after filename" if ( int(@args) > 0 );
@@ -1891,7 +1901,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).":";
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
       
-    }  elsif ( $isMedia == 2 ) {
+    }  elsif ( abs($isMedia) == 2 ) {
       # Voicemsg send    == 2
       $hash->{sentMsgText} = "Voice: $msg";
 
@@ -1901,7 +1911,7 @@ sub TelegramBot_SendIt($$$$$;$$$)
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :".
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).":";
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "voice", undef, $msg, 1 ) if ( ! defined( $ret ) );
-    } else {
+    }  elsif ( abs($isMedia) == 3 ) {
       # Media send    == 3
       $hash->{sentMsgText} = "Document: ".TelegramBot_MsgForLog($msg, ($isMedia<0) );
 
@@ -1910,6 +1920,28 @@ sub TelegramBot_SendIt($$$$$;$$$)
       # add msg (no file)
       Log3 $name, 4, "TelegramBot_SendIt $name: Filename for document file :$msg:";
       $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "document", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
+    }  elsif ( abs($isMedia) == 4 ) {
+      # Media send    == 3
+      $hash->{sentMsgText} = "Video: ".TelegramBot_MsgForLog($msg, ($isMedia<0) );
+
+      $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendVideo";
+
+      # add caption
+      if ( defined( $addPar ) ) {
+        $addPar =~ s/(?<![\\])\\n/\x0A/g;
+        $addPar =~ s/(?<![\\])\\t/\x09/g;
+
+        $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if ( ! defined( $ret ) );
+        $addPar = undef;
+      }
+      
+      # add msg (no file)
+      Log3 $name, 4, "TelegramBot_SendIt $name: Filename for video file :$msg:";
+      $ret = TelegramBot_AddMultipart($hash, $hash->{HU_DO_PARAMS}, "video", undef, $msg, $isMedia ) if ( ! defined( $ret ) );
+    } else {
+      # unknown media / sendtype
+      $ret = "Could not send - Unknown sendType (isMedia : ".$isMedia.") for msg :$msg:";
+      Log3 $name, 1, "TelegramBot_SendIt $name: failed - ".$ret;
     }
 
     if ( defined( $replyid ) ) {
@@ -3622,6 +3654,9 @@ sub TelegramBot_IdentifyStream($$) {
   return (-3,"docx") if ( $msg =~ /^PK\x07\x08/ );    # Office new
   return (-3,"doc") if ( $msg =~ /^\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1/ );    # Office old - D0 CF 11 E0 A1 B1 1A E1
 
+  return (-4,"mp4") if ( $msg =~ /^....\x66\x74\x79\x70\x69\x73\x6F\x6D/ );    # MP4 according to Wikipedia
+  return (-4,"mpg") if ( $msg =~ /^\x00\x00\x01[\xB3\xBA]/ );    # MPG according to Wikipedia
+  
   return (0,undef);
 }
 
@@ -3822,12 +3857,15 @@ sub TelegramBot_BinaryFileWrite($$$) {
     Filenames with special characters (especially spaces) need to be given with url escaping (i.e. spaces need to be replaced by %20). 
     Rules for specifying peers are the same as for messages. Multiple peers are to be separated by space. Captions can also contain multiple words and do not need to be quoted.
     </li>
+    <li><code>sendVideo [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt; [&lt;caption&gt;]</code><br>Sends a video (prefered mp4 format accordingt to Telegram) to the given peer(s) or if ommitted to the default peer. 
+    File is specifying a filename and path to the video file to be send. Further description for sendImage also applies here.
+    </li>
     <li><code>sendMedia|sendDocument [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt;</code><br>Sends a media file (video, audio, image or other file type) to the given peer(s) or if ommitted to the default peer. Handling for files and peers is as specified above.
     </li>
     <li><code>sendVoice [ @&lt;peer1&gt; ... @&lt;peerN&gt;] &lt;file&gt;</code><br>Sends a voice message for playing directly in the browser to the given peer(s) or if ommitted to the default peer. Handling for files and peers is as specified above.
     </li>
     
-    <li><code>silentImage ...</code><br>Sends the given image silently (with disabled_notifications) to the recipients. Syntax and parameters are the same as in the sendImage command.
+    <li><code>silentImage|silentVideo ...</code><br>Sends the given image/video silently (with disabled_notifications) to the recipients. Syntax and parameters are the same as in the send... command.
     </li>
     
 
