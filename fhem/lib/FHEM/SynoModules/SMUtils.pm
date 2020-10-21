@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.19.0');
+use version; our $VERSION = version->declare('1.19.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1315,39 +1315,44 @@ return;
 }
 
 ######################################################################################
-#                    Eintrag zur SendQueue hinzufügen (Standard Parametersatz)
+#    Eintrag zur SendQueue hinzufügen (Standard Parametersatz ohne Prüfung)
+#
 #    $name   = Name (Kalender)device
 #    $opmode = operation mode
 #    $api    = API-Referenz (z.B. $data{SSCal}{$name}{calapi})
 #    $method = auszuführende API-Methode 
-#    $params = spezifische API-Parameter 
+#    $params = spezifische API-Parameter für GET
 #
+#    Weitere Parameter hinzufügen falls vorhanden. 
 ######################################################################################
 sub _addSendqueueSimple {
-   my $paref   = shift;
-   my $name    = $paref->{name};
-   my $opmode  = $paref->{opmode};
-   my $api     = $paref->{api};
-   my $method  = $paref->{method};
-   my $params  = $paref->{params};
-   my $dest    = $paref->{dest};
-   my $reqtype = $paref->{reqtype};
+   my $paref    = shift;
+   my $name     = $paref->{name};
+   my $opmode   = $paref->{opmode};
+   my $api      = $paref->{api};
+   my $method   = $paref->{method};
+   my $params   = $paref->{params};
+   my $dest     = $paref->{dest};
+   my $reqtype  = $paref->{reqtype};
+   my $header   = $paref->{header};
+   my $postdata = $paref->{postdata};
    
-   my $hash    = $defs{$name};
+   my $hash     = $defs{$name};
    
    my $entry = {
        'opmode'     => $opmode, 
        'api'        => $api,   
        'method'     => $method, 
-       'params'     => $params,
        'retryCount' => 0               
    };
    
    # optionale Zusatzfelder 
-   $entry->{dest}    = $dest    if($dest);
-   $entry->{reqtype} = $reqtype if($reqtype);
+   $entry->{params}   = $params    if($params);
+   $entry->{dest}     = $dest      if($dest);
+   $entry->{reqtype}  = $reqtype   if($reqtype);
+   $entry->{header}   = $header    if($header);
+   $entry->{postdata} = $postdata  if($postdata);
    
-                      
    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
    
 return;
@@ -1495,7 +1500,7 @@ sub checkSendRetry {
   my $forbidSend = q{};
   my $startfnref = \&{$startfn};
   
-  my @forbidlist = qw(100 101 103 117 120 400 401 407 408 409 410 418 419 420 800 900
+  my @forbidlist = qw(100 101 103 117 120 400 401 407 408 409 410 414 418 419 420 800 900
                       1000 1001 1002 1003 1004 1006 1007 1100 1101 1200 1300 1301 1400
                       1401 1402 1403 1404 1405 1800 1801 1802 1803 1804 1805 2000 2001    
                       2002);                                                              # bei diesen Errorcodes den Queueeintrag nicht wiederholen, da dauerhafter Fehler !
