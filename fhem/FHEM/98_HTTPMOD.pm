@@ -2553,7 +2553,7 @@ sub HandleSendQueue {
     } continue {
         shift(@{$queue});                                       # remove unusable first element and iterate
     }
-    return if (!ReadyForSending());                             # check busy and delays
+    return if (!ReadyForSending($hash));                        # check busy and delays
 
     shift( @{$queue} );                                         # first element is good and will be used now, remove it from queue (after delays are ok)
     $hash->{BUSY}        = 1;                                   # queue is busy until response is received
