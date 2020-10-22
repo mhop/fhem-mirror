@@ -47,7 +47,8 @@ my %flogpar = (
   "USBWX_[0-8]"
       => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER => "%NAME" },
   "USBWX_ks300"
-      => { GPLOT => "temp4hum6:Temp/Hum,temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
+      => { GPLOT => 
+                "temp4hum6:Temp/Hum,temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
 
   # HomeMatic
@@ -223,7 +224,13 @@ autocreate_Notify($$)
       }
 
       my ($cmd, $ret);
-      my $hash = $defs{$name};  # Called from createlog
+      my $hash = $defs{$name};  # Called (hopefully) from createlog
+
+      if($hash && $hash->{TYPE} ne $type) {
+        Log 1, "autocreate: refusing to create $type:$name, ".
+                "as $hash->{TYPE}:$name already exists";
+        return;
+      }
 
       ####################
       if(!$hash) {
