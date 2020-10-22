@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.8";
+my $version = "1.3.9";
 
 my $srandUsed;
 
@@ -397,6 +397,9 @@ sub todoist_UpdateTask($$$) {
   ## use task content
   elsif (@temp && $temp[0] =~ /title/i) {
     $title = encode_utf8($temp[1]);
+    $title = $h->{"title"} if ($h->{"title"});
+    $title = $h->{"TITLE"} if ($h->{"TITLE"});
+    $title = $h->{"Title"} if ($h->{"Title"});
     $taskId = $hash->{helper}{"TITLES"}{$title} if ($hash->{helper}{"TITLES"});
   }
   ## use Task-Number 
@@ -1858,7 +1861,7 @@ sub todoist_Get($@) {
 sub todoist_setPwd($$@) {
   my ($hash, $name, @pwd) = @_;
    
-  return "Password can't be empty" if (!@pwd);
+  return "todoist: Password can't be empty" if (!@pwd);
   
   my $pwdString=$pwd[0];
   my $enc_pwd = "";
@@ -2381,20 +2384,24 @@ sub todoist_genUUID() {
         <li><b>completeTask</b> - completes a task. Needs number of task (reading 'Task_NUMBER'), the title (TITLE:&lt;TITLE&gt;) or the 
         todoist-Task-ID (ID:&lt;ID&gt;) as parameter<br /><br />
         <code>set &lt;DEVICE&gt; completeTask &lt;TASK-ID&gt;</code> - completes a task by number<br >
-        <code>set &lt;DEVICE&gt; completeTask ID:&lt;todoist-TASK-ID&gt;</code> - completes a task by todoist-Task-ID
-        <code>set &lt;DEVICE&gt; completeTask TITLE:&lt;Task title&gt;</code> - completes a task by title<br /><br /></li>
+        <code>set &lt;DEVICE&gt; completeTask ID:&lt;todoist-TASK-ID&gt;</code> - completes a task by todoist-Task-ID<br/>
+        <code>set &lt;DEVICE&gt; completeTask TITLE:&lt;Task title&gt;</code> - completes a task by title (one word)<br />
+        <code>set &lt;DEVICE&gt; completeTask title=&lt;Task title&gt;</code> - completes a task by title (multiple words)<br />
+        <br /></li>
         <li><b>closeTask</b> - closes a task. Needs number of task (reading 'Task_NUMBER')m the title (TITLE:&lt;TITLE&gt;) or the 
         todoist-Task-ID (ID:<ID>) as parameter<br />
         Difference to complete is: regular task is completed and moved to history, subtask is checked (marked as done, but not moved to history),<br /> 
         recurring task is moved forward (due date is updated).<br /><br />
         <code>set &lt;DEVICE&gt; closeTask &lt;TASK-ID&gt;</code> - completes a task by number<br />
-        <code>set &lt;DEVICE&gt; closeTask ID:&lt;todoist-TASK-ID&gt;</code> - completes a task by todoist-Task-ID
-        <code>set &lt;DEVICE&gt; closeTask TITLE:&lt;Task title&gt;</code> - completes a task by title<br /><br /></li>
+        <code>set &lt;DEVICE&gt; closeTask ID:&lt;todoist-TASK-ID&gt;</code> - completes a task by todoist-Task-ID<br />
+        <code>set &lt;DEVICE&gt; closeTask TITLE:&lt;Task title&gt;</code> - completes a task by title (one word)<br />
+        <code>set &lt;DEVICE&gt; closeTask title=&lt;Task title&gt;</code> - completes a task by title (multiple words)<br /><br /></li>
         <li><b>uncompleteTask</b> - uncompletes a Task. Use it like complete.<br /><br /></li>
         <li><b>deleteTask</b> - deletes a task. Needs number of task (reading 'Task_NUMBER'), title (TITLE:&lt;TITLE&gt;) or the todoist-Task-ID (ID:&lt;ID&gt;) as parameter<br /><br />
         <code>set &lt;DEVICE&gt; deleteTask &lt;TASK-ID&gt;</code> - deletes a task by number<br />
-        <code>set &lt;DEVICE&gt; deleteTask ID:&lt;todoist-TASK-ID&gt;</code> - deletes a task by todoist-Task-ID
-        <code>set &lt;DEVICE&gt; deleteTask TITLE:&lt;Task title&gt;</code> - deletes a task by title<br /><br /></li>
+        <code>set &lt;DEVICE&gt; deleteTask ID:&lt;todoist-TASK-ID&gt;</code> - deletes a task by todoist-Task-ID<br />
+        <code>set &lt;DEVICE&gt; deleteTask TITLE:&lt;Task title&gt;</code> - deletes a task by title (one word)<br />
+        <code>set &lt;DEVICE&gt; deleteTask title=&lt;Task title&gt;</code> - completes a task by title (multiple words)<br /><br /></li>
         <li><b>sortTasks</b> - sort Tasks alphabetically<br /><br /></li>
         <li><b>clearList</b> - <b><u>deletes</u></b> all Tasks from the list (only FHEM listed Tasks can be deleted)<br /><br /></li>
         <li><b>cChildProjects</b> - searches for children and defines them if possible, deletes lists that are deleted 
