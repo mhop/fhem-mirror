@@ -905,8 +905,8 @@ FBDECT_Undef($$)
     The value 0 means deactivate previously set boost mode.
     </li>
 
-  <li>boost &lt;duration&gt;<br>
-    set the boost mode on a Comet/Fritz DECT (FBAHAHTTP IOdev only) for 
+  <li>windowopen &lt;duration&gt;<br>
+    set the windowopen mode on a Comet/Fritz DECT (FBAHAHTTP IOdev only) for 
     duration in seconds.
     The value 0 means deactivate previously set windowopen mode.
     </li>
@@ -1050,13 +1050,13 @@ FBDECT_Undef($$)
     </li>
 
   <li>boost &lt;Dauer&gt;<br>
-    Versetzt den Comet/Fritz DECT 301 in boost Modus f&uuml;" Dauer in Sekunden. 
-    0 bedeutet boost Modus canceln. 
+    Versetzt den Comet/Fritz DECT 301 in boost Modus f&uuml;r Dauer in Sekunden.
+    0 deaktiviert den boost Modus.
     </li>
 
   <li>windowopen &lt;Dauer&gt;<br>
-    Versetzt den Comet/Fritz DECT in windowopen Modus f&uuml;" Dauer in Sekunden. 
-    0 bedeutet windowopen Modus canceln. 
+    Versetzt den Comet/Fritz DECT 301 in windowopen Modus f&uuml;r Dauer in
+    Sekunden. 0 deaktiviert den windowopen Modus.
     </li>
 
   <li>dim &lt;value&gt;<br>
