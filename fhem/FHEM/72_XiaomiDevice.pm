@@ -2260,7 +2260,7 @@ sub XiaomiDevice_GetUpdate($)
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFanFA1")
   {
     $hash->{helper}{packet}{$packetid} = "fan_data_FA1";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "oscillate_enable", "siid": 5, "piid": 8}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "TowerFanP9")
   {
@@ -2383,7 +2383,7 @@ sub XiaomiDevice_GetSettings($)
     my $packetid = $hash->{helper}{packetid};
     $hash->{helper}{packetid} = $packetid+1;
     $hash->{helper}{packet}{$packetid} = "fan_data_FA1";
-    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "oscillate_enable", "siid": 5, "piid": 8}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
+    return XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
   }
 
   if( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "TowerFanP9")
@@ -2575,7 +2575,7 @@ sub XiaomiDevice_GetSpeed($)
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartFanFA1")
   {
     $hash->{helper}{packet}{$packetid} = "fan_data_FA1";
-    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "oscillate_enable", "siid": 5, "piid": 8}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
+    XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"get_properties","params":[{"did": "power", "siid": 2, "piid": 1}, {"did": "level", "siid": 5, "piid": 10}, {"did": "mode", "siid": 2, "piid": 7}, {"did": "led", "siid": 2, "piid": 10}, {"did": "buzzer", "siid": 2, "piid": 11}, {"did": "angle_enable", "siid": 2, "piid": 3}, {"did": "tilt_enable", "siid": 2, "piid": 4}, {"did": "child_lock", "siid": 6, "piid": 1}, {"did": "timed_off", "siid": 5, "piid": 2}, {"did": "angle", "siid": 2, "piid": 5}, {"did": "tilt", "siid": 2, "piid": 6}]}');
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "TowerFanP9")
   {
@@ -3139,11 +3139,11 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "buzzer", (($json->{result}[4]{value} eq "false" || $json->{result}[4]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[4]{value}));
     readingsBulkUpdate( $hash, "angle_enable", (($json->{result}[5]{value} eq "false" || $json->{result}[5]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[5]{value}));
     readingsBulkUpdate( $hash, "tilt_enable", (($json->{result}[6]{value} eq "false" || $json->{result}[6]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[6]{value}));
-    readingsBulkUpdate( $hash, "oscillate_enable", (($json->{result}[7]{value} eq "false" || $json->{result}[7]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[7]{value}));
-    readingsBulkUpdate( $hash, "child_lock", (($json->{result}[8]{value} eq "false" || $json->{result}[8]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[8]{value}));
-    readingsBulkUpdate( $hash, "timed_off", $json->{result}[9]{value} ) if(defined($json->{result}[9]{value}));
-    readingsBulkUpdate( $hash, "angle", $json->{result}[10]{value} ) if(defined($json->{result}[10]{value}));
-    readingsBulkUpdate( $hash, "tilt", $json->{result}[11]{value} ) if(defined($json->{result}[11]{value}));
+    readingsBulkUpdate( $hash, "child_lock", (($json->{result}[7]{value} eq "false" || $json->{result}[7]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[7]{value}));
+    readingsBulkUpdate( $hash, "timed_off", $json->{result}[8]{value} ) if(defined($json->{result}[8]{value}));
+    readingsBulkUpdate( $hash, "angle", $json->{result}[9]{value} ) if(defined($json->{result}[9]{value}));
+    readingsBulkUpdate( $hash, "tilt", $json->{result}[10]{value} ) if(defined($json->{result}[10]{value}));
+    readingsBulkUpdate( $hash, "oscillate_enable", (($json->{result}[5]{value} eq "true" && $json->{result}[6]{value} eq "true") ? 'on' : 'off'), 1 ) if(defined($json->{result}[5]{value}) && defined($json->{result}[6]{value}));
     readingsEndUpdate($hash,1);
     return undef;
   }
