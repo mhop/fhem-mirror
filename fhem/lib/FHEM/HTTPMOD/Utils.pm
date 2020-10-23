@@ -269,7 +269,7 @@ sub EvalExpr {
 
     my $inCheckEval = ($checkOnly ? 0 : 1);
 
-    my $assign = '';
+    my $assign = 'package main; ';
     foreach my $key (keys %{$oRef}) {
         my $type  = ref $oRef->{$key};
         my $vName = substr($key,1);

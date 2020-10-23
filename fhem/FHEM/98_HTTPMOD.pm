@@ -140,7 +140,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.0.09 - 16.10.2020';
+my $Module_Version = '4.0.11 - 23.10.2020';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -953,7 +953,7 @@ sub DoAuth {
             $steps{$1} = 1;
         }
     }
-    Log3 $name, 4, "$name: Auth called with Steps: " . join (" ", sort keys %steps);
+    Log3 $name, 4, "$name: DoAuth called with Steps: " . join (" ", sort keys %steps);
   
     $hash->{sid} = '' if AttrVal($name, "clearSIdBeforeAuth", 0);
     foreach my $step (sort {$b cmp $a} keys %steps) {   # reverse sort
@@ -1293,7 +1293,7 @@ sub GetFn {
 
     my $request = PrepareRequest($hash, "get", $getNum);
     if ($request->{'url'}) {
-        Auth $hash if (AttrVal($name, "reAuthAlways", 0));
+        DoAuth $hash if (AttrVal($name, "reAuthAlways", 0));
         $request->{'value'}  = $getVal;
         AddToSendQueue($hash, $request);        
     } else {
@@ -1325,7 +1325,7 @@ sub GetUpdate {
     }
     
     if ($hash->{MainURL}) {
-        Auth $hash if (AttrVal($name, 'reAuthAlways', 0));
+        Auth($hash) if (AttrVal($name, 'reAuthAlways', 0));
         my $request = PrepareRequest($hash, 'reading');
         AddToSendQueue($hash, $request);                                # no need to copy the request - the hash has been created in prepare above
     }
@@ -1352,7 +1352,7 @@ sub GetUpdate {
             Log3 $name, 3, "$name: no URL for Get $getNum";
             next LOOP;
         }
-        Auth $hash if (AttrVal($name, "reAuthAlways", 0));
+        DoAuth $hash if (AttrVal($name, "reAuthAlways", 0));
         AddToSendQueue($hash, $request); 
     }
     return;
@@ -2516,7 +2516,7 @@ sub ReadyForSending {
             return;
         }
     }
-    my $minSendDelay = AttrVal($hash->{NAME}, "minSendDelay", 0.2);
+    my $minSendDelay = AttrVal($name, "minSendDelay", 0.2);
     if ($now < $last + $minSendDelay) {
         StartQueueTimer($hash, \&HTTPMOD::HandleSendQueue, {log => "minSendDelay $minSendDelay not over"});
         return;
