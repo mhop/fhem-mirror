@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_AutoShuttersControl: fix IsDay Fn for weekend condition
+              - fix detected IsDay for Brightness
+              - https://git.cooltux.net/FHEM/mod-AutoShuttersControl/issues/25
  - feature: 72_XiaomiDevice: New fan type FA1
  - change:  50_TelegramBot: sendVideo and support for video format
  - bugfix:  89_FULLY: Removed log messages

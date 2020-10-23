@@ -738,9 +738,9 @@ sub _getBrightnessSensor {
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{reading} =
       ( $reading ne 'none' ? $reading : 'brightness' );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{triggermin} =
-      ( $min ne 'none' ? $min : -1 );
+      ( $min ne 'none' ? $min : -2 );
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{triggermax} =
-      ( $max ne 'none' ? $max : -1 );
+      ( $max ne 'none' ? $max : -2 );
 
     return $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{device};
 }

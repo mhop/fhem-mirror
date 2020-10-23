@@ -257,13 +257,13 @@ sub _IsDay {
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);
 
     my $brightnessMinVal = (
-          $FHEM::Automation::ShuttersControl::shutters->getBrightnessMinVal > -1
+          $FHEM::Automation::ShuttersControl::shutters->getBrightnessMinVal > -2
         ? $FHEM::Automation::ShuttersControl::shutters->getBrightnessMinVal
         : $FHEM::Automation::ShuttersControl::ascDev->getBrightnessMinVal
     );
 
     my $brightnessMaxVal = (
-          $FHEM::Automation::ShuttersControl::shutters->getBrightnessMaxVal > -1
+          $FHEM::Automation::ShuttersControl::shutters->getBrightnessMaxVal > -2
         ? $FHEM::Automation::ShuttersControl::shutters->getBrightnessMaxVal
         : $FHEM::Automation::ShuttersControl::ascDev->getBrightnessMaxVal
     );
@@ -284,7 +284,15 @@ sub _IsDay {
                             $FHEM::Automation::ShuttersControl::shutters
                               ->getTimeUpEarly ) / 86400
                     )
-                    && !IsWe()
+                    && ( !IsWe()
+                      || ( IsWe()
+                        && ( $FHEM::Automation::ShuttersControl::ascDev
+                          ->getSunriseTimeWeHoliday eq 'off'
+                          || $FHEM::Automation::ShuttersControl::shutters
+                            ->getTimeUpWeHoliday eq '01:25'
+                           )
+                         )
+                        )
                 )
                 || (
                     int( gettimeofday() / 86400 ) != int(
@@ -336,7 +344,7 @@ sub _IsDay {
                       && !$FHEM::Automation::ShuttersControl::shutters
                       ->getSunset
                 )
-                  || !$FHEM::Automation::ShuttersControl::shutters->getSunset
+                  || $FHEM::Automation::ShuttersControl::shutters->getSunrise
             ) ? 1 : 0
           )
           if ( $FHEM::Automation::ShuttersControl::shutters->getDown eq

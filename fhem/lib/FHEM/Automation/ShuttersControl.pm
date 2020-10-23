@@ -506,7 +506,7 @@ sub Notify {
     { # Kommt ein globales Event und beinhaltet folgende Syntax wird die Funktion zur Verarbeitung aufgerufen
         if (
             grep
-m{^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy)(\s.*|$)}xms,
+m{^(ATTR|DELETEATTR)\s(.*ASC_Time_Up_WE_Holiday|.*ASC_Up|.*ASC_Down|.*ASC_AutoAstroModeMorning|.*ASC_AutoAstroModeMorningHorizon|.*ASC_AutoAstroModeEvening|.*ASC_AutoAstroModeEveningHorizon|.*ASC_Time_Up_Early|.*ASC_Time_Up_Late|.*ASC_Time_Down_Early|.*ASC_Time_Down_Late|.*ASC_autoAstroModeMorning|.*ASC_autoAstroModeMorningHorizon|.*ASC_PrivacyDownValue_beforeNightClose|.*ASC_PrivacyUpValue_beforeDayOpen|.*ASC_autoAstroModeEvening|.*ASC_autoAstroModeEveningHorizon|.*ASC_Roommate_Device|.*ASC_WindowRec|.*ASC_residentsDev|.*ASC_rainSensor|.*ASC_windSensor|.*ASC_tempSensor|.*ASC_BrightnessSensor|.*ASC_twilightDevice|.*ASC_ExternalTrigger|.*ASC_Shading_StateChange_SunnyCloudy|.*ASC_TempSensor|.*ASC_Shading_Mode)(\s.*|$)}xms,
             @{$events}
           )
         {
@@ -571,7 +571,7 @@ sub Set {
     elsif ( lc $cmd eq 'controlshading' ) {
         return "usage: $cmd" if ( scalar( @{$aArg} ) > 1 );
 
-        my $response = CheckASC_ConditionsForShadingFn($hash);
+        my $response = CheckASC_ConditionsForShadingFn($hash,$aArg->[0]);
         readingsSingleUpdate(
             $hash, $cmd,
             (
@@ -985,8 +985,6 @@ sub ShuttersCommandSet {
         (
                CheckIfShuttersWindowRecOpen($shuttersDev) == 2
             && $shutters->getShuttersPlace eq 'terrace'
-            && (   $shutters->getLockOut eq 'soft'
-                || $shutters->getLockOut eq 'hard' )
             && !$shutters->getQueryShuttersPos($posValue)
         )
         || (
@@ -1017,7 +1015,9 @@ sub ShuttersCommandSet {
             )
             || (   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
                 && $shutters->getShuttersPlace eq 'terrace'
-                && !$shutters->getQueryShuttersPos($posValue) )
+                && !$shutters->getQueryShuttersPos($posValue)
+                && (   $shutters->getLockOut eq 'soft'
+                    || $shutters->getLockOut eq 'hard' ) )
             || (   $shutters->getRainProtectionStatus eq 'protected'
                 || $shutters->getWindProtectionStatus eq 'protected' )
         )

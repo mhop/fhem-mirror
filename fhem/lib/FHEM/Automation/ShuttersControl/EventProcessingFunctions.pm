@@ -209,8 +209,21 @@ m{^(DELETEATTR|ATTR)         #global ATTR myASC ASC_tempSensor Cellar
                 (.*)?}xms
           )
         {
-            CommandSet( undef, $name . ' controlShading on' )
-              if ( ReadingsVal( $name, 'controlShading', 'off' ) ne 'off' );
+#             ATTR RolloKinZimSteven_F1 ASC_Shading_Mode off
+            if ( $events =~ m{^ATTR\s(.*)\sASC_Shading_Mode\s(off)}xms ) {
+                my %funcHash = (
+                    hash            => $hash,
+                    shuttersdevice  => $1,
+                    value           => $2,
+                    attrEvent       => 1,
+                );
+
+                FHEM::Automation::ShuttersControl::Shading::_CheckShuttersConditionsForShadingFn(\%funcHash);
+            }
+            else {
+                CommandSet( undef, $name . ' controlShading on' )
+                if ( ReadingsVal( $name, 'controlShading', 'off' ) ne 'off' );
+            }
         }
     }
 
@@ -913,11 +926,13 @@ sub EventProcessingResidents {
         for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
             $FHEM::Automation::ShuttersControl::shutters->setShuttersDev(
                 $shuttersDev);
+
             my $getModeUp =
               $FHEM::Automation::ShuttersControl::shutters->getModeUp;
             my $getModeDown =
               $FHEM::Automation::ShuttersControl::shutters->getModeDown;
             $FHEM::Automation::ShuttersControl::shutters->setHardLockOut('off');
+
             if (
                 $FHEM::Automation::ShuttersControl::ascDev->getSelfDefense eq
                 'on'
@@ -1594,7 +1609,7 @@ sub EventProcessingBrightness {
     if ( $events =~ m{$reading:\s(\d+(\.\d+)?)}xms ) {
         my $brightnessMinVal;
         if ( $FHEM::Automation::ShuttersControl::shutters->getBrightnessMinVal >
-            -1 )
+            -2 )
         {
             $brightnessMinVal =
               $FHEM::Automation::ShuttersControl::shutters->getBrightnessMinVal;
@@ -1606,7 +1621,7 @@ sub EventProcessingBrightness {
 
         my $brightnessMaxVal;
         if ( $FHEM::Automation::ShuttersControl::shutters->getBrightnessMaxVal >
-            -1 )
+            -2 )
         {
             $brightnessMaxVal =
               $FHEM::Automation::ShuttersControl::shutters->getBrightnessMaxVal;

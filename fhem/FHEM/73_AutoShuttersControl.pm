@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2018-2020 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -40,6 +40,12 @@
 ### Notizen
 # !!!!! - Innerhalb einer Shutterschleife kein CommandAttr verwenden. Bring Fehler!!! Kommen Raumnamen in die Shutterliste !!!!!!
 #
+
+package main;
+
+use Meta;
+
+
 
 package FHEM::AutoShuttersControl;
 
@@ -1258,7 +1264,7 @@ sub Initialize {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.10.9",
+  "version": "v0.10.10",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

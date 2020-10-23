@@ -83,7 +83,8 @@ BEGIN {
 }
 
 sub CheckASC_ConditionsForShadingFn {
-    my $hash = shift;
+    my $hash    = shift;
+    my $value   = shift;
 
     my $error;
 
@@ -96,10 +97,17 @@ sub CheckASC_ConditionsForShadingFn {
 
     my $count = 1;
     for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
+        my %funcHash = (
+            hash            => $hash,
+            shuttersdevice  => $shuttersDev,
+            value           => $value,
+            attrEvent       => 0,
+        );
+
         InternalTimer(
             gettimeofday() + $count,
 'FHEM::Automation::ShuttersControl::Shading::_CheckShuttersConditionsForShadingFn',
-            $shuttersDev
+            \%funcHash
         );
 
         $count++;
@@ -113,7 +121,11 @@ sub CheckASC_ConditionsForShadingFn {
 }
 
 sub _CheckShuttersConditionsForShadingFn {
-    my $shuttersDev = shift;
+    my $funcHash    = shift;
+    
+    my $hash        = $funcHash->{hash};
+    my $shuttersDev = $funcHash->{shuttersdevice};
+    my $value       = $funcHash->{value};
 
     $FHEM::Automation::ShuttersControl::shutters->setShuttersDev($shuttersDev);
     my $shuttersDevHash = $defs{$shuttersDev};
@@ -121,59 +133,67 @@ sub _CheckShuttersConditionsForShadingFn {
     my $errorMessage;
     my $warnMessage;
     my $infoMessage;
+    
+    if ( $value eq 'off' ) {
+        $FHEM::Automation::ShuttersControl::shutters->setShadingStatus('out');
+        $infoMessage    .= ' shading was deactivated ' . ($funcHash->{attrEvent} ? 'in the device' : 'globally');
+        $errorMessage   .= '';
+        ShadingProcessingDriveCommand( $hash, $shuttersDev );
+    }
+    else {
+        $infoMessage .= (
+            $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne 'off'
+            && $FHEM::Automation::ShuttersControl::ascDev
+            ->getAutoShuttersControlShading eq 'on'
+            && $FHEM::Automation::ShuttersControl::shutters->getOutTemp == -100
+            ? ' shading active, global temp sensor is set, but shutters temperature sensor is not set'
+            : ''
+        );
 
-    $infoMessage .= (
-        $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne 'off'
-          && $FHEM::Automation::ShuttersControl::ascDev
-          ->getAutoShuttersControlShading eq 'on'
-          && $FHEM::Automation::ShuttersControl::shutters->getOutTemp == -100
-        ? ' shading active, global temp sensor is set, but shutters temperature sensor is not set'
-        : ''
-    );
+        $warnMessage .= (
+            $FHEM::Automation::ShuttersControl::shutters->getShadingMode eq 'off'
+            && $FHEM::Automation::ShuttersControl::ascDev
+            ->getAutoShuttersControlShading eq 'on'
+            ? ' global shading active but ASC_Shading_Mode attribut is not set or off'
+            : ''
+        );
 
-    $warnMessage .= (
-        $FHEM::Automation::ShuttersControl::shutters->getShadingMode eq 'off'
-          && $FHEM::Automation::ShuttersControl::ascDev
-          ->getAutoShuttersControlShading eq 'on'
-        ? ' global shading active but ASC_Shading_Mode attribut is not set or off'
-        : ''
-    );
+        $errorMessage .= (
+            $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne 'off'
+            && $FHEM::Automation::ShuttersControl::ascDev
+            ->getAutoShuttersControlShading ne 'on'
+            && $FHEM::Automation::ShuttersControl::ascDev
+            ->getAutoShuttersControlShading ne 'off'
+            ? ' ASC_Shading_Mode attribut is set but global shading has errors, look at ASC device '
+            . '<a href="'
+            . '/fhem?detail='
+            . ReadingsVal( $shuttersDev, 'associatedWith', 'ASC device' )
+            . $::FW_CSRF . '">'
+            . ReadingsVal( $shuttersDev, 'associatedWith', 'ASC device' )
+            . '</a>'
+            : ''
+        );
 
-    $errorMessage .= (
-        $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne 'off'
-          && $FHEM::Automation::ShuttersControl::ascDev
-          ->getAutoShuttersControlShading ne 'on'
-          && $FHEM::Automation::ShuttersControl::ascDev
-          ->getAutoShuttersControlShading ne 'off'
-        ? ' ASC_Shading_Mode attribut is set but global shading has errors, look at ASC device '
-          . '<a href="'
-          . '/fhem?detail='
-          . ReadingsVal( $shuttersDev, 'associatedWith', 'ASC device' )
-          . $::FW_CSRF . '">'
-          . ReadingsVal( $shuttersDev, 'associatedWith', 'ASC device' )
-          . '</a>'
-        : ''
-    );
-
-    $errorMessage .= (
-        $FHEM::Automation::ShuttersControl::shutters->getBrightness == -1
-          && $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne
-          'off'
-        ? ' no brightness sensor found, please set ASC_BrightnessSensor attribut'
-        : ''
-    );
+        $errorMessage .= (
+            $FHEM::Automation::ShuttersControl::shutters->getBrightness == -1
+            && $FHEM::Automation::ShuttersControl::shutters->getShadingMode ne
+            'off'
+            ? ' no brightness sensor found, please set ASC_BrightnessSensor attribut'
+            : ''
+        );
+    }
 
     $message .= ' ERROR: ' . $errorMessage
-      if ( defined($errorMessage)
+    if ( defined($errorMessage)
         && $errorMessage ne '' );
 
     $message .= ' WARN: ' . $warnMessage
-      if ( defined($warnMessage)
+    if ( defined($warnMessage)
         && $warnMessage ne ''
         && $errorMessage eq '' );
 
     $message .= ' INFO: ' . $infoMessage
-      if ( defined($infoMessage)
+    if ( defined($infoMessage)
         && $infoMessage ne ''
         && $errorMessage eq '' );
 
@@ -452,6 +472,8 @@ sub ShadingProcessing {
             || $FHEM::Automation::ShuttersControl::shutters->getModeUp eq 'off'
             || $FHEM::Automation::ShuttersControl::shutters->getModeUp eq
             'absent'
+            || $FHEM::Automation::ShuttersControl::shutters->getModeUp eq
+            'gone'
             || ( $FHEM::Automation::ShuttersControl::shutters->getModeUp eq
                 'home'
                 && $homemode ne 'asleep' )
