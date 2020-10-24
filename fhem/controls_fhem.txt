@@ -1,4 +1,4 @@
-REV 23008
+REV 23013
 DIR unused
 UPD 2020-10-23_07:45:03 352542 ./CHANGED
 UPD 2020-09-07_07:45:03 42758 ./MAINTAINER.txt
@@ -373,7 +373,7 @@ UPD 2019-10-14_07:45:02 89155 FHEM/72_FB_CALLLIST.pm
 UPD 2020-04-16_07:45:03 124570 FHEM/72_FB_CALLMONITOR.pm
 UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2020-03-21_07:45:03 16170 FHEM/72_TA_CMI_JSON.pm
-UPD 2020-10-23_07:45:03 225486 FHEM/72_XiaomiDevice.pm
+UPD 2020-10-24_07:45:03 225371 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
 UPD 2020-10-23_07:45:03 97693 FHEM/73_AutoShuttersControl.pm
 UPD 2020-05-05_07:45:02 201709 FHEM/73_DoorBird.pm
@@ -479,7 +479,7 @@ UPD 2020-05-10_07:45:03 30585 FHEM/98_GOOGLECAST.pm
 UPD 2020-04-01_07:45:03 11523 FHEM/98_GoogleAuth.pm
 UPD 2020-09-21_07:45:03 194553 FHEM/98_HMinfo.pm
 UPD 2019-04-01_07:45:02 31631 FHEM/98_HMtemplate.pm
-UPD 2020-10-22_07:45:02 190045 FHEM/98_HTTPMOD.pm
+UPD 2020-10-24_07:45:03 190044 FHEM/98_HTTPMOD.pm
 UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
@@ -711,7 +711,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2020-08-23_07:45:02 8555 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-08-23_07:45:02 148785 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-10-24_07:45:03 148787 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -739,8 +739,8 @@ UPD 2020-10-23_07:45:07 4384804 docs/commandref.html
 UPD 2020-10-23_07:45:10 2722537 docs/commandref_DE.html
 UPD 2020-09-24_07:45:02 80860 docs/commandref_frame.html
 UPD 2020-09-24_07:45:02 90475 docs/commandref_frame_DE.html
-UPD 2020-10-23_07:45:11 234726 docs/commandref_modular.html
-UPD 2020-10-23_07:45:12 245446 docs/commandref_modular_DE.html
+UPD 2020-10-24_07:45:12 234726 docs/commandref_modular.html
+UPD 2020-10-24_07:45:13 245446 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -761,10 +761,10 @@ UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
 UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
-UPD 2020-10-21_07:45:03 31520 lib/FHEM/HTTPMOD/Utils.pm
+UPD 2020-10-24_07:45:03 31534 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
 UPD 2020-10-16_07:45:04 14254 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2020-10-22_07:45:02 64138 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2020-10-24_07:45:03 64138 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
