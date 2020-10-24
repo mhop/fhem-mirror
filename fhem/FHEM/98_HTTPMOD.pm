@@ -7,7 +7,7 @@
 #     Fhem is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
 #     the Free Software Foundation, either version 2 of the License, or
-#     (at your option) any later version.
+#     (at your option)  any later version.
 # 
 #     Fhem is distributed in the hope that it will be useful,
 #     but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -140,7 +140,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.0.11 - 23.10.2020';
+my $Module_Version = '4.0.12 - 24.10.2020';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -1325,7 +1325,7 @@ sub GetUpdate {
     }
     
     if ($hash->{MainURL}) {
-        Auth($hash) if (AttrVal($name, 'reAuthAlways', 0));
+        DoAuth($hash) if (AttrVal($name, 'reAuthAlways', 0));
         my $request = PrepareRequest($hash, 'reading');
         AddToSendQueue($hash, $request);                                # no need to copy the request - the hash has been created in prepare above
     }
