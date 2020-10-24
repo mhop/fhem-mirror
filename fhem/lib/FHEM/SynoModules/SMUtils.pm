@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.19.3');
+use version; our $VERSION = version->declare('1.20.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -49,6 +49,7 @@ our @EXPORT_OK = qw(
                      delClHash
                      delReadings
                      trim
+                     slurpFile
                      moduleVersion
                      sortVersion
                      showModuleInfo
@@ -233,6 +234,31 @@ sub trim {
   $str =~ s/^\s+|\s+$//gx;
 
 return $str;
+}
+
+###############################################################################
+#                     File in einem Gang einlesen (schlürfen)          
+###############################################################################
+sub slurpFile {
+  my $name = shift // carp $carpnoname                && return 417;
+  my $file = shift // carp "got no filename to slurp" && return 417;
+  
+  my $errorcode = 0;
+  my $content   = q{};
+  my $fh;
+  
+  open $fh, '<', "$file" or do { Log3($name, 2, qq{$name - cannot open local File "$file": $!});
+                                 close ($fh) if($fh);
+                                 $errorcode = 9002;                                    
+                               };
+  if(!$errorcode) {
+      local $/ = undef;                            # enable slurp mode, locally
+      $content = <$fh>;
+       
+      close ($fh);
+  }
+
+return ($errorcode, $content);
 }
 
 #############################################################################################
