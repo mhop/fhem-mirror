@@ -773,6 +773,10 @@ sub Twilight_Midnight {
     }
     my $now = time();
     my $midnight = $now - secondsSinceMidnight( $now ) + DAYSECONDS + 1;
+    my $daysavingdelta = (localtime)[2] - ( localtime( time + DAYSECONDS ) )[2]; 
+    $midnight -= 19 * HOURSECONDS if $daysavingdelta == 1 && (localtime)[2] < 3;
+    $midnight -= 20 * HOURSECONDS if $daysavingdelta == -1 && (localtime)[2] < 3;
+    
     return resetRegisteredInternalTimer( "Midnight", $midnight, \&Twilight_Midnight, $hash, 0 );
 
 }
