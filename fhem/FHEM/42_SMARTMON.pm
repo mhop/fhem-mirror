@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-my $VERSION = "0.9.8";
+my $VERSION = "0.9.9";
 
 my $DEFAULT_INTERVAL = 60; # in minuten
 
@@ -57,7 +57,7 @@ sub SMARTMON_Initialize($)
   $hash->{GetFn}    = "SMARTMON_Get";
   #$hash->{SetFn}    = "SMARTMON_Set";
   $hash->{AttrFn}   = "SMARTMON_Attr";
-  $hash->{AttrList} = "show_raw:0,1,2 disable:0,1 include parameters show_device_info:0,1 ".$readingFnAttributes;
+  $hash->{AttrList} = "show_raw:0,1,2 disable:0,1 include parameters ssh_host show_device_info:0,1 ".$readingFnAttributes;
 }
 
 sub SMARTMON_Log($$$) {
@@ -205,6 +205,10 @@ sub SMARTMON_Attr($$$) {
         $hash->{PARAMETERS}=$attrVal;
       }
       
+      if($attrName eq "ssh_host") {
+        $hash->{SSHHOST}=$attrVal;
+      }
+      
       if($attrName eq "show_raw") {
         SMARTMON_refreshReadings($hash);  
       }
@@ -240,6 +244,10 @@ sub SMARTMON_Attr($$$) {
 
     if($attrName eq "parameters") {
         delete $hash->{PARAMETERS};
+    }
+
+    if($attrName eq "ssh_host") {
+      delete $hash->{SSHHOST};
     }
   }
   
@@ -585,6 +593,8 @@ sub SMARTMON_execute($$) {
   SMARTMON_Log($hash, 5, "Execute: $cmd");
   
   local $SIG{'CHLD'}='DEFAULT';
+  if($hash->{SSHHOST}) {$cmd="ssh ".$hash->{SSHHOST}." \"$cmd\"";}
+  SMARTMON_Log($hash, 5, "cmd: ".$cmd);
   my @ret = qx($cmd);
   my $rcode = $?>>8;
   SMARTMON_Log($hash, 5, "Returncode: ".$rcode);
@@ -688,6 +698,10 @@ sub SMARTMON_execute($$) {
     </li>
     <br>
     </ul><br>
+    <li>ssh_host<br>
+		remote machine adresse. If defined, smartctrl is executed via SSH.
+    </li>
+    <br>
     For more information see smartctrl documentation.
   </ul>
 <!-- ================================ -->
@@ -784,6 +798,10 @@ sub SMARTMON_execute($$) {
     </li>
     <br>
     </ul><br>
+    <li>ssh_host<br>
+		Adresse einer entferten Maschine. Falls definiert, wird smartctrl dort per SSH ausgeführt.
+    </li>
+    <br>
     F&uuml;r weitere Informationen wird die smartctrl-Dokumentation empfohlen.
 
   </ul>
