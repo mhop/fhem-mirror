@@ -2524,8 +2524,9 @@ sub HMinfo_deviceReplace($$$){
 
     if ($defs{$newDev}{$i} && defined $defs{$defs{$newDev}{$i}}){
       $rnHash{new}{$i}=$defs{$newDev}{$i};
-      return "new channel $i already has peers" if(defined $attr{$rnHash{$_}{new}}{peerIDs} 
-                                                   &&      $attr{$rnHash{$_}{new}}{peerIDs} ne "0000000");
+      return "new channel $i:$rnHash{new}{$i} already has peers: $attr{$rnHash{new}{$i}}{peerIDs}" 
+                                                if(defined $attr{$rnHash{new}{$i}}{peerIDs} 
+                                                   &&      $attr{$rnHash{new}{$i}}{peerIDs} ne "0000000");
     }
     else{
       return "channel list incompatible for $newDev: $i";
