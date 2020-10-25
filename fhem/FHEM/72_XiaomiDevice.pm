@@ -3123,7 +3123,7 @@ sub XiaomiDevice_ParseJSON($$)
     readingsBulkUpdate( $hash, "buzzer", (($json->{result}[4]{value} eq "false" || $json->{result}[4]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[4]{value}));
     readingsBulkUpdate( $hash, "angle_enable", (($json->{result}[5]{value} eq "false" || $json->{result}[5]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[5]{value}));
     readingsBulkUpdate( $hash, "child_lock", (($json->{result}[6]{value} eq "false" || $json->{result}[6]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[6]{value}));
-    readingsBulkUpdate( $hash, "timed_off", $json->{result}[7]{value} ) if(defined($json->{result}[7]{value}));
+    readingsBulkUpdate( $hash, "timed_off", $json->{result}[7]{value}, 1 ) if(defined($json->{result}[7]{value}));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -3133,17 +3133,17 @@ sub XiaomiDevice_ParseJSON($$)
     return undef if(ref($json->{result}) ne "ARRAY");
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "power", (($json->{result}[0]{value} eq "false" || $json->{result}[0]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[0]{value}));
-    readingsBulkUpdate( $hash, "level", ($json->{result}[0]{value} eq "false" ? '0' : $json->{result}[1]{value}), 1 ) if(defined($json->{result}[1]{value}));
+    readingsBulkUpdate( $hash, "level", (($json->{result}[0]{value} eq "false" || $json->{result}[0]{value} eq "0") ? '0' : $json->{result}[1]{value}), 1 ) if(defined($json->{result}[1]{value}));
     readingsBulkUpdate( $hash, "mode", ($json->{result}[2]{value} eq "0" ? 'straight' : $json->{result}[2]{value} eq "1" ? 'sleep' : 'auto'), 1 ) if(defined($json->{result}[2]{value}));
     readingsBulkUpdate( $hash, "led", (($json->{result}[3]{value} eq "false" || $json->{result}[3]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[3]{value}));
     readingsBulkUpdate( $hash, "buzzer", (($json->{result}[4]{value} eq "false" || $json->{result}[4]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[4]{value}));
     readingsBulkUpdate( $hash, "angle_enable", (($json->{result}[5]{value} eq "false" || $json->{result}[5]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[5]{value}));
     readingsBulkUpdate( $hash, "tilt_enable", (($json->{result}[6]{value} eq "false" || $json->{result}[6]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[6]{value}));
     readingsBulkUpdate( $hash, "child_lock", (($json->{result}[7]{value} eq "false" || $json->{result}[7]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[7]{value}));
-    readingsBulkUpdate( $hash, "timed_off", $json->{result}[8]{value} ) if(defined($json->{result}[8]{value}));
-    readingsBulkUpdate( $hash, "angle", $json->{result}[9]{value} ) if(defined($json->{result}[9]{value}));
-    readingsBulkUpdate( $hash, "tilt", $json->{result}[10]{value} ) if(defined($json->{result}[10]{value}));
-    readingsBulkUpdate( $hash, "oscillate_enable", (($json->{result}[5]{value} eq "true" && $json->{result}[6]{value} eq "true") ? 'on' : 'off'), 1 ) if(defined($json->{result}[5]{value}) && defined($json->{result}[6]{value}));
+    readingsBulkUpdate( $hash, "timed_off", $json->{result}[8]{value}, 1 ) if(defined($json->{result}[8]{value}));
+    readingsBulkUpdate( $hash, "angle", $json->{result}[9]{value}, 1 ) if(defined($json->{result}[9]{value}));
+    readingsBulkUpdate( $hash, "tilt", $json->{result}[10]{value}, 1 ) if(defined($json->{result}[10]{value}));
+    readingsBulkUpdate( $hash, "oscillate_enable", (($json->{result}[5]{value} eq "false" || $json->{result}[5]{value} eq "0" || $json->{result}[6]{value} eq "false" || $json->{result}[6]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[5]{value}) && defined($json->{result}[6]{value}));
     readingsEndUpdate($hash,1);
     return undef;
   }
@@ -3153,14 +3153,14 @@ sub XiaomiDevice_ParseJSON($$)
     return undef if(ref($json->{result}) ne "ARRAY");
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, "power", (($json->{result}[0]{value} eq "false" || $json->{result}[0]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[0]{value}));
-    readingsBulkUpdate( $hash, "level", $json->{result}[1]{value} ) if(defined($json->{result}[1]{value}));
+    readingsBulkUpdate( $hash, "level", $json->{result}[1]{value}, 1 ) if(defined($json->{result}[1]{value}));
     readingsBulkUpdate( $hash, "mode", ($json->{result}[2]{value} eq "0" ? 'straight' : $json->{result}[2]{value} eq "1" ? 'natural' : 'sleep'), 1 ) if(defined($json->{result}[2]{value}));
     readingsBulkUpdate( $hash, "led", (($json->{result}[3]{value} eq "false" || $json->{result}[3]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[3]{value}));
     readingsBulkUpdate( $hash, "buzzer", (($json->{result}[4]{value} eq "false" || $json->{result}[4]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[4]{value}));
     readingsBulkUpdate( $hash, "angle_enable", (($json->{result}[5]{value} eq "false" || $json->{result}[5]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[5]{value}));
     readingsBulkUpdate( $hash, "child_lock", (($json->{result}[6]{value} eq "false" || $json->{result}[6]{value} eq "0") ? 'off' : 'on'), 1 ) if(defined($json->{result}[6]{value}));
-    readingsBulkUpdate( $hash, "timed_off", $json->{result}[7]{value} ) if(defined($json->{result}[7]{value}));
-    readingsBulkUpdate( $hash, "angle", $json->{result}[8]{value} ) if(defined($json->{result}[8]{value}));
+    readingsBulkUpdate( $hash, "timed_off", $json->{result}[7]{value}, 1 ) if(defined($json->{result}[7]{value}));
+    readingsBulkUpdate( $hash, "angle", $json->{result}[8]{value}, 1 ) if(defined($json->{result}[8]{value}));
     readingsEndUpdate($hash,1);
     return undef;
   }
