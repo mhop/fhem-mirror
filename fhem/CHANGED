@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 49_Arlo: Added 2-factor authentication
  - bugfix:  73_AutoShuttersControl: fix IsDay Fn for weekend condition
               - fix detected IsDay for Brightness
               - https://git.cooltux.net/FHEM/mod-AutoShuttersControl/issues/25
