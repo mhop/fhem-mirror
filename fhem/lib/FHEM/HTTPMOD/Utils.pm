@@ -87,7 +87,11 @@ BEGIN {
         DevIo_SimpleRead
         DevIo_CloseDev
         DevIo_IsOpen
-        
+
+        getUniqueId
+        getKeyValue
+        setKeyValue
+
     ));
 };
 
