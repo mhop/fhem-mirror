@@ -63,7 +63,7 @@ use FHEM::SynoModules::SMUtils qw( completeAPI
                                    updQueueLength                                   
                                    trim
                                    slurpFile
-                                   jboolmap                                   
+                                   jboolmap                               
                                  );                               # Hilfsroutinen Modul 
 
 use FHEM::SynoModules::ErrCodes qw(expErrors);                    # Error Code Modul                                                      
@@ -85,6 +85,9 @@ BEGIN {
       qw(     
           attr      
           AttrVal
+          BlockingCall
+          BlockingKill
+          BlockingInformParent
           CancelDelayedShutdown
           CommandSet
           CommandAttr
@@ -93,6 +96,7 @@ BEGIN {
           CommandGet
           CommandSetReading
           CommandTrigger
+          Debug
           data
           defs
           devspec2array
@@ -133,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.5.0"  => "24.10.2020  new Setter Upload ",
+  "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously",
   "0.4.0"  => "18.10.2020  add reqtype to addSendqueue, new Setter prepareDownload ",
   "0.3.0"  => "16.10.2020  create Reading Hash instead of Array ",
   "0.2.0"  => "16.10.2020  some changes in subroutines ",
@@ -193,7 +197,7 @@ my $splitstr     = "!_ESC_!";                               # Split-String zur �
 my $queueStartFn = "FHEM::SSFile::getApiSites";             # Startfunktion zur Queue-Abarbeitung
 my $mbf          = 1048576;                                 # Divisionsfaktor für Megabytes
 my $kbf          = 1024;                                    # Divisionsfaktor für Kilobytes
-my $found;                                                  # Hash für Ergebnis File::find -> wanted
+my $bound        = "wNWT9spu8GvTg4TJo1iN";                  # Boundary for Multipart POST
 
 ################################################################
 sub Initialize {
@@ -208,14 +212,15 @@ sub Initialize {
  
  # Darstellung FHEMWEB
  # $hash->{FW_summaryFn}        = \&FWsummaryFn;
- #$hash->{FW_addDetailToSummary} = 1 ;                       # zusaetzlich zu der Device-Summary auch eine Neue mit dem Inhalt von DetailFn angezeigt             
- #$hash->{FW_detailFn}           = \&FWdetailFn;
+ # $hash->{FW_addDetailToSummary} = 1 ;                       # zusaetzlich zu der Device-Summary auch eine Neue mit dem Inhalt von DetailFn angezeigt             
+ # $hash->{FW_detailFn}           = \&FWdetailFn;
  $hash->{FW_deviceOverview}     = 1;
  
  $hash->{AttrList} = "additionalInfo:multiple-strict,real_path,size,owner,time,perm,mount_point_type,type,volume_status ".
                      "disable:1,0 ".
                      "interval ".
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ". 
+                     "noAsyncFillQueue:1,0 ".
                      "showPassInLog:1,0 ".
                      "timeout ".
                      $readingFnAttributes;   
@@ -297,6 +302,7 @@ sub Undef {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
+  BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
   delete $data{$type}{$name};
   
   RemoveInternalTimer($name);
@@ -346,10 +352,14 @@ return;
 }
 
 ################################################################
-sub Attr {                             ## no critic 'complexity'
-    my ($cmd,$name,$aName,$aVal) = @_;
+sub Attr {                             
+    my $cmd   = shift;
+    my $name  = shift;
+    my $aName = shift;
+    my $aVal  = shift;
     my $hash  = $defs{$name};
     my $model = $hash->{MODEL};
+    
     my ($do,$val);
       
     # $cmd can be "del" or "set"
@@ -376,6 +386,16 @@ sub Attr {                             ## no critic 'complexity'
         readingsEndUpdate  ($hash, 1); 
     }
     
+    if ($cmd eq "set") {
+        if ($aName =~ m/interval/x && $aVal !~ /^[0-9]+$/x) {
+            return qq{The value of $aName is not valid. Use only integers 0-9 !};
+        }     
+        if($aName =~ m/interval/x) {
+            RemoveInternalTimer($name,"FHEM::SSFile::periodicCall");
+            InternalTimer      (gettimeofday()+1.0, "FHEM::SSFile::periodicCall", $name, 0);
+        }      
+    }
+    
 return;
 }
 
@@ -397,7 +417,7 @@ sub Set {
         
   return if(IsDisabled($name));
   
-  my $idxlist = join(",", sort keys %{$data{$type}{$name}{sendqueue}{entries}});
+  my $idxlist = join(",", sort{$a<=>$b} keys %{$data{$type}{$name}{sendqueue}{entries}});
   
   $setlist    = "Unknown argument $opt, choose one of ";
   
@@ -503,6 +523,8 @@ sub _setDownload {
       return qq{No source file or directory specified for download !}
   }
   
+  delReadings ($name, 0);
+  
   my @dld = split ",", $fp;
   
   for my $dl (@dld) {
@@ -560,7 +582,6 @@ sub _setUpload {
   #          method => auszuführende API-Methode, 
   #          params => "spezifische API-Parameter>
   
-  #$arg       = smUrlEncode ($arg);
   my ($a,$h) = parseParams ($arg);
   my $fp     = $a->[0];
   
@@ -577,7 +598,6 @@ sub _setUpload {
   
   my $ow    = $h->{ow}   // "true";                                      # Überschreiben Steuerbit
   my $cdir  = $h->{cdir} // "true";                                      # create Dir Steuerbit
-  my $bound = "wNWT9spu8GvTg4TJo1iN";
   
   my @uld   = split ",", $fp;
   
@@ -590,22 +610,57 @@ sub _setUpload {
       push @all, $obj;
   } 
   
-  undef $found;
-  for my $obj (@all) {                                                   # Objekte und Inhalte der Ordner auslesen für add Queue
-      find ( { wanted => \&wanted, no_chdir => 1 }, $obj );
-  }
+  readingsSingleUpdate($hash, "state", "Wait for filling upload queue", 1); 
   
-  Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
+  $paref->{allref} = \@all;
+  $paref->{remDir} = $remDir;
+  $paref->{ow}     = $ow;
+  $paref->{cdir}   = $cdir;
+  
+  my $found        = exploreFiles ($paref);
+  $paref->{found}  = $found;
+  
+  delReadings ($name, 0);
+  
+  delete $paref->{allref};
+  
+  if(AttrVal($name, "noAsyncFillQueue", 0)) {                           # kein BlockingCall verwenden
+      __fillUploadQueue ($paref);
+  }
+  else {
+      my $timeout = 1800;
+      $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSFile::__fillUploadQueue", $paref, "FHEM::SSFile::__fillUploadQueueFinish", $timeout, "FHEM::SSFile::blockingTimeout", $hash);
+      $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057      
+  }
+   
+return; 
+}
+  
+######################################################################################
+#         extrahierte Filenamen für Upload in Queue eintragen
+######################################################################################
+sub __fillUploadQueue {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $remDir = $paref->{remDir};
+  my $opt    = $paref->{opt};
+  my $ow     = $paref->{ow};
+  my $cdir   = $paref->{cdir};
+  my $found  = $paref->{found};
+  
+  my $hash   = $defs{$name};
+  
+  # Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
 
   for my $lcf (keys %{$found}) {
       my $fname = (split "\/", $lcf)[-1];
       my $dir   = $remDir.$found->{"$lcf"};                             # zusammengesetztes Zielverzeichnis
       
       my $dat;
-      $dat .= addBodyPart ($bound, qq{content-disposition: form-data; name="path"},                                                              $dir,     "first");
-      $dat .= addBodyPart ($bound, qq{content-disposition: form-data; name="create_parents"},                                                    $cdir            );
-      $dat .= addBodyPart ($bound, qq{content-disposition: form-data; name="overwrite"},                                                         $ow              );
-      $dat .= addBodyPart ($bound, qq{content-disposition: form-data; name="file"; filename="$fname"\r\nContent-Type: application/octet-stream}, "<FILE>", "last" );
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="path"},                                                              $dir,     "first");
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="create_parents"},                                                    $cdir            );
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="overwrite"},                                                         $ow              );
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="file"; filename="$fname"\r\nContent-Type: application/octet-stream}, "<FILE>", "last" );
       
       my $params = { 
           name     => $name,
@@ -618,14 +673,51 @@ sub _setUpload {
           postdata => $dat
       };
       
-      addSendqueue ($params);
+      if(AttrVal($name, "noAsyncFillQueue", 0)) {
+          addSendqueue ($params);
+      }
+      else {
+          my $json = encode_json ($params);
+          BlockingInformParent("FHEM::SSFile::__addQueueFromBlocking", [$json], 1);         
+      }
   }
+
+  if(AttrVal($name, "noAsyncFillQueue", 0)) {
+      return __fillUploadQueueFinish ("$name|$opt");
+  }
+
+return ("$name|$opt");
+}
+
+####################################################################################################
+#                               Finishing Upload Queue
+####################################################################################################
+sub __fillUploadQueueFinish {
+  my $string = shift;
+  
+  my ($name, $opt) = split "\\|", $string;
+  my $hash         = $defs{$name};
+
+  readingsSingleUpdate($hash, "state", "Upload queue fill finished", 1);
   
   if($opt ne "prepareUpload") {  
       getApiSites ($name);                                              # Queue starten
   }
-
+  
 return;
+}
+
+###################################################################
+#        SendQueue aus BlockingCall heraus füllen
+###################################################################
+sub __addQueueFromBlocking {
+  my $json = shift;
+  
+  my $params = decode_json ($json);
+  
+  addSendqueue ($params);
+
+return 1;
 }
 
 ######################################################################################
@@ -1003,14 +1095,14 @@ sub periodicCall {
   else {
       $new = gettimeofday()+$interval;
       readingsBeginUpdate ($hash);
-      readingsBulkUpdate  ($hash, "nextUpdate", "Automatic - next polltime: ".FmtTime($new));     # Abrufmode initial auf "Manual" setzen   
+      readingsBulkUpdate  ($hash, "nextUpdate", "Automatic - next start Queue time: ".FmtTime($new));     # Abrufmode initial auf "Manual" setzen   
       readingsEndUpdate   ($hash,1);
       
       $hash->{MODE} = "Automatic";
   }
   
-  if($hash->{CREDENTIALS} && !IsDisabled($name)) {
- 
+  if(!IsDisabled($name) && ReadingsVal($name, "state", "running") ne "running") {
+      getApiSites($name);                                                               # Queue starten
   }
   
   InternalTimer($new, "FHEM::SSFile::periodicCall", $name, 0);
@@ -1732,8 +1824,7 @@ return;
 #                    last  - Ergänzung des letzten Boundary
 #
 #############################################################################################
-sub addBodyPart { 
-  my $bound = shift;                                   # Boundary String
+sub addBodyPart {
   my $cdisp = shift;
   my $val   = shift;
   my $seq   = shift // "";                             # Sequence: first, last
@@ -1753,19 +1844,47 @@ return $part;
 }
 
 #############################################################################################
-#                       File::Find Auswertungsfunktion 
-#     $found:  Hash Referenz für file : dir Paare
+#                       File::Find Explore Files & Directories
 #############################################################################################
-sub wanted {  
-  my $file =  $File::Find::name;
-  my $dir  =  $File::Find::dir;
-  $dir     =~ s/^\.//x;
-  $dir     =~ s/\/$//x;
-
-  if(-f $file && -r $file) {
-      $found->{"$file"} = "$dir";
-  }
+sub exploreFiles {  
+  my $paref  = shift;
+  my $allref = $paref->{allref};
   
+  my $found;
+  for my $obj (@$allref) {                                                   # Objekte und Inhalte der Ordner auslesen für add Queue
+      find ( { wanted   => sub {  my $file =  $File::Find::name;
+                                  my $dir  =  $File::Find::dir;
+                                  $dir     =~ s/^\.//x;
+                                  $dir     =~ s/\/$//x;
+
+                                  if(-f $file && -r $file) {
+                                      $found->{"$file"} = "$dir";
+                                  }  
+                               }, 
+               no_chdir => 1 
+             }, $obj 
+           );
+  }
+
+return $found;
+}
+
+####################################################################################################
+#                               Abbruchroutine BlockingCall
+####################################################################################################
+sub blockingTimeout {
+  my ($hash,$cause) = @_;
+  my $name          = $hash->{NAME}; 
+  
+  $cause = $cause // "Timeout: process terminated";
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");    
+  
+  setReadingErrorState ($hash, $cause);
+  
+  delete($hash->{HELPER}{RUNNING_PID});
+  
+  checkSendRetry ($name, 0, $queueStartFn);
+
 return;
 }
 
@@ -1945,7 +2064,7 @@ return;
   
   <ul>
   <a name="prepareUpload"></a>
-  <li><b> prepareUpload "&lt;File&gt;[,&lt;File&gt;,...]" &lt;args&gt;</b> <br>
+  <li><b> prepareUpload "&lt;File&gt;[,&lt;File&gt;,...]" | "&lt;Ordner&gt;[,&lt;Ordner&gt;,...]" &lt;args&gt;</b> <br>
   
   Identisch zum "Upload" Befehl. Die Übertragung der Files zur Synology Diskstation wird allerdings nicht sofort
   gestartet, sondern die Einträge nur in die Sendequeue gestellt. 
@@ -2108,13 +2227,9 @@ return;
   <a name="interval"></a>
   <li><b>interval &lt;Sekunden&gt;</b> <br> 
   
-    Automatisches Abrufintervall der Informationen in Sekunden. Ist "0" agegeben, wird kein automatischer Datenabruf 
-    ausgeführt. (default) <br>
-    Sollen z.B. jede Stunde Informationen abgerufen werden, wird das Attribut wie folgt gesetzt: <br><br>
-    
-    <ul>
-      attr &lt;Name&gt; interval 3600  <br>
-    </ul>    
+    Automatischer Start der internen Queue alle X Sekunden. Alle zum Startzeitpunkt in der Queue enthaltenen Einträge
+    (z.B. mit prepareUpload eingefügt) werden abgearbeitet. Ist "0" angegeben, wird kein automatischer Start 
+    ausgeführt. (default)   
     
   </li><br>
   </ul>  
@@ -2125,6 +2240,19 @@ return;
   
     Anzahl der Versuche für das inititiale User login. <br>
     (default: 3)
+    
+  </li><br>
+  </ul>
+  
+  <ul>  
+  <a name="noAsyncFillQueue"></a>
+  <li><b>noAsyncFillQueue</b> <br> 
+  
+    Das Füllen der Upload-Queue kann in Abhängigkeit der Anzahl hochzuladender Dateien/Ordner sehr zeitaufwändig sein und FHEM
+    potentiell blockieren. Aus diesem Grund wird die Queue in einem nebenläufigen Prozess gefüllt. <br>
+    Sollen nur wenige Einträge verarbeitet werden oder bei sehr schnellen Systemen kann durch Setzen dieses Attributs auf die 
+    Verwendung des zusätzlichen Prozesses verzichtet werden. <br>
+    (default: 0)
     
   </li><br>
   </ul>
@@ -2143,7 +2271,7 @@ return;
   <a name="timeout"></a>
   <li><b>timeout  &lt;Sekunden&gt;</b> <br> 
   
-    Timeout für den Datenabruf in Sekunden. <br>
+    Timeout für die Kommunikation mit der File Station API in Sekunden. <br>
     (default: 20)
     
   </li><br>
