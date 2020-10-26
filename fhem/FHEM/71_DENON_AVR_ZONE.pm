@@ -318,10 +318,10 @@ DENON_AVR_ZONE_Define($$$)
 {
 	my ($hash, $a, $h) = @_;
 	my $name = $hash->{NAME};
-	return "Usage: define <name> DENON_AVR_ZONE <zone>  ... wrong paramter count: ".int(@$a)    if(int(@$a) != 3);
+	return "Usage: define <name> DENON_AVR_ZONE <zone> <iodev> ... wrong paramter count: ".int(@$a)    if(int(@$a) != 4);
 
-	AssignIoPort($hash);
-	
+	AssignIoPort($hash, @$a[3]);
+
 	my $IOhash = $hash->{IODev};
     my $IOname = $IOhash->{NAME};
     my $zone;

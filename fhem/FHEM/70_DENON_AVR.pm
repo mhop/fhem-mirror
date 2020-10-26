@@ -31,6 +31,7 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 
@@ -1079,8 +1080,6 @@ DENON_AVR_Initialize($)
 
 	Log 5, "DENON_AVR_Initialize: Entering";
 		
-	require "$attr{global}{modpath}/FHEM/DevIo.pm";
-	
 # Provider
 	$hash->{ReadFn}	    = "DENON_AVR_Read";
 	$hash->{WriteFn}    = "DENON_AVR_Write";
@@ -2367,8 +2366,8 @@ DENON_AVR_Get($@)
 			}
 		}
 		elsif ($a[1] eq "zone")
-		{			
-			my $return = DENON_AVR_Make_Zone($name."_Zone_".$a[2], $a[2]);
+		{
+			my $return = DENON_AVR_Make_Zone($name, $name."_Zone_".$a[2], $a[2]);
 			DENON_AVR_Command_StatusRequest($hash);
 			return $return;
 		}
@@ -3719,14 +3718,14 @@ DENON_AVR_SetUsedInputs($$) {
 }
 
 #####################################
-sub 
-DENON_AVR_Make_Zone($$) {
-	my ( $name, $zone ) = @_;
+sub
+DENON_AVR_Make_Zone($$$) {
+	my ( $ioname, $name, $zone ) = @_;
 	if(!defined($defs{$name}))
 	{
-		fhem("define $name Denon_AVR_ZONE $zone");
+		fhem("define $name Denon_AVR_ZONE $zone $ioname");
 	}
-		
+
     Log3 $name, 3, "DENON_AVR $name: create Denon_AVR_ZONE $zone.";
     return "Denon_AVR_ZONE $name created by DENON_AVR";
 }
