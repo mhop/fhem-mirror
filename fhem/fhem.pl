@@ -4733,9 +4733,10 @@ readingsEndUpdate($$)
       my $reading= $userReading->{reading};
       my ($event, $eventName, $eventValue, $ownRead);
       if(defined($trigger)) {
-        map { $event  = $_ if($_ && $_ =~ m/^$trigger$/);
-              $ownRead = 1 if($_ && $_ =~ m/^$reading:/); } @{$hash->{CHANGED}};
-        next if(!$event || $ownRead);
+        map { $event  = $_ if(defined($_) && $_ =~ m/^$trigger$/);
+              $ownRead = 1 if(defined($_) && $_ =~ m/^$reading:/); }
+            @{$hash->{CHANGED}};
+        next if(!defined($event) || $ownRead);
         ($eventName, $eventValue) = ($1, $2) if($event =~ m/^([^:]*): (.*)$/);
       }
 
