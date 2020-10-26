@@ -760,7 +760,7 @@ __END__
     <b>Define</b>
     <ul>
       <code>
-        define &lt;name&gt; RandomTimer  &lt;timespec_start&gt; &lt;device&gt; &lt;timespec_stop&gt; &lt;timeToSwitch&gt;
+        define &lt;name&gt; RandomTimer  &lt;timespec_start&gt; &lt;device&gt; &lt;timespec_stop&gt; &lt;timeToSwitch&gt; [&lt;[VAR_DURATION][:VAR_START]&gt;]
       </code>
       <br>
       Defines a device, that imitates the random switch functionality of a timer clock, like a <b>FS20 ZSU</b>. The idea to create it, came from the problem, that is was always a little bit tricky to install a timer clock before holiday: finding the manual, testing it the days before and three different timer clocks with three different manuals - a horror.<br>
@@ -796,11 +796,11 @@ __END__
           The optional parameters <b>variations</b> will modify <i>timeToSwitch</i> and/or <i>timespec_start</i>, syntax is [VAR_DURATION][:VAR_START].<br>
           <ul>
             <li>VAR_DURATION will turn <i>timeToSwitch</i> to a minimum value with some random seconds between zero and VAR_DURATION will be added.</li>
-            <li>VAR_START will modify <i>timespec_start</i> by adding some random seconds between zero and VAR_START.</li>
+            <li>VAR_START will modify <i>timespec_start</i> by adding some random number of seconds (between zero and VAR_START).</li>
             <b>Examples:</b><br>
             Add something between 0 and 10 minutes to <i>timeToSwitch</i>:<br>
             <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 600</code><br>
-            Randomize day's first check by half an hour:<br>
+            Randomize day's first check by up to half an hour:<br>
             <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 :1800</code><br>
             Do both:<br>
             <code>defmod Zufall1 RandomTimer *06:00 MYSENSOR_98 22:00:00 3600 600:1800</code><br>
@@ -814,7 +814,7 @@ __END__
           <code>
             define ZufallsTimerTisch RandomTimer *{sunset_abs()} StehlampeTisch +03:00:00 500
           </code><br>
-          defines a timer that starts at sunset an ends 3 hous later. The timer trys to switch every 500 seconds(+-10%).
+          defines a timer that starts at sunset an ends 3 hous later. Every 500 seconds(+-10%), the timer will perform an evaluation of the parameters to decide whether the device has to be switched or not. 
         </li><br>
         <li>
           <code>

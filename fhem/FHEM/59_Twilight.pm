@@ -168,7 +168,7 @@ sub Twilight_Define {
     
     my $useTimer = looks_like_number($weather) || ( $DEFmayChange && $latitude  == AttrVal( 'global', 'latitude', 50.112 ) && $longitude == AttrVal( 'global', 'longitude', 8.686 ) ) ? 1 : 0;
     
-    $hash->{DEFINE} = $weather ? $weather : 1;
+    $hash->{DEFINE} = $weather ? $weather : "none";
     InternalTimer(time(), \&Twilight_Change_DEF,$hash,0) if $useTimer;
         
     return InternalTimer( time()+$useTimer, \&Twilight_Firstrun,$hash,0) if !$init_done || $useTimer;
@@ -381,7 +381,7 @@ sub Twilight_Firstrun {
     
     my $extWeatherVal = 0;
     
-    if ($attrVal) {
+    if ($attrVal && $attrVal ne "none") {
         Twilight_init_ExtWeather_usage( $hash, $attrVal );
          $extWeatherVal = ReadingsNum( $name, "cloudCover", ReadingsNum( $hash->{helper}{extWeather}{Device}, $hash->{helper}{extWeather}{Reading}, 0 ) );
         readingsSingleUpdate ( $hash, "cloudCover", $extWeatherVal, 0 ) if $extWeatherVal;
@@ -394,8 +394,9 @@ sub Twilight_Firstrun {
     #return Twilight_HandleWeatherData( $hash, 0);
     
     my $fnHash = { HASH => $hash };
-    Twilight_sunpos($fnHash) if !$attrVal;
+    Twilight_sunpos($fnHash) if !$attrVal || $attrVal eq "none";
     Twilight_Midnight($fnHash, 1);
+
     delete $hash->{DEFINE};
 
     return;
@@ -616,7 +617,7 @@ sub Twilight_TwilightTimes {
 
     my $name = $hash->{NAME};
 
-    my $swip    = !$firstrun;
+    my $swip    = $firstrun;
 
     my $lat  = $hash->{helper}{'.LATITUDE'};
     my $long = $hash->{helper}{'.LONGITUDE'};
@@ -644,8 +645,8 @@ sub Twilight_TwilightTimes {
         $hash->{TW}{$ss}{LIGHT} = $idx;
         $hash->{TW}{$sr}{STATE} = $idx + 1;
         $hash->{TW}{$ss}{STATE} = 12 - $idx;
-        #$hash->{TW}{$sr}{SWIP}  = $swip;
-        #$hash->{TW}{$ss}{SWIP}  = $swip;
+        $hash->{TW}{$sr}{SWIP}  = $swip;
+        $hash->{TW}{$ss}{SWIP}  = $swip;
 
         ( $hash->{TW}{$sr}{TIME}, $hash->{TW}{$ss}{TIME} ) =
           Twilight_calc( $hash, $deg, $idx );
@@ -682,19 +683,20 @@ sub Twilight_TwilightTimes {
     my $now              = time();
 
     #my @keyListe = qw "DEG LIGHT STATE SWIP TIME NAMENEXT";
-    my @keyListe = qw "DEG LIGHT STATE TIME NAMENEXT";
+    #my @keyListe = qw "DEG LIGHT STATE TIME NAMENEXT";
     for my $ereignis ( sort keys %{ $hash->{TW} } ) {
         next if ( $whitchTimes eq "weather" && !( $ereignis =~ m/weather/ ) );
 
         deleteSingleRegisteredInternalTimer( $ereignis, $hash, \&Twilight_fireEvent );
         
-        if ( defined $hash->{TW}{$ereignis}{TIME} && $hash->{TW}{$ereignis}{TIME} > $now ) { # had been > 0
+        if ( defined $hash->{TW}{$ereignis}{TIME} && ($hash->{TW}{$ereignis}{TIME} > $now || $firstrun) ) { # had been > 0
             #my $fnHash = 
             setRegisteredInternalTimer( $ereignis, $hash->{TW}{$ereignis}{TIME},
                 \&Twilight_fireEvent, $hash, 0 );
             #map { $fnHash->{$_} = $hash->{TW}{$ereignis}{$_} } @keyListe;
         }
     }
+    
 
 # ------------------------------------------------------------------------------
     return 1;
@@ -717,7 +719,7 @@ sub Twilight_fireEvent {
     my $deg   = $myHash->{DEG};
     my $light = $myHash->{LIGHT};
     my $state = $myHash->{STATE};
-    #my $swip  = $myHash->{SWIP};
+    my $swip  = $myHash->{SWIP};
 
     my $eventTime = $myHash->{TIME};
     my $nextEvent = $myHash->{NAMENEXT};
@@ -731,8 +733,8 @@ sub Twilight_fireEvent {
       : "undefined";
 
     my $doTrigger = !( defined( $hash->{LOCAL} ) )
-      #&& ( abs($delta) < 6 || $swip && $state gt $oldState );
-      && ( abs($delta) < 6 || $state gt $oldState );
+      && ( abs($delta) < 6 || $swip && $state gt $oldState );
+      #&& ( abs($delta) < 6 || $state gt $oldState );
 
     Log3(
         $hash, 4,
@@ -764,18 +766,19 @@ sub Twilight_Midnight {
     #my $hash = Twilight_GetHashIndirekt( $fnHash, ( caller(0) )[3] );
     return if ( !defined($hash) );
     
-    if (!defined $hash->{helper}{extWeather}{Device} || $firstrun) {
+    if (!defined $hash->{helper}{extWeather}{Device}) { # || $firstrun) {
         Twilight_TwilightTimes( $hash, "mid", $firstrun);
-        Twilight_sunposTimerSet($hash);
+        #Twilight_sunposTimerSet($hash);
+        Twilight_sunpos({HASH => $hash});
     } else {
         Twilight_HandleWeatherData( $hash, 0);
         Twilight_TwilightTimes( $hash, "mid", $firstrun); 
     }
     my $now = time();
     my $midnight = $now - secondsSinceMidnight( $now ) + DAYSECONDS + 1;
-    my $daysavingdelta = (localtime)[2] - ( localtime( time + DAYSECONDS ) )[2]; 
-    $midnight -= 19 * HOURSECONDS if $daysavingdelta == 1 && (localtime)[2] < 3;
-    $midnight -= 20 * HOURSECONDS if $daysavingdelta == -1 && (localtime)[2] < 3;
+    my $daylightsavingdelta = (localtime ( time - 2 * HOURSECONDS ) )[2] - ( localtime( time + 22 * HOURSECONDS ) )[2]; 
+    $midnight -= 19 * HOURSECONDS if $daylightsavingdelta == 1 && (localtime)[2] < 2;
+    $midnight -= 20 * HOURSECONDS if $daylightsavingdelta == -1 && (localtime)[2] < 3;
     
     return resetRegisteredInternalTimer( "Midnight", $midnight, \&Twilight_Midnight, $hash, 0 );
 
@@ -946,7 +949,7 @@ sub Twilight_sunpos {
               int( ( $dElevation - $hash->{WEATHER_HORIZON} + 12.0 ) / 18.0 *
                   1000 ) / 10;
             Log3( $hash, 3,
-                    "[$hashName] No useable cloudCover value available: ${$extWeatherHorizont}, taking existant weather horizon." );
+                    "[$hashName] No useable cloudCover value available: ${extWeatherHorizont}, taking existant weather horizon." );
         }
     }
 
@@ -1106,7 +1109,7 @@ __END__
     NOTE 1: using useExtWeather attribute may override settings in DEF.
     <br>
     <br>
-    NOTE 2: If weatherDevice-type is known, <Reading> is optional (atm only "Weather"-type devices are supported).
+    NOTE 2: If weatherDevice-type is known, <Reading> is optional (atm only "Weather" or "PROPLANTA" type devices are supported).
     <br>
     A Twilight device periodically calculates the times of different twilight phases throughout the day.
     It calculates a virtual "light" element, that gives an indicator about the amount of the current daylight.
@@ -1257,7 +1260,7 @@ Example:
     <br><br>
     Hinweis 1: Eventuelle Angaben im useExtWeather-Attribut &uumlberschreiben die Angaben im define.
     <br>
-    Hinweis 2: Bei bekannten Wetter-Device-Typen (im Moment ausschließlich: Weather) ist die Angabe des Readings optional.
+    Hinweis 2: Bei bekannten Wetter-Device-Typen (im Moment ausschließlich: Weather oder PROPLANTA) ist die Angabe des Readings optional.
     <br>
     <br>
     Ein Twilight-Device berechnet periodisch die D&auml;mmerungszeiten und -phasen w&auml;hrend des Tages.
@@ -1289,7 +1292,7 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
 
     Beispiel:
     <pre>
-      define myTwilight Twilight 49.962529 10.324845 4.5 MeinWetter_cloudCover
+      define myTwilight Twilight 49.962529 10.324845 4.5 MeinWetter:cloudCover
     </pre>
   </ul>
   <br>
