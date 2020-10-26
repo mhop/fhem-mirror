@@ -41,7 +41,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.0');
+use version; our $VERSION = version->declare('1.20.1');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1608,26 +1608,29 @@ sub purgeSendqueue {
   my $prop  = $paref->{prop} // carp "got no purgeSendqueue argument" && return;
   
   my $type  = $hash->{TYPE};
+  my $ret   = q{};
   
   if($prop eq "-all-") {
       delete $hash->{OPIDX};
       delete $data{$type}{$name}{sendqueue}{entries};
       $data{$type}{$name}{sendqueue}{index} = 0;
-      return "All entries of SendQueue are deleted";
+      $ret = "All entries of SendQueue are deleted";
   } 
   elsif($prop eq "-permError-") {
       for my $idx (keys %{$data{$type}{$name}{sendqueue}{entries}}) { 
           delete $data{$type}{$name}{sendqueue}{entries}{$idx} 
               if($data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend});            
       }
-      return qq{All entries with state "permanent send error" are deleted};
+      $ret = qq{All entries with state "permanent send error" are deleted};
   } 
   else {
       delete $data{$type}{$name}{sendqueue}{entries}{$prop};
-      return qq{SendQueue entry with index "$prop" deleted};
+      $ret = qq{SendQueue entry with index "$prop" deleted};
   }
+  
+  updQueueLength ($hash);
       
-return;
+return $ret;
 }
 
 #############################################################################################
