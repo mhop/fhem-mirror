@@ -292,7 +292,7 @@ telnet_Output($$$)
 {
   my ($hash,$ret,$nonl) = @_;
 
-  if($ret) {
+  if($ret && defined($hash->{CD})) {
     $ret = utf8ToLatin1($ret) if( $hash->{encoding} eq "latin1" );
     if(!$nonl) {        # AsyncOutput stuff
       $ret = "\n$ret\n$hash->{prompt} " if( $hash->{showPrompt});
