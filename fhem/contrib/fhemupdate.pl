@@ -33,6 +33,7 @@ system("mkdir -p fhemupdate");
 my @filelist2 = (
   "./fhem.pl.txt",
   "./CHANGED",
+  "./GPL_V2.txt",
   "./MAINTAINER.txt",
   "./configDB.pm",
   "FHEM/.*.pm",
