@@ -1,4 +1,4 @@
-REV 23032
+REV 23035
 DIR unused
 UPD 2020-10-26_19:49:05 352652 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -545,7 +545,7 @@ UPD 2019-11-19_07:45:03 23610 FHEM/98_serviced.pm
 UPD 2019-12-24_07:45:11 60214 FHEM/98_statistics.pm
 UPD 2020-09-04_07:45:02 34738 FHEM/98_structure.pm
 UPD 2018-08-26_07:45:02 12075 FHEM/98_systemd_watchdog.pm
-UPD 2020-04-13_07:45:02 20644 FHEM/98_telnet.pm
+UPD 2020-10-27_07:45:02 20668 FHEM/98_telnet.pm
 UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
 UPD 2020-10-23_07:45:03 90030 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
@@ -740,8 +740,8 @@ UPD 2020-10-26_19:49:09 4386393 docs/commandref.html
 UPD 2020-10-26_19:49:11 2724182 docs/commandref_DE.html
 UPD 2020-09-24_07:45:02 80860 docs/commandref_frame.html
 UPD 2020-09-24_07:45:02 90475 docs/commandref_frame_DE.html
-UPD 2020-10-26_19:49:13 234741 docs/commandref_modular.html
-UPD 2020-10-26_19:49:14 245461 docs/commandref_modular_DE.html
+UPD 2020-10-27_07:45:10 234741 docs/commandref_modular.html
+UPD 2020-10-27_07:45:11 245461 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
