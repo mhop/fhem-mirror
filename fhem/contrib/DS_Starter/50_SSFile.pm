@@ -159,15 +159,15 @@ my %hset = (                                                                # Ha
   prepareDownload    => { fn => \&_setDownload,            needcred => 1 },
   Upload             => { fn => \&_setUpload,              needcred => 1 },
   prepareUpload      => { fn => \&_setUpload,              needcred => 1 },
-  listUploadsDone    => { fn => \&_setlistUploadsDone,         needcred => 0 },
+  listUploadsDone    => { fn => \&_setlistUploadsDone,     needcred => 0 },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
   apiInfo            => { fn => \&_getapiInfo,             needcred => 1 },
   backgroundTaskList => { fn => \&_getbackgroundTaskList,  needcred => 1 }, 
   fileStationInfo    => { fn => \&_getfilestationInfo,     needcred => 1 },
-  fileInfo           => { fn => \&_getfileInfo,            needcred => 1 },
-  folderList         => { fn => \&_getFolderList,          needcred => 1 },
+  remoteFileInfo     => { fn => \&_getremoteFileInfo,      needcred => 1 },
+  remoteFolderList   => { fn => \&_getRemoteFolderList,    needcred => 1 },
   storedCredentials  => { fn => \&_getstoredCredentials,   needcred => 1 },
   versionNotes       => { fn => \&_getversionNotes,        needcred => 0 },
 );
@@ -176,8 +176,8 @@ my %hmodep = (                                                              # Ha
     fileStationInfo  => { fn => \&_parsefilestationInfo,    doevt => 1 },   # doevt: 1 - Events dürfen ausgelöste werden. 0 - keine Events
     backgroundTask   => { fn => \&_parsebackgroundTaskList, doevt => 1 },
     shareList        => { fn => \&_parseFiFo,               doevt => 1 },
-    folderList       => { fn => \&_parseFiFo,               doevt => 0 },
-    fileInfo         => { fn => \&_parseFiFo,               doevt => 1 },
+    remoteFolderList => { fn => \&_parseFiFo,               doevt => 0 },
+    remoteFileInfo   => { fn => \&_parseFiFo,               doevt => 1 },
     download         => { fn => \&_parseDownload,           doevt => 1 },
     upload           => { fn => \&_parseUpload,             doevt => 1 },
 );
@@ -826,8 +826,8 @@ sub Get {
                    "apiInfo:noArg ".
                    "backgroundTaskList:noArg ".
                    "fileStationInfo:noArg ".
-                   "folderList ".
-                   "fileInfo:textField-long ".
+                   "remoteFolderList ".
+                   "remoteFileInfo:textField-long ".
                    "storedCredentials:noArg ".
                    "versionNotes " 
                    ;
@@ -966,11 +966,11 @@ return;
 }
 
 ######################################################################################
-#                             Getter folderList
+#                             Getter remoteFolderList
 #  Alle freigegebenen Ordner auflisten, Dateien in einem freigegebenen Ordner 
 #  aufzählen und detaillierte Dateiinformationen erhalten
 ######################################################################################
-sub _getFolderList {
+sub _getRemoteFolderList {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -998,7 +998,7 @@ sub _getFolderList {
       
       $params = { 
           name   => $name,
-          opmode => "folderList",
+          opmode => "remoteFolderList",
           api    => "LIST",
           method => "list",                                                          
           params => "&additional=$adds&folder_path=$fp".$mo,
@@ -1027,7 +1027,7 @@ return;
 #                             Getter filefolderInfo
 #                 Informationen über die Datei(en) erhalten 
 ######################################################################################
-sub _getfileInfo {
+sub _getremoteFileInfo {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1059,7 +1059,7 @@ sub _getfileInfo {
   
   $params = { 
       name    => $name,
-      opmode  => "fileInfo",
+      opmode  => "remoteFileInfo",
       api     => "LIST",
       method  => "getinfo",                                                          
       params  => "&additional=$adds&path=$fp".$mo,
@@ -1655,10 +1655,10 @@ sub _parseFiFo {
   if($opmode eq "shareList") {
       $qal = "shares";
   }
-  elsif ($opmode eq "folderList") {
+  elsif ($opmode eq "remoteFolderList") {
       $qal = "files";
   }
-  elsif ($opmode eq "fileInfo") {
+  elsif ($opmode eq "remoteFileInfo") {
       $qal = "files";
   }
   else  {
@@ -2294,21 +2294,21 @@ return $out;
   </ul>
   
   <ul>
-  <a name="fileInfo"></a>
-  <li><b> fileInfo "&lt;File&gt;[,&lt;File&gt;,...]" </b> <br>
+  <a name="remoteFileInfo"></a>
+  <li><b> remoteFileInfo "&lt;File&gt;[,&lt;File&gt;,...]" </b> <br>
   Listet Informationen von einer oder mehreren Dateien der Synology Diskstation getrennt durch ein Komma "," auf. 
   Alle Objekte sind insgesamt in <b>"</b> einzuschließen.
   <br><br>
   
   <b>Beispiele: </b> <br>
-  get &lt;Name&gt; fileInfo "/ApplicationBackup/export.csv,/ApplicationBackup/export_2020_09_25.csv" <br>
+  get &lt;Name&gt; remoteFileInfo "/ApplicationBackup/export.csv,/ApplicationBackup/export_2020_09_25.csv" <br>
   </li><br>
   <br>
   </ul>
   
   <ul>
-  <a name="folderList"></a>
-  <li><b> folderList [&lt;args&gt;] </b> <br>
+  <a name="remoteFolderList"></a>
+  <li><b> remoteFolderList [&lt;args&gt;] </b> <br>
   Listet alle freigegebenen Ordner oder Dateien in einem angegebenen Ordner der Synology Diskstation auf und erstellt 
   detaillierte Dateiinformationen. 
   Ohne Argument werden alle freigegebenen Wurzel-Ordner aufgelistet. Ein Ordnerpfad und zusätzliche 
@@ -2327,11 +2327,11 @@ return $out;
   Objekte mit Leerzeichen im Namen sind in <b>"</b> einzuschließen. <br><br>
   
   <b>Beispiele: </b> <br>
-  get &lt;Name&gt; folderList /home <br>
-  get &lt;Name&gt; folderList "/home/30_Haus & Bau" <br>
-  get &lt;Name&gt; folderList "/home/30_Haus & Bau" filetype=file limit=2 <br>
-  get &lt;Name&gt; folderList "/home/30_Haus & Bau" sort_direction=desc <br>
-  get &lt;Name&gt; folderList /home/Lyrik pattern=doc,txt
+  get &lt;Name&gt; remoteFolderList /home <br>
+  get &lt;Name&gt; remoteFolderList "/home/30_Haus & Bau" <br>
+  get &lt;Name&gt; remoteFolderList "/home/30_Haus & Bau" filetype=file limit=2 <br>
+  get &lt;Name&gt; remoteFolderList "/home/30_Haus & Bau" sort_direction=desc <br>
+  get &lt;Name&gt; remoteFolderList /home/Lyrik pattern=doc,txt
   </li><br>
   <br>
   </ul>
