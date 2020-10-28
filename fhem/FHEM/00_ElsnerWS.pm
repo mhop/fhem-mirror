@@ -15,6 +15,7 @@ sub ElsnerWS_Delete($$);
 sub ElsnerWS_Initialize($);
 sub ElsnerWS_Read($);
 sub ElsnerWS_Ready($);
+sub ElsnerWS_Shutdown($);
 
 # trigger values for down and up commands
 my %customCmdTrigger = ('dayNight' => ['night', 'day'],
@@ -59,6 +60,7 @@ sub ElsnerWS_Initialize($) {
                       "signOfLife:select,off,on signOfLifeInterval:slider,1,1,15 timeEvent:select,no,yes updateGlobalAttr:select,no,yes " .
                       "windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay " .
                       $readingFnAttributes;
+  $hash->{ShutdownFn} = "ElsnerWS_Shutdown";
   $hash->{parseParams} = 1;
   #$hash->{NotifyOrderPrefix} = "45-";
   return;
@@ -969,6 +971,13 @@ sub ElsnerWS_Delete($$) {
       Log3 $name, 2, "ElsnerWS $gplotFile >> $count files deleted";
     }
   }
+  return undef;
+}
+
+# Shutdown
+sub ElsnerWS_Shutdown($) {
+  my ($hash) = @_;
+  DevIo_CloseDev($hash);
   return undef;
 }
 
