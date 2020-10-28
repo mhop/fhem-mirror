@@ -34,6 +34,7 @@ use MIME::Base64;
 use Time::HiRes qw(gettimeofday);
 eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no critic 'eval'
 use Data::Dumper;
+use Encode;
 
 # use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 
@@ -41,7 +42,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.1');
+use version; our $VERSION = version->declare('1.20.2');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -247,12 +248,12 @@ sub slurpFile {
   my $content   = q{};
   my $fh;
   
-  open $fh, '<', "$file" or do { Log3($name, 2, qq{$name - cannot open local File "$file": $!});
-                                 close ($fh) if($fh);
-                                 $errorcode = 9002;                                    
-                               };
+  open $fh, "<", encode("iso_8859_1", "$file") or do { Log3($name, 2, qq{$name - cannot open local File "$file": $!});
+                                                       close ($fh) if($fh);
+                                                       $errorcode = 9002;                                    
+                                                     };
   if(!$errorcode) {
-      local $/ = undef;                            # enable slurp mode, locally
+      local $/ = undef;                              # enable slurp mode, locally
       $content = <$fh>;
        
       close ($fh);
