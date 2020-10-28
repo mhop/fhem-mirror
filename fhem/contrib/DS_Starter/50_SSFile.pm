@@ -59,8 +59,7 @@ use FHEM::SynoModules::SMUtils qw( completeAPI
                                    setReadingErrorNone 
                                    login
                                    logout
-                                   moduleVersion
-                                   updQueueLength                                   
+                                   moduleVersion                                   
                                    trim
                                    slurpFile
                                    jboolmap                               
@@ -100,8 +99,12 @@ BEGIN {
           data
           defs
           devspec2array
+          FileWrite
+          FileDelete
+          FileRead
           FmtTime
           FmtDateTime
+          fhemTimeLocal
           HttpUtils_NonblockingGet
           init_done
           InternalTimer
@@ -117,7 +120,8 @@ BEGIN {
           readingsBulkUpdateIfChanged 
           readingsEndUpdate
           readingsSingleUpdate
-          setKeyValue         
+          setKeyValue
+          urlEncode          
         )
   );
   
@@ -155,6 +159,7 @@ my %hset = (                                                                # Ha
   prepareDownload    => { fn => \&_setDownload,            needcred => 1 },
   Upload             => { fn => \&_setUpload,              needcred => 1 },
   prepareUpload      => { fn => \&_setUpload,              needcred => 1 },
+  listUploadsDone    => { fn => \&_setlistUploadsDone,         needcred => 0 },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -193,11 +198,13 @@ my %vHintsExt_de = (
 );
 
 # Standardvariablen
-my $splitstr     = "!_ESC_!";                               # Split-String zur Übergabe in getCredentials, login & Co.
-my $queueStartFn = "FHEM::SSFile::getApiSites";             # Startfunktion zur Queue-Abarbeitung
-my $mbf          = 1048576;                                 # Divisionsfaktor für Megabytes
-my $kbf          = 1024;                                    # Divisionsfaktor für Kilobytes
-my $bound        = "wNWT9spu8GvTg4TJo1iN";                  # Boundary for Multipart POST
+my $splitstr     = "!_ESC_!";                                                  # Split-String zur Übergabe in getCredentials, login & Co.
+my $queueStartFn = "FHEM::SSFile::getApiSites";                                # Startfunktion zur Queue-Abarbeitung
+my $mbf          = 1048576;                                                    # Divisionsfaktor für Megabytes
+my $kbf          = 1024;                                                       # Divisionsfaktor für Kilobytes
+my $bound        = "wNWT9spu8GvTg4TJo1iN";                                     # Boundary for Multipart POST
+my $excluplddef  = "@";                                                        # vom Upload per default excludierte Objekte (Regex) 
+my $uldcache     = $attr{global}{modpath}."/FHEM/FhemUtils/Uploads_SSFile_";   # Filename-Fragment für hochgeladene Files (wird mit Devicename ergänzt)
 
 ################################################################
 sub Initialize {
@@ -218,6 +225,7 @@ sub Initialize {
  
  $hash->{AttrList} = "additionalInfo:multiple-strict,real_path,size,owner,time,perm,mount_point_type,type,volume_status ".
                      "disable:1,0 ".
+                     "excludeFromUpload:textField-long ".
                      "interval ".
                      "loginRetries:1,2,3,4,5,6,7,8,9,10 ". 
                      "noAsyncFillQueue:1,0 ".
@@ -302,7 +310,7 @@ sub Undef {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});
+  BlockingKill($hash->{HELPER}{RUNNING_PID}) if($hash->{HELPER}{RUNNING_PID});  
   delete $data{$type}{$name};
   
   RemoveInternalTimer($name);
@@ -322,6 +330,16 @@ sub DelayedShutdown {
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  
+  if($data{$type}{$name}{uploaded}) {                                              # Cache File für Uploads schreiben
+      my $json  = encode_json ($data{$type}{$name}{uploaded});
+      push my @upl, $json;
+      my $file  = $uldcache.$name;
+      my $error = FileWrite($file, @upl);
+      if ($error) {
+          Log3 ($name, 2, qq{$name - ERROR writing cache file "$file": $error}); 
+      }
+  }
 
   if($hash->{HELPER}{SID}) {
       logout($hash, $data{$type}{$name}{fileapi}, $splitstr);                      # Session alter User beenden falls vorhanden  
@@ -342,12 +360,18 @@ return 0;
 # Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
 #################################################################
 sub Delete {
-  my ($hash, $arg) = @_;
+  my $hash  = shift;
+  my $arg   = shift;
   my $name  = $hash->{NAME};
   my $index = $hash->{TYPE}."_".$hash->{NAME}."_credentials";
   
   setKeyValue($index, undef);                                                    # gespeicherte Credentials löschen
-    
+  my $file  = $uldcache.$name;
+  my $error = FileDelete($file);                                                 # Cache File für Uploads löschen
+  if ($error) {
+      Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
+  }
+      
 return;
 }
 
@@ -431,6 +455,7 @@ sub Set {
                   "Upload:textField-long ".
                   "eraseReadings:noArg ".
                   "listQueue:noArg ".
+                  "listUploadsDone:noArg ".
                   "logout:noArg ".
                   "prepareDownload:textField-long ".
                   "prepareUpload:textField-long ".
@@ -597,7 +622,8 @@ sub _setUpload {
   $remDir   =~ s/\/$//x;
   
   my $ow    = $h->{ow}   // "true";                                      # Überschreiben Steuerbit
-  my $cdir  = $h->{cdir} // "true";                                      # create Dir Steuerbit
+  my $cdir  = $h->{cdir} // "true";                                      # create Directory Steuerbit
+  my $mode  = $h->{mode} // "full";                                      # Uploadverfahren (full, inc, new:days)
   
   my @uld   = split ",", $fp;
   
@@ -616,6 +642,7 @@ sub _setUpload {
   $paref->{remDir} = $remDir;
   $paref->{ow}     = $ow;
   $paref->{cdir}   = $cdir;
+  $paref->{mode}   = $mode;
   
   my $found        = exploreFiles ($paref);
   $paref->{found}  = $found;
@@ -661,7 +688,7 @@ sub __fillUploadQueue {
       $dat .= addBodyPart (qq{content-disposition: form-data; name="create_parents"},                                                    $cdir            );
       $dat .= addBodyPart (qq{content-disposition: form-data; name="overwrite"},                                                         $ow              );
       $dat .= addBodyPart (qq{content-disposition: form-data; name="file"; filename="$fname"\r\nContent-Type: application/octet-stream}, "<FILE>", "last" );
-      
+
       my $params = { 
           name     => $name,
           opmode   => "upload",
@@ -678,7 +705,7 @@ sub __fillUploadQueue {
       }
       else {
           my $json = encode_json ($params);
-          BlockingInformParent("FHEM::SSFile::__addQueueFromBlocking", [$json], 1);         
+          BlockingInformParent("FHEM::SSFile::addQueueFromBlocking", [$json], 1);         
       }
   }
 
@@ -710,7 +737,7 @@ return;
 ###################################################################
 #        SendQueue aus BlockingCall heraus füllen
 ###################################################################
-sub __addQueueFromBlocking {
+sub addQueueFromBlocking {
   my $json = shift;
   
   my $params = decode_json ($json);
@@ -764,6 +791,18 @@ sub _setlogout {
   logout($hash, $data{$type}{$name}{fileapi}, $splitstr); 
 
 return;
+}
+
+######################################################################################
+#                             Setter listUploadsDone
+######################################################################################
+sub _setlistUploadsDone {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+ 
+  my $ret = listUploadsDone ($hash);
+                    
+return $ret;
 }
 
 ######################################################################################
@@ -1052,13 +1091,23 @@ return $ret;
 #                   initiale Startroutinen nach Restart FHEM
 ######################################################################################
 sub initOnBoot {
-  my ($name) = @_;
-  my $hash   = $defs{$name};
-  my ($ret);
+  my $name = shift;
+  my $hash = $defs{$name};
+  my $type = $hash->{TYPE};
+  
+  my $ret;
   
   RemoveInternalTimer($name, "FHEM::SSFile::initOnBoot");
   
   if ($init_done) {
+      my $file  = $uldcache.$name;
+      my ($error, @content) = FileRead ($file);                                                  # Cache File der Uploads lesen wenn vorhanden
+      
+      if(!$error) {
+          my $json                      = join "", @content;
+          $data{$type}{$name}{uploaded} = decode_json ($json);
+      }
+      
       readingsBeginUpdate($hash);
       readingsBulkUpdate ($hash, "Errorcode"  , "none");
       readingsBulkUpdate ($hash, "Error"      , "none");   
@@ -1517,10 +1566,10 @@ sub _createReadings {
   readingsEndUpdate           ($hash, $evt);
 
   readingsBeginUpdate         ($hash);
-  readingsBulkUpdateIfChanged ($hash, "Errorcode",  $errorcode   );
-  readingsBulkUpdateIfChanged ($hash, "Error",      $error       );
-  readingsBulkUpdate          ($hash, "lastUpdate", FmtTime(time));            
-  readingsBulkUpdate          ($hash, "state",      $state       );                    
+  readingsBulkUpdateIfChanged ($hash, "Errorcode",  $errorcode       );
+  readingsBulkUpdateIfChanged ($hash, "Error",      $error           );
+  readingsBulkUpdate          ($hash, "lastUpdate", FmtDateTime(time));            
+  readingsBulkUpdate          ($hash, "state",      $state           );                    
   readingsEndUpdate           ($hash, 1);   
 
   delReadings($name,1) if($data{$type}{$name}{lastUpdate});                 # Readings löschen wenn Timestamp nicht "lastUpdate"
@@ -1750,11 +1799,12 @@ sub _parseUpload {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $jdata = $paref->{jdata};
-  my $href  = $paref->{href};                             # Hash Referenz für Ergebnisreadings
+  my $href  = $paref->{href};                                                # Hash Referenz für Ergebnisreadings
   my $param = $paref->{param};
   my $head  = $param->{httpheader};
   
   my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
   my $idx   = $hash->{OPIDX};
   
   Log3 ($name, 5, "$name - Header returned:\n".$head);
@@ -1765,14 +1815,17 @@ sub _parseUpload {
   $href->{FileWriteSkipped} = $skip;
   $href->{PID}              = $jdata->{data}{pid};
   $href->{Progress}         = $jdata->{data}{progress};
-  $href->{RemoteFile}       = $file;
+  $href->{RemoteFile}       = encode("utf8", $file);
+  
+  my $obj = $data{$type}{$name}{sendqueue}{entries}{$idx}{lclFile};         # File-Objekt des aktuellen Index
   
   if($skip eq "false") {
-      Log3 ($name, 3, qq{$name - Object uploaded to "$file"});
+      $data{$type}{$name}{uploaded}{"$obj"} = { done => 1, ts => time };    # Status und Zeit des Objekt-Upload speichern 
+      Log3 ($name, 4, qq{$name - Object "$obj" uploaded});
   } else {
-      Log3 ($name, 3, qq{$name - Object upload skipped due to "$file" already exists});
+      Log3 ($name, 3, qq{$name - Object "$obj" already exists -> upload skipped});
   }
-   
+
 return;
 }
 
@@ -1845,21 +1898,48 @@ return $part;
 
 #############################################################################################
 #                       File::Find Explore Files & Directories
+#   -M File Operator: Skript-Startzeit minus Datei-Änderungszeit, in Tagen
 #############################################################################################
 sub exploreFiles {  
   my $paref  = shift;
   my $allref = $paref->{allref};
+  my $name   = $paref->{name};
+  my $mode   = $paref->{mode};                   # Backup/Upload-Mode
+  my $hash   = $paref->{hash};
+  my $type   = $hash->{TYPE};
+  
+  my $lu    = ReadingsVal($name, "lastUpdate", "");
+  
+  my $excl  = AttrVal($name, "excludeFromUpload", "");                                                             # excludierte Objekte (Regex)
+  $excl     =~ s/[\r\n]//gx;
+  my @aexcl = split /,/xms, $excl;
+  push @aexcl, $excluplddef;
+  $excl     = join "|", @aexcl;
+ 
+  my $crt = time;                                                                                                  # current runtime
+  
+  ($mode, my $wait) = split ":", $mode; 
   
   my $found;
-  for my $obj (@$allref) {                                                   # Objekte und Inhalte der Ordner auslesen für add Queue
+  for my $obj (@$allref) {                                                                                         # Objekte und Inhalte der Ordner auslesen für add Queue
       find ( { wanted   => sub {  my $file =  $File::Find::name;
                                   my $dir  =  $File::Find::dir;
-                                  $dir     =~ s/^\.//x;
-                                  $dir     =~ s/\/$//x;
-
-                                  if(-f $file && -r $file) {
+                                  
+                                  if("$file" =~ m/$excl/xs) {                                                      # File excludiert from Upload
+                                      Log3 ($name, 3, qq{$name - Object "$file" is excluded from Upload});
+                                      return;
+                                  }
+                                  
+                                  if($mode ne "full" && $data{$type}{$name}{uploaded}{"$file"}{done}) {
+                                      my $elapsed = ($crt - $data{$type}{$name}{uploaded}{"$file"}{ts}) / 86400;   # verstrichene Zeit seit dem letzten Upload des Files in Tagen
+                                      return if($mode eq "inc" && $elapsed < -M $file);
+                                  }
+                                  
+                                  if(-f $file && -r $file) { 
+                                      $dir =~ s/^\.//x;
+                                      $dir =~ s/\/$//x;
                                       $found->{"$file"} = "$dir";
-                                  }  
+                                  }
                                }, 
                no_chdir => 1 
              }, $obj 
@@ -1886,6 +1966,58 @@ sub blockingTimeout {
   checkSendRetry ($name, 0, $queueStartFn);
 
 return;
+}
+
+#############################################################################################
+#                       liefert die Informationen der bisherigen Uploads
+#############################################################################################
+sub listUploadsDone {                 
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+        
+  if (!keys %{$data{$type}{$name}{uploaded}}) {
+      return qq{No uploads have been made so far.};
+  }
+  
+  my $out  = "<html>";
+  $out .= "<div class=\"makeTable wide\"; style=\"text-align:left\"><b>Date & Time of last successful Uploads done to Synology Diskstation</b> <br>";
+  $out .= "<table class=\"block wide internals\">";
+  $out .= "<tbody>";
+  $out .= "<tr class=\"odd\">"; 
+  $out .= "<td> <b>Object</b> </td><td> <b>upload Date & Time</b> </td><td> <b>State</b> </td></tr>";
+  $out .= "<tr>";
+  $out .= "<td>               </td><td>                           </td><td>              </td></tr>";
+  
+  my $i = 0;
+  for my $idx (sort keys %{$data{$type}{$name}{uploaded}}) {
+      my $ds = $data{$type}{$name}{uploaded}{"$idx"}{done};
+      next if(!$ds);
+      my $ts = $data{$type}{$name}{uploaded}{"$idx"}{ts};
+      
+      $ds    = "success";
+      $ts    = FmtDateTime($ts);
+      
+      if ($i & 1) {                                         # $i ist ungerade
+          $out .= "<tr class=\"odd\">";
+      } 
+      else {
+          $out .= "<tr class=\"even\">";
+      }
+      $i++;
+      
+      $out .= "<td style=\"vertical-align:top\"> $idx </td>";
+      $out .= "<td style=\"vertical-align:top\"> $ts  </td>";
+      $out .= "<td style=\"vertical-align:top\"> $ds  </td>";
+      $out .= "</tr>";
+  }
+  
+  $out .= "</tbody>";
+  $out .= "</table>";
+  $out .= "</div>";
+  $out .= "</html>";
+      
+return $out;
 }
 
 1;
@@ -2124,9 +2256,11 @@ return;
   <ul>
    <table>
    <colgroup> <col width=7%> <col width=93%> </colgroup>
-     <tr><td><b>dest=</b>  </td><td><b>&lt;Ordner&gt;</b>: das File im angegebenen Pfad gespeichert (der Pfad beginnnt mit einem shared Folder und endet ohne "/")                     </td></tr>
+     <tr><td><b>dest=</b>  </td><td><b>&lt;Ordner&gt;</b>: Zielpfad zur Speicherung der Files im Synology Filesystem (der Pfad beginnnt mit einem shared Folder und endet ohne "/")    </td></tr>
      <tr><td><b>ow=  </b>  </td><td>(optional) <b>true</b>: das File wird überschrieben wenn im Ziel-Pfad vorhanden (default), <b>false</b>: das File wird nicht überschrieben         </td></tr>
      <tr><td><b>cdir=</b>  </td><td>(optional) <b>true</b>: übergeordnete(n) Ordner erstellen, falls nicht vorhanden. (default), <b>false</b>: übergeordnete(n) Ordner nicht erstellen </td></tr>
+     <tr><td><b>mode=</b>  </td><td>(optional) <b>full</b>: alle außer im Attribut excludeFromUpload angegebenen Objekte werden berücksichtigt (default)                               </td></tr>
+     <tr><td>              </td><td>(optional) <b>inc</b>: nur neue Objekte und Objekte die sich nach dem letzten Upload verändert haben werden berücksichtigt                         </td></tr>
    </table>
   </ul>
   <br>
@@ -2135,7 +2269,8 @@ return;
   set &lt;Name&gt; Upload "./text.txt" dest=/home/upload                                                               <br>
   set &lt;Name&gt; Upload "/opt/fhem/old data.txt" dest=/home/upload ow=false                                          <br>
   set &lt;Name&gt; Upload "./Archiv neu 2020.txt" dest=/home/upload                                                    <br>
-  set &lt;Name&gt; Upload "./log" dest=/home/upload                                                                    <br>
+  set &lt;Name&gt; Upload "./log" dest=/home/upload mode=inc                                                           <br>
+  set &lt;Name&gt; Upload "./" dest=/home/upload mode=inc                                                              <br>
   set &lt;Name&gt; Upload "/opt/fhem/fhem.pl,./www/images/PlotToChat.png,./log/fhem-2020-10-41.log" dest=/home/upload  <br>
   </li><br>
   </ul>
