@@ -697,7 +697,8 @@ sub __fillUploadQueue {
           reqtype  => "POST",
           header   => "Content-Type: multipart/form-data, boundary=$bound",
           lclFile  => $lcf,
-          postdata => $dat
+          postdata => $dat,
+          remFile  => $dir."/".$fname
       };
       
       if(AttrVal($name, "noAsyncFillQueue", 0)) {
@@ -1799,7 +1800,7 @@ sub _parseUpload {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $jdata = $paref->{jdata};
-  my $href  = $paref->{href};                                                # Hash Referenz für Ergebnisreadings
+  my $href  = $paref->{href};                                                                      # Hash Referenz für Ergebnisreadings
   my $param = $paref->{param};
   my $head  = $param->{httpheader};
   
@@ -1817,13 +1818,14 @@ sub _parseUpload {
   $href->{Progress}         = $jdata->{data}{progress};
   $href->{RemoteFile}       = encode("utf8", $file);
   
-  my $obj = $data{$type}{$name}{sendqueue}{entries}{$idx}{lclFile};         # File-Objekt des aktuellen Index
+  my $lclobj = $data{$type}{$name}{sendqueue}{entries}{$idx}{lclFile};                            # lokales File-Objekt des aktuellen Index
+  my $remobj = $data{$type}{$name}{sendqueue}{entries}{$idx}{remFile};                            # File-Objekt im Zielverezichnis
   
   if($skip eq "false") {
-      $data{$type}{$name}{uploaded}{"$obj"} = { done => 1, ts => time };    # Status und Zeit des Objekt-Upload speichern 
-      Log3 ($name, 4, qq{$name - Object "$obj" uploaded});
+      $data{$type}{$name}{uploaded}{"$lclobj"} = { remobj => $remobj, done => 1, ts => time };    # Status und Zeit des Objekt-Upload speichern 
+      Log3 ($name, 4, qq{$name - Object "$lclobj" uploaded});
   } else {
-      Log3 ($name, 3, qq{$name - Object "$obj" already exists -> upload skipped});
+      Log3 ($name, 3, qq{$name - Object "$remobj" already exists -> upload skipped});
   }
 
 return;
@@ -1985,15 +1987,17 @@ sub listUploadsDone {
   $out .= "<table class=\"block wide internals\">";
   $out .= "<tbody>";
   $out .= "<tr class=\"odd\">"; 
-  $out .= "<td> <b>Object</b> </td><td> <b>upload Date & Time</b> </td><td> <b>State</b> </td></tr>";
+  $out .= "<td> <b>local Object</b> </td><td> <b>remote Object</b> </td><td> <b>upload Date & Time</b> </td></tr>";
   $out .= "<tr>";
-  $out .= "<td>               </td><td>                           </td><td>              </td></tr>";
+  $out .= "<td>                     </td><td>                      </td><td>                           </td></tr>";
   
   my $i = 0;
   for my $idx (sort keys %{$data{$type}{$name}{uploaded}}) {
       my $ds = $data{$type}{$name}{uploaded}{"$idx"}{done};
       next if(!$ds);
+      
       my $ts = $data{$type}{$name}{uploaded}{"$idx"}{ts};
+      my $ro = $data{$type}{$name}{uploaded}{"$idx"}{remobj};
       
       $ds    = "success";
       $ts    = FmtDateTime($ts);
@@ -2007,8 +2011,8 @@ sub listUploadsDone {
       $i++;
       
       $out .= "<td style=\"vertical-align:top\"> $idx </td>";
+      $out .= "<td style=\"vertical-align:top\"> $ro  </td>";
       $out .= "<td style=\"vertical-align:top\"> $ts  </td>";
-      $out .= "<td style=\"vertical-align:top\"> $ds  </td>";
       $out .= "</tr>";
   }
   
