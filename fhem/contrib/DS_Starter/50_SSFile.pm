@@ -624,9 +624,10 @@ sub _setUpload {
   
   $remDir   =~ s/\/$//x;
   
-  my $ow    = $h->{ow}   // "true";                                      # Überschreiben Steuerbit
-  my $cdir  = $h->{cdir} // "true";                                      # create Directory Steuerbit
-  my $mode  = $h->{mode} // "full";                                      # Uploadverfahren (full, inc, new:days)
+  my $ow    = $h->{ow}    // "true";                                     # Überschreiben Steuerbit
+  my $cdir  = $h->{cdir}  // "true";                                     # create Directory Steuerbit
+  my $mode  = $h->{mode}  // "full";                                     # Uploadverfahren (full, inc, new:days)
+  my $struc = $h->{struc} // "true";                                     # true: Übertragung Struktur erhaltend, false: alles landet im angegebenen Dest-Verzeichnis ohne Berücksichtigung des Quellverezchnisses
   
   my @uld   = split ",", $fp;
   
@@ -645,6 +646,7 @@ sub _setUpload {
   $paref->{remDir} = $remDir;
   $paref->{ow}     = $ow;
   $paref->{cdir}   = $cdir;
+  $paref->{struc}  = $struc;
   $paref->{mode}   = $mode;
   
   my $found        = exploreFiles ($paref);
@@ -676,6 +678,7 @@ sub __fillUploadQueue {
   my $opt    = $paref->{opt};
   my $ow     = $paref->{ow};
   my $cdir   = $paref->{cdir};
+  my $struc  = $paref->{struc};
   my $found  = $paref->{found};
   
   my $hash   = $defs{$name};
@@ -684,7 +687,11 @@ sub __fillUploadQueue {
 
   for my $lcf (keys %{$found}) {
       my $fname = (split "\/", $lcf)[-1];
-      my $dir   = $remDir.$found->{"$lcf"};                             # zusammengesetztes Zielverzeichnis
+      my $dir   = $remDir.$found->{"$lcf"};                             # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
+      
+      if($struc eq "false") {                                           # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
+          $dir = $remDir;
+      }
       
       my $dat;
       $dat .= addBodyPart (qq{content-disposition: form-data; name="path"},                                                              $dir,     "first");
@@ -2285,8 +2292,8 @@ return $out;
   Im Argument <b>dest</b> ist das Zielverzeichnis auf der Synology Diskstation anzugeben. 
   Der Pfad der zu übertragenden lokalen Files/Ordner kann als absoluter oder relativer Pfad zum FHEM global 
   <b>modpath</b> angegeben werden. <br>
-  In Ordnern werden die Inhalte inklusive Subordnern ausgelesen und zur Destination Struktur erhaltend übertragen. 
-  Unterverzeichnisse werden per default in der Destination angelegt wenn sie nicht vorhanden sind. <br>  
+  Dateien und Ordner-Inhalte werden im Standard inklusive Subordner ausgelesen und zur Destination Struktur erhaltend übertragen. 
+  Unterverzeichnisse werden im Standard in der Destination angelegt wenn sie nicht vorhanden sind. <br>  
   Alle angegebenen Objekte sind insgesamt in <b>"</b> einzuschließen. <br><br>
   
   Argumente: 
@@ -2300,6 +2307,8 @@ return $out;
      <tr><td><b>cdir=</b>  </td><td>(optional) <b>true</b>: übergeordnete(n) Ordner erstellen, falls nicht vorhanden. (default), <b>false</b>: übergeordnete(n) Ordner nicht erstellen </td></tr>
      <tr><td><b>mode=</b>  </td><td>(optional) <b>full</b>: alle außer im Attribut excludeFromUpload angegebenen Objekte werden berücksichtigt (default)                               </td></tr>
      <tr><td>              </td><td>(optional) <b>inc</b>: nur neue Objekte und Objekte die sich nach dem letzten Upload verändert haben werden berücksichtigt                         </td></tr>
+     <tr><td><b>struc=</b> </td><td>(optional) <b>true</b>: alle Objekte werden inkl. ihrer Verzeichnisstruktur im Zielpfad gespeichert (default)                                      </td></tr>
+     <tr><td>              </td><td>(optional) <b>false</b>: alle Objekte werden ohne die ursprüngliche Verzeichnisstruktur im Zielpfad gespeichert                                    </td></tr>
    </table>
   </ul>
   <br>
@@ -2308,7 +2317,7 @@ return $out;
   set &lt;Name&gt; Upload "./text.txt" dest=/home/upload                                                               <br>
   set &lt;Name&gt; Upload "/opt/fhem/old data.txt" dest=/home/upload ow=false                                          <br>
   set &lt;Name&gt; Upload "./Archiv neu 2020.txt" dest=/home/upload                                                    <br>
-  set &lt;Name&gt; Upload "./log" dest=/home/upload mode=inc                                                           <br>
+  set &lt;Name&gt; Upload "./log" dest=/home/upload mode=inc struc=false                                               <br>
   set &lt;Name&gt; Upload "./" dest=/home/upload mode=inc                                                              <br>
   set &lt;Name&gt; Upload "/opt/fhem/fhem.pl,./www/images/PlotToChat.png,./log/fhem-2020-10-41.log" dest=/home/upload  <br>
   </li><br>
