@@ -333,8 +333,9 @@ sub DelayedShutdown {
   my $type = $hash->{TYPE};
   
   if($data{$type}{$name}{uploaded}) {                                              # Cache File für Uploads schreiben
+      my @upl;
       my $json  = encode_json ($data{$type}{$name}{uploaded});
-      push my @upl, $json;
+      push @upl, $json;
       my $file  = $uldcache.$name;
       my $error = FileWrite($file, @upl);
       if ($error) {
