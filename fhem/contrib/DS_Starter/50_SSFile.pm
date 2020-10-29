@@ -2316,11 +2316,14 @@ return $out;
   </ul>
   <br>
   
+  Im Zielpfad (dest= Argument) können <a href="https://metacpan.org/pod/POSIX::strftime::GNU">POSIX %-Wildcards</a> angegeben werden. <br><br>
+  
   <b>Beispiele: </b> <br>
   set &lt;Name&gt; Upload "./text.txt" dest=/home/upload                                                               <br>
   set &lt;Name&gt; Upload "/opt/fhem/old data.txt" dest=/home/upload ow=false                                          <br>
   set &lt;Name&gt; Upload "./Archiv neu 2020.txt" dest=/home/upload                                                    <br>
   set &lt;Name&gt; Upload "./log" dest=/home/upload mode=inc struc=false                                               <br>
+  set &lt;Name&gt; Upload "./log" dest=/home/upload/%Y_%m_%d_%H_%M_%S mode=full struc=false                            <br>
   set &lt;Name&gt; Upload "./" dest=/home/upload mode=inc                                                              <br>
   set &lt;Name&gt; Upload "/opt/fhem/fhem.pl,./www/images/PlotToChat.png,./log/fhem-2020-10-41.log" dest=/home/upload  <br>
   </li><br>
