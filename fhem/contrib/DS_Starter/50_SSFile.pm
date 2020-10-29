@@ -115,6 +115,7 @@ BEGIN {
           readingFnAttributes          
           ReadingsVal
           RemoveInternalTimer
+          ResolveDateWildcards
           readingsBeginUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged 
@@ -204,7 +205,7 @@ my $queueStartFn = "FHEM::SSFile::getApiSites";                                #
 my $mbf          = 1048576;                                                    # Divisionsfaktor für Megabytes
 my $kbf          = 1024;                                                       # Divisionsfaktor für Kilobytes
 my $bound        = "wNWT9spu8GvTg4TJo1iN";                                     # Boundary for Multipart POST
-my $excluplddef  = "@";                                                        # vom Upload per default excludierte Objekte (Regex) 
+my $excluplddef  = ".*@.*";                                                    # vom Upload per default excludierte Objekte (Regex) 
 my $uldcache     = $attr{global}{modpath}."/FHEM/FhemUtils/Uploads_SSFile_";   # Filename-Fragment für hochgeladene Files (wird mit Devicename ergänzt)
 
 ################################################################
@@ -623,6 +624,8 @@ sub _setUpload {
   }
   
   $remDir   =~ s/\/$//x;
+  my @t     = localtime;
+  $remDir   = ResolveDateWildcards ($remDir, @t);                        # POSIX Wildcards für Verzeichnis auflösen                       
   
   my $ow    = $h->{ow}    // "true";                                     # Überschreiben Steuerbit
   my $cdir  = $h->{cdir}  // "true";                                     # create Directory Steuerbit
@@ -1951,7 +1954,7 @@ sub exploreFiles {
       find ( { wanted   => sub {  my $file =  $File::Find::name;
                                   my $dir  =  $File::Find::dir;
                                   
-                                  if("$file" =~ m/$excl/xs) {                                                      # File excludiert from Upload
+                                  if("$file" =~ m/^$excl$/xs) {                                                      # File excludiert from Upload
                                       Log3 ($name, 3, qq{$name - Object "$file" is excluded from Upload});
                                       return;
                                   }
