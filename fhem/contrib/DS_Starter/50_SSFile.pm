@@ -160,6 +160,7 @@ my %hset = (                                                                # Ha
   Upload             => { fn => \&_setUpload,              needcred => 1 },
   prepareUpload      => { fn => \&_setUpload,              needcred => 1 },
   listUploadsDone    => { fn => \&_setlistUploadsDone,     needcred => 0 },
+  deleteUploadsDone  => { fn => \&_setdeleteUploadsDone,   needcred => 0 },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -451,6 +452,7 @@ sub Set {
   
   if($hash->{CREDENTIALS}) {
       $setlist .= "credentials ".
+                  "deleteUploadsDone:noArg ".
                   "Download:textField-long ".
                   "Upload:textField-long ".
                   "eraseReadings:noArg ".
@@ -804,6 +806,20 @@ sub _setlistUploadsDone {
   my $ret = listUploadsDone ($hash);
                     
 return $ret;
+}
+
+######################################################################################
+#                             Setter deleteUploadsDone
+######################################################################################
+sub _setdeleteUploadsDone {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $hash  = $paref->{hash};
+  my $type  = $hash->{TYPE};
+ 
+  delete $data{$type}{$name}{uploaded};
+                    
+return;
 }
 
 ######################################################################################
@@ -1987,7 +2003,7 @@ sub listUploadsDone {
   $out .= "<table class=\"block wide internals\">";
   $out .= "<tbody>";
   $out .= "<tr class=\"odd\">"; 
-  $out .= "<td> <b>local Object</b> </td><td> <b>remote Object</b> </td><td> <b>upload Date & Time</b> </td></tr>";
+  $out .= "<td> <b>local Object</b> </td><td> <b>remote Object</b> </td><td> <b>Date / Time</b> </td></tr>";
   $out .= "<tr>";
   $out .= "<td>                     </td><td>                      </td><td>                           </td></tr>";
   
@@ -2125,7 +2141,16 @@ return $out;
   Speichert die Zugangsdaten. <br>
   
   </li><br>
-  </ul> 
+  </ul>
+
+  <ul>
+  <a name="deleteUploadsDone"></a>
+  <li><b> deleteUploadsDone </b> <br>
+  
+  Löscht die Historie aller erfolgreich ausgeführten Uploads zur Synology Diskstation. <br> 
+  
+  </li><br>
+  </ul>  
   
   <ul>
   <a name="Download"></a>
@@ -2168,6 +2193,15 @@ return $out;
   Zeigt alle Einträge in der Sendequeue. Die Queue ist normalerweise nur kurz gefüllt, kann aber im Problemfall 
   dauerhaft Einträge enthalten. Dadurch kann ein bei einer Abrufaufgabe aufgetretener Fehler ermittelt und zugeordnet
   werden. <br> 
+  
+  </li><br>
+  </ul>
+  
+  <ul>
+  <a name="listUploadsDone"></a>
+  <li><b> listUploadsDone </b> <br>
+  
+  Zeigt eine Tabelle mit Datum/Zeit, Quelldatei und Zielobjekt aller erfolgreich ausgeführten Uploads zur Synology Diskstation. <br> 
   
   </li><br>
   </ul>
