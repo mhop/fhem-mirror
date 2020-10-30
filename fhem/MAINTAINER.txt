@@ -118,15 +118,14 @@ FHEM/18_CUL_HOERMANN.pm      rudolfkoenig         SlowRF
 FHEM/19_Revolt.pm            yoda_gh              SlowRF
 FHEM/19_VBUSIF.pm            Tobias/pejonp        Sonstige Systeme
 FHEM/20_FRM_AD.pm            jensb                Sonstige Systeme
-FHEM/20_FRM_I2C.pm           ntruchsess           Sonstige Systeme
+FHEM/20_FRM_I2C.pm           jensb                Sonstige Systeme
 FHEM/20_FRM_IN.pm            jensb                Sonstige Systeme
-FHEM/20_FRM_LCD.pm           ntruchsess           Sonstige Systeme (deprecated)
 FHEM/20_FRM_OUT.pm           jensb                Sonstige Systeme
 FHEM/20_FRM_PWM.pm           jensb                Sonstige Systeme
-FHEM/20_FRM_RGB.pm           ntruchsess           Sonstige Systeme
-FHEM/20_FRM_ROTENC.pm        ntruchsess           Sonstige Systeme
-FHEM/20_FRM_SERVO.pm         ntruchsess           Sonstige Systeme
-FHEM/20_FRM_STEPPER.pm       ntruchsess           Sonstige Systeme
+FHEM/20_FRM_RGB.pm           jensb                Sonstige Systeme
+FHEM/20_FRM_ROTENC.pm        jensb                Sonstige Systeme
+FHEM/20_FRM_SERVO.pm         jensb                Sonstige Systeme
+FHEM/20_FRM_STEPPER.pm       jensb                Sonstige Systeme
 FHEM/20_GUEST.pm             loredo               Automatisierung
 FHEM/20_N4HBUS.pm            okoerber             Sonstige Systeme
 FHEM/20_OWFS.pm              mfr69bs              1Wire (deprecated)
@@ -618,6 +617,7 @@ contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
 contrib/commandref*          rudolfkoenig         Sonstiges
 contrib/pre-commit           rudolfkoenig         Sonstiges
 contrib/DEBIAN/*             betateilchen         Sonstiges
+contrib/deprecated/20_FRM_LCD.pm ntruchsess       (deprecated)
 contrib/deprecated/70_Pushalot.pm Talkabout       (deprecated)
 contrib/deprecated/95_PachLog.pm  rudolfkoenig/orphan (deprecated)
 contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung

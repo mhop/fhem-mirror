@@ -1,36 +1,41 @@
 ########################################################################################
-#
 # $Id$
-#
-# FHEM module for one Firmata PWM output pin
-#
 ########################################################################################
-#
-#  LICENSE AND COPYRIGHT
-#
-#  Copyright (C) 2013 ntruchess
-#  Copyright (C) 2016 jensb
-#
-#  All rights reserved
-#
-#  This script is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#
-#  The GNU General Public License can be found at
-#  http://www.gnu.org/copyleft/gpl.html.
-#  A copy is found in the textfile GPL.txt and important notices to the license
-#  from the author is found in LICENSE.txt distributed with these scripts.
-#
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-#  GNU General Public License for more details.
-#
-#  This copyright notice MUST APPEAR in all copies of the script!
-#
-########################################################################################
+
+=encoding UTF-8
+
+=head1 NAME
+
+FHEM module for one Firmata PWM output pin
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright (C) 2013 ntruchess
+Copyright (C) 2016 jensb
+
+All rights reserved
+
+This script is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This script is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this script; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+A copy of the GNU General Public License, Version 2 can also be found at
+
+http://www.gnu.org/licenses/old-licenses/gpl-2.0.
+
+This copyright notice MUST APPEAR in all copies of the script!
+
+=cut
 
 package main;
 
@@ -39,37 +44,34 @@ use warnings;
 
 #add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
 BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
+  if (!grep(/FHEM\/lib$/,@INC)) {
+    foreach my $inc (grep(/FHEM$/,@INC)) {
+      push @INC,$inc."/lib";
+    };
+  };
 };
 
-use Device::Firmata::Constants  qw/ :all /;
 use SetExtensions qw/ :all /;
 
 #####################################
 
 my %gets = (
-  "dim"           => 0,
-  "value"         => 0,
-  "devStateIcon"  => 0,
+  "dim"   => "",
+  "value" => "",
 );
 
+# number of arguments
 my %sets = (
-  "on"                  => 0,
-  "off"                 => 0,
-  "toggle"              => 0,
-  "value"               => 1,
-  "dim:slider,0,1,100"  => 1,
-  "fadeTo"              => 2,
-  "dimUp"               => 0,
-  "dimDown"             => 0,
+  "on:noArg"           => 0,
+  "off:noArg"          => 0,
+  "toggle:noArg"       => 0,
+  "value"              => 1,
+  "dim:slider,0,1,100" => 1,
+  "dimUp:noArg"        => 0,
+  "dimDown:noArg"      => 0,
 );
 
-sub
-FRM_PWM_Initialize($)
+sub FRM_PWM_Initialize
 {
   my ($hash) = @_;
 
@@ -80,51 +82,73 @@ FRM_PWM_Initialize($)
   $hash->{UndefFn}   = "FRM_Client_Undef";
   $hash->{AttrFn}    = "FRM_PWM_Attr";
   $hash->{StateFn}   = "FRM_PWM_State";
-  
+
   $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev $main::readingFnAttributes";
   main::LoadModule("FRM");
 }
 
-sub
-FRM_PWM_Init($$)
+sub FRM_PWM_Init
 {
-	my ($hash,$args) = @_;
-	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
-	return $ret if (defined $ret);
-	my $firmata = $hash->{IODev}->{FirmataDevice};
-	my $name = $hash->{NAME};
-	my $resolution = 8;
-	if (defined $firmata->{metadata}{pwm_resolutions}) {
-		$resolution = $firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} 
-	}
-	$hash->{resolution} = $resolution;
-	$hash->{".max"} = defined $resolution ? (1<<$resolution)-1 : 255;
-	$hash->{".dim"} = 0;
-	$hash->{".toggle"} = "off"; 
-	if (! (defined AttrVal($name,"stateFormat",undef))) {
-		$main::attr{$name}{"stateFormat"} = "value";
-	}
-	my $value = ReadingsVal($name,"value",undef);
-	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
-		FRM_PWM_Set($hash,$name,"value",$value);
-	}
-	main::readingsSingleUpdate($hash,"state","Initialized",1);
-	return undef;
-}
+  my ($hash,$args) = @_;
+  my $name = $hash->{NAME};
 
-sub
-FRM_PWM_Set($@)
-{
-  my ($hash, $name, $cmd, @a) = @_;
-  
-  my @match = grep( $_ =~ /^$cmd($|:)/, keys %sets );
-  #-- check argument
-  return SetExtensions($hash, join(" ", keys %sets), $name, $cmd, @a) unless @match == 1;
-  return "$cmd expects $sets{$match[0]} parameters" unless (@a eq $sets{$match[0]});
+  if (defined($main::defs{$name}{IODev_ERROR})) {
+    return 'Perl module Device::Firmata not properly installed';
+  }
+
+  my $ret = FRM_Init_Pin_Client($hash, $args, Device::Firmata::Constants->PIN_PWM);
+  if (defined($ret)) {
+    readingsSingleUpdate($hash, 'state', "error initializing: $ret", 1);
+    return $ret;
+  }
 
   eval {
+    my $firmata = FRM_Client_FirmataDevice($hash);
+    my $resolution = 8;
+    if (defined $firmata->{metadata}{pwm_resolutions}) {
+      $resolution = $firmata->{metadata}{pwm_resolutions}{$hash->{PIN}}
+    }
+    $hash->{resolution} = $resolution;
+    $hash->{".max"} = defined $resolution ? (1<<$resolution)-1 : 255;
+    $hash->{".dim"} = 0;
+    $hash->{".toggle"} = "off";
+  };
+  if ($@) {
+    my $ret = FRM_Catch($@);
+    readingsSingleUpdate($hash, 'state', "error initializing: $ret", 1);
+    return $ret;
+  }
+
+  if (!(defined AttrVal($name,"stateFormat",undef))) {
+    $main::attr{$name}{"stateFormat"} = "value";
+  }
+
+  my $value = ReadingsVal($name,"value",undef);
+  if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+    FRM_PWM_Set($hash,$name,"value",$value);
+  }
+
+  main::readingsSingleUpdate($hash,"state","Initialized",1);
+
+  return undef;
+}
+
+sub FRM_PWM_Set
+{
+  my ($hash, $name, $cmd, @a) = @_;
+
+  return "set command missing" if(!defined($cmd));
+  my @match = grep( $_ =~ /^$cmd($|:)/, keys %sets );
+  return SetExtensions($hash, join(" ", keys %sets), $name, $cmd, @a) unless @match == 1;
+  return "$cmd requires $sets{$match[0]} argument(s)" unless (@a == $sets{$match[0]});
+
+  if (defined($main::defs{$name}{IODev_ERROR})) {
+    return 'Perl module Device::Firmata not properly installed';
+  }
+
+  my $value = shift @a;
+  eval {
     SETHANDLER: {
-      my $value = $a[0] if @a; 
       $cmd eq "on" and do {
         FRM_PWM_writeOut($hash,$hash->{".max"});
         $hash->{".toggle"} = "on";
@@ -141,7 +165,7 @@ FRM_PWM_Set($@)
           $toggle eq "off" and do {
             FRM_PWM_writeOut($hash,$hash->{".dim"});
             $hash->{".toggle"} = "up";
-            last;    
+            last;
           };
           $toggle eq "up" and do {
             FRM_PWM_writeOut($hash,$hash->{".max"});
@@ -151,7 +175,7 @@ FRM_PWM_Set($@)
           $toggle eq "on" and do {
             FRM_PWM_writeOut($hash,$hash->{".dim"});
             $hash->{".toggle"} = "down";
-            last;    
+            last;
           };
           $toggle eq "down" and do {
             FRM_PWM_writeOut($hash,0);
@@ -197,9 +221,6 @@ FRM_PWM_Set($@)
         };
         last;
       };
-      $cmd eq "fadeTo" and do {
-        die "fadeTo not implemented yet";
-      };
       $cmd eq "dimUp" and do {
         my $dim = $hash->{".dim"};
         my $max = $hash->{".max"};
@@ -230,18 +251,19 @@ FRM_PWM_Set($@)
       };
     }
   };
-	if ($@) {
-  	$@ =~ /^(.*)( at.*FHEM.*)$/;
-  	$hash->{STATE} = "error setting '$cmd': ".(defined $1 ? $1 : $@);
-		return "error setting '$hash->{NAME} $cmd': ".(defined $1 ? $1 : $@);
-	}
-	return undef;
+  if ($@) {
+    my $ret = FRM_Catch($@);
+    $hash->{STATE} = "set $cmd error: " . $ret;
+    return $hash->{STATE};
+  }
+
+  return undef;
 }
 
-sub
-FRM_PWM_writeOut($$)
+sub FRM_PWM_writeOut
 {
   my ($hash,$value) = @_;
+
   FRM_Client_FirmataDevice($hash)->analog_write($hash->{PIN},$value);
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"value",$value, 1);
@@ -249,14 +271,13 @@ FRM_PWM_writeOut($$)
   readingsEndUpdate($hash, 1);
 }
 
-sub
-FRM_PWM_Get($@)
+sub FRM_PWM_Get
 {
   my ($hash, $name, $cmd, @a) = @_;
-  
-  return "FRM_PWM: Get with unknown argument $cmd, choose one of ".join(" ", sort keys %gets)
-    unless defined($gets{$cmd});
-    
+
+  return "get command missing" if(!defined($cmd));
+  return "unknown get command '$cmd', choose one of " . join(":noArg ", sort keys %gets) . ":noArg" if(!defined($gets{$cmd}));
+
   GETHANDLER: {
     $cmd eq 'dim' and do {
       return ReadingsVal($name,"dim",undef);
@@ -264,14 +285,10 @@ FRM_PWM_Get($@)
     $cmd eq 'value' and do {
       return ReadingsVal($name,"value",undef);
     };
-    $cmd eq 'devStateIcon' and do {
-      return return "not implemented yet";
-    };
   }
 }
 
-sub
-FRM_PWM_State($$$$)
+sub FRM_PWM_State
 {
   my ($hash, $tim, $sname, $sval) = @_;
   my $name = $hash->{NAME};
@@ -291,8 +308,7 @@ FRM_PWM_State($$$$)
   return 0; # default processing by fhem.pl
 }
 
-sub
-FRM_PWM_Attr($$$$)
+sub FRM_PWM_Attr
 {
   my ($command,$name,$attribute,$value) = @_;
   my $hash = $main::defs{$name};
@@ -310,9 +326,9 @@ FRM_PWM_Attr($$$$)
     }
   };
   if ($@) {
-    $@ =~ /^(.*)( at.*FHEM.*)$/;
-    $hash->{STATE} = "error setting $attribute to $value: ".$1;
-    return "cannot $command attribute $attribute to $value for $name: ".$1;
+    my $ret = FRM_Catch($@);
+    $hash->{STATE} = "$command $attribute error: " . $ret;
+    return $hash->{STATE};
   }
 }
 
@@ -320,103 +336,151 @@ FRM_PWM_Attr($$$$)
 
 =pod
 
-  CHANGES
+=head1 CHANGES
 
   2016 jensb
     o modified subs FRM_PWM_Init and FRM_PWM_State to support attribute "restoreOnStartup"
 
+  24.08.2020 jensb
+    o check for IODev install error in Init and Set
+    o prototypes removed
+    o set argument metadata added
+    o get/set argument verifier improved
+    o module help updated
+
+  22.10.2020 jensb
+    o annotaded module help of attributes for FHEMWEB
+
 =cut
 
+
 =pod
+
+=head1 FHEM COMMANDREF METADATA
+
+=over
+
 =item device
+
 =item summary Firmata: PWM output
+
 =item summary_DE Firmata: PWM Ausgang
+
+=back
+
+=head1 INSTALLATION AND CONFIGURATION
+
 =begin html
 
-<a name="FRM_PWM"></a>
+<a name="FRM_PWM"/>
 <h3>FRM_PWM</h3>
 <ul>
-  This module represents a pin of a <a href="http://www.firmata.org">Firmata device</a> 
+  This module represents a pin of a <a href="http://www.firmata.org">Firmata device</a>
   that should be configured as a pulse width modulated output (PWM).<br><br>
-  
-  Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in the internal reading "<a href="#FRMinternals">pwm_pins</a>"<br>
-  of the FRM device (after connecting to the Firmata device) to be used as PWM output.<br><br> 
-  
-  <a name="FRM_PWMdefine"></a>
+
+  Requires a defined <a href="#FRM">FRM</a> device to work. The pin must be listed in the internal reading
+  "<a href="#FRMinternals">pwm_pins</a>" of the FRM device (after connecting to the Firmata device) to be
+  used as PWM output.<br><br>
+
+  <a name="FRM_PWMdefine"/>
   <b>Define</b>
   <ul>
-      <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code><br><br>
-      
-      Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
+    <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code><br><br>
+
+    Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
   </ul><br>
- 
-  <a name="FRM_PWMset"></a>
-  <b>Set</b><br>
+
+  <a name="FRM_PWMset"/>
+  <b>Set</b>
   <ul>
-      <li><code>set &lt;name&gt; on</code><br>
-      sets the pulse-width to 100%<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; off</code><br>
-      sets the pulse-width to 0%<br>
-      </li>
-      <li>
-      <a href="#setExtensions">set extensions</a> are supported<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; toggle</code><br>
-      toggles the pulse-width in between to the last value set by 'value' or 'dim' and 0 respectivly 100%<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; value &lt;value&gt;</code><br>
-      sets the pulse-width to the value specified<br>
-      The min value is zero and the max value depends on the Firmata device (see internal reading<br>
-      "<a href="#FRMinternals">pwm_resolutions</a>" of the FRM device). For 8 bits resolution the range
-      is 0 to 255 (also see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; dim &lt;value&gt;</code><br>
-      sets the pulse-width to the value specified in percent<br>
-      Range is from 0 to 100<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; dimUp</code><br>
-      increases the pulse-width by 10%<br>
-      </li>
-      <li>
-      <code>set &lt;name&gt; dimDown</code><br>
-      decreases the pulse-width by 10%<br>
-      </li>
+    <li><code>set &lt;name&gt; on</code><br>
+    sets the pulse-width to 100%<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; off</code><br>
+    sets the pulse-width to 0%<br>
+    </li>
+    <li>
+    <a href="#setExtensions">set extensions</a> are supported<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; toggle</code><br>
+    toggles the pulse-width in between to the last value set by 'value' or 'dim' and 0 respectivly 100%<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; value &lt;value&gt;</code><br>
+    sets the pulse-width to the value specified<br>
+    The min value is zero and the max value depends on the Firmata device (see internal reading<br>
+    "<a href="#FRMinternals">pwm_resolutions</a>" of the FRM device). For 8 bits resolution the range
+    is 0 to 255 (also see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; dim &lt;value&gt;</code><br>
+    sets the pulse-width to the value specified in percent<br>
+    Range is from 0 to 100<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; dimUp</code><br>
+    increases the pulse-width by 10%<br>
+    </li>
+    <li>
+    <code>set &lt;name&gt; dimDown</code><br>
+    decreases the pulse-width by 10%<br>
+    </li>
   </ul><br>
-  
-  <a name="FRM_PWMget"></a>
+
+  <a name="FRM_PWMget"/>
   <b>Get</b><br>
   <ul>
-  N/A
+    <li>
+    <code>get &lt;dim&gt;</code><br>
+    returns current dim setting in percent, see description for set command for more details<br>
+    </li>
+    <li>
+    <code>get &lt;value&gt;</code><br>
+    returns current dim setting, see description for set command for more details<br>
+    </li>
   </ul><br>
-  
-  <a name="FRM_PWMattr"></a>
+
+  <a name="FRM_PWMattr"/>
   <b>Attributes</b><br>
   <ul>
-      <li>restoreOnStartup &lt;on|off&gt;</li>
-      <li>restoreOnReconnect &lt;on|off&gt;</li>
-      <li><a href="#IODev">IODev</a><br>
-      Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
-      than one FRM-device defined.)
-      </li>
-      <li><a href="#eventMap">eventMap</a><br></li>
-      <li><a href="#readingFnAttributes">readingFnAttributes</a><br></li>
+    <a name="restoreOnStartup"/>
+    <li>restoreOnStartup &lt;on|off&gt;</li>
+
+    <a name="restoreOnReconnect"/>
+    <li>restoreOnReconnect &lt;on|off&gt;</li>
+
+    <a name="IODev"/>
+    <li><a href="#IODev">IODev</a><br>
+    Specify which <a href="#FRM">FRM</a> to use. Only required if there is more than one FRM-device defined.
+    </li>
+
+    <li><a href="#attributes">global attributes</a></li>
+
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul><br>
-  
-  <a name="FRM_PWMnotes"></a>
+
+  <a name="FRM_PWMnotes"/>
   <b>Notes</b><br>
   <ul>
-      <li>attribute <i>stateFormat</i><br>
-      In most cases it is a good idea to assign "value" to the attribute <i>stateFormat</i>. This will show the 
-      current value of the pin in the web interface.
-      </li>
-  </ul>  
+    <li>attribute <i>stateFormat</i><br>
+    In most cases it is a good idea to assign "value" to the attribute <i>stateFormat</i>. This will show the
+    current value of the pin in the web interface.
+    </li>
+  </ul>
 </ul><br>
 
 =end html
+
+=begin html_DE
+
+<a name="FRM_PWM"/>
+<h3>FRM_PWM</h3>
+<ul>
+  Die Modulbeschreibung von FRM_PWM gibt es nur auf <a href="commandref.html#FRM_PWM">Englisch</a>. <br>
+</ul><br>
+
+=end html_DE
+
 =cut
