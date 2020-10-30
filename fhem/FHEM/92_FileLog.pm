@@ -1163,7 +1163,7 @@ FileLog_seekTo($$$$$)
       last;
     }
     if($reformatFn) { no strict; $data = &$reformatFn($data); use strict; }
-    if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /o) {
+    if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d[ .]/o) {
       $next = seekBackOneLine($fh, $fh->tell);
       next;
     }
