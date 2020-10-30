@@ -142,7 +142,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously",
+  "0.6.0"  => "30.10.2020  Upload files may contain  ",
+  "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously, some more improvements around Upload ",
   "0.4.0"  => "18.10.2020  add reqtype to addSendqueue, new Setter prepareDownload ",
   "0.3.0"  => "16.10.2020  create Reading Hash instead of Array ",
   "0.2.0"  => "16.10.2020  some changes in subroutines ",
@@ -637,7 +638,12 @@ sub _setUpload {
   my @all;
   for my $obj (@uld) {                                                   # nicht existierende objekte aussondern
       if (! -e $obj) {
-          Log3 ($name, 3, qq{$name - The object "$obj" doesn't exist, ignore it for upload});
+          my @globes = glob ("$obj");                                    # Wildcards auflösen (https://perldoc.perl.org/functions/glob)
+          if (@globes) {
+              push (@all, @globes);
+              next;
+          }
+          Log3 ($name, 3, qq{$name - The object "$obj" doesn't exist or can't be dissolved, ignore it for upload});
           next;
       }
       push @all, $obj;
@@ -2295,7 +2301,8 @@ return $out;
   Im Argument <b>dest</b> ist das Zielverzeichnis auf der Synology Diskstation anzugeben. 
   Der Pfad der zu übertragenden lokalen Files/Ordner kann als absoluter oder relativer Pfad zum FHEM global 
   <b>modpath</b> angegeben werden. <br>
-  Dateien und Ordner-Inhalte werden im Standard inklusive Subordner ausgelesen und zur Destination Struktur erhaltend übertragen. 
+  Dateien und Ordner-Inhalte werden im Standard inklusive Subordner ausgelesen und zur Destination Struktur erhaltend übertragen.
+  Dateien können Wildcards (*.) enthalten um nur bestimmte Dateien hochzuladen. <br> 
   Unterverzeichnisse werden im Standard in der Destination angelegt wenn sie nicht vorhanden sind. <br>  
   Alle angegebenen Objekte sind insgesamt in <b>"</b> einzuschließen. <br><br>
   
@@ -2306,6 +2313,7 @@ return $out;
    <table>
    <colgroup> <col width=7%> <col width=93%> </colgroup>
      <tr><td><b>dest=</b>  </td><td><b>&lt;Ordner&gt;</b>: Zielpfad zur Speicherung der Files im Synology Filesystem (der Pfad beginnnt mit einem shared Folder und endet ohne "/")    </td></tr>
+     <tr><td>              </td><td> Es können <a href="https://metacpan.org/pod/POSIX::strftime::GNU">POSIX %-Wildcards</a> angegeben werden.                                         </td></tr> 
      <tr><td><b>ow=  </b>  </td><td>(optional) <b>true</b>: das File wird überschrieben wenn im Ziel-Pfad vorhanden (default), <b>false</b>: das File wird nicht überschrieben         </td></tr>
      <tr><td><b>cdir=</b>  </td><td>(optional) <b>true</b>: übergeordnete(n) Ordner erstellen, falls nicht vorhanden. (default), <b>false</b>: übergeordnete(n) Ordner nicht erstellen </td></tr>
      <tr><td><b>mode=</b>  </td><td>(optional) <b>full</b>: alle außer im Attribut excludeFromUpload angegebenen Objekte werden berücksichtigt (default)                               </td></tr>
@@ -2316,13 +2324,12 @@ return $out;
   </ul>
   <br>
   
-  Im Zielpfad (dest= Argument) können <a href="https://metacpan.org/pod/POSIX::strftime::GNU">POSIX %-Wildcards</a> angegeben werden. <br><br>
-  
   <b>Beispiele: </b> <br>
   set &lt;Name&gt; Upload "./text.txt" dest=/home/upload                                                               <br>
   set &lt;Name&gt; Upload "/opt/fhem/old data.txt" dest=/home/upload ow=false                                          <br>
   set &lt;Name&gt; Upload "./Archiv neu 2020.txt" dest=/home/upload                                                    <br>
   set &lt;Name&gt; Upload "./log" dest=/home/upload mode=inc struc=false                                               <br>
+  set &lt;Name&gt; Upload "./log/*.txt,./log/archive/fhem-2019-12*.*" dest=/home/upload mode=full                      <br>
   set &lt;Name&gt; Upload "./log" dest=/home/upload/%Y_%m_%d_%H_%M_%S mode=full struc=false                            <br>
   set &lt;Name&gt; Upload "./" dest=/home/upload mode=inc                                                              <br>
   set &lt;Name&gt; Upload "/opt/fhem/fhem.pl,./www/images/PlotToChat.png,./log/fhem-2020-10-41.log" dest=/home/upload  <br>
