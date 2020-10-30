@@ -142,7 +142,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.6.0"  => "30.10.2020  Upload files may contain  ",
+  "0.6.0"  => "30.10.2020  Upload files may contain wildcards *. ",
   "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously, some more improvements around Upload ",
   "0.4.0"  => "18.10.2020  add reqtype to addSendqueue, new Setter prepareDownload ",
   "0.3.0"  => "16.10.2020  create Reading Hash instead of Array ",
@@ -187,17 +187,23 @@ my %hmodep = (                                                              # Ha
 
 # Versions History extern
 my %vNotesExtern = (
+  "0.6.0"  => "30.10.2020  A new Set command Upload is integrated and the fillup upload queue routine is running asynchronously.<br>".
+                           "Some more improvements around Upload were done, e.g. Upload files may contain wildcards *.",
   "0.1.0"  => "12.10.2020  initial "
 );
 
 # Hints EN
 my %vHintsExt_en = (
-  "1" => "The module integrates Synology File Station with FHEM. "
+  "2" => "When defining the upload target paths <a href=\"https://metacpan.org/pod/POSIX::strftime::GNU\">POSIX %-Wildcards</a> can be used as part of the target path. ".
+         "This way changing upload targets can be created depending on the current timestamp.",
+  "1" => "The module integrates <a href=\"https://www.synology.com/en-global/knowledgebase/DSM/help/FileStation/FileBrowser_desc\">Synology File Station</a> with FHEM. "
 );
 
 # Hints DE
 my %vHintsExt_de = (
-  "1" => "Das Modul integriert die Synology File Station in FHEM. "
+  "2" => encode ("utf8", "Bei der Definition der Upload Zielpfade könnnen <a href=\"https://metacpan.org/pod/POSIX::strftime::GNU\">POSIX %-Wildcards</a> als Bestandteil des Zielpfads verwendet werden. ".
+         "Damit können wechselnde Uploadziele in Abhängigkeit des aktuellen Timestamps erzeugt werden."),
+  "1" => "Das Modul integriert die <a href=\"https://www.synology.com/de-de/knowledgebase/DSM/help/FileStation/FileBrowser_desc\">Synology File Station</a> in FHEM. "
 );
 
 # Standardvariablen
@@ -1953,21 +1959,25 @@ sub exploreFiles {
  
   my $crt = time;                                                                                                  # current runtime
   
-  ($mode, my $wait) = split ":", $mode; 
+  ($mode, my $d) = split ":", $mode;                                                                               # $d = Anzahl Tage bei Mode= nth:X
   
   my $found;
   for my $obj (@$allref) {                                                                                         # Objekte und Inhalte der Ordner auslesen für add Queue
       find ( { wanted   => sub {  my $file =  $File::Find::name;
                                   my $dir  =  $File::Find::dir;
                                   
-                                  if("$file" =~ m/^$excl$/xs) {                                                      # File excludiert from Upload
+                                  if("$file" =~ m/^$excl$/xs) {                                                    # File excludiert from Upload
                                       Log3 ($name, 3, qq{$name - Object "$file" is excluded from Upload});
                                       return;
                                   }
                                   
-                                  if($mode ne "full" && $data{$type}{$name}{uploaded}{"$file"}{done}) {
+                                  if($mode eq "inc" && $data{$type}{$name}{uploaded}{"$file"}{done}) {
                                       my $elapsed = ($crt - $data{$type}{$name}{uploaded}{"$file"}{ts}) / 86400;   # verstrichene Zeit seit dem letzten Upload des Files in Tagen
-                                      return if($mode eq "inc" && $elapsed < -M $file);
+                                      return if($elapsed < -M $file);
+                                  }
+                                  
+                                  if($mode eq "nth") {
+                                      return if(-M $file > $d);
                                   }
                                   
                                   if(-f $file && -r $file) { 
@@ -2306,7 +2316,7 @@ return $out;
   Unterverzeichnisse werden im Standard in der Destination angelegt wenn sie nicht vorhanden sind. <br>  
   Alle angegebenen Objekte sind insgesamt in <b>"</b> einzuschließen. <br><br>
   
-  Argumente: 
+  Pflichtargumente: 
   <br>
   
   <ul>
@@ -2314,12 +2324,23 @@ return $out;
    <colgroup> <col width=7%> <col width=93%> </colgroup>
      <tr><td><b>dest=</b>  </td><td><b>&lt;Ordner&gt;</b>: Zielpfad zur Speicherung der Files im Synology Filesystem (der Pfad beginnnt mit einem shared Folder und endet ohne "/")    </td></tr>
      <tr><td>              </td><td> Es können <a href="https://metacpan.org/pod/POSIX::strftime::GNU">POSIX %-Wildcards</a> angegeben werden.                                         </td></tr> 
-     <tr><td><b>ow=  </b>  </td><td>(optional) <b>true</b>: das File wird überschrieben wenn im Ziel-Pfad vorhanden (default), <b>false</b>: das File wird nicht überschrieben         </td></tr>
-     <tr><td><b>cdir=</b>  </td><td>(optional) <b>true</b>: übergeordnete(n) Ordner erstellen, falls nicht vorhanden. (default), <b>false</b>: übergeordnete(n) Ordner nicht erstellen </td></tr>
-     <tr><td><b>mode=</b>  </td><td>(optional) <b>full</b>: alle außer im Attribut excludeFromUpload angegebenen Objekte werden berücksichtigt (default)                               </td></tr>
-     <tr><td>              </td><td>(optional) <b>inc</b>: nur neue Objekte und Objekte die sich nach dem letzten Upload verändert haben werden berücksichtigt                         </td></tr>
-     <tr><td><b>struc=</b> </td><td>(optional) <b>true</b>: alle Objekte werden inkl. ihrer Verzeichnisstruktur im Zielpfad gespeichert (default)                                      </td></tr>
-     <tr><td>              </td><td>(optional) <b>false</b>: alle Objekte werden ohne die ursprüngliche Verzeichnisstruktur im Zielpfad gespeichert                                    </td></tr>
+   </table>
+  </ul>
+  <br>
+  
+  Optionale Argumente: 
+  <br>
+  
+  <ul>
+   <table>
+   <colgroup> <col width=7%> <col width=93%> </colgroup>
+     <tr><td><b>ow=  </b>  </td><td> <b>true</b>: das File wird überschrieben wenn im Ziel-Pfad vorhanden (default), <b>false</b>: das File wird nicht überschrieben         </td></tr>
+     <tr><td><b>cdir=</b>  </td><td> <b>true</b>: übergeordnete(n) Ordner erstellen, falls nicht vorhanden. (default), <b>false</b>: übergeordnete(n) Ordner nicht erstellen </td></tr>
+     <tr><td><b>mode=</b>  </td><td> <b>full</b>: alle außer im Attribut excludeFromUpload angegebenen Objekte werden berücksichtigt (default)                               </td></tr>
+     <tr><td>              </td><td> <b>inc</b>: nur neue Objekte und Objekte die sich nach dem letzten Upload verändert haben werden berücksichtigt                         </td></tr>
+     <tr><td>              </td><td> <b>nth:&lt;Tage&gt;</b>: nur Objekte neuer als &lt;Tage&gt; werden berücksichtigt (gebrochene Zahlen sind erlaubt, z.B. 3.6)            </td></tr>   
+     <tr><td><b>struc=</b> </td><td> <b>true</b>: alle Objekte werden inkl. ihrer Verzeichnisstruktur im Zielpfad gespeichert (default)                                      </td></tr>
+     <tr><td>              </td><td> <b>false</b>: alle Objekte werden ohne die ursprüngliche Verzeichnisstruktur im Zielpfad gespeichert                                    </td></tr>
    </table>
   </ul>
   <br>
