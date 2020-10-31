@@ -4593,7 +4593,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       if($param =~ m/^\((.*)\)$/ ){                 # list of options?
         my @parLst = split('\|',$1);
         if(  defined $parIn[$pCnt]){                # user param provided
-          if( $parIn[$pCnt] !~ m/[:\{\[\(]/ && grep/$parIn[$pCnt]/,@parLst){ # parameter not comparable or matched 
+          my ($tmp1) = map{my$foo=$_;;$foo =~ s/(.)/\\$1/g;;$foo}($parIn[$pCnt]);       
+          if( $parIn[$pCnt] !~ m/[:\{\[\(]/ && grep/$tmp1/,@parLst){ # parameter not comparable or matched 
           }
           elsif($param =~ m/([\-\d\.]*)\.\.([\-\d\.]*)/ ){# we check for min/max but not for step
             my ($min,$max) = ($1,$2);
@@ -5094,14 +5095,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $prep = $a[2];
       splice  @a,2,1;#remove prep
     }
-
     my (undef,undef,$regName,$data,$peerChnIn) = @a;
     $state = "";
     my $mdAl  = CUL_HM_getAliasModel($hash);
     my @regArr = CUL_HM_getRegN($st,$mdAl,($roleD?"00":""),($roleC?$chn:""));
     
+    my ($tmp1) = map{my$foo=$_;;$foo =~ s/(.)/\\$1/g;;$foo}($regName); # we need to consider spacial chars
     return "$regName failed: supported register are ".join(" ",sort @regArr)
-            if (!grep /^$regName$/,@regArr );
+            if (!grep /^$tmp1$/,@regArr );
 
     my $reg  = $culHmRegDefine->{$regName};
     my $conv = $reg->{c};
