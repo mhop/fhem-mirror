@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.6.1"  => "31.10.2020   ",
+  "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
@@ -1660,7 +1660,7 @@ sub _getBalanceMonthData {                 ## no critic "not used"
           $addon = createDateAddon ($params);
       }  
       
-      my $dim = $m+1-2 ? 30+(($m+1)*3%7<4) : 28+!(($y+1900)%4||($y+1900)%400*!(($y+1900)%100));        # errechnet wieviel Tage der Monat hat
+      my $dim = daysInMonth ($m+1, $y+1900);                                      # errechnet wieviel Tage der gegebene Monat hat
  
       eval { timelocal(0, 0, 0, $dim, $m, $y) } or do { $state    = (split(" at", $@))[0];
                                                         $errstate = 1;
@@ -3176,6 +3176,21 @@ sub delReadingFromBlocking {
   readingsDelete($hash, $reading);
 
 return 1;
+}
+
+################################################################
+#   errechnet wieviel Tage ein gegebener Monat eines 
+#   bestimmten Jahres hat
+#   $m: realer Monat (1..12)
+#   $y: reales Jahr  (2020)
+################################################################
+sub daysInMonth {
+  my $m = shift;
+  my $y = shift;
+
+  my $dim = $m-2?30+($m*3%7<4):28+!($y%4||$y%400*!($y%100));
+
+return $dim;
 }
 
 ################################################################
