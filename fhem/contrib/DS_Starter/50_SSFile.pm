@@ -753,6 +753,9 @@ sub __fillUploadQueueFinish {
 
   readingsSingleUpdate($hash, "state", "Upload queue fill finished", 1);
   
+  my $ql = ReadingsVal($name, "QueueLength", 0);                        # zusätzlichen Event wenn Queue Aufbau fertig
+  CommandTrigger(undef, "$name QueueLength: $ql");
+  
   if($opt ne "prepareUpload") {  
       getApiSites ($name);                                              # Queue starten
   }
@@ -1859,14 +1862,20 @@ sub _parseUpload {
   
   my $lclobj = $data{$type}{$name}{sendqueue}{entries}{$idx}{lclFile};                            # lokales File-Objekt des aktuellen Index
   my $remobj = $data{$type}{$name}{sendqueue}{entries}{$idx}{remFile};                            # File-Objekt im Zielverezichnis
+  my $trtxt;
   
   if($skip eq "false") {
       $data{$type}{$name}{uploaded}{"$lclobj"} = { remobj => $remobj, done => 1, ts => time };    # Status und Zeit des Objekt-Upload speichern 
       Log3 ($name, 4, qq{$name - Object "$lclobj" uploaded});
-  } else {
+      $trtxt = qq{Upload: local File "$lclobj" to remote File "$remobj"};  
+  } 
+  else {
       Log3 ($name, 3, qq{$name - Object "$remobj" already exists -> upload skipped});
+      $trtxt = qq{Upload: skipped upload local File "$lclobj"};
   }
 
+  CommandTrigger(undef, "$name $trtxt");
+  
 return;
 }
 
