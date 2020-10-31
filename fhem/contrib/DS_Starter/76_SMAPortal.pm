@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $
+# $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -137,7 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear ",
+  "3.6.1"  => "31.10.2020   ",
+  "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
   "3.4.1"  => "18.08.2020  add selected providerlevel to deletion blacklist # Forum: https://forum.fhem.de/index.php/topic,102112.msg1078990.html#msg1078990 ",
@@ -1611,9 +1612,12 @@ sub _getBalanceMonthData {                 ## no critic "not used"
 
   my @bd  = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
   my $tag = "balanceMonthData";
+  
+  my $d   = (localtime(time))[3];                                    # heutiges Tages-Datum (Tag)
 
   for my $bal (@bd) {
       my ($y,$m);
+      
       my $addon = "Month_";
       
       if($bal !~ /current/ixms) {
@@ -1658,15 +1662,15 @@ sub _getBalanceMonthData {                 ## no critic "not used"
           $addon = createDateAddon ($params);
       }  
  
-      eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
-                                                     $errstate = 1;
-                                                     Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
-                                                     return ($errstate,$state,$reread,$retry);
-                                                   };
+      eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                      $errstate = 1;
+                                                      Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
+                                                      return ($errstate,$state,$reread,$retry);
+                                                    };
                                                    
       Log3 ($name, 4, "$name - retrieve $tag ".($y+1900)."-".sprintf "%02d", $m+1);
                                                    
-      my $cts     = fhemTimeLocal(0, 0, 0, 1, $m, $y);
+      my $cts     = fhemTimeLocal(0, 0, 0, $d, $m, $y);
       my $offset  = fhemTzOffset($cts);
       my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
@@ -2991,13 +2995,13 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22640 2020-08-21 07:30:21Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
