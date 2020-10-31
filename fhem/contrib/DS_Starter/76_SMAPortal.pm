@@ -1612,8 +1612,6 @@ sub _getBalanceMonthData {                 ## no critic "not used"
 
   my @bd  = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
   my $tag = "balanceMonthData";
-  
-  my $d   = (localtime(time))[3];                                    # heutiges Tages-Datum (Tag)
 
   for my $bal (@bd) {
       my ($y,$m);
@@ -1661,16 +1659,18 @@ sub _getBalanceMonthData {                 ## no critic "not used"
           };        
           $addon = createDateAddon ($params);
       }  
+      
+      my $dim = $m+1-2 ? 30+(($m+1)*3%7<4) : 28+!(($y+1900)%4||($y+1900)%400*!(($y+1900)%100));        # errechnet wieviel Tage der Monat hat
  
-      eval { timelocal(0, 0, 0, $d, $m, $y) } or do { $state    = (split(" at", $@))[0];
-                                                      $errstate = 1;
-                                                      Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
-                                                      return ($errstate,$state,$reread,$retry);
-                                                    };
+      eval { timelocal(0, 0, 0, $dim, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                        $errstate = 1;
+                                                        Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
+                                                        return ($errstate,$state,$reread,$retry);
+                                                      };
                                                    
       Log3 ($name, 4, "$name - retrieve $tag ".($y+1900)."-".sprintf "%02d", $m+1);
                                                    
-      my $cts     = fhemTimeLocal(0, 0, 0, $d, $m, $y);
+      my $cts     = fhemTimeLocal(0, 0, 0, $dim, $m, $y);
       my $offset  = fhemTzOffset($cts);
       my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
