@@ -36,13 +36,13 @@ eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no 
 use Data::Dumper;
 use Encode;
 
-# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+ use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                 # Error Code Modul
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.2');
+use version; our $VERSION = version->declare('1.20.3');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1457,7 +1457,7 @@ sub __addSendqueueEntry {
                       
   $data{$type}{$name}{sendqueue}{entries}{$index} = $entry;  
 
-  updQueueLength ($hash);                                                       # update Länge der Sendequeue 
+  updQueueLength ($hash, "", 0);                                  # update Länge der Sendequeue ohne Event
       
 return;
 }
@@ -1591,7 +1591,7 @@ sub checkSendRetry {
           Log3($name, 2, qq{$name - ERROR - "$hash->{OPMODE}" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
           
           my $rst = gettimeofday()+$rs;                                                  # resend Timer 
-          updQueueLength       ($hash,$rst);                                             # updaten Länge der Sendequeue mit resend Timer
+          updQueueLength       ($hash, $rst);                                            # updaten Länge der Sendequeue mit resend Timer
           startFunctionDelayed ($name, $rst, $startfn, $name);
       }
   }
@@ -1635,11 +1635,17 @@ return $ret;
 }
 
 #############################################################################################
-#                        Länge Senedequeue updaten          
+#                        Länge Senedequeue updaten 
+#     $rst:   Resend Timestamp
+#     $evtt:  Eventtyp  0 - kein Event
+#                       1 - immer Event (Standard)
+#                       2 - Event nur bei fallendem QueueLength-Zähler
+#                       3 - Event nur bei steigendem QueueLength-Zähler
 #############################################################################################
 sub updQueueLength {
   my $hash = shift // carp $carpnohash && return; 
   my $rst  = shift;
+  my $evtt = shift // 1;
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
@@ -1647,9 +1653,20 @@ sub updQueueLength {
   
   readingsDelete ($hash, "QueueLenth");                                            # entferne Reading mit Typo
   
+  my $evt  = $evtt;
+  my $oql  = ReadingsVal($name, "QueueLength", 0);
+  
+  if ($evtt == 2) {                                                                # Events nur bei Herabzählen der Queue
+      $evt = $oql > $ql ? 1 : 0;
+  }
+ 
+  if ($evtt == 3) {                                                                # Events nur bei Heraufzählen der Queue
+      $evt = $ql > $oql ? 1 : 0;
+  } 
+  
   readingsBeginUpdate         ($hash);                                             
   readingsBulkUpdateIfChanged ($hash, "QueueLength", $ql);                         # Länge Sendqueue updaten
-  readingsEndUpdate           ($hash,1);
+  readingsEndUpdate           ($hash, $evt);
   
   my $head        = "next planned SendQueue start:";
    
