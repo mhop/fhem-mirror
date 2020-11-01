@@ -134,6 +134,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "1.11.7" => "01.11.2020  quotation marks can be used in text tag of received messages (__botCGIcheckData) ",
   "1.11.6" => "08.10.2020  add urlEncode of character codes like \x{c3}\x{85} to formString  ",
   "1.11.5" => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "1.11.4" => "05.10.2020  use setCredentials from SMUtils ",
@@ -1552,8 +1553,21 @@ sub __botCGIcheckData {
   $args =~ s/=/="/gx;
   $args .= "\"";
   
-  $args     = urlDecode($args);
-  my($a,$h) = parseParams($args);
+  $args  = urlDecode($args);
+  
+  my $ca = $args;
+  my ($teco) = $ca =~ /text="(.*)"/x;                                                  # " im Text-Tag escapen (V: 1.11.7)
+  if ($teco) {
+      $teco =~ s/"/_ESC_/gx;
+      $ca   =~ s/text="(.*)"/text="$teco"/x;
+  }
+  
+  my($a,$h) = parseParams($ca);
+  
+  for my $k (%$h) {                                                                    # Text escaped " wiederherstellen
+      next if($k ne "text");
+      $h->{$k} =~ s/_ESC_/"/gx;                                                        
+  }
   
   if (!defined($h->{botname})) {
       Log 1, "TYPE SSChatBot - ERROR - no Botname received";

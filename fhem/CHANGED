@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  50_SSChatBot: quotation marks can be used in text tag of received 
+                          messages
  - feature: 10_FRM: Device::Firmata, receiveTimeout, ... (forum #114552)
  - feature: 20_FRM_*: Device::Firmata, ... (forum #114552)
  - change:  20_FRM_LCD: removed, use I2C_LCD (forum #114552)
