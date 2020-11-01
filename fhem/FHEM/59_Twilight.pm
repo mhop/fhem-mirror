@@ -200,7 +200,7 @@ sub Twilight_Change_DEF {
     my $weather = $hash->{DEFINE};
     $weather = "" if $weather eq "none";
     if (looks_like_number($weather)) {
-        my @wd = devspec2array("TYPE=Weather");
+        my @wd = devspec2array("TYPE=Weather|PROPLANTA");
         my ($err, $wreading) = Twilight_disp_ExtWeather($hash, $wd[0]) if $wd[0];
         $weather = $err ? "" : $wd[0] ;
     }
@@ -278,7 +278,7 @@ sub Twilight_HandleWeatherData {
     $inNotify ? Log3( $hash, 5, "[$name] NotifyFn called, reading is $extWeather, last is $last" ) 
               : Log3( $hash, 5, "[$name] timer based weather update called, reading is $extWeather, last is $last" );
 
-    return if $inNotify && abs ($last - $extWeather) < 6;
+    return if $inNotify && (abs($last - $extWeather) <6 && !defined $hash->{helper}{extWeather}{dispatch} || ReadingsAge($name, "cloudCover", 0) < 3575 && defined $hash->{helper}{extWeather}{dispatch});
 
     my $weather_horizon = Twilight_getWeatherHorizon( $hash, $extWeather, 1);
             
@@ -477,16 +477,16 @@ sub Twilight_disp_ExtWeather {
     
     my $dispatch = {
         "Weather" => {
-            "cloudCover" => "cloudCover", 
+            "trigger" => "cloudCover", 
             "function" => \&getwTYPE_Weather 
          },
         "PROPLANTA" => { 
-            "cloudCover" => "fc0_cloud06",
+            "trigger" => "fc0_cloud06",
             "function" => \&getwTYPE_PROPLANTA 
         }
     };
     if (ref $dispatch->{$wtype} eq 'HASH') {
-        $extWReading =  $dispatch->{$wtype}{cloudCover};
+        $extWReading =  $dispatch->{$wtype}{trigger};
         $hash->{helper}{extWeather}{dispatch} = $dispatch->{$wtype};
     } else {
         $extWReading = "none"; 
@@ -1032,11 +1032,20 @@ sub getwTYPE_Weather {
     $ret[0] = $rAge < 24 ? ReadingsNum($extDev,"cloudCover",0) : 50;
     Log3( $hash, 5, "[$hash->{NAME}] function is called, cc is $ret[0], hours sr: $sr_hour, ss: $ss_hour" );
     
+    my $lastestFcHourVal = -1;
+    
+    for (my $i=28; $i=0; $i--) {
+      $lastestFcHourVal = ReadingsNum($extDev,"hfc${i}_cloudCover",-1);
+      last if $lastestFcHourVal > -1;
+    }
+    
+    $lastestFcHourVal = 0 if $lastestFcHourVal == -1;
+    
     my $hfc_sr = max( 0 , $sr_hour - $hour ) + $rAge; #remark: needs some additionals logic for midnight updates! (ReadingsAge()?)
     my $hfc_ss = max( 0 , $ss_hour - $hour ) + $rAge;
     
-    $ret[1] = $hfc_sr && $rAge < 24 ? ReadingsNum($extDev,"hfc${hfc_sr}_cloudCover",0) : $ret[0];
-    $ret[2] = $hfc_ss && $rAge < 24 ? ReadingsNum($extDev,"hfc${hfc_ss}_cloudCover",0) : $ret[0];
+    $ret[1] = $hfc_sr && $rAge < 24 ? ReadingsNum($extDev,"hfc${hfc_sr}_cloudCover",$lastestFcHourVal) : $ret[0];
+    $ret[2] = $hfc_ss && $rAge < 24 ? ReadingsNum($extDev,"hfc${hfc_ss}_cloudCover",$lastestFcHourVal) : $ret[0];
 
     return @ret;
 }
