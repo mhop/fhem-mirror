@@ -952,7 +952,7 @@ sub WeekdayTimer_Update {
   # Fenserkontakte abfragen - wenn einer im Status closed, dann Schaltung um 60 Sekunden verzögern
   my $winopen = WeekdayTimer_FensterOffen($hash, $newParam, $idx);
   if ($winopen) {
-    readingsSingleUpdate ($hash,  "state", ($winopen == 1 or lc($winopen) eq "true") ? "open window" : $winopen, 1);
+    readingsSingleUpdate ($hash,  "state", ($winopen eq "1" or lc($winopen) eq "true") ? "open window" : $winopen, 1);
     return;
   }
 
