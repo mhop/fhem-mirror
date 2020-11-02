@@ -1,5 +1,5 @@
 ##########################################################################################################################
-# $Id: 93_Log2Syslog.pm 21923 2020-05-12 20:00:24Z DS_Starter $
+# $Id: 93_Log2Syslog.pm 21947 2020-05-15 19:56:46Z DS_Starter $
 ##########################################################################################################################
 #       93_Log2Syslog.pm
 #
@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.3" => "02.11.2020  avoid HandleArchiving which was called in seldom (unknown) cases ",
   "5.12.2" => "15.05.2020  permit content of 'exclErrCond' to fhemLog strings ",
   "5.12.1" => "12.05.2020  add dev to check regex of 'exclErrCond' ",
   "5.12.0" => "16.04.2020  improve IETF octet count again, internal code changes for PBP ",
@@ -2290,8 +2291,6 @@ sub Log3slog {
 
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
-  my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
-  OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
           $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
@@ -2439,12 +2438,12 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{Log2Syslog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21923 2020-05-12 20:00:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21947 2020-05-15 19:56:46Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21923 2020-05-12 20:00:24Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_Log2Syslog.pm 21947 2020-05-15 19:56:46Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -2856,9 +2855,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 attr &lt;name&gt; exclErrCond Error: none, 
                         Errorcode: none,
                         Dum.Energy PV: 2853.0,, Error: none,
-                        .*Seek_Error_Rate_.*,
-                        .*Raw_Read_Error_Rate_.*,
-                        .*sabotageError:.*,
+                        Seek_Error_Rate_,
+                        Raw_Read_Error_Rate_,
+                        sabotageError:,
         </pre>
     </li>
     </ul>
@@ -3630,9 +3629,9 @@ Aug 18 21:26:54 fhemtest.myds.me 1 2017-08-18T21:26:54 fhemtest.myds.me Test_eve
 attr &lt;name&gt; exclErrCond Error: none, 
                         Errorcode: none,
                         Dum.Energy PV: 2853.0,, Error: none,
-                        .*Seek_Error_Rate_.*,
-                        .*Raw_Read_Error_Rate_.*,
-                        .*sabotageError:.*,
+                        Seek_Error_Rate_,
+                        Raw_Read_Error_Rate_,
+                        sabotageError:,
         </pre>
     </li>
     </ul>
