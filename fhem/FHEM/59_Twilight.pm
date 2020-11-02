@@ -1034,7 +1034,7 @@ sub getwTYPE_Weather {
     
     my $lastestFcHourVal = -1;
     
-    for (my $i=28; $i=0; $i--) {
+    for (my $i=28; $i>-1; $i--) {
       $lastestFcHourVal = ReadingsNum($extDev,"hfc${i}_cloudCover",-1);
       last if $lastestFcHourVal > -1;
     }
