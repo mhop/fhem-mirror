@@ -42,7 +42,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.3');
+use version; our $VERSION = version->declare('1.20.4');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -482,6 +482,7 @@ sub smUrlEncode {
       "&"       => "%26",
       "%"       => "%25",
       "+"       => "%2B",
+      " "       => "%20",
   };
   
   %$replacements = (%$replacements, %$hextourl);
@@ -1366,6 +1367,7 @@ sub _addSendqueueSimple {
    my $lclFile  = $paref->{lclFile};
    my $remFile  = $paref->{remFile};
    my $remDir   = $paref->{remDir};
+   my $timeout  = $paref->{timeout};
    
    my $hash     = $defs{$name};
    
@@ -1385,6 +1387,7 @@ sub _addSendqueueSimple {
    $entry->{lclFile}  = $lclFile   if($lclFile);
    $entry->{remFile}  = $remFile   if($remFile);
    $entry->{remDir}   = $remDir    if($remDir);
+   $entry->{timeout}  = $timeout   if($timeout);
    
    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
    
