@@ -106,6 +106,7 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.3" => "02.11.2020  avoid do Logfile archiving which was executed in seldom (unknown) cases ",
   "5.12.2" => "15.05.2020  permit content of 'exclErrCond' to fhemLog strings ",
   "5.12.1" => "12.05.2020  add dev to check regex of 'exclErrCond' ",
   "5.12.0" => "16.04.2020  improve IETF octet count again, internal code changes for PBP ",
@@ -2290,8 +2291,6 @@ sub Log3slog {
 
   my ($seconds, $microseconds) = gettimeofday();
   my @t = localtime($seconds);
-  my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
-  OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
           $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
