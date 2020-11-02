@@ -1,6 +1,6 @@
-REV 23064
+REV 23072
 DIR unused
-UPD 2020-10-31_07:45:06 352845 ./CHANGED
+UPD 2020-11-02_07:45:03 352959 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-10-31_07:45:06 42741 ./MAINTAINER.txt
 UPD 2020-10-21_07:45:03 41442 ./configDB.pm
@@ -262,7 +262,7 @@ UPD 2020-08-15_07:45:02 58131 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
-UPD 2020-10-10_07:45:02 101454 FHEM/50_SSChatBot.pm
+UPD 2020-11-02_07:45:03 102045 FHEM/50_SSChatBot.pm
 UPD 2020-10-22_07:45:02 167085 FHEM/50_TelegramBot.pm
 UPD 2015-07-28_14:05:31 18601 FHEM/50_WS300.pm
 UPD 2016-10-06_07:45:12 19924 FHEM/51_I2C_BH1750.pm
@@ -302,7 +302,7 @@ UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
 UPD 2020-05-15_07:45:03 26789 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2019-02-25_07:45:03 40604 FHEM/59_PROPLANTA.pm
-UPD 2020-10-26_19:49:05 59741 FHEM/59_Twilight.pm
+UPD 2020-11-02_07:45:03 60169 FHEM/59_Twilight.pm
 UPD 2020-04-17_07:45:02 21167 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-10-18_07:45:03 51082 FHEM/59_Weather.pm
@@ -506,7 +506,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2020-04-23_07:45:04 26890 FHEM/98_WOL.pm
-UPD 2020-10-20_07:45:05 67159 FHEM/98_WeekdayTimer.pm
+UPD 2020-11-02_07:45:03 67161 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -637,10 +637,10 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-10-17_07:45:02 272680 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-11-02_07:45:03 272888 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
-UPD 2020-10-17_07:45:02 23274 FHEM/lib/AttrTemplate/zwave.template
+UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-13_07:45:02 2001 FHEM/lib/Device/Firmata.pm
 UPD 2015-07-28_14:05:30 7846 FHEM/lib/Device/Firmata/Base.pm
 UPD 2018-01-13_07:45:02 21899 FHEM/lib/Device/Firmata/Constants.pm
@@ -735,12 +735,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-10-31_07:45:09 4390160 docs/commandref.html
-UPD 2020-10-31_07:45:12 2723788 docs/commandref_DE.html
-UPD 2020-09-24_07:45:02 80860 docs/commandref_frame.html
-UPD 2020-09-24_07:45:02 90475 docs/commandref_frame_DE.html
-UPD 2020-11-01_07:45:11 233991 docs/commandref_modular.html
-UPD 2020-11-01_07:45:12 244705 docs/commandref_modular_DE.html
+UPD 2020-11-02_07:45:07 4390158 docs/commandref.html
+UPD 2020-11-02_07:45:09 2723786 docs/commandref_DE.html
+UPD 2020-11-02_07:45:03 80858 docs/commandref_frame.html
+UPD 2020-11-02_07:45:03 90473 docs/commandref_frame_DE.html
+UPD 2020-11-02_07:45:11 233989 docs/commandref_modular.html
+UPD 2020-11-02_07:45:12 244703 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2270,7 +2270,7 @@ UPD 2020-08-23_07:45:02 31126 www/pgm2/f18.js
 UPD 2020-10-01_07:45:03 10057 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
 UPD 2020-08-18_07:45:03 62091 www/pgm2/fhemweb.js
-UPD 2019-11-26_07:45:03 13796 www/pgm2/fhemweb_colorpicker.js
+UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
 UPD 2017-11-07_07:45:02 5913 www/pgm2/fhemweb_iconLabel.js
