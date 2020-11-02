@@ -3843,25 +3843,29 @@ desc:The sonos2mqtt bridge including automated setup for speaker devices (adds 2
 filter:TYPE=MQTT2_DEVICE
 order:M_05c
 set DEVICE attrTemplate sonos2mqtt_bridge
-define n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;\
+attr DEVICE setList PauseAll:noArg sonos/cmd/pauseall\
+CheckSubscription:noArg sonos/cmd/check-subscriptions
+defmod n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;\
   set $EVTPART1 attrTemplate sonos2mqtt_speaker;\
   set $EVTPART1 x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
-define n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
+defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
   my @tv = ("S14","S11","S9");\
+  my @line = ("S5","Z90","ZP120");\
   my $url="http://$EVTPART1:1400";\
   my $xmltext = GetFileFromURL("$url/xml/device_description.xml");\
-  my ($mn)=$xmltext =~ /<modelNumber>(S[0-9]+)/;\
-  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;\
+  my ($mn)=$xmltext =~ /(S[0-9]+)/;\
+  my ($img)=$xmltext =~ /(.*)<\/url>/;\
   my $icon="Sonos2mqtt_icon-$mn";\
   my $setList=AttrVal($NAME,'setList','');\
   fhem("setreading $NAME modelNumber $mn");\
   fhem("\"wget -qO ./www/images/default/$icon.png $url$img\"");\
   fhem("attr $NAME icon $icon;sleep 4 WI;set WEB rereadicons");\
   if (grep(/$mn/, @tv)) {$setList=~s/input:Queue \{/input:Queue,TV \{/};\
+  if (grep(/$mn/, @line)) {$setList=~s/input:Queue \{/input:Queue,Line_In \{/};\
   $setList=~s/;/;;/g;\
   fhem("attr $NAME setList $setList")\
 }
-setreading DEVICE attrTemplateVersion 20200801
+setreading DEVICE attrTemplateVersion 20201102
 
   
 name:sonos2mqtt_speaker

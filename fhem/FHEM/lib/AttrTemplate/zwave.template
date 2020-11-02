@@ -243,6 +243,7 @@ filter:TYPE=ZWave
 order:03AEOTEC00000
 desc:Templates for AEOTEC/AEON Labs devices. <br>Manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/6000084017">here</a>. <br>firmware updates are available for some devices, but for updating, you have to use a separate Windows machine.
 
+
 #AEON Labs ZW095 Home Energy Meter Gen5
 name:ZW095_Home_Energy_Meter
 filter:TYPE=ZWave
@@ -306,6 +307,13 @@ option:global
 get DEVICE configAll
 setreading DEVICE attrTemplateVersion ZW100_Multisensor_USB_20201007
 
+name:ZWA005_TriSensor
+filter:TYPE=ZWave
+order:03AEOTEC0000ZWA005
+desc:Applies to AEON Labs ZWA005 TriSensor.<br>NOTE: early version!<br>The template is based on this <a href="https://forum.fhem.de/index.php/topic,115396.0.html">forum thread</a>, manufacturer info can be found <a href="https://aeotec.freshdesk.com/support/solutions/folders/6000232835">here</a>. Having an up-to-date firmware is highly recommended!
+set DEVICE configByte  4 1    ## Binary Sensor Report Enable (for seperate motion reporting)
+setreading DEVICE attrTemplateVersion ZWA005_TriSensor_20201030
+
 
 name:----Eurotronic-devices-section--------
 filter:TYPE=ZWave
@@ -325,8 +333,9 @@ par:RADIO_DIRECT_VALVE_CONTROL;Change mode to direct valve control (needs additi
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
 attr DEVICE icon ICON
 set DEVICE configByte  4 1  ## should set "send battery reports once a day"
+set DEVICE configByte  5 1  ## should set "Temperature Report Threshold" to 1 (lowest value)
+set DEVICE configByte  6 1  ## should set valve reports to 1% delta - might not lead to any report...
 option:{ RADIO_NONZWAVE_EXTERNAL_TEMP + RADIO_ZWAVE_EXTERNAL_TEMP + RADIO_NO_EXTERNAL_TEMP }
-set DEVICE configByte  6 5  ## should set valve reports to 5% delta
 option:{ RADIO_DIRECT_VALVE_CONTROL }
 set DEVICE configByte 64 31 ## should set "manufacturer specific"
 option:{ RADIO_NO_EXTERNAL_TEMP }
@@ -341,7 +350,8 @@ attr DEVICE setList sml_temperature
 #closing section
 option:global
 attr DEVICE webCmd desired-temp
+attr DEVICE userReadings energySaveHeating:setpointTemp.+energySaveHeating {ReadingsNum($name,"setpointTemp",0)}, heating:setpointTemp.+heating {ReadingsNum($name,"setpointTemp",0)}, thermostatMode:setpointTemp.+ {ReadingsVal($name,"setpointTemp",0)=~m/(heating|energySaveHeating)/; $1?$1:undef}, valve:reportedState.+(dim.[0-9.]+|off) {my $val = ReadingsVal($name,"state",0); return 0 if $val eq "off"; ReadingsNum($name,"state",0)}
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
 get  DEVICE configAll
 set DEVICE attrTemplate speechcontrol_type_thermostat
-setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201017
+setreading DEVICE attrTemplateVersion Eurotronic_Spirit_20201101
