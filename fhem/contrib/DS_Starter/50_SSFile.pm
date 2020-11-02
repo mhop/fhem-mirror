@@ -122,7 +122,8 @@ BEGIN {
           readingsEndUpdate
           readingsSingleUpdate
           setKeyValue
-          urlEncode          
+          urlEncode
+          urlDecode          
         )
   );
   
@@ -142,6 +143,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.0"  => "02.11.2020  new set command deleteRemoteObj, fix download object with space in name ",
   "0.6.0"  => "30.10.2020  Upload files may contain wildcards *. ",
   "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously, some more improvements around Upload ",
   "0.4.0"  => "18.10.2020  add reqtype to addSendqueue, new Setter prepareDownload ",
@@ -163,6 +165,7 @@ my %hset = (                                                                # Ha
   prepareUpload      => { fn => \&_setUpload,              needcred => 1 },
   listUploadsDone    => { fn => \&_setlistUploadsDone,     needcred => 0 },
   deleteUploadsDone  => { fn => \&_setdeleteUploadsDone,   needcred => 0 },
+  deleteRemoteObject => { fn => \&_setdeleteRemoteObject,  needcred => 1 },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -183,6 +186,7 @@ my %hmodep = (                                                              # Ha
     remoteFileInfo   => { fn => \&_parseFiFo,               doevt => 1 },
     download         => { fn => \&_parseDownload,           doevt => 1 },
     upload           => { fn => \&_parseUpload,             doevt => 1 },
+    deleteRemoteObj  => { fn => \&_parsedeleteRemoteObject, doevt => 1 },
 );
 
 # Versions History extern
@@ -462,6 +466,7 @@ sub Set {
   if($hash->{CREDENTIALS}) {
       $setlist .= "credentials ".
                   "deleteUploadsDone:noArg ".
+                  "deleteRemoteObject:textField-long ".
                   "Download:textField-long ".
                   "Upload:textField-long ".
                   "eraseReadings:noArg ".
@@ -846,6 +851,57 @@ sub _setdeleteUploadsDone {
   delete $data{$type}{$name}{uploaded};
                     
 return;
+}
+
+######################################################################################
+#                             Setter _setdeleteRemoteObject
+######################################################################################
+sub _setdeleteRemoteObject {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+  
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !}
+  }
+  
+  delReadings  ($name, 0);
+  
+  $arg       = smUrlEncode ($arg);
+  my ($a,$h) = parseParams ($arg);
+  my $fp     = $a->[0];
+  
+  if(!$fp) {
+      return qq{No source file or directory specified for upload !}
+  }  
+  
+  my $recursive = $h->{recursive} // "true";                             # true: Dateien rekursiv löschen innerhalb eines Ordners, false: Nur Datei/Ordner der ersten Ebene löschen 
+  
+  my @del = split ",", $fp;
+  
+  for my $dl (@del) {
+      $dl =~ s/"//xg;
+      $dl = qq{"$dl"};
+      
+      my $params = { 
+          name    => $name,
+          opmode  => "deleteRemoteObj",
+          api     => "DELETE",
+          method  => "delete",                                                          
+          params  => "&recursive=$recursive&path=$dl",
+          reqtype => "GET",
+          header  => "Accept: application/json",
+          timeout => 600,
+      };
+
+      addSendqueue ($params);  
+  }
+
+  getApiSites ($name);                                                  # Queue starten
+   
+return; 
 }
 
 ######################################################################################
@@ -1246,7 +1302,7 @@ sub getApiSites {
    
    readingsBeginUpdate ($hash);                   
    readingsBulkUpdate  ($hash, "state", "running");                    
-   readingsEndUpdate   ($hash,1);
+   readingsEndUpdate   ($hash, 1);
    
    if ($hash->{OPMODE} eq "apiInfo") {
        $data{$type}{$name}{fileapi}{PARSET} = 0;                                             # erzwinge Abruf API 
@@ -1257,12 +1313,12 @@ sub getApiSites {
        return checkSID($name);
    }
 
-   my $timeout = AttrVal($name,"timeout",20);
+   my $timeout = AttrVal($name, "timeout", 20);
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
    
    # API initialisieren und abrufen
    ####################################
-   $data{$type}{$name}{fileapi} = apistatic ("file");                                    # API Template im HELPER instanziieren
+   $data{$type}{$name}{fileapi} = apistatic ("file");                                        # API Template im HELPER instanziieren
    
    Log3 ($name, 4, "$name - API imported:\n".Dumper $data{$type}{$name}{fileapi});
      
@@ -1415,14 +1471,14 @@ sub execOp {
    my $reqtype  = $data{$type}{$name}{sendqueue}{entries}{$idx}{reqtype};
    my $header   = $data{$type}{$name}{sendqueue}{entries}{$idx}{header};
    my $postdata = $data{$type}{$name}{sendqueue}{entries}{$idx}{postdata};
+   my $toutdef  = $data{$type}{$name}{sendqueue}{entries}{$idx}{timeout} // 20;
    my $fileapi  = $data{$type}{$name}{fileapi};
    
-   my ($url,$timeout,$param,$error,$errorcode);
-
-   Log3($name, 4, "$name - start SendQueue entry index \"$idx\" ($hash->{OPMODE}) for operation."); 
-
-   $timeout = AttrVal($name, "timeout", 20);
+   my ($url,$param,$error,$errorcode);
    
+   my $timeout  = AttrVal($name, "timeout", $toutdef);
+
+   Log3($name, 4, "$name - start SendQueue entry index \"$idx\" ($hash->{OPMODE}) for operation.");    
    Log3($name, 5, "$name - HTTP-Call will be done with timeout: $timeout s");
    
    $param = {
@@ -1800,24 +1856,30 @@ sub _parseDownload {
   my $hash  = $paref->{hash};
   my $jdata = $paref->{jdata};
   my $param = $paref->{param};
+  my $href  = $paref->{href}; 
   my $head  = $param->{httpheader};
   
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
   my $idx   = $hash->{OPIDX};
   
-  my $obj   = (split "=", $data{$type}{$name}{sendqueue}{entries}{$idx}{params})[1];
+  my $obj   = urlDecode ((split "=", $data{$type}{$name}{sendqueue}{entries}{$idx}{params})[1]);
   
   Log3 ($name, 5, "$name - Header returned:\n".$head);
   
   if($head =~ /404\sNot\sFound/xms) {     
-      Log3 ($name, 2, qq{$name - Object $obj not found for download});
+      Log3 ($name, 2, qq{$name - ERROR - Object $obj not found for download});
       return 9002;                                                        # return Errorcode
+  }
+  
+  if($head =~ /400\sBad\sRequest/xms) {     
+      Log3 ($name, 2, qq{$name - ERROR - Object $obj - Bad Request});
+      return 9003;                                                        # return Errorcode
   }
   
   my $err;
   my $sp   = q{};
-  my $dest = $data{$type}{$name}{sendqueue}{entries}{$idx}{dest};
+  my $dest = urlDecode ($data{$type}{$name}{sendqueue}{entries}{$idx}{dest});
 
   open my $fh, '>', $dest or do { $err = qq{Can't open file "$dest": $!};
                                   Log3($name, 2, "$name - $err");
@@ -1830,7 +1892,9 @@ sub _parseDownload {
       close   $fh;
   }
   
-  Log3 ($name, 3, qq{$name - Object downloaded to "$dest"});
+  $href->{LocalFile} = $dest;
+  
+  Log3 ($name, 3, qq{$name - Object $obj downloaded to "$dest"});
    
 return;
 }
@@ -1876,6 +1940,30 @@ sub _parseUpload {
 
   CommandTrigger(undef, "$name $trtxt");
   
+return;
+}
+
+#############################################################################################
+#                   delete Objekt parse Funktion
+#       $jdata:   decodierte received JSON Data 
+#       $href:    Referenz zum Hash für erstellte Readings
+#############################################################################################
+sub _parsedeleteRemoteObject { 
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $jdata = $paref->{jdata};
+  my $href  = $paref->{href};
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  my $idx   = $hash->{OPIDX};
+  
+  my $obj   = urlDecode ((split "path=", $data{$type}{$name}{sendqueue}{entries}{$idx}{params})[1]);
+  
+  Log3 ($name, 3, qq{$name - remote Object $obj deleted});
+  
+  $href->{deletedRemoteFile} = $obj;
+   
 return;
 }
 
