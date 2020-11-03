@@ -1027,7 +1027,7 @@ sub getwTYPE_Weather {
     my $extDev  = $hash->{helper}{extWeather}{Device};
     my ($hour, $sr_hour, $ss_hour) = getTwilightHours($hash); 
     
-    my $rAge = int(ReadingsAge("extDev","cloudCover",0)/3600);
+    my $rAge = int(ReadingsAge($extDev,"cloudCover",0)/3600);
     
     $ret[0] = $rAge < 24 ? ReadingsNum($extDev,"cloudCover",0) : 50;
     Log3( $hash, 5, "[$hash->{NAME}] function is called, cc is $ret[0], hours sr: $sr_hour, ss: $ss_hour" );
