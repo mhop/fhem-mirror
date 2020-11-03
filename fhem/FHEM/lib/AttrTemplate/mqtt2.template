@@ -2435,6 +2435,26 @@ set DEVICE x_mqttcom announce
 attr DEVICE model shellyflood
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+# shellygas using original firmware
+name:shellygas
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shellygas using original firmware <br>Adds stateFormat, setlist, icon, devStateIcon
+order:A_16b
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+attr DEVICE icon feinstaub
+attr DEVICE devStateIcon none:ampel_gruen mild:ampel_gelb heavy:ampel_rot test:ampel_gruen
+attr DEVICE setList \
+  start_self_test:noArg shellies/DEVNAME/sensor/start_self_test\
+  mute:noArg shellies/DEVNAME/sensor/mute\
+  unmute:noArg shellies/DEVNAME/sensor/unmute\
+  x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE stateFormat gas
+deletereading -q DEVICE (?!associatedWith).*
+set DEVICE x_mqttcom announce
+attr DEVICE model shellygas
+setreading DEVICE attrTemplateVersion 20201103
+
 # shellydw using original firmware
 # contributed by majestro84, https://forum.fhem.de/index.php/topic,94060.msg1054466.html#msg1054466
 name:shellydw
@@ -3853,8 +3873,8 @@ defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
   my @line = ("S5","Z90","ZP120");\
   my $url="http://$EVTPART1:1400";\
   my $xmltext = GetFileFromURL("$url/xml/device_description.xml");\
-  my ($mn)=$xmltext =~ /(S[0-9]+)/;\
-  my ($img)=$xmltext =~ /(.*)<\/url>/;\
+  my ($mn)=$xmltext =~ /<modelNumber>([SZ]P?[0-9]{1,3})/;\
+  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;\
   my $icon="Sonos2mqtt_icon-$mn";\
   my $setList=AttrVal($NAME,'setList','');\
   fhem("setreading $NAME modelNumber $mn");\
@@ -3865,7 +3885,7 @@ defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
   $setList=~s/;/;;/g;\
   fhem("attr $NAME setList $setList")\
 }
-setreading DEVICE attrTemplateVersion 20201102
+setreading DEVICE attrTemplateVersion 20201103
 
   
 name:sonos2mqtt_speaker
