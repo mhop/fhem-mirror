@@ -796,10 +796,9 @@ FW_inlineModify()       // Do not generate a new HTML page upon pressing modify
         return FW_okDialog(resp);
       }
       if(isDef) {
+        newDef = FW_htmlQuote(newDef);
         if(newDef.indexOf("\n") >= 0)
           newDef = '<pre>'+newDef+'</pre>';
-        else
-          newDef = FW_htmlQuote(newDef);
         $("div#disp").html(newDef).css("display", "");
         $("div#edit").css("display", "none");
       }
