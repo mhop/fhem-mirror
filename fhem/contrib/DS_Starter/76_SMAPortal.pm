@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site ",
   "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
@@ -314,7 +315,7 @@ sub Initialize {
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "useRelativeNames:1,0 ".
-                           "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
+                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -1526,6 +1527,8 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
   
+  _detailViewOn ($paref);                                                         # Detailanzeige einschalten
+  
   my ($reread,$retry,$errstate) = (0,0,0); 
   
   my @bd  = split /\s+/x ,AttrVal($name, "balanceDay", "current");
@@ -1608,6 +1611,8 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                       # Referenz zum Datenarray
   
+  _detailViewOn ($paref);                                            # Detailanzeige einschalten
+  
   my ($reread,$retry,$errstate) = (0,0,0);   
 
   my @bd  = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
@@ -1615,7 +1620,6 @@ sub _getBalanceMonthData {                 ## no critic "not used"
 
   for my $bal (@bd) {
       my ($y,$m);
-      
       my $addon = "Month_";
       
       if($bal !~ /current/ixms) {
@@ -1659,7 +1663,7 @@ sub _getBalanceMonthData {                 ## no critic "not used"
           };        
           $addon = createDateAddon ($params);
       }  
-      
+
       my $dim = daysInMonth ($m+1, $y+1900);                                      # errechnet wieviel Tage der gegebene Monat hat
  
       eval { timelocal(0, 0, 0, $dim, $m, $y) } or do { $state    = (split(" at", $@))[0];
@@ -1704,6 +1708,8 @@ sub _getBalanceYearData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                                      # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
+  
+  _detailViewOn ($paref);                                                        # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
@@ -1848,6 +1854,38 @@ sub _getPlantLogbook {                   ## no critic "not used"
                                         addon    => "",
                                         daref    => $daref
                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
+#                Detailanzeige einschalten
+#             vor dem eigentlichen Datenabruf
+################################################################
+sub _detailViewOn {                      ## no critic "not used"
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                                                       # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0); 
+
+  my $tag     = "detailViewSwitch";
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"showDetailMode":"true"}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/UpdateDisplayOption',
+                                         tag      => $tag,
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractHelperData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "",
+                                         daref    => $daref
+                                      });
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -2954,6 +2992,34 @@ sub extractConsumerHistData {                                                  #
   }
   
 return;
+}
+
+################################################################
+#          Auswertung Daten aus Hilfsroutinen
+################################################################
+sub extractHelperData {
+  my $hash      = shift;
+  my $daref     = shift;             # Referenz zum Datenarray
+  my $jdata     = shift;             # empfangene JSON-Daten
+  my $addon     = shift;             # ein optionales AddOn
+  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
+  
+  my $name      = $hash->{NAME};
+  my $sd;
+  
+  Log3 ($name, 4, "$name - extracting Helper data ");
+  
+  my $data = eval{decode_json($jdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                               return;
+                                             };
+
+  if(ref $data eq "HASH") {
+      while (my ($k,$v) = each %$data) {
+          push @$daref, "$tag:$v";
+      }
+  }
+  
+return; 
 }
 
 ################################################################
