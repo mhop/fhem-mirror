@@ -1957,10 +1957,8 @@ sub __dispatchPost {
                                                      call    => $call,
                                                      tag     => $tag,
                                                      fields  => $fields,
-                                                     content => $cont,
+                                                     content => $cont
                                                   });
-                                                  
-  $ua->cookie_jar->extract_cookies($data);
                                                               
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
                                                         ua       => $ua,
@@ -2076,23 +2074,28 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my ($reread,$retry) = (0,0);
   my $data            = "";
     
-  my $v5d        = AttrVal($name, "verbose5Data", "none");
-  my $ad_content = encode("utf8", $ad->decoded_content); 
-  my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
+  my $v5d             = AttrVal($name, "verbose5Data", "none");
+  my $ad_content      = encode("utf8", $ad->decoded_content); 
+  my $act             = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
+  my $attstr          = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
   
-  my $wm1e = qq{Updating of the live data was interrupted};
-  my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
-  my $wm2e = qq{The current consumption could not be determined. The current purchased electricity is unknown};
-  my $wm2d = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
-  my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
-  my $em1d = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
-  my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
-  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
+  my $wm1e            = qq{Updating of the live data was interrupted};
+  my $wm1d            = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
+  my $wm2e            = qq{The current consumption could not be determined. The current purchased electricity is unknown};
+  my $wm2d            = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
+  my $em1e            = qq{Communication with the Sunny Home Manager is currently not possible};
+  my $em1d            = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
+  my $em2e            = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
+  my $em2d            = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
 
+  ___extractCookie ({ ua   => $ua,
+                      data => $ad,
+                      name => $name,
+                   });  
+  
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
-  my $jsonerror = $ad->header('Jsonerror') // "";                # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  my $jsonerror = $ad->header('Jsonerror') // "";                                                     # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
   
   if($jsonerror) {
       $errstate = 1;
@@ -2162,6 +2165,22 @@ sub ___analyzeData {                   ## no critic 'complexity'
   }
   
 return ($reread,$retry,$errstate,$state);
+}
+
+################################################################
+#            Cookie Daten analysieren & extrahieren
+# Die extract_cookies()-Methode sucht im HTTP::Response-Objekt, 
+# das als Argument übergeben wird, nach Set-Cookie: und 
+# Set-Cookie2: Headern.
+################################################################
+sub ___extractCookie {                   
+  my $paref = shift;
+  my $ua    = $paref->{ua};
+  my $data  = $paref->{data};           # empfangene Rohdaten
+  
+  eval { $ua->cookie_jar->extract_cookies($data) };
+  
+return;
 }
 
 ################################################################
