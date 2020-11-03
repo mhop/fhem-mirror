@@ -1004,7 +1004,13 @@ sub GetSetData {                       ## no critic 'complexity'
   
   ### Daten abrufen 
   #############################
-  if($getp ne "none") {            
+  if($getp ne "none") { 
+
+      _detailViewOn ({ name     => $name,
+                       ua       => $ua,
+                       state    => $state, 
+                       daref    => \@da
+                    }); 
 
       for my $k (keys %{$subs{$name}}) {
           next if(!$subs{$name}{$k}{doit});           
