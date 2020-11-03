@@ -949,7 +949,7 @@ sub GetSetData {                       ## no critic 'complexity'
   if($errstate) {
       $st = encode_base64 ( $state,"");
       return "$name|0|0|$errstate|$getp|$setp|$st";
-  } 
+  }
 
   ### die Anlagen Asset Daten auslesen (Funktionen aus %mandatory mit doit=1)
   ### (Hash %mandatory ist leer wenn kein SMA Home Manager eingesetzt)
@@ -1959,8 +1959,11 @@ sub __dispatchPost {
                                                      fields  => $fields,
                                                      content => $cont,
                                                   });
+                                                  
+  $ua->cookie_jar->extract_cookies($data);
                                                               
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        ua       => $ua,
                                                         errstate => $errstate,
                                                         state    => $state,
                                                         data     => $data
@@ -2067,6 +2070,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $name            = $paref->{name};
   my $errstate        = $paref->{errstate};
   my $state           = $paref->{state};
+  my $ua              = $paref->{ua};
   my $ad              = $paref->{data};
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
@@ -2075,7 +2079,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $v5d        = AttrVal($name, "verbose5Data", "none");
   my $ad_content = encode("utf8", $ad->decoded_content); 
   my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";   # Log vorbereiten
+  my $attstr     = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
   
   my $wm1e = qq{Updating of the live data was interrupted};
   my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
@@ -2089,6 +2093,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
   my $jsonerror = $ad->header('Jsonerror') // "";                # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  
   if($jsonerror) {
       $errstate = 1;
       $state    = "SMA Portal failure: "."Message -> ".$data->{Message}.",\nStackTrace -> ".$data->{StackTrace}.",\nExceptionType -> ".$data->{ExceptionType};
