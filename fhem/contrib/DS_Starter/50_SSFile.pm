@@ -2274,6 +2274,32 @@ return $out;
   Löscht die Historie aller erfolgreich ausgeführten Uploads zur Synology Diskstation. <br> 
   
   </li><br>
+  </ul>
+
+  <ul>
+  <a name="deleteRemoteObject"></a>
+  <li><b> deleteRemoteObject  "&lt;File&gt;[,&lt;File&gt;,...]" | "&lt;Ordner&gt;[,&lt;Ordner&gt;,...]" [&lt;args&gt;]</b> <br>
+  
+  Löscht die angegebenen Files oder Verzeichnisse auf der Synology Diskstation. Mehrere Objekte sind durch Komma zu trennen.
+  Verzeichnissse sind ohne "/" am Ende einzugeben. Alle angegebenen Objekte sind insgesamt in <b>"</b> einzuschließen.  <br><br>
+  
+  Optional kann als &lt;args&gt; angegeben werden: 
+  <br> 
+  
+  <ul>
+   <table>
+   <colgroup> <col width=7%> <col width=93%> </colgroup>
+     <tr><td><b>recursive=</b> </td><td><b>true</b>: Dateien innerhalb eines Ordners rekursiv löschen. (default)    </td></tr>
+     <tr><td>                  </td><td><b>false</b>: Nur erste Ebene Datei/Ordner löschen. Wenn ein zu löschender Ordner eine Datei enthält, wird ein Fehler auftreten, weil der Ordner nicht direkt gelöscht werden kann.    </td></tr>
+   </table>
+  </ul>
+  <br>
+  
+  <b>Beispiele: </b> <br>
+  set &lt;Name&gt; deleteRemoteObject "/backup/Carport-20200625-1147065130.jpg"     <br>
+  set &lt;Name&gt; deleteRemoteObject "/backup/log,/backup/cookie - old.txt"        <br>
+  set &lt;Name&gt; deleteRemoteObject "/backup/log/archive" recursive=false         <br>
+  </li><br>
   </ul>  
   
   <ul>
