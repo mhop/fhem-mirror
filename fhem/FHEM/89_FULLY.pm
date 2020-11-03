@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#  89_FULLY.pm 2.01
+#  89_FULLY.pm 2.02
 #
 #  $Id$
 #
@@ -40,7 +40,7 @@ sub FULLY_Decrypt ($);
 sub FULLY_Ping ($$);
 sub FULLY_SetPolling ($$;$);
 
-my $FULLY_VERSION = '2.01';
+my $FULLY_VERSION = '2.02';
 
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
@@ -126,12 +126,12 @@ sub FULLY_Define ($$)
 
 	$hash->{version} = $FULLY_VERSION;
 	$hash->{onForTimer} = 'off';
+	$hash->{nextUpdate} = 'off';
 	$hash->{fully}{schedule} = 0;
 	
-	my $interval = 0;
 	if (@$a == 4) {
 		if ($$a[3] =~ /^[0-9]+$/) {
-			$interval = $$a[3];
+			$hash->{fully}{interval} = $$a[3];
 		}
 		else {
 			$hash->{fully}{password} = $$a[3];
@@ -139,18 +139,25 @@ sub FULLY_Define ($$)
 	}
 	elsif (@$a == 5) {
 		$hash->{fully}{password} = $$a[3];
-		$interval = $$a[4];
+		$hash->{fully}{interval} = $$a[4];
 	}
 
 	if (!exists($hash->{fully}{password})) {
-		my ($errpass, $encpass) = getKeyValue ($name.'_password');	
-		$hash->{fully}{password} = FULLY_Decrypt ($encpass) if (!defined($errpass) && defined($encpass));
+		my ($errpass, $encpass) = getKeyValue ($name.'_password');
+		if (!defined($errpass) && defined($encpass)) {
+			$hash->{fully}{password} = FULLY_Decrypt ($encpass);
+		}
+		else {
+			FULLY_Log ($hash, 2, "Fully password not defined");
+		}
 	}
 
-	if (!$init_done || exists($hash->{fully}{password})) {
+	if (!$init_done && exists($hash->{fully}{password})) {
 		FULLY_Log ($hash, 1, "Version $FULLY_VERSION Opening device ".$hash->{host});
 		FULLY_GetDeviceInfo ($name);
-		FULLY_SetPolling ($hash, 1, $interval);
+		if (exists($hash->{fully}{interval})) {
+			FULLY_SetPolling ($hash, 1, $hash->{fully}{interval});
+		}
 	}
 	
 	if ($init_done && !exists($hash->{fully}{password}) && exists($hash->{CL})) {
@@ -219,7 +226,7 @@ sub FULLY_SetPolling ($$;$)
 {
 	my ($hash, $mode, $interval) = @_;
 	my $name = $hash->{NAME};
-	$interval //= AttrVal ($name, 'pollInterval', $FULLY_POLL_INTERVAL);
+	$interval //= AttrVal ($name, 'pollInterval', $hash->{fully}{interval} // $FULLY_POLL_INTERVAL);
 	
 	if ($mode == 0 || $interval == 0) {
 		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
@@ -229,6 +236,10 @@ sub FULLY_SetPolling ($$;$)
 	}
 	elsif ($mode == 1) {
 		RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
+		if (!exists($hash->{fully}{password})) {
+			FULLY_Log ($hash, 2, "Polling not activated. Fully password not defined");
+			return;
+		}
 		$interval = $FULLY_POLL_RANGE[0] if ($interval < $FULLY_POLL_RANGE[0]);
 		$interval = $FULLY_POLL_RANGE[1] if ($interval > $FULLY_POLL_RANGE[1]);
 		FULLY_Log ($hash, 2, "Polling activated")
@@ -320,7 +331,8 @@ sub FULLY_Set ($@)
 	my @p = ();
 	
 	return "Device disabled" if (AttrVal ($name, 'disable', 0) == 1);
-	return "No password defined for Fully access" if (!exists($hash->{fully}{password}));
+	return "FULLY: Missing password, choose one of authentication"
+		if (!exists($hash->{fully}{password}) && $opt ne 'authentication');
 	
 	my $expert = AttrVal ($name, 'expert', 0);
 	$options .= " setStringSetting setBooleanSetting" if ($expert);
@@ -334,6 +346,7 @@ sub FULLY_Set ($@)
 
 		if (!defined($password)) {
 			setKeyValue ($name."_password", undef);
+			delete $hash->{fully}{password};
 			return 'Password for FULLY authentication deleted';
 		}		
 
@@ -344,6 +357,7 @@ sub FULLY_Set ($@)
 		return "Can't store credentials. $err" if (defined($err));
 		
 		$hash->{fully}{password} = $password;
+		FULLY_SetPolling ($hash, 1);
 		
 		return 'Password for FULLY authentication stored';		
 	}
@@ -653,7 +667,12 @@ sub FULLY_ExecuteCB ($$$)
 	if ($err eq '') {
 		# Process response
 		FULLY_Log ($hash, 5, $data, 0);
-		my $result = decode_json ($data);
+		my $result = eval { decode_json ($data) };
+		if (!defined($result)) {
+			FULLY_Log ($hash, 2, "Error in JSON data");
+			return;
+		}
+		
 		if (!exists($result->{status})) {
 			$result->{status} = 'OK';
 			$result->{statustext} //= 'N/A';
