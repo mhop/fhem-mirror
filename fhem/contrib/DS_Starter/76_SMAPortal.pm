@@ -1004,13 +1004,7 @@ sub GetSetData {                       ## no critic 'complexity'
   
   ### Daten abrufen 
   #############################
-  if($getp ne "none") { 
-
-      _detailViewOn ({ name     => $name,
-                       ua       => $ua,
-                       state    => $state, 
-                       daref    => \@da
-                    }); 
+  if($getp ne "none") {            
 
       for my $k (keys %{$subs{$name}}) {
           next if(!$subs{$name}{$k}{doit});           
@@ -1879,7 +1873,7 @@ sub _detailViewOn {                      ## no critic "not used"
 
   my $tag     = "detailViewSwitch";
   my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
-  my $cont    = qq{{"showDetailMode":"true"}};
+  my $cont    = qq{{"showDetailMode":true}};
   
   ($errstate,$state) = __dispatchPost ({ name     => $name,
                                          ua       => $ua,
