@@ -162,10 +162,13 @@ sub addConfDBFiles {
     else {
         # get pathnames to archiv
         push( @pathname, $configfile ) if ($configfile);
-        Log( 2, 'backup include: ' . $configfile );
+        Log( 2, 'backup include: ' . $configfile )
+          if ($configfile);
+
         $ret = parseConfig($configfile);
         push( @pathname, $statefile ) if ($statefile);
-        Log( 2, 'backup include: ' . $statefile );
+        Log( 2, 'backup include: ' . $statefile )
+          if ($statefile);
     }
     
     return $ret;
