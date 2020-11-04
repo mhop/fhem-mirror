@@ -137,6 +137,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
+  "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
                            "extract OperationHealth key, new attr cookieDelete ",
@@ -236,9 +238,9 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 );  
 
 my %hset = (                                                                # Hash der Set-Funktion
-    credentials         => { fn => "_setCredentials"         }, 
-    getData             => { fn => "_setGetData"             },
-    createPortalGraphic => { fn => "_setCreatePortalGraphic" },     
+    credentials         => { fn => \&_setCredentials         }, 
+    getData             => { fn => \&_setGetData             },
+    createPortalGraphic => { fn => \&_setCreatePortalGraphic },     
 );
 
 my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
@@ -277,7 +279,7 @@ my @pd = qw( plantMasterData
              plantLogbook
            );
 
-
+my $defuseragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0";
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -313,7 +315,7 @@ sub Initialize {
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "useRelativeNames:1,0 ".
-                           "verbose5Data:multiple-strict,none,loginData,".$v5d." ".
+                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -371,7 +373,7 @@ return;
 ###############################################################
 #                          SMAPortal Set
 ###############################################################
-sub Set {                             ## no critic 'complexity'
+sub Set {                             
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -427,14 +429,12 @@ sub Set {                             ## no critic 'complexity'
           prop1 => $prop1,
           aref  => \@a,
       };
-      
-      no strict "refs";                                                        ## no critic 'NoStrict'  
-      if($hset{$opt}) {
-          my $ret = "";
-          $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+        
+      if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+          my $ret = q{};
+          $ret    = &{$hset{$opt}{fn}} ($params); 
           return $ret;
       }
-      use strict "refs";
 
       return "$setlist";
   } 
@@ -890,7 +890,7 @@ sub GetSetData {                       ## no critic 'complexity'
   my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
-  my $useragent          = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
+  my $useragent          = AttrVal($name, "userAgent", $defuseragent);
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                = AttrVal($name, "verbose5Data", "none"); 
   my $verbose            = AttrVal($name, "verbose", 3);
@@ -947,7 +947,7 @@ sub GetSetData {                       ## no critic 'complexity'
   if($errstate) {
       $st = encode_base64 ( $state,"");
       return "$name|0|0|$errstate|$getp|$setp|$st";
-  } 
+  }
 
   ### die Anlagen Asset Daten auslesen (Funktionen aus %mandatory mit doit=1)
   ### (Hash %mandatory ist leer wenn kein SMA Home Manager eingesetzt)
@@ -1004,13 +1004,22 @@ sub GetSetData {                       ## no critic 'complexity'
   #############################
   if($getp ne "none") {            
 
+      _detailViewOn ({ name     => $name,
+                       ua       => $ua,
+                       state    => $state, 
+                       daref    => \@da
+                    });                                      # Detailanzeige einschalten
+      
       for my $k (keys %{$subs{$name}}) {
           next if(!$subs{$name}{$k}{doit});           
+          
           no strict "refs";                                  ## no critic 'NoStrict'  
+          
           if(!defined &{$subs{$name}{$k}{func}}) {
               Log3 ($name, 2, qq{$name - WARNING - data provider '$k' call function '$subs{$name}{$k}{func}' doesn't exist and is ignored }); 
               next;
           }            
+          
           ($errstate,$state,$reread,$retry) = &{$subs{$name}{$k}{func}} ({ name     => $name,
                                                                            ua       => $ua,
                                                                            state    => $state, 
@@ -1525,6 +1534,8 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
   
+  # _detailViewOn ($paref);                                                         # Detailanzeige einschalten
+  
   my ($reread,$retry,$errstate) = (0,0,0); 
   
   my @bd  = split /\s+/x ,AttrVal($name, "balanceDay", "current");
@@ -1607,6 +1618,8 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                       # Referenz zum Datenarray
   
+  # _detailViewOn ($paref);                                            # Detailanzeige einschalten
+  
   my ($reread,$retry,$errstate) = (0,0,0);   
 
   my @bd  = split /\s+/x ,AttrVal($name, "balanceMonth", "current");
@@ -1657,16 +1670,18 @@ sub _getBalanceMonthData {                 ## no critic "not used"
           };        
           $addon = createDateAddon ($params);
       }  
+
+      my $dim = daysInMonth ($m+1, $y+1900);                                      # errechnet wieviel Tage der gegebene Monat hat
  
-      eval { timelocal(0, 0, 0, 1, $m, $y) } or do { $state    = (split(" at", $@))[0];
-                                                     $errstate = 1;
-                                                     Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
-                                                     return ($errstate,$state,$reread,$retry);
-                                                   };
+      eval { timelocal(0, 0, 0, $dim, $m, $y) } or do { $state    = (split(" at", $@))[0];
+                                                        $errstate = 1;
+                                                        Log3($name, 2, "$name - ERROR - invalid date/time format in attribute 'balanceMonth' detected: $state");
+                                                        return ($errstate,$state,$reread,$retry);
+                                                      };
                                                    
       Log3 ($name, 4, "$name - retrieve $tag ".($y+1900)."-".sprintf "%02d", $m+1);
                                                    
-      my $cts     = fhemTimeLocal(0, 0, 0, 1, $m, $y);
+      my $cts     = fhemTimeLocal(0, 0, 0, $dim, $m, $y);
       my $offset  = fhemTzOffset($cts);
       my $anchort = int($cts + $offset);                                          # anchorTime in UTC -> abzurufendes Datum
        
@@ -1700,6 +1715,8 @@ sub _getBalanceYearData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                                      # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
+  
+  # _detailViewOn ($paref);                                                        # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
@@ -1849,6 +1866,38 @@ return ($errstate,$state,$reread,$retry);
 }
 
 ################################################################
+#                Detailanzeige einschalten
+#             vor dem eigentlichen Datenabruf
+################################################################
+sub _detailViewOn {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};                                                       # LWP Useragent
+  my $state = $paref->{state};                  
+  my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
+  
+  my ($reread,$retry,$errstate) = (0,0,0); 
+
+  my $tag     = "detailViewSwitch";
+  my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+  my $cont    = qq{{"showDetailMode":true}};
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/FixedPages/HoManEnergyRedesign.aspx/UpdateDisplayOption',
+                                         tag      => $tag,
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractHelperData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "",
+                                         daref    => $daref
+                                      });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
 #                    Dispatcher GET
 ################################################################
 sub __dispatchGet {
@@ -1915,10 +1964,11 @@ sub __dispatchPost {
                                                      call    => $call,
                                                      tag     => $tag,
                                                      fields  => $fields,
-                                                     content => $cont,
+                                                     content => $cont
                                                   });
                                                               
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        ua       => $ua,
                                                         errstate => $errstate,
                                                         state    => $state,
                                                         data     => $data
@@ -2025,28 +2075,35 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $name            = $paref->{name};
   my $errstate        = $paref->{errstate};
   my $state           = $paref->{state};
+  my $ua              = $paref->{ua};
   my $ad              = $paref->{data};
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
     
-  my $v5d        = AttrVal($name, "verbose5Data", "none");
-  my $ad_content = encode("utf8", $ad->decoded_content); 
-  my $act        = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
-  my $attstr     = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";   # Log vorbereiten
+  my $v5d             = AttrVal($name, "verbose5Data", "none");
+  my $ad_content      = encode("utf8", $ad->decoded_content); 
+  my $act             = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
+  my $attstr          = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
   
-  my $wm1e = qq{Updating of the live data was interrupted};
-  my $wm1d = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
-  my $wm2e = qq{The current consumption could not be determined. The current purchased electricity is unknown};
-  my $wm2d = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
-  my $em1e = qq{Communication with the Sunny Home Manager is currently not possible};
-  my $em1d = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
-  my $em2e = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
-  my $em2d = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
+  my $wm1e            = qq{Updating of the live data was interrupted};
+  my $wm1d            = qq{Die Aktualisierung der Live-Daten wurde unterbrochen};
+  my $wm2e            = qq{The current consumption could not be determined. The current purchased electricity is unknown};
+  my $wm2d            = qq{Der aktuelle Verbrauch konnte nicht ermittelt werden. Der aktuelle Netzbezug ist unbekannt};
+  my $em1e            = qq{Communication with the Sunny Home Manager is currently not possible};
+  my $em1d            = qq{Die Kommunikation mit dem Sunny Home Manager ist zurzeit nicht m};
+  my $em2e            = qq{The current data cannot be retrieved from the PV system. Check the cabling and configuration};
+  my $em2d            = qq{Die aktuellen Daten .*? nicht von der Anlage abgerufen werden.*? Sie die Verkabelung und Konfiguration}; 
 
+  ___extractCookie ({ ua   => $ua,
+                      data => $ad,
+                      name => $name,
+                   });  
+  
   $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
-  my $jsonerror = $ad->header('Jsonerror') // "";                # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  my $jsonerror = $ad->header('Jsonerror') // "";                                                     # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
+  
   if($jsonerror) {
       $errstate = 1;
       $state    = "SMA Portal failure: "."Message -> ".$data->{Message}.",\nStackTrace -> ".$data->{StackTrace}.",\nExceptionType -> ".$data->{ExceptionType};
@@ -2118,9 +2175,25 @@ return ($reread,$retry,$errstate,$state);
 }
 
 ################################################################
+#            Cookie Daten analysieren & extrahieren
+# Die extract_cookies()-Methode sucht im HTTP::Response-Objekt, 
+# das als Argument übergeben wird, nach Set-Cookie: und 
+# Set-Cookie2: Headern.
+################################################################
+sub ___extractCookie {                   
+  my $paref = shift;
+  my $ua    = $paref->{ua};
+  my $data  = $paref->{data};           # empfangene Rohdaten
+  
+  eval { $ua->cookie_jar->extract_cookies($data) } or return;
+  
+return;
+}
+
+################################################################
 ##  Verarbeitung empfangene Daten, setzen Readings
 ################################################################
-sub ParseData {                                                    ## no critic 'complexity'
+sub ParseData {
   my $string = shift;
   my @a      = split("\\|",$string);
   my $hash   = $defs{$a[0]};
@@ -2770,6 +2843,7 @@ sub extractConsumerMasterdata {
   my $clivedata = shift;
   my $name      = $hash->{NAME};
   my %consumers;
+  my %hcon;
   my ($i,$res);
   
   Log3 ($name, 4, "$name - ##### extracting consumer master data #### ");
@@ -2789,22 +2863,22 @@ sub extractConsumerMasterdata {
       next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
       
-      $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
-      $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
-      $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
-      $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
+      $hcon{$i}{DeviceName}           = $cn;
+      $hcon{$i}{ConsumerOid}          = $consumers{"${i}_ConsumerOid"};
+      $hcon{$i}{SerialNumber}         = $c->{'SerialNumber'};
+      $hcon{$i}{SUSyID}               = $c->{'SUSyID'};
       
       $i++;
   }
   
-  if($hash->{HELPER}{CONSUMER}) {
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
-              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
-              next if(!defined $val);
-              Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
-          }
+  for my $key (keys %hcon) {          
+      for my $parname (keys %{$hcon{$key}}) { 
+          my $val = $hcon{$key}{$parname};
+          
+          next if(!$val);
+          
+          Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
       }
   }
   
@@ -2950,6 +3024,34 @@ sub extractConsumerHistData {                                                  #
   }
   
 return;
+}
+
+################################################################
+#          Auswertung Daten aus Hilfsroutinen
+################################################################
+sub extractHelperData {
+  my $hash      = shift;
+  my $daref     = shift;             # Referenz zum Datenarray
+  my $jdata     = shift;             # empfangene JSON-Daten
+  my $addon     = shift;             # ein optionales AddOn
+  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
+  
+  my $name      = $hash->{NAME};
+  my $sd;
+  
+  Log3 ($name, 4, "$name - extracting Helper data ");
+  
+  my $data = eval{decode_json($jdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                               return;
+                                             };
+
+  if(ref $data eq "HASH") {
+      while (my ($k,$v) = each %$data) {
+          push @$daref, "$tag:$v";
+      }
+  }
+  
+return; 
 }
 
 ################################################################
@@ -3172,6 +3274,21 @@ sub delReadingFromBlocking {
   readingsDelete($hash, $reading);
 
 return 1;
+}
+
+################################################################
+#   errechnet wieviel Tage ein gegebener Monat eines 
+#   bestimmten Jahres hat
+#   $m: realer Monat (1..12)
+#   $y: reales Jahr  (2020)
+################################################################
+sub daysInMonth {
+  my $m = shift;
+  my $y = shift;
+
+  my $dim = $m-2?30+($m*3%7<4):28+!($y%4||$y%400*!($y%100));
+
+return $dim;
 }
 
 ################################################################

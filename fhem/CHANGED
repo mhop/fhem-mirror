@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  76_SMAPortal: some improvements, avoid login trouble in some cases
  - bugfix:  89_FULLY: Fixed JSON decoding error and password handling
  - bugfix:  98_backup.pm: log output include files (forum #115478)
  - bugfix:  93_Log2Syslog: avoid Logfile archive execution done in rare cases
