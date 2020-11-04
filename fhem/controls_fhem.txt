@@ -1,6 +1,6 @@
-REV 23082
+REV 23092
 DIR unused
-UPD 2020-11-03_07:45:03 353104 ./CHANGED
+UPD 2020-11-04_07:45:02 353174 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-10-31_07:45:06 42741 ./MAINTAINER.txt
 UPD 2020-10-21_07:45:03 41442 ./configDB.pm
@@ -428,7 +428,7 @@ UPD 2020-03-26_07:45:03 58824 FHEM/88_Timer.pm
 UPD 2018-05-01_07:45:03 39556 FHEM/88_xs1Bridge.pm
 UPD 2018-04-14_07:45:02 22528 FHEM/88_xs1Dev.pm
 UPD 2020-03-26_07:45:03 109173 FHEM/89_ESPEInk.pm
-UPD 2020-10-21_07:45:03 33485 FHEM/89_FULLY.pm
+UPD 2020-11-04_07:45:02 34043 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -709,9 +709,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2020-08-23_07:45:02 8555 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-11-04_07:45:02 12651 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-10-24_07:45:03 148787 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-11-04_07:45:02 148878 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -739,8 +739,8 @@ UPD 2020-11-02_07:45:07 4390158 docs/commandref.html
 UPD 2020-11-02_07:45:09 2723786 docs/commandref_DE.html
 UPD 2020-11-02_07:45:03 80858 docs/commandref_frame.html
 UPD 2020-11-02_07:45:03 90473 docs/commandref_frame_DE.html
-UPD 2020-11-03_07:45:10 233989 docs/commandref_modular.html
-UPD 2020-11-03_07:45:11 244703 docs/commandref_modular_DE.html
+UPD 2020-11-04_07:45:10 233989 docs/commandref_modular.html
+UPD 2020-11-04_07:45:11 244703 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2269,7 +2269,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2020-08-23_07:45:02 31126 www/pgm2/f18.js
 UPD 2020-10-01_07:45:03 10057 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2020-08-18_07:45:03 62091 www/pgm2/fhemweb.js
+UPD 2020-11-04_07:45:02 62076 www/pgm2/fhemweb.js
 UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
