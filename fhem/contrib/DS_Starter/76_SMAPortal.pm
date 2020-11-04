@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site ",
+  "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
   "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
   "3.5.0"  => "10.10.2020  _getLiveData: get data from Dashboard instead of homemanager site depending of attr noHomeManager, ".
@@ -238,9 +238,9 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
 );  
 
 my %hset = (                                                                # Hash der Set-Funktion
-    credentials         => { fn => "_setCredentials"         }, 
-    getData             => { fn => "_setGetData"             },
-    createPortalGraphic => { fn => "_setCreatePortalGraphic" },     
+    credentials         => { fn => \&_setCredentials         }, 
+    getData             => { fn => \&_setGetData             },
+    createPortalGraphic => { fn => \&_setCreatePortalGraphic },     
 );
 
 my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
@@ -279,7 +279,7 @@ my @pd = qw( plantMasterData
              plantLogbook
            );
 
-
+my $defuseragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0";
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -373,7 +373,7 @@ return;
 ###############################################################
 #                          SMAPortal Set
 ###############################################################
-sub Set {                             ## no critic 'complexity'
+sub Set {                             
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name    = $a[0];
@@ -429,14 +429,12 @@ sub Set {                             ## no critic 'complexity'
           prop1 => $prop1,
           aref  => \@a,
       };
-      
-      no strict "refs";                                                        ## no critic 'NoStrict'  
-      if($hset{$opt}) {
-          my $ret = "";
-          $ret = &{$hset{$opt}{fn}} ($params) if(defined &{$hset{$opt}{fn}}); 
+        
+      if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+          my $ret = q{};
+          $ret    = &{$hset{$opt}{fn}} ($params); 
           return $ret;
       }
-      use strict "refs";
 
       return "$setlist";
   } 
@@ -892,7 +890,7 @@ sub GetSetData {                       ## no critic 'complexity'
   my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
-  my $useragent          = AttrVal($name, "userAgent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)");
+  my $useragent          = AttrVal($name, "userAgent", $defuseragent);
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                = AttrVal($name, "verbose5Data", "none"); 
   my $verbose            = AttrVal($name, "verbose", 3);
@@ -1006,13 +1004,22 @@ sub GetSetData {                       ## no critic 'complexity'
   #############################
   if($getp ne "none") {            
 
+      _detailViewOn ({ name     => $name,
+                       ua       => $ua,
+                       state    => $state, 
+                       daref    => \@da
+                    });                                      # Detailanzeige einschalten
+      
       for my $k (keys %{$subs{$name}}) {
           next if(!$subs{$name}{$k}{doit});           
+          
           no strict "refs";                                  ## no critic 'NoStrict'  
+          
           if(!defined &{$subs{$name}{$k}{func}}) {
               Log3 ($name, 2, qq{$name - WARNING - data provider '$k' call function '$subs{$name}{$k}{func}' doesn't exist and is ignored }); 
               next;
           }            
+          
           ($errstate,$state,$reread,$retry) = &{$subs{$name}{$k}{func}} ({ name     => $name,
                                                                            ua       => $ua,
                                                                            state    => $state, 
@@ -1527,7 +1534,7 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
   
-  _detailViewOn ($paref);                                                         # Detailanzeige einschalten
+  # _detailViewOn ($paref);                                                         # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0); 
   
@@ -1611,7 +1618,7 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                       # Referenz zum Datenarray
   
-  _detailViewOn ($paref);                                            # Detailanzeige einschalten
+  # _detailViewOn ($paref);                                            # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
@@ -1709,7 +1716,7 @@ sub _getBalanceYearData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
   
-  _detailViewOn ($paref);                                                        # Detailanzeige einschalten
+  # _detailViewOn ($paref);                                                        # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
@@ -1862,7 +1869,7 @@ return ($errstate,$state,$reread,$retry);
 #                Detailanzeige einschalten
 #             vor dem eigentlichen Datenabruf
 ################################################################
-sub _detailViewOn {                      ## no critic "not used"
+sub _detailViewOn {
   my $paref = shift;
   my $name  = $paref->{name};
   my $ua    = $paref->{ua};                                                       # LWP Useragent
@@ -2178,7 +2185,7 @@ sub ___extractCookie {
   my $ua    = $paref->{ua};
   my $data  = $paref->{data};           # empfangene Rohdaten
   
-  eval { $ua->cookie_jar->extract_cookies($data) };
+  eval { $ua->cookie_jar->extract_cookies($data) } or return;
   
 return;
 }
@@ -2186,7 +2193,7 @@ return;
 ################################################################
 ##  Verarbeitung empfangene Daten, setzen Readings
 ################################################################
-sub ParseData {                                                    ## no critic 'complexity'
+sub ParseData {
   my $string = shift;
   my @a      = split("\\|",$string);
   my $hash   = $defs{$a[0]};
