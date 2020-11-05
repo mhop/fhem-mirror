@@ -407,6 +407,9 @@ sub Set {
                   push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
               }
+              else {
+                  delete $hash->{HELPER}{CONSUMER}{$lfd};
+              }
               $lfd++;
           }
       } 
