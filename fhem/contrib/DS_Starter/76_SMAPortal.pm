@@ -403,6 +403,7 @@ sub Set {
           my $lfd = 0;
           for my $key (keys %{$hash->{HELPER}{CONSUMER}{$lfd}}) {
               my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
+              Log3($name, 1, "$name - Lfd: $lfd, DEV: $dev");
               if($dev) {
                   push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
@@ -436,7 +437,6 @@ sub Set {
       };
         
       if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
-          Log3($name, 1, "$name - SETLIST: $setlist");
           my $ret = q{};
           $ret    = &{$hset{$opt}{fn}} ($params); 
           return $ret;
