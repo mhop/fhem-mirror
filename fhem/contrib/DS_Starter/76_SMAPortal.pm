@@ -400,14 +400,12 @@ sub Set {
                  "getData:noArg "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
-          my $lfd = 0;
           for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-              my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
+              my $dev = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
               if($dev) {
                   push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
               }
-              $lfd++;
           }
       }       
   }  
