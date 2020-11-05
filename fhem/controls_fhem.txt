@@ -1,6 +1,6 @@
-REV 23092
+REV 23096
 DIR unused
-UPD 2020-11-04_07:45:02 353174 ./CHANGED
+UPD 2020-11-05_07:45:02 353253 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-10-31_07:45:06 42741 ./MAINTAINER.txt
 UPD 2020-10-21_07:45:03 41442 ./configDB.pm
@@ -402,7 +402,7 @@ UPD 2019-03-23_07:45:03 31840 FHEM/75_msgConfig.pm
 UPD 2016-08-22_07:45:11 9037 FHEM/76_MSGFile.pm
 UPD 2016-12-08_07:45:12 17663 FHEM/76_MSGMail.pm
 UPD 2019-10-24_07:45:02 98948 FHEM/76_SMAInverter.pm
-UPD 2020-10-14_07:45:07 221665 FHEM/76_SMAPortal.pm
+UPD 2020-11-05_07:45:02 226186 FHEM/76_SMAPortal.pm
 UPD 2020-04-21_07:45:02 34158 FHEM/76_SMAPortalSPG.pm
 UPD 2018-06-04_07:45:02 37197 FHEM/76_msgDialog.pm
 UPD 2020-04-17_07:45:02 56471 FHEM/77_SMAEM.pm
@@ -709,9 +709,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2020-11-04_07:45:02 12651 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-11-05_07:45:02 14519 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-11-04_07:45:02 148878 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-11-05_07:45:02 148976 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2019-07-19_07:45:03 28861 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -739,8 +739,8 @@ UPD 2020-11-02_07:45:07 4390158 docs/commandref.html
 UPD 2020-11-02_07:45:09 2723786 docs/commandref_DE.html
 UPD 2020-11-02_07:45:03 80858 docs/commandref_frame.html
 UPD 2020-11-02_07:45:03 90473 docs/commandref_frame_DE.html
-UPD 2020-11-04_07:45:10 233989 docs/commandref_modular.html
-UPD 2020-11-04_07:45:11 244703 docs/commandref_modular_DE.html
+UPD 2020-11-05_07:45:10 233989 docs/commandref_modular.html
+UPD 2020-11-05_07:45:11 244703 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
