@@ -412,7 +412,7 @@ sub Set {
               }
               $lfd++;
           }
-      } 
+      }       
   }  
   
   if(@ads) {
@@ -436,6 +436,7 @@ sub Set {
       };
         
       if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+          Log3($name, 1, "$name - SETLIST: $setlist");
           my $ret = q{};
           $ret    = &{$hset{$opt}{fn}} ($params); 
           return $ret;
