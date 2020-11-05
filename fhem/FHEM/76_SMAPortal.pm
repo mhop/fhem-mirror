@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
   "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
@@ -380,7 +381,7 @@ sub Set {
   my $opt     = $a[1];
   my $prop    = $a[2];
   my $prop1   = $a[3];
-  my $setlist;
+  my ($setlist,@ads);
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -399,20 +400,19 @@ sub Set {
                  "getData:noArg "
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
-          my $lfd = 0;
-          for my $key (keys %{$hash->{HELPER}{CONSUMER}{$lfd}}) {
-              my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
+          for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+              my $dev = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
               if($dev) {
-                  $ad .= "|" if($lfd != 0);
-                  $ad .= $dev;
-              }
-              if ($dev && $setlist !~ /$dev/x) {
+                  push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
               }
-              $lfd++;
           }
-      } 
+      }       
   }  
+  
+  if(@ads) {
+      $ad = join "|", @ads;
+  }
             
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
@@ -3234,10 +3234,10 @@ return;
 #   @setl = $name,$setread,$retries,$helper
 ###################################################################
 sub setFromBlocking {
-  my $name      = shift;
-  my $setread   = shift // "NULL";
-  my $helper    = shift // "NULL";
-  my $hash      = $defs{$name};
+  my $name    = shift;
+  my $setread = shift // "NULL";
+  my $helper  = shift // "NULL";
+  my $hash    = $defs{$name};
   
   if($setread ne "NULL") {
       my @cparts = split ":", $setread, 2;
