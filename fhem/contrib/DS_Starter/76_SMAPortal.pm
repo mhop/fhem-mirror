@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $
+# $Id: 76_SMAPortal.pm 23096 2020-11-04 20:29:29Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.3"  => "05.11.2020  fix not all consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
   "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
   "3.6.0"  => "11.10.2020  new relative time arguments for attr balanceDay, balanceMonth, balanceYear, new attribute useRelativeNames ",
@@ -380,7 +381,7 @@ sub Set {
   my $opt     = $a[1];
   my $prop    = $a[2];
   my $prop1   = $a[3];
-  my $setlist;
+  my ($setlist,@ads);
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -403,16 +404,17 @@ sub Set {
           for my $key (keys %{$hash->{HELPER}{CONSUMER}{$lfd}}) {
               my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
               if($dev) {
-                  $ad .= "|" if($lfd != 0);
-                  $ad .= $dev;
-              }
-              if ($dev && $setlist !~ /$dev/x) {
+                  push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
               }
               $lfd++;
           }
       } 
   }  
+  
+  if(@ads) {
+      $ad = join "|", @ads;
+  }
             
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
@@ -2843,6 +2845,7 @@ sub extractConsumerMasterdata {
   my $clivedata = shift;
   my $name      = $hash->{NAME};
   my %consumers;
+  my %hcon;
   my ($i,$res);
   
   Log3 ($name, 4, "$name - ##### extracting consumer master data #### ");
@@ -2862,22 +2865,22 @@ sub extractConsumerMasterdata {
       next if(!$cn);
       $cn                             = replaceJunkSigns($cn);
       
-      $hash->{HELPER}{CONSUMER}{$i}{DeviceName}   = $cn;
-      $hash->{HELPER}{CONSUMER}{$i}{ConsumerOid}  = $consumers{"${i}_ConsumerOid"};
-      $hash->{HELPER}{CONSUMER}{$i}{SerialNumber} = $c->{'SerialNumber'};
-      $hash->{HELPER}{CONSUMER}{$i}{SUSyID}       = $c->{'SUSyID'};
+      $hcon{$i}{DeviceName}           = $cn;
+      $hcon{$i}{ConsumerOid}          = $consumers{"${i}_ConsumerOid"};
+      $hcon{$i}{SerialNumber}         = $c->{'SerialNumber'};
+      $hcon{$i}{SUSyID}               = $c->{'SUSyID'};
       
       $i++;
   }
   
-  if($hash->{HELPER}{CONSUMER}) {
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          for my $parname (keys %{$hash->{HELPER}{CONSUMER}{$key}}) { 
-              my $val = $hash->{HELPER}{CONSUMER}{$key}{$parname};
-              next if(!defined $val);
-              Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
-              BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
-          }
+  for my $key (keys %hcon) {          
+      for my $parname (keys %{$hcon{$key}}) { 
+          my $val = $hcon{$key}{$parname};
+          
+          next if(!$val);
+          
+          Log3 ($name, 4, "$name - CONSUMER master data: $key -> $parname = $val");
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "CONSUMER:$key:$parname:$val"], 1);
       }
   }
   
@@ -3092,13 +3095,13 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23096 2020-11-04 20:29:29Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 22964 2020-10-13 15:40:38Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23096 2020-11-04 20:29:29Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -3233,10 +3236,10 @@ return;
 #   @setl = $name,$setread,$retries,$helper
 ###################################################################
 sub setFromBlocking {
-  my $name      = shift;
-  my $setread   = shift // "NULL";
-  my $helper    = shift // "NULL";
-  my $hash      = $defs{$name};
+  my $name    = shift;
+  my $setread = shift // "NULL";
+  my $helper  = shift // "NULL";
+  my $hash    = $defs{$name};
   
   if($setread ne "NULL") {
       my @cparts = split ":", $setread, 2;
