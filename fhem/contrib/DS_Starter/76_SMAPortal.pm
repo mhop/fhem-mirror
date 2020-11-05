@@ -401,15 +401,11 @@ sub Set {
                  ;   
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           my $lfd = 0;
-          for my $key (keys %{$hash->{HELPER}{CONSUMER}{$lfd}}) {
+          for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
               my $dev = $hash->{HELPER}{CONSUMER}{$lfd}{DeviceName};
-              Log3($name, 1, "$name - Lfd: $lfd, DEV: $dev");
               if($dev) {
                   push @ads, $dev; 
                   $setlist .= "$dev:on,off,auto ";
-              }
-              else {
-                  delete $hash->{HELPER}{CONSUMER}{$lfd};
               }
               $lfd++;
           }
