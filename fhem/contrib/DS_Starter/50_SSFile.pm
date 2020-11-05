@@ -199,14 +199,50 @@ my %vNotesExtern = (
 # Hints EN
 my %vHintsExt_en = (
   "2" => "When defining the upload target paths <a href=\"https://metacpan.org/pod/POSIX::strftime::GNU\">POSIX %-Wildcards</a> can be used as part of the target path. ".
-         "This way changing upload targets can be created depending on the current timestamp.",
+         "This way changing upload targets can be created depending on the current timestamp.<br>".
+		 "Examples of prominent wildcards: <br><br>".
+		 "<table>".
+		 "<colgroup> <col width=20%> <col width=75%> <col width=5%></colgroup>".
+		 "<tr><td><b>Specification</b>  </td><td><b>replaced by</b>                                                     </td><td><b>Example</b>  </td></tr>".
+		 "<tr><td>                      </td><td>                                                                       </td><td>                </td></tr>".
+		 "<tr><td>%a                    </td><td>The abbreviated weekday name according to the current locale           </td><td>Thu             </td></tr>".
+		 "<tr><td>%y                    </td><td>Year, last two digits (00-99)                                          </td><td>01              </td></tr>".
+		 "<tr><td>%Y                    </td><td>Year incl. century                                                     </td><td>2020            </td></tr>".
+		 "<tr><td>%m                    </td><td>Month as decimal number (01-12)                                        </td><td>08              </td></tr>".
+		 "<tr><td>%d                    </td><td>The day of the month as decimal number (01-31)                         </td><td>23              </td></tr>".
+		 "<tr><td>%H                    </td><td>The hour in 24-hour format (00-23)                                     </td><td>14              </td></tr>".
+		 "<tr><td>%M                    </td><td>The minute as decimal number (00-59)                                   </td><td>55              </td></tr>".
+		 "<tr><td>%S                    </td><td>The second as decimal number (00-60)                                   </td><td>02              </td></tr>".
+		 "<tr><td>%V                    </td><td>The ISO 8601 week number of the current year as decimal number (01-53) </td><td>34              </td></tr>".
+		 "<tr><td>%T                    </td><td>The time in 24-hour notation (%H:%M:%S)                                </td><td>14:55:02        </td></tr>".
+		 "</table>".
+		 "<br>"
+		 ,
   "1" => "The module integrates <a href=\"https://www.synology.com/en-global/knowledgebase/DSM/help/FileStation/FileBrowser_desc\">Synology File Station</a> with FHEM. "
 );
 
 # Hints DE
 my %vHintsExt_de = (
   "2" => encode ("utf8", "Bei der Definition der Upload Zielpfade könnnen <a href=\"https://metacpan.org/pod/POSIX::strftime::GNU\">POSIX %-Wildcards</a> als Bestandteil des Zielpfads verwendet werden. ".
-         "Damit können wechselnde Uploadziele in Abhängigkeit des aktuellen Timestamps erzeugt werden."),
+         "Damit können wechselnde Uploadziele in Abhängigkeit des aktuellen Timestamps erzeugt werden.<br>".
+		 "Beispiele prominenter Wildcards: <br><br>".
+		 "<table>".
+		 "<colgroup> <col width=20%> <col width=75%> <col width=5%></colgroup>".
+		 "<tr><td><b>Spezifizierung</b> </td><td><b>ersetzt durch</b>                                                   </td><td><b>Beispiel</b> </td></tr>".
+		 "<tr><td>                      </td><td>                                                                       </td><td>                </td></tr>".
+		 "<tr><td>%a                    </td><td>Der abgekürzte Wochentagsname entsprechend dem aktuellen Gebietsschema </td><td>Mo              </td></tr>".
+		 "<tr><td>%y                    </td><td>Jahr, letzte zwei Ziffern (00-99)                                      </td><td>01              </td></tr>".
+		 "<tr><td>%Y                    </td><td>Jahr incl. Jahrhundert                                                 </td><td>2020            </td></tr>".
+		 "<tr><td>%m                    </td><td>Monat als Dezimalzahl (01-12)                                          </td><td>08              </td></tr>".
+		 "<tr><td>%d                    </td><td>Der Tag des Monats als Dezimalzahl (01-31)                             </td><td>23              </td></tr>".
+		 "<tr><td>%H                    </td><td>Die Stunde im 24-Stunden-Format (00-23)                                </td><td>14              </td></tr>".
+		 "<tr><td>%M                    </td><td>Die Minute als Dezimalzahl (00-59)                                     </td><td>55              </td></tr>".
+		 "<tr><td>%S                    </td><td>Die Sekunde als Dezimalzahl (00-60)                                    </td><td>02              </td></tr>".
+		 "<tr><td>%V                    </td><td>Die ISO 8601-Wochennummer des laufenden Jahres als Dezimalzahl (01-53) </td><td>34              </td></tr>".
+		 "<tr><td>%T                    </td><td>Die Uhrzeit in 24-Stunden-Notation (%H:%M:%S)                          </td><td>14:55:02        </td></tr>".
+		 "</table>".
+		 "<br>"
+		 ),
   "1" => "Das Modul integriert die <a href=\"https://www.synology.com/de-de/knowledgebase/DSM/help/FileStation/FileBrowser_desc\">Synology File Station</a> in FHEM. "
 );
 
