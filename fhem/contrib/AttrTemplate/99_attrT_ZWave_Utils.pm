@@ -18,9 +18,15 @@ BEGIN {
     GP_Import(
         qw(
           InternalVal
+          readingsSingleUpdate
+		  readingsBulkUpdate
+          ReadingsVal
           ReadingsNum
+          ReadingsAge
           devspec2array
-          FW_makeImage 
+          FW_makeImage
+          defs
+		  Log3
           )
     );
 }
@@ -96,7 +102,38 @@ sub devStateIcon_shutter {
 
 }
 
+sub desiredTemp {
+  my $name = shift // return;
+  my $call = shift // 'OK';
+  
+  my $hash = $defs{$name} // return;
+  my $now = time;
+  my $state = ReadingsVal($name,'state','unknown');
+  my $stateNum = ReadingsNum($name,'state',20);
+  Log3($hash, 3, "ZWave-utils desiredTemp called, state is $state");
+  #return if ReadingsAge($name,'state',10000000) > 3;
+  
+  if ($state =~ m,desired-temp|thermostatSetpointSet,) {
+    readingsBulkUpdate($hash, 'desired-temp',$stateNum,1);
+    return;
+  }
+  if ($state =~ m,tmAuto|tmManual|tmHeating,) {
+    readingsBulkUpdate($hash, 'desired-temp',ReadingsVal($name,'heating','unknown'),1);
+    return;
+  }
+  if ($state =~ m,tmEnergySaveHeating,) {
+    readingsBulkUpdate($hash, 'desired-temp',ReadingsVal($name,'energySaveHeating','unknown'),1);
+    return;
+  }
+  
+  if ($state =~ m,off,) {
+    readingsBulkUpdate($hash, 'desired-temp',6,'unknown',1);
+    return;
+  }
+  Log3($hash, 3, "ZWave-utils desiredTemp called but no match for $state");
 
+  return;
+}
 
 1;
 
