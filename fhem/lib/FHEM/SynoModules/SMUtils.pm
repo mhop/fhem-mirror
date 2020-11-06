@@ -36,13 +36,13 @@ eval "use JSON;1;" or my $nojsonmod = 1;                                  ## no 
 use Data::Dumper;
 use Encode;
 
- use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
+# use lib qw(/opt/fhem/FHEM  /opt/fhem/lib);                              # für Syntaxcheck mit: perl -c /opt/fhem/lib/FHEM/SynoModules/SMUtils.pm
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                 # Error Code Modul
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.4');
+use version; our $VERSION = version->declare('1.20.5');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -54,6 +54,7 @@ our @EXPORT_OK = qw(
                      moduleVersion
                      sortVersion
                      showModuleInfo
+					 convertHashToTable
                      jboolmap
                      smUrlEncode
                      plotPngToFile
@@ -344,6 +345,76 @@ sub sortVersion {
   }
   
 return @sorted;
+}
+
+#############################################################################################
+#        Gibt die erste Key-Ebene eines Hash als Tabelle formatiert zurück 
+#    $headl:  Überschrift über Tabelle
+#    $thead:  String der Elemente des Tabellenkopfes (Komma getrennt), z.B.
+#             "local Object,remote Object,Date,Time"
+#    $datah:  Referenz zum Hashobjekt mit Daten zur Konvertierung in eine Tabelle
+#############################################################################################
+sub convertHashToTable {                 
+  my $paref = shift;
+  my $hash  = $paref->{hash}  // carp $carpnohash && return; 
+  my $datah = $paref->{datah} // carp "got no hash ref of data for table convert" && return;
+  my $headl = $paref->{headl} // q{};
+  my $thead = $paref->{thead} // q{};
+  
+  my $name  = $hash->{NAME};
+  
+  my $sub = sub { 
+      my $idx = shift;
+      my @ret;          
+      for my $key (sort keys %{$datah->{$idx}}) {
+		  push @ret, $datah->{$idx}{$key};
+      }
+      return @ret;
+  };
+  
+  my $out  = "<html>";
+  $out .= "<div class=\"makeTable wide\"; style=\"text-align:left\"><b>$headl</b> <br>";
+  $out .= "<table class=\"block wide internals\">";
+  $out .= "<tbody>";
+  $out .= "<tr class=\"odd\">"; 
+  
+  if ($thead) {
+      my @hd = split ",", $thead;
+      for my $elem (@hd) {
+	      $out .= "<td> <b>$elem</b> </td>";
+	  }
+  }
+
+  $out .= "</tr>";
+  
+  my $i = 0;
+  for my $idx (sort keys %{$datah}) {
+      my @sq = $sub->($idx);
+	  next if(!@sq);
+      
+      if ($i & 1) {                                            # $i ist ungerade
+          $out .= "<tr class=\"odd\">";
+      } 
+      else {
+          $out .= "<tr class=\"even\">";
+      }
+      $i++;
+	  
+	  $out .= "<td style=\"vertical-align:top\"> $idx </td>";
+	  
+	  for my $he (@sq) {
+	      $out .= "<td style=\"vertical-align:top\"> $he </td>";
+	  }
+
+      $out .= "</tr>";
+  }
+  
+  $out .= "</tbody>";
+  $out .= "</table>";
+  $out .= "</div>";
+  $out .= "</html>";
+      
+return $out;
 }
 
 #############################################################################################
