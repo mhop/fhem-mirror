@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2020.11.06 v0.2.2
+# - FEATURE: Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
+#
 # 2020.10.07 v0.2.1
 # - BUG:     Not a HASH reference at ./FHEM/37_echodevice.pm line 2975
 #
@@ -401,7 +404,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.1";
+my $ModulVersion     = "0.2.2";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -4172,6 +4175,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A32DOYMUN6DTXA" || $ModelNumber eq "Echo Dot")        		{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A32DDESGESSHZA" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A1RABVCI4QCIKC" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
+	elsif($ModelNumber eq "A3RMGO6LYLH7YN" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
 	elsif($ModelNumber eq "AWZZ5CVHX2CD"   || $ModelNumber eq "Echo Show")				{return "Echo Show Gen2";}
