@@ -139,14 +139,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.6"  => "07.11.2020  fix weekly byDay interval 1 week ",
+  "2.4.6"  => "06.11.2020  bugfix weekly byDay ",
   "2.4.5"  => "03.11.2020  fix commandref wiki link ",
   "2.4.4"  => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "2.4.3"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "2.4.2"  => "03.10.2020  get from SMUtils: completeAPI showAPIinfo evaljson setReadingErrorState setReadingErrorNone showModuleInfo ".
                            "login logout getClHash delClHash trim moduleVersion updQueueLength delReadings checkSendRetry startFunctionDelayed ".
                            "minor fix in periodicCall ",
-  "2.4.1"  => "20.05.2020  new function '_evalTimeAndWrite' ",
+  "2.4.1"  => "20.05.2020  new function 'evalTimeAndWrite' ",
   "2.4.0"  => "19.05.2020  more changes according to PBP, switch to packages, fix cannot delete (and display in table) EventId of block 0 ",
   "2.3.0"  => "25.04.2020  set compatibility to Calendar package 2.3.4-0631, some changes according to PBP ",
   "2.2.3"  => "24.03.2020  minor code change ",
@@ -661,7 +661,7 @@ sub _setcalUpdate {
   Log3($name, 5, "$name - Calendar selection for add queue: ".join(',', @cas));
 
   if($model eq "Diary") {                                                                     # Modell Terminkalender
-      my ($err,$tstart,$tend) = _timeEdge ($name);
+      my ($err,$tstart,$tend) = timeEdge ($name);
       
       if($err) {
           Log3($name, 2, "$name - ERROR in timestamp: $err");
@@ -1109,7 +1109,7 @@ sub getApiSites {
    
    $hash->{HELPER}{LOGINRETRIES} = 0;
    
-   my ($err,$tstart,$tend) = _timeEdge($name);
+   my ($err,$tstart,$tend) = timeEdge($name);
    $tstart = FmtDateTime($tstart);
    $tend   = FmtDateTime($tend);
 
@@ -1152,7 +1152,7 @@ sub getApiSites {
    
    if ($data{SSCal}{$name}{calapi}{PARSET}) {                                               # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
        Log3($name, 4, "$name - API hash values already set - ignore get apisites");
-       return _checkSID($name);
+       return checkSID($name);
    }
 
    my $timeout = AttrVal($name,"timeout",20);
@@ -1285,7 +1285,7 @@ sub getApiSites_parse {                                    ## no critic 'complex
         }
     }
     
-return _checkSID($name);
+return checkSID($name);
 }
 
 #############################################################################################
@@ -1560,7 +1560,7 @@ sub extractEventlist {                                    ## no critic 'complexi
   my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = _timeEdge  ($name);          # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my (undef,$tstart,$tend) = timeEdge($name);             # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
@@ -1695,31 +1695,31 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                       Log3($name, 5, "$name - YEARLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                      ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'YEARLY',
-                                                                         name        => $name,
-                                                                         excl        => $excl,
-                                                                         eventno     => $n,
-                                                                         calref      => $data->{data}{$key}[$i],
-                                                                         timezone    => $tz,
-                                                                         begindate   => $bdate,
-                                                                         newbdate    => $nbdate,
-                                                                         begintime   => $btime,
-                                                                         newbtime    => $nbtime,
-                                                                         begints     => $bts,
-                                                                         enddate     => $edate,
-                                                                         newedate    => $nedate, 
-                                                                         endtime     => $etime,
-                                                                         newetime    => $netime,
-                                                                         endts       => $ets,
-                                                                         newendts    => $nets,
-                                                                         sumarrayref => \@row_array,
-                                                                         untilts     => $uets,
-                                                                         newbegints  => $nbts,
-                                                                         tstart      => $tstart,
-                                                                         tend        => $tend,
-                                                                         until       => $until,
-                                                                         uid         => $uid
-                                                                      });   
+                      ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'YEARLY',
+                                                                        name        => $name,
+                                                                        excl        => $excl,
+                                                                        eventno     => $n,
+                                                                        calref      => $data->{data}{$key}[$i],
+                                                                        timezone    => $tz,
+                                                                        begindate   => $bdate,
+                                                                        newbdate    => $nbdate,
+                                                                        begintime   => $btime,
+                                                                        newbtime    => $nbtime,
+                                                                        begints     => $bts,
+                                                                        enddate     => $edate,
+                                                                        newedate    => $nedate, 
+                                                                        endtime     => $etime,
+                                                                        newetime    => $netime,
+                                                                        endts       => $ets,
+                                                                        newendts    => $nets,
+                                                                        sumarrayref => \@row_array,
+                                                                        untilts     => $uets,
+                                                                        newbegints  => $nbts,
+                                                                        tstart      => $tstart,
+                                                                        tend        => $tend,
+                                                                        until       => $until,
+                                                                        uid         => $uid
+                                                                     });   
                       
                       next if($next);                                       
                       last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
@@ -1748,31 +1748,31 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                           Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                          ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'MONTHLY',
-                                                                             name        => $name,
-                                                                             excl        => $excl,
-                                                                             eventno     => $n,
-                                                                             calref      => $data->{data}{$key}[$i],
-                                                                             timezone    => $tz,
-                                                                             begindate   => $bdate,
-                                                                             newbdate    => $nbdate,
-                                                                             begintime   => $btime,
-                                                                             newbtime    => $nbtime,
-                                                                             begints     => $bts,
-                                                                             enddate     => $edate,
-                                                                             newedate    => $nedate, 
-                                                                             endtime     => $etime,
-                                                                             newetime    => $netime,
-                                                                             endts       => $ets,
-                                                                             newendts    => $nets,
-                                                                             sumarrayref => \@row_array,
-                                                                             untilts     => $uets,
-                                                                             newbegints  => $nbts,
-                                                                             tstart      => $tstart,
-                                                                             tend        => $tend,
-                                                                             until       => $until,
-                                                                             uid         => $uid
-                                                                          });   
+                          ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'MONTHLY',
+                                                                            name        => $name,
+                                                                            excl        => $excl,
+                                                                            eventno     => $n,
+                                                                            calref      => $data->{data}{$key}[$i],
+                                                                            timezone    => $tz,
+                                                                            begindate   => $bdate,
+                                                                            newbdate    => $nbdate,
+                                                                            begintime   => $btime,
+                                                                            newbtime    => $nbtime,
+                                                                            begints     => $bts,
+                                                                            enddate     => $edate,
+                                                                            newedate    => $nedate, 
+                                                                            endtime     => $etime,
+                                                                            newetime    => $netime,
+                                                                            endts       => $ets,
+                                                                            newendts    => $nets,
+                                                                            sumarrayref => \@row_array,
+                                                                            untilts     => $uets,
+                                                                            newbegints  => $nbts,
+                                                                            tstart      => $tstart,
+                                                                            tend        => $tend,
+                                                                            until       => $until,
+                                                                            uid         => $uid
+                                                                         });   
                           
                           next if($next);                                        
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
@@ -1780,8 +1780,7 @@ sub extractEventlist {                                    ## no critic 'complexi
                   }
                   
                   if ($byday) {                                                 # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
-                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$numOfRatedDay);
-                      my ($rDaysToAddOrSub,$rNewTime);
+                      my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$numOfRatedDay,$rDaysToAddOrSub,$rNewTime);
                       my @ByDays = split(",", $byday);                          # Array der Wiederholungstage
                       
                       for my $rByDay (@ByDays) {
@@ -1838,31 +1837,31 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                               Log3($name, 5, "$name - MONTHLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
-                              ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'MONTHLY',
-                                                                                 name        => $name,
-                                                                                 excl        => $excl,
-                                                                                 eventno     => $n,
-                                                                                 calref      => $data->{data}{$key}[$i],
-                                                                                 timezone    => $tz,
-                                                                                 begindate   => $bdate,
-                                                                                 newbdate    => $nbdate,
-                                                                                 begintime   => $btime,
-                                                                                 newbtime    => $nbtime,
-                                                                                 begints     => $bts,
-                                                                                 enddate     => $edate,
-                                                                                 newedate    => $nedate, 
-                                                                                 endtime     => $etime,
-                                                                                 newetime    => $netime,
-                                                                                 endts       => $ets,
-                                                                                 newendts    => $nets,
-                                                                                 sumarrayref => \@row_array,
-                                                                                 untilts     => $uets,
-                                                                                 newbegints  => $nbts,
-                                                                                 tstart      => $tstart,
-                                                                                 tend        => $tend,
-                                                                                 until       => $until,
-                                                                                 uid         => $uid
-                                                                              });   
+                              ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'MONTHLY',
+                                                                                name        => $name,
+                                                                                excl        => $excl,
+                                                                                eventno     => $n,
+                                                                                calref      => $data->{data}{$key}[$i],
+                                                                                timezone    => $tz,
+                                                                                begindate   => $bdate,
+                                                                                newbdate    => $nbdate,
+                                                                                begintime   => $btime,
+                                                                                newbtime    => $nbtime,
+                                                                                begints     => $bts,
+                                                                                enddate     => $edate,
+                                                                                newedate    => $nedate, 
+                                                                                endtime     => $etime,
+                                                                                newetime    => $netime,
+                                                                                endts       => $ets,
+                                                                                newendts    => $nets,
+                                                                                sumarrayref => \@row_array,
+                                                                                untilts     => $uets,
+                                                                                newbegints  => $nbts,
+                                                                                tstart      => $tstart,
+                                                                                tend        => $tend,
+                                                                                until       => $until,
+                                                                                uid         => $uid
+                                                                             });   
                               
                               next if($next);                                        
                               last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
@@ -1871,20 +1870,20 @@ sub extractEventlist {                                    ## no critic 'complexi
                   }
               }
   
-              if ($freq eq "WEEKLY") {                                                  # wöchentliche Wiederholung, 
-                                                                                        # Interval 1 Woche funktioniert              
+              if ($freq eq "WEEKLY") {                                                  # wöchentliche Wiederholung                                                                             
                   if ($byday) {                                                         # Wiederholungseigenschaft -> Wochentag z.B. 2WE,-1SU,4FR (kann auch Liste bei WEEKLY sein)              
                       my ($nbhh,$nbmm,$nbss,$nehh,$nemm,$ness,$rNewTime);
-                      my ($numOfRatedDay,$rDaysToAddOrSub,$quit);                   
-                      
+                      my ($numOfRatedDay,$rDaysToAddOrSub);                   
                       my @ByDays   = split(",", $byday);                                # Array der Wiederholungstage
+
                       my $btsstart = $bts;
-                      ($ci,$quit)  = (0,0);
+                      $ci = -1;
                       
-                      while ($nbts <= $tend) {                                                   
+                      while ($ci<$count) {                                                   
                           $rNewTime = $btsstart;
                           
-                          for my $rByDay (@ByDays) {   
+                          for my $rByDay (@ByDays) {
+                              $ci++;   
                               
                               my $numOfAppointmentDay = _weekdayNumber ($rByDay);                            # liefert Nr des Wochentages: SU = 0 ... SA = 6
                               
@@ -1911,41 +1910,37 @@ sub extractEventlist {                                    ## no critic 'complexi
 
                               Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                               
-                              ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'WEEKLY',
-                                                                                 name        => $name,
-                                                                                 excl        => $excl,
-                                                                                 eventno     => $n,
-                                                                                 calref      => $data->{data}{$key}[$i],
-                                                                                 timezone    => $tz,
-                                                                                 begindate   => $bdate,
-                                                                                 newbdate    => $nbdate,
-                                                                                 begintime   => $btime,
-                                                                                 newbtime    => $nbtime,
-                                                                                 begints     => $bts,
-                                                                                 enddate     => $edate,
-                                                                                 newedate    => $nedate, 
-                                                                                 endtime     => $etime,
-                                                                                 newetime    => $netime,
-                                                                                 endts       => $ets,
-                                                                                 newendts    => $nets,
-                                                                                 sumarrayref => \@row_array,
-                                                                                 untilts     => $uets,
-                                                                                 newbegints  => $nbts,
-                                                                                 tstart      => $tstart,
-                                                                                 tend        => $tend,
-                                                                                 until       => $until,
-                                                                                 uid         => $uid
-                                                                              });   
-                              $ci++ if(!$ignore);   
+                              ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'WEEKLY',
+                                                                                name        => $name,
+                                                                                excl        => $excl,
+                                                                                eventno     => $n,
+                                                                                calref      => $data->{data}{$key}[$i],
+                                                                                timezone    => $tz,
+                                                                                begindate   => $bdate,
+                                                                                newbdate    => $nbdate,
+                                                                                begintime   => $btime,
+                                                                                newbtime    => $nbtime,
+                                                                                begints     => $bts,
+                                                                                enddate     => $edate,
+                                                                                newedate    => $nedate, 
+                                                                                endtime     => $etime,
+                                                                                newetime    => $netime,
+                                                                                endts       => $ets,
+                                                                                newendts    => $nets,
+                                                                                sumarrayref => \@row_array,
+                                                                                untilts     => $uets,
+                                                                                newbegints  => $nbts,
+                                                                                tstart      => $tstart,
+                                                                                tend        => $tend,
+                                                                                until       => $until,
+                                                                                uid         => $uid
+                                                                             });   
                               
-                              if($ci > $count) {
-                                  $quit = 1;
-                              }                              
-                                                                              
-                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend || $quit);              
+                              next if($next);                      
+                              last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);              
                           }
-                          last if(defined $uets && ($uets < $nbts) || $quit);
-                          $btsstart += (7 * 86400 * $interval);                                             # addiere Wochenintervall                             
+                          last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
+                          $btsstart += (7 * 86400 * $interval);                                             # addiere Tagesintervall, z.B. 4th Freitag ...                             
                       }
                   } 
                   else {    
@@ -1965,31 +1960,31 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                           Log3($name, 5, "$name - WEEKLY event - Begin: $nbdate $nbtime, End: $nedate $netime");
                            
-                          ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'WEEKLY',
-                                                                             name        => $name,
-                                                                             excl        => $excl,
-                                                                             eventno     => $n,
-                                                                             calref      => $data->{data}{$key}[$i],
-                                                                             timezone    => $tz,
-                                                                             begindate   => $bdate,
-                                                                             newbdate    => $nbdate,
-                                                                             begintime   => $btime,
-                                                                             newbtime    => $nbtime,
-                                                                             begints     => $bts,
-                                                                             enddate     => $edate,
-                                                                             newedate    => $nedate, 
-                                                                             endtime     => $etime,
-                                                                             newetime    => $netime,
-                                                                             endts       => $ets,
-                                                                             newendts    => $nets,
-                                                                             sumarrayref => \@row_array,
-                                                                             untilts     => $uets,
-                                                                             newbegints  => $nbts,
-                                                                             tstart      => $tstart,
-                                                                             tend        => $tend,
-                                                                             until       => $until,
-                                                                             uid         => $uid
-                                                                          });   
+                          ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'WEEKLY',
+                                                                            name        => $name,
+                                                                            excl        => $excl,
+                                                                            eventno     => $n,
+                                                                            calref      => $data->{data}{$key}[$i],
+                                                                            timezone    => $tz,
+                                                                            begindate   => $bdate,
+                                                                            newbdate    => $nbdate,
+                                                                            begintime   => $btime,
+                                                                            newbtime    => $nbtime,
+                                                                            begints     => $bts,
+                                                                            enddate     => $edate,
+                                                                            newedate    => $nedate, 
+                                                                            endtime     => $etime,
+                                                                            newetime    => $netime,
+                                                                            endts       => $ets,
+                                                                            newendts    => $nets,
+                                                                            sumarrayref => \@row_array,
+                                                                            untilts     => $uets,
+                                                                            newbegints  => $nbts,
+                                                                            tstart      => $tstart,
+                                                                            tend        => $tend,
+                                                                            until       => $until,
+                                                                            uid         => $uid
+                                                                         });   
                           
                           next if($next);                      
                           last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
@@ -2014,31 +2009,31 @@ sub extractEventlist {                                    ## no critic 'complexi
   
                       Log3($name, 5, "$name - DAILY event - Begin: $nbdate $nbtime, End: $nedate $netime");
   
-                      ($ignore, $done, $n, $next) = _evalTimeAndWrite ({ recurring   => 'DAILY',
-                                                                         name        => $name,
-                                                                         excl        => $excl,
-                                                                         eventno     => $n,
-                                                                         calref      => $data->{data}{$key}[$i],
-                                                                         timezone    => $tz,
-                                                                         begindate   => $bdate,
-                                                                         newbdate    => $nbdate,
-                                                                         begintime   => $btime,
-                                                                         newbtime    => $nbtime,
-                                                                         begints     => $bts,
-                                                                         enddate     => $edate,
-                                                                         newedate    => $nedate, 
-                                                                         endtime     => $etime,
-                                                                         newetime    => $netime,
-                                                                         endts       => $ets,
-                                                                         newendts    => $nets,
-                                                                         sumarrayref => \@row_array,
-                                                                         untilts     => $uets,
-                                                                         newbegints  => $nbts,
-                                                                         tstart      => $tstart,
-                                                                         tend        => $tend,
-                                                                         until       => $until,
-                                                                         uid         => $uid
-                                                                      });   
+                      ($ignore, $done, $n, $next) = evalTimeAndWrite ({ recurring   => 'DAILY',
+                                                                        name        => $name,
+                                                                        excl        => $excl,
+                                                                        eventno     => $n,
+                                                                        calref      => $data->{data}{$key}[$i],
+                                                                        timezone    => $tz,
+                                                                        begindate   => $bdate,
+                                                                        newbdate    => $nbdate,
+                                                                        begintime   => $btime,
+                                                                        newbtime    => $nbtime,
+                                                                        begints     => $bts,
+                                                                        enddate     => $edate,
+                                                                        newedate    => $nedate, 
+                                                                        endtime     => $etime,
+                                                                        newetime    => $netime,
+                                                                        endts       => $ets,
+                                                                        newendts    => $nets,
+                                                                        sumarrayref => \@row_array,
+                                                                        untilts     => $uets,
+                                                                        newbegints  => $nbts,
+                                                                        tstart      => $tstart,
+                                                                        tend        => $tend,
+                                                                        until       => $until,
+                                                                        uid         => $uid
+                                                                     });   
                       
                       next if($next);                      
                       last if((defined $uets && ($uets < $nbts)) || $nbts > $tend);
@@ -2116,7 +2111,7 @@ sub extractToDolist {                               ## no critic 'complexity'
   my ($nbdate,$nbtime,$nbts,$nedate,$netime,$nets);
   my @row_array;
   
-  my (undef,$tstart,$tend) = _timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
+  my (undef,$tstart,$tend) = timeEdge($name);       # Sollstart- und Sollendezeit der Kalenderereignisse ermitteln
   my $datetimestart        = FmtDateTime($tstart);
   my $datetimeend          = FmtDateTime($tend);
        
@@ -2219,7 +2214,7 @@ return createReadings ("$name|$rowlist");               # synchoner Mode
 #   Array auf wenn Prüfung positiv
 #
 #############################################################################################
-sub _evalTimeAndWrite {
+sub evalTimeAndWrite {
   my ($argref)  = @_;
   my $name      = $argref->{name};
   my $n         = $argref->{eventno};
@@ -2339,9 +2334,9 @@ sub writeValuesToArray {                                                   ## no
   
   my ($upcoming,$alarmed,$started,$ended) = (0,0,0,0);
  
-  $upcoming = _isUpcoming ($ts,0,$bts);                                     # initiales upcoming
-  $started  = _isStarted  ($ts,$bts,$ets);
-  $ended    = _isEnded    ($ts,$ets);
+  $upcoming = isUpcoming ($ts,0,$bts);                                     # initiales upcoming
+  $started  = isStarted  ($ts,$bts,$ets);
+  $ended    = isEnded    ($ts,$ets);
   
   if($bdate && $btime) {
       push(@$aref, $bts+$n." 05_Begin "  .$bdate." ".$btime."\n");
@@ -2388,10 +2383,10 @@ sub writeValuesToArray {                                                   ## no
       $val  = encode("UTF-8", $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{TIMEVALUE}{$z});
       
       if(!$data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} && !$isRecurrence) {                # wenn keine Veränderung vorhanden ist ({RECURRENCEID}{index}=undef) gelten die Erinnerungszeiten Standarderinnerungszeiten
-          ($uts,$td) = _evtNotTime ($name,$val,$bts);   
+          ($uts,$td) = evtNotTime ($name,$val,$bts);   
           push(@$aref, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
           
-          $alarmed = _isAlarmed ($ts,$uts,$bts) if(!$alarmed);
+          $alarmed = isAlarmed ($ts,$uts,$bts) if(!$alarmed);
       } 
       elsif ($data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} &&
                $data{SSCal}{$name}{vcalendar}{"$uid"}{VALM}{RECURRENCEID}{$z} eq $origdtstart) {
@@ -2405,10 +2400,10 @@ sub writeValuesToArray {                                                   ## no
               Log3($name, 3, "$name - ERROR - invalid date/time format in 'writeValuesToArray' detected: $err ");
           };                                       
           
-          ($uts,$td) = _evtNotTime ($name,$val,$chts);   
+          ($uts,$td) = evtNotTime ($name,$val,$chts);   
           push(@$aref, $bts+$n." 80_".sprintf("%0$l.0f", $ens)."_notifyDateTime " .$td."\n");
           
-          $alarmed = _isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
+          $alarmed = isAlarmed ($ts,$uts,$chts) if(!$alarmed);  
           
           $isAlldaychanded = 0;          
       }
@@ -2776,22 +2771,22 @@ sub extractIcal {                                                   ## no critic
               $vcal{$n}{SEQUENCE}    = $v     if($k eq "SEQUENCE");
               
               if($k eq "DTSTART") {
-                  $v                 = _icalTimecheck ($name,$v);
+                  $v                 = icalTimecheck ($name,$v);
                   $vcal{$n}{DTSTART} = $v;
               }
               
               if($k eq "DTEND") {
-                  $v                 = _icalTimecheck ($name,$v);
+                  $v                 = icalTimecheck ($name,$v);
                   $vcal{$n}{DTEND} = $v;
               }
               
               if($k eq "RECURRENCE-ID") {
-                  $v                      = _icalTimecheck ($name,$v);
+                  $v                      = icalTimecheck ($name,$v);
                   $vcal{$n}{RECURRENCEID} = $v;
               }
               
               if($k eq "EXDATE") {
-                  $v                  = _icalTimecheck ($name,$v);
+                  $v                  = icalTimecheck ($name,$v);
                   $vcal{$n}{EXDATES} .= $v." ";
               }
           }
@@ -2802,7 +2797,7 @@ sub extractIcal {                                                   ## no critic
   while ($vh->{evt_notify_setting}[$n]) {
       for (keys %{$vh->{evt_notify_setting}[$n]}) {
           if($_ eq "recurrence-id") {
-              $valm{$n}{RECURRENCEID} = _icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
+              $valm{$n}{RECURRENCEID} = icalTimecheck ($name,$vh->{evt_notify_setting}[$n]{$_});
           }
 
           if($_ eq "time_value") {
@@ -2844,7 +2839,7 @@ return;
 #  Checked und korrigiert Zeitformate aus VCALENDAR um sie mit API-Werten vergleichbar
 #  zu machen
 #############################################################################################
-sub _icalTimecheck {
+sub icalTimecheck {
   my $name = shift;
   my $v    = shift;
   
@@ -2892,7 +2887,7 @@ return $v;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts vor Alarmzeit $ats und vor Startzeit $bts,
 #  sonst 0
 #############################################################################################
-sub _isUpcoming {
+sub isUpcoming {
   my ($ts,$ats,$bts) = @_;
 
   if($ats) {
@@ -2908,7 +2903,7 @@ sub _isUpcoming {
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts zwischen Alarmzeit $ats und Startzeit $bts,
 #  sonst 0
 #############################################################################################
-sub _isAlarmed {
+sub isAlarmed {
   my ($ts,$ats,$bts) = @_;
   
 return $ats ? (($ats <= $ts && $ts < $bts) ? 1 : 0) : 0;
@@ -2919,7 +2914,7 @@ return $ats ? (($ats <= $ts && $ts < $bts) ? 1 : 0) : 0;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts zwischen Startzeit $bts und Endezeit $ets,
 #  sonst 0
 #############################################################################################
-sub _isStarted {
+sub isStarted {
   my ($ts,$bts,$ets) = @_;
   
   return 0 unless($bts);
@@ -2937,7 +2932,7 @@ return 1;
 #  Rückkehrwert 1 wenn aktueller Timestamp $ts größer Endezeit $ets,
 #  sonst 0
 #############################################################################################
-sub _isEnded {
+sub isEnded {
   my ($ts,$ets) = @_;
 
   return 0 unless($ets && $ts);
@@ -2948,7 +2943,7 @@ return $ets <= $ts ? 1 : 0;
 #############################################################################################
 #                                     check SID
 #############################################################################################
-sub _checkSID { 
+sub checkSID { 
   my $name = shift;
   my $hash = $defs{$name};
   
@@ -2967,7 +2962,7 @@ return calOp($name);
 #############################################################################################
 #              Start- und Endezeit ermitteln
 #############################################################################################
-sub _timeEdge {
+sub timeEdge {
   my ($name) = @_;
   my $hash   = $defs{$name};
   my ($error,$t1,$t2) = ("","","");
@@ -2980,7 +2975,7 @@ sub _timeEdge {
   my $cutLaterDays = AttrVal($name, "cutLaterDays", 5)."d";
 
   # start of time window
-  ($error,$t1) = __GetSecondsFromTimeSpec($cutOlderDays);
+  ($error,$t1) = GetSecondsFromTimeSpec($cutOlderDays);
   if($error) {
       Log3 $hash, 2, "$name: attribute cutOlderDays: $error";
       return ($error,"","");
@@ -2992,7 +2987,7 @@ sub _timeEdge {
   }
 
   # end of time window
-  ($error,$t2) = __GetSecondsFromTimeSpec($cutLaterDays);
+  ($error,$t2) = GetSecondsFromTimeSpec($cutLaterDays);
   if($error) {
       Log3 $hash, 2, "$name: attribute cutLaterDays: $error";
       return ($error,"","");
@@ -3019,7 +3014,7 @@ return ("",$t1,$t2);
 #                           $ts:  Timstamp als YYYY-MM-DD HH:MM:SS
 #                 
 #############################################################################################
-sub _evtNotTime {
+sub evtNotTime {
   my ($name,$tv,$bts) = @_;
   my $hash            = $defs{$name};
   my ($uts,$ts)       = ("","");
@@ -3060,7 +3055,7 @@ return ($uts,$ts);
 #############################################################################################
 #              Unix timestamp aus Zeitdifferenz berechnen
 #############################################################################################
-sub __GetSecondsFromTimeSpec {
+sub GetSecondsFromTimeSpec {
   my ($tspec) = @_;
 
   # days
