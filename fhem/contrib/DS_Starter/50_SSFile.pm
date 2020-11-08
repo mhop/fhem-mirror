@@ -72,6 +72,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
 use Encode;
 use File::Find;
+use File::Glob ':bsd_glob';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                 ## no critic 'eval'
                                                     
@@ -143,7 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.7.1"  => "08.11.2020  fix download ",
+  "0.7.1"  => "08.11.2020  fix download, fix perl warning while upload not existing files  ",
   "0.7.0"  => "02.11.2020  new set command deleteRemoteObj, fix download object with space in name ",
   "0.6.0"  => "30.10.2020  Upload files may contain wildcards *. ",
   "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously, some more improvements around Upload ",
@@ -593,7 +594,6 @@ sub _setDownload {
   #          method => auszuführende API-Methode, 
   #          params => "spezifische API-Parameter>
   
-  # $arg       = smUrlEncode ($arg);
   my ($s,$d) = split "dest=", $arg;
   $d         = smUrlEncode ($d);
   
@@ -692,21 +692,23 @@ sub _setUpload {
   
   my @all;
   for my $obj (@uld) {                                                   # nicht existierende objekte aussondern
-      if (! -e $obj) {
-          my @globes = glob ("$obj");                                    # Wildcards auflösen (https://perldoc.perl.org/functions/glob)
-          if (@globes) {
-              push (@all, @globes);
-              next;
-          }
-          Log3 ($name, 3, qq{$name - The object "$obj" doesn't exist or can't be dissolved, ignore it for upload});
+      my @globes = bsd_glob ("$obj");                                    # Wildcards auflösen (https://perldoc.perl.org/functions/glob)
+      push (@all, @globes);
+  }
+  Log3 ($name, 1, "$name - all: ".Dumper @all);
+  my @afiles;
+  for my $file (@all) {
+      if (-e $file) {
+          push @afiles, $file;
           next;
       }
-      push @all, $obj;
-  } 
-  
+      Log3 ($name, 3, qq{$name - The object "$file" doesn't exist or can't be dissolved, ignore it for upload});
+      next;
+  }
+
   readingsSingleUpdate($hash, "state", "Wait for filling upload queue", 1); 
   
-  $paref->{allref} = \@all;
+  $paref->{allref} = \@afiles;
   $paref->{remDir} = $remDir;
   $paref->{ow}     = $ow;
   $paref->{cdir}   = $cdir;
@@ -1975,7 +1977,7 @@ sub _parseUpload {
   if($skip eq "false") {
       $data{$type}{$name}{uploaded}{"$lclobj"} = { remobj => $remobj, done => 1, ts => time };    # Status und Zeit des Objekt-Upload speichern 
       Log3 ($name, 4, qq{$name - Object "$lclobj" uploaded});
-      $trtxt = qq{Upload: local File "$lclobj" to remote File "$remobj"};  
+      $trtxt = qq{Uploaded: local File "$lclobj" to remote File "$remobj"};  
   } 
   else {
       Log3 ($name, 3, qq{$name - Object "$remobj" already exists -> upload skipped});
@@ -2680,6 +2682,7 @@ return $out;
     "Download",
     "Upload",
     "Backup",
+    "Restore",
     "Filestransfer",
     "File Station"
   ],
@@ -2710,7 +2713,8 @@ return $out;
         "FHEM::SynoModules::SMUtils": 0,
         "FHEM::SynoModules::ErrCodes": 0,
         "GPUtils": 0,
-        "File::Find": 0
+        "File::Find": 0,
+        "File::Glob": 0
       },
       "recommends": {
         "FHEM::Meta": 0
