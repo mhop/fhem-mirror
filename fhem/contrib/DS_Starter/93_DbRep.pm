@@ -2969,13 +2969,14 @@ sub averval_DoParse {
      
          # Grünlandtemperatursumme
          my ($y,$m,$d) = split "-", $runtime_string;
-         if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum) && $sum >= 0) {
+         if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum)) {
              $m    = DbRep_removeLeadingZero ($m);
              $d    = DbRep_removeLeadingZero ($d);
              $gts  = 0 if($m == 1 && $d == 1);
              
-             my $f = $m >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
-                     $m == 2 ? 0.75 : 0.5;
+             my $f = $sum <= 0 ? 0    :
+                     $m   >= 3 ? 1.00 :                                          # Faktorenberechnung lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme
+                     $m   == 2 ? 0.75 : 0.5;
                      
              $gts += $sum*$f;
              # $gts  = 200 if($gts>200);
