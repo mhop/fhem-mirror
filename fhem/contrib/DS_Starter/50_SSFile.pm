@@ -594,6 +594,11 @@ sub _setDownload {
   #          params => "spezifische API-Parameter>
   
   # $arg       = smUrlEncode ($arg);
+  my ($s,$d) = split "dest=", $arg;
+  $d         = smUrlEncode ($d);
+  
+  $arg       = $s."dest=".$d;
+  
   my ($a,$h) = parseParams ($arg);
   my $fp     = $a->[0];
   
