@@ -695,7 +695,7 @@ sub _setUpload {
       my @globes = bsd_glob ("$obj");                                    # Wildcards auflösen (https://perldoc.perl.org/functions/glob)
       push (@all, @globes);
   }
-  Log3 ($name, 1, "$name - all: ".Dumper @all);
+
   my @afiles;
   for my $file (@all) {
       if (-e $file) {
