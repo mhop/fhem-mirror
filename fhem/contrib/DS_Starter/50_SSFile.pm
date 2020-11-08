@@ -143,6 +143,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.1"  => "08.11.2020  fix download ",
   "0.7.0"  => "02.11.2020  new set command deleteRemoteObj, fix download object with space in name ",
   "0.6.0"  => "30.10.2020  Upload files may contain wildcards *. ",
   "0.5.0"  => "26.10.2020  new Setter Upload and fillup upload queue asynchronously, some more improvements around Upload ",
@@ -592,13 +593,15 @@ sub _setDownload {
   #          method => auszuführende API-Methode, 
   #          params => "spezifische API-Parameter>
   
-  $arg       = smUrlEncode ($arg);
+  # $arg       = smUrlEncode ($arg);
   my ($a,$h) = parseParams ($arg);
   my $fp     = $a->[0];
   
   if(!$fp) {
       return qq{No source file or directory specified for download !}
   }
+  
+  $fp = smUrlEncode ($fp);
   
   delReadings ($name, 0);
   
