@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.006
+#  Version 4.8.007
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -63,6 +63,9 @@ use vars qw(%HMCCU_SCRIPTS);
 	'KEY_TRANSCEIVER' => {
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true'
 	},
+	'VIRTUAL_KEY' => {
+		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true'
+	},
 	'BLIND' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0'
 	},
@@ -85,13 +88,13 @@ use vars qw(%HMCCU_SCRIPTS);
 		F => 1, S => 'TEMPERATURE', C => 'TEMPERATURE', V => ''
 	},
 	'THERMALCONTROL_TRANSMIT' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => ''
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => ''
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
-		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => ''
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => 'on:30.5,off:4.5'
 	}
 );
 
@@ -171,6 +174,11 @@ use vars qw(%HMCCU_SCRIPTS);
 		'off' => 'V:PRESS_SHORT:1',
 		'press' => 'V:PRESS_SHORT:1'
 	},
+	'VIRTUAL_KEY' => {
+		'on' => 'V:PRESS_SHORT:1',
+		'off' => 'V:PRESS_SHORT:1',
+		'press' => 'V:PRESS_SHORT:1'
+	},
 	'BLIND' => {
 		'pct' => 'V:LEVEL:?level',
 		'open' => 'V:LEVEL:100',
@@ -229,7 +237,8 @@ use vars qw(%HMCCU_SCRIPTS);
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
 		'boost' => 'V:BOOST_MODE:1',
-		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program'
+		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program',
+		'get week-program' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
 	},
 	'CLIMATECONTROL_RT_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_TEMPERATURE:?temperature',
@@ -237,7 +246,9 @@ use vars qw(%HMCCU_SCRIPTS);
 		'on' => 'V:MANU_MODE:30.5',
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
-		'boost' => 'V:BOOST_MODE:1'
+		'boost' => 'V:BOOST_MODE:1',
+		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program',
+		'get week-program' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_POINT_TEMPERATURE:?temperature',
@@ -321,6 +332,10 @@ use vars qw(%HMCCU_SCRIPTS);
 		'PRESS_LONG' =>  { '1' => 'pressed', 'true' => 'pressed' }
 	},
 	'KEY_TRANSCEIVER' => {
+		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },
+		'PRESS_LONG' =>  { '1' => 'pressed', 'true' => 'pressed' }
+	},
+	'VIRTUAL_KEY' => {
 		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },
 		'PRESS_LONG' =>  { '1' => 'pressed', 'true' => 'pressed' }
 	},

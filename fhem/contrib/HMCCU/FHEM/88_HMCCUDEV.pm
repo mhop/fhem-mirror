@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.033
+#  Version 4.4.034
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -226,8 +226,8 @@ sub HMCCUDEV_InitDevice ($$)
 			my ($sc, $sd, $cc, $cd, $sdCnt, $cdCnt) = HMCCU_GetSpecialDatapoints ($devHash);
 			return -1 if ($cdCnt > 2);
 
-			HMCCU_UpdateRoleCommands ($ioHash, $devHash, $attr{$devHash->{NAME}}{controlchannel});
-			HMCCU_UpdateAdditionalCommands ($ioHash, $devHash, $attr{$devHash->{NAME}}{controlchannel});
+			HMCCU_UpdateRoleCommands ($ioHash, $devHash, $cc);
+			HMCCU_UpdateAdditionalCommands ($ioHash, $devHash, $cc, $cd);
 
 			if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
 				if (!HMCCU_SetDefaultAttributes ($devHash, {
@@ -404,7 +404,7 @@ sub HMCCUDEV_Set ($@)
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
 
 	# Get additional commands
-	my $cmdList = $hash->{hmccu}{cmdlist} // '';
+	my $cmdList = $hash->{hmccu}{cmdlist}{set} // '';
 
 	# Some commands require a control channel and datapoint
 	if ($opt =~ /^(control|toggle)$/) {
@@ -436,8 +436,8 @@ sub HMCCUDEV_Set ($@)
 	elsif ($opt eq 'toggle') {
 		return HMCCU_ExecuteToggleCommand ($hash, $cc, $cd);
 	}
-	elsif (exists($hash->{hmccu}{roleCmds}{$opt})) {
-		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, $opt, $cc, $a, $h);
+	elsif (exists($hash->{hmccu}{roleCmds}{set}{$opt})) {
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'set', $opt, $cc, $a, $h);
 	}
 	elsif ($opt eq 'clear') {
 		return HMCCU_ExecuteSetClearCommand ($hash, $a);
@@ -492,6 +492,9 @@ sub HMCCUDEV_Get ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
 
+	# Get additional commands
+	my $cmdList = $hash->{hmccu}{cmdlist}{get} // '';
+
 	# Virtual devices only support command get update
 	return "HMCCUDEV: Unknown argument $opt, choose one of update:noArg"
 		if ($ccuif eq 'fhem' && $opt ne 'update');
@@ -535,19 +538,20 @@ sub HMCCUDEV_Get ($@)
 		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($devDesc));
 		push @addList, split (',', $devDesc->{CHILDREN});
 
-		return HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $opt, \@addList);
+		my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $opt, \@addList);
+		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($resp));
+		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $resp);
 	}
 	elsif ($opt eq 'paramsetdesc') {
 		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
+	elsif (exists($hash->{hmccu}{roleCmds}{get}{$opt})) {
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $cc, $a, $h);
+	}
 	elsif ($opt eq 'defaults') {
 		$result = HMCCU_GetDefaults ($hash, 0);
 		return $result;
-	}
-	elsif ($opt eq 'weekprogram') {
-		my $program = shift @$a;
-		return HMCCU_DisplayWeekProgram ($hash, $program);
 	}
 	else {
 		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of datapoint";
@@ -557,8 +561,7 @@ sub HMCCUDEV_Get ($@)
 		$retmsg .= ':'.join(",", @valuelist) if ($valuecount > 0);
 		$retmsg .= ' defaults:noArg update:noArg config:noArg'.
 			' paramsetDesc:noArg deviceInfo:noArg values:noArg';
-		$retmsg .= ' weekProgram:all,'.join(',', sort keys %{$hash->{hmccu}{tt}})
-			if (exists($hash->{hmccu}{tt}));
+		$retmsg .= " $cmdList" if ($cmdList ne '');
 
 		return $retmsg;
 	}

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.028
+#  Version 4.4.029
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -111,7 +111,7 @@ sub HMCCUCHN_Define ($@)
 			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
 			return $ccuinactive > 0 ?
 				'CCU and/or IO device not ready. Please try again later' :
-				'Cannot detect IO device';
+				'Cannot detect IO device or CCU device not found';
 		}
 	}
 	else {
@@ -163,8 +163,11 @@ sub HMCCUCHN_InitDevice ($$)
 		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
 		HMCCU_UpdateDevice ($ioHash, $devHash);
 		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
-		HMCCU_UpdateRoleCommands ($ioHash, $devHash);
-		HMCCU_UpdateAdditionalCommands ($ioHash, $devHash);
+		
+		my ($sc, $sd, $cc, $cd, $sdCnt, $cdCnt) = HMCCU_GetSpecialDatapoints ($devHash);
+		
+		HMCCU_UpdateRoleCommands ($ioHash, $devHash, $cc);
+		HMCCU_UpdateAdditionalCommands ($ioHash, $devHash, $cc, $cd);
 
 		if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
 			if (!HMCCU_SetDefaultAttributes ($devHash)) {
@@ -267,7 +270,7 @@ sub HMCCUCHN_Set ($@)
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
 	
 	# Additional commands, including state commands
-	my $cmdList = $hash->{hmccu}{cmdlist} // '';
+	my $cmdList = $hash->{hmccu}{cmdlist}{set} // '';
 
 	# Some commands require a control datapoint
 	if ($opt =~ /^(control|toggle)$/) {
@@ -297,8 +300,8 @@ sub HMCCUCHN_Set ($@)
 	elsif ($opt eq 'toggle') {
 		return HMCCU_ExecuteToggleCommand ($hash, $cc, $cd);
 	}
-	elsif (exists($hash->{hmccu}{roleCmds}{$opt})) {
-		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, $opt, $cc, $a, $h);
+	elsif (exists($hash->{hmccu}{roleCmds}{set}{$opt})) {
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'set', $opt, $cc, $a, $h);
 	}
 	elsif ($opt eq 'clear') {
 		return HMCCU_ExecuteSetClearCommand ($hash, $a);
@@ -352,6 +355,9 @@ sub HMCCUCHN_Get ($@)
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
 	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
 
+	# Additional commands, including state commands
+	my $cmdList = $hash->{hmccu}{cmdlist}{get} // '';
+
 	my $result = '';
 	my $rc;
 
@@ -375,18 +381,19 @@ sub HMCCUCHN_Get ($@)
 	elsif ($opt =~ /^(config|values|update)$/) {
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);	
-		return HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $opt, \@addList);	
+		my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $opt, \@addList);
+		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($resp));
+		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $resp);
 	}
 	elsif ($opt eq 'paramsetdesc') {
 		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
+	elsif (exists($hash->{hmccu}{roleCmds}{get}{$opt})) {
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $cc, $a, $h);
+	}
 	elsif ($opt eq 'defaults') {
 		return HMCCU_GetDefaults ($hash, 0);
-	}
-	elsif ($opt eq 'weekprogram') {
-		my $program = shift @$a;
-		return HMCCU_DisplayWeekProgram ($hash, $program);
 	}
 	else {
 		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of defaults:noArg datapoint";
@@ -397,8 +404,7 @@ sub HMCCUCHN_Get ($@)
 		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
 		$retmsg .= " update:noArg deviceInfo:noArg config:noArg".
 			" paramsetDesc:noArg values:noArg";
-		$retmsg .= ' weekProgram:all,'.join(',', sort keys %{$hash->{hmccu}{tt}})
-			if (exists($hash->{hmccu}{tt}));
+		$retmsg .= " $cmdList" if ($cmdList ne '');
 		
 		return $retmsg;
 	}
