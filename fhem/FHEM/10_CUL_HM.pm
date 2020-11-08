@@ -431,19 +431,24 @@ sub CUL_HM_updateConfig($){##########################
           $hash->{helper}{vd}{idl} = 0;
           $hash->{helper}{vd}{idh} = 0;
         }
-        my $d =ReadingsVal($name,"valvePosTC","");
-        $d =~ s/ %//;
-        CUL_HM_Set($hash,$name,"valvePos",$d);
-        CUL_HM_Set($hash,$name,"virtTemp",ReadingsVal($name,"temperature",""));
-        CUL_HM_Set($hash,$name,"virtHum" ,ReadingsVal($name,"humidity",""));
-        CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if (ReadingsVal($name,"valvePosTC",""));
-        RemoveInternalTimer("valvePos:$vId");
-        RemoveInternalTimer("valveTmr:$vId");
-        InternalTimer($hash->{helper}{vd}{next}
-                     ,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+        if ($hash->{helper}{fkt} eq "vdCtrl"){
+          my $d = ReadingsVal($name,"valvePosTC","");
+          $d =~ s/ %//;
+          CUL_HM_Set($hash,$name,"valvePos",$d);
+          CUL_HM_UpdtReadSingle($hash,"valveCtrl","restart",1) if ($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+          RemoveInternalTimer("valvePos:$vId");
+          RemoveInternalTimer("valveTmr:$vId");
+          InternalTimer($hash->{helper}{vd}{next},"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+        }
+        elsif($hash->{helper}{fkt} eq "virtThSens"){
+          my $d = ReadingsVal($name,"temperature","");
+          CUL_HM_Set($hash,$name,"virtTemp",$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+          $d = ReadingsVal($name,"humidity","");
+          CUL_HM_Set($hash,$name,"virtHum" ,$d) if($d =~ m/^[-+]?[0-9]+\.?[0-9]*$/);
+        }
+
         # delete - virtuals dont have regs 
-        delete $attr{$name}{$_}
-            foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
+        delete $attr{$name}{$_} foreach ("autoReadReg","actCycle","actStatus","burstAccess","serialNr"); 
       }
     }
     elsif ($st eq "sensRain") {
@@ -4599,10 +4604,10 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           elsif($param =~ m/([\-\d\.]*)\.\.([\-\d\.]*)/ ){# we check for min/max but not for step
             my ($min,$max) = ($1,$2);
             if ($parIn[$pCnt] !~ m/^[-+]?[0-9]+\.?[0-9]*$/){
-              $paraFail = "$parIn[$pCnt] not numeric";
+              $paraFail = "\'$parIn[$pCnt]\' not numeric";
             }
             elsif ($parIn[$pCnt] < $min || $parIn[$pCnt] > $max ){
-              $paraFail = "$parIn[$pCnt] out of range min:$min max:$max";
+              $paraFail = "\'$parIn[$pCnt]\' out of range min:$min max:$max";
             }
           }
           else{                                     # user param no match
