@@ -59,6 +59,11 @@ for my $fn (sort { $a <=> $b } @files) {
     unlink("$ARGV[0]/$fn");
     next;
   }
+  # There is sometimes 0x0x in the XML, see
+  # https://products.z-wavealliance.org/products/1694
+  $mi =~s/0x/00/;
+  $pti=~s/0x/00/;
+  $pi =~s/0x/00/;
   printf OF "%s-%s-%s,%s,%s,%s\n", $mi,$pti,$pi,$fn,$pic,$bn;
 }
 closedir(DIRH);
