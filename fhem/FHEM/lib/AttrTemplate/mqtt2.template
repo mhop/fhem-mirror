@@ -32,7 +32,8 @@ attr DEVICE bridgeRegexp \
   (ESPClient_[^/]+)/.*:.* "$1"\
   (ebusd)/global/.*:.* "$1"\
   valetudo[/]([^/]+)[/].*:.* "$1"\
-  [^/]+[/](ems-esp[^/]+)/start:.* "$1"\
+  [^/]+[/](ems-esp[^/]*)/start:.* "$1"\
+  /(ems-esp[^/]*)/start:.* "$1"\
   wallpanel[/]([^/]+)[/].*:.* "wallpanel_$1"\
   (wled)[/]([^/]+)[/].*:.* "$1_$2"\
   (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
@@ -2977,6 +2978,37 @@ name:ems-esp_heater_device
 filter:TYPE=MQTT2_DEVICE
 desc:EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
 order:E_02a
+par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
+par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
+attr DEVICE icon ICON
+modify DEVICE DEV_ID
+attr DEVICE bridgeRegexp \
+  DEV_ID/(sensors|sm_data|hp_data|thermostat_data).*:.* "ems_esp_$1"\
+  DEV_ID/(boiler_data|tapwater_active|heating_active|mixing_data|shower_data).*:.* "ems_esp_boiler"\
+  DEV_ID/(status|info|heartbeat).*:.* "Heizung"
+attr DEVICE userReadings formatedUptime:uptime.* {my $m = ReadingsVal($name,"uptime_sec",0)/60;; return sprintf "0 000 00:%02d", $m if $m < 60;; my $h = $m / 60;; $m %= 60;; return sprintf "0 000 %02d:%02d", $h, $m if $h < 24;; my $d = $h / 24;; $h %= 24;; return sprintf "0 %03d %02d:%02d", $d, $h, $m if $d <365;; my $y = $d / 365;; $d %= 365;; return sprintf "%d %03d %02d:%02d", $y, $d, $h, $m}
+attr DEVICE  readingList DEV_ID/status:.* LWT\
+  DEV_ID/heartbeat:.* { json2nameValue($EVENT) }\
+  DEV_ID/info:.* { json2nameValue($EVENT) }\
+  DEV_ID/status:.* { json2nameValue($EVENT) }
+attr DEVICE stateFormat Interface: \
+LWT\
+Signal: \
+rssi %\
+<br>Uptime: formatedUptime\
+<br>IPAddress : <a href="http://ip" target="_blank">ip</a>
+attr DEVICE setList restart:noArg DEV_ID/restart
+attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
+attr DEVICE autocreate 1
+attr DEVICE webCmd restart
+attr DEVICE model ems-esp_heater_device
+setreading DEVICE attrTemplateVersion 20201107
+
+
+name:ems-esp_heater_device_outdated
+filter:TYPE=MQTT2_DEVICE
+desc:Compability version of template, for firmware versions prior to 2.1!<br>EMS-ESP is a open-source system to communicate with EMS (Energy Management System) based boilers, thermostats and other modules from manufacturers like Bosch, Buderus, Nefit, Junkers and Sieger, see <a href="https://github.com/proddy/EMS-ESP">project page</a>. First version, to contribute see <a href="https://forum.fhem.de/index.php/topic,104968.0.html">Forum Thread</a>.
+order:E_02a1
 par:BASE_ID;base topic set, default is "home";{ AttrVal("DEVICE","readingList","") =~ m,([^/:]+)/, ? $1 : "home" }
 par:DEV_ID;ID topic set, default is "ems-esp";{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+/([^/]+), ? $1 : "ems-esp" }
 par:ICON;ICON as set, defaults to sani_boiler_temp;{ AttrVal("DEVICE","icon","sani_boiler_temp") }
@@ -2998,7 +3030,7 @@ attr DEVICE setList restart:noArg BASE_ID/DEV_ID/restart
 attr DEVICE devStateIcon online:it_net offline:it_net@red  2.1:lan_rs485 2.0:lan_rs485@red
 attr DEVICE autocreate 1
 attr DEVICE webCmd restart
-attr DEVICE model ems-esp_heater_device
+attr DEVICE model ems-esp_heater_device_outdated
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:ems-esp_boiler
