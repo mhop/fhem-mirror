@@ -1,11 +1,14 @@
 #/usr/bin/perl
 
+use strict;
+use warnings;
+
 # Creates the FHEM file from the raw data
 
 # Usage: zwavealliance.images.parse downloaddir
 # Downloaddir is filled with the following script:
 # i=1
-# while test $i -lt 3000
+# while test $i -lt 4034
 # do
 #   echo $i
 #   wget -O $i -q http://products.z-wavealliance.org/products/$i/XML
@@ -26,7 +29,7 @@ for my $fn (sort { $a <=> $b } @files) {
   next if (! -f $path);
   print("$fn\n");
   open(FH, $path) || die("Cant open $path\n");
-  my ($bn,$mi,$pti,$pi,$pic,$em) = ('','','','','','');
+  my ($bn,$mi,$pti,$pi,$pic,$em,$ppi) = ('','','','','','','');
   while(my $l = <FH>) {
     chomp($l);
 
@@ -35,10 +38,15 @@ for my $fn (sort { $a <=> $b } @files) {
     $mi  = $1 if($l =~ m,<ManufacturerId>0x(....)</ManufacturerId>,);
     $pti = $1 if($l =~ m,<ProductTypeId>0x(....)</ProductTypeId>,);
     $pi  = $1 if($l =~ m,<ProductId>0x(....)</ProductId>,);
-    $pic = $1 if($l =~ m,<Image>.*productName=(.*)</Image>,);
+    $pic = $1 if($l =~ m,<CertificationNumber>(.*)</CertificationNumber>,);
+    $ppi = $1 if($l =~ m,<value>product_pictures/(.*)\.(.*)</value>,);
 
   }
   close(FH);
+  if($pic ne $ppi) {
+    printf "Problem: $pic vs. $ppi\n";
+    # just to see new problems with pictures
+  }
   if($em eq 'empty') {
     printf "No data for $fn, deleting the file\n";
     # in the hope that somebody will fix the file
