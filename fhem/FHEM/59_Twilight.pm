@@ -85,6 +85,7 @@ BEGIN {
           perlSyntaxCheck
           EvalSpecials
           AnalyzePerlCommand
+          AnalyzeCommandChain
           stacktrace
           )
     );
@@ -259,16 +260,21 @@ sub Twilight_HandleWeatherData {
     } elsif (defined $hash->{helper}{extWeather}{dispatch}{userfunction} ) {
         #Log3( $hash, 5, "[$hash->{NAME}] before dispatch" );
         my %specials = (
-                    '$WEATHERDEV'     => $extWeather,
-                    '$WEATHERREADING' => $hash->{helper}{extWeather}{dispatch}{trigger}
+                    '$W_DEVICE'  => $extWeather,
+                    '$W_READING' => $hash->{helper}{extWeather}{trigger}
                        );
-        my $evalcode = EvalSpecials ($hash->{helper}{extWeather}{dispatch}->{function}, %specials); 
-                
+        my $evalcode = $hash->{helper}{extWeather}{dispatch}{userfunction};
+        map { my $key =  $_; $key =~ s{\$}{\\\$}gxms;
+            my $val = $specials{$_};
+            $evalcode =~ s{$key}{$val}gxms
+        } keys %specials;
+        my $ret = AnalyzePerlCommand( $hash, $evalcode );
+        Log3( $hash, 4, "[$hash->{NAME}] external code result: $ret" );
         ( $extWeather, $sr_extWeather, $ss_extWeather ) = 
-            AnalyzePerlCommand( $hash, $evalcode );
-                
-        Log3( $hash, 5, "[$hash->{NAME}] external code results: $extWeather $sr_extWeather $ss_extWeather" );
-        
+            split (":", $ret);
+        return if !looks_like_number($extWeather);
+        $sr_extWeather = 50 if !looks_like_number($sr_extWeather);
+        $ss_extWeather = 50 if !looks_like_number($ss_extWeather);
     }
 
     my $last = ReadingsNum($name, "cloudCover", -1);
@@ -278,7 +284,7 @@ sub Twilight_HandleWeatherData {
     $inNotify ? Log3( $hash, 5, "[$name] NotifyFn called, reading is $extWeather, last is $last" ) 
               : Log3( $hash, 5, "[$name] timer based weather update called, reading is $extWeather, last is $last" );
 
-    return if $inNotify && (abs($last - $extWeather) <6 && !defined $hash->{helper}{extWeather}{dispatch} || ReadingsAge($name, "cloudCover", 0) < 3575 && defined $hash->{helper}{extWeather}{dispatch});
+    return if $inNotify && (abs($last - $extWeather) <6 && !defined $hash->{helper}{extWeather}{dispatch} || ReadingsAge($name, "cloudCover", 4000) < 3575 && defined $hash->{helper}{extWeather}{dispatch});
 
     my $weather_horizon = Twilight_getWeatherHorizon( $hash, $extWeather, 1);
             
@@ -388,11 +394,6 @@ sub Twilight_Firstrun {
     }
     Twilight_getWeatherHorizon( $hash, $extWeatherVal );
     
-    #next 3: Materials only
-    #Twilight_TwilightTimes( $hash, "mid") if !defined $hash->{helper}{extWeather}{Device};
-    #Twilight_TwilightTimes( $hash, "weather"); 
-    #return Twilight_HandleWeatherData( $hash, 0);
-    
     my $fnHash = { HASH => $hash };
     Twilight_sunpos($fnHash) if !$attrVal || $attrVal eq "none";
     Twilight_Midnight($fnHash, 1);
@@ -434,12 +435,12 @@ sub Twilight_init_ExtWeather_usage {
         return "External weather device seems not to exist" if (!defined $defs{$extWeather} && $init_done);
         
         ### This is the place to allow external dispatch functions...
-        if ($parts[1] && 0) { #&& 0 to disable this part atm...
+        if ($parts[1] ) { #&& 0 to disable this part atm...
             my %specials = (
-                '$WEATHERDEV'     => $extWeather,
-                '$WEATHERREADING' => $extWReading
+                '$W_DEV'     => $extWeather,
+                '$W_READING' => $extWReading
             );
-            my $err = perlSyntaxCheck( $parts[1], %specials );
+            my $err = perlSyntaxCheck( $parts[1] );
             return $err if ( $err );
         }
     } else {
@@ -447,7 +448,6 @@ sub Twilight_init_ExtWeather_usage {
         my @devices=devspec2array("TYPE=Weather"); 
         return "No Weather-Type device found if !$devices[0]";
         $extWeather = $devices[0];
-        #$extWReading = "cloudCover";
     }
     
     ($err, $extWReading) = Twilight_disp_ExtWeather($hash, $extWeather) if !$extWReading; 
@@ -457,8 +457,11 @@ sub Twilight_init_ExtWeather_usage {
     $hash->{helper}{extWeather}{regexp} = $extWregex;
     $hash->{helper}{extWeather}{Device} = $extWeather;
     $hash->{helper}{extWeather}{Reading} = $extWReading if !$parts[1] && !exists  $hash->{helper}{extWeather}{dispatch};
-    $hash->{helper}{extWeather}{trigger} = $extWReading if $parts[1];
-    $hash->{helper}{extWeather}{userfunction} = $parts[1] if $parts[1];
+    if ($parts[1]) {
+        $hash->{helper}{extWeather}{trigger} = $extWReading ;
+        $parts[1] = qq ({ $parts[1] }) if $parts[1] !~ m/^{.*}$/s;
+        $hash->{helper}{extWeather}{dispatch}{userfunction} = $parts[1];
+    }
     return InternalTimer( time(), \&Twilight_Firstrun,$hash,0) if $init_done && $useTimer;
     return;
 }
@@ -1017,7 +1020,7 @@ sub getTwilightHours {
     my $hour    = ( localtime )[2];
     my $sr_hour = ( localtime( $hash->{TW}{sr_weather}{TIME}))[2];
     my $ss_hour = ( localtime( $hash->{TW}{ss_weather}{TIME}))[2]; 
-    return $hour, $sr_hour, $ss_hour;
+    return $hour,$sr_hour,$ss_hour;
 }
 
 sub getwTYPE_Weather {
@@ -1054,7 +1057,6 @@ sub getwTYPE_Weather {
 sub getwTYPE_PROPLANTA {
     my $hash   = shift // return;
     
-    
     my $extDev = $hash->{helper}{extWeather}{Device};
     my @hour  = getTwilightHours($hash); 
     
@@ -1063,14 +1065,17 @@ sub getwTYPE_PROPLANTA {
     
     my @ret;
     for (my $i = 0; $i < 3 ; $i++) {
-        $hour[$i] <=  4 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud03",0) : 
-        $hour[$i] <=  7 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud06",0) :
-        $hour[$i] <= 10 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud09",0) :
-        $hour[$i] <= 19 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud18",0) :
-        $hour[$i] <= 22 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud21",0) :
-    $ret[$i] = ReadingsNum($extDev,"fc${fc_day1}_cloud03",0);
+        $hour[$i] <  4 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud03",0) : (
+        $hour[$i] <  7 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud06",0) : (
+        $hour[$i] < 10 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud09",0) : (
+        $hour[$i] < 13 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud12",0) : (
+        $hour[$i] < 16 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud15",0) : (
+        $hour[$i] < 19 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud18",0) : (
+        $hour[$i] < 22 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud21",0) :
+        $ret[$i] = ReadingsNum($extDev,"fc${fc_day1}_cloud03",0)))))));
     }
-    return @ret;;
+    #Log3( $hash, 4, "[$hash->{NAME}] Proplanta data: hours $hour[0]-$hour[1]-$hour[2], fc_day0 $fc_day0, data $ret[0]-$ret[1]-$ret[2]");
+    return @ret;
 }
 1;
 
@@ -1206,10 +1211,29 @@ __END__
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><b>useExtWeather &lt;device&gt;[:&lt;reading&gt;]</b></li>
+    <li><b>useExtWeather &lt;device&gt;[:&lt;reading&gt;] [&lt;usercode&gt;]</b></li>
     use data from other devices to calculate <b>twilight_weather</b>.<br/>
     The reading used shoud be in the range of 0 to 100 like the reading <b>c_clouds</b>    in an <b><a href="#openweathermap">openweathermap</a></b> device, where 0 is clear sky and 100 are overcast clouds.<br/>
     Note: Atm. additional weather effects like heavy rain or thunderstorms are neglegted for the calculation of the <b>twilight_weather</b> reading.<br/>
+    
+    By adding <b>usercode</b>, (Note: experimental feature! May work or not or lead to crashes etc....) you may get more realistic results for sr_weather and ss_weather calculation. Just return - besides the actual cloudCover reading value additional predicted values for corresponding indoor times, seperated by ":"<br>
+    <pre>
+      Value_A:Value_B:Value_C
+    </pre>
+    Value_A representing the actual cloudCover value, Value_B at sr_indoor and Value_C at ss_indoor (all values in 0-100 format).<br>
+    Example:
+    <pre>
+      attr myTwilight useExtWeather MyWeather:cloudCover { myCloudCoverAnalysis("MyWeather") }
+    </pre>
+    with corresponding code for myUtils:
+    <pre>
+    sub myCloudCoverAnalysis {
+        my $weatherName = shift;
+        my $ret = ReadingsVal($weatherName,"cloudCover",50);
+        $ret .= ":".ReadingsVal($weatherName,"cloudCover_morning",55);
+        $ret .= ":".ReadingsVal($weatherName,"cloudCover_evening",65);
+        return $ret; 
+    }
   </ul>
   <br>
 
@@ -1352,10 +1376,28 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt;</b></li>
+    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt; [&lt;usercode&gt;]</b></li>
     Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
     Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
-    Wettereffekte wie Starkregen oder Gewitter k&umlnnen derzeit f&uumlr die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen werden.
+    Wettereffekte wie Starkregen oder Gewitter k&umlnnen derzeit f&uumlr die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen werden.<br>
+    Durch Angabe von <b>usercode</b> (Achtung: experimentelles feature! Kann auch schiefgehen...) kann die Berechnung der sr_weather und ss_weather-Zeiten verbessert werden, indem die zum jeweils zugehörigen indoor-Zeitpunkt gehörenden Vorhersage-Werte zurückgegeben werden. Das Rückgabe-Format der Funktion muss sein:<br>
+    <pre>
+      Wert_A:Wert_B:Wert_C
+    </pre>
+    wobei Wert_A der aktuelle cloudCover-Wert ist, Wert_B der zum Zeitpunt für sr_indoor und Wert_C für ss_indoor (alle Werte nummerisch im Bereich 0-100).<br>
+    Beispiel:
+    <pre>
+      attr myTwilight useExtWeather MeinWetter:cloudCover { myCloudCoverAnalysis("MeinWetter") }
+    </pre>
+    mit folgendem (wenig sinnvollen) Code für myUtils:
+    <pre>
+    sub myCloudCoverAnalysis {
+        my $weatherName = shift;
+        my $ret = ReadingsVal($weatherName,"cloudCover",50);
+        $ret .= ":".ReadingsVal($weatherName,"cloudCover_morning",55);
+        $ret .= ":".ReadingsVal($weatherName,"cloudCover_evening",65);
+        return $ret; 
+    }
   </ul>
   <br>
 
