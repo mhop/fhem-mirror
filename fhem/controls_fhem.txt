@@ -1,4 +1,4 @@
-REV 23130
+REV 23134
 DIR unused
 UPD 2020-11-10_07:45:04 353469 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -152,7 +152,7 @@ UPD 2015-07-28_14:05:31 10651 FHEM/24_NetIO230B.pm
 UPD 2020-04-13_07:45:02 22881 FHEM/24_TPLinkHS110.pm
 UPD 2018-05-09_07:45:02 355062 FHEM/26_KM273.pm
 UPD 2019-06-17_07:45:03 64846 FHEM/26_tahoma.pm
-UPD 2019-10-22_07:45:02 93142 FHEM/30_DUOFERN.pm
+UPD 2020-11-11_07:45:02 93308 FHEM/30_DUOFERN.pm
 UPD 2015-07-28_14:05:31 4923 FHEM/30_ENECSYSGW.pm
 UPD 2020-03-07_07:45:02 75607 FHEM/30_HUEBridge.pm
 UPD 2019-12-31_07:45:05 32719 FHEM/30_LIGHTIFY.pm
@@ -638,7 +638,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-11-09_07:45:03 275899 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-11-11_07:45:02 281456 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
@@ -740,8 +740,8 @@ UPD 2020-11-10_07:45:08 4398789 docs/commandref.html
 UPD 2020-11-10_07:45:10 2725102 docs/commandref_DE.html
 UPD 2020-11-02_07:45:03 80858 docs/commandref_frame.html
 UPD 2020-11-02_07:45:03 90473 docs/commandref_frame_DE.html
-UPD 2020-11-10_07:45:12 234477 docs/commandref_modular.html
-UPD 2020-11-10_07:45:13 245193 docs/commandref_modular_DE.html
+UPD 2020-11-11_07:45:09 234477 docs/commandref_modular.html
+UPD 2020-11-11_07:45:10 245193 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1753,6 +1753,7 @@ UPD 2019-02-14_07:45:03 4752 www/images/fhemSVG/well.svg
 UPD 2020-07-26_07:45:03 187891 www/images/fhemSVG/wintergarten_icon.svg
 UPD 2017-03-18_07:45:02 7396 www/images/fhemSVG/wuerfel.svg
 UPD 2019-02-19_07:45:03 5808 www/images/fhemSVG/xiaomi_multi.svg
+UPD 2020-11-11_07:45:02 584 www/images/fhemSVG/zigbee.svg
 UPD 2015-07-28_14:05:33 1269 www/images/openautomation/audio_audio.svg
 UPD 2015-07-28_14:05:33 1192 www/images/openautomation/audio_eject.svg
 UPD 2015-07-28_14:05:33 1578 www/images/openautomation/audio_eq.svg
