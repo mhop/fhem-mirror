@@ -106,6 +106,7 @@ ZWDongle_Initialize($)
     neighborListPos
     neighborListFmt
     showSetInState:1,0
+    setReadingOnAck:1,0
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
@@ -1014,6 +1015,8 @@ ZWDongle_Attr($$$$)
   } elsif($attr eq "showSetInState") {
     $hash->{showSetInState} = ($cmd eq "set" ? (defined($value) ? $value:1) :0);
 
+  } elsif($attr eq "setReadingOnAck") {
+    $hash->{setReadingOnAck}= ($cmd eq "set" ? (defined($value) ? $value:1) :0);
   }
 
   return undef;
@@ -1313,6 +1316,12 @@ ZWDongle_Ready($)
       &lt;cmd&gt;. E.g.: Issuing the command on changes the state first to
       set_on, and after the device ack is received, to on.  This is analoguos
       to the CUL_HM module.  Default for this attribute is 0.
+      </li>
+
+    <li><a name="ZWDonglesetReadingOnAck">setReadingOnAck</a><br>
+      If the attribute is set to 1, and a command with an argument is issued to
+      a ZWave device, then a reading with the same name will be updated upon
+      reception of the corresponding ZWave ACK radio telegram.
       </li>
       
   </ul>

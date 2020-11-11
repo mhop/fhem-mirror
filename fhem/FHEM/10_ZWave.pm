@@ -20,7 +20,7 @@ sub ZWave_addToSendStack($$$);
 sub ZWave_secStart($);
 sub ZWave_secEnd($);
 sub ZWave_configParseModel($;$);
-sub ZWave_callbackId($);
+sub ZWave_callbackId($;$);
 sub ZWave_setEndpoints($);
 
 our ($FW_ME,$FW_tp,$FW_ss);
@@ -997,6 +997,7 @@ ZWave_Cmd($$@)
   my ($type, $hash, @a) = @_;
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
+  my $fullCmd = join(" ",@a);
   my $cmd  = shift(@a);
 
   # Collect the commands from the distinct classes
@@ -1151,13 +1152,13 @@ ZWave_Cmd($$@)
   my $data;
   if(!$cmdId) {
     $data = $cmdFmt;
-    $data .= ZWave_callbackId($baseHash);
+    $data .= ZWave_callbackId($baseHash, $fullCmd);
 
   } else {
     my $len = sprintf("%02x", length($cmdFmt)/2+1);
     my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
     $data = "13$id$len$cmdId${cmdFmt}$cmdEf"; # 13==SEND_DATA
-    $data .= ZWave_callbackId($baseHash);
+    $data .= ZWave_callbackId($baseHash, $fullCmd);
   }
 
   if($type eq "get" && $hash->{CL} && !ZWave_isWakeUp($hash)) {
@@ -1212,7 +1213,7 @@ ZWave_SCmd($$@)
 {
   my ($type, $hash, @a) = @_;
   if($hash->{secInProgress} && !(@a < 2 || $a[1] eq "?")) {
-    my %h = ( T => $type, A => \@a );
+    my %h = ( T => $type, A => \@a, CL => $hash->{CL} );
     push @{$hash->{secStack}}, \%h;
     return ($type eq "get" ?
             "Secure operation in progress, executing in background" : "");
@@ -2970,7 +2971,7 @@ ZWave_configCheckParam($$$$@)
   return ("", sprintf("05%02x", $h->{index})) if($type eq "get");
 
   if($cmd eq "configRGBLedColorForTesting") {
-    return ("6 digit hext number needed","") if($arg[0] !~ m/^[0-9a-f]{6}$/i);
+    return ("6 digit hex number needed","") if($arg[0] !~ m/^[0-9a-f]{6}$/i);
     return ("", sprintf("04%02x03%s", $h->{index}, $arg[0]));
   }
 
@@ -3925,15 +3926,15 @@ ZWave_secTestNetworkkeyVerify ($)
 }
 
 sub
-ZWave_secAddToSendStack($$)
+ZWave_secAddToSendStack($$;$)
 {
-  my ($hash, $cmd) = @_;
+  my ($hash, $cmd, $cmdTxt) = @_;
   my $name = $hash->{NAME};
 
   my $id = $hash->{nodeIdHex};
   my $len = sprintf("%02x", (length($cmd)-2)/2+1);
   my $cmdEf  = (AttrVal($name, "noExplorerFrames", 0) == 0 ? "25" : "05");
-  my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash);
+  my $data = "13$id$len$cmd$cmdEf" . ZWave_callbackId($hash, $cmdTxt);
   ZWave_addToSendStack($hash, "set", $data);
 }
 
@@ -3979,7 +3980,12 @@ ZWave_secEnd($)
   delete $hash->{secStack};
   delete $hash->{secTimer};
   foreach my $cmd (@{$secStack}) {
-    ZWave_SCmd($cmd->{T}, $hash, @{$cmd->{A}});
+    my $ret = ZWave_SCmd($cmd->{T}, $hash, @{$cmd->{A}});
+    if($ret) {
+      my $msg = "ERROR: $cmd->{T} ".join(" ", @{$cmd->{A}})." => $ret";
+      asyncOutput($cmd->{CL}, $msg) if($cmd->{CL});
+      Log 1, $msg;
+    }
   }
 }
 
@@ -4112,7 +4118,7 @@ ZWave_secNonceReceived($$)
   }
 
   my $enc = ZWave_secEncrypt($hash, $r_nonce_hex, $secMsg);
-  ZWave_secAddToSendStack($hash, '98'.$enc);
+  ZWave_secAddToSendStack($hash, '98'.$enc, $cmd);
   if ($type eq "set" && $cmd && $cmd !~ m/^config.*request$/) {
     readingsSingleUpdate($hash, "state", $cmd, 1);
     Log3 $name, 5, "$name: type=$type, cmd=$cmd ($getSecMsg)";
@@ -4617,17 +4623,21 @@ ZWave_getHash($$$)
 
 my $zwave_cbid = 0;
 my %zwave_cbid2dev;
+my %zwave_cbid2cmd;
 sub
-ZWave_callbackId($)
+ZWave_callbackId($;$)
 {
-  my ($p) = @_;
+  my ($p,$cmd) = @_;
   if(ref($p) eq "HASH") {
-    $zwave_cbid =  0 if($zwave_cbid == 255);
-    $zwave_cbid2dev{++$zwave_cbid} = $p;
-    return sprintf("%02x", $zwave_cbid);
+    $zwave_cbid = ($zwave_cbid+1) % 256;
+    my $hx = sprintf("%02x", $zwave_cbid);
+    $zwave_cbid2dev{$hx} = $p;
+    $zwave_cbid2cmd{$hx} = $cmd if(defined($cmd));
+    return $hx;
   }
-  return $zwave_cbid2dev{hex($p)};
+  return $zwave_cbid2dev{$p};
 }
+
 
 sub
 ZWave_wakeupTimer($$)
@@ -5089,16 +5099,29 @@ ZWave_Parse($$@)
       my $name="";
       if($hash) {
         ZWave_processSendStack($hash, "ack", $callbackid);
-        readingsSingleUpdate($hash, "transmit", $lmsg, 0);
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, "transmit", $lmsg, 0);
+
+        my $lCU = $hash->{lastChannelUsed};
+        my $lname = $lCU ? $lCU : $hash->{NAME};
+
         if($iodev->{showSetInState}) {
-          my $lCU = $hash->{lastChannelUsed};
-          my $lname = $lCU ? $lCU : $hash->{NAME};
           my $state = ReadingsVal($lname, "state", "");
           if($state =~ m/^set_(.*)$/) {
-            readingsSingleUpdate($defs{$lname}, "state", $1, 1);
+            readingsBulkUpdate($defs{$lname}, "state", $1, 1);
             $name = $lname;
           }
         }
+
+        if($iodev->{setReadingOnAck}) {
+          my $ackCmd = $zwave_cbid2cmd{$callbackid};
+          if($ackCmd) {
+            my ($reading, $val) = split(" ", $ackCmd, 2);
+            readingsBulkUpdate($defs{$lname},$reading,$val,1) if(defined($val));
+          }
+        }
+
+        readingsEndUpdate($hash, 1);
       }
       delete($hash->{lastChannelUsed});
       return $name;
@@ -5323,9 +5346,8 @@ ZWave_Parse($$@)
 
   } else {
     if($hash->{ignoreDupMsg} && $callbackid ne "00") {
-      my $hp = hex($callbackid);
-      if($zwave_cbid2dev{$hp}) {
-        delete $zwave_cbid2dev{$hp};
+      if($zwave_cbid2dev{$callbackid}) {
+        delete $zwave_cbid2dev{$callbackid};
       } else {
         Log3 $name, 3, "$name: ignore duplicate answer $event[0]";
         return "";
