@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
   "3.6.1"  => "31.10.2020  adjust anchortime in getBalanceMonthData ",
@@ -238,10 +239,10 @@ my %statkeys = (                           # Statistikdaten auszulesende Schlüs
   AutarkyRate           => 1,
 );  
 
-my %hset = (                                                                # Hash der Set-Funktion
-    credentials         => { fn => \&_setCredentials         }, 
-    getData             => { fn => \&_setGetData             },
-    createPortalGraphic => { fn => \&_setCreatePortalGraphic },     
+my %hset = (                                                                                           # Hash der Set-Funktion
+  credentials         => { fn => \&_setCredentials         }, 
+  getData             => { fn => \&_setGetData             },
+  createPortalGraphic => { fn => \&_setCreatePortalGraphic },     
 );
 
 my %mandatory;                                                                                         # Arbeitskopie von %stpl -> abzurufenden Datenprovider Stammdaten nach Login
@@ -263,6 +264,13 @@ my %stpl = (                                                                    
   balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
 
+my %hua = (                                                                                            # mögliche UserAgents für eine Round-Robin-Liste
+  1  => "Mozilla/5.0 (Windows NT 10.0; rv:81.0) Gecko/20100101 Firefox/81.0", 
+  2  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.195 Safari/537.36",
+  3  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",   
+  4  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38",	
+);
+
                                                                    # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
@@ -279,8 +287,6 @@ my @pd = qw( plantMasterData
              weatherData
              plantLogbook
            );
-
-my $defuseragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:77.0) Gecko/20100101 Firefox/77.0";
 
 ###############################################################
 #                  SMAPortal Initialize
@@ -747,7 +753,7 @@ sub Attr {
     if ($cmd eq "set") {
         if ($aName eq "interval") {
             unless ($aVal =~ /^\d+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
-            return qq{The interval must be >= 120 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 120);
+            return qq{The interval must be >= 180 seconds or 0 if you don't want use automatic updates} if($aVal > 0 && $aVal < 180);
             InternalTimer(gettimeofday()+1.0, "FHEM::SMAPortal::CallInfo", $hash, 0);
         }          
     }
@@ -890,7 +896,6 @@ sub GetSetData {                       ## no critic 'complexity'
   my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
-  my $useragent          = AttrVal($name, "userAgent", $defuseragent);
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
   my $v5d                = AttrVal($name, "verbose5Data", "none"); 
   my $verbose            = AttrVal($name, "verbose", 3);
@@ -900,6 +905,12 @@ sub GetSetData {                       ## no critic 'complexity'
   my @da                 = ();
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
+  
+  my @ak           = keys %hua;                                        # UserAgent zufällig vorbelegen
+  my $randomua     = $ak[rand @ak];
+  my $defuseragent = $hua{$randomua};
+  my $useragent    = AttrVal($name, "userAgent", $defuseragent);
+  BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "usedUserAgent:$useragent", "NULL" ], 1);
   
   my %hal = (                                                          # Header Accept-Language sprachenabhängig
       "DE" => "de,en-US;q=0.7,en;q=0.3",
@@ -3124,7 +3135,7 @@ sub deleteData {
   my $name   = $hash->{NAME};
   my @allrds = keys%{$defs{$name}{READINGS}};
  
-  my $bl     = "state|lastCycleTime|Counter|loginState";                       # Blacklist
+  my $bl     = "state|lastCycleTime|Counter|loginState|usedUserAgent";         # Blacklist
   
   my $pblvl  = $stpl{plantLogbook}{level};                                     # Logbuch Level
   
@@ -4441,7 +4452,7 @@ return;
               
        <ul>
          <b>Note:</b> 
-         The retrieval interval should not be less than 120 seconds. As of previous experiences SMA suffers an interval of  
+         The retrieval interval must not be less than 180 seconds. As of previous experiences SMA suffers an interval of  
          120 seconds although the SMA terms and conditions don't permit an automatic data fetch by computer programs.
        </ul>
        </li><br>
@@ -4772,8 +4783,8 @@ return;
        
        <ul>
          <b>Hinweis:</b> 
-         Das Abfrageintervall sollte nicht kleiner 120 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
-         Intervall von 120 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
+         Das Abfrageintervall darf nicht kleiner 180 Sekunden sein. Nach bisherigen Erfahrungen toleriert SMA ein 
+         Intervall von 180 Sekunden obwohl lt. SMA AGB der automatische Datenabruf untersagt ist.
        </ul>
        </li><br>
        
