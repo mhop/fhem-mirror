@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_DbRep: new attrbute avgDailyMeanGWSwithGTS for Grassland 
+                      temperature sum calculation
  - feature: 76_SMAPortal: random select the default user agent
  - new:     48_MieleAtHome: Module to integrate the Miele@Home API
  - feature: 59_Twilight: add experimental option: myUtils forecast code
