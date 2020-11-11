@@ -436,7 +436,7 @@ FileLog_Set($@)
     if(!FileLog_Switch($hash)) { # No rename, reopen anyway
       my $fh = $hash->{FH};
       my $cn = $hash->{currentlogfile};
-      $fh->close();
+      $fh->close() if($fh);
       if($cmd eq "clear") {
         $fh = new IO::File(">$cn");
         setReadingsVal($hash, "linesInTheFile", 0, TimeNow());
