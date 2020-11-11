@@ -1319,9 +1319,9 @@ ZWDongle_Ready($)
       </li>
 
     <li><a name="ZWDonglesetReadingOnAck">setReadingOnAck</a><br>
-      If the attribute is set to 1, and a command with an argument is issued to
-      a ZWave device, then a reading with the same name will be updated upon
-      reception of the corresponding ZWave ACK radio telegram.
+      If the attribute is set to 1, and a set command with an argument is
+      issued to a ZWave device, then a reading with the same name will be
+      updated upon reception of the corresponding ZWave ACK radio telegram.
       </li>
       
   </ul>

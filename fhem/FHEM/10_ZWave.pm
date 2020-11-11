@@ -997,7 +997,7 @@ ZWave_Cmd($$@)
   my ($type, $hash, @a) = @_;
   return "no $type argument specified" if(int(@a) < 2);
   my $name = shift(@a);
-  my $fullCmd = join(" ",@a);
+  my $fullCmd = $type." ".join(" ",@a);
   my $cmd  = shift(@a);
 
   # Collect the commands from the distinct classes
@@ -4118,7 +4118,7 @@ ZWave_secNonceReceived($$)
   }
 
   my $enc = ZWave_secEncrypt($hash, $r_nonce_hex, $secMsg);
-  ZWave_secAddToSendStack($hash, '98'.$enc, $cmd);
+  ZWave_secAddToSendStack($hash, '98'.$enc, "$type $cmd");
   if ($type eq "set" && $cmd && $cmd !~ m/^config.*request$/) {
     readingsSingleUpdate($hash, "state", $cmd, 1);
     Log3 $name, 5, "$name: type=$type, cmd=$cmd ($getSecMsg)";
@@ -4632,6 +4632,7 @@ ZWave_callbackId($;$)
     $zwave_cbid = ($zwave_cbid+1) % 256;
     my $hx = sprintf("%02x", $zwave_cbid);
     $zwave_cbid2dev{$hx} = $p;
+    #Log 1, "CB: $cmd => $hx" if($cmd);
     $zwave_cbid2cmd{$hx} = $cmd if(defined($cmd));
     return $hx;
   }
@@ -5116,8 +5117,10 @@ ZWave_Parse($$@)
         if($iodev->{setReadingOnAck}) {
           my $ackCmd = $zwave_cbid2cmd{$callbackid};
           if($ackCmd) {
-            my ($reading, $val) = split(" ", $ackCmd, 2);
-            readingsBulkUpdate($defs{$lname},$reading,$val,1) if(defined($val));
+            #Log 1, "ACK: $callbackid => $ackCmd";
+            my ($type, $reading, $val) = split(" ", $ackCmd, 3);
+            readingsBulkUpdate($defs{$lname}, $reading, $val, 1) 
+                if($type eq "set" && defined($val));
           }
         }
 
