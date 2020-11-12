@@ -93,7 +93,8 @@ BEGIN {
           Log
           Log3    
           makeReadingName          
-          modules          
+          modules 
+          parseParams          
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
@@ -137,6 +138,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.9.9"  => "12.11.2020  Studieb Kamik ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
@@ -383,10 +385,11 @@ return;
 sub Set {                             
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
-  my $name    = $a[0];
-  my $opt     = $a[1];
-  my $prop    = $a[2];
-  my $prop1   = $a[3];
+  my $name  = shift @a;
+  my $opt   = shift @a;
+  my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+  my $prop  = shift @a;
+  my $prop1 = shift @a;
   my ($setlist,@ads);
   my $ad      = "";
     
@@ -410,7 +413,7 @@ sub Set {
               my $dev = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
               if($dev) {
                   push @ads, $dev; 
-                  $setlist .= "$dev:on,off,auto ";
+                  $setlist .= "$dev ";
               }
           }
       }       
@@ -419,11 +422,24 @@ sub Set {
   if(@ads) {
       $ad = join "|", @ads;
   }
+  
+  my ($a,$h) = parseParams ($arg);
+  my $gcval  = $h->{gcval}    // 24;                         # GridConsumptionValue
+  my $pvval  = $h->{pvval}    // 76;                         # PvValue
+  my $lval   = $h->{lval}     // 0;                          # LimitedEnergyValue
+  
+  $gcval = sprintf "%.10f", $gcval/100;
+  $pvval = sprintf "%.10f", $pvval/100;
+  $lval  = sprintf "%.10f", $lval/100;
+  
+  $gcval =~ s/\./,/x;
+  $pvval =~ s/\./,/x;
+  $lval  =~ s/\./,/x;
             
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
       $hash->{HELPER}{GETTER} = "none";
-      $hash->{HELPER}{SETTER} = "$opt:$prop";
+      $hash->{HELPER}{SETTER} = "$opt:$gcval#$pvval#$lval";
       CallInfo($hash);      
   } 
   else {
@@ -982,23 +998,57 @@ sub GetSetData {                       ## no critic 'complexity'
   ### Verbraucher schalten
   #######################################
   if($setp ne "none") {                                   
-      my ($serial,$id);
+      my ($serial,$id,$oid,$h);
+      
+      my ($gcval, $pvval, $lval) = split "#",$setp; 
+      
       for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+          $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
           if($h && $h eq $d) {
               $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
               $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
+              $oid    = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
           }
       }
-      my $plantOid = $hash->{HELPER}{PLANTOID};      
-      my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
-                                      'mode'         => $op, 
-                                      'serialNumber' => $serial, 
-                                      'SUSyID'       => $id, 
-                                      'plantOid'     => $plantOid
-                                  } 
+      my $plantOid = $hash->{HELPER}{PLANTOID};
+
+  if($verbose == 5) {
+      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
+      $ua->add_handler( response_done => sub { shift->dump; return } );
+  }
+
+      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my $content = {
+                      'UsePriceLimit'             => qq{"False"}, 
+                      'UsesCanFrames'             => qq{"True"}, 
+                      'ConsumerOid'               => qq{"$oid"}, 
+                      'DeviceStatus'              => qq{"DeviceActive"},
+                      'DataAcceptance'            => "[…]",
+                      '0'                         => qq{"true"},
+                      '1'                         => qq{"false"},
+                      'PowerConsumerName'         => qq{"$h"},
+                      'Priority'                  => qq{"1"},
+                      'RbTimeframeTypeEnergyPv_0' => qq{"pv"},
+                      'MaxPriceAllowedValue'      => qq{"0,1283000000"},
+                      'GridConsumptionValue'      => qq{"$gcval"},
+                      'PvValue'                   => qq{"$pvval"},
+                      'LimitedEnergyValue'        => qq{"$lval"},
+                      'ConsumerIcon'              => qq{"/Images/DeviceIcons/ChargingStation.png"},
+                      'ConsumerColor.ColorString' => qq{"rgba(49,101,255,1)"},
+                    } ;
+  
+      my $res      = $ua->post("https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid",
+                                %fields,      
+                                Content => $content
                               ); 
                               
+  if($verbose == 5) {
+      Log3 ($name, 5, "$name - Return Code: ".$res->code); 
+  }
+  
+  $ua->remove_handler('request_send');
+  $ua->remove_handler('response_done');
+  
       $res = $res->decoded_content();
       Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
       if($res eq "true") {
