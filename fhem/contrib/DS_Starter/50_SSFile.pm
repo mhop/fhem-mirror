@@ -207,11 +207,11 @@ my %vHintsExt_en = (
 		 "<colgroup> <col width=20%> <col width=75%> <col width=5%></colgroup>".
 		 "<tr><td><b>Specification</b>  </td><td><b>replaced by</b>                                                     </td><td><b>Example</b>  </td></tr>".
 		 "<tr><td>                      </td><td>                                                                       </td><td>                </td></tr>".
-		 "<tr><td>%a                    </td><td>The abbreviated weekday name according to the current locale           </td><td>Thu             </td></tr>".
+		 "<tr><td>%%a                   </td><td>The abbreviated weekday name according to the current locale           </td><td>Thu             </td></tr>".
 		 "<tr><td>%y                    </td><td>Year, last two digits (00-99)                                          </td><td>01              </td></tr>".
 		 "<tr><td>%Y                    </td><td>Year incl. century                                                     </td><td>2020            </td></tr>".
 		 "<tr><td>%m                    </td><td>Month as decimal number (01-12)                                        </td><td>08              </td></tr>".
-		 "<tr><td>%d                    </td><td>The day of the month as decimal number (01-31)                         </td><td>23              </td></tr>".
+		 "<tr><td>%%d                   </td><td>The day of the month as decimal number (01-31)                         </td><td>23              </td></tr>".
 		 "<tr><td>%H                    </td><td>The hour in 24-hour format (00-23)                                     </td><td>14              </td></tr>".
 		 "<tr><td>%M                    </td><td>The minute as decimal number (00-59)                                   </td><td>55              </td></tr>".
 		 "<tr><td>%S                    </td><td>The second as decimal number (00-60)                                   </td><td>02              </td></tr>".
@@ -232,11 +232,11 @@ my %vHintsExt_de = (
 		 "<colgroup> <col width=20%> <col width=75%> <col width=5%></colgroup>".
 		 "<tr><td><b>Spezifizierung</b> </td><td><b>ersetzt durch</b>                                                   </td><td><b>Beispiel</b> </td></tr>".
 		 "<tr><td>                      </td><td>                                                                       </td><td>                </td></tr>".
-		 "<tr><td>%a                    </td><td>Der abgekürzte Wochentagsname entsprechend dem aktuellen Gebietsschema </td><td>Mo              </td></tr>".
+		 "<tr><td>%%a                   </td><td>Der abgekürzte Wochentagsname entsprechend dem aktuellen Gebietsschema </td><td>Mo              </td></tr>".
 		 "<tr><td>%y                    </td><td>Jahr, letzte zwei Ziffern (00-99)                                      </td><td>01              </td></tr>".
 		 "<tr><td>%Y                    </td><td>Jahr incl. Jahrhundert                                                 </td><td>2020            </td></tr>".
 		 "<tr><td>%m                    </td><td>Monat als Dezimalzahl (01-12)                                          </td><td>08              </td></tr>".
-		 "<tr><td>%d                    </td><td>Der Tag des Monats als Dezimalzahl (01-31)                             </td><td>23              </td></tr>".
+		 "<tr><td>%%d                   </td><td>Der Tag des Monats als Dezimalzahl (01-31)                             </td><td>23              </td></tr>".
 		 "<tr><td>%H                    </td><td>Die Stunde im 24-Stunden-Format (00-23)                                </td><td>14              </td></tr>".
 		 "<tr><td>%M                    </td><td>Die Minute als Dezimalzahl (00-59)                                     </td><td>55              </td></tr>".
 		 "<tr><td>%S                    </td><td>Die Sekunde als Dezimalzahl (00-60)                                    </td><td>02              </td></tr>".
