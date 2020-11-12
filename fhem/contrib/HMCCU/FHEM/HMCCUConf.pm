@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.007
+#  Version 4.8.010
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -17,6 +17,7 @@ package HMCCUConf;
 use strict;
 use warnings;
 
+use vars qw($HMCCU_CONFIG_VERSION);
 use vars qw(%HMCCU_STATECONTROL);
 use vars qw(%HMCCU_READINGS);
 use vars qw(%HMCCU_ROLECMDS);
@@ -25,6 +26,8 @@ use vars qw(%HMCCU_CONVERSIONS);
 use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
+
+$HMCCU_CONFIG_VERSION = '4.8.010';
 
 ######################################################################
 # Channel roles with state and control datapoints
@@ -84,8 +87,14 @@ use vars qw(%HMCCU_SCRIPTS);
 	'DIMMER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0'
 	},
+	'WEATHER' => {
+		F => 3, S => 'TEMPERATURE', C => 'TEMPERATURE', V => ''
+	},
 	'WEATHER_TRANSMIT' => {
-		F => 1, S => 'TEMPERATURE', C => 'TEMPERATURE', V => ''
+		F => 3, S => 'TEMPERATURE', C => 'TEMPERATURE', V => ''
+	},
+	'CLIMATE_TRANSCEIVER' => {
+		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'ACTUAL_TEMPERATURE', V => ''	
 	},
 	'THERMALCONTROL_TRANSMIT' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_TEMPERATURE', V => 'on:30.5,off:4.5'
@@ -115,8 +124,15 @@ use vars qw(%HMCCU_SCRIPTS);
 		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
 	'DIMMER_VIRTUAL_RECEIVER' =>
 		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+	'WEATHER' =>
+		'(SC#\.)?TEMPERATURE$:+measured-temp;'.
+		'(SC#\.)?HUMIDITY$:+humidity',
 	'WEATHER_TRANSMIT' =>
-		'(SC#\.)?TEMPERATURE$:+measured-temp', 
+		'(SC#\.)?TEMPERATURE$:+measured-temp;'.
+		'(SC#\.)?HUMIDITY$:+humidity',
+	'CLIMATE_TRANSCEIVER' =>
+		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity',
 	'THERMALCONTROL_TRANSMIT' =>
 		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
 		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
@@ -268,16 +284,19 @@ use vars qw(%HMCCU_SCRIPTS);
 %HMCCU_ATTR = (
 	'BLIND' => {
 		'substexcl' => 'pct',
+		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
 		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'substexcl' => 'pct',
+		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
 		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'substexcl' => 'pct',
+		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
 		'webCmd' => 'open:close:stop:pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
