@@ -998,7 +998,7 @@ sub GetSetData {                       ## no critic 'complexity'
   ### Verbraucher schalten
   #######################################
   if($setp ne "none") {                                   
-      my ($serial,$id,$oid,$h);
+      my ($serial,$id,$oid,$h,$oname);
       
       my ($gcval, $pvval, $lval) = split "#",$setp; 
       
@@ -1008,6 +1008,7 @@ sub GetSetData {                       ## no critic 'complexity'
               $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
               $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
               $oid    = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
+			  $oname  = decode("utf8", $hash->{HELPER}{CONSUMER}{$key}{DeviceOrigName});
           }
       }
       my $plantOid = $hash->{HELPER}{PLANTOID};
@@ -1026,7 +1027,7 @@ sub GetSetData {                       ## no critic 'complexity'
                       'DataAcceptance'            => "[…]",
                       '0'                         => qq{"true"},
                       '1'                         => qq{"false"},
-                      'PowerConsumerName'         => qq{"$h"},
+                      'PowerConsumerName'         => qq{"$oname"},
                       'Priority'                  => qq{"1"},
                       'RbTimeframeTypeEnergyPv_0' => qq{"pv"},
                       'MaxPriceAllowedValue'      => qq{"0,1283000000"},
@@ -2922,9 +2923,10 @@ sub extractConsumerMasterdata {
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       next if(!$cn);
-      $cn                             = replaceJunkSigns($cn);
+      $cn                             = replaceJunkSigns($cn);                    # Verbrauchername gemäß Readingreguarien verändern
       
       $hcon{$i}{DeviceName}           = $cn;
+	  $hcon{$i}{DeviceOrigName}       = encode("utf8", $c->{'DeviceName'});       # der originale Verbrauchername
       $hcon{$i}{ConsumerOid}          = $consumers{"${i}_ConsumerOid"};
       $hcon{$i}{SerialNumber}         = $c->{'SerialNumber'};
       $hcon{$i}{SUSyID}               = $c->{'SUSyID'};
