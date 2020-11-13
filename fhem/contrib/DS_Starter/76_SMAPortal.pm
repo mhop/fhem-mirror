@@ -1018,24 +1018,26 @@ sub GetSetData {                       ## no critic 'complexity'
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
 
-      my %fields  = ("Content-Type" => "application/json; charset=utf-8");      
+      my %fields  = ( "Content-Type" => "application/x-www-form-urlencoded",
+                      "Accept"       => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                      
+                    );      
+      
       my $content = {
-                      'UsePriceLimit'             => qq{"False"}, 
-                      'UsesCanFrames'             => qq{"True"}, 
-                      'ConsumerOid'               => qq{"$oid"}, 
-                      'DeviceStatus'              => qq{"DeviceActive"},
-                      'DataAcceptance'            => "[…]",
-                      '0'                         => qq{"true"},
-                      '1'                         => qq{"false"},
-                      'PowerConsumerName'         => qq{"$oname"},
-                      'Priority'                  => qq{"1"},
-                      'RbTimeframeTypeEnergyPv_0' => qq{"pv"},
-                      'MaxPriceAllowedValue'      => qq{"0,1283000000"},
-                      'GridConsumptionValue'      => qq{"$gcval"},
-                      'PvValue'                   => qq{"$pvval"},
-                      'LimitedEnergyValue'        => qq{"$lval"},
-                      'ConsumerIcon'              => qq{"/Images/DeviceIcons/ChargingStation.png"},
-                      'ConsumerColor.ColorString' => qq{"rgba(49,101,255,1)"},
+                      'UsePriceLimit'             => "False", 
+                      'UsesCanFrames'             => "True", 
+                      'ConsumerOid'               => "$oid", 
+                      'DeviceStatus'              => "DeviceActive",
+                      'DataAcceptance'            => ["true", "false"],
+                      'PowerConsumerName'         => "$oname",
+                      'Priority'                  => "1",
+                      'RbTimeframeTypeEnergyPv_0' => "pv",
+                      'MaxPriceAllowedValue'      => "0,1011000000",
+                      'GridConsumptionValue'      => "$gcval",
+                      'PvValue'                   => "$pvval",
+                      'LimitedEnergyValue'        => "$lval",
+                      'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
+                      'ConsumerColor.ColorString' => "rgba(49,101,255,1)",
                     } ;
   
       my $res      = $ua->post("https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid",
