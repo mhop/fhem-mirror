@@ -1000,7 +1000,7 @@ sub GetSetData {                       ## no critic 'complexity'
   if($setp ne "none") {                                   
       my ($serial,$id,$oid,$h,$oname);
       
-      my ($gcval, $pvval, $lval) = split "#",$setp; 
+      my ($gcval, $pvval, $lval) = split "#",$op; 
       
       for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
           $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
