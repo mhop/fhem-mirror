@@ -177,7 +177,7 @@ sub I2C_HDC1008_I2CRec ($$) {
 			
 			if ( $clientmsg->{direction} eq "i2cread" && defined($clientmsg->{received}) ) 
 			{
-				Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  received: $clientmsg->{type} $clientmsg->{received}";
+				Log3 $hash, 5, "[$name] I2C_HDC1008_I2CRec  received: $clientmsg->{received}";
 				I2C_HDC1008_UpdateTempHum  ($hash, $clientmsg->{received}) if $clientmsg->{nbyte} == 4;
 			}
 		}
