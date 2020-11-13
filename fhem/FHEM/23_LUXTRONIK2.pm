@@ -52,8 +52,8 @@ sub LUXTRONIK2_readData ($);
 
 
 #List of firmware versions that are known to be compatible with this modul
-my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#";
-my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#";
+my $testedFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
+my $compatibleFirmware = "#V1.51#V1.54C#V1.60#V1.61#V1.64#V1.69#V1.70#V1.73#V1.77#V1.80#V1.81#V1.86.0#";
 
 sub ##########################################
 LUXTRONIK2_Log($$$)
@@ -240,7 +240,7 @@ LUXTRONIK2_Set($$@)
    }
 
   #Check Firmware and Set-Parameter-lock 
-  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater)$/i ) 
+  if ( $cmd =~ /^(synchronizeClockHeatPump|hotWaterTemperatureTarget|opModeHotWater|opModeVentilation)$/i ) 
    {
     my $firmware = ReadingsVal($name,"firmware","");
     my $firmwareCheck = LUXTRONIK2_checkFirmware($firmware);
@@ -276,6 +276,7 @@ LUXTRONIK2_Set($$@)
    elsif(int(@_)==4 &&
          ($cmd eq 'hotWaterTemperatureTarget'
             || $cmd eq 'opModeHotWater'
+            || $cmd eq 'opModeVentilation'
             || $cmd eq 'returnTemperatureHyst'
             || $cmd eq 'returnTemperatureSetBack'
             || $cmd eq 'heatingCurveEndPoint'
@@ -323,6 +324,7 @@ LUXTRONIK2_Set($$@)
           ." returnTemperatureHyst "
           ." returnTemperatureSetBack "
           ." opModeHotWater:Auto,Party,Off"
+          ." opModeVentilation:Auto,Off"
           ." synchronizeClockHeatPump:noArg"
           ." INTERVAL ";
           
@@ -1399,6 +1401,8 @@ sub LUXTRONIK2_SetParameter ($$$)
    my %opMode = ( "Auto" => 0,
                  "Party" => 2,
                    "Off" => 4);
+   my %opVentMode = ( "Auto" => 0,
+                       "Off" => 3);
    
   if(AttrVal($name, "allowSetParameter", 0) != 1) {
    return $name." Error: Setting of parameters not allowed. Please set attribut 'allowSetParameter' to 1";
@@ -1465,6 +1469,14 @@ sub LUXTRONIK2_SetParameter ($$$)
      }
      $setParameter = 4;
      $setValue = $opMode{$realValue};
+  }
+  
+  elsif ($parameterName eq "opModeVentilation") {
+    if (! exists($opVentMode{$realValue})) {
+      return "$name Error: Wrong parameter given for opModeVentilation, use Automatik,Off"
+     }
+     $setParameter = 894;
+     $setValue = $opVentMode{$realValue};
   }
   
   elsif ($parameterName eq "returnTemperatureHyst") {
@@ -2288,6 +2300,9 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
        <li><code>opModeHotWater &lt;Mode&gt;</code><br>
          Operating Mode of domestic hot water boiler (Auto | Party | Off)
          </li><br>
+       <li><code>opModeVentilation &lt;Mode&gt;</code><br>
+         Operating Mode of Ventilation (Auto | Off)
+         </li><br>
      <li><code>resetStatistics &lt;statReadings&gt;</code>
          <br>
          Deletes the selected statistic values <i>all, statBoilerGradientCoolDownMin, statAmbientTemp..., statElectricity..., statHours..., statHeatQ...</i>
@@ -2449,6 +2464,10 @@ LUXTRONIK2_doStatisticDeltaSingle ($$$$$$$)
       <li><code>opModeHotWater &lt;Betriebsmodus&gt;</code>
          <br>
          Betriebsmodus des Heißwasserspeichers ( Auto | Party | Off )
+         </li><br>
+      <li><code>opModeVentilation &lt;Betriebsmodus&gt;</code>
+         <br>
+         Betriebsmodus der Lueftung ( Auto | Off )
          </li><br>
      <li><code>resetStatistics &lt;statWerte&gt;</code>
          <br>

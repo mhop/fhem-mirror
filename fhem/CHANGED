@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 23_LUXTRONIK2: new set parameter opModeVentilation
  - feature: 93_DbRep: new attrbute avgDailyMeanGWSwithGTS for Grassland 
                       temperature sum calculation
  - feature: 76_SMAPortal: random select the default user agent
