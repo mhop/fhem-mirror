@@ -2115,8 +2115,8 @@ sub exploreFiles {
                                   }
                                   
                                   if($mode eq "inc" && $data{$type}{$name}{uploaded}{"$file"}{done}) {
-                                      my $elapsed = ($crt - $data{$type}{$name}{uploaded}{"$file"}{ts}) / 86400;   # verstrichene Zeit seit dem letzten Upload des Files in Tagen
-                                      return if($elapsed < -M $file);
+                                      my $elapsed = ($crt - $data{$type}{$name}{uploaded}{"$file"}{ts})/86400;     # verstrichene Zeit seit dem letzten Upload des Files in Tagen
+                                      return if($elapsed < ($crt-(stat($file))[9])/86400);
                                   }
                                   
                                   if($mode eq "nth") {
