@@ -52,6 +52,8 @@ use MIME::Base64;
 use Encode;
 use utf8;
 
+use HttpUtils;
+
 # Run before module compilation
 BEGIN {
   # Import from main::
@@ -117,7 +119,8 @@ BEGIN {
           FW_subdir                                 
           FW_room                                  
           FW_detail                                 
-          FW_wname           
+          FW_wname   
+          urlEncode          
         )
   );
   
@@ -1021,9 +1024,10 @@ sub GetSetData {                       ## no critic 'complexity'
       my %fields  = ( "Content-Type" => "application/x-www-form-urlencoded",
                       "Accept"       => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
                       
-                    );      
-      
-      my $content = {
+                    );
+                    
+      my $rgb     = urlEncode ("rgba(49,101,255,1)");
+      my $content = [
                       'UsePriceLimit'             => "False", 
                       'UsesCanFrames'             => "True", 
                       'ConsumerOid'               => "$oid", 
@@ -1037,8 +1041,8 @@ sub GetSetData {                       ## no critic 'complexity'
                       'PvValue'                   => "$pvval",
                       'LimitedEnergyValue'        => "$lval",
                       'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
-                      'ConsumerColor.ColorString' => "rgba(49,101,255,1)",
-                    } ;
+                      'ConsumerColor.ColorString' => $rgb,
+                    ];
   
       my $res      = $ua->post("https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid",
                                 %fields,      
