@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 22817 2020-09-21 19:32:21Z DS_Starter $
+# $Id: 93_DbRep.pm 23141 2020-11-11 21:41:39Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -56,8 +56,9 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
-our %DbRep_vNotesIntern = (
-  "8.41.0"  => "08.11.2020  new attrbute avgDailyMeanGWSwithGTS for Grassland temperature sum ",
+my %DbRep_vNotesIntern = (
+  "8.42.0"  => "14.11.2020  new vals next_day_begin, next_day_end for time attr Forum: https://forum.fhem.de/index.php/topic,53584.msg1100040.html#msg1100040 ",
+  "8.41.0"  => "08.11.2020  new attrbute avgDailyMeanGWSwithGTS for Grassland temperature sum, minor bugfixes in create time array ",
   "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament Forum: #114293, commandRef revised ",
   "8.40.7"  => "03.09.2020  rename getter dbValue to sqlCmdBlocking, consider attr timeout in function DbRep_sqlCmdBlocking (blocking function), commandRef revised ",
   "8.40.6"  => "27.08.2020  commandRef revised ",
@@ -88,56 +89,11 @@ our %DbRep_vNotesIntern = (
   "8.30.4"  => "22.01.2020  adjust behavior of OutputWriteToDB (averageValue,sumValue) - write value at every begin and also at every end of period ".
                             "Forum: https://forum.fhem.de/index.php/topic,105787.msg1013920.html#msg1013920 ".
                             "fix Warning when Agent has detected a renamed device",
-  "8.30.3"  => "28.11.2019  countEntries encode \$device, change count_ParseDone for \"countEntriesDetail\" ",
-  "8.30.2"  => "24.11.2019  change order of delete(\$hash->{HELPER}{RUNNING_PID}) in *_ParseDone routines, Forum: https://forum.fhem.de/index.php/topic,105591.msg996089.html#msg996089 ",
-  "8.30.1"  => "22.11.2019  commandref revised ",
-  "8.30.0"  => "14.11.2019  new command set adminCredentials and get storedCredentials, attribute useAdminCredentials ",
-  "8.29.1"  => "11.11.2019  commandref revised ",
-  "8.29.0"  => "08.11.2019  add option FullDay for timeDiffToNow and timeOlderThan, Forum: https://forum.fhem.de/index.php/topic,53584.msg991139.html#msg991139 ",
-  "8.28.2"  => "18.10.2019  change SQL selection in deldoublets_DoParse due to Incompatible change of MySQL 8.0.13, Forum: https://forum.fhem.de/index.php/topic,104593.msg985007.html#msg985007 ",
-  "8.28.1"  => "09.10.2019  fix warnings line 5173 ",
-  "8.28.0"  => "30.09.2019  seqDoubletsVariance - separate specification of positive and negative variance possible, Forum: https://forum.fhem.de/index.php/topic,53584.msg959963.html#msg959963 ",
-  "8.27.2"  => "27.09.2019  fix export data to file, fix delDoublets if MySQL and VALUE contains \, fix readingRename without leading device ",
-  "8.27.1"  => "22.09.2019  comma are shown in sqlCmdHistory, Forum: #103908 ",
-  "8.27.0"  => "15.09.2019  save memory usage by eliminating \$hash -> {dbloghash}, fix warning uninitialized value \$idevice in split ",
-  "8.26.0"  => "07.09.2019  make SQL Wildcard (\%) possible as placeholder in a reading list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                            "sub DbRep_createUpdateSql deleted, new sub DbRep_createCommonSql ",
-  "8.25.0"  => "01.09.2019  make SQL Wildcard (\%) possible as placeholder in a device list: https://forum.fhem.de/index.php/topic,101756.0.html ".
-                            "sub DbRep_modAssociatedWith changed ",
-  "8.24.0"  => "24.08.2019  devices marked as \"Associated With\" if possible, fhem.pl 20069 2019-08-27 08:36:02Z is needed ",
-  "8.23.1"  => "26.08.2019  fix add newline at the end of DbRep_sqlCmdBlocking result, Forum: #103295 ",
-  "8.23.0"  => "24.08.2019  prepared for devices marked as \"Associated With\" if possible ",
-  "8.22.0"  => "23.08.2019  new attr fetchValueFn. When fetching the database content, manipulate the VALUE-field before create reading ",
-  "8.21.2"  => "14.08.2019  commandRef revised ",
-  "8.21.1"  => "31.05.2019  syncStandby considers executeBeforeProc, commandRef revised ",
-  "8.21.0"  => "28.04.2019  implement FHEM command \"dbReadingsVal\" ",
-  "8.20.1"  => "28.04.2019  set index verbose changed, check index \"Report_Idx\" in getInitData ",
-  "8.20.0"  => "27.04.2019  don't save hash refs in central hash to prevent potential memory leak, new set \"index\" ".
-                            "command, \"repository\" added in Meta.json ",
-  "8.19.1"  => "10.04.2019  adjust \$hash->{HELPER}{IDRETRIES} if value is negative ",
-  "8.19.0"  => "04.04.2019  explain is possible in sqlCmd ",
-  "8.18.0"  => "01.04.2019  new aggregation year ",
-  "8.17.2"  => "28.03.2019  consideration of daylight saving time/leap year changed (func DbRep_corrRelTime) ",
-  "8.17.1"  => "24.03.2019  edit Meta data, activate Meta.pm, prevent module from deactivation in case of unavailable Meta.pm ",
-  "8.17.0"  => "20.03.2019  prepare for Meta.pm, new attribute \"sqlCmdVars\" ",
-  "8.16.0"  => "17.03.2019  include sortTopicNum from 99_Utils, allow PRAGMAS leading an SQLIte SQL-Statement in sqlCmd, switch to DbRep_setVersionInfo ",
-  "8.15.0"  => "04.03.2019  readingsRename can rename readings of a given (optional) device ",
-  "8.14.1"  => "04.03.2019  Bugfix in deldoublets with SQLite, Forum: https://forum.fhem.de/index.php/topic,53584.msg914489.html#msg914489 ",
-  "8.14.0"  => "19.02.2019  delete Readings if !goodReadingName and featurelevel > 5.9 ",
-  "8.13.0"  => "11.02.2019  executeBeforeProc / executeAfterProc for sumValue, maxValue, minValue, diffValue, averageValue ",
-  "8.12.0"  => "10.02.2019  executeBeforeProc / executeAfterProc for sqlCmd ",
-  "8.11.2"  => "03.02.2019  fix no running tableCurrentFillup if database is closed ",
-  "8.11.1"  => "25.01.2019  fix sort of versionNotes ",
-  "8.11.0"  => "24.01.2019  command exportToFile or attribute \"expimpfile\" accepts option \"MAXLINES=\" ",
-  "8.10.1"  => "23.01.2019  change DbRep_charfilter to eliminate \xc2",
-  "8.10.0"  => "19.01.2019  sqlCmd, sqlCmdBlocking may input SQL session variables, Forum:#96082 ",
-  "8.9.10"  => "18.01.2019  fix warnings Malformed UTF-8 character during importFromFile, Forum:#96056 ",
-  "8.9.9"   => "06.01.2019  diffval_DoParse: 'ORDER BY TIMESTAMP' added to statements Forum:https://forum.fhem.de/index.php/topic,53584.msg882082.html#msg882082",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
 # Version History extern:
-our %DbRep_vNotesExtern = ( 
+my %DbRep_vNotesExtern = ( 
   "8.40.7"  => "03.09.2020 The get Command \"dbValue\" has been renamed to \"sqlCmdBlocking\. You can use \"dbValue\" furthermore in your scripts, but it is ".
                            "deprecated and will be removed soon. Please change your scripts to use \"sqlCmdBlocking\" instead. ",
   "8.40.4"  => "23.07.2020 The new aggregation type 'minute' is now available. ",
@@ -288,7 +244,15 @@ our %DbRep_vNotesExtern = (
 );
 
 # Hint Hash en
-our %DbRep_vHintsExt_en = (
+my %DbRep_vHintsExt_en = (
+  "5" => "The grassland temperature sum (GTS) is a special form of the growth degree days, which is used in agricultural meteorology. ".
+         "It is used to determine the date for the beginning of field work after winter in Central Europe.<br> ".
+         "All positive daily averages are recorded from the beginning of the year. In January is multiplied by the factor 0.5, in February ".
+         " by the factor 0.75, and from March onwards the „full“ daily value (times factor 1) is then included in the calculation.<br> ".
+         "If the sum of 200 is exceeded in spring, the sustainable vegetation start is reached. The background is the ".
+         " nitrogen uptake and processing of the soil, which is dependent on this temperature sum. In middle latitudes ".
+         "this is usually achieved in the course of March, at the turn from early spring to mid-spring. <br>".
+         "(see also <a href=\"https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
   "4" => "The attribute 'valueFilter' can specify a REGEXP expression that is used for additional field selection as described in set-function. "
          ."If you need more assistance please to the manual of your used database. For example the overview about REGEXP for "
          ."MariaDB refer to <a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions "
@@ -307,11 +271,19 @@ our %DbRep_vHintsExt_en = (
 );
 
 # Hint Hash de
-our %DbRep_vHintsExt_de = (
-  "4" => "Im Attribut 'valueFilter' können REGEXP zur erweiterten Feldselektion angegeben werden. Welche Felder berücksichtigt "
-         ."werden, ist in der jeweiligen set-Funktion beschrieben. Für weitere Hilfe bitte die REGEXP-Dokumentation ihrer "
-         ."verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:<br>"
-         ."<a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions Overview</a>. ",
+my %DbRep_vHintsExt_de = (
+  "5" => "Die Grünlandtemperatursumme (GTS) ist eine Spezialform der Wachstumsgradtage, die in der Agrarmeteorologie verwendet wird. ".
+         "Sie wird herangezogen, um in Mitteleuropa den Termin für das Einsetzen der Feldarbeit nach dem Winter zu bestimmen.<br> ".
+         "Es werden ab Jahresbeginn alle positiven Tagesmittel erfasst. Im Januar wird mit dem Faktor 0,5 multipliziert, im Februar ".
+         "mit dem Faktor 0,75, und ab März geht dann der „volle“ Tageswert (mal Faktor 1) in die Rechnung ein.<br> ".
+         "Wird im Frühjahr die Summe von 200 überschritten, ist der nachhaltige Vegetationsbeginn erreicht. Hintergrund ist die ".
+         "Stickstoffaufnahme und -verarbeitung des Bodens, welcher von dieser Temperatursumme abhängig ist. In mittleren Breiten ".
+         "wird das meist im Laufe des März, an der Wende von Vorfrühling zu Mittfrühling erreicht. <br>".
+         "(siehe auch <a href=\"https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
+  "4" => "Im Attribut 'valueFilter' können REGEXP zur erweiterten Feldselektion angegeben werden. Welche Felder berücksichtigt ".
+         "werden, ist in der jeweiligen set-Funktion beschrieben. Für weitere Hilfe bitte die REGEXP-Dokumentation ihrer ".
+         "verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:<br>".
+         "<a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions Overview</a>. ",
   "3" => "Merkmale und Restriktionen von komplexen <a href=\"https://fhem.de/commandref_DE.html#devspec\">Geräte-Spezifikationen (devspec) ",
   "2" => "Mit dem gesetzten Attribut <b>averageCalcForm = avgDailyMeanGWS</b> wird die Durchschnittsauswertung nach den Vorgaben des ".
          "deutschen Wetterdienstes vorgenommen.<br> Seit dem 01.04.2001 wurde der Standard wie folgt festgelegt: <br>".
@@ -764,10 +736,12 @@ sub DbRep_Set {
       
   } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
+      delete $hash->{HELPER}{DELENTRIES};
+      
       if (!AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return " Set attribute 'allowDeletion' if you want to allow deletion of any database entries. Use it with care !";
       }      
-      delete $hash->{HELPER}{DELENTRIES};
+      
       shift @a;
       shift @a;
       $hash->{HELPER}{DELENTRIES} = \@a if(@a);
@@ -1016,12 +990,12 @@ sub DbRep_Get {
   
   } elsif ($opt =~ /sqlCmdBlocking|dbValue/) {
       return qq{get "$opt" needs at least an argument} if ( @a < 3 );
-	  
-	  if($opt eq "dbValue") {
-	      Log3($name, 1, qq{$name - WARNING - the command "dbValue" is deprecated and will be removed soon. Please use "sqlCmdBlocking" instead.});
-	  }
       
-	  my @cmd = @a;
+      if($opt eq "dbValue") {
+          Log3($name, 1, qq{$name - WARNING - the command "dbValue" is deprecated and will be removed soon. Please use "sqlCmdBlocking" instead.});
+      }
+      
+      my @cmd = @a;
       shift @cmd; shift @cmd;
       
       my $sqlcmd       = join " ", @cmd;
@@ -1329,7 +1303,7 @@ sub DbRep_Attr {
         
         if ($aName eq "timeYearPeriod") {
             # 06-01 02-28
-            unless ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/ )
+            unless ($aVal =~ /^(\d{2})-(\d{2})\s(\d{2})-(\d{2})$/x )
                 { return "The Value of \"$aName\" isn't valid. Set the account period as \"MM-DD MM-DD\".";}
             my ($mm1, $dd1, $mm2, $dd2) = ($aVal =~ /^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/);
             my (undef,undef,undef,$mday,$mon,$year1,undef,undef,undef) = localtime(time);     # Istzeit Ableitung
@@ -1353,21 +1327,48 @@ sub DbRep_Attr {
             delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
             delete($attr{$name}{timeDiffToNow})   if ($attr{$name}{timeDiffToNow});
             delete($attr{$name}{timeOlderThan})   if ($attr{$name}{timeOlderThan});
-            return undef;
+            return;
         }
         if ($aName eq "timestamp_begin" || $aName eq "timestamp_end") {
-            my ($a,$b,$c) = split('_',$aVal);
-            if ($a =~ /^current$|^previous$/ && $b =~ /^hour$|^day$|^week$|^month$|^year$/ && $c =~ /^begin$|^end$/) {
-                delete($attr{$name}{timeDiffToNow})  if ($attr{$name}{timeDiffToNow});
-                delete($attr{$name}{timeOlderThan})  if ($attr{$name}{timeOlderThan});
-                delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
-                return undef;
+            my @dtas = qw(current_year_begin
+                          current_year_end
+                          previous_year_begin
+                          previous_year_end
+                          current_month_begin
+                          current_month_end
+                          previous_month_begin
+                          previous_month_end
+                          current_week_begin
+                          current_week_end
+                          previous_week_begin
+                          previous_week_end
+                          current_day_begin
+                          current_day_end
+                          previous_day_begin
+                          previous_day_end
+                          next_day_begin
+                          next_day_end
+                          current_hour_begin
+                          current_hour_end
+                          previous_hour_begin
+                          previous_hour_end
+                         );
+
+            if ($aVal ~~ @dtas) {
+                delete($attr{$name}{timeDiffToNow});
+                delete($attr{$name}{timeOlderThan});
+                delete($attr{$name}{timeYearPeriod});
+                return;
             }
+            
             $aVal = DbRep_formatpicker($aVal);      
-            unless ($aVal =~ /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/) 
-                {return " The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of \"current_[year|month|day|hour]_begin\",\"current_[year|month|day|hour]_end\", \"previous_[year|month|day|hour]_begin\", \"previous_[year|month|day|hour]_end\" !";}
+            if ($aVal !~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/x) 
+                {return "The Value of $aName is not valid. Use format YYYY-MM-DD HH:MM:SS or one of:\n".
+                        "current_[year|month|day|hour]_begin, current_[year|month|day|hour]_end,\n".
+                        "previous_[year|month|day|hour]_begin, previous_[year|month|day|hour]_end,\n".
+                        "next_day_begin, next_day_end";}
            
-            my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+            my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($aVal =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x);
            
             eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
            
@@ -1375,9 +1376,9 @@ sub DbRep_Attr {
                 my @l = split (/at/, $@);
                 return " The Value of $aName is out of range - $l[0]";
             }
-            delete($attr{$name}{timeDiffToNow})  if ($attr{$name}{timeDiffToNow});
-            delete($attr{$name}{timeOlderThan})  if ($attr{$name}{timeOlderThan});
-            delete($attr{$name}{timeYearPeriod}) if ($attr{$name}{timeYearPeriod});
+            delete($attr{$name}{timeDiffToNow});
+            delete($attr{$name}{timeOlderThan});
+            delete($attr{$name}{timeYearPeriod});
         }
         if ($aName =~ /ftpTimeout|timeout|diffAccept/) {
             unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 without decimal places !";}
@@ -1388,16 +1389,16 @@ sub DbRep_Attr {
         if ($aName eq "timeDiffToNow") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
                 { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
-            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod})  if ($attr{$name}{timeYearPeriod});
+            delete($attr{$name}{timestamp_begin});
+            delete($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeYearPeriod});
         } 
         if ($aName eq "timeOlderThan") {
             unless ($aVal =~ /^[0-9]+$/ || $aVal =~ /^\s*[ydhms]:([\d]+)\s*/ && $aVal !~ /.*,.*/ )
                 { return "The Value of \"$aName\" isn't valid. Set simple seconds like \"86400\" or use form like \"y:1 d:10 h:6 m:12 s:20\". Refer to commandref !";}
-            delete($attr{$name}{timestamp_begin}) if ($attr{$name}{timestamp_begin});
-            delete($attr{$name}{timestamp_end})   if ($attr{$name}{timestamp_end});
-            delete($attr{$name}{timeYearPeriod})  if ($attr{$name}{timeYearPeriod});
+            delete($attr{$name}{timestamp_begin});
+            delete($attr{$name}{timestamp_end});
+            delete($attr{$name}{timeYearPeriod});
         }
         if ($aName eq "dumpMemlimit" || $aName eq "dumpSpeed") {
             unless ($aVal =~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 without decimal places.";}
@@ -2010,16 +2011,18 @@ sub DbRep_Main {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
          
  } elsif ($opt eq "delEntries") {
-     if($IsTimeSet || $IsAggrSet) {                                            # Forum:#113202
-         my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-         my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-         my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
-         my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     delete $hash->{HELPER}{DELENTRIES};
+     if($IsTimeSet || $IsAggrSet) {                                                                                         # Forum:#113202
+         my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
+         my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
+         my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+         my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
          if($nthants > $othants) {
              ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
              return;
          }  
      }
+     
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
  
  } elsif ($opt eq "tableCurrentPurge") {
@@ -2111,17 +2114,19 @@ sub DbRep_Main {
  }
  
  if ($opt =~ /reduceLog/) {
-     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($runtime_string_first =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
-     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($runtime_string_next  =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
-     my $nthants = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
-     my $othants = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     delete $hash->{HELPER}{REDUCELOG};
+     my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
+     my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
+     my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
+     my $othants = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+     
      if($nthants > $othants) {
          ReadingsSingleUpdateValue ($hash, "state", "Error - Wrong time limits. The <nn> (days newer than) option must be greater than the <no> (older than) one !", 1);
          return;
      } 
-     $hash->{HELPER}{RUNNING_REDUCELOG} = BlockingCall("DbRep_reduceLog", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
-     ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
+     $hash->{HELPER}{RUNNING_REDUCELOG}           = BlockingCall("DbRep_reduceLog", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "DbRep_reduceLogDone", $to, "DbRep_reduceLogAborted", $hash);
      $hash->{HELPER}{RUNNING_REDUCELOG}{loglevel} = 5 if($hash->{HELPER}{RUNNING_REDUCELOG});  # Forum #77057 
+     ReadingsSingleUpdateValue ($hash, "state", "reduceLog database is running - be patient and see Logfile !", 1);
      return;
  }
                               
@@ -2134,8 +2139,10 @@ return;
 #                              Create zentrales Timsstamp-Array
 ################################################################################################################
 sub DbRep_createTimeArray {
- my ($hash,$aggregation,$opt) = @_;
- my $name = $hash->{NAME}; 
+ my $hash        = shift;
+ my $aggregation = shift;
+ my $opt         = shift;
+ my $name        = $hash->{NAME}; 
 
  # year   als Jahre seit 1900 
  # $mon   als 0..11
@@ -2143,7 +2150,6 @@ sub DbRep_createTimeArray {
  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);       # Istzeit Ableitung
  my ($tsbegin,$tsend,$dim,$tsub,$tadd);
  my ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear);
- 
 
  #  absolute Auswertungszeiträume statische und dynamische (Beginn / Ende) berechnen 
  if($hash->{HELPER}{MINTS} && $hash->{HELPER}{MINTS} =~ m/0000-00-00/) {
@@ -2151,29 +2157,32 @@ sub DbRep_createTimeArray {
      delete $hash->{HELPER}{MINTS};
  }
  
- my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
- $tsbegin = AttrVal($name, "timestamp_begin", $mints);
- $tsbegin = DbRep_formatpicker($tsbegin);
- $tsend   = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
- $tsend   = DbRep_formatpicker($tsend);
+ my $mints = $hash->{HELPER}{MINTS} // "1970-01-01 01:00:00";  # Timestamp des 1. Datensatzes verwenden falls ermittelt
+ $tsbegin  = AttrVal($name, "timestamp_begin", $mints);
+ $tsbegin  = DbRep_formatpicker($tsbegin);
+ $tsend    = AttrVal($name, "timestamp_end", strftime "%Y-%m-%d %H:%M:%S", localtime(time));
+ $tsend    = DbRep_formatpicker($tsend);
  
  if ( my $tap = AttrVal($name, "timeYearPeriod", undef)) {
      # a  b   c  d
      # 06-01 02-28 , wenn c < a && $mon < a -> Jahr(a)-1, sonst Jahr(c)+1
      my $ybp = $year+1900;  
      my $yep = $year+1900;
-     $tap =~ qr/^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/p;
+     $tap    =~ qr/^(\d{2})-(\d{2}) (\d{2})-(\d{2})$/p;
      my $mbp = $1;
      my $dbp = $2;
      my $mep = $3;
      my $dep = $4;
-     my $c = ($mon+1).$mday;
-     my $e = $mep.$dep;
+     my $c   = ($mon+1).$mday;
+     my $e   = $mep.$dep;
+     
      if ($mep <= $mbp && $c <= $e) {
          $ybp--;
-     } else {
+     } 
+     else {
          $yep++;
      }
+     
      $tsbegin = "$ybp-$mbp-$dbp 00:00:00";
      $tsend   = "$yep-$mep-$dep 23:59:59";
  }
@@ -2181,55 +2190,55 @@ sub DbRep_createTimeArray {
  if (AttrVal($name,"timestamp_begin","") eq "current_year_begin" ||
           AttrVal($name,"timestamp_end","") eq "current_year_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_year_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_year_end") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_begin","") eq "current_year_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_end","") eq "current_year_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year)) if(AttrVal($name,"timestamp_end","")   eq "current_year_end");
  }
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_year_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_year_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_end", "") eq "previous_year_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,0,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_year_end" ||
           AttrVal($name, "timestamp_end", "") eq "previous_year_end") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_begin", "") eq "previous_year_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_end", "") eq "previous_year_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,31,11,$year-1)) if(AttrVal($name, "timestamp_end", "")   eq "previous_year_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_month_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_month_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_month_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_month_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_month_end") {
-     $dim = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_month_end");
+     $dim     = $mon-1?30+(($mon+1)*3%7<4):28+!($year%4||$year%400*!($year%100));
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_month_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_month_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_month_begin") {
-     $ryear = ($mon-1<0)?$year-1:$year;
-     $rmon  = ($mon-1<0)?11:$mon-1;
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_begin");
+     $ryear   = ($mon-1<0)?$year-1:$year;
+     $rmon    = ($mon-1<0)?11:$mon-1;
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,1,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_month_end" ||
           AttrVal($name, "timestamp_end", "") eq "previous_month_end") {
-     $ryear = ($mon-1<0)?$year-1:$year;
-     $rmon  = ($mon-1<0)?11:$mon-1;
-     $dim   = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_month_end");
+     $ryear   = ($mon-1<0)?$year-1:$year;
+     $rmon    = ($mon-1<0)?11:$mon-1;
+     $dim     = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_month_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$dim,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_month_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_week_begin" ||
@@ -2243,7 +2252,7 @@ sub DbRep_createTimeArray {
      $tsub = 518400 if($wday == 0);       # wenn Start am "So" dann Korrektur -6 Tage
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "current_week_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_week_end" ||
@@ -2253,25 +2262,25 @@ sub DbRep_createTimeArray {
      $tadd = 345600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur +4 Tage
      $tadd = 259200 if($wday == 4);       # wenn Start am "Do" dann Korrektur +3 Tage
      $tadd = 172800 if($wday == 5);       # wenn Start am "Fr" dann Korrektur +2 Tage
-     $tadd = 86400 if($wday == 6);        # wenn Start am "Sa" dann Korrektur +1 Tage
+     $tadd = 86400  if($wday == 6);       # wenn Start am "Sa" dann Korrektur +1 Tage
      $tadd = 0 if($wday == 0);            # wenn Start am "So" keine Korrektur
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+$tadd);
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "current_week_end");
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "current_week_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "current_week_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_week_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_week_begin") {
-     $tsub = 604800 if($wday == 1);       # wenn Start am "Mo" dann Korrektur -7 Tage
-     $tsub = 691200 if($wday == 2);       # wenn Start am "Di" dann Korrektur -8 Tage
-     $tsub = 777600 if($wday == 3);       # wenn Start am "Mi" dann Korrektur -9 Tage
-     $tsub = 864000 if($wday == 4);       # wenn Start am "Do" dann Korrektur -10 Tage
-     $tsub = 950400 if($wday == 5);       # wenn Start am "Fr" dann Korrektur -11 Tage
+     $tsub = 604800  if($wday == 1);      # wenn Start am "Mo" dann Korrektur -7 Tage
+     $tsub = 691200  if($wday == 2);      # wenn Start am "Di" dann Korrektur -8 Tage
+     $tsub = 777600  if($wday == 3);      # wenn Start am "Mi" dann Korrektur -9 Tage
+     $tsub = 864000  if($wday == 4);      # wenn Start am "Do" dann Korrektur -10 Tage
+     $tsub = 950400  if($wday == 5);      # wenn Start am "Fr" dann Korrektur -11 Tage
      $tsub = 1036800 if($wday == 6);      # wenn Start am "Sa" dann Korrektur -12 Tage
      $tsub = 1123200 if($wday == 0);      # wenn Start am "So" dann Korrektur -13 Tage
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_week_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_begin");
  }
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_week_end" ||
@@ -2284,21 +2293,35 @@ sub DbRep_createTimeArray {
      $tsub = 518400 if($wday == 6);       # wenn Start am "Sa" dann Korrektur -6 Tage
      $tsub = 604800 if($wday == 0);       # wenn Start am "So" dann Korrektur -7 Tage
      ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time-$tsub);
-     $tsbegin  = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_end");
-     $tsend    = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_week_end");
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_week_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_week_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_day_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_day_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_day_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_day_end") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_day_end");
  } 
+ 
+ if (AttrVal($name, "timestamp_begin", "") eq "next_day_begin" ||
+          AttrVal($name, "timestamp_end", "") eq "next_day_begin") {
+     ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+86400);                    # Istzeit + 1 Tag      
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_begin");
+ }
+ 
+ if (AttrVal($name, "timestamp_begin", "") eq "next_day_end" ||
+          AttrVal($name, "timestamp_end", "") eq "next_day_end") {
+     ($rsec,$rmin,$rhour,$rmday,$rmon,$ryear) = localtime(time+86400);                    # Istzeit + 1 Tag      
+     $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "next_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "next_day_end");
+ }
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_day_begin" ||
           AttrVal($name, "timestamp_end", "") eq "previous_day_begin") {
@@ -2314,7 +2337,7 @@ sub DbRep_createTimeArray {
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
      }
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_day_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,0,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_day_end" ||
@@ -2331,19 +2354,19 @@ sub DbRep_createTimeArray {
          $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
      }
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_day_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_day_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,23,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_day_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_hour_begin" ||
           AttrVal($name, "timestamp_end", "") eq "current_hour_begin") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_hour_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_begin");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "current_hour_end" ||
           AttrVal($name, "timestamp_end", "") eq "current_hour_end") {
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_begin", "") eq "current_hour_end");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "") eq "current_hour_end");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$hour,$mday,$mon,$year)) if(AttrVal($name, "timestamp_end", "")   eq "current_hour_end");
  } 
  
  if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin" ||
@@ -2365,15 +2388,15 @@ sub DbRep_createTimeArray {
          }
      }
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_begin");
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_hour_begin");
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(0,0,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_begin");
  } 
  
- if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_end" ||
-          AttrVal($name, "timestamp_end", "") eq "previous_hour_end") {
+ if (AttrVal($name, "timestamp_begin", "") eq "previous_hour_end" || AttrVal($name, "timestamp_end", "") eq "previous_hour_end") {
      $rhour = $hour-1;
      $rmday = $mday;
      $rmon  = $mon;
      $ryear = $year;
+     
      if($rhour<0) {
          $rhour = 23;
          $rmday = $mday-1;
@@ -2386,33 +2409,31 @@ sub DbRep_createTimeArray {
              $rmday = $rmon-1?30+(($rmon+1)*3%7<4):28+!($ryear%4||$ryear%400*!($ryear%100));  # Achtung: Monat als 1...12 (statt 0...11)
          }
      }
+     
      $tsbegin = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_begin", "") eq "previous_hour_end"); 
-     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "") eq "previous_hour_end"); 
+     $tsend   = strftime "%Y-%m-%d %T",localtime(timelocal(59,59,$rhour,$rmday,$rmon,$ryear)) if(AttrVal($name, "timestamp_end", "")   eq "previous_hour_end"); 
  }  
  
- # extrahieren der Einzelwerte von Datum/Zeit Beginn
- my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = ($tsbegin =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/); 
- # extrahieren der Einzelwerte von Datum/Zeit Ende 
- my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = ($tsend =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
+ my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $tsbegin =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;      # extrahieren der Einzelwerte von Datum/Zeit Beginn
+ my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $tsend   =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;      # extrahieren der Einzelwerte von Datum/Zeit Ende 
  
- # relative Zeit normieren  
- my ($timeolderthan,$timedifftonow,$fdopt) = DbRep_normRelTime($hash);
+ my ($timeolderthan,$timedifftonow,$fdopt) = DbRep_normRelTime($hash);                                   # relative Zeit normieren  
  
  ### relative Auswertungszeit Beginn berücksichtigen, Umwandeln in Epochesekunden Beginn ###
- my $epoch_seconds_begin = timelocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
+ my $epoch_seconds_begin = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  if($timedifftonow) {
      $epoch_seconds_begin = time() - $timedifftonow;
      Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: $timedifftonow sec"); 
- } elsif ($timeolderthan) {
-     my $mints = $hash->{HELPER}{MINTS}?$hash->{HELPER}{MINTS}:"1970-01-01 01:00:00";                   # Timestamp des 1. Datensatzes verwenden falls ermittelt
-     $mints =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
-     $epoch_seconds_begin = timelocal($6, $5, $4, $3, $2-1, $1-1900);
+ } 
+ elsif ($timeolderthan) {
+     $mints               =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_begin = fhemTimeLocal ($6, $5, $4, $3, $2-1, $1-1900);  
  }
 
- if($fdopt) {                                                                                           # FullDay Option ist gesetzt
-     my $tbs = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
-     $tbs    =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
-     $epoch_seconds_begin = timelocal(00, 00, 00, $3, $2-1, $1-1900);    
+ if($fdopt) {                                                                                            # FullDay Option ist gesetzt
+     my $tbs              = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
+     $tbs                 =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_begin = fhemTimeLocal(00, 00, 00, $3, $2-1, $1-1900);    
  }
  my $tsbegin_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_begin);
  
@@ -2423,16 +2444,17 @@ sub DbRep_createTimeArray {
  ###########################################################################################
 
  ### relative Auswertungszeit Ende berücksichtigen, Umwandeln in Epochesekunden Endezeit ###
- my $epoch_seconds_end = timelocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+ my $epoch_seconds_end = fhemTimeLocal($sec2, $min2, $hh2, $dd2, $mm2-1, $yyyy2-1900);
+ 
  if($timeolderthan) {
      $epoch_seconds_end = time() - $timeolderthan;
  }
  Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp end: $timeolderthan sec") if(AttrVal($name, "timeOlderThan", undef)); 
  
  if($fdopt) {                                                                                           # FullDay Option ist gesetzt
-     my $tes = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
-     $tes    =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
-     $epoch_seconds_end = timelocal(59, 59, 23, $3, $2-1, $1-1900);  
+     my $tes            = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
+     $tes               =~ /^(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)$/;
+     $epoch_seconds_end = fhemTimeLocal(59, 59, 23, $3, $2-1, $1-1900);  
  }
  my $tsend_string = strftime "%Y-%m-%d %H:%M:%S", localtime($epoch_seconds_end);
  
@@ -2460,12 +2482,12 @@ sub DbRep_createTimeArray {
  
  my $wd = strftime "%a", localtime($runtime);                           # Wochentag des aktuellen Startdatum/Zeit
  my $wdadd = 604800 if($wd eq "Mo");                                    # wenn Start am "Mo" dann nächste Grenze +7 Tage
- $wdadd = 518400 if($wd eq "Di");                                       # wenn Start am "Di" dann nächste Grenze +6 Tage
- $wdadd = 432000 if($wd eq "Mi");                                       # wenn Start am "Mi" dann nächste Grenze +5 Tage
- $wdadd = 345600 if($wd eq "Do");                                       # wenn Start am "Do" dann nächste Grenze +4 Tage
- $wdadd = 259200 if($wd eq "Fr");                                       # wenn Start am "Fr" dann nächste Grenze +3 Tage
- $wdadd = 172800 if($wd eq "Sa");                                       # wenn Start am "Sa" dann nächste Grenze +2 Tage
- $wdadd = 86400  if($wd eq "So");                                       # wenn Start am "So" dann nächste Grenze +1 Tage
+ $wdadd    = 518400 if($wd eq "Di");                                    # wenn Start am "Di" dann nächste Grenze +6 Tage
+ $wdadd    = 432000 if($wd eq "Mi");                                    # wenn Start am "Mi" dann nächste Grenze +5 Tage
+ $wdadd    = 345600 if($wd eq "Do");                                    # wenn Start am "Do" dann nächste Grenze +4 Tage
+ $wdadd    = 259200 if($wd eq "Fr");                                    # wenn Start am "Fr" dann nächste Grenze +3 Tage
+ $wdadd    = 172800 if($wd eq "Sa");                                    # wenn Start am "Sa" dann nächste Grenze +2 Tage
+ $wdadd    = 86400  if($wd eq "So");                                    # wenn Start am "So" dann nächste Grenze +1 Tage
              
  Log3 ($name, 5, "DbRep $name - weekday start for selection: $wd  ->  wdadd: $wdadd") if($wdadd); 
  
@@ -2781,6 +2803,7 @@ sub averval_DoParse {
  my $qlf        = "avg";
  
  my ($gts,$gtsstr) = (0,q{});                                                     # Variablen für Grünlandtemperatursumme GTS
+ my $gtsreached;
  
  my ($dbh,$sql,$sth,$err,$selspec,$addon);
 
@@ -2967,9 +2990,9 @@ sub averval_DoParse {
          @wsn    = split(" ",$runtime_string_next);
          $wrstr .= $runtime_string."#".$sum."#".$wsf[0]."_".$wsf[1]."#".$wsn[0]."_".$wsn[1]."|";    # Kombi zum Rückschreiben in die DB
      
-         # Grünlandtemperatursumme
+         ### Grünlandtemperatursumme lt. https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme ###
          my ($y,$m,$d) = split "-", $runtime_string;
-         if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum)) {
+         if ($acf eq "avgDailyMeanGWSwithGTS" && looks_like_number($sum)) {      
              $m    = DbRep_removeLeadingZero ($m);
              $d    = DbRep_removeLeadingZero ($d);
              $gts  = 0 if($m == 1 && $d == 1);
@@ -2979,11 +3002,14 @@ sub averval_DoParse {
                      $m   == 2 ? 0.75 : 0.5;
                      
              $gts += $sum*$f;
-             # $gts  = 200 if($gts>200);
-             # Log3 ($name, 3, "DbRep $name - Grassland temperature sum for $runtime_string: ".sprintf("%.1f",$gts)." (factor $f for month $m)");
+             
+             if($gts >= 200) {
+                 $gtsreached = $gtsreached // $runtime_string;
+             }
              
              $gtsstr .= $runtime_string."#".$gts."#".$rsf[0]."|";
          }
+         #############################################################################################
      } 
      elsif ($acf eq "avgTimeWeightMean") {
          # zeitgewichteten Mittelwert berechnen
@@ -3114,7 +3140,7 @@ sub averval_DoParse {
 
  $rt = $rt.",".$brt;
  
- return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr";
+ return "$name|$arrstr|$device|$reading|$rt|0|$irowdone|$gtsstr|$gtsreached";
 }
 
 ####################################################################################################
@@ -3135,6 +3161,7 @@ sub averval_ParseDone {
   my $err        = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone   = $a[6];
   my $gtsstr     = $a[7] ? decode_base64($a[7]) : undef;
+  my $gtsreached = $a[8];
   my $reading_runtime_string;
   my $erread;
   
@@ -3181,7 +3208,8 @@ sub averval_ParseDone {
 
       ReadingsBulkUpdateValue ($hash, $reading_rt_string, sprintf("%.1f",$val));
   }
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateValue ($hash, "reachedGTSthreshold", $gtsreached) if($gtsreached);
+  readingsEndUpdate       ($hash, 1);
   
   readingsBeginUpdate($hash);
   my @arr = split("\\|", $arrstr);
@@ -6264,7 +6292,7 @@ sub sqlCmd_DoParse {
   my $vars = AttrVal($name, "sqlCmdVars", "");
   if ($vars) {
       @pms = split(";",$vars); 
-	  
+      
       for my $pm (@pms) {
           if($pm !~ /PRAGMA|SET/i) {
               next;
@@ -6287,7 +6315,7 @@ sub sqlCmd_DoParse {
   if($cmd =~ /^\s*SET.*;/i) {
       @pms = split(";",$cmd); 
       $sql = q{};
- 	  
+      
       for my $pm (@pms) {
           
           if($pm !~ /SET/i) {
@@ -6315,7 +6343,7 @@ sub sqlCmd_DoParse {
   if($cmd =~ /^\s*PRAGMA.*;/i) {   
       @pms = split(";",$cmd);
       $sql = q{};
-	  
+      
       for my $pm (@pms) {
           
           if($pm !~ /PRAGMA/i) {
@@ -6342,7 +6370,7 @@ sub sqlCmd_DoParse {
   # z.B. PREPARE statement FROM @CMD
   if($sql =~ /^\s*PREPARE.*;/i) {   
       @pms = split(";",$sql);
-      $sql = q{}; 	  
+      $sql = q{};     
       for my $pm (@pms) {
           
           if($pm !~ /PREPARE/i) {
@@ -10130,8 +10158,8 @@ sub DbRep_normRelTime {
  # evtl. Relativzeiten bei "reduceLog" oder "deleteEntries" berücksichtigen
  @a = @{$hash->{HELPER}{REDUCELOG}}  if($hash->{HELPER}{REDUCELOG});
  @a = @{$hash->{HELPER}{DELENTRIES}} if($hash->{HELPER}{DELENTRIES});
- foreach (@a) {     
-     if($_ =~ /\b(\d+(:\d+)?)\b/) {
+ for my $ey (@a) {     
+     if($ey =~ /\b(\d+(:\d+)?)\b/) {
          my ($od,$nd) = split(":",$1);                                # $od - Tage älter als , $nd - Tage neuer als
          $toth        = "d:$od" if($od);
          $tdtn        = "d:$nd" if($nd);
@@ -11633,12 +11661,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 22817 2020-09-21 19:32:21Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 23141 2020-11-11 21:41:39Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 22817 2020-09-21 19:32:21Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 23141 2020-11-11 21:41:39Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -13571,7 +13599,7 @@ return;
                                 </li>     
                                 <br><br>
                 
-    <a name="dbstatus"></a>	
+    <a name="dbstatus"></a> 
     <li><b> dbstatus </b> -  lists global information about MySQL server status (e.g. informations related to cache, threads, bufferpools, etc. ). 
                              Initially all available informations are reported. Using the attribute <a href="#showStatus">showStatus</a> the quantity of
                              results can be limited to show only the desired values. Further detailed informations of items meaning are 
@@ -13592,16 +13620,16 @@ return;
                             The timeout can be set with the attribute <a href="#dbreptimeout">timeout</a>.
                             <br><br>
                            
-						    <ul>
-							  <b>Examples:</b>  <br>
-							  { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-							  { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>                                   
-							  get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-							</ul>
+                            <ul>
+                              <b>Examples:</b>  <br>
+                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>                                   
+                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+                            </ul>
                             </li> 
-                            <br>							
-							
-							Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
+                            <br>                            
+                            
+                            Because of its mode of operation this function is particular convenient for user own perl scripts.  <br>
                             The input accepts multi line commands and delivers multi line results as well. 
                             This command also accept the setting of SQL session variables like "SET @open:=NULL, 
                             @closed:=NULL;". <br>
@@ -13610,7 +13638,7 @@ return;
                             are separated by newline ("\n"). <br>
                             This function only set/update status readings, the userExitFn function isn't called.                            
                             <br><br>
-							
+                            
                             If you create a little routine in 99_myUtils, for example: 
                             <br>                            
                             <pre>
@@ -13624,15 +13652,15 @@ sub dbval {
                             it can be accessed with e.g. those calls: 
                             <br><br>                  
                                  
-							<ul>
-							   <b>Examples:</b>  <br>
-							   { dbval("&lt;name&gt;","select count(*) from history") } <br>
-							   $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-							</ul>                            
+                            <ul>
+                               <b>Examples:</b>  <br>
+                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
+                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+                            </ul>                            
                      
                             <br><br>                                 
     
-    <a name="dbvars"></a>	
+    <a name="dbvars"></a>   
     <li><b> dbvars </b> -  lists global informations about MySQL system variables. Included are e.g. readings related to InnoDB-Home, datafile path, 
                            memory- or cache-parameter and so on. The Output reports initially all available informations. Using the 
                            attribute <a href="#showVariables">showVariables</a> the quantity of results can be limited to show only the desired values. 
@@ -13648,14 +13676,14 @@ sub dbval {
                                  </li> 
                                  <br><br>
 
-	<a name="minTimestamp"></a>
+    <a name="minTimestamp"></a>
     <li><b> minTimestamp </b> - Identifies the oldest timestamp in the database (will be executed implicitely at FHEM start).
                                 The timestamp is used as begin of data selection if no time attribut is set to determine the
                                 start date.                                
                                 </li>     
                                 <br><br>                                     
 
-	<a name="procinfo"></a>
+    <a name="procinfo"></a>
     <li><b> procinfo </b> - Reports the existing database processes in a summary table (only MySQL). <br>
                             Typically only the own processes of the connection user (set in DbLog configuration file) will be
                             reported. If all precesses have to be reported, the global "PROCESS" right has to be granted to the 
@@ -13669,7 +13697,7 @@ sub dbval {
                             <br><br>    
 
     <a name="storedCredentials"></a>
-	<li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
+    <li><b> storedCredentials </b> - Reports the users / passwords stored for database access by the device. <br>
                                    (only valid if database type is MYSQL)
                                    </li>     
                                    <br><br>                            
@@ -13708,7 +13736,7 @@ sub dbval {
     <a name="versionNotes"></a>
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
                               Shows realease informations and/or hints about the module. 
-							  
+                              
                               <br><br>
                              
                               <ul>
@@ -13721,10 +13749,10 @@ sub dbval {
                               </ul>
                              
                               </li>
-							 
-						      <br>							  
-							  
-							  It contains only main release informations for module users. <br>
+                             
+                              <br>                            
+                              
+                              It contains only main release informations for module users. <br>
                               If no options are specified, both release informations and hints will be shown. "rel" shows 
                               only release informations and "hints" shows only hints. By the &lt;key&gt;-specification only 
                               the hint with the specified number is shown.                          
@@ -13799,15 +13827,20 @@ sub dbval {
                                    <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td><b>avgArithmeticMean :</b> </td><td>the arithmetic average is calculated (default) </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td><b>avgDailyMeanGWS   :</b> </td><td>calculates the daily medium temperature according the 
-                                                                                                  specifications of german weather service (pls. see "get &lt;name&gt; versionNotes 2"). <br>
-                                                                                                  This variant uses aggregation "day" automatically. </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td><b>avgTimeWeightMean                          :</b> </td><td>calculates a time weighted average mean value is calculated </td></tr>
+                                      <tr><td><b>avgArithmeticMean:</b>       </td><td>the arithmetic average is calculated (default)                                         </td></tr>
+                                      <tr><td>                                </td><td>                                                                                       </td></tr>
+                                      <tr><td><b>avgDailyMeanGWS:</b>         </td><td>calculates the daily medium temperature according the                                  </td></tr>
+                                      <tr><td>                                </td><td>specifications of german weather service (see also "get &lt;name&gt; versionNotes 2")  </td></tr>
+                                      <tr><td>                                </td><td>This variant uses aggregation "day" automatically.                                     </td></tr>
+                                      <tr><td>                                </td><td>                                                                                       </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>like "avgDailyMeanGWS" and additionally the grassland temperature sum                  </td></tr>
+                                      <tr><td>                                </td><td>If the value 200 is reached, the reading "reachedGTSthreshold" is created with the     </td></tr>
+                                      <tr><td>                                </td><td>date of the first time this threshold value is reached.                                </td></tr>                                        <tr><td>                                </td><td><b>Note:</b> the attribute timestamp_begin must be set to the beginning of a year !    </td></tr>
+                                      <tr><td>                                </td><td>(see also "get &lt;name&gt; versionNotes 5")                                           </td></tr>                                
+                                      <tr><td>                                </td><td>                                                                                       </td></tr>
+                                      <tr><td><b>avgTimeWeightMean:</b>       </td><td>calculates a time weighted average mean value is calculated                            </td></tr>
                                    </table>
-                                   </ul>                                   
+                                   </ul>                                                 
                                 </li><br>
 
   <a name="countEntriesDetail"></a>
@@ -14317,6 +14350,8 @@ sub bdump {
                               <b>current_day_end</b>        : matches "&lt;current day&gt; 23:59:59"                <br>
                               <b>previous_day_begin</b>     : matches "&lt;previous day&gt; 00:00:00"               <br>
                               <b>previous_day_end</b>       : matches "&lt;previous day&gt; 23:59:59"               <br>
+                              <b>next_day_begin</b>         : matches "&lt;next day&gt; 00:00:00"                   <br>
+                              <b>next_day_end</b>           : matches "&lt;next day&gt; 23:59:59"                   <br>
                               <b>current_hour_begin</b>     : matches "&lt;current hour&gt;:00:00"                  <br>
                               <b>current_hour_end</b>       : matches "&lt;current hour&gt;:59:59"                  <br>
                               <b>previous_hour_begin</b>    : matches "&lt;previous hour&gt;:00:00"                 <br>
@@ -14349,6 +14384,8 @@ sub bdump {
                               <b>current_day_end</b>        : matches "&lt;current day&gt; 23:59:59"                <br>
                               <b>previous_day_begin</b>     : matches "&lt;previous day&gt; 00:00:00"               <br>
                               <b>previous_day_end</b>       : matches "&lt;previous day&gt; 23:59:59"               <br>
+                              <b>next_day_begin</b>         : matches "&lt;next day&gt; 00:00:00"                   <br>
+                              <b>next_day_end</b>           : matches "&lt;next day&gt; 23:59:59"                   <br>
                               <b>current_hour_begin</b>     : matches "&lt;current hour&gt;:00:00"                  <br>
                               <b>current_hour_end</b>       : matches "&lt;current hour&gt;:59:59"                  <br>
                               <b>previous_hour_begin</b>    : matches "&lt;previous hour&gt;:00:00"                 <br>
@@ -14786,12 +14823,12 @@ sub bdump {
                                (nur gültig bei Datenbanktyp MYSQL und DbRep-Typ "Client")
                                </li> <br>
                   
-			  
+              
     <li><b> averageValue [display | writeToDB | writeToDBSingle | writeToDBInTime]</b> 
                                  - berechnet einen Durchschnittswert des Datenbankfelds "VALUE" in den Zeitgrenzen 
                                  der möglichen time.*-Attribute. <br><br>
                                  </li>
-								 
+                                 
                                  Es muss das auszuwertende Reading im Attribut <a href="#reading">reading</a> 
                                  angegeben sein.                                  
                                  Mit dem Attribut <a href="#averageCalcForm">averageCalcForm</a> wird die Berechnungsvariante zur 
@@ -14809,7 +14846,7 @@ sub bdump {
                                    </table>
                                    </ul>
                                    <br>
-								 
+                                 
                                  Der neue Readingname wird aus einem Präfix und dem originalen Readingnamen gebildet, 
                                  wobei der originale Readingname durch das Attribut "readingNameMap" ersetzt werden kann.
                                  Der Präfix setzt sich aus der Bildungsfunktion und der Aggregation zusammen. <br>
@@ -14845,7 +14882,7 @@ sub bdump {
                                  
                                 <br>
 
-	
+    
     <li><b> cancelDump </b>   -  bricht einen laufenden Datenbankdump ab. </li> <br>
     
 
@@ -14855,7 +14892,7 @@ sub bdump {
                                  berücksichtigt wie gesetzte Zeitgrenzen (Attribute time.*).  <br>
                                  Fehlen diese Beschränkungen, wird die gesamte Datenbank durchsucht und der angegebene Wert 
                                  geändert. <br><br>
-								 </li>
+                                 </li>
                                  
                                  <ul>
                                    <b>Syntax: </b> <br>
@@ -14875,10 +14912,10 @@ sub bdump {
                                                                                                           des Perl-Code geändert werden. Der zurückgebene Wert von $VALUE und $UNIT wird in dem Feld 
                                                                                                           VALUE bzw. UNIT des Datensatzes gespeichert. </li></td></tr>
                                    </table>
-								</ul>
+                                </ul>
                                 <br>
                                 
-                                 <ul>								
+                                 <ul>                               
                                  <b>Beispiele: </b> <br>
                                  set &lt;name&gt; changeValue "OL","12 OL"  <br>               
                                  # der alte Feldwert "OL" wird in "12 OL" geändert.  <br><br>
@@ -14916,18 +14953,18 @@ sub bdump {
                                  <br>
                                  </ul>
                       
-					  
+                      
     <li><b> countEntries [history | current] </b> 
                                  -  liefert die Anzahl der Tabelleneinträge (default: history) in den gegebenen 
                                  Zeitgrenzen (siehe <a href="#DbRepattr">Attribute</a>). 
                                  Sind die Timestamps nicht gesetzt, werden alle Einträge der Tabelle gezählt. 
                                  Beschränkungen durch die Attribute <a href="#device">device</a> bzw. <a href="#reading">reading</a> 
                                  gehen in die Selektion mit ein. <br>
-								 </li>	
-								 
+                                 </li>  
+                                 
                                  Standardmäßig wird die Summe aller Datensätze, gekennzeichnet mit "ALLREADINGS", erstellt.
                                  Ist das Attribut "countEntriesDetail" gesetzt, wird die Anzahl jedes einzelnen Readings 
-                                 zusätzlich ausgegeben. <br><br>							 
+                                 zusätzlich ausgegeben. <br><br>                             
                                  
                                  Die für diese Funktion relevanten Attribute sind: <br><br>
 
@@ -14947,14 +14984,14 @@ sub bdump {
                                    
                                  <br>
              
-			 
+             
     <li><b> delDoublets [adviceDelete | delete]</b>   -  zeigt bzw. löscht doppelte / mehrfach vorkommende Datensätze.
                                  Dazu wird Timestamp, Device,Reading und Value ausgewertet. <br>
                                  Die <a href="#DbRepattr">Attribute</a> zur Aggregation,Zeit-,Device- und Reading-Abgrenzung werden dabei 
                                  berücksichtigt. Ist das Attribut "aggregation" nicht oder auf "no" gesetzt, wird im Standard die Aggregation 
                                  "day" verwendet.
                                  <br><br>
-								 </li>
+                                 </li>
                                  
                                    <ul>
                                    <table>  
@@ -14974,7 +15011,7 @@ sub bdump {
                                  beeinflusst <b>NUR</b> die Anzeige der Daten.   <br>
                                  Vor und nach der Ausführung von "delDoublets" kann ein FHEM-Kommando bzw. Perl-Routine ausgeführt 
                                  werden. (siehe Attribute <a href="#executeBeforeProc">executeBeforeProc</a>, <a href="#executeAfterProc">executeAfterProc</a>)
-                                 <br><br>								 
+                                 <br><br>                                
                                   
                                  <ul>
                                  <b>Beispiel:</b> <br><br>
@@ -15009,6 +15046,7 @@ sub bdump {
                                  <br>
                                  <br>
 
+    <a name="delEntries"></a>
     <li><b> delEntries [&lt;no&gt;[:&lt;nn&gt;]] </b>   -  löscht alle oder die durch die <a href="#DbRepattr">Attribute</a> device und/oder 
                                  reading definierten Datenbankeinträge. Die Eingrenzung über Timestamps erfolgt 
                                  folgendermaßen: <br><br>
@@ -16219,14 +16257,14 @@ sub bdump {
                              Ergebnismenge eingeschränkt werden, um nur gewünschte Ergebnisse abzurufen. Detailinformationen zur Bedeutung der einzelnen Readings 
                              sind <a href="http://dev.mysql.com/doc/refman/5.7/en/server-status-variables.html">hier</a> verfügbar.  <br><br>
                              
-							 <ul>
-							   <b>Beispiel</b>  <br>
-							   attr &lt;name&gt; showStatus %uptime%,%qcache%    <br> 
-							   get &lt;name&gt; dbstatus  <br>              
-							   # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthaltenen
-							 </ul>                                 
-							 </li> 
-							 <br><br>                               
+                             <ul>
+                               <b>Beispiel</b>  <br>
+                               attr &lt;name&gt; showStatus %uptime%,%qcache%    <br> 
+                               get &lt;name&gt; dbstatus  <br>              
+                               # Es werden nur Readings erzeugt die im Namen "uptime" und "qcache" enthaltenen
+                             </ul>                                 
+                             </li> 
+                             <br><br>                               
     
     <a name="sqlCmdBlocking"></a>                        
     <li><b> sqlCmdBlocking &lt;SQL-Statement&gt;</b> - 
@@ -16234,14 +16272,14 @@ sub bdump {
                             Der Timeout kann mit dem Attribut <a href="#dbreptimeout">timeout</a> eingestellt werden.
                             <br><br>
                            
-							<ul>
-							  <b>Beispiele:</b>  <br>
-							  { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-							  { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
-							  get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
-							</ul>
+                            <ul>
+                              <b>Beispiele:</b>  <br>
+                              { fhem("get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+                              { CommandGet(undef,"Rep.LogDB1 sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device") } <br>
+                              get &lt;name&gt; sqlCmdBlocking select device,count(*) from history where timestamp > '2018-04-01' group by device  <br>
+                            </ul>
                             </li>
-							<br>                           
+                            <br>                           
                             
                             Diese Funktion ist durch ihre Arbeitsweise speziell für den Einsatz in benutzerspezifischen Scripten geeignet. <br>
                             Die Eingabe akzeptiert Mehrzeiler und gibt ebenso mehrzeilige Ergebisse zurück.
@@ -16254,7 +16292,7 @@ sub bdump {
                             wird nicht aufgerufen.                            
                             <br><br>
                             
-							Erstellt man eine kleine Routine in 99_myUtils, wie z.B.: 
+                            Erstellt man eine kleine Routine in 99_myUtils, wie z.B.: 
                             <br>                            
                             <pre>
 sub dbval {
@@ -16267,12 +16305,12 @@ sub dbval {
                             kann sqlCmdBlocking vereinfacht verwendet werden mit Aufrufen wie: 
                             <br><br>                  
                                  
-							 <ul>
-							   <b>Beispiele:</b>  <br>
-							   { dbval("&lt;name&gt;","select count(*) from history") } <br>
-							   oder <br>
-							   $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
-							 </ul>                            
+                             <ul>
+                               <b>Beispiele:</b>  <br>
+                               { dbval("&lt;name&gt;","select count(*) from history") } <br>
+                               oder <br>
+                               $ret = dbval("&lt;name&gt;","select count(*) from history"); <br>
+                             </ul>                            
                             
                              <br><br>
                                  
@@ -16283,14 +16321,14 @@ sub dbval {
                            abzurufen. Weitere Informationen zur Bedeutung der ausgegebenen Variablen sind 
                            <a href="http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html">hier</a> verfügbar. <br><br>
                            
-						   <ul>
-						     <b>Beispiel</b>  <br>
-						     attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
-						     get &lt;name&gt; dbvars  <br>               
-						     # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
-						   </ul>
-						   </li> 
-						   <br><br>  
+                           <ul>
+                             <b>Beispiel</b>  <br>
+                             attr &lt;name&gt; showVariables %version%,%query_cache%    <br>
+                             get &lt;name&gt; dbvars  <br>               
+                             # Es werden nur Readings erzeugt die im Namen "version" und "query_cache" enthalten
+                           </ul>
+                           </li> 
+                           <br><br>  
 
     <a name="minTimestamp"></a>
     <li><b> minTimestamp </b> - Ermittelt den Zeitstempel des ältesten Datensatzes in der Datenbank (wird implizit beim Start von
@@ -16324,14 +16362,14 @@ sub dbval {
                             Weitere Erläuterungen zu den gelieferten Informationen sind 
                             <a href="https://msdn.microsoft.com/en-us/library/ms711681(v=vs.85).aspx">hier</a> zu finden. <br><br>
                                  
-					        <ul>
-							  <b>Beispiel</b>  <br>
-							  attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br> 
-							  get &lt;name&gt; svrinfo  <br>              
-							  # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten
-							</ul> 
-							</li> 
-							<br><br>                                                    
+                            <ul>
+                              <b>Beispiel</b>  <br>
+                              attr &lt;name&gt; showSvrInfo %SQL_CATALOG_TERM%,%NAME%   <br> 
+                              get &lt;name&gt; svrinfo  <br>              
+                              # Es werden nur Readings erzeugt die im Namen "SQL_CATALOG_TERM" und "NAME" enthalten
+                            </ul> 
+                            </li> 
+                            <br><br>                                                    
     
     <a name="tableinfo"></a>    
     <li><b> tableinfo </b> -  ruft Tabelleninformationen aus der mit dem DbRep-Device verbundenen Datenbank ab (MySQL). 
@@ -16339,14 +16377,14 @@ sub dbval {
                               Mit dem Attribut <a href="#showTableInfo">showTableInfo</a> können die Ergebnisse eingeschränkt werden. Erläuterungen zu den erzeugten 
                               Readings sind  <a href="http://dev.mysql.com/doc/refman/5.7/en/show-table-status.html">hier</a> zu finden.  <br><br>
                                  
-							  <ul>
-							    <b>Beispiel</b>  <br>
-							    attr &lt;name&gt; showTableInfo current,history   <br>
-							    get &lt;name&gt; tableinfo  <br>               
-							    # Es werden nur Information der Tabellen "current" und "history" angezeigt
-							  </ul>
-							  </li> 
-							  <br><br>
+                              <ul>
+                                <b>Beispiel</b>  <br>
+                                attr &lt;name&gt; showTableInfo current,history   <br>
+                                get &lt;name&gt; tableinfo  <br>               
+                                # Es werden nur Information der Tabellen "current" und "history" angezeigt
+                              </ul>
+                              </li> 
+                              <br><br>
 
     <a name="versionNotes"></a> 
     <li><b> versionNotes [hints | rel | &lt;key&gt;] </b> - 
@@ -16363,10 +16401,10 @@ sub dbval {
                              </ul>
                              
                              </li>
-							 
-							 <br>
-							 Sind keine Optionen angegeben, werden sowohl Release Informationen als auch Hinweise angezeigt.
-							 Es sind nur Release Informationen mit Bedeutung für den Modulnutzer enthalten. <br>
+                             
+                             <br>
+                             Sind keine Optionen angegeben, werden sowohl Release Informationen als auch Hinweise angezeigt.
+                             Es sind nur Release Informationen mit Bedeutung für den Modulnutzer enthalten. <br>
                                       
                                                      
   <br>
@@ -16446,13 +16484,19 @@ sub dbval {
                                    <ul>
                                    <table>  
                                    <colgroup> <col width=20%> <col width=80%> </colgroup>
-                                      <tr><td> <b>avgArithmeticMean                          :</b> </td><td>es wird der arithmetische Mittelwert berechnet (default) </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td> <b>avgDailyMeanGWS                            :</b> </td><td>berechnet die Tagesmitteltemperatur entsprechend den
-                                                                                                   Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2"). <br>
-                                                                                                   Diese Variante verwendet automatisch die Aggregation "day". </td></tr>
-                                      <tr><td> </td><td> </td></tr>
-                                      <tr><td> <b>avgTimeWeightMean                          :</b> </td><td>berechnet den zeitgewichteten Mittelwert </td></tr>
+                                      <tr><td> <b>avgArithmeticMean:          </b></td><td>es wird der arithmetische Mittelwert berechnet (default)                                </td></tr>
+                                      <tr><td>                                </td><td>                                                                                            </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWS:</b>        </td><td>berechnet die Tagesmitteltemperatur entsprechend den                                        </td></tr>
+                                      <tr><td>                                </td><td>Vorschriften des deutschen Wetterdienstes (siehe "get &lt;name&gt; versionNotes 2")         </td></tr>
+                                      <tr><td>                                </td><td>Diese Variante verwendet automatisch die Aggregation "day".                                 </td></tr>
+                                      <tr><td>                                </td><td>                                                                                            </td></tr>
+                                      <tr><td> <b>avgDailyMeanGWSwithGTS:</b> </td><td>wie "avgDailyMeanGWS" und berechnet zusätzlich die Grünlandtemperatursumme.                 </td></tr>
+                                      <tr><td>                                </td><td>Ist der Wert 200 erreicht, wird das Reading "reachedGTSthreshold" mit dem Datum             </td></tr>
+                                      <tr><td>                                </td><td>des erstmaligen Erreichens dieses Schwellenwertes erstellt.                                 </td></tr>
+                                      <tr><td>                                </td><td><b>Hinweis:</b> das Attribut timestamp_begin muß auf den Anfang eines Jahres gesetzt sein ! </td></tr>
+                                      <tr><td>                                </td><td>(siehe "get &lt;name&gt; versionNotes 5")                                                   </td></tr>
+                                      <tr><td>                                </td><td>                                                                                            </td></tr>
+                                      <tr><td> <b>avgTimeWeightMean:</b>      </td><td>berechnet den zeitgewichteten Mittelwert                                                    </td></tr>
                                    </table>
                                    </ul>
                                 </li><br>
@@ -16961,6 +17005,8 @@ sub bdump {
                               <b>current_day_end</b>        : entspricht "&lt;aktueller Tag&gt; 23:59:59"                 <br>
                               <b>previous_day_begin</b>     : entspricht "&lt;Vortag&gt; 00:00:00"                        <br>
                               <b>previous_day_end</b>       : entspricht "&lt;Vortag&gt; 23:59:59"                        <br>
+                              <b>next_day_begin</b>         : entspricht "&lt;nächster Tag&gt; 00:00:00"                  <br>
+                              <b>next_day_end</b>           : entspricht "&lt;nächster Tag&gt; 23:59:59"                  <br>
                               <b>current_hour_begin</b>     : entspricht "&lt;aktuelle Stunde&gt;:00:00"                  <br>
                               <b>current_hour_end</b>       : entspricht "&lt;aktuelle Stunde&gt;:59:59"                  <br>
                               <b>previous_hour_begin</b>    : entspricht "&lt;vorherige Stunde&gt;:00:00"                 <br>
@@ -16992,6 +17038,8 @@ sub bdump {
                               <b>current_day_end</b>        : entspricht "&lt;aktueller Tag&gt; 23:59:59"                 <br>
                               <b>previous_day_begin</b>     : entspricht "&lt;Vortag&gt; 00:00:00"                        <br>
                               <b>previous_day_end</b>       : entspricht "&lt;Vortag&gt; 23:59:59"                        <br>
+                              <b>next_day_begin</b>         : entspricht "&lt;nächster Tag&gt; 00:00:00"                  <br>
+                              <b>next_day_end</b>           : entspricht "&lt;nächster Tag&gt; 23:59:59"                  <br>
                               <b>current_hour_begin</b>     : entspricht "&lt;aktuelle Stunde&gt;:00:00"                  <br>
                               <b>current_hour_end</b>       : entspricht "&lt;aktuelle Stunde&gt;:59:59"                  <br>
                               <b>previous_hour_begin</b>    : entspricht "&lt;vorherige Stunde&gt;:00:00"                 <br>
