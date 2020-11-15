@@ -957,6 +957,16 @@ HUEDevice_Set($@)
   if( %obj ) {
     if( defined($obj{on}) ) {
       $hash->{desired} = $obj{on}?1:0;
+
+      if( defined($hash->{lights}) ) {
+        foreach my $light ( split(',', $hash->{lights}) ) {
+          next if( !$light );
+          my $code = $light;
+             $code = $hash->{IODev}->{NAME} ."-". $code if( defined($hash->{IODev}) );
+          next if( !defined($modules{HUEDevice}{defptr}{$code}) );
+          $modules{HUEDevice}{defptr}{$code}->{desired} = $hash->{desired};
+        }
+      }
     }
 
     if( !defined($obj{transitiontime}) ) {
