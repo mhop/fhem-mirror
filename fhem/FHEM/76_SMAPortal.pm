@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
@@ -264,11 +265,18 @@ my %stpl = (                                                                    
   balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
 
-my %hua = (                                                                                            # mögliche UserAgents für eine Round-Robin-Liste
+my %hua = (                                                                                            # mögliche Random UserAgents
   1  => "Mozilla/5.0 (Windows NT 10.0; rv:81.0) Gecko/20100101 Firefox/81.0", 
   2  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.195 Safari/537.36",
   3  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",   
-  4  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38",	
+  4  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38",
+  5  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:82.0) Gecko/20100101 Firefox/82.0",
+  6  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4044.129 Safari/537.36",
+  7  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:86.0) Gecko/20100101 Firefox/86.0",
+  8  => "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:86.0) Gecko/20100101 Firefox/86.0",
+  9  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0",
+  10 => "Mozilla/5.0 (Linux; Android 8.0.0; PRA-LX1 Build/HUAWEIPRA-LX1; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.198 Mobile Safari/537.36",
+  11 => "Mozilla/5.0 (Linux; Android 8.0.0; BAH2-L09 Build/HUAWEIBAH2-L09; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.185 Safari/537.36", 
 );
 
                                                                    # Tags der verfügbaren Datenquellen
@@ -322,7 +330,7 @@ sub Initialize {
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "useRelativeNames:1,0 ".
-                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,".$v5d." ".
+                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,switchConsumer,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -383,10 +391,11 @@ return;
 sub Set {                             
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
-  my $name    = $a[0];
-  my $opt     = $a[1];
-  my $prop    = $a[2];
-  my $prop1   = $a[3];
+  my $name  = shift @a;
+  my $opt   = shift @a;
+  my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
+  my $prop  = shift @a;
+  my $prop1 = shift @a;
   my ($setlist,@ads);
   my $ad      = "";
     
@@ -990,6 +999,12 @@ sub GetSetData {                       ## no critic 'complexity'
               $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
           }
       }
+      
+      if($verbose == 5 && $v5d =~ /switchConsumer/x) {
+          $ua->add_handler( request_send  => sub { shift->dump; return } );
+          $ua->add_handler( response_done => sub { shift->dump; return } );
+      }
+  
       my $plantOid = $hash->{HELPER}{PLANTOID};      
       my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
                                       'mode'         => $op, 
@@ -997,10 +1012,14 @@ sub GetSetData {                       ## no critic 'complexity'
                                       'SUSyID'       => $id, 
                                       'plantOid'     => $plantOid
                                   } 
-                              ); 
+                              );
+      
+      $ua->remove_handler('request_send');
+      $ua->remove_handler('response_done');                              
                               
       $res = $res->decoded_content();
       Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
+      
       if($res eq "true") {
           $state = "ok - switched consumer $d to $op";
           BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
@@ -1051,22 +1070,22 @@ sub GetSetData {                       ## no critic 'complexity'
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
               my $cd = AttrVal($name, "cookieDelete", "auto");
-			  
-			  if($retc == $thold || $cd =~ /Attempt/x) {                                           # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+              
+              if($retc == $thold || $cd =~ /Attempt/x) {                                           # Schwellenwert Leseversuche erreicht -> Cookie File löschen
                   my $msg = qq{$name - Threshold reached, delete cookie file before retry...};
-				  
-				  if($cd =~ /Attempt/x) {
-				      $msg = qq{$name - force delete cookie file before retry...};
-				  }
-				  
-				  Log3 ($name, 3, $msg); 
+                  
+                  if($cd =~ /Attempt/x) {
+                      $msg = qq{$name - force delete cookie file before retry...};
+                  }
+                  
+                  Log3 ($name, 3, $msg); 
                   sleep $sleepretry;                                                               # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
                   return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
               }
               
-			  sleep $sleepretry;                                                     
+              sleep $sleepretry;                                                     
               goto &GetSetData;
           }  
 
@@ -1113,7 +1132,7 @@ sub _doLogin {
   my $v5d      = AttrVal($name, "verbose5Data", "none");  
   my $verbose  = AttrVal($name, "verbose", 3);
   
-  if($verbose == 5 && $v5d =~ /loginData/) {
+  if($verbose == 5 && $v5d =~ /loginData/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
@@ -1126,7 +1145,7 @@ sub _doLogin {
   my $cookie   = $loginp->header('Set-Cookie') // "";
   
   if ($loginp->is_success) {
-      if($v5d =~ /loginData/) {
+      if($v5d =~ /loginData/x) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
           Log3 ($name, 5, "$name - Header Location: ".  $location);
           Log3 ($name, 5, "$name - Header Set-Cookie: ".$cookie);
@@ -2872,9 +2891,10 @@ sub extractConsumerMasterdata {
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       next if(!$cn);
-      $cn                             = replaceJunkSigns($cn);
+      $cn                             = replaceJunkSigns($cn);                    # Verbrauchername gemäß Readingreguarien anpassen
       
       $hcon{$i}{DeviceName}           = $cn;
+      $hcon{$i}{DeviceOrigName}       = encode("utf8", $c->{'DeviceName'});       # der originale Verbrauchername
       $hcon{$i}{ConsumerOid}          = $consumers{"${i}_ConsumerOid"};
       $hcon{$i}{SerialNumber}         = $c->{'SerialNumber'};
       $hcon{$i}{SUSyID}               = $c->{'SUSyID'};
