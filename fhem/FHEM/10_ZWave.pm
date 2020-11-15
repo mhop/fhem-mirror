@@ -5100,31 +5100,39 @@ ZWave_Parse($$@)
       my $name="";
       if($hash) {
         ZWave_processSendStack($hash, "ack", $callbackid);
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash, "transmit", $lmsg, 0);
+        readingsSingleUpdate($hash, "transmit", $lmsg, 0);
 
-        my $lCU = $hash->{lastChannelUsed};
-        my $lname = $lCU ? $lCU : $hash->{NAME};
+        my $sos = ($iodev->{showSetInState} ||
+                   $iodev->{setReadingOnAck});
 
-        if($iodev->{showSetInState}) {
-          my $state = ReadingsVal($lname, "state", "");
-          if($state =~ m/^set_(.*)$/) {
-            readingsBulkUpdate($defs{$lname}, "state", $1, 1);
-            $name = $lname;
+        if($sos) {
+          my $lCU = $hash->{lastChannelUsed};
+          my $lname = $lCU ? $lCU : $hash->{NAME};
+          my $lhash = $defs{$lname} ? $defs{$lname} : $hash;
+
+          readingsBeginUpdate($lhash);
+
+          if($iodev->{showSetInState}) {
+            my $state = ReadingsVal($lname, "state", "");
+            if($state =~ m/^set_(.*)$/) {
+              readingsBulkUpdate($lhash, "state", $1, 1);
+              $name = $lname;
+            }
           }
-        }
 
-        if($iodev->{setReadingOnAck}) {
-          my $ackCmd = $zwave_cbid2cmd{$callbackid};
-          if($ackCmd) {
-            #Log 1, "ACK: $callbackid => $ackCmd";
-            my ($type, $reading, $val) = split(" ", $ackCmd, 3);
-            readingsBulkUpdate($defs{$lname}, $reading, $val, 1) 
-                if($type eq "set" && defined($val));
+          if($iodev->{setReadingOnAck}) {
+            my $ackCmd = $zwave_cbid2cmd{$callbackid};
+            if($ackCmd) {
+              #Log 1, "ACK: $callbackid => $ackCmd";
+              my ($type, $reading, $val) = split(" ", $ackCmd, 3);
+              readingsBulkUpdate($lhash, $reading, $val, 1) 
+                  if($type eq "set" && defined($val));
+              $name = $lname;
+            }
           }
-        }
 
-        readingsEndUpdate($hash, 1);
+          readingsEndUpdate($lhash, 1) if($sos);
+        }
       }
       delete($hash->{lastChannelUsed});
       return $name;
