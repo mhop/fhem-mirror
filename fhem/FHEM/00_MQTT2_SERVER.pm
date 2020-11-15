@@ -90,8 +90,9 @@ MQTT2_SERVER_keepaliveChecker($)
                $now < $cHash->{lastMsgTime}+$cHash->{keepalive}*$multiplier );
       my $msgName = $clName;
       $msgName .= "/".$cHash->{cid} if($cHash->{cid});
-      Log3 $hash, 3, "$hash->{NAME}: $msgName left us (keepalive check)";
       CommandDelete(undef, $clName);
+      Log3 $hash, 3, "$hash->{NAME}: $msgName left us (keepalive check)"
+        if(!$hash->{isReplaced});
     }
   }
   InternalTimer($now+10, "MQTT2_SERVER_keepaliveChecker", $hash, 0);
@@ -121,6 +122,7 @@ MQTT2_SERVER_Undef($@)
               !$h->{PEER} || $h->{PEER} ne $hash->{PEER});
       Log3 $shash, 4,
         "Closing second connection for $h->{cid}/$h->{PEER} without lwt";
+      $hash->{isReplaced} = 1;
       return $ret;
     }
 
