@@ -867,7 +867,7 @@ FW_answerCall($)
     $ldir = "$attr{global}{modpath}/docs" if($dir eq "docs");
 
     # pgm2 check is for jquery-ui images
-    my $static = ($ext =~ m/(css|js|png|jpg)/i || $dir =~ m/^pgm2/);
+    my $static = ($ext =~ m/(css|js|png|jpg|html|svg)/i || $dir =~ m/^pgm2/);
     my $fname = ($ext ? "$file.$ext" : $file);
     return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1)
       if(-r "$ldir/$fname" || $static); # no return for FLOORPLAN
@@ -875,6 +875,9 @@ FW_answerCall($)
 
   } elsif($arg =~ m/^$FW_ME(.*)/s) {
     $arg = $1; # The stuff behind FW_ME, continue to check for commands/FWEXT
+
+  } elsif($arg =~ m,^/favicon.ico$,) {
+    return FW_serveSpecial("favicon", "ico", "$FW_icondir/default", 1);
 
   } else {
     Log3 $FW_wname, 4, "$FW_wname: redirecting $arg to $FW_ME";
