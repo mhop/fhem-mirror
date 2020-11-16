@@ -273,7 +273,13 @@ my %hua = (                                                                     
   1  => "Mozilla/5.0 (Windows NT 10.0; rv:81.0) Gecko/20100101 Firefox/81.0", 
   2  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.195 Safari/537.36",
   3  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",   
-  4  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38",	
+  4  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36 Edg/86.0.622.38",
+  5  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:82.0) Gecko/20100101 Firefox/82.0",
+  6  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4044.129 Safari/537.36",
+  7  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:86.0) Gecko/20100101 Firefox/86.0",
+  8  => "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:86.0) Gecko/20100101 Firefox/86.0",
+  9  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0",
+  10 => "Mozilla/5.0 (Linux; Android 8.0.0; PRA-LX1 Build/HUAWEIPRA-LX1; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.198 Mobile Safari/537.36"  
 );
 
                                                                    # Tags der verfügbaren Datenquellen
@@ -431,14 +437,9 @@ sub Set {
   my $pvval  = $h->{pvval}    // 76;                         # PvValue
   my $lval   = $h->{lval}     // 0;                          # LimitedEnergyValue
   
-  $gcval = sprintf "%.10f", $gcval/100;
-  $pvval = sprintf "%.10f", $pvval/100;
-  $lval  = sprintf "%.10f", $lval/100;
+  $gcval = $gcval/100;
+  $pvval = $pvval/100;
   
-  $gcval =~ s/\./,/x;
-  $pvval =~ s/\./,/x;
-  $lval  =~ s/\./,/x;
-            
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
       $hash->{HELPER}{GETTER} = "none";
@@ -1026,7 +1027,7 @@ sub GetSetData {                       ## no critic 'complexity'
                       
                     );
                     
-      my $rgb     = urlEncode ("rgba(49,101,255,1)");
+      my $rgb     = "rgba(49,101,255,1)";
       my $content = [
                       'UsePriceLimit'             => "False", 
                       'UsesCanFrames'             => "True", 
@@ -1036,16 +1037,16 @@ sub GetSetData {                       ## no critic 'complexity'
                       'PowerConsumerName'         => "$oname",
                       'Priority'                  => "1",
                       'RbTimeframeTypeEnergyPv_0' => "pv",
-                      'MaxPriceAllowedValue'      => "0,1011000000",
-                      'GridConsumptionValue'      => "$gcval",
-                      'PvValue'                   => "$pvval",
-                      'LimitedEnergyValue'        => "$lval",
+                      'MaxPriceAllowedValue'      => 0,
+                      'GridConsumptionValue'      => $gcval,
+                      'PvValue'                   => $pvval,
+                      'LimitedEnergyValue'        => $lval,
                       'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
                       'ConsumerColor.ColorString' => $rgb,
                     ];
   
       my $res      = $ua->post("https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid",
-                                %fields,      
+                                %fields,
                                 Content => $content
                               ); 
                               
