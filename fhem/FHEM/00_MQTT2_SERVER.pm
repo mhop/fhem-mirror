@@ -92,7 +92,7 @@ MQTT2_SERVER_keepaliveChecker($)
       $msgName .= "/".$cHash->{cid} if($cHash->{cid});
       CommandDelete(undef, $clName);
       Log3 $hash, 3, "$hash->{NAME}: $msgName left us (keepalive check)"
-        if(!$hash->{isReplaced});
+        if(!$cHash->{isReplaced});
     }
   }
   InternalTimer($now+10, "MQTT2_SERVER_keepaliveChecker", $hash, 0);
