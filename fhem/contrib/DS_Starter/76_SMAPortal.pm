@@ -49,10 +49,9 @@ use LWP::UserAgent;
 use HTTP::Cookies;
 use JSON qw(decode_json);
 use MIME::Base64;
+use Color;
 use Encode;
 use utf8;
-
-use HttpUtils;
 
 # Run before module compilation
 BEGIN {
@@ -95,8 +94,7 @@ BEGIN {
           Log
           Log3    
           makeReadingName          
-          modules 
-          parseParams          
+          modules          
           readingsSingleUpdate
           readingsBulkUpdate
           readingsBulkUpdateIfChanged
@@ -119,8 +117,7 @@ BEGIN {
           FW_subdir                                 
           FW_room                                  
           FW_detail                                 
-          FW_wname   
-          urlEncode          
+          FW_wname           
         )
   );
   
@@ -141,7 +138,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.9.9"  => "12.11.2020  Studieb Kamik ",
+  "3.7.0"  => "16.11.2020  add new consumer management for switched sockets and EVCharger ",
+  "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
   "3.6.2"  => "03.11.2020  new function _detailViewOn to Switch the detail view on SMA energy balance site, new default userAgent ",
@@ -269,7 +267,7 @@ my %stpl = (                                                                    
   balanceTotalData    => { doit => 0, nohm => 0, level => 'L14', func => '_getBalanceTotalData'    },
 );
 
-my %hua = (                                                                                            # mögliche UserAgents für eine Round-Robin-Liste
+my %hua = (                                                                                            # mögliche Random UserAgents
   1  => "Mozilla/5.0 (Windows NT 10.0; rv:81.0) Gecko/20100101 Firefox/81.0", 
   2  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.195 Safari/537.36",
   3  => "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36",   
@@ -279,10 +277,21 @@ my %hua = (                                                                     
   7  => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:86.0) Gecko/20100101 Firefox/86.0",
   8  => "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:86.0) Gecko/20100101 Firefox/86.0",
   9  => "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0",
-  10 => "Mozilla/5.0 (Linux; Android 8.0.0; PRA-LX1 Build/HUAWEIPRA-LX1; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.198 Mobile Safari/537.36"  
+  10 => "Mozilla/5.0 (Linux; Android 8.0.0; PRA-LX1 Build/HUAWEIPRA-LX1; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.198 Mobile Safari/537.36",
+  11 => "Mozilla/5.0 (Linux; Android 8.0.0; BAH2-L09 Build/HUAWEIBAH2-L09; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.185 Safari/537.36", 
 );
 
-                                                                   # Tags der verfügbaren Datenquellen
+my %hal = (                                                                       # Header Accept-Language sprachenabhängig
+  "DE" => "de,en-US;q=0.7,en;q=0.3",
+  "EN" => "en-US;q=0.7,en;q=0.3"
+);
+
+my %hsusyid = (                                                                   # Schalten/Management der Verbraucher entspr. ihrer SUSyID
+  191 => { arg => ":on,off,auto",            fn => \&_switchConsumer },           # 191 = Schaltdosen
+  315 => { arg => ":colorpicker,CT,0,1,100", fn => \&_manageConsumerByEnergy },   # 315 = SMA EV Charger
+);
+
+                                                                                  # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
              balanceDayData
@@ -333,7 +342,7 @@ sub Initialize {
                            "showPassInLog:1,0 ".
                            "userAgent ".
                            "useRelativeNames:1,0 ".
-                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,".$v5d." ".
+                           "verbose5Data:multiple-strict,none,loginData,detailViewSwitch,switchConsumer,".$v5d." ".
                            $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };          ## no critic 'eval' # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
@@ -399,7 +408,7 @@ sub Set {
   my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
   my $prop  = shift @a;
   my $prop1 = shift @a;
-  my ($setlist,@ads);
+  my ($setlist,@ads,$susyid);
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -417,12 +426,14 @@ sub Set {
                  "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
                  "getData:noArg "
                  ;   
+      
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
               my $dev = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
               if($dev) {
+                  $susyid   = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
                   push @ads, $dev; 
-                  $setlist .= "$dev ";
+                  $setlist .= $dev.$hsusyid{$susyid}{arg}." ";
               }
           }
       }       
@@ -431,19 +442,19 @@ sub Set {
   if(@ads) {
       $ad = join "|", @ads;
   }
-  
-  my ($a,$h) = parseParams ($arg);
-  my $gcval  = $h->{gcval}    // 24;                         # GridConsumptionValue
-  my $pvval  = $h->{pvval}    // 76;                         # PvValue
-  my $lval   = $h->{lval}     // 0;                          # LimitedEnergyValue
-  
-  $gcval = $gcval/100;
-  $pvval = $pvval/100;
-  
+            
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
+      #$susyid = 191;                                                    # Standard ist Schaltsteckdose
+      for my $k (keys %{$hash->{HELPER}{CONSUMER}}) {
+          my $dev = $hash->{HELPER}{CONSUMER}{$k}{DeviceName};
+          if($opt eq $dev) {
+              $susyid = $hash->{HELPER}{CONSUMER}{$k}{SUSyID};
+              last;
+          }
+      }
       $hash->{HELPER}{GETTER} = "none";
-      $hash->{HELPER}{SETTER} = "$opt:$gcval#$pvval#$lval";
+      $hash->{HELPER}{SETTER} = "$opt:$susyid:$prop";
       CallInfo($hash);      
   } 
   else {
@@ -913,7 +924,7 @@ return ($interval,$maxcycles,$timeoutdef);
 ##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
 sub GetSetData {                       ## no critic 'complexity'
-  my ($string) = @_;
+  my $string             = shift;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
@@ -923,6 +934,7 @@ sub GetSetData {                       ## no critic 'complexity'
   my $state              = "ok";
   my ($st,$lc)           = ("","");
   my @da                 = ();
+  my $params;
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
   
@@ -930,21 +942,11 @@ sub GetSetData {                       ## no critic 'complexity'
   my $randomua     = $ak[rand @ak];
   my $defuseragent = $hua{$randomua};
   my $useragent    = AttrVal($name, "userAgent", $defuseragent);
+  
   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "usedUserAgent:$useragent", "NULL" ], 1);
   
-  my %hal = (                                                          # Header Accept-Language sprachenabhängig
-      "DE" => "de,en-US;q=0.7,en;q=0.3",
-      "EN" => "en-US;q=0.7,en;q=0.3"
-  );
- 
-  my ($d,$op);  
-  if($setp ne "none") {
-      # Verbraucher soll in den Status $op geschaltet werden
-      ($d,$op) = split(":",$setp);
-  }
-  
   Log3 ($name, 5, "$name - Start operation with CookieLocation: $cookieLocation and UserAgent: $useragent");
-  Log3 ($name, 5, "$name - data get: $getp, data set: ".(($d && $op)?($d." ".$op):$setp));
+  Log3 ($name, 5, "$name - data get: $getp, data set: $setp");
   
   my $ua = LWP::UserAgent->new;
   
@@ -999,73 +1001,28 @@ sub GetSetData {                       ## no critic 'complexity'
       }   
   }  
   
-  ### Verbraucher schalten
+  ###   Verbraucher schalten / managen
   #######################################
-  if($setp ne "none") {                                   
-      my ($serial,$id,$oid,$h,$oname);
+  if($setp ne "none") {
+      my ($d,$susyid,$op) = split(":",$setp);                                         # $op -> Verbraucher Manage Operation 
       
-      my ($gcval, $pvval, $lval) = split "#",$op; 
+      $params = {
+          name   => $name,
+          ua     => $ua,
+          state  => $state,
+          daref  => \@da,
+          d      => $d,
+          susyid => $susyid,
+          op     => $op
+      };
       
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-          if($h && $h eq $d) {
-              $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
-              $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
-              $oid    = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
-			  $oname  = decode("utf8", $hash->{HELPER}{CONSUMER}{$key}{DeviceOrigName});
-          }
+      if($hsusyid{$susyid} && defined &{$hsusyid{$susyid}{fn}}) {
+          ($errstate,$state) = &{$hsusyid{$susyid}{fn}} ($params); 
       }
-      my $plantOid = $hash->{HELPER}{PLANTOID};
-
-  if($verbose == 5) {
-      $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
-      $ua->add_handler( response_done => sub { shift->dump; return } );
-  }
-
-      my %fields  = ( "Content-Type" => "application/x-www-form-urlencoded",
-                      "Accept"       => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                      
-                    );
-                    
-      my $rgb     = "rgba(49,101,255,1)";
-      my $content = [
-                      'UsePriceLimit'             => "False", 
-                      'UsesCanFrames'             => "True", 
-                      'ConsumerOid'               => "$oid", 
-                      'DeviceStatus'              => "DeviceActive",
-                      'DataAcceptance'            => ["true", "false"],
-                      'PowerConsumerName'         => "$oname",
-                      'Priority'                  => "1",
-                      'RbTimeframeTypeEnergyPv_0' => "pv",
-                      'MaxPriceAllowedValue'      => 0,
-                      'GridConsumptionValue'      => $gcval,
-                      'PvValue'                   => $pvval,
-                      'LimitedEnergyValue'        => $lval,
-                      'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
-                      'ConsumerColor.ColorString' => $rgb,
-                    ];
-  
-      my $res      = $ua->post("https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid",
-                                %fields,
-                                Content => $content
-                              ); 
-                              
-  if($verbose == 5) {
-      Log3 ($name, 5, "$name - Return Code: ".$res->code); 
-  }
-  
-  $ua->remove_handler('request_send');
-  $ua->remove_handler('response_done');
-  
-      $res = $res->decoded_content();
-      Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
-      if($res eq "true") {
-          $state = "ok - switched consumer $d to $op";
-          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
-          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
-      } 
       else {
-          $state = "Error - couldn't switch consumer $d to $op";
+          $errstate = 1;
+          $state    = qq{ERROR - Switch or energy management function for SMA device with SUSyID '$susyid' doesn't exist. Inform Maintainer.};
+          Log3 ($name, 1, "$name - $state");
       }
   } 
   
@@ -1109,22 +1066,22 @@ sub GetSetData {                       ## no critic 'complexity'
           if($retry && $retc < $maxretries) {                                                      # neuer Retry im gleichen Zyklus (nicht wenn Verbraucher schalten)      
               $hash->{HELPER}{RETRIES}++;
               my $cd = AttrVal($name, "cookieDelete", "auto");
-			  
-			  if($retc == $thold || $cd =~ /Attempt/x) {                                           # Schwellenwert Leseversuche erreicht -> Cookie File löschen
+              
+              if($retc == $thold || $cd =~ /Attempt/x) {                                           # Schwellenwert Leseversuche erreicht -> Cookie File löschen
                   my $msg = qq{$name - Threshold reached, delete cookie file before retry...};
-				  
-				  if($cd =~ /Attempt/x) {
-				      $msg = qq{$name - force delete cookie file before retry...};
-				  }
-				  
-				  Log3 ($name, 3, $msg); 
+                  
+                  if($cd =~ /Attempt/x) {
+                      $msg = qq{$name - force delete cookie file before retry...};
+                  }
+                  
+                  Log3 ($name, 3, $msg); 
                   sleep $sleepretry;                                                               # Threshold exceed  -> Retry mit Cookie löschen
                   $exceed = 1;
                   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "RETRIES:".$hash->{HELPER}{RETRIES} ], 1);
                   return "$name|$exceed|$newcycle|$errstate|$getp|$setp";                
               }
               
-			  sleep $sleepretry;                                                     
+              sleep $sleepretry;                                                     
               goto &GetSetData;
           }  
 
@@ -1147,7 +1104,7 @@ sub GetSetData {                       ## no critic 'complexity'
   }
 
   # Daten müssen als Einzeiler zurückgegeben werden
-  $st  = encode_base64 ($state, "");
+  $st = encode_base64 ($state, "");
   if(@da) {
       $lc = join "###", @da;
       $lc = encode_base64 ($lc, ""); 
@@ -1171,7 +1128,7 @@ sub _doLogin {
   my $v5d      = AttrVal($name, "verbose5Data", "none");  
   my $verbose  = AttrVal($name, "verbose", 3);
   
-  if($verbose == 5 && $v5d =~ /loginData/) {
+  if($verbose == 5 && $v5d =~ /loginData/x) {
       $ua->add_handler( request_send  => sub { shift->dump; return } );         # for debugging
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
@@ -1184,7 +1141,7 @@ sub _doLogin {
   my $cookie   = $loginp->header('Set-Cookie') // "";
   
   if ($loginp->is_success) {
-      if($v5d =~ /loginData/) {
+      if($v5d =~ /loginData/x) {
           Log3 ($name, 5, "$name - Status Login Page: ".$loginp->status_line);
           Log3 ($name, 5, "$name - Header Location: ".  $location);
           Log3 ($name, 5, "$name - Header Set-Cookie: ".$cookie);
@@ -1278,6 +1235,132 @@ sub __isLoggedIn {
   }
   
 return 0; 
+}
+
+################################################################
+#                   Consumer  schalten
+################################################################
+sub _switchConsumer {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $ua     = $paref->{ua};                                                       # LWP Useragent
+  my $state  = $paref->{state};                  
+  my $daref  = $paref->{daref};                                                    # Referenz zum Datenarray
+  my $d      = $paref->{d};
+  my $susyid = $paref->{susyid};
+  my $op     = $paref->{op};
+  
+  my $hash  = $defs{$name};
+  
+  my ($serial,$id);
+  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+      my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+      if($h && $h eq $d) {
+          $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
+      }
+  }
+  
+  my $plantOid = $hash->{HELPER}{PLANTOID};
+  my $errstate = 0; 
+  my %fields   = ("Content-Type" => "application/x-www-form-urlencoded; charset=UTF-8");
+  my $tag      = "switchConsumer";
+  
+  my $cont     = { 
+      'mode'         => $op, 
+      'serialNumber' => $serial, 
+      'SUSyID'       => $susyid, 
+      'plantOid'     => $plantOid
+  }; 
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode',
+                                         tag      => $tag,
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractSwitchConsumerData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
+                                         daref    => $daref
+                                      });
+
+return ($errstate,$state);
+}
+
+################################################################
+#   Consumer Management abhängig von erzeugter PV-Energie
+#   (z.B. EV Charger)
+#   $op:  enthält den Anteil der erzeugten PV der vorhanden
+#         muß bevor der Verbraucher eingeschaltet werden sollen
+#         (der Anteil bezogener Energie ergibt sich aus 
+#          100% - PV)
+################################################################
+sub _manageConsumerByEnergy {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $ua     = $paref->{ua};                                                       # LWP Useragent
+  my $state  = $paref->{state};                  
+  my $daref  = $paref->{daref};                                                    # Referenz zum Datenarray
+  my $d      = $paref->{d};
+  my $susyid = $paref->{susyid};
+  my $op     = $paref->{op};                                                       
+  
+  my $hash  = $defs{$name};
+  
+  my $pvval = $op/100;
+  my $gcval = 1-$pvval;
+  
+  my ($serial,$oid,$oname);
+  
+  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+      my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+      if($h && $h eq $d) {
+          $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
+          $oid    = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
+          $oname  = decode("utf8", $hash->{HELPER}{CONSUMER}{$key}{DeviceOrigName});
+      }
+  }
+  
+  my $gclog = 100-$op;
+  Log3 ($name, 4, qq{$name - Manage consumer "$d" (SuSyID $susyid): switch on if condition PV=$op% (GridConsumption=$gclog%) is fulfilled });
+  
+  my $plantOid = $hash->{HELPER}{PLANTOID};
+  my $errstate = 0; 
+  my %fields   = ( "Content-Type" => "application/x-www-form-urlencoded",
+                   "Accept"       => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                 );
+  my $rgb      = "rgba(49,101,255,1)";
+  my $cont     = [
+                   'UsePriceLimit'             => "False", 
+                   'UsesCanFrames'             => "True", 
+                   'ConsumerOid'               => "$oid", 
+                   'DeviceStatus'              => "DeviceActive",
+                   'DataAcceptance'            => ["true", "false"],
+                   'PowerConsumerName'         => "$oname",
+                   'Priority'                  => "1",
+                   'RbTimeframeTypeEnergyPv_0' => "pv",
+                   'MaxPriceAllowedValue'      => 0,
+                   'GridConsumptionValue'      => $gcval,
+                   'PvValue'                   => $pvval,
+                   'LimitedEnergyValue'        => 0,
+                   'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
+                   'ConsumerColor.ColorString' => $rgb,
+                 ];
+  my $tag       = "switchConsumer";
+  
+  ($errstate,$state) = __dispatchPost ({ name     => $name,
+                                         ua       => $ua,
+                                         call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid',
+                                         tag      => $tag,
+                                         state    => $state, 
+                                         fnaref   => [ qw( extractSwitchConsumerData ) ],
+                                         fields   => \%fields,
+                                         content  => $cont,
+                                         addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
+                                         daref    => $daref
+                                      });
+
+return ($errstate,$state);
 }
 
 ################################################################
@@ -1431,7 +1514,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
-      Log3 $name, 2, "$name - $state";
+      Log3 ($name, 2, "$name - $state");
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -1475,7 +1558,7 @@ sub _getConsumerMonthData {             ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
-      Log3 $name, 2, "$name - $state";
+      Log3 ($name, 2, "$name - $state");
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -1528,7 +1611,7 @@ sub _getConsumerYearData {              ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because of the plant ID isn't set.};      
-      Log3 $name, 2, "$name - $state";
+      Log3 ($name, 2, "$name - $state");
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -2049,7 +2132,7 @@ sub __dispatchPost {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag);
+          $state = &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag) // $state;
       }
       use strict "refs";
   }
@@ -2149,6 +2232,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
+  my $decerror        = 0;                                                                            # JSON Dekodierfehler
     
   my $v5d             = AttrVal($name, "verbose5Data", "none");
   my $ad_content      = encode("utf8", $ad->decoded_content); 
@@ -2169,7 +2253,9 @@ sub ___analyzeData {                   ## no critic 'complexity'
                       name => $name,
                    });  
   
-  $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
+  $data = eval{decode_json($ad_content)} or do { $data     = $ad_content;
+                                                 $decerror = 1;
+                                               };
   
   my $jsonerror = $ad->header('Jsonerror') // "";                                                     # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
   
@@ -2179,7 +2265,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
       return ($reread,$retry,$errstate,$state);
   }
   
-  if(ref $data eq "HASH") {
+  if(!$decerror && ref $data eq "HASH") {                                                            # es wurde JSON empfangen und Ergebnis ist ein HASH
       for my $k (keys %{$data}) {
           my $val = $data->{$k};
           next if(!defined $val);
@@ -2225,19 +2311,23 @@ sub ___analyzeData {                   ## no critic 'complexity'
               }
           }
       }
-  } 
+  }
+  elsif (!$decerror) {                                                                                        # es wurde JSON empfangen aber Ergebnis ist KEIN HASH
+      Log3 ($name, 5, "$name - decoded Content received: ". jboolmap($data));
+  }  
   else {
-      my $njdat = encode("utf8", $ad->as_string); 
-      
+      my $njdat = encode("utf8", $ad->as_string);	  
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
           my($p1,$p2) = $njdat =~ /<h2>401\s-\sUnauthorized:.(.*)?<\/h2>.*?<h3>(.*)?<\/h3>/sx;
           $state      = ($p1 // "")." ".($p2 // "");          
       }
-      
+	  
+	  $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
       $errstate = 1;
+	  $state    = "ERROR - see logfile for further information";
   }
   
 return ($reread,$retry,$errstate,$state);
@@ -2341,8 +2431,8 @@ sub ParseData {
   
   if(!$errstate) {
       if($setp ne "none") {
-          my ($d,$op) = split(":",$setp);
-          $op         = ($op eq "auto") ? "off (automatic)" : $op;
+          my ($d,$susyid,$op) = split(":",$setp);
+          $op                 = ($op eq "auto") ? "off (automatic)" : $op;
           readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
       }
       readingsBulkUpdate($hash, "lastCycleTime",   $ctime   ) if($ctime > 0);
@@ -2930,10 +3020,10 @@ sub extractConsumerMasterdata {
       $consumers{"${i}_ConsumerLfd"}  = $i;
       my $cn                          = $consumers{"${i}_ConsumerName"};          # Verbrauchername
       next if(!$cn);
-      $cn                             = replaceJunkSigns($cn);                    # Verbrauchername gemäß Readingreguarien verändern
+      $cn                             = replaceJunkSigns($cn);                    # Verbrauchername gemäß Readingreguarien anpassen
       
       $hcon{$i}{DeviceName}           = $cn;
-	  $hcon{$i}{DeviceOrigName}       = encode("utf8", $c->{'DeviceName'});       # der originale Verbrauchername
+      $hcon{$i}{DeviceOrigName}       = encode("utf8", $c->{'DeviceName'});       # der originale Verbrauchername
       $hcon{$i}{ConsumerOid}          = $consumers{"${i}_ConsumerOid"};
       $hcon{$i}{SerialNumber}         = $c->{'SerialNumber'};
       $hcon{$i}{SUSyID}               = $c->{'SUSyID'};
@@ -3094,6 +3184,36 @@ sub extractConsumerHistData {                                                  #
   }
   
 return;
+}
+
+################################################################
+#          Auswertung Ergebnis aus Switch Consumer
+################################################################
+sub extractSwitchConsumerData {
+  my $hash      = shift;
+  my $daref     = shift;             # Referenz zum Datenarray
+  my $jdata     = shift;             # empfangene JSON-Daten
+  my $addon     = shift;             # ein optionales AddOn
+  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
+  
+  my $name      = $hash->{NAME};
+  
+  Log3 ($name, 4, "$name - extracting Switch Consumer result ");
+  
+  my ($d,$susyid,$op) = split(":",$addon);                                         # $op -> Verbraucher Manage Operation 
+  Log3 ($name, 3, qq{$name - Set "$d $op" result: $jdata});
+  
+  my $state;
+  if($jdata eq "true") {
+      $state = "ok - switched consumer $d to $op";
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
+  } 
+  else {
+      $state = "ERROR - couldn't switch consumer $d to $op";
+  }
+ 
+return $state; 
 }
 
 ################################################################
@@ -3415,6 +3535,28 @@ sub replaceJunkSigns {
   $rn = makeReadingName($rn);  
   
 return($rn);
+}
+
+###############################################################################
+#                       JSON Boolean Test und Mapping
+#   $var  = Variante der boolean Auswertung:
+#           "char": Rückgabe von true / false für wahr / falsch
+#           "bin" : Rückgabe von 1 / 0 für wahr / falsch
+###############################################################################
+sub jboolmap { 
+  my $bool = shift;
+  my $var  = shift // "char";
+  
+  my $true  = ($var eq "char") ? "true"  : 1;
+  my $false = ($var eq "char") ? "false" : 0;
+  
+  my $is_boolean = JSON::is_bool($bool);
+  
+  if($is_boolean) {
+      $bool = $bool ? $true : $false;
+  }
+  
+return $bool;
 }
 
 ###############################################################################
@@ -4984,7 +5126,8 @@ return;
         "LWP": 0,
         "HTTP::Cookies": 0,
         "MIME::Base64": 0,
-        "utf8": 0
+        "utf8": 0,
+        "Color": 0
       },
       "recommends": {
         "FHEM::Meta": 0
