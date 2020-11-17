@@ -246,16 +246,14 @@ MQTT2_DEVICE_Parse($$)
         $add = makeReadingName($add); # Convert non-valid characters to _
       }
 
-      $topic =~ s,([\^\$\[\]()\.\\]),\\$1,g;
-      $topic =~ s,\s,.,g;
+      my $reTopic = $topic;
+      $reTopic =~ s#([^A-Z0-9_/-])#"\\x".sprintf("%02x",ord($1))#ige;
 
       for my $ch (@{$cidArr}) {
         my $nn = $ch->{NAME};
         next if(!AttrVal($nn, "autocreate", 1)); # device autocreate
         my $rl = AttrVal($nn, "readingList", "");
         $rl .= "\n" if($rl);
-        my $reTopic = $topic;
-        $reTopic =~ s#([^A-Z0-9_/-])#"\\x".sprintf("%02x",ord($1))#ige;
         my $regex = ($cid eq $newCid ? "$cid:" : "").$reTopic.":.*";
         CommandAttr(undef, "$nn readingList $rl$regex $add")
                 if(index($rl, $regex) == -1);   # Forum #84372
