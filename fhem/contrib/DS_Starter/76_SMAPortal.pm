@@ -928,7 +928,7 @@ return ($interval,$maxcycles,$timeoutdef);
 ##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
 sub GetSetData {                       ## no critic 'complexity'
-  my $string             = shift;
+  my ($string)           = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
@@ -4484,9 +4484,8 @@ return;
 <h3>SMAPortal</h3>
 <ul>
 
-   With this module it is possible to fetch data from the <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> and switch
-   consumers (e.g. bluetooth plug sockets) if any are present.
-   At the momentent that are the following data: <br><br>
+   With this module, data can be retrieved from the <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> and 
+   devices which are registered in the SMA Portal can be controlled. <br><br>
    <ul>
     <ul>
      <li>Live data (Consumption and PV-Generation) </li>
@@ -4495,6 +4494,7 @@ return;
      <li>Weather data delivered from SMA for the facility location </li>
      <li>Forecast data (Consumption and PV-Generation) inclusive suggestion times to switch comsumers on </li>
      <li>the planned times by the Sunny Home Manager to switch consumers on and the current state of consumers (if present) </li>
+     <li>Control of devices registered with SMA Home Manager or SMA Portal </li>
     </ul> 
    </ul>
    <br>
@@ -4572,18 +4572,10 @@ return;
      <br>
      
      <ul>
-     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> </li>  
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> <br> 
      Set Username / Password used for the login into the SMA Sunny Portal.   
      </ul> 
-     <br>
-     
-     <ul>
-     <a name="consumer"></a>
-     <li><b> &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
-     Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
-     that means the consumer are controlled by the Sunny Home Manager.    
-     </li>      
-     </ul>
+     </li> 
      <br>
      
      <ul>
@@ -4592,9 +4584,29 @@ return;
      Identical to the "get data" command. Simplifies the use of the attribute "webCmd" in the FHEMWEB.  
      </ul> 
      </li>
+     <br>
+     
+     <ul>
+     <a name="consumer"></a>
+     <li><b> &lt;consumer name&gt; &lt;on | off | auto | GC&gt; </b> <br> 
+     The consumers connected to the SMA Sunny Homemanager are offered as soon as they are detected by the module. 
+	 Different types of consumers are recognized by the module and consumer specific actions are offered.  
+     <br><br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=25%> <col width=75%> </colgroup>
+          <tr><td> <b>SMA Bluetoth Sockets</b> </td><td><b>on</b> switch on, <b>off</b> switch off, <b>auto</b> control by the Sunny Home Manager             </td></tr>
+          <tr><td> <b>SMA EV Charger</b>       </td><td><b>GC</b> Percentage of grid reference to be accepted for charging the electric vehicle (0..100)      </td></tr>
+       </table>
+       </ul>
+     
+     </li>     
+     </ul>
+     <br>
    
    </ul>
-   <br><br>
+   <br>
    
    <a name="SMAPortalGet"></a>
    <b>Get</b>
@@ -4810,8 +4822,8 @@ return;
 <h3>SMAPortal</h3>
 <ul>
 
-   Mit diesem Modul können Daten aus dem <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> abgerufen werden.
-   Momentan sind es: <br><br>
+   Mit diesem Modul können Daten aus dem <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> abgerufen und die am SMA 
+   Home Manager bzw. im SMA Portal registrierten Geräte gesteuert werden. <br><br>
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
@@ -4820,6 +4832,7 @@ return;
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
      <li>die durch den Sunny Home Manager geplanten Schaltzeiten und aktuellen Status von Verbrauchern (sofern vorhanden) </li>
+     <li>Steuerung von am SMA Home Manager bzw. SMA Portal registrierten Geräten </li>
     </ul> 
    </ul>
    <br>
@@ -4914,11 +4927,20 @@ return;
      
      <ul>
      <a name="Verbrauchername"></a>
-     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
-     Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
-     Modul erkannt wurden.
-     Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
-     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto). 
+     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto | GC&gt; </b> <br>  
+     Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher angeboten sobald sie vom
+     Modul erkannt wurden. Es werden verschiedene Arten von Verbrauchern durch das Modul erkannt und auf den Verbrauchertyp
+     angepasste Aktionen angeboten.
+     <br><br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=25%> <col width=75%> </colgroup>
+          <tr><td> <b>SMA Bluetoth Steckdosen</b> </td><td><b>on</b> einschalten, <b>off</b> ausschalten, <b>auto</b> Steuerung durch den Sunny Home Manager             </td></tr>
+          <tr><td> <b>SMA EV Charger</b>          </td><td><b>GC</b> Anteil des Netzbezugs in Prozent, der für das Laden des E-Fahrzeugs akzeptiert werden soll (0..100) </td></tr>
+       </table>
+       </ul>
+     
      </li>     
      </ul>
    
