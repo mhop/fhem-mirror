@@ -3,7 +3,8 @@
 ##############################################
 #
 # 2020.11.18 v0.2.3
-# - FEATURE: Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
+# - FEATURE: get custom-history-records
+#            Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
 #            Unterstützung A2H4LV5GIZ1JFT Echo Dot Gen4 with Clock
 #            Unterstützung AVE5HX13UR5NO  Zero Touch (Logitech)
 #            Unterstützung A3GZUE7F9MEB4U Sony WH-100XM3
