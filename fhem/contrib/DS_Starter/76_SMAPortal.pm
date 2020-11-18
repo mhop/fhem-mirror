@@ -49,7 +49,6 @@ use LWP::UserAgent;
 use HTTP::Cookies;
 use JSON qw(decode_json);
 use MIME::Base64;
-use Color;
 use Encode;
 use utf8;
 
@@ -138,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.7.0"  => "16.11.2020  add new consumer management for switched sockets and EVCharger ",
+  "3.7.0"  => "18.11.2020  add new consumer management for switched sockets and EVCharger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
@@ -287,8 +286,8 @@ my %hal = (                                                                     
 );
 
 my %hsusyid = (                                                                   # Schalten/Management der Verbraucher entspr. ihrer SUSyID
-  191 => { arg => ":on,off,auto",            fn => \&_switchConsumer },           # 191 = Schaltdosen
-  315 => { arg => ":colorpicker,CT,0,1,100", fn => \&_manageConsumerByEnergy },   # 315 = SMA EV Charger
+  191 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 191 = Schaltdosen
+  315 => { arg => ":slider,0,1,100", fn => \&_manageConsumerByEnergy },           # 315 = SMA EV Charger
 );
 
                                                                                   # Tags der verfügbaren Datenquellen
@@ -844,8 +843,13 @@ sub CallInfo {                         ## no critic 'complexity'
       }
       
       if ($hash->{HELPER}{RUNNING_PID}) {
-          Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
-          return;
+		  if($hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {                # tote PID's löschen
+			  delete $hash->{HELPER}{RUNNING_PID};
+		  }
+		  else {
+              Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
+              return;
+		  }
       } 
       
       my $getp = $hash->{HELPER}{GETTER};
@@ -1307,8 +1311,8 @@ sub _manageConsumerByEnergy {
   
   my $hash  = $defs{$name};
   
-  my $pvval = $op/100;
-  my $gcval = 1-$pvval;
+  my $gcval = $op/100;
+  my $pvval = 1-$gcval;
   
   my ($serial,$oid,$oname);
   
@@ -1321,8 +1325,8 @@ sub _manageConsumerByEnergy {
       }
   }
   
-  my $gclog = 100-$op;
-  Log3 ($name, 4, qq{$name - Manage consumer "$d" (SuSyID $susyid): switch on if condition PV=$op% (GridConsumption=$gclog%) is fulfilled });
+  my $pvlog = 100-$op;
+  Log3 ($name, 4, qq{$name - Manage consumer "$d" (SuSyID $susyid): switch on if condition GridConsumption=$op% (PV=$pvlog%) is fulfilled });
   
   my $plantOid = $hash->{HELPER}{PLANTOID};
   my $errstate = 0; 
@@ -1353,7 +1357,7 @@ sub _manageConsumerByEnergy {
                                          call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid',
                                          tag      => $tag,
                                          state    => $state, 
-                                         fnaref   => [ qw( extractSwitchConsumerData ) ],
+                                         fnaref   => [ qw( extractConsumerByEnergyData ) ],
                                          fields   => \%fields,
                                          content  => $cont,
                                          addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
@@ -1686,8 +1690,6 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
   
-  # _detailViewOn ($paref);                                                         # Detailanzeige einschalten
-  
   my ($reread,$retry,$errstate) = (0,0,0); 
   
   my @bd  = split /\s+/x ,AttrVal($name, "balanceDay", "current");
@@ -1769,8 +1771,6 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                          # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                       # Referenz zum Datenarray
-  
-  # _detailViewOn ($paref);                                            # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
@@ -1867,8 +1867,6 @@ sub _getBalanceYearData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                                      # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
-  
-  # _detailViewOn ($paref);                                                        # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
@@ -2130,9 +2128,19 @@ sub __dispatchPost {
   
   if ($data_cont && $data_cont !~ m/undefined/ix) {
       my @func = @$fnref;
+	  
+      my $params = {
+          hash      => $hash,
+          daref     => $daref,
+          data_cont => $data_cont,
+          data      => $data,
+          fnaddon   => $fnaddon,
+          tag       => $tag
+      };
+	  
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          $state = &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag) // $state;
+          $state = &{$fn} ($params) // $state;
       }
       use strict "refs";
   }
@@ -2202,9 +2210,8 @@ sub ___postData {
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
 
-  my $data  = $ua->post( $call, %$fields, Content => $content );
-                         
-  my $dcont = $data->content;                                                  
+  my $data  = $ua->post( $call, %$fields, Content => $content );    
+  my $dcont = $data->decoded_content;                                                  
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
@@ -2235,7 +2242,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $decerror        = 0;                                                                            # JSON Dekodierfehler
     
   my $v5d             = AttrVal($name, "verbose5Data", "none");
-  my $ad_content      = encode("utf8", $ad->decoded_content); 
+  my $ad_content      = encode("utf8", $ad->decoded_content);
+  my $rescode         = $ad->code;                                                                    # HTML Code der Antwort 
   my $act             = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
   my $attstr          = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
   
@@ -2314,7 +2322,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
   }
   elsif (!$decerror) {                                                                                        # es wurde JSON empfangen aber Ergebnis ist KEIN HASH
       Log3 ($name, 5, "$name - decoded Content received: ". jboolmap($data));
-  }  
+  }
   else {
       my $njdat = encode("utf8", $ad->as_string);	  
       if($njdat =~ /401\s-\sUnauthorized/x) {
@@ -2326,7 +2334,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
 	  $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
-      $errstate = 1;
+      $errstate = 1 if($rescode != 302);                                                                     # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
 	  $state    = "ERROR - see logfile for further information";
   }
   
@@ -2783,23 +2791,26 @@ return;
 #                    Total
 ################################################################
 sub extractStatisticData {
-  my $hash      = shift;
-  my $daref     = shift;
-  my $statistic = shift;
-  my $period    = shift;
-  my $tag       = shift;
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $daref     = $paref->{daref};
+  my $data_cont = $paref->{data_cont};         # empfangene Daten decoded Content
+  my $data      = $paref->{data};              # empfangene Rohdaten
+  my $period    = $paref->{fnaddon};
+  my $tag       = $paref->{tag};
+  
   my $name      = $hash->{NAME};
   my $sd;
   
   Log3 ($name, 4, "$name - extracting balance data ");
   
-  $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+  $data_cont = eval{decode_json($data_cont)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
   my $lv = $stpl{$tag}{level};
   
-  if(ref $statistic eq "HASH") {
-      $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
+  if(ref $data_cont eq "HASH") {
+      $sd = decode_json ( encode('UTF-8', $data_cont->{d}) );
   }
 
   if($sd && ref $sd eq "ARRAY") {
@@ -3190,21 +3201,23 @@ return;
 #          Auswertung Ergebnis aus Switch Consumer
 ################################################################
 sub extractSwitchConsumerData {
-  my $hash      = shift;
-  my $daref     = shift;             # Referenz zum Datenarray
-  my $jdata     = shift;             # empfangene JSON-Daten
-  my $addon     = shift;             # ein optionales AddOn
-  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $daref     = $paref->{daref};                # Referenz zum Datenarray
+  my $data_cont = $paref->{data_cont};            # Daten decoded Content
+  my $data      = $paref->{data};                 # empfangene Rohdaten
+  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine  
   
   my $name      = $hash->{NAME};
   
   Log3 ($name, 4, "$name - extracting Switch Consumer result ");
   
   my ($d,$susyid,$op) = split(":",$addon);                                         # $op -> Verbraucher Manage Operation 
-  Log3 ($name, 3, qq{$name - Set "$d $op" result: $jdata});
+  Log3 ($name, 3, qq{$name - Set "$d $op" result: $data_cont});
   
   my $state;
-  if($jdata eq "true") {
+  if($data_cont eq "true") {
       $state = "ok - switched consumer $d to $op";
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
@@ -3217,26 +3230,69 @@ return $state;
 }
 
 ################################################################
+#          Auswertung Ergebnis aus Manage Consumer
+#          By Energy
+################################################################
+sub extractConsumerByEnergyData {
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $daref     = $paref->{daref};                # Referenz zum Datenarray
+  my $data_cont = $paref->{data_cont};            # Daten decoded Content
+  my $data      = $paref->{data};                 # empfangene Rohdaten
+  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine 
+  
+  my $name      = $hash->{NAME};
+  
+  Log3 ($name, 4, "$name - extracting manage Consumer by energy result ");
+  
+  my $rescode         = $data->code;                                                                    # HTML Code der Antwort (sollte 302 sein bei Erfolg)
+  my $location        = $data->header('Location');
+  my ($d,$susyid,$op) = split(":",$addon);                                                              # $op -> eingestellter Gridconsomption Schwellenwert
+  my $pvlog           = 100-$op;
+  
+  Log3 ($name, 3, qq{$name - Consumer "$d" (SuSyID $susyid) set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled });
+  Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
+  
+  my $state;
+  if($rescode == 302) {
+      $state = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
+	  Log3 ($name, 3, qq{$name - $state});
+	  Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
+	  
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
+      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
+  } 
+  else {
+      $state = qq{ERROR - couldn't set Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%)};
+  }
+ 
+return $state; 
+}
+
+################################################################
 #          Auswertung Daten aus Hilfsroutinen
 ################################################################
 sub extractHelperData {
-  my $hash      = shift;
-  my $daref     = shift;             # Referenz zum Datenarray
-  my $jdata     = shift;             # empfangene JSON-Daten
-  my $addon     = shift;             # ein optionales AddOn
-  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $daref     = $paref->{daref};                # Referenz zum Datenarray
+  my $data_cont = $paref->{data_cont};            # Daten decoded Content
+  my $data      = $paref->{data};                 # empfangene Rohdaten
+  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine            
   
   my $name      = $hash->{NAME};
   my $sd;
   
   Log3 ($name, 4, "$name - extracting Helper data ");
   
-  my $data = eval{decode_json($jdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
-                                               return;
-                                             };
+  my $decd = eval{decode_json($data_cont)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                   return;
+                                                 };
 
-  if(ref $data eq "HASH") {
-      while (my ($k,$v) = each %$data) {
+  if(ref $decd eq "HASH") {
+      while (my ($k,$v) = each %$decd) {
           push @$daref, "$tag:$v";
       }
   }
@@ -5126,8 +5182,7 @@ return;
         "LWP": 0,
         "HTTP::Cookies": 0,
         "MIME::Base64": 0,
-        "utf8": 0,
-        "Color": 0
+        "utf8": 0
       },
       "recommends": {
         "FHEM::Meta": 0
