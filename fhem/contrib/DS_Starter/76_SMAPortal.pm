@@ -843,22 +843,22 @@ sub CallInfo {                         ## no critic 'complexity'
       }
       
       if ($hash->{HELPER}{RUNNING_PID}) {
-		  if($hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {                # tote PID's löschen
-			  delete $hash->{HELPER}{RUNNING_PID};
-		  }
-		  else {
+          if($hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {                # tote PID's löschen
+              delete $hash->{HELPER}{RUNNING_PID};
+          }
+          else {
               Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
               return;
-		  }
+          }
       } 
       
       my $getp = $hash->{HELPER}{GETTER};
       my $setp = $hash->{HELPER}{SETTER};
      
       if(!$nc && !$nr) {
-          Log3 ($name, 3, "$name - ################################################################");
-          Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
-          Log3 ($name, 3, "$name - ################################################################"); 
+          Log3 ($name, 4, "$name - ################################################################");
+          Log3 ($name, 4, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
+          Log3 ($name, 4, "$name - ################################################################"); 
           Log3 ($name, 5, "$name - SMAPortal version:          $hash->{HELPER}{VERSION}");
           Log3 ($name, 4, "$name - calculated maximum cycles:  $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:         $timeout");
@@ -1112,7 +1112,7 @@ sub GetSetData {                       ## no critic 'complexity'
   if(@da) {
       $lc = join "###", @da;
       $lc = encode_base64 ($lc, ""); 
-      Log3 ($name, 3, "$name - data retrieved successfully.");
+      Log3 ($name, 3, "$name - data retrieval done.");
   }
 
 return "$name|$exceed|$newcycle|$errstate|$getp|$setp|$st|$lc";
@@ -2128,7 +2128,7 @@ sub __dispatchPost {
   
   if ($data_cont && $data_cont !~ m/undefined/ix) {
       my @func = @$fnref;
-	  
+      
       my $params = {
           hash      => $hash,
           daref     => $daref,
@@ -2137,7 +2137,7 @@ sub __dispatchPost {
           fnaddon   => $fnaddon,
           tag       => $tag
       };
-	  
+      
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
           $state = &{$fn} ($params) // $state;
@@ -2324,18 +2324,18 @@ sub ___analyzeData {                   ## no critic 'complexity'
       Log3 ($name, 5, "$name - decoded Content received: ". jboolmap($data));
   }
   else {
-      my $njdat = encode("utf8", $ad->as_string);	  
+      my $njdat = encode("utf8", $ad->as_string);     
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
           my($p1,$p2) = $njdat =~ /<h2>401\s-\sUnauthorized:.(.*)?<\/h2>.*?<h3>(.*)?<\/h3>/sx;
           $state      = ($p1 // "")." ".($p2 // "");          
       }
-	  
-	  $njdat = encode("utf8", $ad->decoded_content);
+      
+      $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
       $errstate = 1 if($rescode != 302);                                                                     # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
-	  $state    = "ERROR - see logfile for further information";
+      $state    = "ERROR - see logfile for further information";
   }
   
 return ($reread,$retry,$errstate,$state);
@@ -3257,9 +3257,9 @@ sub extractConsumerByEnergyData {
   my $state;
   if($rescode == 302) {
       $state = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
-	  Log3 ($name, 3, qq{$name - $state});
-	  Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
-	  
+      Log3 ($name, 3, qq{$name - $state});
+      Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
+      
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
   } 
