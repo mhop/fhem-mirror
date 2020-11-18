@@ -3108,8 +3108,8 @@ CommandSetstate($$)
 
   my @rets;
   foreach my $sdev (devspec2array($a[0],$cl)) {
-    if(!defined($defs{$sdev}) && $init_done) { # 115934
-      push @rets, "Please define $sdev first";
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first" if($init_done); # 115934
       next;
     }
 
