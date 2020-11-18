@@ -3251,9 +3251,6 @@ sub extractConsumerByEnergyData {
   my ($d,$susyid,$op) = split(":",$addon);                                                              # $op -> eingestellter Gridconsomption Schwellenwert
   my $pvlog           = 100-$op;
   
-  Log3 ($name, 3, qq{$name - Consumer "$d" (SuSyID $susyid) set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled });
-  Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
-  
   my $state;
   if($rescode == 302) {
       $state = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
