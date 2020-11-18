@@ -348,22 +348,28 @@ sub
 FHT_Define($$)
 {
   my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split(" ", $def);
 
   return "wrong syntax: define <name> FHT CODE" if(int(@a) != 3);
-  $a[2] = lc($a[2]);
+  my $id = lc($a[2]);
   return "Define $a[0]: wrong CODE format: specify a 4 digit hex value"
-  		if($a[2] !~ m/^[a-f0-9][a-f0-9][a-f0-9][a-f0-9]$/i);
+  		if($id !~ m/^[a-f0-9][a-f0-9][a-f0-9][a-f0-9]$/i);
+  return "FHT id $id is already used by $modules{FHT}{defptr}{$id}{NAME}"
+    if($modules{FHT}{defptr}{$id});
 
+  $modules{FHT}{defptr}{$id} = $hash;
 
-  $hash->{CODE} = $a[2];
+  delete($modules{FHT}{defptr}{lc($hash->{OLDDEF})}) # Modify
+    if($hash->{OLDDEF});
+
+  $hash->{CODE} = $id;
   AssignIoPort($hash);
 
   # Check if the CULs id collides with our id.
   if($hash->{IODev} && $hash->{IODev}{TYPE} eq "CUL") {
      $hash->{IODev}{FHTID} =~ m/^(..)(..)$/;
      my ($i1, $i2) = (hex($1), hex($2));
-     $a[2] =~ m/^(..)(..)$/;
+     $id =~ m/^(..)(..)$/;
      my ($l1, $l2) = (hex($1), hex($2));
 
      if($l2 == $i2 && $l1 >= $i1 && $l1 <= $i1+7) {
@@ -374,10 +380,7 @@ FHT_Define($$)
   }
 
   $hash->{webCmd} = "desired-temp"; # Hint for FHEMWEB
-  $modules{FHT}{defptr}{$a[2]} = $hash;
-
-  #Log3 $a[0], 2, "Asking the FHT device $a[0]/$a[2] to send its data";
-  #FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
+  $modules{FHT}{defptr}{$id} = $hash;
 
   return undef;
 }
