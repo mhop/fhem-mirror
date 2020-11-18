@@ -2,6 +2,33 @@
 #
 ##############################################
 #
+# 2020.11.18 v0.2.3
+# - FEATURE: Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
+#            Unterstützung A2H4LV5GIZ1JFT Echo Dot Gen4 with Clock
+#            Unterstützung AVE5HX13UR5NO  Zero Touch (Logitech)
+#            Unterstützung A3GZUE7F9MEB4U Sony WH-100XM3
+#            Unterstützung A2J0R2SD7G9LPA Lenovo P10
+#            Unterstützung A1J16TEDOYCZTN Amazon Tablet
+#            Unterstützung A38EHHIB10L47V Fire HD 8 Tablet
+#            Unterstützung A112LJ20W14H95 Media Display
+#            Unterstützung A1H0CMF1XM0ZP4 Bose Soundtouch
+#            Unterstützung AAMFMBBEW2960  Garmin DriveSmart 65 with Amazon Alexa
+#            Unterstützung A2IVLV5VM2W81  Mobile Voice iOS";}
+#            Unterstützung A2TF17PFR55MTB Mobile Voice Android
+#            Unterstützung A3V3VA38K169FO Fire Tablet
+#            Unterstützung AVD3HM0HOJAAL  Sonos One
+#            Unterstützung A1C66CX2XD756O Fire HD 8 Tablet
+#            Unterstützung A17LGWINFBUTZZ Anker Roav Car Charger
+#            Unterstützung A2XPGY5LRKB9BE FitBit watch
+#            Unterstützung A2Y04QPFCANLPQ Bose QC35 II
+#            Unterstützung A3BW5ZVFHRCQPO Alexa Car
+#            Unterstützung A303PJF6ISQ7IC Echo Auto
+#            Unterstützung A1ZB65LA390I4K Fire HD 10 Tablet
+#            Unterstützung AVU7CPPF2ZRAS  Fire HD 8 Plus (2020)
+#            Unterstützung A24Z7PEXY4MDTK Sony WF-1000X
+#            Unterstützung ABN8JEI7OQF61  Sony WF-1000XM3
+#            Unterstützung A7S41FQ5TWBC9  Sony WH-1000XM4
+#
 # 2020.11.06 v0.2.2
 # - FEATURE: Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
 #
@@ -404,7 +431,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.2";
+my $ModulVersion     = "0.2.3";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -571,7 +598,7 @@ sub echodevice_Get($@) {
 		$usage .= "help:noArg  " ;
 	}
 	elsif ($hash->{model} eq "ACCOUNT") {
-		$usage .= "settings:noArg devices:noArg actions:noArg tracks:noArg help:noArg conversations:noArg html_results:noArg address status:noArg ";
+		$usage .= "settings:noArg devices:noArg actions:noArg tracks:noArg help:noArg conversations:noArg html_results:noArg address status:noArg customer-history-records:noArg";
 	}
 	else {
 		$usage .= "tunein settings:noArg primeplayeigene_albums primeplayeigene_tracks primeplayeigene_artists primeplayeigeneplaylist:noArg help:noArg html_results:noArg ";
@@ -764,6 +791,10 @@ sub echodevice_Get($@) {
 
 	elsif($command eq "address") {
 		echodevice_SendCommand($hash,"address",$parameter);
+	}
+	
+	elsif($command eq "customer-history-records") {
+		echodevice_SendCommand($hash,"customer-history-records",$parameter);
 	}
 	
   return undef;
@@ -1937,6 +1968,13 @@ sub echodevice_SendCommand($$$) {
 		$SendDataL  = $SendData ;
 		$SendData   = "";
 	}
+	
+	elsif ($type eq "customer-history-records") {
+		$SendUrl    = "https://www.amazon.de/alexa-privacy/apd/rvh/customer-history-records/?startTime=0&endTime=2005090388459&recordType=VOICE_HISTORY&maxRecordSize=100";
+		$SendMetode = "GET";
+		$SendDataL  = "" ;
+		$SendData   = "";
+	}	
 	
 	elsif ($type eq "config_address_from" || $type eq "config_address_to" || $type eq "config_address_between") {
 		$SendUrl   .= "/api/traffic/settings";
@@ -3792,6 +3830,85 @@ sub echodevice_Parse($$$) {
 			asyncOutput( $param->{CL}, $return );
 		}
 	}
+
+	elsif($msgtype eq "customer-history-records") {
+	
+		my $addresscount = 0;
+	
+		my $return = '<html><table align="" border="0" cellspacing="0" cellpadding="3" width="100%" height="100%" class="mceEditable"><tbody>';
+		$return   .= "<p>Sprachaufnahmen-Verlauf:</p>";
+		$return   .= "<tr><td><strong>Datum</strong></td><td><strong>&nbsp;&nbsp;&nbsp;Echoname</strong></td><td><strong>&nbsp;&nbsp;&nbsp;Aufname</strong></td></tr>";			
+	
+		if (!defined($json->{customerHistoryRecords})) {}
+		elsif (ref($json->{customerHistoryRecords}) ne "ARRAY") {}
+		else {
+			# Play on Device
+			foreach my $result (@{$json->{customerHistoryRecords}}) {
+				foreach my $Voicerecords (@{$result->{voiceHistoryRecordItems}}) {
+					next if ($Voicerecords->{recordItemType} ne "CUSTOMER_TRANSCRIPT");
+					my ($S, $M, $H, $d, $m, $Y) = localtime($result->{timestamp} / 1000);
+					$m += 1;
+					$Y += 1900;
+					my $dt = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $d,$m, $Y, $H, $M, $S);
+					$addresscount ++;
+					
+					my $MP3Filename = $Voicerecords->{recordItemKey} . ".mp3";
+					$MP3Filename =~ s/#//g;
+					
+					$return .= "<tr><td>" . $dt . " &nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;". $result->{device}{"deviceName"} . '</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href=' . '"' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'"' . '>play' . "</a></td><td>" . $Voicerecords->{transcriptText} . " &nbsp;&nbsp;&nbsp;</td><td>" . $Voicerecords->{recordItemType} . " &nbsp;&nbsp;&nbsp;</td></tr>";
+					
+					if ((-e $FW_dir . "/echodevice/VoiceRecords/". $MP3Filename)) { 
+						Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] Use EXIST MP3File  = " . $MP3Filename ;
+					}
+					else {
+						Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] Download MP3File  = " . $MP3Filename ;
+
+						#Header auslesen
+						my $AmazonHeader;
+
+						# Browser User Agent
+						my $HeaderLanguage = AttrVal($name,"browser_language","de,en-US;q=0.7,en;q=0.3");
+						my $UserAgent = AttrVal($name,"browser_useragent","Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:62.0) Gecko/20100101 Firefox/62.0"); 
+						
+						if (AttrVal($name,"browser_useragent_random",0) == 1) {
+							$UserAgent = join('', map{('a'..'z','A'..'Z',0..9)[rand 62]} 0..20);
+						}
+					
+						if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
+						else 							{$AmazonHeader = "User-Agent: ". $UserAgent ."\r\nAccept-Language: " . $HeaderLanguage . "\r\nDNT: 1\r\nConnection: keep-alive\r\nUpgrade-Insecure-Requests: 1\r\nCookie:".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
+						
+						my $params =  {
+						   url             => "https://www.amazon.de/alexa-privacy/apd/rvh/audio?uid=" . urlEncode($Voicerecords->{utteranceId}),
+						   header          => $AmazonHeader,
+						   timeout         => 10,
+						   noshutdown      => 1,
+						   keepalive       => 1,
+						   method          => "GET",
+						   CL              => $param->{CL},
+						   hash            => $hash,
+						   type            => $MP3Filename,
+						   httpversion     => $param->{httpversion},
+						   callback        => \&echodevice_AmazonVoiceMP3
+						};
+
+						HttpUtils_NonblockingGet($params);						
+					}
+				}
+			}
+		}
+		
+		$return .= "</tbody></table>";
+		$return .= "<p><strong>".$addresscount. " Sprachaufnahmen gefunden</strong></p>";
+		$return .= "</html>";
+		$return =~ s/'/&#x0027/g;
+		
+		if ($addresscount == 0) {
+			asyncOutput( $param->{CL}, "Es konnten keine Sprachaufnahmen gefunden werden!" );
+		}
+		else {
+			asyncOutput( $param->{CL}, $return );
+		}
+	}
 	
 	else {
 		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] json for unknown message \n".Dumper(echodevice_anonymize($hash, $json));
@@ -3799,7 +3916,6 @@ sub echodevice_Parse($$$) {
   
 	echodevice_HandleCmdQueue($hash);
 
-	return undef;
 }
 
 ##########################
@@ -4176,6 +4292,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A32DDESGESSHZA" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A1RABVCI4QCIKC" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A3RMGO6LYLH7YN" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
+	elsif($ModelNumber eq "A2H4LV5GIZ1JFT" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4 with Clock";}
 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
 	elsif($ModelNumber eq "AWZZ5CVHX2CD"   || $ModelNumber eq "Echo Show")				{return "Echo Show Gen2";}
@@ -4216,6 +4333,30 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A3NTO4JLV9QWRB" || $ModelNumber eq "Gigaset L800HX")			{return "Gigaset L800HX";}
 	elsif($ModelNumber eq "A1HNT9YTOBE735" || $ModelNumber eq "Telekom Smart Speaker")	{return "Telekom Smart Speaker";}
 	elsif($ModelNumber eq "A1WAR447VT003J" || $ModelNumber eq "Yamaha MusicCast 20")	{return "Yamaha MusicCast 20";}
+	elsif($ModelNumber eq "AVE5HX13UR5NO"  || $ModelNumber eq "Zero Touch (Logitech)")	{return "Zero Touch (Logitech)";}
+	elsif($ModelNumber eq "A3GZUE7F9MEB4U" || $ModelNumber eq "Sony WH-100XM3")			{return "Sony WH-100XM3";}
+	elsif($ModelNumber eq "A2J0R2SD7G9LPA" || $ModelNumber eq "Lenovo P10")				{return "Lenovo P10";}
+	elsif($ModelNumber eq "A1J16TEDOYCZTN" || $ModelNumber eq "Amazon Tablet")			{return "Amazon Tablet";}
+	elsif($ModelNumber eq "A38EHHIB10L47V" || $ModelNumber eq "Fire HD 8 Tablet")		{return "Fire HD 8 Tablet";}
+	elsif($ModelNumber eq "A112LJ20W14H95" || $ModelNumber eq "Media Display")			{return "Media Display";}
+	elsif($ModelNumber eq "A1H0CMF1XM0ZP4" || $ModelNumber eq "Bose Soundtouch")		{return "Bose Soundtouch";}
+	elsif($ModelNumber eq "AAMFMBBEW2960"  || $ModelNumber eq "Garmin DriveSmart 65 with Amazon Alexa")	{return "Garmin DriveSmart 65 with Amazon Alexa";}
+	elsif($ModelNumber eq "A2IVLV5VM2W81"  || $ModelNumber eq "Mobile Voice iOS")		{return "Mobile Voice iOS";}
+	elsif($ModelNumber eq "A2TF17PFR55MTB" || $ModelNumber eq "Mobile Voice Android")	{return "Mobile Voice Android";}
+	elsif($ModelNumber eq "A3V3VA38K169FO" || $ModelNumber eq "Fire Tablet")			{return "Fire Tablet";}
+	elsif($ModelNumber eq "AVD3HM0HOJAAL"  || $ModelNumber eq "Sonos One")				{return "Sonos One";}
+	elsif($ModelNumber eq "A1C66CX2XD756O" || $ModelNumber eq "Fire HD 8 Tablet")		{return "Fire HD 8 Tablet";}
+	elsif($ModelNumber eq "A17LGWINFBUTZZ" || $ModelNumber eq "Anker Roav Car Charger")	{return "Anker Roav Car Charger";}
+	elsif($ModelNumber eq "A2XPGY5LRKB9BE" || $ModelNumber eq "FitBit watch")			{return "FitBit watch";}
+	elsif($ModelNumber eq "A2Y04QPFCANLPQ" || $ModelNumber eq "Bose QC35 II")			{return "Bose QC35 II";}
+	elsif($ModelNumber eq "A3BW5ZVFHRCQPO" || $ModelNumber eq "Alexa Car")				{return "Alexa Car";}
+	elsif($ModelNumber eq "A303PJF6ISQ7IC" || $ModelNumber eq "Echo Auto")				{return "Echo Auto";}
+	elsif($ModelNumber eq "A1ZB65LA390I4K" || $ModelNumber eq "Fire HD 10 Tablet")		{return "Fire HD 10 Tablet";}
+	elsif($ModelNumber eq "AVU7CPPF2ZRAS"  || $ModelNumber eq "Fire HD 8 Plus (2020)")	{return "Fire HD 8 Plus (2020)";}
+	elsif($ModelNumber eq "A24Z7PEXY4MDTK" || $ModelNumber eq "Sony WF-1000X")			{return "Sony WF-1000X";}
+	elsif($ModelNumber eq "ABN8JEI7OQF61"  || $ModelNumber eq "Sony WF-1000XM3")		{return "Sony WF-1000XM3";}
+	elsif($ModelNumber eq "A7S41FQ5TWBC9"  || $ModelNumber eq "Sony WH-1000XM4")		{return "Sony WH-1000XM4";}
+	
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
@@ -5115,6 +5256,39 @@ sub echodevice_Google($$$) {
     };
 
 	HttpUtils_NonblockingGet($params);
+}
+
+sub echodevice_AmazonVoiceMP3($) {
+	my ($param, $err, $data) = @_;
+	my $hash = $param->{hash};
+	my $name = $hash->{NAME};
+	my $type = $param->{type};
+	Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] [$type] URL      = " . $param->{url};
+	Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] [$type] HEADER   = " . $param->{header};
+	Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] [$type] KEY      = " . $param->{type};
+	Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] [$type] ERROR    = " . $err if ($err);
+	Log3 $name, 5, "[$name] [echodevice_AmazonVoiceMP3] [$type] DATA     = " . $data;
+
+	#ReadingsVal($hash->{IODev}->{NAME} , lc("TTS_Filename"), "")
+	my $MP3Filename = $param->{type};
+	
+	Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] [$type] MP3File  = " . $MP3Filename;
+
+	if ($data eq "") {
+		Log3 $name, 3, "[$name] [echodevice_AmazonVoiceMP3] [$type] no data received";
+		readingsSingleUpdate( $hash, "tts_error", "no data received",1 );
+		return;
+	}
+	
+	#Verzeichnis echodevice anlegen
+	mkdir($FW_dir . "/echodevice", 0777) unless(-d $FW_dir . "/echodevice" );
+	mkdir($FW_dir . "/echodevice/VoiceRecords", 0777) unless(-d $FW_dir . "/echodevice/VoiceRecords" );
+
+	# MP3 Datei anlegen
+	open(FH, ">$FW_dir/echodevice/VoiceRecords/$MP3Filename");
+	print FH $data;
+	close(FH);
+
 }
 
 sub echodevice_ParseTTSMP3($) {
