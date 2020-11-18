@@ -1436,6 +1436,13 @@ The following local attributes are used by a wider range of devices:
 
   <b>Get</b><ul>N/A</ul><br>
 
+  <b>Internals</b>
+    <a name="init_errors"></a>
+    <li>init_errors<br>
+      contains configuration errors and security issues collected at FHEM
+      startup.
+    </li><br>
+
   <b>Attributes</b>
   <ul>
     <a name="altitude"></a>
@@ -1464,7 +1471,8 @@ The following local attributes are used by a wider range of devices:
     <li>autosave<br>
         enable some modules to automatically trigger save after a configuration
         change, e.g. after a new device was created. Default is 1 (true), you
-        can deactivate this feature by setting the value to 0.
+        can deactivate this feature by setting the value to 0. Configration
+        errors at startup automatically deactivate this value.
     </li>
 
     <a name="backupcmd"></a>
@@ -1672,9 +1680,8 @@ The following local attributes are used by a wider range of devices:
     <li>motd<br>
         Message Of The Day. Displayed on the homescreen of the FHEMWEB package,
         or directly after the telnet logon, before displaying the fhem> prompt.
-        SecurityCheck is setting motd if it is not defined upon startup, to
-        avoid this set the motd value to none.  motd is also used to show
-        collected error messages upon FHEM start.
+        In addition, the content of the internal value init_errors will be
+        displayed. To avoid displaying messages set its value to none.
     </li><br>
 
     <a name="mseclog"></a>

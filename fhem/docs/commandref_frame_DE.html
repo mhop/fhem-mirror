@@ -1533,6 +1533,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 
   <b>Get</b><ul>N/A</ul><br>
 
+  <b>Internals</b>
+    <a name="init_errors"></a>
+    <li>init_errors<br>
+        Konfigurations Fehlermeldungen beim FHEM Start und Security Meldungen werden
+        hier gesammelt.
+    </li><br>
+
+
   <b>Attributes</b>
   <ul>
     <a name="altitude"></a>
@@ -1558,6 +1566,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         erfolgt vom <a href="#autocreate"> autocreate</a> Ger&auml;t, um so
         automatisch ein FHEM-Ger&auml;t bei erreichen einer entsprechenden
         Nachricht zu erstellen.
+    </li><br>
+
+    <a name="autosave"></a>
+    <li>autosave<br>
+        Der Standardwert 1 aktiviert einige Module nach einer 
+        Konfigurationsänderung automatisch zu speichern z.B. wenn ein neues 
+        Ger&auml;t erstellt wurde. Treten beim FHEM Start Konfigurationsfehler 
+        auf wird diese Funktion automatisch deaktiviert (0).
     </li><br>
 
     <a name="backupcmd"></a>
@@ -1780,11 +1796,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
     <li>motd<br>
         Nachricht des Tages. Wird im Begr&uuml;&szligungsbildschirm von FHEM
         angezeigt, oder direkt beim Start einer &quot;telnet&quot; Sitzung,
-        bevor der fhem&gt; Prompt erscheint. Der SecurityCheck setzt motd wenn
-        es bisher nicht gesetzt ist. Um das zu verhindern, k&ouml;nnen sie den
-        Wert von motd auf &quot;none&quot; setzen.
-        motd wird auch verwendet, um Fehlermeldungen w&auml;hrend des
-        FHEM-Starts zu sammeln und anzuzeigen.
+        bevor der fhem&gt; Prompt erscheint. Zus&auml;tzlich wird der Inhalt 
+        des Internals init_errors angezeigt. Die Anzeige der gesamten Meldung 
+        wird durch attr global motd none abgeschaltet.
     </li><br>
 
     <a name="mseclog"></a>
