@@ -3835,7 +3835,7 @@ sub echodevice_Parse($$$) {
 	elsif($msgtype eq "customer-history-records") {
 	
 		my $addresscount = 0;
-	
+		my $Voicetext;
 		my $return = '<html><table align="" border="0" cellspacing="0" cellpadding="3" width="100%" height="100%" class="mceEditable"><tbody>';
 		$return   .= "<p>Sprachaufnahmen-Verlauf:</p>";
 		$return   .= "<tr><td><strong>Datum</strong></td><td><strong>&nbsp;&nbsp;&nbsp;Echoname</strong></td><td><strong>&nbsp;&nbsp;&nbsp;Aufname</strong></td></tr>";			
@@ -3846,17 +3846,20 @@ sub echodevice_Parse($$$) {
 			# Play on Device
 			foreach my $result (@{$json->{customerHistoryRecords}}) {
 				foreach my $Voicerecords (@{$result->{voiceHistoryRecordItems}}) {
-					next if ($Voicerecords->{recordItemType} ne "CUSTOMER_TRANSCRIPT");
+				
+					next if ($Voicerecords->{recordItemType} eq "TTS_REPLACEMENT_TEXT") ;
 					my ($S, $M, $H, $d, $m, $Y) = localtime($result->{timestamp} / 1000);
 					$m += 1;
 					$Y += 1900;
 					my $dt = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $d,$m, $Y, $H, $M, $S);
 					$addresscount ++;
+									
+					if ($Voicerecords->{transcriptText} eq "") {$Voicetext = "Falsch erkannt";} else {$Voicetext=$Voicerecords->{transcriptText};}
 					
 					my $MP3Filename = $Voicerecords->{recordItemKey} . ".mp3";
 					$MP3Filename =~ s/#//g;
 					
-					$return .= "<tr><td>" . $dt . " &nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;". $result->{device}{"deviceName"} . '</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a target="_blank" href=' . '"' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'"' . '>play' . "</a></td><td>" . $Voicerecords->{transcriptText} . " &nbsp;&nbsp;&nbsp;</td><td>" . $Voicerecords->{recordItemType} . " &nbsp;&nbsp;&nbsp;</td></tr>";
+					$return .= "<tr><td>" . $dt . " &nbsp;&nbsp;&nbsp;</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;". $result->{device}{"deviceName"} . '</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' . '<audio controls><source src="' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'" type="audio/wav">' . '<a target="_blank" href=' . '"' . $FW_ME . '/echodevice/VoiceRecords/' . $MP3Filename .'"' . '>play' . "</a>"  .  '</audio>' . "</td><td><p>" . $Voicetext . "</p> &nbsp;&nbsp;&nbsp;</td></tr>";
 					
 					if ((-e $FW_dir . "/echodevice/VoiceRecords/". $MP3Filename)) { 
 						Log3 $name, 4, "[$name] [echodevice_AmazonVoiceMP3] Use EXIST MP3File  = " . $MP3Filename ;
