@@ -2,9 +2,12 @@
 #
 ##############################################
 #
+# 2020.11.19 v0.2.4
+# - CHANGE:  get custom-history-records Dialog angepasst
+# - FEATURE: Unterstützung A2U21SRK4QGSE1 Echo Dot Gen4
+#
 # 2020.11.18 v0.2.3
 # - FEATURE: get custom-history-records
-#            Unterstützung A3RMGO6LYLH7YN Echo Dot Gen4
 #            Unterstützung A2H4LV5GIZ1JFT Echo Dot Gen4 with Clock
 #            Unterstützung AVE5HX13UR5NO  Zero Touch (Logitech)
 #            Unterstützung A3GZUE7F9MEB4U Sony WH-100XM3
@@ -4289,6 +4292,7 @@ sub echodevice_LostConnect($$){
 ##########################
 sub echodevice_getModel($){
 	my ($ModelNumber) = @_;
+	my $name = $hash->{NAME};
 	
 	if   ($ModelNumber eq "AB72C64C86AW2"  || $ModelNumber eq "Echo")            		{return "Echo";}
 	elsif($ModelNumber eq "A3S5BH2HU6VAYF" || $ModelNumber eq "Echo Dot")        		{return "Echo Dot";}
@@ -4296,6 +4300,8 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A32DDESGESSHZA" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A1RABVCI4QCIKC" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen3";}
 	elsif($ModelNumber eq "A3RMGO6LYLH7YN" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
+	elsif($ModelNumber eq "A2U21SRK4QGSE1" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4";}
+	 
 	elsif($ModelNumber eq "A2H4LV5GIZ1JFT" || $ModelNumber eq "Echo Dot")				{return "Echo Dot Gen4 with Clock";}
 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
