@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.7.0"  => "18.11.2020  add new consumer management for switched sockets and EVCharger ",
+  "3.7.0"  => "19.11.2020  add new consumer management for switched sockets and EVCharger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
@@ -179,43 +179,6 @@ my %vNotesIntern = (
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
   "2.5.0"  => "25.08.2019  change switch consumer to on<->automatic only in graphic overview, Forum: https://forum.fhem.de/index.php/topic,102112.msg969002.html#msg969002",
-  "2.4.5"  => "22.08.2019  fix some warnings, Forum: https://forum.fhem.de/index.php/topic,102112.msg968829.html#msg968829 ",
-  "2.4.4"  => "11.07.2019  fix consinject to show multiple consumer icons if planned ",
-  "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
-  "2.4.2"  => "02.07.2019  change header design of portal graphics ",
-  "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
-  "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
-  "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
-  "2.3.6"  => "21.06.2019  revise commandref ",                        
-  "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
-  "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
-  "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
-  "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
-  "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
-  "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
-  "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
-                           "add consumer energy data of current day/month/year, new attribute \"verbose5Data\" ",
-  "2.1.2"  => "08.06.2019  correct planned time of consumer in PortalAsHtml if planned time is at next day ",
-  "2.1.1"  => "08.06.2019  add units to values, some bugs fixed ",
-  "2.1.0"  => "07.06.2019  add informations about consumer switch and power state ",
-  "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device ",
-  "1.8.0"  => "27.05.2019  redesign of SMAPortal graphics by Wzut/XGuide ",
-  "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
-  "1.7.0"  => "01.05.2019  code change of PortalAsHtml, new attributes \"portalGraphicColor\" and \"portalGraphicStyle\" ",
-  "1.6.0"  => "29.04.2019  function PortalAsHtml ",
-  "1.5.5"  => "22.04.2019  fix readings for BattryOut and BatteryIn ",
-  "1.5.4"  => "26.03.2019  delete L1_InfoMessages if no info occur ",
-  "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
-  "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
-  "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
-  "1.5.0"  => "23.03.2019  add consumer data ",
-  "1.4.0"  => "22.03.2019  add function extractPlantMasterData, DbLog_split, change L2 Readings ",
-  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
-  "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
-  "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
-  "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
-  "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
-  "1.1.0"  => "09.03.2019  make get data more stable, new attribute 'getDataRetries' ",
   "1.0.0"  => "03.03.2019  initial "
 );
 
@@ -1357,7 +1320,7 @@ sub _manageConsumerByEnergy {
                                          call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid',
                                          tag      => $tag,
                                          state    => $state, 
-                                         fnaref   => [ qw( extractConsumerByEnergyData ) ],
+                                         fnaref   => [ qw( extractManageConsumerByEnergy ) ],
                                          fields   => \%fields,
                                          content  => $cont,
                                          addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
@@ -2048,6 +2011,34 @@ return ($errstate,$state,$reread,$retry);
 }
 
 ################################################################
+#    Abruf Settings eines Consumers mit SUSyID 315
+#    (z.B. nach HTML 302 Weiterleitung)
+################################################################
+sub _getConsumerEnergySetting {                    ## no critic "not used"
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $state    = $paref->{state};                  
+  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  my $oid      = $paref->{oid};                    # Consumer oid
+  my $addon    = $paref->{addon};                  # optionales AddOn - hier das managed Device 
+  
+  my ($reread,$retry,$errstate) = (0,0,0);    
+  
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/'.$oid,
+                                        tag      => "consumerCurrentdata",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerEnergySetting ) ],
+                                        addon    => $addon,
+                                        daref    => $daref
+                                     });
+  
+return ($errstate,$state,$reread,$retry); 
+}
+
+################################################################
 #                    Dispatcher GET
 ################################################################
 sub __dispatchGet {
@@ -2058,7 +2049,7 @@ sub __dispatchGet {
   my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
-  my $fnaddon  = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
+  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   my $hash     = $defs{$name};
   
@@ -2082,7 +2073,7 @@ sub __dispatchGet {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$data);
+          &{$fn} ($hash,$daref,$data_cont,$addon,$data);
       }
       use strict "refs";
   }
@@ -2103,7 +2094,7 @@ sub __dispatchPost {
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
   my $fields   = $paref->{fields};                 # Referenz zum Hash der zu übertragenden PUSH Header
   my $cont     = $paref->{content};                # Content Daten für PUSH (String)
-  my $fnaddon  = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
+  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   my $hash     = $defs{$name};
   
@@ -2131,10 +2122,11 @@ sub __dispatchPost {
       
       my $params = {
           hash      => $hash,
+          ua        => $ua,
           daref     => $daref,
           data_cont => $data_cont,
           data      => $data,
-          fnaddon   => $fnaddon,
+          addon     => $addon,
           tag       => $tag
       };
       
@@ -2334,8 +2326,10 @@ sub ___analyzeData {                   ## no critic 'complexity'
       $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
-      $errstate = 1 if($rescode != 302);                                                                     # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
-      $state    = "ERROR - see logfile for further information";
+      if($rescode != 302) {                                                                                  # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
+          $errstate = 1; 
+          $state    = "ERROR - see logfile for further information";
+      }
   }
   
 return ($reread,$retry,$errstate,$state);
@@ -2422,7 +2416,7 @@ sub ParseData {
   readingsEndUpdate($hash, 1);
   
   my $ldlv = $stpl{liveData}{level};
-  my $cclv = $stpl{consumerCurrentdata}{level};
+  # my $cclv = $stpl{consumerCurrentdata}{level};
   my $lddo = $subs{$name}{liveData}{doit};
   
   my $pv   = ReadingsNum($name, "${ldlv}_PV"             , 0);
@@ -2438,11 +2432,11 @@ sub ParseData {
   readingsBeginUpdate($hash);
   
   if(!$errstate) {
-      if($setp ne "none") {
-          my ($d,$susyid,$op) = split(":",$setp);
-          $op                 = ($op eq "auto") ? "off (automatic)" : $op;
-          readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
-      }
+     # if($setp ne "none") {
+     #     my ($d,$susyid,$op) = split(":",$setp);
+     #     $op                 = ($op eq "auto") ? "off (automatic)" : $op;
+     #     readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op) if($susyid == 191);
+     # }
       readingsBulkUpdate($hash, "lastCycleTime",   $ctime   ) if($ctime > 0);
       readingsBulkUpdate($hash, "summary",         $sum." W") if($subs{$name}{liveData}{doit});
       readingsBulkUpdate($hash, "lastSuccessTime", $ts      );
@@ -2796,7 +2790,7 @@ sub extractStatisticData {
   my $daref     = $paref->{daref};
   my $data_cont = $paref->{data_cont};         # empfangene Daten decoded Content
   my $data      = $paref->{data};              # empfangene Rohdaten
-  my $period    = $paref->{fnaddon};
+  my $period    = $paref->{addon};
   my $tag       = $paref->{tag};
   
   my $name      = $hash->{NAME};
@@ -2833,7 +2827,9 @@ sub extractPlantMasterData {
   my $forecast = shift;
   my $addon    = shift;
   my $data     = shift;                       # gelieferte Rohdaten
+  
   my $name     = $hash->{NAME};
+  
   my ($amount,$unit);
   
   Log3 ($name, 4, "$name - ##### extracting plant master data #### ");
@@ -2928,6 +2924,7 @@ sub extractConsumerPlanData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
+  
   my $name     = $hash->{NAME};
   my %consumers;
   my ($key,$val);
@@ -3011,6 +3008,7 @@ sub extractConsumerMasterdata {
   my $hash      = shift; 
   my $daref     = shift;
   my $clivedata = shift;
+  
   my $name      = $hash->{NAME};
   my %consumers;
   my %hcon;
@@ -3063,6 +3061,7 @@ sub extractConsumerCurrentdata {
   my $hash      = shift; 
   my $daref     = shift;
   my $clivedata = shift;
+  
   my $name      = $hash->{NAME};
   my %consumers;
   my ($i,$res);
@@ -3136,6 +3135,7 @@ sub extractConsumerHistData {                                                  #
   my $daref  = shift;
   my $chdata = shift;
   my $tf     = shift;
+  
   my $name   = $hash->{NAME};
   my %consumers;
   my ($i,$gcr,$gct,$pcr,$pct,$tct,$bcr,$bct);
@@ -3206,7 +3206,7 @@ sub extractSwitchConsumerData {
   my $daref     = $paref->{daref};                # Referenz zum Datenarray
   my $data_cont = $paref->{data_cont};            # Daten decoded Content
   my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $addon     = $paref->{addon};                # ein optionales AddOn
   my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine  
   
   my $name      = $hash->{NAME};
@@ -3221,6 +3221,10 @@ sub extractSwitchConsumerData {
       $state = "ok - switched consumer $d to $op";
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
+      
+      my $cclv = $stpl{consumerCurrentdata}{level};
+      $op      = ($op eq "auto") ? "off (automatic)" : $op;
+      push @$daref, "${cclv}_${d}_Switch:$op";
   } 
   else {
       $state = "ERROR - couldn't switch consumer $d to $op";
@@ -3233,38 +3237,83 @@ return $state;
 #          Auswertung Ergebnis aus Manage Consumer
 #          By Energy
 ################################################################
-sub extractConsumerByEnergyData {
+sub extractManageConsumerByEnergy {
   my $paref     = shift;
   my $hash      = $paref->{hash};
+  my $ua        = $paref->{ua};                   # LWP Useragent     
   my $daref     = $paref->{daref};                # Referenz zum Datenarray
   my $data_cont = $paref->{data_cont};            # Daten decoded Content
   my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $addon     = $paref->{addon};                # ein optionales AddOn
   my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine 
   
   my $name      = $hash->{NAME};
   
+  my ($errstate,$reread,$retry) = (0,0,0);
+  
   Log3 ($name, 4, "$name - extracting manage Consumer by energy result ");
   
   my $rescode         = $data->code;                                                                    # HTML Code der Antwort (sollte 302 sein bei Erfolg)
-  my $location        = $data->header('Location');
   my ($d,$susyid,$op) = split(":",$addon);                                                              # $op -> eingestellter Gridconsomption Schwellenwert
   my $pvlog           = 100-$op;
   
   my $state;
   if($rescode == 302) {
-      $state = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
+      my $location = $data->header('Location');
+      $state       = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
+      
       Log3 ($name, 3, qq{$name - $state});
-      Log3 ($name, 3, qq{$name - GET "$location" to read the new values are set });
+      Log3 ($name, 3, qq{$name - next step: GET "$location" to read the new values are set });
       
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
       BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
+      
+      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+          if($h && $h eq $d) {
+              $paref->{oid} = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
+          }
+      }
+      
+      $paref->{name}  = $name;
+      $paref->{state} = $state;
+      $paref->{addon} = $d;                                                        # das gemanagte Device in addon mitgeben
+      
+      ($errstate,$state,$reread,$retry) = _getConsumerEnergySetting ($paref);
   } 
   else {
       $state = qq{ERROR - couldn't set Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%)};
   }
  
 return $state; 
+}
+
+################################################################
+#  Abruf der aktuell eingestellten Energy Management Settings
+#  von Verbrauchern des Typs 315 (z.B. SMA EV Charger)
+################################################################
+sub extractConsumerEnergySetting {
+  my $hash      = shift;
+  my $daref     = shift;
+  my $data_cont = shift;                       # gelieferter data content
+  my $addon     = shift;
+  my $data      = shift;                       # gelieferte Rohdaten
+  
+  my $name      = $hash->{NAME};
+  
+  my ($errstate,$reread,$retry) = (0,0,0);
+  
+  Log3 ($name, 4, "$name - extracting current Consumer energy settings ");
+  
+  my $d    = $addon; 
+  my $cclv = $stpl{consumerCurrentdata}{level};  
+
+  my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s0\.(\d{2});/x // "undefined";
+  my ($pvval) = $data_cont =~ /var\spvValue\s=\s0\.(\d{2});/x              // "undefined";
+  
+  push @$daref, "${cclv}_${d}_SwitchCondition:GridConsumption=$gcval% PV=$pvval%";
+  
+return; 
 }
 
 ################################################################
@@ -3276,7 +3325,7 @@ sub extractHelperData {
   my $daref     = $paref->{daref};                # Referenz zum Datenarray
   my $data_cont = $paref->{data_cont};            # Daten decoded Content
   my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{fnaddon};              # ein optionales AddOn
+  my $addon     = $paref->{addon};                # ein optionales AddOn
   my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine            
   
   my $name      = $hash->{NAME};
