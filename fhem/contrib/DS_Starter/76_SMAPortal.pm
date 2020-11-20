@@ -3308,8 +3308,11 @@ sub extractConsumerEnergySetting {
   my $d    = $addon; 
   my $cclv = $stpl{consumerCurrentdata}{level};  
 
-  my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s0\.(\d{2});/x // "undefined";
-  my ($pvval) = $data_cont =~ /var\spvValue\s=\s0\.(\d{2});/x              // "undefined";
+  my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
+  my ($pvval) = $data_cont =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
+  
+  $gcval      = sprintf("%.2f",$gcval) * 100;
+  $pvval      = sprintf("%.2f",$pvval) * 100;
   
   push @$daref, "${cclv}_${d}_SwitchCondition:GridConsumption=$gcval% PV=$pvval%";
   
