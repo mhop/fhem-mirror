@@ -2049,7 +2049,7 @@ sub __dispatchGet {
   my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
-  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
+  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion oder spezielle Steuerungen
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
   my $hash     = $defs{$name};
   
@@ -2064,7 +2064,8 @@ sub __dispatchGet {
   ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
                                                         errstate => $errstate,
                                                         state    => $state,
-                                                        data     => $data
+                                                        data     => $data,
+                                                        addon    => $addon
                                                      });
   
   return ($errstate,$state,$reread,$retry) if($errstate || $reread || $retry);
@@ -2112,7 +2113,8 @@ sub __dispatchPost {
                                                         ua       => $ua,
                                                         errstate => $errstate,
                                                         state    => $state,
-                                                        data     => $data
+                                                        data     => $data,
+                                                        addon    => $addon
                                                      });
   
   return ($errstate,$state) if($errstate);
@@ -2228,6 +2230,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $state           = $paref->{state};
   my $ua              = $paref->{ua};
   my $ad              = $paref->{data};
+  my $addon           = $paref->{addon} // "";                                                        # addon kann Optionen zur Analysesteuerung enthalten
+  
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
@@ -2326,8 +2330,8 @@ sub ___analyzeData {                   ## no critic 'complexity'
       $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
-      if($rescode != 302) {                                                                                  # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
-          $errstate = 0; 
+      if($rescode != 302 || $addon !~ /noJSONdata/x) {                                                       # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
+          $errstate = 1; 
           $state    = "ERROR - see logfile for further information";
       }
   }
@@ -3277,7 +3281,7 @@ sub extractManageConsumerByEnergy {
       
       $paref->{name}  = $name;
       $paref->{state} = $state;
-      $paref->{addon} = $d;                                                        # das gemanagte Device in addon mitgeben
+      $paref->{addon} = "$d:noJSONdata";                                                               # das gemanagte Device in addon mitgeben
       
       ($errstate,$state,$reread,$retry) = _getConsumerEnergySetting ($paref);
   } 
@@ -3305,21 +3309,15 @@ sub extractConsumerEnergySetting {
   
   Log3 ($name, 4, "$name - extracting current Consumer energy settings ");
   
-  my $d    = $addon; 
-  my $cclv = $stpl{consumerCurrentdata}{level}; 
+  my ($d)     = split ":", $addon; 
+  my $cclv    = $stpl{consumerCurrentdata}{level}; 
+  my $dcont   = encode("utf8", $data->decoded_content);  
 
-  my $ad_content = encode("utf8", $data->decoded_content);  
-
-  my ($gcval) = $ad_content =~ /var\sgridConsumptionValue\s=\s(.*?);/x;
-  my ($pvval) = $ad_content =~ /var\spvValue\s=\s(.*?);/x;
-  
-  # Log3 ($name, 1, "$name - CONTENT:  $ad_content");
-  Log3 ($name, 1, "$name - 1.  gcval: $gcval, pvval: $pvval ");
+  my ($gcval) = $dcont =~ /var\sgridConsumptionValue\s=\s(.*?);/x;
+  my ($pvval) = $dcont =~ /var\spvValue\s=\s(.*?);/x;
   
   $gcval      = sprintf("%.2f",$gcval) * 100;
   $pvval      = sprintf("%.2f",$pvval) * 100;
-  
-  Log3 ($name, 1, "$name - 2.  gcval: $gcval, pvval: $pvval ");
   
   push @$daref, "${cclv}_${d}_SwitchCondition:GridConsumption=$gcval% PV=$pvval%";
   
