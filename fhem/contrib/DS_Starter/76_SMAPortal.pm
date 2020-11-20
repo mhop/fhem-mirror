@@ -3310,10 +3310,10 @@ sub extractConsumerEnergySetting {
 
   my $ad_content = encode("utf8", $data->decoded_content);  
 
-  my $gcval = $ad_content =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
-  my $pvval = $ad_content =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
+  my ($gcval) = $ad_content =~ /var\sgridConsumptionValue\s=\s(.*?);/x;
+  my ($pvval) = $ad_content =~ /var\spvValue\s=\s(.*?);/x;
   
-  Log3 ($name, 1, "$name - CONTENT:  $ad_content");
+  # Log3 ($name, 1, "$name - CONTENT:  $ad_content");
   Log3 ($name, 1, "$name - 1.  gcval: $gcval, pvval: $pvval ");
   
   $gcval      = sprintf("%.2f",$gcval) * 100;
