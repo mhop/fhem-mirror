@@ -2327,7 +2327,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
       
       if($rescode != 302) {                                                                                  # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
-          $errstate = 1; 
+          $errstate = 0; 
           $state    = "ERROR - see logfile for further information";
       }
   }
