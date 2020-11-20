@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 08/2020
-my $thzversion = "0.190";
+my $thzversion = "0.191";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -450,6 +450,7 @@ my %sets439539common = (
   "p76RoomThermCorrection"		=> {cmd2=>"0A0109", argMin =>  "-5", argMax =>    "5", 	type =>"4temp",  unit =>" K"},
   "p77OutThermFilterTime"		=> {cmd2=>"0A010C", argMin =>  "1",  argMax =>   "24", 	type =>"0clean",  unit =>" h"},
   "p35PasteurisationInterval"	=> {cmd2=>"0A0586", argMin =>  "1",  argMax =>   "30", 	type =>"1clean",  unit =>""},
+  "p80EnableSolar"              => {cmd2=>"0A03C1", argMin =>  "0",  argMax =>   "1", 	type =>"1clean",  unit =>""},
   "p35PasteurisationTemp"		=> {cmd2=>"0A0587", argMin =>  "10", argMax =>   "65", 	type =>"5temp",  unit =>" °C"},
   "p34BoosterDHWTempAct"		=> {cmd2=>"0A0589", argMin => "-10", argMax =>  "10",	type =>"5temp",  unit =>" °C"},
   "p99DHWmaxFlowTemp"			=> {cmd2=>"0A058C", argMin =>  "10", argMax =>  "75",	type =>"5temp",  unit =>" °C"},
@@ -899,7 +900,7 @@ sub THZ_Initialize($) {
 		    ."interval_sDisplay:0,60,120,180,300 "
 		    ."firmware:4.39,2.06,2.14,5.39,4.39technician "
             ."interval_sDewPointHC1:0,60,120,180,300 "
-            ."simpleReadTimeout:0.25,0.5,0.75,1,2,4,6 " #standard has been 0.5 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.5 sec.
+            ."simpleReadTimeout:0.25,0.5,0.75,1,2,4,6 " #standard has been 0.75 since msg468515 If blocking attribut is NOT enabled then set the timeout value to a maximum value of 0.75 sec.
             ."nonblocking:0,1 "
 		    . $readingFnAttributes;
   $data{FWEXT}{"/THZ_PrintcurveSVG"}{FUNC} = "THZ_PrintcurveSVG";
@@ -939,23 +940,21 @@ sub THZ_Define($$) {
 ########################################################################################
 #
 # THZ_Refresh_all_gets - Called once refreshes current reading for all gets and initializes the regular interval calls
-#
+# refresh all registers; the register with interval_command ne 0 will keep on refreshing
 # Parameter $hash
 # 
 ########################################################################################
 sub THZ_Refresh_all_gets($) {
   my ($hash) = @_;
   RemoveInternalTimer(0, "THZ_GetRefresh");
-  #THZ_RemoveInternalTimer("THZ_GetRefresh"); not needed since https://svn.fhem.de/trac/changeset/15667/ because now there is a second parameter for the function
-  #Log3 $hash->{NAME}, 3, "THZ_GetRefresh_all ";
   Log3 $hash->{NAME}, 5, "thzversion = $thzversion ";
   my $timedelay= 65; 						#5 seconds were ok but considering winter 2017/2018 I prefer to increase
-  foreach  my $cmdhash  (keys %gets) {
-        my %par = (  hash => $hash, command => $cmdhash );
-        #RemoveInternalTimer(\%par); #commented out in  v.0161 because appearently redundant; THZ_RemoveInternalTimer is more efficient and both are not needed
-        InternalTimer(gettimeofday() + ($timedelay) , "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
-        $timedelay += 1.6;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
-  }  #refresh all registers; the register with interval_command ne 0 will keep on refreshing
+  foreach  my $cmdhash  (keys %gets) {   
+        my %par = (hash => $hash, command => $cmdhash);
+#        my %par = (hash => $hash, command => $cmdhash, NAME => $hash->{NAME} ); #does not group in apptime
+        InternalTimer((gettimeofday() + $timedelay), "THZ_GetRefresh", \%par, 0);		#increment 0.6 $timedelay++
+        $timedelay += 2;                      #0.6 seconds were ok but considering winter 2017/2018 I prefer to increase
+  }  
 }
 
 
@@ -997,8 +996,8 @@ sub THZ_GetRefresh($) {
             return;
         }
     }
-    elsif (($hash->{STATE} ne "disconnected") and (AttrVal($name, "state", " ")  ne "disconnected" )) {
-        THZ_Get($hash, $hash->{NAME}, $command);        
+    elsif (($hash->{STATE} ne "disconnected") and (ReadingsVal($name, "state", " ")  ne "disconnected" )) {
+        THZ_Get($hash, $name, $command);        
     }
     
     my $interval = AttrVal($name, ("interval_".$command), 0);
@@ -1506,7 +1505,8 @@ sub THZ_ReadAnswer($) {
 	Log3 $hash->{NAME}, 5, "$name start Function THZ_ReadAnswer";
     my $buf =undef;
     my $rtimeout = (AttrVal($name, "simpleReadTimeout", "0.8"));
-    $rtimeout = minNum($rtimeout,1.6) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.5s if nonblocking disabled
+    $rtimeout +=1 if (AttrVal($hash->{NAME}, "firmware" , "4.39")  =~ /^2/);
+    $rtimeout = minNum($rtimeout,1.8) if (AttrVal($name, "nonblocking", "0") eq 0); # set to max 1.8s if nonblocking disabled
     my $count = 0; my $countmax = 20;
     while ((!defined($buf)) and ($count <= $countmax)) {
         select(undef, undef, undef, 0.01) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
