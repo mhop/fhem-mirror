@@ -3311,6 +3311,7 @@ sub extractConsumerEnergySetting {
   my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
   my ($pvval) = $data_cont =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
   
+  Log3 ($name, 1, "$name - CONTENT:  $data_cont");
   Log3 ($name, 1, "$name - 1.  gcval: $gcval, pvval: $pvval ");
   
   $gcval      = sprintf("%.2f",$gcval) * 100;
