@@ -2163,7 +2163,7 @@ sub ___getData {
   }
   
   my $data  = $ua->get( $call );  
-  my $dcont = $data->content;                                                  
+  my $dcont = $data->decoded_content;                                                  
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
