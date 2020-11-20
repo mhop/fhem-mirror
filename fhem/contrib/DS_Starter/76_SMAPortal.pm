@@ -3311,8 +3311,12 @@ sub extractConsumerEnergySetting {
   my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
   my ($pvval) = $data_cont =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
   
+  Log3 ($name, 1, "$name - 1.  gcval: $gcval, pvval: $pvval ");
+  
   $gcval      = sprintf("%.2f",$gcval) * 100;
   $pvval      = sprintf("%.2f",$pvval) * 100;
+  
+  Log3 ($name, 1, "$name - 2.  gcval: $gcval, pvval: $pvval ");
   
   push @$daref, "${cclv}_${d}_SwitchCondition:GridConsumption=$gcval% PV=$pvval%";
   
