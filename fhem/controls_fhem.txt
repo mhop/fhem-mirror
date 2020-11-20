@@ -1,4 +1,4 @@
-REV 23183
+REV 23187
 DIR unused
 UPD 2020-11-16_07:45:03 353797 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -208,7 +208,7 @@ UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
-UPD 2020-11-19_07:45:02 246145 FHEM/37_echodevice.pm
+UPD 2020-11-20_07:45:03 246354 FHEM/37_echodevice.pm
 UPD 2019-10-05_07:45:03 22167 FHEM/37_fakeRoku.pm
 UPD 2019-04-14_07:45:03 79219 FHEM/37_harmony.pm
 UPD 2020-04-17_07:45:02 152805 FHEM/37_plex.pm
@@ -736,12 +736,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-11-19_07:45:06 4401859 docs/commandref.html
-UPD 2020-11-19_07:45:09 2728993 docs/commandref_DE.html
-UPD 2020-11-19_07:45:02 81058 docs/commandref_frame.html
-UPD 2020-11-19_07:45:02 90904 docs/commandref_frame_DE.html
-UPD 2020-11-19_07:45:10 234712 docs/commandref_modular.html
-UPD 2020-11-19_07:45:11 245659 docs/commandref_modular_DE.html
+UPD 2020-11-20_07:45:07 4401875 docs/commandref.html
+UPD 2020-11-20_07:45:10 2728678 docs/commandref_DE.html
+UPD 2020-11-20_07:45:03 81074 docs/commandref_frame.html
+UPD 2020-11-20_07:45:03 90589 docs/commandref_frame_DE.html
+UPD 2020-11-20_07:45:11 234728 docs/commandref_modular.html
+UPD 2020-11-20_07:45:12 245344 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
