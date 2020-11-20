@@ -2163,7 +2163,7 @@ sub ___getData {
   }
   
   my $data  = $ua->get( $call );  
-  my $dcont = $data->decoded_content;                                                  
+  my $dcont = $data->content;                                                  
 
   $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
@@ -3306,12 +3306,14 @@ sub extractConsumerEnergySetting {
   Log3 ($name, 4, "$name - extracting current Consumer energy settings ");
   
   my $d    = $addon; 
-  my $cclv = $stpl{consumerCurrentdata}{level};  
+  my $cclv = $stpl{consumerCurrentdata}{level}; 
 
-  my ($gcval) = $data_cont =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
-  my ($pvval) = $data_cont =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
+  my $ad_content = encode("utf8", $data->decoded_content);  
+
+  my ($gcval) = $ad_content =~ /var\sgridConsumptionValue\s=\s(.*?);/x // "undefined";
+  my ($pvval) = $ad_content =~ /var\spvValue\s=\s(.*?);/x              // "undefined";
   
-  Log3 ($name, 1, "$name - CONTENT:  $data_cont");
+  Log3 ($name, 1, "$name - CONTENT:  $ad_content");
   Log3 ($name, 1, "$name - 1.  gcval: $gcval, pvval: $pvval ");
   
   $gcval      = sprintf("%.2f",$gcval) * 100;
