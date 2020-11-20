@@ -2330,7 +2330,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
       $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
   Log3 ($name, 1, "$name - ADDON: ".$addon);
-      if($rescode != 302 || $addon !~ /noJSONdata/x) {                                                       # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
+      if($rescode != 302 && $addon !~ /noJSONdata/x) {                                                       # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
           $errstate = 1; 
           $state    = "ERROR - see logfile for further information";
       }
