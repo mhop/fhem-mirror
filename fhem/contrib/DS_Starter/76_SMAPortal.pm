@@ -137,7 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.7.0"  => "19.11.2020  add new consumer management for switched sockets and EVCharger ",
+  "3.7.0"  => "21.11.2020  add new consumer management for switched sockets and SMA EV Charger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
@@ -1205,7 +1205,7 @@ return 0;
 }
 
 ################################################################
-#                   Consumer  schalten
+#                   Consumer schalten
 ################################################################
 sub _switchConsumer {
   my $paref  = shift;
@@ -1452,15 +1452,35 @@ sub _getConsumerCurrData {               ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);
   
-  ($errstate,$state) = __dispatchGet ({ name     => $name,
-                                        ua       => $ua,
-                                        call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
-                                        tag      => "consumerCurrentdata",
-                                        state    => $state, 
-                                        fnaref   => [ qw( extractConsumerCurrentdata ) ],
-                                        addon    => "",
-                                        daref    => $daref
+  # einfache Verbraucher (z.B Schaltsteckdosen) abfragen
+  ($errstate,$state) = __dispatchGet ({ name   => $name,
+                                        ua     => $ua,
+                                        call   => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                        tag    => "consumerCurrentdata",
+                                        state  => $state, 
+                                        fnaref => [ qw( extractConsumerCurrentdata ) ],
+                                        addon  => "",
+                                        daref  => $daref
                                      });
+                                     
+  return ($errstate,$state,$reread,$retry) if($errstate);
+                                     
+  # Verbraucher mit Energymanagement (z.B. SMA EV Charger SUSyID=315 abfragen)
+  my $hash = $defs{$name};
+  
+  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+      my $susyid      = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
+      next if($susyid != 315);                                            # nur Auswertung SMA EV Charger
+      
+      my $oid         = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
+      my $d           = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+      
+      $paref->{state} = $state;
+      $paref->{oid}   = $oid;
+      $paref->{addon} = "$d:noJSONdata";                                  # das gemanagte Device in addon mitgeben, noJSONdata -> kein no JSON Fehler auswerten !!
+
+      ($errstate,$state) = _getConsumerEnergySetting ($paref);
+  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1474,6 +1494,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   my $ua       = $paref->{ua};                     # LWP Useragent
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate) = (0,0,0);
@@ -2044,29 +2065,21 @@ return ($errstate,$state,$reread,$retry);
 sub __dispatchGet {
   my $paref    = shift;
   my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $call     = $paref->{call};                   # Seitenaufruf zur Datenquelle
-  my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
   my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion oder spezielle Steuerungen
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate)     = (0,0,0);
   
-  my ($data,$data_cont)             = ___getData ({ name => $name,
-                                                    ua   => $ua,
-                                                    call => $call,
-                                                    tag  => $tag
-                                                 });
+  my ($data,$data_cont)             = ___getData ($paref);
+  
+  $paref->{data}     = $data;
+  $paref->{errstate} = $errstate;
                           
-  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
-                                                        errstate => $errstate,
-                                                        state    => $state,
-                                                        data     => $data,
-                                                        addon    => $addon
-                                                     });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ($paref);
   
   return ($errstate,$state,$reread,$retry) if($errstate || $reread || $retry);
   
@@ -2089,33 +2102,22 @@ sub __dispatchPost {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
-  my $call     = $paref->{call};                   # Seitenaufruf zur Datenquelle
   my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
-  my $fields   = $paref->{fields};                 # Referenz zum Hash der zu übertragenden PUSH Header
-  my $cont     = $paref->{content};                # Content Daten für PUSH (String)
   my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
+  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate)     = (0,0,0);
                                                    
-  my ($data,$data_cont)             = ___postData ({ name    => $name,
-                                                     ua      => $ua,
-                                                     call    => $call,
-                                                     tag     => $tag,
-                                                     fields  => $fields,
-                                                     content => $cont
-                                                  });
+  my ($data,$data_cont)             = ___postData ($paref);
+  
+  $paref->{data}     = $data;
+  $paref->{errstate} = $errstate;
                                                               
-  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
-                                                        ua       => $ua,
-                                                        errstate => $errstate,
-                                                        state    => $state,
-                                                        data     => $data,
-                                                        addon    => $addon
-                                                     });
+  ($reread,$retry,$errstate,$state) = ___analyzeData ($paref);
   
   return ($errstate,$state) if($errstate);
   
@@ -2146,11 +2148,11 @@ return ($errstate,$state,$reread,$retry);
 #                      Standard Abruf Daten GET
 ################################################################
 sub ___getData {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $ua    = $paref->{ua};
-  my $call  = $paref->{call};
-  my $tag   = $paref->{tag};
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $ua      = $paref->{ua};                     # LWP Useragent
+  my $call    = $paref->{call};                   # Seitenaufruf zur Datenquelle
+  my $tag     = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   
   my $v5d     = AttrVal($name, "verbose5Data", "none");
   my $verbose = AttrVal($name, "verbose", 3);
@@ -2166,8 +2168,7 @@ sub ___getData {
   
   my $data  = $ua->get( $call );  
   my $dcont = $data->content;                                                  
-
-  $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
+  $cont     = eval{decode_json($dcont)} or do { $cont = $dcont };               # Test JSON dekodieren und anzeigen
   
   if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
@@ -2188,8 +2189,8 @@ sub ___postData {
   my $name    = $paref->{name};
   my $ua      = $paref->{ua};
   my $call    = $paref->{call};
-  my $fields  = $paref->{fields};
-  my $content = $paref->{content};
+  my $fields  = $paref->{fields};               # Referenz zum Hash der zu übertragenden PUSH Header
+  my $content = $paref->{content};              # Content Daten für PUSH (String)
   my $tag     = $paref->{tag};
   
   my $v5d     = AttrVal($name, "verbose5Data", "none");
@@ -2206,8 +2207,7 @@ sub ___postData {
 
   my $data  = $ua->post( $call, %$fields, Content => $content );    
   my $dcont = $data->decoded_content;                                                  
-
-  $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
+  $cont     = eval{decode_json($dcont)} or do { $cont = $dcont };               # Test JSON dekodieren und anzeigen
   
   if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
@@ -2329,7 +2329,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
       
       $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
-  Log3 ($name, 1, "$name - ADDON: ".$addon);
+
       if($rescode != 302 && $addon !~ /noJSONdata/x) {                                                       # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
           $errstate = 1; 
           $state    = "ERROR - see logfile for further information";
