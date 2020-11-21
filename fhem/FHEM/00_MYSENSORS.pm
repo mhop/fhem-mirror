@@ -75,6 +75,7 @@ sub Initialize {
     last-sensorid
     stateFormat
     OTA_firmwareConfig
+    disable:0,1
   );
   $hash->{AttrList} = $hash->{AttrList} = join(" ", @attrList);
   return;
@@ -98,6 +99,7 @@ BEGIN {GP_Import(qw(
   AttrVal
   Log3
   FileRead
+  IsDisabled
   ))};
 
 my %sensorAttr = (
@@ -466,6 +468,11 @@ sub Attr {
   if ($attribute eq "OTA_firmwareConfig") {
     return;
   }
+  if ($attribute eq "disable") {
+    return Stop($hash) if $command eq "set" && $value;
+    InternalTimer(time(), "MYSENSORS::Start", $hash,0);
+    return;
+  }
   return;
 }
 
@@ -476,6 +483,7 @@ sub Start {
   if (!AttrVal($hash->{NAME},"stateFormat",0)) {
     CommandAttr(undef, "$hash->{NAME} stateFormat connection")
   }
+  return if IsDisabled( $hash->{NAME} );
   DevIo_CloseDev($hash);
   return DevIo_OpenDev($hash, 0, "MYSENSORS::Init");
 }
@@ -532,7 +540,7 @@ sub Init {
 sub GetConnectStatus {
   my $hash = shift // return;
   my $name = $hash->{NAME};
-  Log3 $name, 4, "MySensors: GetConnectStatus called ...";
+  Log3( $name, 4, "MySensors: GetConnectStatus called ..." );
 
   # neuen Timer starten in einem konfigurierten Interval.
   InternalTimer(gettimeofday()+300, "MYSENSORS::GetConnectStatus", $hash);# Restart check in 5 mins again
@@ -627,12 +635,14 @@ sub onPresentationMsg {
       return;
     }
   }
+  return if IsDisabled( $client->{NAME} );
   return MYSENSORS::DEVICE::onPresentationMessage($client,$msg);
 };
 
 sub onSetMsg {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
+    return if IsDisabled( $client->{NAME} );
     return MYSENSORS::DEVICE::onSetMessage($client,$msg);
   } 
   Log3($hash->{NAME},3,"MYSENSORS: ignoring set-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
@@ -642,6 +652,7 @@ sub onSetMsg {
 sub onRequestMsg {
   my ($hash,$msg) = @_;
   if (my $client = matchClient($hash,$msg)) {
+    return if IsDisabled( $client->{NAME} );
     return MYSENSORS::DEVICE::onRequestMessage($client,$msg);
   } 
   Log3($hash->{NAME},3,"MYSENSORS: ignoring req-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".variableTypeToStr($msg->{subType}));
@@ -684,7 +695,10 @@ sub onInternalMsg {
     if ($type == I_HEARTBEAT_RESPONSE) {
       RemoveInternalTimer($hash,"MYSENSORS::Start"); ## Reset reconnect because timeout was not reached
       readingsSingleUpdate($hash, "heartbeat", "alive", 0);
-      if ($client = matchClient($hash,$msg)){ MYSENSORS::DEVICE::onInternalMessage($client,$msg) };
+      if ($client = matchClient($hash,$msg)){ 
+         return if IsDisabled( $client->{NAME} );
+         MYSENSORS::DEVICE::onInternalMessage($client,$msg) 
+      };
       return;
     }
     
@@ -718,12 +732,14 @@ sub onInternalMsg {
     
     if ($type == I_TIME) {
       if ($client = matchClient($hash,$msg)){ 
+        return if IsDisabled( $client->{NAME} );
         return MYSENSORS::DEVICE::onInternalMessage($client,$msg) 
       }
     }
 
   }
   if ($client = matchClient($hash,$msg)) {
+    return if IsDisabled( $client->{NAME} );
     return MYSENSORS::DEVICE::onInternalMessage($client,$msg);
   } 
   if ($client = matchChan76GWClient($hash,$msg)) {
@@ -739,10 +755,12 @@ sub onStreamMsg {
   my $client;
   if ($client = matchClient($hash, $msg)) {
     Log3($hash->{NAME}, 4, "$hash->{NAME}: received stream message for $client - regular IODev");
+    return if IsDisabled( $client->{NAME} );
     return MYSENSORS::DEVICE::onStreamMessage($client, $msg);
   } 
   if ($client = matchChan76GWClient($hash,$msg)) {
     Log3($hash->{NAME}, 4, "$hash->{NAME}: received stream message for $client - Chan76-IODev");
+    return if IsDisabled( $client->{NAME} );
     return MYSENSORS::DEVICE::onStreamMessage($client,$msg);
   } 
   Log3($hash->{NAME},3,"MYSENSORS: ignoring stream-msg from unknown radioId $msg->{radioId}, childId $msg->{childId} for ".datastreamTypeToStr($msg->{subType}).". IO: $hash->{NAME}");

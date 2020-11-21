@@ -63,6 +63,7 @@ BEGIN {
     RemoveInternalTimer
     asyncOutput
     readingFnAttributes
+    IsDisabled
   ))
 };
 
@@ -95,6 +96,7 @@ sub Initialize {
     OTA_Chan76_IODev
     streamFilePatterns
     model
+    disable:0,1
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
@@ -255,6 +257,7 @@ sub UnDefine {
 sub Set {
     my ($hash,$name,$command,@values) = @_;
     return "At least one parameter is needed!" if !defined $command;
+    return "Node is disabled!" if IsDisabled( $hash->{NAME} );
     if(!defined($hash->{sets}->{$command})) {
       $hash->{sets}->{fwType} = join(",", MYSENSORS::getFirmwareTypes($hash->{IODev}));
       my $list = join(" ", map {
