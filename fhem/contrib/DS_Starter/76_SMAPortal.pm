@@ -249,11 +249,11 @@ my %hal = (                                                                     
 );
 
 my %hsusyid = (                                                                   # Schalten/Management der Verbraucher entspr. ihrer SUSyID
-  191 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 191 = Schaltdosen
+  191 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 191 = SMA Schaltdosen
   315 => { arg => ":slider,0,1,100", fn => \&_manageConsumerByEnergy },           # 315 = SMA EV Charger
+  366 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 366 = Edimax sp-2101w v1 Schaltdosen
 );
-
-                                                                                  # Tags der verfügbaren Datenquellen
+                                                                              # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
              balanceDayData
