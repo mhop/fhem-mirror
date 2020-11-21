@@ -21,6 +21,7 @@ allowed_Initialize($)
   $hash->{AuthenticateFn} = "allowed_Authenticate";
   $hash->{SetFn}    = "allowed_Set";
   $hash->{AttrFn}   = "allowed_Attr";
+  $hash->{RenameFn} = "allowed_Rename";
   no warnings 'qw';
   my @attrList = qw(
     allowedCommands
@@ -74,6 +75,13 @@ allowed_Define($$)
 
 sub
 allowed_Undef($$)
+{
+  $auth_refresh = 1;
+  return undef;
+}
+
+sub
+allowed_Rename($$)
 {
   $auth_refresh = 1;
   return undef;

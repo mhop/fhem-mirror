@@ -3791,6 +3791,7 @@ CallFn(@)
   if(!$d || !$defs{$d}) {
     $d = "<undefined>" if(!defined($d));
     Log 0, "Strange call for nonexistent $d: $n";
+    stacktrace();
     return undef;
   }
   if(!$defs{$d}{TYPE}) {
