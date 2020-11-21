@@ -114,7 +114,8 @@ sub Initialize {
 sub Twilight_Define {
     my $hash = shift;
     my $aref = shift;
-    my $href = shift // return if !defined $aref;
+    my $href = shift;
+    return if !defined $aref && !defined $href;
     
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
     
@@ -202,7 +203,8 @@ sub Twilight_Change_DEF {
     $weather = "" if $weather eq "none";
     if (looks_like_number($weather)) {
         my @wd = devspec2array("TYPE=Weather|PROPLANTA");
-        my ($err, $wreading) = Twilight_disp_ExtWeather($hash, $wd[0]) if $wd[0];
+        my ($err, $wreading);
+        ($err, $wreading) = Twilight_disp_ExtWeather($hash, $wd[0]) if $wd[0];
         $weather = $err ? "" : $wd[0] ;
     }
     $newdef = "$hash->{helper}{'.LATITUDE'} $hash->{helper}{'.LONGITUDE'}" if $hash->{helper}{'.LATITUDE'} != AttrVal( 'global', 'latitude', 50.112 ) || $hash->{helper}{'.LONGITUDE'} != AttrVal( 'global', 'longitude', 8.686 );
@@ -277,14 +279,14 @@ sub Twilight_HandleWeatherData {
         $ss_extWeather = 50 if !looks_like_number($ss_extWeather);
     }
 
-    my $last = ReadingsNum($name, "cloudCover", -1);
+    my $lastcc = ReadingsNum($name, "cloudCover", -1);
             
     #here we have to split up for extended forecast handling... 
             
-    $inNotify ? Log3( $hash, 5, "[$name] NotifyFn called, reading is $extWeather, last is $last" ) 
-              : Log3( $hash, 5, "[$name] timer based weather update called, reading is $extWeather, last is $last" );
+    $inNotify ? Log3( $hash, 5, "[$name] NotifyFn called, reading is $extWeather, last is $lastcc" ) 
+              : Log3( $hash, 5, "[$name] timer based weather update called, reading is $extWeather, last is $lastcc" );
 
-    return if $inNotify && (abs($last - $extWeather) <6 && !defined $hash->{helper}{extWeather}{dispatch} || ReadingsAge($name, "cloudCover", 4000) < 3575 && defined $hash->{helper}{extWeather}{dispatch});
+    return if $inNotify && (abs($lastcc - $extWeather) <6 && !defined $hash->{helper}{extWeather}{dispatch} || ReadingsAge($name, "cloudCover", 4000) < 3575 && defined $hash->{helper}{extWeather}{dispatch});
 
     my $weather_horizon = Twilight_getWeatherHorizon( $hash, $extWeather, 1);
             
@@ -389,7 +391,8 @@ sub Twilight_Firstrun {
     
     if ($attrVal && $attrVal ne "none") {
         Twilight_init_ExtWeather_usage( $hash, $attrVal );
-         $extWeatherVal = ReadingsNum( $name, "cloudCover", ReadingsNum( $hash->{helper}{extWeather}{Device}, $hash->{helper}{extWeather}{Reading}, 0 ) );
+        my $ewr = $hash->{helper}{extWeather}{Reading}  // $hash->{helper}{extWeather}{dispatch}{trigger} // $hash->{helper}{extWeather}{trigger}; 
+        $extWeatherVal = ReadingsNum( $name, "cloudCover", ReadingsNum( $hash->{helper}{extWeather}{Device}, $ewr, 0 ) );
         readingsSingleUpdate ( $hash, "cloudCover", $extWeatherVal, 0 ) if $extWeatherVal;
     }
     Twilight_getWeatherHorizon( $hash, $extWeatherVal );
@@ -411,7 +414,7 @@ sub Twilight_Attr {
 
     if ( $attrName eq 'useExtWeather' ) {
         if ($cmd eq "set") {
-            return "External weather device already in use, most likely assigned by define" if $hash->{helper}{extWeather}{regexp} =~ m,$attrVal,;
+            return "External weather device already in use, most likely assigned by define" if $hash->{helper}{extWeather}{regexp} =~ m{$attrVal}xms;
             return Twilight_init_ExtWeather_usage($hash, $attrVal); 
         } elsif ($cmd eq "del") {
             notifyRegexpChanged( $hash, "" );
@@ -440,13 +443,13 @@ sub Twilight_init_ExtWeather_usage {
                 '$W_DEV'     => $extWeather,
                 '$W_READING' => $extWReading
             );
-            my $err = perlSyntaxCheck( $parts[1] );
+            $err = perlSyntaxCheck( $parts[1] );
             return $err if ( $err );
         }
     } else {
         #conversion code, try to guess the ext. weather device to replace yahoo
         my @devices=devspec2array("TYPE=Weather"); 
-        return "No Weather-Type device found if !$devices[0]";
+        return "No Weather-Type device found" if !$devices[0];
         $extWeather = $devices[0];
     }
     
@@ -459,7 +462,7 @@ sub Twilight_init_ExtWeather_usage {
     $hash->{helper}{extWeather}{Reading} = $extWReading if !$parts[1] && !exists  $hash->{helper}{extWeather}{dispatch};
     if ($parts[1]) {
         $hash->{helper}{extWeather}{trigger} = $extWReading ;
-        $parts[1] = qq ({ $parts[1] }) if $parts[1] !~ m/^{.*}$/s;
+        $parts[1] = qq ({ $parts[1] }) if $parts[1] !~ m/^[{].*}$/xms;
         $hash->{helper}{extWeather}{dispatch}{userfunction} = $parts[1];
     }
     return InternalTimer( time(), \&Twilight_Firstrun,$hash,0) if $init_done && $useTimer;
@@ -637,9 +640,9 @@ sub Twilight_TwilightTimes {
         $idx++;
         next if ( $whitchTimes eq "weather" && !( $horizon =~ m/weather/ ) );
 
-        my ( $name, $deg ) = split( ":", $horizon );
-        my $sr = "sr$name";
-        my $ss = "ss$name";
+        my ( $sxname, $deg ) = split( ":", $horizon );
+        my $sr = "sr$sxname";
+        my $ss = "ss$sxname";
         $hash->{TW}{$sr}{NAME}  = $sr;
         $hash->{TW}{$ss}{NAME}  = $ss;
         $hash->{TW}{$sr}{DEG}   = $deg;
@@ -1018,8 +1021,8 @@ sub twilight {
 sub getTwilightHours {
     my $hash    = shift // return;
     my $hour    = ( localtime )[2];
-    my $sr_hour = ( localtime( $hash->{TW}{sr_weather}{TIME}))[2];
-    my $ss_hour = ( localtime( $hash->{TW}{ss_weather}{TIME}))[2]; 
+    my $sr_hour = defined $hash->{TW}{sr_weather}{TIME} ? ( localtime( $hash->{TW}{sr_weather}{TIME} ))[2] : 7;
+    my $ss_hour = defined $hash->{TW}{ss_weather}{TIME} ? ( localtime( $hash->{TW}{ss_weather}{TIME} ))[2] : 18; 
     return $hour,$sr_hour,$ss_hour;
 }
 
