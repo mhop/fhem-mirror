@@ -1292,6 +1292,7 @@ FW_updateHashes()
   my $hre = AttrVal($FW_wname, "hiddenroomRegexp", "");
   foreach my $d (devspec2array(".*", $FW_chash)) {
     next if(IsIgnored($d));
+    $FW_rooms{all}{$d} = 1;
 
     foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
       next if($hre && $r =~ m/$hre/);
@@ -1319,16 +1320,13 @@ FW_updateHashes()
 
 
   $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
+  @FW_roomsArr = sort grep { $_ ne "all" } keys %FW_rooms;
 
   if(AttrVal($FW_wname, "sortRooms", "")) { # Slow!
     my @sortBy = split( " ", AttrVal( $FW_wname, "sortRooms", "" ) );
     my %sHash;                                                       
     map { $sHash{$_} = FW_roomIdx(\@sortBy,$_) } keys %FW_rooms;
-    @FW_roomsArr = sort { $sHash{$a} cmp $sHash{$b} } keys %FW_rooms;
-
-  } else {
-    @FW_roomsArr = sort keys %FW_rooms;
-
+    @FW_roomsArr = sort { $sHash{$a} cmp $sHash{$b} } @FW_roomsArr;
   }
 }
 
@@ -1951,8 +1949,7 @@ FW_showRoom()
     @devs = () if( int(@devs) == 1 && !defined($defs{$devs[0]}) );
 
   } else {
-    @devs= grep { (($FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_}) ||
-                   $FW_room eq "all") && !IsIgnored($_) } keys %defs;
+    @devs = grep { $FW_rooms{$FW_room} && $FW_rooms{$FW_room}{$_} } keys %defs;
   }
 
   my (%group, @atEnds, %usuallyAtEnd, %sortIndex);
