@@ -1114,7 +1114,7 @@ ZWave_Cmd($$@)
 
   if($cmdFmt !~ m/%s/ && $cmd !~ m/^config/) {
     for(my $i1 = 0; $i1<int(@a); $i1++) {
-      return "Error: $a[$i1] is not a decimal number"
+      return "Error: $a[$i1] is not an integer"
         if($a[$i1] !~ m/^[-\d]+$/);
     }
   }
