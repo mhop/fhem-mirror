@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.42.1"  => "22.11.2020  fix delete \$hash->{HELPER}{REDUCELOG} Forum:#116057",
   "8.42.0"  => "14.11.2020  new vals next_day_begin, next_day_end for time attr Forum: https://forum.fhem.de/index.php/topic,53584.msg1100040.html#msg1100040 ",
   "8.41.0"  => "08.11.2020  new attrbute avgDailyMeanGWSwithGTS for Grassland temperature sum, minor bugfixes in create time array ",
   "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament Forum: #114293, commandRef revised ",
@@ -1856,15 +1857,16 @@ sub DbRep_Main {
  DbRep_delread($hash);
  
  if ($opt =~ /dumpMySQL|dumpSQLite/) {     
-     BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
+     BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT})   if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
      BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
-     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE})        if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      
      if($dbmodel =~ /MYSQL/) {
          if ($prop eq "serverSide") {
              $hash->{HELPER}{RUNNING_BCKPREST_SERVER} = BlockingCall("mysql_DoDumpServerSide", "$name", "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
              ReadingsSingleUpdateValue ($hash, "state", "serverSide Dump is running - be patient and see Logfile !", 1);
-         } else {
+         } 
+         else {
              $hash->{HELPER}{RUNNING_BACKUP_CLIENT} = BlockingCall("mysql_DoDumpClientSide", "$name", "DbRep_DumpDone", $to, "DbRep_DumpAborted", $hash);
              ReadingsSingleUpdateValue ($hash, "state", "clientSide Dump is running - be patient and see Logfile !", 1);
          }
@@ -1877,14 +1879,16 @@ sub DbRep_Main {
  }
  
  if ($opt =~ /restoreMySQL/) {  
-     BlockingKill($hash->{HELPER}{RUNNING_RESTORE}) if (exists($hash->{HELPER}{RUNNING_RESTORE}));
+     BlockingKill($hash->{HELPER}{RUNNING_RESTORE})  if (exists($hash->{HELPER}{RUNNING_RESTORE}));
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      
      if($prop =~ /csv/) {
          $hash->{HELPER}{RUNNING_RESTORE} = BlockingCall("mysql_RestoreServerSide", "$name|$prop", "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
-     } elsif ($prop =~ /sql/) {
+     } 
+     elsif ($prop =~ /sql/) {
          $hash->{HELPER}{RUNNING_RESTORE} = BlockingCall("mysql_RestoreClientSide", "$name|$prop", "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
-     } else {
+     } 
+     else {
          ReadingsSingleUpdateValue ($hash, "state", "restore database error - unknown fileextension \"$prop\"", 1);
      }
      
@@ -1893,7 +1897,7 @@ sub DbRep_Main {
  }
  
  if ($opt =~ /restoreSQLite/) { 
-     BlockingKill($hash->{HELPER}{RUNNING_RESTORE}) if (exists($hash->{HELPER}{RUNNING_RESTORE}));
+     BlockingKill($hash->{HELPER}{RUNNING_RESTORE})  if (exists($hash->{HELPER}{RUNNING_RESTORE}));
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
      $hash->{HELPER}{RUNNING_RESTORE} = BlockingCall("DbRep_sqliteRestore", "$name|$prop", "DbRep_restoreDone", $to, "DbRep_restoreAborted", $hash);
      ReadingsSingleUpdateValue ($hash, "state", "restore database is running - be patient and see Logfile !", 1);
@@ -1902,7 +1906,7 @@ sub DbRep_Main {
  
  if ($opt =~ /optimizeTables|vacuum/) { 
      BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
-     BlockingKill($hash->{HELPER}{RUNNING_RESTORE}) if (exists($hash->{HELPER}{RUNNING_RESTORE}));     
+     BlockingKill($hash->{HELPER}{RUNNING_RESTORE})  if (exists($hash->{HELPER}{RUNNING_RESTORE}));     
      $hash->{HELPER}{RUNNING_OPTIMIZE} = BlockingCall("DbRep_optimizeTables", "$name", "DbRep_OptimizeDone", $to, "DbRep_OptimizeAborted", $hash);
      ReadingsSingleUpdateValue ($hash, "state", "optimize tables is running - be patient and see Logfile !", 1);
      return;
@@ -1910,8 +1914,8 @@ sub DbRep_Main {
  
  if ($opt =~ /repairSQLite/) {  
      BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
-     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
-     BlockingKill($hash->{HELPER}{RUNNING_REPAIR}) if (exists($hash->{HELPER}{RUNNING_REPAIR}));
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE})      if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
+     BlockingKill($hash->{HELPER}{RUNNING_REPAIR})        if (exists($hash->{HELPER}{RUNNING_REPAIR}));
      $hash->{HELPER}{RUNNING_REPAIR} = BlockingCall("DbRep_sqliteRepair", "$name", "DbRep_RepairDone", $to, "DbRep_RepairAborted", $hash);
      ReadingsSingleUpdateValue ($hash, "state", "repair database is running - be patient and see Logfile !", 1);
      return;
@@ -1961,7 +1965,8 @@ sub DbRep_Main {
 
  if($IsTimeSet || $IsAggrSet) {
      ($epoch_seconds_begin,$epoch_seconds_end,$runtime_string_first,$runtime_string_next,$ts) = DbRep_createTimeArray($hash,$aggregation,$opt);
- } else {
+ } 
+ else {
      Log3 ($name, 4, "DbRep $name - Timestamp begin human readable: not set") if($opt !~ /tableCurrentPurge/);  
      Log3 ($name, 4, "DbRep $name - Timestamp end human readable: not set")   if($opt !~ /tableCurrentPurge/); 
  }
@@ -1972,45 +1977,45 @@ sub DbRep_Main {
  ############################# 
  if ($opt eq "sumValue") {
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("sumval_DoParse", "$name§$device§$reading§$prop§$ts", "sumval_ParseDone", $to, "DbRep_ParseAborted", $hash);
-     
- } elsif ($opt =~ m/countEntries/) {
+ } 
+ elsif ($opt =~ m/countEntries/) {
      my $table = $prop;
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "DbRep_ParseAborted", $hash);
-     
- } elsif ($opt eq "averageValue") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("count_DoParse", "$name§$table§$device§$reading§$ts", "count_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+ } 
+ elsif ($opt eq "averageValue") { 
      Log3 ($name, 4, "DbRep $name - averageValue calculation sceme: ".AttrVal($name,"averageCalcForm","avgArithmeticMean"));
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("averval_DoParse", "$name§$device§$reading§$prop§$ts", "averval_ParseDone", $to, "DbRep_ParseAborted", $hash); 
- 
- } elsif ($opt eq "fetchrows") {
+ } 
+ elsif ($opt eq "fetchrows") {
      my $table = $prop;             
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("fetchrows_DoParse", "$name|$table|$device|$reading|$runtime_string_first|$runtime_string_next", "fetchrows_ParseDone", $to, "DbRep_ParseAborted", $hash);
-    
- } elsif ($opt =~ /delDoublets/) {
+ } 
+ elsif ($opt =~ /delDoublets/) {
      my $cmd = $prop?$prop:"adviceDelete"; 
      # delseqdoubl_ParseDone ist Auswertefunktion auch für delDoublets
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
-    
- } elsif ($opt =~ /delSeqDoublets/) {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("deldoublets_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);  
+ } 
+ elsif ($opt =~ /delSeqDoublets/) {
      my $cmd = $prop?$prop:"adviceRemain"; 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);
-    
- } elsif ($opt eq "exportToFile") {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("delseqdoubl_DoParse", "$name§$cmd§$device§$reading§$ts", "delseqdoubl_ParseDone", $to, "DbRep_ParseAborted", $hash);   
+ } 
+ elsif ($opt eq "exportToFile") {
      my $file = $prop;
      DbRep_beforeproc($hash, "export");
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$runtime_string_first§$file§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash);
-    
- } elsif ($opt eq "importFromFile") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("expfile_DoParse", "$name§$device§$reading§$runtime_string_first§$file§$ts", "expfile_ParseDone", $to, "DbRep_ParseAborted", $hash); 
+ } 
+ elsif ($opt eq "importFromFile") { 
      my $file = $prop;
      DbRep_beforeproc($hash, "import");     
      $hash->{HELPER}{RUNNING_PID} = BlockingCall("impfile_Push", "$name|$runtime_string_first|$file", "impfile_PushDone", $to, "DbRep_ParseAborted", $hash);
-    
- } elsif ($opt eq "maxValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
-         
- } elsif ($opt eq "minValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
-         
- } elsif ($opt eq "delEntries") {
+ } 
+ elsif ($opt eq "maxValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("maxval_DoParse", "$name§$device§$reading§$prop§$ts", "maxval_ParseDone", $to, "DbRep_ParseAborted", $hash);      
+ } 
+ elsif ($opt eq "minValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("minval_DoParse", "$name§$device§$reading§$prop§$ts", "minval_ParseDone", $to, "DbRep_ParseAborted", $hash);        
+ } 
+ elsif ($opt eq "delEntries") {
      delete $hash->{HELPER}{DELENTRIES};
      if($IsTimeSet || $IsAggrSet) {                                                                                         # Forum:#113202
          my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
@@ -2023,20 +2028,20 @@ sub DbRep_Main {
          }  
      }
      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
- 
- } elsif ($opt eq "tableCurrentPurge") {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|history|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
+ } 
+ elsif ($opt eq "tableCurrentPurge") {
      undef $runtime_string_first;
      undef $runtime_string_next;      
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);        
- 
- } elsif ($opt eq "tableCurrentFillup") {         
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);        
- 
- } elsif ($opt eq "diffValue") {        
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);   
-         
- } elsif ($opt eq "insert") { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("del_DoParse", "$name|current|$device|$reading|$runtime_string_first|$runtime_string_next", "del_ParseDone", $to, "DbRep_ParseAborted", $hash);
+ } 
+ elsif ($opt eq "tableCurrentFillup") {         
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("currentfillup_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "currentfillup_Done", $to, "DbRep_ParseAborted", $hash);
+ } 
+ elsif ($opt eq "diffValue") {        
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("diffval_DoParse", "$name§$device§$reading§$prop§$ts", "diffval_ParseDone", $to, "DbRep_ParseAborted", $hash);         
+ } 
+ elsif ($opt eq "insert") { 
      # Daten auf maximale Länge (entsprechend der Feldlänge in DbLog) beschneiden wenn nicht SQLite
      if ($dbmodel ne 'SQLITE') {
          $hash->{HELPER}{I_DEVICE}  = substr($hash->{HELPER}{I_DEVICE},0, $hash->{HELPER}{DBREPCOL}{DEVICE});
@@ -2044,16 +2049,15 @@ sub DbRep_Main {
          $hash->{HELPER}{I_VALUE}   = substr($hash->{HELPER}{I_VALUE},0, $hash->{HELPER}{DBREPCOL}{VALUE});
          $hash->{HELPER}{I_UNIT}    = substr($hash->{HELPER}{I_UNIT},0, $hash->{HELPER}{DBREPCOL}{UNIT}) if($hash->{HELPER}{I_UNIT});
      }
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "DbRep_ParseAborted", $hash);   
-         
- } elsif ($opt =~ /deviceRename|readingRename/) { 
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "DbRep_ParseAborted", $hash);   
-         
- } elsif ($opt =~ /changeValue/) {
-     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "DbRep_ParseAborted", $hash);   
-     
- } elsif ($opt =~ /sqlCmd|sqlSpecial/ ) {
-    # Execute a generic sql command or special sql
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("insert_Push", "$name", "insert_Done", $to, "DbRep_ParseAborted", $hash);           
+ } 
+ elsif ($opt =~ /deviceRename|readingRename/) { 
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("change_Push", "$name|$device|$reading|$runtime_string_first|$runtime_string_next", "change_Done", $to, "DbRep_ParseAborted", $hash);         
+ } 
+ elsif ($opt =~ /changeValue/) {
+     $hash->{HELPER}{RUNNING_PID} = BlockingCall("changeval_Push", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts", "change_Done", $to, "DbRep_ParseAborted", $hash);    
+ } 
+ elsif ($opt =~ /sqlCmd|sqlSpecial/ ) {                             # Execute a generic sql command or special sql
     if ($opt =~ /sqlSpecial/) {
         my ($tq,$gcl);
         
@@ -2061,14 +2065,14 @@ sub DbRep_Main {
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > (now() - interval 2 day)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /MYSQL/);
             $prop = "select Device, reading, count(0) AS `countA` from history where ( TIMESTAMP > ('now' - '2 days')) group by DEVICE, READING order by countA desc, DEVICE limit 50;"       if($dbmodel =~ /SQLITE/);
             $prop = "select Device, reading, count(0) AS countA from history where ( TIMESTAMP > (NOW() - INTERVAL '2' DAY)) group by DEVICE, READING order by countA desc, DEVICE limit 50;" if($dbmodel =~ /POSTGRESQL/);
-        
-        } elsif ($prop eq "allDevReadCount") {
+        } 
+        elsif ($prop eq "allDevReadCount") {
             $prop = "select device, reading, count(*) from history group by DEVICE, READING;";
-        
-        } elsif ($prop eq "allDevCount") {
+        } 
+        elsif ($prop eq "allDevCount") {
             $prop = "select device, count(*) from history group by DEVICE;";
-        
-        } elsif ($prop eq "recentReadingsOfDevice") {
+        } 
+        elsif ($prop eq "recentReadingsOfDevice") {
             if($dbmodel =~ /MYSQL/)      {$tq = "NOW() - INTERVAL 1 DAY"; $gcl = "READING"};
             if($dbmodel =~ /SQLITE/)     {$tq = "datetime('now','-1 day')"; $gcl = "READING"};
             if($dbmodel =~ /POSTGRESQL/) {$tq = "CURRENT_TIMESTAMP - INTERVAL '1 day'"; $gcl = "READING,DEVICE"};
@@ -2083,8 +2087,8 @@ sub DbRep_Main {
                                         x.READING   = t1.READING;");
             
             $prop   = join(" ", @cmd);
-        
-        } elsif ($prop eq "readingsDifferenceByTimeDelta") {           
+        } 
+        elsif ($prop eq "readingsDifferenceByTimeDelta") {           
             my @cmd = split(/\s/, "SET \@diff=0;
                                    SET \@delta=NULL;
                                    SELECT t1.TIMESTAMP,t1.READING,t1.VALUE,t1.DIFF,t1.TIME_DELTA 
@@ -2106,15 +2110,13 @@ sub DbRep_Main {
         }
     }
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("sqlCmd_DoParse", "$name|$opt|$runtime_string_first|$runtime_string_next|$prop", "sqlCmd_ParseDone", $to, "DbRep_ParseAborted", $hash);     
- 
- } elsif ($opt =~ /syncStandby/ ) {
-    # Befehl vor Procedure ausführen
-    DbRep_beforeproc($hash, "syncStandby");
+ } 
+ elsif ($opt =~ /syncStandby/ ) {
+    DbRep_beforeproc($hash, "syncStandby");                           # Befehl vor Procedure ausführen
     $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_syncStandby", "$name§$device§$reading§$runtime_string_first§$runtime_string_next§$ts§$prop", "DbRep_syncStandbyDone", $to, "DbRep_ParseAborted", $hash);     
  }
  
  if ($opt =~ /reduceLog/) {
-     delete $hash->{HELPER}{REDUCELOG};
      my ($yyyy1, $mm1, $dd1, $hh1, $min1, $sec1) = $runtime_string_first =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x; 
      my ($yyyy2, $mm2, $dd2, $hh2, $min2, $sec2) = $runtime_string_next  =~ /(\d+)-(\d+)-(\d+)\s(\d+):(\d+):(\d+)/x;
      my $nthants = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900);
@@ -9188,6 +9190,7 @@ sub DbRep_reduceLogDone {
   my $erread;  
   
   delete $hash->{HELPER}{RUNNING_REDUCELOG};
+  delete $hash->{HELPER}{REDUCELOG};
 
   if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
@@ -9240,6 +9243,7 @@ sub DbRep_reduceLogAborted {
   Log3 ($name, 2, "DbRep $name - Database reduceLog aborted due to \"$cause\" ");
   
   delete($hash->{HELPER}{RUNNING_REDUCELOG});
+  delete $hash->{HELPER}{REDUCELOG};
 
 return;
 }
