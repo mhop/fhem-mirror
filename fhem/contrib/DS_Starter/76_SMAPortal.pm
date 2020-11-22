@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.9.9"  => "22.11.2020  KOmpatest ",
   "3.7.0"  => "21.11.2020  add new consumer management for switched sockets and SMA EV Charger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
@@ -2167,7 +2168,7 @@ sub ___getData {
   }
   
   my $data  = $ua->get( $call );  
-  my $dcont = $data->content;                                                  
+  my $dcont = $data->decoded_content;                                                  
   $cont     = eval{decode_json($dcont)} or do { $cont = $dcont };               # Test JSON dekodieren und anzeigen
   
   if($v5d =~ /$tag/x) {
