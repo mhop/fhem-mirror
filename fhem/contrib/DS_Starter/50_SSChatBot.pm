@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 50_SSChatBot.pm 22911 2020-10-04 20:15:27Z DS_Starter $
+# $Id: 50_SSChatBot.pm 22946 2020-10-09 09:28:23Z DS_Starter $
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
@@ -35,7 +35,6 @@ package FHEM::SSChatBot;                                                        
 
 use strict;                           
 use warnings;
-# use utf8;
 use GPUtils qw(GP_Import GP_Export);                                                                          # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 use FHEM::SynoModules::API qw(apistatic);                                                                     # API Modul
@@ -92,6 +91,7 @@ BEGIN {
           CommandAttr
           CommandDefine
           CommandGet
+		  CommandTrigger
           data
           defs
           devspec2array
@@ -135,7 +135,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.11.6" => "07.10.2020  add \x{c3}\x{85} () to formString urlEncode ",
+  "1.12.0" => "23.11.2020  generate event UserInitialized when users are once loaded, Forum: https://forum.fhem.de/index.php/topic,105714.msg1103700.html#msg1103700 ",
+  "1.11.7" => "01.11.2020  quotation marks can be used in text tag of received messages (__botCGIcheckData) ",
+  "1.11.6" => "08.10.2020  add urlEncode of character codes like \x{c3}\x{85} to formString  ",
   "1.11.5" => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
   "1.11.4" => "05.10.2020  use setCredentials from SMUtils ",
   "1.11.3" => "04.10.2020  use showStoredCredentials from SMUtils ",
@@ -169,6 +171,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "1.11.6" => "08.10.2020 Hexadecimal codes of characters like \x{c3}\x{85} can now be used or processed in the asyncSendItem command. ",
   "1.11.0" => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it. ", 
   "1.7.0"  => "26.05.2020 It is possible to send SVG plots very easily with the command asyncSendItem ",
   "1.4.0"  => "15.03.2020 Command '1_sendItem' renamed to 'asyncSendItem' because of Aesthetics ",
@@ -189,7 +192,8 @@ my %vHintsExt_de = (
 );
 
 # Standardvariablen
-my $queueStartFn = "FHEM::SSChatBot::getApiSites";                          # Startfunktion zur Queue-Abarbeitung
+my $queueStartFn = "FHEM::SSChatBot::getApiSites";                                                   # Startfunktion zur Queue-Abarbeitung
+my $enctourl     = { map { sprintf("\\x{%02x}", $_) => sprintf( "%%%02X", $_ ) } ( 0 ... 255 ) };    # Standard Hex Codes zu UrlEncode, z.B. \x{c2}\x{b6} -> %C2%B6 -> ¶
 
 my %hset = (                                                                # Hash für Set-Funktion
     botToken         => { fn => \&_setbotToken         }, 
@@ -535,8 +539,6 @@ sub _setasyncSendItem {
   
   return qq{Your sendstring is incorrect. It must contain at least text with the "text=" tag like text="..."\nor only some text like "this is a test" without the "text=" tag.} if(!$text);
   
-  # $text  = decode("utf8", $text);
-  # $text  = formString($text, decode("utf8", $text));
   $text  = formString($text, "text");
   
   $users = AttrVal($name,"defaultPeer", "") if(!$users);
@@ -1178,7 +1180,7 @@ sub _parseUsers {
   my $name = $hash->{NAME};
      
   my ($un,$ui,$st,$nn,$em,$uids);     
-  my %users = ();                
+  my %users;                
   my $i     = 0;
 
   my $out = "<html>";
@@ -1207,8 +1209,14 @@ sub _parseUsers {
       $i++;
   }
 
-  $hash->{HELPER}{USERS}       = \%users if(%users);
-  $hash->{HELPER}{USERFETCHED} = 1;
+  if(%users) {
+	  $hash->{HELPER}{USERS} = \%users;
+	  if(!$hash->{HELPER}{USERFETCHED}) {
+		  my $event = "CHAT_INITIALIZED";
+		  CommandTrigger(undef, "$name $event");
+	  }
+	  $hash->{HELPER}{USERFETCHED} = 1;
+  }
 
   my @newa;
   my $list = $modules{$hash->{TYPE}}{AttrList};
@@ -1358,26 +1366,24 @@ return;
 sub formString {
   my $txt  = shift;
   my $func = shift;
-  my (%replacements,$pat);
-  
+  my ($replacements,$pat);
+    
   if($func ne "attachement") {
-      %replacements = (
+      $replacements = {
           '"'       => "´",                         # doppelte Hochkomma sind im Text nicht erlaubt
           " H"      => "%20H",                      # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
           "#"       => "%23",                       # Hashtags sind im Text nicht erlaubt und wird encodiert
           "&"       => "%26",                       # & ist im Text nicht erlaubt und wird encodiert    
           "%"       => "%25",                       # % ist nicht erlaubt und wird encodiert
           "+"       => "%2B",
-          "\\x{c3}" => "%C3",
-          "\\x{85}" => "%85",
-          "\\x{bc}" => "%BC",
-          "\\x{9c}" => "%9C",
-      );
+      };
+      
+	  %$replacements = (%$replacements, %$enctourl);
   } 
   else {
-      %replacements = (
+      $replacements = {
           " H" => "%20H"                            # Bug in HttpUtils(?) wenn vor großem H ein Zeichen + Leerzeichen vorangeht
-      );    
+      };    
   }
   
   $txt    =~ s/\n/ESC_newline_ESC/xg;
@@ -1390,9 +1396,9 @@ sub formString {
       $txt .= $line;
   }
   
-  $pat = join '|', map { quotemeta; } keys(%replacements);
+  $pat = join '|', map { quotemeta; } keys(%$replacements);
   
-  $txt =~ s/($pat)/$replacements{$1}/xg;  
+  $txt =~ s/($pat)/$replacements->{$1}/xg;
   
 return $txt;
 }
@@ -1555,8 +1561,21 @@ sub __botCGIcheckData {
   $args =~ s/=/="/gx;
   $args .= "\"";
   
-  $args     = urlDecode($args);
-  my($a,$h) = parseParams($args);
+  $args  = urlDecode($args);
+  
+  my $ca = $args;
+  my ($teco) = $ca =~ /text="(.*)"/x;                                                  # " im Text-Tag escapen (V: 1.11.7)
+  if ($teco) {
+      $teco =~ s/"/_ESC_/gx;
+      $ca   =~ s/text="(.*)"/text="$teco"/x;
+  }
+  
+  my($a,$h) = parseParams($ca);
+  
+  for my $k (%$h) {                                                                    # Text escaped " wiederherstellen
+      next if($k ne "text");
+      $h->{$k} =~ s/_ESC_/"/gx;                                                        
+  }
   
   if (!defined($h->{botname})) {
       Log 1, "TYPE SSChatBot - ERROR - no Botname received";
