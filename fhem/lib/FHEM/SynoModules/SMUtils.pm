@@ -25,6 +25,9 @@
 #
 #########################################################################################################################
 
+# Version History
+# 1.20.6   delete $hash->{OPMODE} in checkSendRetry
+
 package FHEM::SynoModules::SMUtils;                                          
 
 use strict;           
@@ -42,7 +45,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.5');
+use version; our $VERSION = version->declare('1.20.6');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1601,7 +1604,10 @@ sub checkSendRetry {
   my $startfn    = shift // carp $carpnotfn            && return;
   my $hash       = $defs{$name};  
   my $idx        = $hash->{OPIDX};
+  my $opmode     = $hash->{OPMODE};
   my $type       = $hash->{TYPE};
+  
+  $hash->{OPMODE} = q{};
   
   my $forbidSend = q{};
   my $startfnref = \&{$startfn};
@@ -1620,7 +1626,7 @@ sub checkSendRetry {
   if(!$retry) {                                                                           # Befehl erfolgreich, Senden nur neu starten wenn weitere Einträge in SendQueue
       delete $hash->{OPIDX};
       delete $data{$type}{$name}{sendqueue}{entries}{$idx};
-      Log3($name, 4, qq{$name - Opmode "$hash->{OPMODE}" finished successfully, Sendqueue index "$idx" deleted.});
+      Log3($name, 4, qq{$name - Opmode "$opmode" finished successfully, Sendqueue index "$idx" deleted.});
       updQueueLength ($hash);
       
       if(keys %{$data{$type}{$name}{sendqueue}{entries}}) {
@@ -1642,10 +1648,9 @@ sub checkSendRetry {
           $forbidSend = expErrors($hash,$errorcode);                                      # Fehlertext zum Errorcode ermitteln
           $data{$type}{$name}{sendqueue}{entries}{$idx}{forbidSend} = $forbidSend;
           
-          Log3($name, 2, qq{$name - ERROR - "$hash->{OPMODE}" SendQueue index "$idx" not executed. It seems to be a permanent error. Exclude it from new send attempt !});
+          Log3($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. It seems to be a permanent error. Exclude it from new send attempt !});
           
           delete $hash->{OPIDX};
-          delete $hash->{OPMODE};
           
           updQueueLength ($hash);                                                         # updaten Länge der Sendequeue
           
@@ -1662,7 +1667,7 @@ sub checkSendRetry {
               : 86400
               ;
           
-          Log3($name, 2, qq{$name - ERROR - "$hash->{OPMODE}" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
+          Log3($name, 2, qq{$name - ERROR - "$opmode" SendQueue index "$idx" not executed. Restart SendQueue in $rs s (retryCount $rc).});
           
           my $rst = gettimeofday()+$rs;                                                  # resend Timer 
           updQueueLength       ($hash, $rst);                                            # updaten Länge der Sendequeue mit resend Timer
