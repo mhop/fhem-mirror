@@ -91,7 +91,7 @@ BEGIN {
           CommandAttr
           CommandDefine
           CommandGet
-		  CommandTrigger
+          CommandTrigger
           data
           defs
           devspec2array
@@ -1210,12 +1210,14 @@ sub _parseUsers {
   }
 
   if(%users) {
-	  $hash->{HELPER}{USERS} = \%users;
-	  if(!$hash->{HELPER}{USERFETCHED}) {
-		  my $event = "CHAT_INITIALIZED";
-		  CommandTrigger(undef, "$name $event");
-	  }
-	  $hash->{HELPER}{USERFETCHED} = 1;
+      $hash->{HELPER}{USERS}       = \%users;
+      my $olduf                    = $hash->{HELPER}{USERFETCHED};
+      $hash->{HELPER}{USERFETCHED} = 1;
+      
+      if(!$olduf) {
+          my $event = "CHAT_INITIALIZED";
+          CommandTrigger(undef, "$name $event");
+      }
   }
 
   my @newa;
@@ -1378,7 +1380,7 @@ sub formString {
           "+"       => "%2B",
       };
       
-	  %$replacements = (%$replacements, %$enctourl);
+      %$replacements = (%$replacements, %$enctourl);
   } 
   else {
       $replacements = {
