@@ -1,6 +1,6 @@
-REV 23206
+REV 23216
 DIR unused
-UPD 2020-11-16_07:45:03 353797 ./CHANGED
+UPD 2020-11-23_07:45:02 353877 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-11-14_07:45:03 42806 ./MAINTAINER.txt
 UPD 2020-10-21_07:45:03 41442 ./configDB.pm
@@ -38,7 +38,7 @@ UPD 2020-11-21_07:45:02 147131 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2020-11-12_07:45:04 45785 FHEM/00_ZWDongle.pm
-UPD 2020-11-16_07:45:03 164373 FHEM/01_FHEMWEB.pm
+UPD 2020-11-23_07:45:02 164344 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2020-10-03_07:45:14 43003 FHEM/02_FTUISRV.pm
 UPD 2019-09-06_07:45:02 7946 FHEM/02_HTTPSRV.pm
@@ -76,7 +76,7 @@ UPD 2020-09-28_07:45:03 67511 FHEM/10_SOMFY.pm
 UPD 2020-09-20_07:45:03 8181 FHEM/10_SchellenbergHandle.pm
 UPD 2019-12-21_07:45:03 18318 FHEM/10_UNIRoll.pm
 UPD 2020-08-11_07:45:02 54394 FHEM/10_WS980.pm
-UPD 2020-11-16_07:45:03 263655 FHEM/10_ZWave.pm
+UPD 2020-11-23_07:45:02 263470 FHEM/10_ZWave.pm
 UPD 2020-07-29_07:45:02 33780 FHEM/10_pilight_ctrl.pm
 UPD 2020-11-19_07:45:02 46883 FHEM/11_FHT.pm
 UPD 2017-08-14_07:45:02 8037 FHEM/11_FHT8V.pm
@@ -442,7 +442,7 @@ UPD 2020-08-27_07:45:03 17737 FHEM/91_watchdog.pm
 UPD 2020-11-12_07:45:04 62187 FHEM/92_FileLog.pm
 UPD 2017-08-14_07:45:02 11589 FHEM/92_SingleFileLog.pm
 UPD 2020-06-24_07:45:03 443191 FHEM/93_DbLog.pm
-UPD 2020-11-16_07:45:03 934772 FHEM/93_DbRep.pm
+UPD 2020-11-23_07:45:02 934929 FHEM/93_DbRep.pm
 UPD 2018-09-18_07:45:02 18106 FHEM/93_FHEM2FHEM.pm
 UPD 2020-11-03_07:45:03 175754 FHEM/93_Log2Syslog.pm
 UPD 2020-01-22_07:45:06 71181 FHEM/93_PWMR.pm
@@ -710,9 +710,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2020-11-09_07:45:03 16356 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2020-11-23_07:45:02 17630 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-11-09_07:45:03 149295 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2020-11-23_07:45:02 149511 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2020-11-09_07:45:03 33380 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -736,12 +736,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-11-20_07:45:07 4401875 docs/commandref.html
+UPD 2020-11-23_07:45:06 4401696 docs/commandref.html
 UPD 2020-11-20_07:45:10 2728678 docs/commandref_DE.html
 UPD 2020-11-20_07:45:03 81074 docs/commandref_frame.html
 UPD 2020-11-20_07:45:03 90589 docs/commandref_frame_DE.html
-UPD 2020-11-22_07:45:10 234728 docs/commandref_modular.html
-UPD 2020-11-22_07:45:11 245344 docs/commandref_modular_DE.html
+UPD 2020-11-23_07:45:10 234728 docs/commandref_modular.html
+UPD 2020-11-23_07:45:11 245344 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1550,6 +1550,7 @@ UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
 UPD 2019-02-14_07:45:03 1861 www/images/fhemSVG/perl.svg
 UPD 2019-02-14_07:45:03 6193 www/images/fhemSVG/perl6.svg
+UPD 2020-11-23_07:45:02 8151 www/images/fhemSVG/phoscon.svg
 UPD 2019-02-14_07:45:03 3977 www/images/fhemSVG/php.svg
 UPD 2019-02-23_07:45:05 2984 www/images/fhemSVG/pushover.svg
 UPD 2019-02-14_07:45:03 1255 www/images/fhemSVG/pypi.svg
@@ -1665,6 +1666,7 @@ UPD 2019-02-14_07:45:03 1921 www/images/fhemSVG/sketchup-layout.svg
 UPD 2015-07-28_14:05:32 5746 www/images/fhemSVG/socket_timer.svg
 UPD 2020-07-26_07:45:03 234856 www/images/fhemSVG/solar_icon.svg
 UPD 2018-01-28_07:45:02 2742 www/images/fhemSVG/sonos_play1.svg
+UPD 2020-11-23_07:45:02 12098 www/images/fhemSVG/speach_control.svg
 UPD 2020-07-26_07:45:03 95779 www/images/fhemSVG/springbrunnen_icon.svg
 UPD 2020-07-26_07:45:03 423703 www/images/fhemSVG/sprinkler_icon.svg
 UPD 2019-02-14_07:45:03 2375 www/images/fhemSVG/sqlite.svg
