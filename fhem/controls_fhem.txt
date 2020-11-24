@@ -1,6 +1,6 @@
-REV 23216
+REV 23225
 DIR unused
-UPD 2020-11-23_07:45:02 353877 ./CHANGED
+UPD 2020-11-24_07:45:03 354184 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-11-14_07:45:03 42806 ./MAINTAINER.txt
 UPD 2020-10-21_07:45:03 41442 ./configDB.pm
@@ -97,9 +97,9 @@ UPD 2018-08-08_07:45:02 5776 FHEM/14_CUL_TX.pm
 UPD 2020-01-09_07:45:02 15580 FHEM/14_CUL_WS.pm
 UPD 2020-08-18_07:45:03 13964 FHEM/14_FLAMINGO.pm
 UPD 2020-04-14_07:45:03 19347 FHEM/14_Hideki.pm
-UPD 2020-07-22_07:45:02 24185 FHEM/14_SD_BELL.pm
+UPD 2020-11-24_07:45:03 25727 FHEM/14_SD_BELL.pm
 UPD 2019-12-07_07:45:02 12591 FHEM/14_SD_RSL.pm
-UPD 2020-07-22_07:45:02 141673 FHEM/14_SD_UT.pm
+UPD 2020-11-24_07:45:03 150326 FHEM/14_SD_UT.pm
 UPD 2020-09-25_07:45:05 69123 FHEM/14_SD_WS.pm
 UPD 2020-04-14_07:45:03 18426 FHEM/14_SD_WS07.pm
 UPD 2020-07-17_07:45:03 35356 FHEM/14_SD_WS09.pm
@@ -263,7 +263,7 @@ UPD 2020-08-15_07:45:02 58131 FHEM/49_SSCamSTRM.pm
 UPD 2018-03-12_07:45:04 46280 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
-UPD 2020-11-02_07:45:03 102045 FHEM/50_SSChatBot.pm
+UPD 2020-11-24_07:45:03 102879 FHEM/50_SSChatBot.pm
 UPD 2020-10-22_07:45:02 167085 FHEM/50_TelegramBot.pm
 UPD 2015-07-28_14:05:31 18601 FHEM/50_WS300.pm
 UPD 2016-10-06_07:45:12 19924 FHEM/51_I2C_BH1750.pm
@@ -303,7 +303,7 @@ UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
 UPD 2020-05-15_07:45:03 26789 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2019-02-25_07:45:03 40604 FHEM/59_PROPLANTA.pm
-UPD 2020-11-21_07:45:02 62899 FHEM/59_Twilight.pm
+UPD 2020-11-24_07:45:03 62899 FHEM/59_Twilight.pm
 UPD 2020-04-17_07:45:02 21167 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-10-18_07:45:03 51082 FHEM/59_Weather.pm
@@ -638,7 +638,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-09-08_07:45:03 60403 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-11-11_07:45:02 281456 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-11-24_07:45:03 281746 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
@@ -736,12 +736,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-11-23_07:45:06 4401696 docs/commandref.html
-UPD 2020-11-20_07:45:10 2728678 docs/commandref_DE.html
+UPD 2020-11-24_07:45:07 4402157 docs/commandref.html
+UPD 2020-11-24_07:45:10 2729139 docs/commandref_DE.html
 UPD 2020-11-20_07:45:03 81074 docs/commandref_frame.html
 UPD 2020-11-20_07:45:03 90589 docs/commandref_frame_DE.html
-UPD 2020-11-23_07:45:10 234728 docs/commandref_modular.html
-UPD 2020-11-23_07:45:11 245344 docs/commandref_modular_DE.html
+UPD 2020-11-24_07:45:11 234728 docs/commandref_modular.html
+UPD 2020-11-24_07:45:12 245344 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -765,7 +765,7 @@ UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2020-10-26_07:45:03 31591 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
 UPD 2020-11-03_07:45:03 14279 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2020-11-07_07:45:03 68065 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2020-11-24_07:45:03 68142 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
@@ -1284,10 +1284,14 @@ UPD 2015-07-28_14:05:34 9478 www/images/default/ws_W_kl.png
 UPD 2019-08-09_07:45:02 21769 www/images/fhemSVG/3d_printer.svg
 UPD 2019-02-09_07:45:03 59586 www/images/fhemSVG/Botvac_VR200.svg
 UPD 2017-11-26_07:45:02 58372 www/images/fhemSVG/DIN_rail_housing.svg
+UPD 2020-11-24_07:45:03 9685 www/images/fhemSVG/HomeMatic.svg
+UPD 2020-11-24_07:45:03 16258 www/images/fhemSVG/HomeMatic_Schrift.svg
 UPD 2017-11-14_07:45:02 14088 www/images/fhemSVG/HutschIcon3.svg
 UPD 2015-07-28_14:05:32 2027 www/images/fhemSVG/IR.svg
 UPD 2015-07-28_14:05:32 3699 www/images/fhemSVG/Icon_Fisch.svg
+UPD 2020-11-24_07:45:03 5555 www/images/fhemSVG/PlayStation.svg
 UPD 2017-11-14_07:45:02 21240 www/images/fhemSVG/RPi.svg
+UPD 2020-11-24_07:45:03 64098 www/images/fhemSVG/Siemens_synco_QAX910.svg
 UPD 2017-10-29_07:45:02 13843 www/images/fhemSVG/Todoist.svg
 UPD 2017-10-04_07:45:02 4361 www/images/fhemSVG/Ventilator_fett.svg
 UPD 2017-10-04_07:45:02 7800 www/images/fhemSVG/Ventilator_wind.svg
@@ -1502,6 +1506,7 @@ UPD 2017-11-14_07:45:02 6772 www/images/fhemSVG/it_remote_folder.svg
 UPD 2017-05-05_07:45:02 5178 www/images/fhemSVG/kindle.svg
 UPD 2020-07-26_07:45:03 4430 www/images/fhemSVG/kodi.svg
 UPD 2020-07-26_07:45:03 3135 www/images/fhemSVG/kodi_icon.svg
+UPD 2020-11-24_07:45:03 33643 www/images/fhemSVG/krippe.svg
 UPD 2020-04-27_07:45:02 177096 www/images/fhemSVG/kuehlschrank_big.svg
 UPD 2020-04-27_07:45:02 270578 www/images/fhemSVG/kuehlschrank_small.svg
 UPD 2015-07-28_14:05:32 8487 www/images/fhemSVG/lan_rs485.svg
