@@ -939,7 +939,7 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200828
 
 #tasmota device with Infrared-circuit
 name:tasmota_ir
-desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread</a><br><a href=https://github.com/arendst/Sonoff-Tasmota/wiki/Commands#irremote">Tasmota IRremote Commands</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">set <devicename> irsend</a>
+desc:Demonstrates multiple options how to configure tasmota devices as IR remote control extension.<br><a href="https://forum.fhem.de/index.php/topic,67316.0.html">Forum Thread IR-Remote</a><br><a href="https://forum.fhem.de/index.php/topic,98905.0.html">Forum Thread tasmota_ir-Template</a><br><a href="https://tasmota.github.io/docs/IR-Remote/">Tasmota IR-Remote Docu</a><br><a href="https://tasmota.github.io/docs/Tasmota-IR/">Tasmota IR Communication Docu</a><br><a href="https://github.com/altelch/SonoffIR">Simple IR-circuit</a><br><a href="https://forum.fhem.de/index.php/topic,98723.msg920946.html#msg920946">irsend syntax</a><br>NOTE: This is more like a showcase for several options to send and receive commands, not really a "ready to use" device.
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 order:A_01d
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
