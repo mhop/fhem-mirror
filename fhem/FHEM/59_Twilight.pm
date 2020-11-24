@@ -1075,7 +1075,7 @@ sub getwTYPE_PROPLANTA {
         $hour[$i] < 16 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud15",0) : (
         $hour[$i] < 19 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud18",0) : (
         $hour[$i] < 22 ? $ret[$i] = ReadingsNum($extDev,"fc${fc_day0}_cloud21",0) :
-        $ret[$i] = ReadingsNum($extDev,"fc${fc_day1}_cloud03",0)))))));
+        $ret[$i] = ReadingsNum($extDev,"fc${fc_day1}_cloud00",0)))))));
     }
     #Log3( $hash, 4, "[$hash->{NAME}] Proplanta data: hours $hour[0]-$hour[1]-$hour[2], fc_day0 $fc_day0, data $ret[0]-$ret[1]-$ret[2]");
     return @ret;
