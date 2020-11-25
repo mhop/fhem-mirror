@@ -92,6 +92,8 @@ sub LuftdatenInfo_Define($$) {
 
   delete($hash->{READINGS});
 
+  $DEF =~ s/\s+/ /g;
+
   if($MODE eq "remote"){
     return("Usage: define <name> $TYPE $MODE <SENSORID1> [<SENSORID2> ...]")
       if($DEF !~ m/^[\s\d]+$/);
