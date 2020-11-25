@@ -112,6 +112,11 @@ my %hueModels = (
   ZGPSWITCH => {name => 'Hue Tap'               ,type => 'ZGPSwitch'               ,subType => 'sensor',
                                                                                     icon => 'hue_filled_tap', },
 
+  LCX002    => {name => 'Hue play gradient lightstrip'     ,type => 'Extended color light'    ,subType => 'extcolordimmer',
+                                                                                    icon => 'hue_filled_lightstrip', },
+  440400982841 => {name => 'Hue Play'           ,type => 'Extended color light'    ,subType => 'extcolordimmer',
+                                                                                    icon => 'hue_filled_play', },
+
  'FLS-H3'  => {name => 'dresden elektronik FLS-H lp'  ,type => 'Color temperature light' ,subType => 'ctdimmer',},
  'FLS-PP3' => {name => 'dresden elektronik FLS-PP lp' ,type => 'Extended color light'    ,subType => 'extcolordimmer', },
 
