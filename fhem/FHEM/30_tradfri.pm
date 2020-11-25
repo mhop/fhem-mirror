@@ -531,9 +531,21 @@ tradfri_Get($$@)
       if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
         $group = AttrVal( $chash->{NAME}, 'alias', $group );
       }
-
       $ret .= sprintf( "%-20s %-20s %-20s", $key, $group, $scene->{name} );
-      $ret .= sprintf( " %s\n", join( ",", @{$scene->{lights}} ) );
+
+      #$ret .= sprintf( " %s\n", join( ",", @{$scene->{lights}} ) );
+      my $lights;
+      foreach my $light (@{$scene->{lights}}) {
+        $lights .= ',' if( $lights );
+        my $code = "$name-$light";
+        if( my $chash = $modules{HUEDevice}{defptr}{$code} ) {
+          $lights .= AttrVal( $chash->{NAME}, 'alias', $chash->{NAME} );
+        } else {
+          $lights .= $light;
+        }
+      }
+      $ret .= "$lights\n";
+
     }
     if( $ret ) {
       my $header = sprintf( "%-20s %-20s %-20s", "ID", "GROUP", "NAME" );
