@@ -410,6 +410,7 @@ sub HUEBridge_fillBridgeInfo($$)
 
   $hash->{name} = $config->{name};
   $hash->{modelid} = $config->{modelid};
+  $hash->{bridgeid} = $config->{bridgeid};
   $hash->{swversion} = $config->{swversion};
   $hash->{apiversion} = $config->{apiversion};
 
@@ -469,7 +470,8 @@ HUEBridge_OpenDev($)
       return;
     }
 
-  $hash->{mac} = $result->{'mac'};
+  $hash->{mac} = $result->{mac};
+  #$hash->{bridgeid} = $result->{bridgeid};
 
   readingsSingleUpdate($hash, 'state', 'connected', 1 );
   HUEBridge_GetUpdate($hash);
