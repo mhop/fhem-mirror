@@ -1,4 +1,4 @@
-REV 23225
+REV 23228
 DIR unused
 UPD 2020-11-24_07:45:03 354184 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -300,7 +300,7 @@ UPD 2020-11-09_07:45:03 218348 FHEM/57_SSCal.pm
 UPD 2020-05-29_07:45:05 53032 FHEM/58_HVAC_DaikinAC.pm
 UPD 2020-03-09_07:45:03 20495 FHEM/59_GSI.pm
 UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
-UPD 2020-05-15_07:45:03 26789 FHEM/59_LuftdatenInfo.pm
+UPD 2020-11-25_07:45:03 26811 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2019-02-25_07:45:03 40604 FHEM/59_PROPLANTA.pm
 UPD 2020-11-24_07:45:03 62899 FHEM/59_Twilight.pm
@@ -740,8 +740,8 @@ UPD 2020-11-24_07:45:07 4402157 docs/commandref.html
 UPD 2020-11-24_07:45:10 2729139 docs/commandref_DE.html
 UPD 2020-11-20_07:45:03 81074 docs/commandref_frame.html
 UPD 2020-11-20_07:45:03 90589 docs/commandref_frame_DE.html
-UPD 2020-11-24_07:45:11 234728 docs/commandref_modular.html
-UPD 2020-11-24_07:45:12 245344 docs/commandref_modular_DE.html
+UPD 2020-11-25_07:45:10 234728 docs/commandref_modular.html
+UPD 2020-11-25_07:45:12 245344 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1416,6 +1416,8 @@ UPD 2015-08-10_07:45:11 33264 www/images/fhemSVG/fts_sunblind_90.svg
 UPD 2015-07-28_14:05:32 1650 www/images/fhemSVG/fts_window_1wbb_open.svg
 UPD 2020-03-02_07:45:03 3323 www/images/fhemSVG/fuel.svg
 UPD 2017-11-14_07:45:02 5430 www/images/fhemSVG/garden_socket.svg
+UPD 2020-11-25_07:45:03 6480 www/images/fhemSVG/gasmeter1.svg
+UPD 2020-11-25_07:45:03 3712 www/images/fhemSVG/gasmeter2.svg
 UPD 2017-11-26_07:45:02 2381 www/images/fhemSVG/gasoline.svg
 UPD 2020-05-14_07:45:02 856 www/images/fhemSVG/gassistant.svg
 UPD 2020-04-27_07:45:02 941642 www/images/fhemSVG/gefrierschrank_icon.svg
