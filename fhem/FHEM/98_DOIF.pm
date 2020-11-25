@@ -4285,8 +4285,8 @@ sub bar
     $trans = -1;
   } else {
     $bwidth= 75 if (!defined $bwidth);
-    $trans = 16;
-    $bheight += 16;
+    $trans = 13;
+    $bheight += 13;
   }
   
   $bwidth=75 if (!defined $bwidth);
@@ -4330,7 +4330,7 @@ sub bar
   $out.= sprintf('<linearGradient id="gradbar_%d_%d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',$currColor,$minColor,color($currColor),color($minColor));
   $out.= '</defs>';
   $out.= sprintf('<rect x="10" y="0" width="%d" height="%d" rx="5" ry="5" fill="url(#gradbackbar)"/>',$bwidth,$bheight);
-  $out.= sprintf('<text text-anchor="middle" x="%d" y="16" style="fill:white; font-size:14px">%s</text>',$bwidth/2+10,$header) if (defined $header and $header ne ""); 
+  $out.= sprintf('<text text-anchor="middle" x="%d" y="13" style="fill:white; font-size:14px">%s</text>',$bwidth/2+10,$header) if (defined $header and $header ne ""); 
   $out.= sprintf('<g transform="translate(0,%d)">',$trans);
   my $nullColor;
   my $null;
@@ -4394,58 +4394,84 @@ sub describeArc {
 
 sub color {
 
-  my ($hue)=@_;
+  my ($hue,$lightness)=@_;
   if (substr($hue,0,1) eq "#") {
    return ($hue);
   }
   my $l;
-  if ($hue>180 and $hue<290) {
-    $l=65;
+  if (defined $lightness) {
+    $l=$lightness;
   } else {
-    $l=50;
+    if ($hue>180 and $hue<290) {
+      $l=65;
+    } else {
+      $l=50;
+    }
   }
   return ("hsl($hue,100%,".$l."%)");
 }
 
-
-sub temp_ring {
-  my ($value,$min,$max,$size) = @_;
+sub temp_uring {
+  my ($value,$min,$max,$size,$type,$lightring,$lightnumber) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=80 if (!defined $size);
-  return(ring($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1));
+  return(ring($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$type,$lightring,$lightnumber));
+}
+
+sub temp_ring{
+  my ($value,$min,$max,$size,$lightring,$lightnumber) = @_;
+  return(temp_uring($value,$min,$max,$size,undef,$lightring,$lightnumber));
+}
+
+sub temp_mring{
+  my ($value,$min,$max,$size,$lightring,$lightnumber) = @_;
+  return(temp_uring($value,$min,$max,$size,1,$lightring,$lightnumber));
+}
+
+
+sub hum_uring {
+  my ($value,$size,$type,$lightring,$lightnumber) = @_;
+  $size=80 if (!defined $size);
+  return(ring($value,0,100,undef,undef,"%",$size,\&hum_hue,0,$type,$lightring,$lightnumber));
 } 
 
-sub hum_ring {
-  my ($value,$size) = @_;
-  $size=80 if (!defined $size);
-  return(ring($value,0,100,undef,undef,"%",$size,\&hum_hue,0));
-} 
+sub hum_ring{
+  my ($value,$size,$lightring,$lightnumber) = @_;
+  return(hum_uring($value,$size,undef,$lightring,$lightnumber));
+}
+
+sub hum_mring{
+  my ($value,$size,$lightring,$lightnumber) = @_;
+  return(hum_uring($value,$size,1,$lightring,$lightnumber));
+}
 
 sub temp_hum_ring {
-  my ($value,$value2,$min,$max,$size) = @_;
+  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=90 if (!defined $size);
-  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,0,100,0,0,"%",\&hum_hue,0));
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,0,100,0,0,"%",\&hum_hue,0,$lightring,$lightnumber));
 } 
 
 sub temp_temp_ring {
-  my ($value,$value2,$min,$max,$size) = @_;
+  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=90 if (!defined $size);
-  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,1));
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,1,$lightring,$lightnumber));
 } 
-
-
-
 
 sub ring
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$model,$lr,$ln) = @_;
   my $out;
   my ($format,$value);
+  if (defined $lr) {
+    if (!defined $ln) {
+       $ln=$lr;
+    }
+  } 
   
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
@@ -4471,19 +4497,25 @@ sub ring
   my $y=125-$val1;
   my $currColor;
   if (defined $func) {
+    if (defined($model)) {
+      $minColor=&{$func}($value);
+    }
     $currColor=&{$func}($value);
   } else {
     if ($minColor < $maxColor) {
-      $currColor=$prop*($maxColor-$minColor);
+      $currColor=$prop*($maxColor-$minColor)+$minColor;
     } else {
-      $currColor=(1-$prop)*($minColor-$maxColor);
+      $currColor=(1-$prop)*($minColor-$maxColor)+$maxColor;
+    }
+    if (defined($model)) {
+      $minColor=$currColor;
     }
   }    
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 60 55" style="width:%dpx; height:%dpx;">',$size/100*60,$size/100*55);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
-  $out.= sprintf('<linearGradient id="gradtemp_ring1_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
-  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,$x1,$y1,$x2,$y2,color($currColor),color($minColor));
+  $out.= sprintf('<linearGradient id="gradtemp_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:-1),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
   
   $out.= '<linearGradient id="gradtemp_ring2" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64); stop-opacity:0.6"/>\
   <stop offset="1" style="stop-color:rgb(32,32,32); stop-opacity:0.8"/><linearGradient>';
@@ -4494,35 +4526,53 @@ sub ring
   $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="6">');
   $out.=describeArc(40, 30, 26, 0, 280);
   $out.='</g>';
-  $out.=sprintf('<g stroke="rgb(96,96,96)" fill="none" stroke-width="0.5">');
+  $out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
   $out.=describeArc(40, 30, 29, 0, 280);
   $out.='</g>';
-  $out.=sprintf('<g stroke="rgb(96,96,96)" fill="none" stroke-width="0.5">');
+  $out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
   $out.=describeArc(40, 30, 23, 0, 280);
   $out.='</g>';
-  $out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color($minColor));
-  $out.=describeArc(40, 30, 26, 0, 10);
+  #if (!defined($model)) {
+  #  $out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color($minColor));
+  #  $out.=describeArc(40, 30, 26, 0, 10);
+  #  $out.='</g>';
+  #}
+  $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6">';
+  $out.=describeArc(40, 30, 26, 0, 1);
   $out.='</g>';
-  $out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
-  $out.=describeArc(40, 30, 26, 270, 280);
+  $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6">';
+  $out.=describeArc(40, 30, 26, 279, 280);
   $out.='</g>';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d)" fill="none" stroke-width="6">',$currColor,$minColor);
+  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
+  #$out.=describeArc(40, 30, 26, 270, 280);
+  #$out.='</g>';
+  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="6">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, 26, 0, int($prop*280));
   $out.='</g>';
 
-  $out.= sprintf('<text text-anchor="middle" x="40" y="35" style="fill:%s;font-size:18px;font-weight:bold;">%s</text>',color($currColor),sprintf($format,$val));
-  $out.= sprintf('<text text-anchor="middle" x="40" y="47" style="fill:%s;font-size:10px;">%s</text>',color($currColor),$unit) if (defined $unit);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="35" style="fill:%s;font-size:18px;font-weight:bold;">%s</text>',color($currColor,$ln),sprintf($format,$val));
+  $out.= sprintf('<text text-anchor="middle" x="40" y="47" style="fill:%s;font-size:10px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
   $out.= '</svg>';
   return ($out);
 }
 
+sub mring
+{
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$lr,$ln) = @_;
+  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,1,$lr,$ln));
+}
+
 sub ring2
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$lr,$ln) = @_;
   my $out;
   my ($format,$value);
   my ($format2,$value2);
-  
+  if (defined $lr) {
+    if (!defined $ln) {
+       $ln=$lr;
+    }
+  } 
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
   $dec=1 if (!defined $dec);
@@ -4549,9 +4599,9 @@ sub ring2
     $currColor=&{$func}($value);
   } else {
     if ($minColor < $maxColor) {
-      $currColor=$prop*($maxColor-$minColor);
+      $currColor=$prop*($maxColor-$minColor)+$minColor;
     } else {
-      $currColor=(1-$prop)*($minColor-$maxColor);
+      $currColor=(1-$prop)*($minColor-$maxColor)+$maxColor;
     }
   }   
   
@@ -4580,20 +4630,20 @@ sub ring2
     $currColor2=&{$func2}($value2);
   } else {
     if ($minColor2 < $maxColor2) {
-      $currColor2=$prop2*($maxColor2-$minColor2);
+      $currColor2=$prop2*($maxColor2-$minColor2)+$minColor2;
     } else {
-      $currColor2=(1-$prop2)*($minColor2-$maxColor2);
+      $currColor2=(1-$prop2)*($minColor2-$maxColor2)+$maxColor2;
     }
   }    
 
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 60 54" style="width:%dpx; height:%dpx;">',$size/100*60,$size/100*54);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
-  $out.= sprintf('<linearGradient id="grad_ring1_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
-  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,$x1,$y1,$x2,$y2,color($currColor),color($currColor));
+  $out.= sprintf('<linearGradient id="grad2_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:-1),$x1,$y1,$x2,$y2,color($currColor,$lr),color($currColor,$lr));
   
-  $out.= sprintf('<linearGradient id="grad_ring2_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
-  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor2,$minColor2,$x12,$y12,$x22,$y22,color($currColor2),color($currColor2));
+  $out.= sprintf('<linearGradient id="grad2_ring2_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor2,$minColor2,(defined $lr ? $lr:-1),$x12,$y12,$x22,$y22,color($currColor2,$lr),color($currColor2,$lr));
  
   $out.= '<linearGradient id="grad_ring3" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64); stop-opacity:0.6"/>\
   <stop offset="1" style="stop-color:rgb(32,32,32); stop-opacity:0.8"/><linearGradient>';
@@ -4604,36 +4654,42 @@ sub ring2
   $out.=describeArc(40, 30, 25.5, 0, 280);
   $out.='</g>';
   
-  $out.=sprintf('<g stroke="rgb(96,96,96)" fill="none" stroke-width="0.5">');
+  $out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
   $out.=describeArc(40, 30, 28.5, 0, 280);
   $out.='</g>';
  
-  $out.=sprintf('<g stroke="rgb(96,96,96)" fill="none" stroke-width="0.5">');
+  $out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
   $out.=describeArc(40, 30, 22, 0, 280);
   $out.='</g>';
  
  
-  $out.=sprintf('<g stroke="url(#grad_ring1_%d_%d)" fill="none" stroke-width="3">',$currColor,$minColor);
+  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="3">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, 27, 0, int($prop*280));
   $out.='</g>';
 
-  $out.=sprintf('<g stroke="url(#grad_ring2_%d_%d)" fill="none" stroke-width="3">',$currColor2,$minColor2);
+  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="3">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, 23.5, 0, int($prop2*280));
   $out.='</g>';
-
-  $out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor));
-  $out.=describeArc(40, 30, 27, 273, 280);
+    $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
+  $out.=describeArc(40, 30, 25.2, 0, 1.5);
   $out.='</g>';
 
-  $out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor2));
-  $out.=describeArc(40, 30, 23.5, 273, 280);
+  $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
+  $out.=describeArc(40, 30, 25.2, 279, 280.5);
   $out.='</g>';
+  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor));
+  #$out.=describeArc(40, 30, 27, 273, 280);
+  #$out.='</g>';
+
+  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor2));
+  #$out.=describeArc(40, 30, 23.5, 273, 280);
+  #$out.='</g>';
     
-  $out.= sprintf('<text text-anchor="middle" x="40" y="30" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor),sprintf($format,$val));
-  $out.= sprintf('<text text-anchor="middle" x="40" y="17" style="fill:%s;font-size:8px;">%s</text>',color($currColor),$unit) if (defined $unit);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="30" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor,$ln),sprintf($format,$val));
+  $out.= sprintf('<text text-anchor="middle" x="40" y="17" style="fill:%s;font-size:8px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
   
-  $out.= sprintf('<text text-anchor="middle" x="40" y="43.5" style="fill:%s;font-size:14px;font-weight:bold;">%s</text>',color($currColor2),sprintf($format2,$val2));
-  $out.= sprintf('<text text-anchor="middle" x="40" y="50" style="fill:%s;font-size:7px;">%s</text>',color($currColor2),$unit2) if (defined $unit2);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="43.5" style="fill:%s;font-size:14px;font-weight:bold;">%s</text>',color($currColor2,$ln),sprintf($format2,$val2));
+  $out.= sprintf('<text text-anchor="middle" x="40" y="50" style="fill:%s;font-size:7px;">%s</text>',color($currColor2,$ln),$unit2) if (defined $unit2);
 
   $out.= '</svg>';
   return ($out);
