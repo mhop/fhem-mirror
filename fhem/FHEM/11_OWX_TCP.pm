@@ -60,7 +60,7 @@ sub new($) {
 		#-- OWX device
 		hash => $hash,
 		#-- module version
-	    version => "7.11",
+	    version => "7.21",
 		#-- 16 byte search string
 		search => [0,0,0,0 ,0,0,0,0, 0,0,0,0, 0,0,0,0],
 		ROM_ID => [0,0,0,0 ,0,0,0,0],
@@ -485,6 +485,7 @@ sub Query ($$) {
     $buffer = main::DevIo_DoSimpleRead($hash);
     alarm 0;
   };
+  #--- 2019
   if ($@) {
     if( $numexp<=1 ){
       main::Log3 $name, 4, "OWX_TCP::Query timed out in first attempt - maybe one byte missing";

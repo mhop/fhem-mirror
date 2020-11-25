@@ -5,6 +5,7 @@
 # FHEM module providing hardware dependent functions for the FRM interface of OWX
 #
 # Prof. Dr. Peter A. Henning
+# Contributions by Jens B
 #
 # $Id$
 #
@@ -43,9 +44,6 @@ package OWX_FRM;
 use strict;
 use warnings;
 
-use Device::Firmata::Constants qw/ :all /;
-use GPUtils qw(:all);
-
 ########################################################################################
 # 
 # Constructor
@@ -58,7 +56,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-        version => "7.11"
+        version => "7.21"
 	}, $class;
 }
 
@@ -76,12 +74,19 @@ sub Define($) {
 	my ($self,$def) = @_;
 	my $hash = $self->{hash};
 
-  	if (!defined($main::modules{FRM})) {
-  	  my $ret = "OWX_FRM::Define module FRM not yet loaded, please define an FRM device first."; 
-  	  main::Log3 $hash->{NAME},1,$ret;
-  	  return $ret;
-  	}
-  	
+    if (!defined($main::modules{FRM})) {
+      my $ret = "module FRM not yet loaded, please define an FRM device first"; 
+      main::Log3 $hash->{NAME},1,"OWX_FRM::Define error: $ret";
+      $hash->{STATE} = "error: $ret";
+      return $ret;
+    }
+
+    if (main::FRM_Get_Device_Firmata_Status() != main::FRM_DEVICE_FIRMATA_STATUS_INSTALLED) {
+      my $ret = "Perl module Device::Firmata not properly installed";
+      main::Log3 $hash->{NAME},1,"OWX_FRM::Define error: $ret";
+      $hash->{STATE} = "error: $ret";
+    }
+
   	my @a = split( "[ \t][ \t]*", $def );
     my $u = "wrong syntax: define <name> OWX <firmata-device>:<firmata-pin>";
     return $u unless int(@a) > 0;
@@ -202,6 +207,10 @@ sub Reopen () {
 sub Init() {
   my ($self) = @_;
   
+  if (main::FRM_Get_Device_Firmata_Status() != main::FRM_DEVICE_FIRMATA_STATUS_INSTALLED) {
+    return 'Error: Perl module Device::Firmata not properly installed';
+  }
+  
   if (defined($self->{OWX})) {
     # class method called with parent hash instead of class hash as 1st parameter, fix
     $self = $self->{OWX};
@@ -222,7 +231,7 @@ sub Init() {
   #-- 10_FRM.pm is broken
   #-- possible workaround
   $main::attr{$name}{IODev} = $hash->{IODev}->{NAME};
-  my $ret = main::FRM_Init_Pin_Client($hash,\@args,PIN_ONEWIRE);
+  my $ret = main::FRM_Init_Pin_Client($hash,\@args,Device::Firmata::Constants->PIN_ONEWIRE);
   
   if (defined $ret){
     $msg = "Error ".$ret;
@@ -242,7 +251,7 @@ sub Init() {
       $firmata->onewire_config($pin,1);
     }
   };
-  return GP_Catch($@) if ($@);
+  return main::FRM_Catch($@) if ($@);
   
   $hash->{STATE}="Initialized";
   main::InternalTimer(main::gettimeofday()+10, "OWX_Discover", $hash,0);
@@ -608,7 +617,7 @@ sub Write(@) {
 		$firmata->onewire_command_series( $pin, $ow_command );
 	};
 	if ($@) { 
-		main::Log3 $name,1,"OWX_FRM::Write device $name exception " . GP_Catch($@);
+		main::Log3 $name,1,"OWX_FRM::Write device $name exception " . main::FRM_Catch($@);
 		return 0 
 	}
 }
@@ -693,6 +702,15 @@ sub firmata_to_device
 
 1;
 
+=pod
+
+=head1 CHANGES
+
+  04.10.2020 jensb
+    o check for Device::Firmata install error in Define and Init
+    o GP_Catch() replaced with FRM_Catch() to provide filtered error messages for Perl errors
+  
+=cut
 
 =pod
 =item device
