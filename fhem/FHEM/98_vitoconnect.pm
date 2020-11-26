@@ -171,8 +171,10 @@
 #                 Information aus dem GW auslesen (Attribut "vitoconnect_gw_readings" auf "1" setzen;
 #                    noch unvollständig!)
 #
-#                 readings for heating.power.production.demandCoverage.* fixed
+# 2020-07-06      readings for heating.power.production.demandCoverage.* fixed
 #                 bei logResponseOnce wird bei getCode angefangen damit auch gw.json neu erzeugt wird
+#
+# 2020-11-26      Bugfix für einige "set"-Kommandos für HK2 und HK3
 #
 #
 #   ToDo:         timeout konfigurierbar machen
@@ -1092,7 +1094,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "HK2-Solltemperatur_normal" ) {
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.operating.programs.normal/setTemperature",
+            "heating.circuits.1.operating.programs.normal/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name, $opt, @args
         );
@@ -1101,7 +1103,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "HK3-Solltemperatur_normal" ) {
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.operating.programs.normal/setTemperature",
+            "heating.circuits.2.operating.programs.normal/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name, $opt, @args
         );
@@ -1110,7 +1112,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "HK1-Solltemperatur_reduziert" ) {
         vitoconnect_action(
             $hash,
-            "heating.circuits.1.operating.programs.reduced/setTemperature",
+            "heating.circuits.0.operating.programs.reduced/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name, $opt, @args
         );
@@ -1119,7 +1121,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "HK2-Solltemperatur_reduziert" ) {
         vitoconnect_action(
             $hash,
-            "heating.circuits.2.operating.programs.reduced/setTemperature",
+            "heating.circuits.1.operating.programs.reduced/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name, $opt, @args
         );
@@ -1128,7 +1130,7 @@ sub vitoconnect_Set {
     elsif ( $opt eq "HK3-Solltemperatur_reduziert" ) {
         vitoconnect_action(
             $hash,
-            "heating.circuits.0.operating.programs.reduced/setTemperature",
+            "heating.circuits.2.operating.programs.reduced/setTemperature",
             "{\"targetTemperature\":$args[0]}",
             $name, $opt, @args
         );
