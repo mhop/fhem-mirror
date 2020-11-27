@@ -376,7 +376,7 @@ DevIo_OpenDev($$$;$)
       if($ret) {
         if($hadFD && !defined($hash->{FD})) { # Forum #54732 / ser2net
           DevIo_Disconnected($hash);
-          $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
+          $hash->{NEXT_OPEN} = gettimeofday() + $nextOpenDelay;
 
         } else {
           DevIo_CloseDev($hash);
@@ -476,7 +476,7 @@ DevIo_OpenDev($$$;$)
     # somebody is communicating over another TCP connection. As the connect
     # for non-existent devices has a delay of 3 sec, we are sitting all the
     # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
+    if($hash->{NEXT_OPEN} && gettimeofday() < $hash->{NEXT_OPEN}) {
       return &$doCb(undef); # Forum 53309
     }
 
@@ -497,7 +497,7 @@ DevIo_OpenDev($$$;$)
         $readyfnlist{"$name.$dev"} = $hash;
         DevIo_setStates($hash, "disconnected");
         DoTrigger($name, "DISCONNECTED") if(!$reopen);
-        $hash->{NEXT_OPEN} = time() + $nextOpenDelay;
+        $hash->{NEXT_OPEN} = gettimeofday() + $nextOpenDelay;
         return 0;
       }
 
