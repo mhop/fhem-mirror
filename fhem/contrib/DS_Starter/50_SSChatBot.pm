@@ -135,7 +135,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.12.1" => "28.11.2020  fix cannot send after received anything ",
+  "1.12.1" => "28.11.2020  fix cannot send after received anything, fix greedy regex in _botCGIcheckData ",
   "1.12.0" => "23.11.2020  generate event CHAT_INITIALIZED when users are once loaded, Forum: https://forum.fhem.de/index.php/topic,105714.msg1103700.html#msg1103700 ".
                            "postpone new operation is one ist still running ",
   "1.11.7" => "01.11.2020  quotation marks can be used in text tag of received messages (__botCGIcheckData) ",
@@ -1574,10 +1574,10 @@ sub __botCGIcheckData {
   $args  = urlDecode($args);
   
   my $ca = $args;
-  my ($teco) = $ca =~ /text="(.*)"/x;                                                  # " im Text-Tag escapen (V: 1.11.7)
+  my ($teco) = $ca =~ /text="(.*?)"/x;                                                 # " im Text-Tag escapen (V: 1.11.7), fix greedy Regex V1.12.1
   if ($teco) {
       $teco =~ s/"/_ESC_/gx;
-      $ca   =~ s/text="(.*)"/text="$teco"/x;
+      $ca   =~ s/text="(.*?)"/text="$teco"/x;                                          # fix greedy Regex V1.12.1
   }
   
   my($a,$h) = parseParams($ca);
@@ -1601,9 +1601,9 @@ sub __botCGIcheckData {
   } 
   
   my $dat = {
-      name       => $name,
-      args       => $args,
-      h          => $h,
+      name => $name,
+      args => $args,
+      h    => $h,
   };
                     
 return ('','',$dat);
