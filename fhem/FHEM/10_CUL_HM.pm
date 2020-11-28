@@ -423,7 +423,6 @@ sub CUL_HM_updateConfig($){##########################
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
-        $hash->{helper}{virtTC} = "00";
         $hash->{helper}{vd}{msgRed}= 0 if(!defined $hash->{helper}{vd}{msgRed});
         if(!defined $hash->{helper}{vd}{next}){
           ($hash->{helper}{vd}{msgCnt},$hash->{helper}{vd}{next}) = 
@@ -1138,6 +1137,35 @@ sub CUL_HM_Attr(@) {#################################
       }
     }
   }
+  elsif($attrName eq "ignore"){
+    if ($init_done){
+      if ($cmd eq "set"){
+        $attr{$name}{".ignoreSet"} = $attrVal; # remember user desire
+        foreach my $chNm(CUL_HM_getAssChnNames($name)){
+          if( $attrVal == 1){
+            $attr{$chNm}{$attrName} = 1;
+          }
+          elsif( defined $attr{$chNm}{".ignoreSet"}){
+            $attr{$chNm}{$attrName} = $attr{$chNm}{".ignoreSet"};
+          }
+          else{
+            delete $attr{$chNm}{$attrName};
+          }
+        }
+      }
+      else {
+        delete $attr{$name}{".ignoreSet"};
+        foreach my $chNm(CUL_HM_getAssChnNames($name)){
+          if( defined $attr{$chNm}{".ignoreSet"}){
+            $attr{$chNm}{$attrName} = $attr{$chNm}{".ignoreSet"};
+          }
+          else{
+            delete $attr{$chNm}{$attrName};
+          }
+        }
+      }
+    }
+  }
  
   CUL_HM_queueUpdtCfg($name) if ($updtReq);
   return;
@@ -1239,18 +1267,21 @@ sub CUL_HM_hmInitMsgUpdt($){ #update device init msg for HMLAN
 
 sub CUL_HM_Notify(@){#################################
   my ($ntfy, $dev) = @_;
-  return "" if ($dev->{NAME} ne "global");
-
-  my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
-  return undef if(!$events); # Some previous notify deleted the array.
-  return undef if (grep !/INITIALIZED/,@{$events});
-  delete $modules{CUL_HM}{NotifyFn};
-  # execute some cleanup after init
-  
-  CUL_HM_updateConfig("startUp");
-  InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
-
-  return undef;
+  if ($dev->{NAME} eq "global"){
+    my $events = deviceEvents($dev, AttrVal($ntfy->{NAME}, "addStateEvent", 0));
+    return undef if(!$events); # Some previous notify deleted the array.
+    return undef if (grep !/INITIALIZED/,@{$events});
+    delete $modules{CUL_HM}{NotifyFn};
+    # execute some cleanup after init
+    
+    CUL_HM_updateConfig("startUp");
+    InternalTimer(1,"CUL_HM_setupHMLAN", "initHMLAN", 0);#start asap once FHEM is operational
+    
+    return undef;
+  }
+  else {
+    return "";
+  }
 }
 
 sub CUL_HM_setupHMLAN(@){#################################
@@ -6129,7 +6160,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           $hash->{helper}{vd}{typ} = 1; #valvePos
           my $idDev = substr($pId[0],0,6);
           $hash->{helper}{vd}{nDev}  =  CUL_HM_id2Name($idDev);
-          $hash->{helper}{vd}{id}  = $modules{CUL_HM}{defptr}{$pId[0]}
+          $hash->{helper}{vd}{id}    = $modules{CUL_HM}{defptr}{$pId[0]}
                                                 ?$pId[0]
                                                 :$idDev;
           $hash->{helper}{vd}{cmd} = "A258$dst$idDev";
@@ -6161,10 +6192,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
           $hash->{helper}{vd}{msgRed} = 0 if(!defined $hash->{helper}{vd}{msgRed});
 
           $hash->{helper}{virtTC}   = ($cmd eq "valvePos")?"03":"00";
-          CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)
-                if ($cmd eq "valvePos");
-          $hash->{helper}{vd}{next} = ReadingsVal($name,".next",gettimeofday()) 
-                if (!defined $hash->{helper}{vd}{next});
+          CUL_HM_UpdtReadSingle($hash,"valveCtrl","init",1)                     if ($cmd eq "valvePos");
+          $hash->{helper}{vd}{next} = ReadingsVal($name,".next",gettimeofday()) if (!defined $hash->{helper}{vd}{next});
           CUL_HM_valvePosUpdt("valvePos:$dst$chn");
         }
         $hash->{helper}{virtTC} = ($cmd eq "valvePos")?"03":"00";
