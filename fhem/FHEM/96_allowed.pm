@@ -68,6 +68,7 @@ allowed_Define($$)
     $hash->{devices} = \%list;
   }
   $auth_refresh = 1;
+  $hash->{".validFor"} = () if(!$hash->{OLDDEF});
   readingsSingleUpdate($hash, "state", "validFor:", 0);
   SecurityCheck() if($init_done);
   return undef;
@@ -95,31 +96,28 @@ allowed_Authorize($$$$;$)
   my ($me, $cl, $type, $arg, $silent) = @_;
 
   return 0 if($me->{disabled});
-  if( $cl->{SNAME} ) {
-    return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
-  } else {
-    return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{NAME}\b/);
-  }
+  my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
+  return 0 if(!$me->{".validFor"}{$vName});
   return 0 if(AttrVal($me->{NAME}, "allowedIfAuthenticatedByMe", 0) &&
               (!$cl->{AuthenticatedBy} ||
                 $cl->{AuthenticatedBy} ne $me->{NAME}));
 
   if($type eq "cmd") {
-    return 0 if(!$me->{allowedCommands});
+    return 0 if(!$me->{".allowedCommands"});
     # Return 0: allow stacking with other instances, see Forum#46380
-    return 0 if($me->{allowedCommands} =~ m/\b\Q$arg\E\b/);
+    return 0 if($me->{".allowedCommands"} =~ m/\b\Q$arg\E\b/);
     Log3 $me, 3, "Forbidden command $arg for $cl->{NAME}";
     stacktrace() if(AttrVal($me, "verbose", 5));
     return 2;
   }
 
   if($type eq "devicename") {
-    return 0 if(!$me->{allowedDevices} &&
-                !$me->{allowedDevicesRegexp});
-    return 1 if($me->{allowedDevices} &&
-                $me->{allowedDevices} =~ m/\b\Q$arg\E\b/);
-    return 1 if($me->{allowedDevicesRegexp} &&
-                $arg =~ m/^$me->{allowedDevicesRegexp}$/);
+    return 0 if(!$me->{".allowedDevices"} &&
+                !$me->{".allowedDevicesRegexp"});
+    return 1 if($me->{".allowedDevices"} &&
+                $me->{".allowedDevices"} =~ m/\b\Q$arg\E\b/);
+    return 1 if($me->{".allowedDevicesRegexp"} &&
+                $arg =~ m/^$me->{".allowedDevicesRegexp"}$/);
     if(!$silent) {
       Log3 $me, 3, "Forbidden device $arg for $cl->{NAME}";
       stacktrace() if(AttrVal($me, "verbose", 5));
@@ -152,7 +150,8 @@ allowed_Authenticate($$$$)
   };
 
   return 0 if($me->{disabled});
-  return 0 if(!$me->{validFor} || $me->{validFor} !~ m/\b$cl->{SNAME}\b/);
+  my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
+  return 0 if(!$me->{".validFor"}{$vName});
 
   if($cl->{TYPE} eq "FHEMWEB") {
     my $basicAuth = AttrVal($aName, "basicAuth", undef);
@@ -317,10 +316,16 @@ allowed_Attr(@)
           $attrName eq "allowedDevicesRegexp"  ||
           $attrName eq "validFor") {
     if($set) {
-      $hash->{$attrName} = join(" ", @param);
+      if($attrName eq "validFor") {
+        my %vf = map {$_,1} split(",", join(",",@param));
+        $hash->{".$attrName"} = \%vf;
+      } else {
+        $hash->{".$attrName"} = join(" ", @param);
+      }
     } else {
-      delete($hash->{$attrName});
+      delete($hash->{".$attrName"});
     }
+
     if($attrName eq "validFor") {
       readingsSingleUpdate($hash, "state", "validFor:".join(",",@param), 1);
       InternalTimer(1, "SecurityCheck", 0) if($init_done);
@@ -354,14 +359,14 @@ allowed_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
 
-  my %vf = map {$_,1} split(",", $defs{$d}{validFor} ? $defs{$d}{validFor}:"");
   my (@F_arr, @t_arr);
   my @arr = map {
               my $ca = $modules{$defs{$_}{TYPE}}{CanAuthenticate};
               push(@F_arr, $_) if($ca == 1);
               push(@t_arr, $_) if($ca == 2);
-              "<input type='checkbox' ".($vf{$_} ? "checked ":"").
-                   "name='$_' class='vfAttr'><label>$_</label>"
+              "<input type='checkbox' ".
+                ($hash->{".validFor"}{$_} ? "checked ":"").
+                "name='$_' class='vfAttr'><label>$_</label>"
             }
             grep { !$defs{$_}{SNAME} && 
                    $modules{$defs{$_}{TYPE}}{CanAuthenticate} } 
