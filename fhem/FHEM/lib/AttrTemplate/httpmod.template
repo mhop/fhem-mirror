@@ -532,14 +532,15 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 #################################
 #Show updates for CUL_HM devices, Forum: https://forum.fhem.de/index.php/topic,78501.msg972144.html#msg972144
 
-#Contributed by Pfriemler & yersinia, see https://forum.fhem.de/index.php/topic,78501.msg1043080.html#msg1043080
+#Contributed by Pfriemler, mcp & yersinia, see https://forum.fhem.de/index.php/topic,78501.msg1104534.html#msg1104534
 name:hm_fw_check_v2
 filter:TYPE=HTTPMOD
-desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com)<br />Define a HTTPMOD device like <br>define hm_fw_check HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br /><a href="https://forum.fhem.de/index.php/topic,78501.msg1043080.html#msg1043080">Source: Forum</a>
+desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com) and includes HmIP adaption provided by mcp<br />Define a HTTPMOD device like <br>define DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br /><a href="https://forum.fhem.de/index.php/topic,78501.msg1104534.html#msg1104534">Source: Forum</a>
 order:X_01a
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to one day (86400s); {InternalVal("DEVICE","Interval",86400)}
 defmod DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/\DEVICE INTERVAL
+attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete showNewFWOnly:yes,no
 attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete showNewFWOnly:yes,no
 attr DEVICE do_not_notify 1
 attr DEVICE enableControlSet 1
@@ -563,8 +564,8 @@ attr DEVICE stateFormat {   my $ret ="";;\
 	my $nextCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(InternalVal($name,"TRIGGERTIME_FMT","2000-01-01 00:00:00"))));;\
 	my $cellstyle = "padding:3pt;;border-bottom:1px dotted lightgray;;";;\
     $ret .= '<div style="text-align:left;;">';;;;\
-    $ret .= 'last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html">homematic</a>-fw-check => '.$lastCheck;;\
-    $ret .= '<br />';;\
+    $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html">homematic</a>-fw-check => '.$lastCheck;;\
+    $ret .= '</div>';;\
     my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");;\
     if($check eq "no fw-updates needed!") {\
       $ret .= '<div style="color:limegreen;;font-weight:bold;;">';;\
@@ -575,19 +576,19 @@ attr DEVICE stateFormat {   my $ret ="";;\
       $ret .= $check;;\
       $ret .= '</div>';;\
     } else {\
-		$ret .= '<br /><div style="display:table;;width:100%;;">';;\
+		$ret .= '<div style="display:table;;width:100%;;">';;\
 		$ret .= '<div style="display:table-row;;">';;\
 	      $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:50%;;font-weight:bold;;">device</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:30%;;font-weight:bold;;">model</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:10%;;font-weight:bold;;">current</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:10%;;font-weight:bold;;">new</div>';;\
+		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:40%;;font-weight:bold;;">model</div>';;\
+		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:5%;;font-weight:bold;;">current</div>';;\
+		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:5%;;font-weight:bold;;">new</div>';;\
 		$ret .= '</div>';; #header\
       my @devices = split(',',$check);;\
       foreach my $devStr (@devices) {\
-        #my ($dev,$md,$idx,$ofw,$nfw) = $devStr =~ m/([^\s]+)\s[(]([^\s]+)\s[(](\d+)[)]\sofw_([\d\.]+)\s=>\snfw_([\d\.]+)/;;\
 		my ($dev,$idx) = $devStr =~ m/([^\s]+)\s[(](\d+)[)]/;;\
 		my $md = ReadingsVal($name,("hmfw-type-".$idx),"?");;\
-		my $ofw = AttrVal($dev,"firmware","?");;\
+		#my $ofw = AttrVal($dev,"firmware","?");;\
+		my $ofw = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
 		my $nfw = ReadingsVal($name,("hmfw-version-".$idx),"none");;\
         my $fw_link = "https://ccu3-update.homematic.com/firmware/download?cmd=download&serial=0&product=".$md;;\
 		$ret .= '<div style="display:table-row;;">';;\
@@ -609,7 +610,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
       }\
 	  $ret .= '</div>';; #table\
     }\
-	$ret .= "<br /><div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
+	$ret .= "<div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
     $ret .= '</div>';;\
   return $ret;;\
 }
@@ -621,9 +622,9 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 		sprintf(uc(ReadingsVal($name,"hmfw-type-".$_,"?")).":".ReadingsVal($name,"hmfw-version-".$_,"?").":".$_);;\
 	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d)/g;;\
 	\
-	foreach my $dev (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=(virtual|)")) {\
-      my $md = AttrVal($dev,"model","?");;\
-      my $v = AttrVal($dev,"firmware","0.0");;\
+	foreach my $dev (devspec2array("TYPE=CUL_HM|HMCCUDEV:FILTER=DEF=(......|..............):FILTER=subType!=virtual")) {\
+	  my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));;\
+	  my $v = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
       my ($h,$l) = split('\.',$v);;\
       foreach my $newFW (grep m/^${md}:/i,@eq3FwList) {\
 		my ($fwmd, $fwv, $idx) = $newFW =~ m/([^:]+):(\d+[.]\d+[.]\d+):(\d+)$/;;\
@@ -640,9 +641,7 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
   return ($ret eq "")?"no fw-updates needed!":$ret;;\
 }
 attr DEVICE webCmd reread
-attr DEVICE model homematic_fw_check_v2
-setreading DEVICE attrTemplateVersion 20200522 or prior
-
+attr DEVICE model hm_fw_check_v2
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
 name:aculfw_fw_check
