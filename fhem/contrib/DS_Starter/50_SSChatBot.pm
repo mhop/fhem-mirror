@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 50_SSChatBot.pm 22946 2020-10-09 09:28:23Z DS_Starter $
+# $Id: 50_SSChatBot.pm 23220 2020-11-23 18:07:13Z DS_Starter $
 #########################################################################################################################
 #       50_SSChatBot.pm
 #
@@ -135,7 +135,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "1.12.0" => "23.11.2020  generate event UserInitialized when users are once loaded, Forum: https://forum.fhem.de/index.php/topic,105714.msg1103700.html#msg1103700 ",
+  "1.12.1" => "28.11.2020  fix cannot send after received anything ",
+  "1.12.0" => "23.11.2020  generate event CHAT_INITIALIZED when users are once loaded, Forum: https://forum.fhem.de/index.php/topic,105714.msg1103700.html#msg1103700 ".
+                           "postpone new operation is one ist still running ",
   "1.11.7" => "01.11.2020  quotation marks can be used in text tag of received messages (__botCGIcheckData) ",
   "1.11.6" => "08.10.2020  add urlEncode of character codes like \x{c3}\x{85} to formString  ",
   "1.11.5" => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
@@ -861,6 +863,11 @@ sub getApiSites {
        return $ret;  
    }
    
+   if($hash->{OPMODE}) {                                   # Überholer vermeiden wenn eine Operation läuft (V. 1.12.0" => "23.11.2020)
+       Log3($name, 4, qq{$name - Operation "$hash->{OPMODE} (idx: $hash->{OPIDX})" is still running. Next operation start postponed}); 
+       return;                                  
+   }
+   
    # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
    for my $idx (sort{$a<=>$b} keys %{$data{SSChatBot}{$name}{sendqueue}{entries}}) {
        if (!$data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{forbidSend} || $hash->{HELPER}{RESENDFORCE}) {
@@ -985,7 +992,7 @@ sub getApiSites_parse {
             Log3 ($name, 4, "$name - API completed:\n".Dumper $hash->{HELPER}{API});   
 
             if ($opmode eq "apiInfo") {                                              # API Infos in Popup anzeigen
-                showAPIinfo    ($hash, $hash->{HELPER}{API});                           # übergibt Referenz zum instanziierten API-Hash)
+                showAPIinfo    ($hash, $hash->{HELPER}{API});                        # übergibt Referenz zum instanziierten API-Hash)
                 checkSendRetry ($name, 0, $queueStartFn);
                 return;
             }     
@@ -1305,6 +1312,9 @@ sub _parseSendItem {
                  
   my $postid = "";
   my $idx    = $hash->{OPIDX};
+  
+  return if(!$idx);
+  
   my $uid    = $data{SSChatBot}{$name}{sendqueue}{entries}{$idx}{userid}; 
   
   if($data->{data}{succ}{user_id_post_map}{$uid}) {
@@ -1538,6 +1548,8 @@ sub _botCGIdata {
   readingsBulkUpdate  ($hash, "Error",             "none"       );
   readingsBulkUpdate  ($hash, "state",             $state       );        
   readingsEndUpdate   ($hash,1);
+  
+  delete $hash->{OPMODE};
   
 return ("text/plain; charset=utf-8", $ret);
 }
