@@ -354,13 +354,13 @@ allowed_fhemwebFn($$$$)
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
 
-  my $vf = $defs{$d}{validFor} ? $defs{$d}{validFor} : "";
+  my %vf = map {$_,1} split(",", $defs{$d}{validFor} ? $defs{$d}{validFor}:"");
   my (@F_arr, @t_arr);
   my @arr = map {
               my $ca = $modules{$defs{$_}{TYPE}}{CanAuthenticate};
               push(@F_arr, $_) if($ca == 1);
               push(@t_arr, $_) if($ca == 2);
-              "<input type='checkbox' ".($vf =~ m/\b$_\b/ ? "checked ":"").
+              "<input type='checkbox' ".($vf{$_} ? "checked ":"").
                    "name='$_' class='vfAttr'><label>$_</label>"
             }
             grep { !$defs{$_}{SNAME} && 
