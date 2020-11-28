@@ -1478,8 +1478,6 @@ sub _botCGIdata {
    
   Log3($name, 4, "$name - received data decoded:\n".Dumper($h));
   
-  $hash->{OPMODE} = "receiveData";
-  
   # ausgehende Datenfelder (Chat -> FHEM), die das Chat senden kann
   # ===============================================================
   # token: bot token
@@ -1548,8 +1546,6 @@ sub _botCGIdata {
   readingsBulkUpdate  ($hash, "Error",             "none"       );
   readingsBulkUpdate  ($hash, "state",             $state       );        
   readingsEndUpdate   ($hash,1);
-  
-  delete $hash->{OPMODE};
   
 return ("text/plain; charset=utf-8", $ret);
 }
