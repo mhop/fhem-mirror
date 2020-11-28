@@ -1,5 +1,5 @@
 ################################################################################################
-# $Id: 77_SMAEM.pm 21445 2020-03-18 08:23:24Z DS_Starter $
+# $Id: 77_SMAEM.pm 21706 2020-04-16 20:38:04Z DS_Starter $
 #
 #  Copyright notice
 #
@@ -36,6 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
+  "4.3.0" => "28.11.2020  attribute serialNumber may contain multiple serial numbers ",
   "4.2.0" => "14.04.2020  delete 'use bignum' ",
   "4.1.0" => "17.03.2020  add define option <interface> ",
   "4.0.1" => "10.02.2020  fix perl warning Forum: https://forum.fhem.de/index.php/topic,51569.msg1021988.html#msg1021988",
@@ -133,7 +134,7 @@ our %SMAEM_obisitem = (
 ###############################################################
 #                  SMAEM Initialize
 ###############################################################
-sub SMAEM_Initialize ($) {
+sub SMAEM_Initialize {
   my ($hash) = @_;
   
   $hash->{ReadFn}            = "SMAEM_Read";
@@ -163,7 +164,7 @@ return;
 ###############################################################
 #                  SMAEM Define
 ###############################################################
-sub SMAEM_Define ($$) {
+sub SMAEM_Define {
   my ($hash, $def) = @_;
   my $name= $hash->{NAME};
   my ($success, $gridin_sum, $gridout_sum);
@@ -206,35 +207,32 @@ sub SMAEM_Define ($$) {
   delete($readyfnlist{"$name"});
   $selectlist{"$name"} = $hash;
   
-  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                         # Modul Meta.pm nicht vorhanden
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
   
   Log3($name, 3, "$name - The perl module \"IO::Interface\" is missing. You should install it.") if($IOInterfaceAbsent);
   
-  # Versionsinformationen setzen
-  SMAEM_setVersionInfo($hash);
+  SMAEM_setVersionInfo($hash);                                                  # Versionsinformationen setzen
   
-  # gespeicherte Serialnummern lesen und extrahieren
-  my $retcode = SMAEM_getserials($hash); 
+  my $retcode                    = SMAEM_getserials($hash);                     # gespeicherte Serialnummern lesen und extrahieren         
   $hash->{HELPER}{READFILEERROR} = $retcode if($retcode);
   
   
   if($hash->{HELPER}{ALLSERIALS}) {
       my @allserials = split(/_/,$hash->{HELPER}{ALLSERIALS});
-	  foreach(@allserials) {
+	  for (@allserials) {
 	      my $smaserial = $_;
-	      # gespeicherte Energiezählerwerte von File einlesen
-          my $retcode = SMAEM_getsum($hash,$smaserial);
+          my $retcode                    = SMAEM_getsum($hash,$smaserial);      # gespeicherte Energiezählerwerte von File einlesen
           $hash->{HELPER}{READFILEERROR} = $retcode if($retcode);
 	  }
   }
   
-return undef;
+return;
 }
 
 ###############################################################
 #                  SMAEM Undefine
 ###############################################################
-sub SMAEM_Undef ($$) {
+sub SMAEM_Undef {
   my ($hash, $arg) = @_;
   my $name= $hash->{NAME};
   my $socket= $hash->{TCPDev};
@@ -255,14 +253,14 @@ return;
 ###############################################################
 #                  SMAEM Delete
 ###############################################################
-sub SMAEM_Delete ($$) {
+sub SMAEM_Delete {
     my ($hash, $arg) = @_;
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_energysum";
     
     # gespeicherte Energiezählerwerte löschen
     setKeyValue($index, undef);
     
-return undef;
+return;
 }
 
 #######################################################################################################
@@ -272,7 +270,7 @@ return undef;
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
-sub SMAEM_DelayedShutdown ($) {
+sub SMAEM_DelayedShutdown {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   
@@ -287,7 +285,7 @@ return 0;
 ###############################################################
 #                  SMAEM Set
 ###############################################################
-sub SMAEM_Set ($@) {
+sub SMAEM_Set {
   my ($hash, @a) = @_;
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name = $a[0];
@@ -300,19 +298,23 @@ sub SMAEM_Set ($@) {
   if ($opt eq "reset") {
       BlockingKill($hash->{HELPER}{RUNNING_PID}) if(defined($hash->{HELPER}{RUNNING_PID}));
       delete $hash->{HELPER}{ALLSERIALS};
-	  foreach my $key (keys %{$hash}) {
+
+      for my $key (keys %{$hash}) {
 		  delete $hash->{$key} if($key =~ /GRIDIN_SUM|GRIDOUT_SUM/);
-      } 
-      my $result = unlink $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM"; 
-      if ($result) {      
-          $result = "Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM deleted. It will be initialized immediately.";  
-      } else {
-          $result = "Error while deleting Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM: $!";
       }
-      Log3 ($name, 3, "SMAEM $name - $result");
-      return $result;
-  
-  } else {
+      
+      my $res = unlink $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM"; 
+      
+      if ($res) {      
+          $res = "Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM deleted. It will be initialized immediately.";  
+      } 
+      else {
+          $res = "Error while deleting Cachefile ".$attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM: $!";
+      }
+      Log3 ($name, 3, "SMAEM $name - $res");
+      return $res;
+  } 
+  else {
       return "$setlist";
   }  
   
@@ -322,7 +324,7 @@ return;
 ###############################################################
 #                  SMAEM Attr
 ###############################################################
-sub SMAEM_Attr ($$$$) {
+sub SMAEM_Attr {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
   my $do;
@@ -358,14 +360,14 @@ sub SMAEM_Attr ($$$$) {
       readingsSingleUpdate($hash, "state", $val, 1);
   }
   
-return undef;
+return;
 }
 
 ###############################################################
 #                  SMAEM Read (Hauptschleife)
 ###############################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub SMAEM_Read ($) {
+sub SMAEM_Read {
   my ($hash)  = @_;
   my $name    = $hash->{NAME};
   my $socket  = $hash->{TCPDev};
@@ -377,11 +379,14 @@ sub SMAEM_Read ($) {
   
   $socket->recv($data, 656);
   my $dl = length($data);
+  
   if($dl == 600) {                                                  # Each SMAEM packet is 600 bytes of packed payload
       $model = "EM / HM 2.0 < 2.03.4.R";
-  } elsif($dl == 608) {                                             # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
+  } 
+  elsif($dl == 608) {                                               # Each packet of HM with FW >= 2.03.4.R is 608 bytes of packed payload
       $model = "HM 2.0 >= 2.03.4.R";
-  } else {
+  } 
+  else {
       $model = "unknown";
       Log3 ($name, 3, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
   }
@@ -394,18 +399,19 @@ sub SMAEM_Read ($) {
   my $smaserial = hex(substr($hex,40,8));
   
   return if(!$smaserial);
-  return if($refsn && $refsn ne $smaserial);                        # nur selektiv eine EM mit angegebener Serial lesen (default: alle)
+  return if($refsn && $refsn !~ /$smaserial/);                        # nur selektiv eine EM mit angegebener Serial(s) lesen (default: alle)
   
   $hash->{MODEL} = $model;
   
   # alle Serialnummern in HELPER sammeln und ggf. speichern
-  if(!defined($hash->{HELPER}{ALLSERIALS}) || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {
-      my $sep = $hash->{HELPER}{ALLSERIALS}?"_":undef;
-      if($sep) {
-	      $hash->{HELPER}{ALLSERIALS} = $hash->{HELPER}{ALLSERIALS}.$sep.$smaserial;
-	  } else {
-	      $hash->{HELPER}{ALLSERIALS} = $smaserial;
+  if(!$hash->{HELPER}{ALLSERIALS} || $hash->{HELPER}{ALLSERIALS} !~ /$smaserial/) {      
+      if($hash->{HELPER}{ALLSERIALS}) {
+	      $hash->{HELPER}{ALLSERIALS} .= "_".$smaserial;
+	  } 
+      else {
+	      $hash->{HELPER}{ALLSERIALS}  = $smaserial;
 	  }
+      
       SMAEM_setserials($hash);
   }
   
@@ -433,18 +439,18 @@ sub SMAEM_Read ($) {
           $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});          # Forum #77057
           Log3 ($name, 4, "SMAEM $name - Blocking process with PID: $hash->{HELPER}{RUNNING_PID}{pid} started");
       }
-  
-  } else {
+  } 
+  else {
 	  Log3 $hash, 5, "SMAEM $name - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
   }
   
-return undef;
+return;
 }
 
 ###############################################################
 #          non-blocking Inverter Datenabruf
 ###############################################################
-sub SMAEM_DoParse ($) {
+sub SMAEM_DoParse {
     my ($string) = @_;
     my ($name,$dataenc,$smaserial,$dl) = split("\\|", $string);
     my $hash       = $defs{$name};
@@ -453,8 +459,8 @@ sub SMAEM_DoParse ($) {
     my $diffaccept = AttrVal($name, "diffAccept", 10);
     my ($error,@row_array,@array);
  
-    my $gridinsum  = $hash->{'GRIDIN_SUM_'.$smaserial} ?sprintf("%.4f",$hash->{'GRIDIN_SUM_'.$smaserial}):'';    
-    my $gridoutsum = $hash->{'GRIDOUT_SUM_'.$smaserial}?sprintf("%.4f",$hash->{'GRIDOUT_SUM_'.$smaserial}):'';
+    my $gridinsum  = $hash->{'GRIDIN_SUM_'.$smaserial}  ? sprintf("%.4f",$hash->{'GRIDIN_SUM_'.$smaserial})  : '';    
+    my $gridoutsum = $hash->{'GRIDOUT_SUM_'.$smaserial} ? sprintf("%.4f",$hash->{'GRIDOUT_SUM_'.$smaserial}) : '';
  
     # check if cacheSMAEM-file has been opened at module start and try again if not
     if($hash->{HELPER}{READFILEERROR}) {
@@ -463,7 +469,8 @@ sub SMAEM_DoParse ($) {
             $error = encode_base64($retcode,"");
             $discycles++;
             return "$name|''|''|''|$error|$discycles|''"; 
-        } else {
+        } 
+        else {
             delete($hash->{HELPER}{READFILEERROR})
         }
     }
@@ -535,62 +542,80 @@ sub SMAEM_DoParse ($) {
 	Log3 ($name, 4, "SMAEM $name - old GRIDOUT_SUM_$smaserial got from RAM: $gridoutsum");
 	
 	my $plausibility_out = 0;
+    
     if( !$gridoutsum || ($bezug_wirk_count && $bezug_wirk_count < $gridoutsum) ) {
         $gridoutsum = $bezug_wirk_count;
 		Log3 ($name, 4, "SMAEM $name - gridoutsum_$smaserial new set: $gridoutsum");
-    } else {
+    } 
+    else {
         if ($gridoutsum && $bezug_wirk_count >= $gridoutsum) {
-            if(($bezug_wirk_count - $gridoutsum) <= $diffaccept) {	
-                # Plausibilitätscheck ob Differenz kleiner als erlaubter Wert -> Fehlerprävention			
+            if(($bezug_wirk_count - $gridoutsum) <= $diffaccept) {                 # Plausibilitätscheck ob Differenz kleiner als erlaubter Wert -> Fehlerprävention			
                 my $diffb = ($bezug_wirk_count - $gridoutsum)>0 ? sprintf("%.4f",$bezug_wirk_count - $gridoutsum) : 0;   
+                
                 Log3 ($name, 4, "SMAEM $name - bezug_wirk_count: $bezug_wirk_count");
                 Log3 ($name, 4, "SMAEM $name - gridoutsum_$smaserial: $gridoutsum");
                 Log3 ($name, 4, "SMAEM $name - diffb: $diffb");			
+                
                 $gridoutsum = $bezug_wirk_count;
-			    push(@row_array, $ps."Bezug_WirkP_Zaehler_Diff ".$diffb."\n");
+			    
+                push(@row_array, $ps."Bezug_WirkP_Zaehler_Diff ".$diffb."\n");
 			    push(@row_array, $ps."Bezug_WirkP_Kosten_Diff ".sprintf("%.4f", $diffb*AttrVal($name, "powerCost", 0))."\n");
-				$plausibility_out = 1;
-			} else {
-			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
-				my $d = $bezug_wirk_count - $gridoutsum;
+				
+                $plausibility_out = 1;
+			} 
+            else {                                   			                   # Zyklus verwerfen wenn Plausibilität nicht erfüllt
+				my $d      = $bezug_wirk_count - $gridoutsum;
 			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDOUT exceeding. \n".
                              "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
-			    $error = encode_base64($errtxt,"");
-				Log3 ($name, 1, "SMAEM $name - $errtxt");
-				$gridinsum  = $einspeisung_wirk_count;
+			    $error     = encode_base64($errtxt,"");
+				
+                Log3 ($name, 1, "SMAEM $name - $errtxt");
+				
+                $gridinsum  = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
-		        $discycles++;
+		        
+                $discycles++;
+                
                 return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";     
 			}
         }
     }  
 
 	my $plausibility_in = 0;
+    
     if( !$gridinsum || ($einspeisung_wirk_count && $einspeisung_wirk_count < $gridinsum) ) {
         $gridinsum = $einspeisung_wirk_count;
 		Log3 ($name, 4, "SMAEM $name - gridinsum_$smaserial new set: $gridinsum");
-    } else {
+    } 
+    else {
         if ($gridinsum && $einspeisung_wirk_count >= $gridinsum) {
-		    if(($einspeisung_wirk_count - $gridinsum) <= $diffaccept) {
-			    # Plausibilitätscheck ob Differenz kleiner als erlaubter Wert -> Fehlerprävention
+		    if(($einspeisung_wirk_count - $gridinsum) <= $diffaccept) { 			    # Plausibilitätscheck ob Differenz kleiner als erlaubter Wert -> Fehlerprävention
                 my $diffe = ($einspeisung_wirk_count - $gridinsum)>0 ? sprintf("%.4f",$einspeisung_wirk_count - $gridinsum) : 0;
+                
                 Log3 ($name, 4, "SMAEM $name - einspeisung_wirk_count: $einspeisung_wirk_count");
                 Log3 ($name, 4, "SMAEM $name - gridinsum_$smaserial: $gridinsum");
                 Log3 ($name, 4, "SMAEM $name - diffe: $diffe");
+                
                 $gridinsum = $einspeisung_wirk_count;
-			    push(@row_array, $ps."Einspeisung_WirkP_Zaehler_Diff ".$diffe."\n");
+			    
+                push(@row_array, $ps."Einspeisung_WirkP_Zaehler_Diff ".$diffe."\n");
 			    push(@row_array, $ps."Einspeisung_WirkP_Verguet_Diff ".sprintf("%.4f", $diffe*AttrVal($name, "feedinPrice", 0))."\n");
-				$plausibility_in = 1;
-			} else {
-			    # Zyklus verwerfen wenn Plausibilität nicht erfüllt
-				my $d = $einspeisung_wirk_count - $gridinsum;
+				
+                $plausibility_in = 1;
+			} 
+            else {                                                                      # Zyklus verwerfen wenn Plausibilität nicht erfüllt
+				my $d      = $einspeisung_wirk_count - $gridinsum;
 			    my $errtxt = "Cycle discarded due to allowed diff \"$d\" GRIDIN exceeding. \n".
                              "Try to set attribute \"diffAccept > $d\" temporary or execute \"reset\".";
-			    $error = encode_base64($errtxt,"");
-				Log3 ($name, 1, "SMAEM $name - $errtxt");
-				$gridinsum  = $einspeisung_wirk_count;
+			    $error     = encode_base64($errtxt,"");
+				
+                Log3 ($name, 1, "SMAEM $name - $errtxt");
+				
+                $gridinsum  = $einspeisung_wirk_count;
 				$gridoutsum = $bezug_wirk_count;
-		        $discycles++;
+		        
+                $discycles++;
+                
                 return "$name|''|$gridinsum|$gridoutsum|$error|$discycles|''";  
 			}
         }
@@ -777,7 +802,7 @@ sub SMAEM_DoParse ($) {
 ###############################################################
 #         Auswertung non-blocking Inverter Datenabruf
 ###############################################################
-sub SMAEM_ParseDone ($) {
+sub SMAEM_ParseDone {
  my ($string)   = @_;
  my @a          = split("\\|",$string);
  my $name       = $a[0];
@@ -823,7 +848,7 @@ return;
 ###############################################################
 #           Abbruchroutine Timeout Inverter Abfrage
 ###############################################################
-sub SMAEM_ParseAborted ($) {
+sub SMAEM_ParseAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   my $discycles  = $hash->{HELPER}{FAULTEDCYCLES};
@@ -842,7 +867,7 @@ return;
 ###############################################################
 #                  DbLog_splitFn
 ###############################################################
-sub SMAEM_DbLogSplit ($) {
+sub SMAEM_DbLogSplit {
   my ($event,$device) = @_;
   my ($reading, $value, $unit) = "";
 
@@ -882,15 +907,14 @@ return ($reading, $value, $unit);
 
 ###############################################################
 ###       alle Serial-Nummern in cacheSMAEM speichern
-sub SMAEM_setserials ($) {
+sub SMAEM_setserials {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
 	my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$as);
     
-    $as = $hash->{HELPER}{ALLSERIALS};
-    
-    $index = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
+    $as      = $hash->{HELPER}{ALLSERIALS};
+    $index   = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
     $retcode = SMAEM_setCacheValue($hash,$index,$as);
     
     if ($retcode) { 
@@ -903,7 +927,7 @@ return ($retcode);
 
 ###############################################################
 ###  Summenwerte für GridIn, GridOut speichern
-sub SMAEM_setsum ($$$$) {
+sub SMAEM_setsum {
     my ($hash,$smaserial,$gridinsum,$gridoutsum) = @_;
     my $name    = $hash->{NAME};
 	my $modpath = $attr{global}{modpath};
@@ -926,7 +950,7 @@ return ($retcode);
 
 ###############################################################
 ###  Schreibroutine in eigenes Keyvalue-File
-sub SMAEM_setCacheValue ($$$) {
+sub SMAEM_setCacheValue {
   my ($hash,$key,$value) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   
@@ -955,20 +979,21 @@ return FileWrite($param, @new);
 
 ###############################################################
 ###          gespeicherte Serial-Nummern auslesen
-sub SMAEM_getserials ($) {
+sub SMAEM_getserials {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
     my $modpath = $attr{global}{modpath};
     my ($index,$retcode,$serials);
 	
-    $index = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
+    $index               = $hash->{TYPE}."_".$hash->{NAME}."_allserials";
     ($retcode, $serials) = SMAEM_getCacheValue($index);
     
     if ($retcode) {
         Log3($name, 1, "SMAEM $name - $retcode") if ($retcode);
         Log3($name, 3, "SMAEM $name - Create new cacheFile $modpath/FHEM/FhemUtils/cacheSMAEM");
 		$retcode = SMAEM_createCacheFile($hash); 
-    } else {
+    } 
+    else {
 	    if ($serials) {
             $hash->{HELPER}{ALLSERIALS} = $serials;
             Log3 ($name, 3, "SMAEM $name - read saved serial numbers from $modpath/FHEM/FhemUtils/cacheSMAEM");  
@@ -980,7 +1005,7 @@ return ($retcode);
 
 ###############################################################
 ###  Summenwerte für GridIn, GridOut auslesen
-sub SMAEM_getsum ($$) {
+sub SMAEM_getsum {
     my ($hash,$smaserial) = @_;
     my $name   = $hash->{NAME};
     my $modpath = $attr{global}{modpath};
@@ -1004,7 +1029,7 @@ return ($retcode);
 
 ###############################################################
 ###  Leseroutine aus eigenem Keyvalue-File
-sub SMAEM_getCacheValue ($) {
+sub SMAEM_getCacheValue {
   my ($key) = @_;
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   my $param = {
@@ -1022,7 +1047,7 @@ return (undef, undef);
 
 ###############################################################
 ###  Anlegen eigenes Keyvalue-File wenn nicht vorhanden
-sub SMAEM_createCacheFile ($) {
+sub SMAEM_createCacheFile {
   my $fName = $attr{global}{modpath}."/FHEM/FhemUtils/cacheSMAEM";
   my $param = {
                FileName   => $fName,
@@ -1038,7 +1063,7 @@ return FileWrite($param, @new);
 
 ###############################################################
 ###  $update time of last update
-sub SMAEM_setlastupdate ($$) {
+sub SMAEM_setlastupdate {
     my ($hash,$smaserial) = @_;
 	my $name              = $hash->{NAME};
 	
@@ -1056,7 +1081,7 @@ return;
 #                          Versionierungen des Moduls setzen
 #                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
-sub SMAEM_setVersionInfo($) {
+sub SMAEM_setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
@@ -1068,12 +1093,12 @@ sub SMAEM_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 77_SMAEM.pm 21445 2020-03-18 08:23:24Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 77_SMAEM.pm 21706 2020-04-16 20:38:04Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v; 
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 77_SMAEM.pm 21445 2020-03-18 08:23:24Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 77_SMAEM.pm 21706 2020-04-16 20:38:04Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -1187,7 +1212,8 @@ return;
   
   <a name="serialNumber"></a>
   <li><b>serialNumber</b> <br>
-  The serial number (e.g. 1900212213) of the SMA Energy Meter which data has to be received. <br>
+  The serial number(s) (e.g. 1900212213) of the SMA Energy Meter to be received by the SMAEM device. 
+  Multiple serial numbers must be separated by spaces.<br>
   (default: no restriction)
   </li>
   <br>
@@ -1299,7 +1325,8 @@ return;
   
   <a name="serialNumber"></a>
   <li><b>serialNumber</b> <br>
-  Die Seriennummer (z.B. 1900212213) des SMA Energy Meters der durch das SMAEM-Device empfangen werden soll. <br>
+  Die Seriennummer(n) (z.B. 1900212213) des SMA Energy Meters die durch das SMAEM-Device empfangen werden sollen. 
+  Mehrere Seriennummern sind durch Leerzeichen getrennt anzugeben.<br>
   (default: keine Einschränkung)
   </li>
   <br>
