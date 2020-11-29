@@ -184,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
   "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
   "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
@@ -9764,7 +9765,7 @@ sub _sendChat {
                                                    if(exists $chatparams{$key}->{attr}); 
        if($chatparams{$key}->{set}) {     
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $chatparams{$key}->{default} if (!$extparamref->{$key} && !$chatparams{$key}->{attr});    
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
 
        Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
@@ -9777,6 +9778,7 @@ sub _sendChat {
    for my $key (keys(%chatparams)) {
        push(@err, $key) if ($chatparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
+   
    if ($#err >= 0) {
        $ret = "Missing at least one required parameter or attribute: ".join(', ',@err);
        Log3($name, 2, "$name - $ret");
@@ -9832,15 +9834,16 @@ sub _sendChat {
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
           $mtype = "\@Snapshot";
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+      } 
+      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
           $mtype = $hash->{CAMNAME};
       }
+      
       for my $key (@as) {
            ($subject,$fname) = __extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
            
-           # User aufsplitten und zu jedem die ID ermitteln
-           my @ua = split(",", $peers);
+           my @ua = split(",", $peers);                                                     # User aufsplitten und zu jedem die ID ermitteln
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
@@ -9893,9 +9896,9 @@ sub _sendChat {
                                   aref  => \@as
                                 } 
                               );
-          $mtype  = "\@Snapshot";
-          
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+          $mtype  = "\@Snapshot";   
+      } 
+      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           extractTIDfromCache ( { name  => $name, 
                                   tac   => $tac, 
                                   media => "SENDRECS",
@@ -9911,8 +9914,7 @@ sub _sendChat {
       for my $key (@unique) {
            ($subject,$fname) = __extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
            
-           # User aufsplitten und zu jedem die ID ermitteln
-           my @ua = split(/,/x, $peers);
+           my @ua = split(/,/x, $peers);                                                     # User aufsplitten und zu jedem die ID ermitteln
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
@@ -9970,18 +9972,21 @@ return;
 #                            Daten extrahieren für SSChatBot Versand
 ####################################################################################################
 sub __extractForChat {
-  my ($name,$key,$paref) = @_;
-  my $hash               = $defs{$name};
-  my $subject            = $paref->{subject};
-  my $sdat               = $paref->{sdat};                           # Hash von Imagedaten base64 codiert
-  my $vdat               = $paref->{vdat};                           # Hashref der Videodaten   
+  my $name    = shift;
+  my $key     = shift;
+  my $paref   = shift;
+  my $hash    = $defs{$name};
+  my $subject = $paref->{subject};
+  my $sdat    = $paref->{sdat};                           # Hash von Imagedaten base64 codiert
+  my $vdat    = $paref->{vdat};                           # Hashref der Videodaten   
+  
   my ($fname,$tdir,$ct,$cache);
   
   if($sdat) {
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                    # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{sdat}{$key}{createdTm};
-          $fname = trim(delete $paref->{sdat}{$key}{fileName});      
+          $ct    = $paref->{sdat}{$key}{createdTm};
+          $fname = trim ($paref->{sdat}{$key}{fileName});      
       } 
       else {
           $ct    = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
@@ -9990,11 +9995,11 @@ sub __extractForChat {
   } 
   
   if($vdat) {
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                    # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{vdat}{$key}{createdTm};
-          $fname = trim(delete $paref->{vdat}{$key}{fileName});
-          $tdir  = trim(delete $paref->{vdat}{$key}{tdir});
+          $ct    = $paref->{vdat}{$key}{createdTm};
+          $fname = trim ($paref->{vdat}{$key}{fileName});
+          $tdir  = trim ($paref->{vdat}{$key}{tdir});
       } 
       else {
           $ct    = cache($name, "c_read", "$vdat"."{$key}{createdTm}");  
@@ -10229,9 +10234,9 @@ sub __extractForTelegram {
   if($sdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct     = delete $paref->{sdat}{$key}{createdTm};
-          $img    = delete $paref->{sdat}{$key}{imageData};
-          $fname  = trim(delete $paref->{sdat}{$key}{fileName});
+          $ct     = $paref->{sdat}{$key}{createdTm};
+          $img    = $paref->{sdat}{$key}{imageData};
+          $fname  = trim ($paref->{sdat}{$key}{fileName});
           $data   = MIME::Base64::decode_base64($img); 
           Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for TelegramBot prepare");
           undef $img;
@@ -10249,9 +10254,9 @@ sub __extractForTelegram {
   if($vdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{vdat}{$key}{createdTm};
-          $data  = delete $paref->{vdat}{$key}{imageData};
-          $fname = trim(delete $paref->{vdat}{$key}{fileName});
+          $ct    = $paref->{vdat}{$key}{createdTm};
+          $data  = $paref->{vdat}{$key}{imageData};
+          $fname = trim ($paref->{vdat}{$key}{fileName});
           Log3($name, 4, "$name - Video data sequence [$key] got from internal Cache for TelegramBot prepare");
       } 
       else {
@@ -10833,8 +10838,7 @@ sub __sendEmailblocking {                                                    ## 
           my %seen;
           my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
 
-          # attach mail
-          for my $key (@unique) {
+          for my $key (@unique) {                                                               # attach mail
               next if(!cache($name, "c_isvalidkey", "$sdat"."{$key}{imageData}")); 
               $ct      = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
               $img     = cache($name, "c_read", "$sdat"."{$key}{imageData}");
@@ -10852,10 +10856,9 @@ sub __sendEmailblocking {                                                    ## 
       }
   }
   
-  if($vdat) {
-      ### Videodaten (mp4) wurden geliefert
+  if($vdat) {                                                      # Videodaten (mp4) wurden geliefert
       my ($ct,$video);
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                             # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
           @as = sort{$a<=>$b}keys%{$vdat};
           for my $key (@as) {
@@ -10913,12 +10916,10 @@ sub __sendEmailblocking {                                                    ## 
   } 
   else {
       # Verwendung neues Net::SMTP::SSL > 3.00
-      if($sslfrominit) {
-          # sofortiger SSL connect
+      if($sslfrominit) {                                                        # sofortiger SSL connect
           $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpsslport, SSL => 1, Debug => $smtpdebug);
       } 
-      else {
-          # erst unverschlüsselt, danach switch zu encrypted
+      else {                                                                    # erst unverschlüsselt, danach switch zu encrypted
           $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
       }
   }
@@ -10930,8 +10931,7 @@ sub __sendEmailblocking {                                                    ## 
       return "$name|$err|''";   
   }
       
-  if(!$sslfb && !$sslfrominit) {  
-      # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
+  if(!$sslfb && !$sslfrominit) {                                               # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
       if($smtp->can_ssl() && !$smtpnousessl) {                      
           unless( $smtp->starttls ( SSL_verify_mode => 0, 
                                     SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
@@ -11083,12 +11083,11 @@ return;
 #################################################################################################
 sub extractTIDfromCache { 
   my $params = shift;
-  
-  my $name  = $params->{name};
-  my $tac   = $params->{tac};
-  my $media = $params->{media};
-  my $mode  = $params->{mode};
-  my $aref  = $params->{aref};
+  my $name   = $params->{name};
+  my $tac    = $params->{tac};
+  my $media  = $params->{media};
+  my $mode   = $params->{mode};
+  my $aref   = $params->{aref};
   
   if($mode eq "serial") {                                                                # Serial Nummern auslesen
       for my $ck (cache($name, "c_getkeys")) {                                           
@@ -11168,7 +11167,7 @@ sub cleanData {
       return;
   } 
   
-  if(AttrVal($name,"cacheType","internal") eq "internal") {                                  # internes Caching
+  if(AttrVal($name, "cacheType", "internal") eq "internal") {                                # internes Caching
       if($tac) {
           if($data{SSCam}{RS}{$tac}) {
               delete $data{SSCam}{RS}{$tac};
