@@ -144,6 +144,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.3"  => "29.11.2020  fix (prepare)Download without dest= option",
+  "0.7.2"  => "22.11.2020  undef variables containing a lot of data in execOp ",
   "0.7.1"  => "08.11.2020  fix download, fix perl warning while upload not existing files  ",
   "0.7.0"  => "02.11.2020  new set command deleteRemoteObj, fix download object with space in name ",
   "0.6.0"  => "30.10.2020  Upload files may contain wildcards *. ",
@@ -597,8 +599,7 @@ sub _setDownload {
   my ($s,$d) = split "dest=", $arg;
   $d         = smUrlEncode ($d);
   
-  $arg       = $s."dest=".$d;
-  
+  $arg       = $s." dest=".$d if($d);
   my ($a,$h) = parseParams ($arg);
   my $fp     = $a->[0];
   
@@ -642,6 +643,14 @@ sub _setDownload {
   
   if($opt ne "prepareDownload") {  
       getApiSites ($name);                                    # Queue starten
+  }
+  else {
+      readingsBeginUpdate         ($hash);
+      readingsBulkUpdateIfChanged ($hash, "Errorcode",        "none" );
+      readingsBulkUpdateIfChanged ($hash, "Error",            "none" );
+      readingsBulkUpdate          ($hash, "QueueAddDownload", $a->[0]);            
+      readingsBulkUpdate          ($hash, "state",            "done" );                    
+      readingsEndUpdate           ($hash, 1);      
   }
 
 return;
@@ -809,6 +818,13 @@ sub __fillUploadQueueFinish {
   
   if($opt ne "prepareUpload") {  
       getApiSites ($name);                                              # Queue starten
+  }
+  else {
+      readingsBeginUpdate         ($hash);
+      readingsBulkUpdateIfChanged ($hash, "Errorcode", "none");
+      readingsBulkUpdateIfChanged ($hash, "Error",     "none");            
+      readingsBulkUpdate          ($hash, "state",     "done");                    
+      readingsEndUpdate           ($hash, 1);      
   }
   
 return;
@@ -1520,7 +1536,7 @@ sub execOp {
    my $toutdef  = $data{$type}{$name}{sendqueue}{entries}{$idx}{timeout} // 20;
    my $fileapi  = $data{$type}{$name}{fileapi};
    
-   my ($url,$param,$error,$errorcode);
+   my ($url,$param,$error,$errorcode,$content);
    
    my $timeout  = AttrVal($name, "timeout", $toutdef);
 
@@ -1552,12 +1568,13 @@ sub execOp {
        
        Log3($name, 5, "$name - POST data (string <FILE> will be replaced with content of $lclFile):\n$postdata");
        
-       ($errorcode, my $content) = slurpFile ($name, $lclFile);
+       ($errorcode, $content) = slurpFile ($name, $lclFile);
        
        if($errorcode) {
            $error = expErrors   ($hash, $errorcode           );
            setReadingErrorState ($hash, $error, $errorcode   );
            checkSendRetry       ($name, 1,      $queueStartFn); 
+           undef $content;
            return;          
        }
        
@@ -1568,6 +1585,9 @@ sub execOp {
    }
    
    HttpUtils_NonblockingGet ($param);
+   
+   undef $content;
+   undef $postdata;
 
 return;   
 } 
