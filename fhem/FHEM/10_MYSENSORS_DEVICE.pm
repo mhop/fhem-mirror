@@ -281,7 +281,7 @@ sub Set {
       }
       
       if ($command eq "reboot") {
-        AttrVal($name, "OTA_BL_Type", 0) or ReadingsVal($name, "BL_VERSION", 0) 
+        (AttrVal($name, "OTA_BL_Type", 0) or ReadingsVal($name, "BL_VERSION", 0)) 
           ? return sendClientMessage($hash, 
                                      childId => 255, 
                                      cmd => C_INTERNAL, 
