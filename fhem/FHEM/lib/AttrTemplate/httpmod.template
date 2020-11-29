@@ -180,7 +180,7 @@ setreading DEVICE attrTemplateVersion 20201129
 #Austrian weather, Forum: https://forum.fhem.de/index.php/topic,94110.msg868080.html#msg868080; enhanced by JoeALLb: https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164
 name:ORF_weather
 filter:TYPE=HTTPMOD
-desc: Get austrian weather.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD none 1800 <br>You will be asked to provide a MAINURL like https://wetter.orf.at/steiermark/ and a stationname like grazuniversitaet<br><a href="https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164">Source: Enhanced version in FHEM Forum</a>
+desc: Get austrian weather data from orf.<br>Define a HTTPMOD device like <br>defmod weatherORF HTTPMOD none 1800 <br>You will be asked to provide a MAINURL like https://wetter.orf.at/steiermark/ and a stationname like grazuniversitaet<br><a href="https://forum.fhem.de/index.php/topic,97694.msg912164.html#msg912164">Source: Enhanced version in FHEM Forum</a>
 order:WEATHER03
 par:MAINURL;First part of the URL. Example: https://wetter.orf.at/steiermark/;{ AttrVal("DEVICE","get02URL","") =~ m,(https://wetter.orf.at/[^/]+[/]).*, ? $1 : undef }
 par:STATIONNAME;Name of the respective weather station as written in the last part of the URL. Examples: grazuniversitaet or innerestadt;{ AttrVal("DEVICE","get01URL","") =~ m,https://wetter.orf.at/[^/]+[/]([^/]+)[/], ? $1 : undef }
@@ -209,6 +209,95 @@ attr ORF_Weather readingOExpr $val =~ s/([\d]+),([\d]+) */$1.$2/ if $val =~ m{\A
 attr DEVICE stateFormat W: wind, H: humidity%rH, T: temperature°C
 attr DEVICE model ORF_weather
 setreading DEVICE attrTemplateVersion 20201129
+
+#Austrian weather, contributed by JoeALLb Forum: https://forum.fhem.de/index.php/topic,97694.msg1105574.html#msg1105574; 
+name:bergfex_weather
+filter:TYPE=HTTPMOD
+desc: Get austrian weather data from bergfex.<br>Define a HTTPMOD device like <br>define bergfexInnsbruck HTTPMOD none 0<br>Adapt the city to your needs.
+order:WEATHER04
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+par:CITY;Name of the city you want to consider. Examples: innsbruck, salzburg, wien-stadt. <br>Please check the URL with the city to use before. The page must have the same structure as https://www.bergfex.at/sommer/innsbruck/wetter/ <br>For example, wien doesn't work, and wien-stadt or wien-und-umgebung work; { undef }
+attr DEVICE enableControlSet 1
+attr DEVICE get01Expr $val =~ /.*title="(.*)"|.*?>\n?([\d,-]+)|([\d:.,-]*)/;; $val="$1$2$3";;
+attr DEVICE get01Name Wetter
+attr DEVICE get01Poll 1
+attr DEVICE get01RegOpt smx
+attr DEVICE get01Regex \p{Any}\
+,\s(?<uhrzeit>\d\d:\d\d)[^\n]+\
+\n(?<textS0>[^\n]+).*?\
+Niederschlag:\s+(?<niederschlag>\d+.).*?\
+(?:9-Tage\sWettervorhersage).*?\
+(?'textD0'(?<="icon"......).{1,100}png..title..(?:.+?)").*?\
+(?'tmax0'(?<="tmax">)(?:[\d,-]+)°).*?\
+(?'tmin0'(?<="tmin">)(?:[\d,-]+)°).*?\
+(?'rainW0'(?<=\n)(?:[\d,]+)%).*?\
+(?'rain0'(?<=rrr)\d+.+?\n(?:[\d,-]+)l?).*?\
+(?'sunhour0'(?<=sonne)\d+">[^<]+(?:<))\
+(?:.*?(?<textD1>(?&textD0)))?\
+.*?(?<tmax1>(?&tmax0))\
+.*?(?<tmin1>(?&tmin0))\
+.*?(?<rainW1>(?&rainW0))\
+.*?(?<rain1>(?&rain0))\
+.*?(?<sunhour1>(?&sunhour0))\
+.*?(?<textD2>(?&textD0))\
+.*?(?<tmax2>(?&tmax0))\
+.*?(?<tmin2>(?&tmin0))\
+.*?(?<rainW2>(?&rainW0))\
+.*?(?<rain2>(?&rain0))\
+.*?(?<sunhour2>(?&sunhour0))\
+.*?(?<textD3>(?&textD0))\
+.*?(?<tmax3>(?&tmax0))\
+.*?(?<tmin3>(?&tmin0))\
+.*?(?<rainW3>(?&rainW0))\
+.*?(?<rain3>(?&rain0))\
+.*?(?<sunhour3>(?&sunhour0))\
+.*?(?<textD4>(?&textD0))\
+.*?(?<tmax4>(?&tmax0))\
+.*?(?<tmin4>(?&tmin0))\
+.*?(?<rainW4>(?&rainW0))\
+.*?(?<rain4>(?&rain0))\
+.*?(?<sunhour4>(?&sunhour0))\
+.*?(?<textD5>(?&textD0))\
+.*?(?<tmax5>(?&tmax0))\
+.*?(?<tmin5>(?&tmin0))\
+.*?(?<rainW5>(?&rainW0))\
+.*?(?<rain5>(?&rain0))\
+.*?(?<sunhour5>(?&sunhour0))\
+.*?(?<textD6>(?&textD0))\
+.*?(?<tmax6>(?&tmax0))\
+.*?(?<tmin6>(?&tmin0))\
+.*?(?<rain6>(?&rain0))\
+.*?(?<sunhour6>(?&sunhour0))\
+.*?(?<textD7>(?&textD0))\
+.*?(?<tmax7>(?&tmax0))\
+.*?(?<tmin7>(?&tmin0))\
+.*?(?<rain7>(?&rain0))\
+.*?(?<sunhour7>(?&sunhour0))\
+.*?(?<textD8>(?&textD0))\
+.*?(?<tmax8>(?&tmax0))\
+.*?(?<tmin8>(?&tmin0))\
+#.*?(?<rainW8>(?&rainW0))\
+.*?(?<rain8>(?&rain0))\
+.*?(?<sunhour8>(?&sunhour0))
+attr DEVICE getURL https://www.bergfex.at/sommer/CITY/wetter/
+attr DEVICE get02Expr $val =~ /.*<p>([^<]+)/;; $val="$1";;
+attr DEVICE get02Name Wetter2
+attr DEVICE get02Poll 1
+attr DEVICE get02RegOpt smx
+attr DEVICE get02Regex (?'txtL0'<h2>[^>]+?<span\sclass='less-important'>[^>]+\/[^>]+>.<.h2>\n+<div\sclass="txt_markup"><p>[^<]+)<\
+(?:.*?(?<txtL1>(?&txtL0)))?\
+(?:.*?(?<txtL2>(?&txtL0)))?\
+(?:.*?(?<txtL3>(?&txtL0)))?\
+(?:.*?(?<txtL4>(?&txtL0)))?
+attr DEVICE widgetOverride get01Regex:textField-long\
+get02Regex:textField-long\
+get01Expr:textField-long\
+get02Expr:textField-long\
+widgetOverride:textField-long
+attr DEVICE room WHICHROOM
+attr DEVICE model bergfex_weather
+setreading DEVICE attrTemplateVersion 20201129
+
 
 #Geschwindigkeitsüberwachung, Forum: https://forum.fhem.de/index.php/topic,90014.msg824805.html#msg824805
 name:blitzer_atudo
