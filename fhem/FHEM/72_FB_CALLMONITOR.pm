@@ -810,7 +810,7 @@ FB_CALLMONITOR_reverseSearch($$)
                     $number =~ s/^0049/0/; # remove country code
                     Log3 $name, 4, "FB_CALLMONITOR ($name) - using dasoertliche.de for reverse search of $number";
 
-                    $result = GetFileFromURL("https://www.dasoertliche.de/?form_name=search_inv&ph=".$number, 3, undef, 1);
+                    $result = GetFileFromURL("https://www.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
                     if(not defined($result))
                     {
                         if(AttrVal($name, "reverse-search-cache", "0") eq "1")
