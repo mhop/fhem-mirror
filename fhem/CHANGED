@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  72_FB_CALLMONITOR: fix reverse search for dasoertliche.de
  - bugfix:  49_SSCam: fix cannot send snaps/recs if snapTelegramTxt + 
                       snapChatTxt and no cacheType (cacheType=internal) is set
  - bugfix:  50_SSChatBot: fix cannot send after receiving anything
