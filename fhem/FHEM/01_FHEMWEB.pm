@@ -1535,8 +1535,8 @@ FW_doDetail($)
                 sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
   my $groupList = "multiple,".join(",", 
                 sort map { $_ =~ s/ /#/g ;$_} keys %FW_groups);				
-  $attrList =~ s/room /room:$roomList /;
-  $attrList =~ s/group /group:$groupList /;
+  $attrList =~ s/\broom\b/room:$roomList/;
+  $attrList =~ s/\bgroup\b/group:$groupList/;
   $attrList = FW_widgetOverride($d, $attrList);
   $attrList =~ s/\\/\\\\/g;
   $attrList =~ s/'/\\'/g;
