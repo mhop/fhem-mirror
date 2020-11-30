@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.4"  => "30.11.2020  add mtime, crtime to uploaded files ",
   "0.7.3"  => "29.11.2020  fix (prepare)Download without dest= option",
   "0.7.2"  => "22.11.2020  undef variables containing a lot of data in execOp ",
   "0.7.1"  => "08.11.2020  fix download, fix perl warning while upload not existing files  ",
@@ -760,9 +761,11 @@ sub __fillUploadQueue {
   
   # Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
 
-  for my $lcf (keys %{$found}) {
-      my $fname = (split "\/", $lcf)[-1];
-      my $dir   = $remDir.$found->{"$lcf"};                             # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
+  for my $sn (keys %{$found}) {
+      my $fname  = (split "\/", $found->{$sn}{lfile})[-1];
+      my $mtime  = $found->{$sn}{mtime}  * 1000;                        # Angabe in Millisekunden
+      my $crtime = $found->{$sn}{crtime} * 1000;                        # Angabe in Millisekunden
+      my $dir    = $remDir.$found->{$sn}{ldir};                         # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
       
       if($struc eq "false") {                                           # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
           $dir = $remDir;
@@ -772,6 +775,8 @@ sub __fillUploadQueue {
       $dat .= addBodyPart (qq{content-disposition: form-data; name="path"},                                                              $dir,     "first");
       $dat .= addBodyPart (qq{content-disposition: form-data; name="create_parents"},                                                    $cdir            );
       $dat .= addBodyPart (qq{content-disposition: form-data; name="overwrite"},                                                         $ow              );
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="mtime"},                                                             $mtime           );
+      $dat .= addBodyPart (qq{content-disposition: form-data; name="crtime"},                                                            $crtime          );      
       $dat .= addBodyPart (qq{content-disposition: form-data; name="file"; filename="$fname"\r\nContent-Type: application/octet-stream}, "<FILE>", "last" );
 
       my $params = { 
@@ -781,7 +786,7 @@ sub __fillUploadQueue {
           method   => "upload",                                                          
           reqtype  => "POST",
           header   => "Content-Type: multipart/form-data, boundary=$bound",
-          lclFile  => $lcf,
+          lclFile  => $found->{$sn}{lfile},
           postdata => $dat,
           remFile  => $dir."/".$fname
       };
@@ -2125,6 +2130,7 @@ sub exploreFiles {
   ($mode, my $d) = split ":", $mode;                                                                               # $d = Anzahl Tage bei Mode= nth:X
   
   my $found;
+  my $sn = 0;
   for my $obj (@$allref) {                                                                                         # Objekte und Inhalte der Ordner auslesen für add Queue
       find ( { wanted   => sub {  my $file =  $File::Find::name;
                                   my $dir  =  $File::Find::dir;
@@ -2143,10 +2149,14 @@ sub exploreFiles {
                                       return if(-M $file > $d);
                                   }
                                   
-                                  if(-f $file && -r $file) { 
+                                  if(-f $file && -r $file) {
+                                      $sn++;                                      
                                       $dir =~ s/^\.//x;
                                       $dir =~ s/\/$//x;
-                                      $found->{"$file"} = "$dir";
+                                      $found->{$sn}{lfile}  = "$file";
+                                      $found->{$sn}{ldir}   = "$dir";
+                                      $found->{$sn}{mtime}  = (stat $file)[9];
+                                      $found->{$sn}{crtime} = (stat $file)[10];
                                   }
                                }, 
                no_chdir => 1 
