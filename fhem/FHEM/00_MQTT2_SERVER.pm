@@ -381,6 +381,7 @@ MQTT2_SERVER_Read($@)
     if(!$hash->{answerScheduled}) {
       $hash->{answerScheduled} = 1;
       InternalTimer($hash->{lastMsgTime}+1, sub(){
+        return if(!$hash->{FD}); # Closed in the meantime, #114425
         delete($hash->{answerScheduled});
         my $r = $defs{$sname}{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
@@ -488,7 +489,7 @@ MQTT2_SERVER_sendto($$$$)
   my ($shash, $hash, $topic, $val) = @_;
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
-  my $dump = (AttrVal($shash->{NAME},"verbose",1) >= 5) ? $shash->{NAME} :undef;
+  my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
   foreach my $s (keys %{$hash->{subscriptions}}) {
     my $re = $s;
     $re =~ s,^#$,.*,g;
