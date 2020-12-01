@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.7.1"  => "01.12.2020  fix problem that 'Bad request' after call consumerMasterdata if haven't any consumer available delivers an error ",
   "3.7.0"  => "21.11.2020  add new consumer management for switched sockets and SMA EV Charger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
@@ -1433,7 +1434,7 @@ sub _getConsumerMasterdata {             ## no critic "not used"
                                         tag      => "consumerMasterdata",
                                         state    => $state, 
                                         fnaref   => [ qw( extractConsumerMasterdata ) ],
-                                        addon    => "",
+                                        addon    => "noJSONdata",                            # wenn kein Consumer vorhanden wird kein JSON geliefert !
                                         daref    => $daref
                                      });
   
@@ -3009,9 +3010,9 @@ return;
 ##          Auswertung Consumer Stammdaten
 ################################################################
 sub extractConsumerMasterdata {
-  my $hash      = shift; 
-  my $daref     = shift;
-  my $clivedata = shift;
+  my $hash  = shift; 
+  my $daref = shift;
+  my $cdata = shift;
   
   my $name      = $hash->{NAME};
   my %consumers;
@@ -3020,14 +3021,14 @@ sub extractConsumerMasterdata {
   
   Log3 ($name, 4, "$name - ##### extracting consumer master data #### ");
   
-  $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
-                                                     return;
-                                                   };
+  $cdata = eval{decode_json($cdata)} or do { Log3 ($name, 4, "$name - No JSON Data were delivered from SMA. Possibly you haven't any consumer integrated."); 
+                                                   return;
+                                                  };
   my $lv = $stpl{consumerMasterdata}{level};
   
   # allen Consumer Objekten die ID zuordnen
   $i = 0;
-  for my $c (@{$clivedata->{'MeasurementData'}}) {
+  for my $c (@{$cdata->{'MeasurementData'}}) {
       $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;

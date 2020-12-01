@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  76_SMAPortal: fix problem that after call consumerMasterdata 
+                          delivers an error if haven't any consumer available
  - bugfix:  72_FB_CALLMONITOR: fix reverse search for dasoertliche.de
  - bugfix:  49_SSCam: fix cannot send snaps/recs if snapTelegramTxt + 
                       snapChatTxt and no cacheType (cacheType=internal) is set
