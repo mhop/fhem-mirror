@@ -224,7 +224,7 @@ BlockingInformParent($;$$$)
 	
   # Write the data back, calling the function
   if(!$telnetClient) {
-    my $addr = "localhost:$defs{$BC_telnetDevice}{PORT}";
+    my $addr = "127.0.0.1:$defs{$BC_telnetDevice}{PORT}";
     $telnetClient = IO::Socket::INET->new(PeerAddr => $addr);
     if(!$telnetClient) {
       Log 1, "BlockingInformParent ($informFn): Can't connect to $addr: $@";
