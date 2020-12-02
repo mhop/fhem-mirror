@@ -41,7 +41,7 @@ sub CommandHelp {
     
     my $outputInfo = cref_findInfo($modPath,$mod);
 
-	if($cmds{help}{InternalCmds} !~ m/$mod\,/) {
+    if($cmds{help}{InternalCmds} !~ m/(^|\,)$mod\,/) {
       my %mods;
 	  my @modDir = ("$modPath/FHEM");
 
