@@ -61,7 +61,7 @@ at_Define($$)
   }
 
   return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
-                                        if($tm !~ m/^(\+)?(\*(\{\d+\})?)?(.*)$/);
+                                       if($tm !~ m/^(\+)?(\*(\{\d+\})?)?(.*)$/);
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
 
   my ($abstime, $err, $hr, $min, $sec, $fn);
@@ -91,7 +91,7 @@ at_Define($$)
     }
 
   }
-  return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
+  return "datespec is not allowed with +" if($abstime && $rel);
 
   if($hash->{CL}) {     # Do not check this for definition
     $err = perlSyntaxCheck($command, ());
