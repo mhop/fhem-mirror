@@ -3633,7 +3633,7 @@ GetTimeSpec($)
     my ($err, $fn2);
     ($err, $hr, $min, $sec, $fn2) = GetTimeSpec($tspec);
     return ("the function \"$fn\" must return a timespec and not $tspec.",
-                undef, undef, undef, undef) if($err);
+                undef, undef, undef, $tspec) if($err);
 
   } else {
     return ("Wrong timespec $tspec: either HH:MM:SS or {perlcode}",

@@ -74,7 +74,21 @@ at_Define($$)
 
   } else {
     ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
-    return $err if($err);
+    if($err) { # $fn contains the result, try again
+      my $ntspec = $fn;
+      $fn = undef;
+      if($ntspec =~ m/^\d{10}$/) {
+        $abstime = $ntspec;
+
+      } elsif($ntspec =~ m/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)$/) {
+        my ($y,$m,$d,$h,$m2,$s) = ($1,$2,$3,$4,$5,$6);
+        $abstime = mktime($s,$m2,$h,$d,$m-1,$y-1900, 0,0,-1);
+
+      } else {
+        return $err;
+      }
+
+    }
 
   }
   return "datespec is not allowed with + or *" if($abstime && ($rel || $rep));
