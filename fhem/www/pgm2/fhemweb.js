@@ -309,11 +309,11 @@ FW_jqueryReadyFn()
       $("#content > #workbench").html(data);
       var mtype = $("#content > #workbench a[name]").attr("name"), aTag;
       if(mtype) {
-        var mv = (mtype+""+val).replaceAll(/[^a-z0-9_]/ig,'_');
+        var mv = (""+mtype+val).replace(/[^a-z0-9_]/ig,'_');
         aTag = $("#content > #workbench").find("a[name="+mv+"]");
       }
       if(!$(aTag).length) { // old style syntax without type
-        var v = (val).replaceAll(/[^a-z0-9_]/ig,'_');
+        var v = (val).replace(/[^a-z0-9_]/ig,'_');
         aTag = $("#content > #workbench").find("a[name="+v+"]");
       }
       if($(aTag).length) {
