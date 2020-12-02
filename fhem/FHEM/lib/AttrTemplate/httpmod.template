@@ -401,6 +401,29 @@ attr DEVICE room WHICHROOM
 attr DEVICE model pharmacy_emergency_service_germany
 setreading DEVICE attrTemplateVersion 20201129
 
+#Pharmacy emergency service Germany - aponet, Forum https://forum.fhem.de/index.php/topic,87234.0.html
+name:aponet_pharmacy_emergency_service_germany
+filter:TYPE=HTTPMOD
+desc: Gets the current emergency service of a pharmacy closeby your postal code<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD https://www.aponet.de/apotheke/notdienstsuche?tx_aponetpharmacy_search[action]=result&tx_aponetpharmacy_search[controller]=Search&tx_aponetpharmacy_search[search][plzort]=91320&tx_aponetpharmacy_search[search][date]=&tx_aponetpharmacy_search[search][street]=&tx_aponetpharmacy_search[search][radius]=15&tx_aponetpharmacy_search[search][lat]=&tx_aponetpharmacy_search[search][lng]=&type=1982 0<br />Change the postalcode (91320 in this example) and the radius (15 in this example) to yours<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html">Source: Forum</a><br />
+order:DIV02
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+attr DEVICE reading01Name NotName
+attr DEVICE reading01Regex class="name">(.*?)<\/h4>
+attr DEVICE reading02Name NotdienstVon
+attr DEVICE reading02Regex Notdienst vom(.*?Uhr)
+attr DEVICE reading03Name NotdienstBis
+attr DEVICE reading03Regex Notdienst vom.*?Uhr bis(.*?Uhr)
+attr DEVICE reading04Name NotdienstTelefon
+attr DEVICE reading04Regex href="tel:(.*?)"
+attr DEVICE reading05Name NotdienstAdresse
+attr DEVICE reading05Regex (?s)strasse">([\sa-zA-Z0-9äöüÄÖÜß.&#;;_-]+).*?plz">(\d+).*?ort">([\sa-zA-Z0-9äöüÄÖÜß.&#;;_-]+)<
+attr DEVICE reading06Name DatumVon
+attr DEVICE reading06Regex Notdienst vom ([ 0-9.:&#;;_-]+)
+attr DEVICE stateFormat NotName, NotdienstTelefon, NotdienstAdresse-1 in NotdienstAdresse-2 NotdienstAdresse-3
+attr DEVICE model aponet_pharmacy_emergency_service_germany
+setreading DEVICE attrTemplateVersion 20201202
+
+
 #################################
 #HP Printers
 #
@@ -658,7 +681,6 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 par:INTERVAL;Actual interval for updating, defaults to one day (86400s); {InternalVal("DEVICE","Interval",86400)}
 defmod DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/\DEVICE INTERVAL
 attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete showNewFWOnly:yes,no
-attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01Regex reading02AutoNumLen reading02Name reading02RegOpt reading02Regex readingMaxAge readingMaxAgeReplacementMode:text,reading,internal,expression,delete showNewFWOnly:yes,no
 attr DEVICE do_not_notify 1
 attr DEVICE enableControlSet 1
 attr DEVICE icon hm_ccu
@@ -672,7 +694,6 @@ attr DEVICE reading02RegOpt g
 attr DEVICE reading02Regex (?si)"version":"(\d+[.]\d+[.]\d+)
 attr DEVICE readingMaxAge 10
 attr DEVICE readingMaxAgeReplacementMode delete
-attr DEVICE room WHICHROOM
 attr DEVICE showError 1
 attr DEVICE showMatched 1
 attr DEVICE showNewFWOnly yes
@@ -680,7 +701,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
     my $lastCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(ReadingsTimestamp($name,"MATCHED_READINGS","2000-01-01 00:00:00"))));;\
 	my $nextCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(InternalVal($name,"TRIGGERTIME_FMT","2000-01-01 00:00:00"))));;\
 	my $cellstyle = "padding:3pt;;border-bottom:1px dotted lightgray;;";;\
-    $ret .= '<div style="text-align:left;;">';;;;\
+    $ret .= '<div style="text-align:left;;">';;\
     $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html">homematic</a>-fw-check => '.$lastCheck;;\
     $ret .= '</div>';;\
     my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");;\
@@ -704,7 +725,6 @@ attr DEVICE stateFormat {   my $ret ="";;\
       foreach my $devStr (@devices) {\
 		my ($dev,$idx) = $devStr =~ m/([^\s]+)\s[(](\d+)[)]/;;\
 		my $md = ReadingsVal($name,("hmfw-type-".$idx),"?");;\
-		#my $ofw = AttrVal($dev,"firmware","?");;\
 		my $ofw = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
 		my $nfw = ReadingsVal($name,("hmfw-version-".$idx),"none");;\
         my $fw_link = "https://ccu3-update.homematic.com/firmware/download?cmd=download&serial=0&product=".$md;;\
@@ -727,7 +747,7 @@ attr DEVICE stateFormat {   my $ret ="";;\
       }\
 	  $ret .= '</div>';; #table\
     }\
-	$ret .= "<div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
+	$ret .= "<br \/><div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
     $ret .= '</div>';;\
   return $ret;;\
 }
@@ -740,14 +760,14 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d)/g;;\
 	\
 	foreach my $dev (devspec2array("TYPE=CUL_HM|HMCCUDEV:FILTER=DEF=(......|..............):FILTER=subType!=virtual")) {\
-	  my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));;\
-	  my $v = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
-      my ($h,$l) = split('\.',$v);;\
-      foreach my $newFW (grep m/^${md}:/i,@eq3FwList) {\
+	my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));;\
+	my $v = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
+        my ($h,$l) = split('\.',$v);;\
+        foreach my $newFW (grep m/^${md}:/i,@eq3FwList) {\
 		my ($fwmd, $fwv, $idx) = $newFW =~ m/([^:]+):(\d+[.]\d+[.]\d+):(\d+)$/;;\
 		my ($fwh, $fwl) = split('\.',$fwv);;\
 		if(($newfwonly eq "no") || (($fwh > $h) || (($fwh == $h) && ($fwl > $l)))) {\
-          $ret .= "," if($ret ne "");;\
+		  $ret .= "," if($ret ne "");;\
 		  $ret .= $dev." (".$idx.")";;\
         }\
       }\
@@ -760,8 +780,7 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model hm_fw_check_v2
-setreading DEVICE attrTemplateVersion 20201129
-
+setreading DEVICE attrTemplateVersion 20201202
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
 name:aculfw_fw_check
