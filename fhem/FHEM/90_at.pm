@@ -61,7 +61,7 @@ at_Define($$)
   }
 
   return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
-                                       if($tm !~ m/^(\+)?(\*(\{\d+\})?)?(.*)$/);
+                                       if($tm !~ m/^(\+)?(\*(\{\d+\})?)?(.+)$/);
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
 
   my ($abstime, $err, $hr, $min, $sec, $fn);
@@ -75,7 +75,7 @@ at_Define($$)
   } else {
     ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
     if($err) { # $fn contains the result, try again
-      my $ntspec = $fn;
+      my $ntspec = ($fn ? $fn : "");
       $fn = undef;
       if($ntspec =~ m/^\d{10}$/) {
         $abstime = $ntspec;
