@@ -1,8 +1,8 @@
 ##############################################
 # 00_THZ
 # $Id$
-# by immi 11/2020
-my $thzversion = "0.192";
+# by immi 12/2020
+my $thzversion = "0.193";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -1543,7 +1543,7 @@ sub THZ_ReadAnswer($) {
     }
     return ("THZ_ReadAnswer: InterfaceNotRespondig. Maybe too slow", "") if(!defined($buf)) ;
 	my $data =  uc(unpack('H*', $buf));
-	$count =1; $countmax = 60;
+	$count =1; $countmax = 120;	#increased to 120 for LeJoke his raspi4 is very fast reading and reaches 60 evry time
 	while (( (length($data) == 1) or (($data =~ m/^01/) and ($data !~ m/1003$/m ))) and ($count <= $countmax)){ 
         select(undef, undef, undef, 0.005) if( $^O =~ /Win/ ); ###delay of 5 ms for windows-OS, because SimpleReadWithTimeout does not wait
         my $buf1 = DevIo_SimpleReadWithTimeout($hash, 0.02);
@@ -1554,7 +1554,7 @@ sub THZ_ReadAnswer($) {
             Log3($hash->{NAME}, 5, "double read $count result with buf1  $data");
             $count ++;
 	    }
-        else{ $count += 5; }
+        else{ $count += 10; }	# increased to 10 because doubled the countmax
     }
 	return ("THZ_ReadAnswer: Interface max repeat limited to $countmax ", $data) if ($count == ($countmax +1));
 	Log3 $hash->{NAME}, 5, "THZ_ReadAnswer: uc unpack: '$data'";	
