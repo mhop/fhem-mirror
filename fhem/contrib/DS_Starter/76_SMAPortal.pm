@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id: 76_SMAPortal.pm 23242 2020-11-27 17:41:03Z DS_Starter $
+# $Id: 76_SMAPortal.pm 23272 2020-12-01 20:51:52Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -137,6 +137,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "3.7.2"  => "02.12.2020  fix PlantOid= in _getConsumerxxxData, add SUSyID 425 ",
   "3.7.1"  => "01.12.2020  fix problem that 'Bad request' after call consumerMasterdata if haven't any consumer available delivers an error ",
   "3.7.0"  => "21.11.2020  add new consumer management for switched sockets and SMA EV Charger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
@@ -251,8 +252,9 @@ my %hal = (                                                                     
 
 my %hsusyid = (                                                                   # Schalten/Management der Verbraucher entspr. ihrer SUSyID
   191 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 191 = SMA Schaltdosen
-  315 => { arg => ":slider,0,1,100", fn => \&_manageConsumerByEnergy },           # 315 = SMA EV Charger
+  315 => { arg => ":slider,0,1,100", fn => \&_manageConsumerByEnergy },           # 315 = Geräte über SEMP (z.B. SMA EV Charger)
   366 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 366 = Edimax sp-2101w v1 Schaltdosen
+  425 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 425 = Fritz Dect Steckdosen
 );
                                                                               # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
@@ -1511,7 +1513,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   my $dds      = (split(/\s+/x, TimeNow()))[0];
   my $dde      = (split(/\s+/x, FmtDateTime(time()+86400)))[0];
   
-  my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&'.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
+  my $ccdd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=2&PlantOid='.$PlantOid.'&StartTime='.$dds.'&EndTime='.$dde.'';
   
   # Energiedaten aktueller Tag
   Log3 ($name, 4, "$name - getting consumer energy data of current day");
@@ -1564,7 +1566,7 @@ sub _getConsumerMonthData {             ## no critic "not used"
       $mde = "$ye-$me-01";
   }
   
-  my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&'.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
+  my $ccmd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=4&PlantOid='.$PlantOid.'&StartTime='.$mds.'&EndTime='.$mde.'';
 
   # Energiedaten aktueller Monat
   Log3 ($name, 4, "$name - getting consumer energy data of current month");
@@ -1619,7 +1621,7 @@ sub _getConsumerYearData {              ## no critic "not used"
       $yde = ($1+1)."-01-01";
   }
   
-  my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&'.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
+  my $ccyd = 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetMeasuredValues?IntervalId=5&PlantOid='.$PlantOid.'&StartTime='.$yds.'&EndTime='.$yde.'';
 
   # Energiedaten aktuelles Jahr
   Log3 ($name, 4, "$name - getting consumer energy data of current year");
@@ -3394,13 +3396,13 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23242 2020-11-27 17:41:03Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23272 2020-12-01 20:51:52Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23242 2020-11-27 17:41:03Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23272 2020-12-01 20:51:52Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
