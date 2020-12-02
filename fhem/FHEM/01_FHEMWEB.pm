@@ -3239,6 +3239,7 @@ FW_devState($$@)
   } else {
     my $html = "";
     foreach my $state (split("\n", $state)) {
+      $state =~ s/ *$//;
       $txt = $state;
       my ($icon, $isHtml);
       ($icon, $link, $isHtml) = FW_dev2image($d,$state);
