@@ -200,12 +200,17 @@ sub MAX_Define {
     $hash->{type}                = $type;
     $hash->{devtype}             = $devtype;
     $hash->{addr}                = $addr;
-    $hash->{TimeSlot}            = -1 if ($type =~ m{Thermostat}xms); # wird durch CUL_MAX neu gesetzt 
     $hash->{'.count'}            = 0; # ToDo Kommentar
     $hash->{'.sendToAddr'}       = '-1'; # zu wem haben wird direkt gesendet ?
     $hash->{'.sendToName'}       = '';
     $hash->{'.timer'}            = 300 if (($type ne 'PushButton') && ($type ne 'Cube'));
     $hash->{SVN}                 = (qw($Id$))[2];
+
+    if ($type =~ m{Thermostat}xms) {
+	$hash->{TimeSlot} = -1 ; # wird durch CUL_MAX neu gesetzt 
+	$hash->{webCmd}   = 'desiredTemperature'; # Hint for FHEMWEB
+    }
+
     $modules{MAX}{defptr}{$addr} = $hash;
 
     CommandAttr(undef,"$name model $type"); # Forum Stats werten nur attr model aus
@@ -1853,7 +1858,7 @@ sub MAX_Parse
     {
       my @ar = grep {$_ ne $args[1]} @peers;
       @peers = sort @ar;
-      readingsDelete($sname,'peers') if (!@peers); # keiner mehr da
+      readingsDelete($shash,'peers') if (!@peers); # keiner mehr da
     }
 
     readingsBulkUpdate($shash, 'peers', join(',',@peers)) if (@peers);
@@ -1925,11 +1930,13 @@ sub MAX_Parse
   my $state = ReadingsVal($shash->{NAME}, 'state', 'waiting for data');
 
   $shash->{'.desiredTemperature'} = MAX_SerializeTemperature($shash->{'.desiredTemperature'}) if($shash->{'.desiredTemperature'});
-  my $c = '';
-  $c = '&deg;C' if (exists($shash->{'.desiredTemperature'}) && (substr($shash->{'.desiredTemperature'},0,1) ne 'o')); # on/off
+  #my $c = '';
+  #$c = '&deg;C' if (exists($shash->{'.desiredTemperature'}) && (substr($shash->{'.desiredTemperature'},0,1) ne 'o')); # on/off
   #$c = '°C' if (defined($shash->{'.desiredTemperature'}) && substr($shash->{'.desiredTemperature'},0,1) ne 'o'); # on/off
 
-  $state = $shash->{'.desiredTemperature'}.$c if (exists($shash->{'.desiredTemperature'}));
+  #$state = $shash->{'.desiredTemperature'}.$c if (exists($shash->{'.desiredTemperature'}));
+
+  $state = $shash->{'.desiredTemperature'} if (exists($shash->{'.desiredTemperature'}));
   $state = ($shash->{'.isopen'}) ? 'opened' : 'closed' if (exists($shash->{'.isopen'}));
 
   if ($shash->{devtype} > 5) 
@@ -1941,19 +1948,19 @@ sub MAX_Parse
 
   if (IsDummy($shash->{NAME}))
   {
-   $state .= " (auto)"                     if (exists($shash->{mode}) && (int($shash->{'.mode'}) == 0));
-   $state .= " (manual)"                   if (exists($shash->{mode}) && (int($shash->{'.mode'}) == 1));
+   $state .= ' (auto)'                     if (exists($shash->{mode}) && (int($shash->{'.mode'}) == 0));
+   $state .= ' (manual)'                   if (exists($shash->{mode}) && (int($shash->{'.mode'}) == 1));
   }
 
-  $state .= ' (boost)'                     if (exists($shash->{'.mode'})    && (int($shash->{'.mode'}) == 3));
-  $state .= ' (until '.$shash->{until}.')' if (exists($shash->{'.mode'})    && (int($shash->{'.mode'}) == 2) && exists($shash->{until}));
-  $state .= ' (battery low)'               if (exists($shash->{'.battery'}) && $shash->{'.battery'});
-  $state .= ' (rf error)'                  if (exists($shash->{'.rferror'}) && $shash->{'.rferror'});
+  $state .= ' (boost)'                 if (exists($shash->{'.mode'})    && (int($shash->{'.mode'}) == 3));
+  $state .= " (until shash->{'until')" if (exists($shash->{'.mode'})    && (int($shash->{'.mode'}) == 2) && exists($shash->{'until'}));
+  $state .= ' (battery low)'           if (exists($shash->{'.battery'}) && $shash->{'.battery'});
+  $state .= ' (rf error)'              if (exists($shash->{'.rferror'}) && $shash->{'.rferror'});
  
   readingsBulkUpdate($shash, 'state',        $state);
 
   if (exists($shash->{'.desiredTemperature'})
-      && $c # weder on noch off
+      && substr($shash->{'.desiredTemperature'},0,1) ne 'o')
       && ($shash->{'.desiredTemperature'} != ReadingsNum($sname,'windowOpenTemperature',0))
       && AttrNum($sname,'windowOpenCheck',0))
   {
