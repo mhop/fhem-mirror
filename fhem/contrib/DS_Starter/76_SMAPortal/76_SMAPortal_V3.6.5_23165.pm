@@ -1,5 +1,5 @@
 #########################################################################################################################
-# $Id$
+# $Id: 76_SMAPortal.pm 23105 2020-11-05 22:24:21Z DS_Starter $
 #########################################################################################################################
 #       76_SMAPortal.pm
 #
@@ -137,8 +137,6 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "3.7.1"  => "01.12.2020  fix problem that 'Bad request' after call consumerMasterdata if haven't any consumer available delivers an error ",
-  "3.7.0"  => "21.11.2020  add new consumer management for switched sockets and SMA EV Charger ",
   "3.6.5"  => "12.11.2020  verbose5data switchConsumer, more preselected user agents ",
   "3.6.4"  => "11.11.2020  preselect the user agent randomly, set min. interval to 180 s ",
   "3.6.3"  => "05.11.2020  fix only four consumer are shown in set command drop down list ",
@@ -180,6 +178,43 @@ my %vNotesIntern = (
   "2.6.0"  => "20.04.2020  change package config, improve cookie management, decouple switch consumers from livedata retrieval ".
                            "some improvements according to PBP ",
   "2.5.0"  => "25.08.2019  change switch consumer to on<->automatic only in graphic overview, Forum: https://forum.fhem.de/index.php/topic,102112.msg969002.html#msg969002",
+  "2.4.5"  => "22.08.2019  fix some warnings, Forum: https://forum.fhem.de/index.php/topic,102112.msg968829.html#msg968829 ",
+  "2.4.4"  => "11.07.2019  fix consinject to show multiple consumer icons if planned ",
+  "2.4.3"  => "07.07.2019  change header design of portal graphics again ",
+  "2.4.2"  => "02.07.2019  change header design of portal graphics ",
+  "2.4.1"  => "01.07.2019  replace space in consumer name by a valid sign for reading creation ",
+  "2.4.0"  => "26.06.2019  support for FTUI-Widget ",
+  "2.3.7"  => "24.06.2019  replace suggestIcon by consumerAdviceIcon ",
+  "2.3.6"  => "21.06.2019  revise commandref ",                        
+  "2.3.5"  => "20.06.2019  subroutine consinject added to pv, pvco style ",
+  "2.3.4"  => "19.06.2019  change some readingnames, delete L4_plantOid, next04hours_state ",
+  "2.3.3"  => "16.06.2019  change verbose 4 output, fix warning if no weather info was got ",
+  "2.3.2"  => "14.06.2019  add request string to verbose 5, add battery data to live and historical consumer data ",
+  "2.3.1"  => "13.06.2019  switch Credentials read from RAM to verbose 4, changed W/h->Wh and kW/h->kWh in PortalAsHtml ",
+  "2.3.0"  => "12.06.2019  add set on,off,automatic cmd for controlled devices ",
+  "2.2.0"  => "10.06.2019  relocate RestOfDay and Tomorrow data from level 3 to level 2, change readings to start all with uppercase, ".
+                           "add consumer energy data of current day/month/year, new attribute \"verbose5Data\" ",
+  "2.1.2"  => "08.06.2019  correct planned time of consumer in PortalAsHtml if planned time is at next day ",
+  "2.1.1"  => "08.06.2019  add units to values, some bugs fixed ",
+  "2.1.0"  => "07.06.2019  add informations about consumer switch and power state ",
+  "2.0.0"  => "03.06.2019  designed for SMAPortalSPG graphics device ",
+  "1.8.0"  => "27.05.2019  redesign of SMAPortal graphics by Wzut/XGuide ",
+  "1.7.1"  => "01.05.2019  PortalAsHtml: use of colored svg-icons possible ",
+  "1.7.0"  => "01.05.2019  code change of PortalAsHtml, new attributes \"portalGraphicColor\" and \"portalGraphicStyle\" ",
+  "1.6.0"  => "29.04.2019  function PortalAsHtml ",
+  "1.5.5"  => "22.04.2019  fix readings for BattryOut and BatteryIn ",
+  "1.5.4"  => "26.03.2019  delete L1_InfoMessages if no info occur ",
+  "1.5.3"  => "26.03.2019  delete L1_ErrorMessages, L1_WarningMessages if no errors or warnings occur ",
+  "1.5.2"  => "25.03.2019  prevent module from deactivation in case of unavailable Meta.pm ",
+  "1.5.1"  => "24.03.2019  fix \$VAR1 problem Forum: #27667.msg922983.html#msg922983 ",
+  "1.5.0"  => "23.03.2019  add consumer data ",
+  "1.4.0"  => "22.03.2019  add function extractPlantMasterData, DbLog_split, change L2 Readings ",
+  "1.3.0"  => "18.03.2019  change module to use package FHEM::SMAPortal and Meta.pm, new sub setVersionInfo ",
+  "1.2.3"  => "12.03.2019  make ready for 98_Installer.pm ", 
+  "1.2.2"  => "11.03.2019  new Errormessage analyze added, make ready for Meta.pm ", 
+  "1.2.1"  => "10.03.2019  behavior of state changed, commandref revised ", 
+  "1.2.0"  => "09.03.2019  integrate weather data, minor fixes ",
+  "1.1.0"  => "09.03.2019  make get data more stable, new attribute 'getDataRetries' ",
   "1.0.0"  => "03.03.2019  initial "
 );
 
@@ -244,17 +279,7 @@ my %hua = (                                                                     
   11 => "Mozilla/5.0 (Linux; Android 8.0.0; BAH2-L09 Build/HUAWEIBAH2-L09; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/86.0.4240.185 Safari/537.36", 
 );
 
-my %hal = (                                                                       # Header Accept-Language sprachenabhängig
-  "DE" => "de,en-US;q=0.7,en;q=0.3",
-  "EN" => "en-US;q=0.7,en;q=0.3"
-);
-
-my %hsusyid = (                                                                   # Schalten/Management der Verbraucher entspr. ihrer SUSyID
-  191 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 191 = SMA Schaltdosen
-  315 => { arg => ":slider,0,1,100", fn => \&_manageConsumerByEnergy },           # 315 = SMA EV Charger
-  366 => { arg => ":on,off,auto",    fn => \&_switchConsumer },                   # 366 = Edimax sp-2101w v1 Schaltdosen
-);
-                                                                              # Tags der verfügbaren Datenquellen
+                                                                   # Tags der verfügbaren Datenquellen
 my @pd = qw( plantMasterData
              consumerMasterdata
              balanceDayData
@@ -371,7 +396,7 @@ sub Set {
   my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
   my $prop  = shift @a;
   my $prop1 = shift @a;
-  my ($setlist,@ads,$susyid);
+  my ($setlist,@ads);
   my $ad      = "";
     
   return if(IsDisabled($name));
@@ -389,14 +414,12 @@ sub Set {
                  "createPortalGraphic:Generation,Consumption,Generation_Consumption,Differential ".
                  "getData:noArg "
                  ;   
-      
       if($hash->{HELPER}{PLANTOID} && $hash->{HELPER}{CONSUMER}) {
           for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
               my $dev = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
               if($dev) {
-                  $susyid   = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
                   push @ads, $dev; 
-                  $setlist .= $dev.$hsusyid{$susyid}{arg}." ";
+                  $setlist .= "$dev:on,off,auto ";
               }
           }
       }       
@@ -408,16 +431,8 @@ sub Set {
             
   if ($opt && $ad && $opt =~ /$ad/x) {
       # Verbraucher schalten
-      #$susyid = 191;                                                    # Standard ist Schaltsteckdose
-      for my $k (keys %{$hash->{HELPER}{CONSUMER}}) {
-          my $dev = $hash->{HELPER}{CONSUMER}{$k}{DeviceName};
-          if($opt eq $dev) {
-              $susyid = $hash->{HELPER}{CONSUMER}{$k}{SUSyID};
-              last;
-          }
-      }
       $hash->{HELPER}{GETTER} = "none";
-      $hash->{HELPER}{SETTER} = "$opt:$susyid:$prop";
+      $hash->{HELPER}{SETTER} = "$opt:$prop";
       CallInfo($hash);      
   } 
   else {
@@ -807,22 +822,17 @@ sub CallInfo {                         ## no critic 'complexity'
       }
       
       if ($hash->{HELPER}{RUNNING_PID}) {
-          if($hash->{HELPER}{RUNNING_PID}{pid} =~ m/DEAD/) {                # tote PID's löschen
-              delete $hash->{HELPER}{RUNNING_PID};
-          }
-          else {
-              Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
-              return;
-          }
+          Log3 ($name, 3, "$name - An old data cycle is still running, the new data cycle start is postponed.");
+          return;
       } 
       
       my $getp = $hash->{HELPER}{GETTER};
       my $setp = $hash->{HELPER}{SETTER};
      
       if(!$nc && !$nr) {
-          Log3 ($name, 4, "$name - ################################################################");
-          Log3 ($name, 4, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
-          Log3 ($name, 4, "$name - ################################################################"); 
+          Log3 ($name, 3, "$name - ################################################################");
+          Log3 ($name, 3, "$name - ###      start new set/get data from SMA Sunny Portal        ###");
+          Log3 ($name, 3, "$name - ################################################################"); 
           Log3 ($name, 5, "$name - SMAPortal version:          $hash->{HELPER}{VERSION}");
           Log3 ($name, 4, "$name - calculated maximum cycles:  $maxcycles");
           Log3 ($name, 4, "$name - calculated timeout:         $timeout");
@@ -892,7 +902,7 @@ return ($interval,$maxcycles,$timeoutdef);
 ##      schaltet auch Verbraucher des Sunny Home Managers
 ################################################################
 sub GetSetData {                       ## no critic 'complexity'
-  my ($string)           = @_;
+  my ($string) = @_;
   my ($name,$getp,$setp) = split("\\|",$string);
   my $hash               = $defs{$name}; 
   my $cookieLocation     = AttrVal($name, "cookieLocation", "./log/".$name."_cookie.txt");
@@ -902,7 +912,6 @@ sub GetSetData {                       ## no critic 'complexity'
   my $state              = "ok";
   my ($st,$lc)           = ("","");
   my @da                 = ();
-  my $params;
   
   my ($errstate,$reread,$retry,$exceed,$newcycle) = (0,0,0,0,0);
   
@@ -910,11 +919,21 @@ sub GetSetData {                       ## no critic 'complexity'
   my $randomua     = $ak[rand @ak];
   my $defuseragent = $hua{$randomua};
   my $useragent    = AttrVal($name, "userAgent", $defuseragent);
-  
   BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "usedUserAgent:$useragent", "NULL" ], 1);
   
+  my %hal = (                                                          # Header Accept-Language sprachenabhängig
+      "DE" => "de,en-US;q=0.7,en;q=0.3",
+      "EN" => "en-US;q=0.7,en;q=0.3"
+  );
+ 
+  my ($d,$op);  
+  if($setp ne "none") {
+      # Verbraucher soll in den Status $op geschaltet werden
+      ($d,$op) = split(":",$setp);
+  }
+  
   Log3 ($name, 5, "$name - Start operation with CookieLocation: $cookieLocation and UserAgent: $useragent");
-  Log3 ($name, 5, "$name - data get: $getp, data set: $setp");
+  Log3 ($name, 5, "$name - data get: $getp, data set: ".(($d && $op)?($d." ".$op):$setp));
   
   my $ua = LWP::UserAgent->new;
   
@@ -969,28 +988,45 @@ sub GetSetData {                       ## no critic 'complexity'
       }   
   }  
   
-  ###   Verbraucher schalten / managen
+  ### Verbraucher schalten
   #######################################
-  if($setp ne "none") {
-      my ($d,$susyid,$op) = split(":",$setp);                                         # $op -> Verbraucher Manage Operation 
-      
-      $params = {
-          name   => $name,
-          ua     => $ua,
-          state  => $state,
-          daref  => \@da,
-          d      => $d,
-          susyid => $susyid,
-          op     => $op
-      };
-      
-      if($hsusyid{$susyid} && defined &{$hsusyid{$susyid}{fn}}) {
-          ($errstate,$state) = &{$hsusyid{$susyid}{fn}} ($params); 
+  if($setp ne "none") {                                   
+      my ($serial,$id);
+      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
+          my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
+          if($h && $h eq $d) {
+              $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
+              $id     = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
+          }
       }
+      
+      if($verbose == 5 && $v5d =~ /switchConsumer/x) {
+          $ua->add_handler( request_send  => sub { shift->dump; return } );
+          $ua->add_handler( response_done => sub { shift->dump; return } );
+      }
+  
+      my $plantOid = $hash->{HELPER}{PLANTOID};      
+      my $res      = $ua->post('https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode', {
+                                      'mode'         => $op, 
+                                      'serialNumber' => $serial, 
+                                      'SUSyID'       => $id, 
+                                      'plantOid'     => $plantOid
+                                  } 
+                              );
+      
+      $ua->remove_handler('request_send');
+      $ua->remove_handler('response_done');                              
+                              
+      $res = $res->decoded_content();
+      Log3 ($name, 3, "$name - Set \"$d $op\" result: ".$res);
+      
+      if($res eq "true") {
+          $state = "ok - switched consumer $d to $op";
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
+          BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
+      } 
       else {
-          $errstate = 1;
-          $state    = qq{ERROR - Switch or energy management function for SMA device with SUSyID '$susyid' doesn't exist. Inform Maintainer.};
-          Log3 ($name, 1, "$name - $state");
+          $state = "Error - couldn't switch consumer $d to $op";
       }
   } 
   
@@ -1072,11 +1108,11 @@ sub GetSetData {                       ## no critic 'complexity'
   }
 
   # Daten müssen als Einzeiler zurückgegeben werden
-  $st = encode_base64 ($state, "");
+  $st  = encode_base64 ($state, "");
   if(@da) {
       $lc = join "###", @da;
       $lc = encode_base64 ($lc, ""); 
-      Log3 ($name, 3, "$name - data retrieval done.");
+      Log3 ($name, 3, "$name - data retrieved successfully.");
   }
 
 return "$name|$exceed|$newcycle|$errstate|$getp|$setp|$st|$lc";
@@ -1206,132 +1242,6 @@ return 0;
 }
 
 ################################################################
-#                   Consumer schalten
-################################################################
-sub _switchConsumer {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $ua     = $paref->{ua};                                                       # LWP Useragent
-  my $state  = $paref->{state};                  
-  my $daref  = $paref->{daref};                                                    # Referenz zum Datenarray
-  my $d      = $paref->{d};
-  my $susyid = $paref->{susyid};
-  my $op     = $paref->{op};
-  
-  my $hash  = $defs{$name};
-  
-  my ($serial,$id);
-  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-      my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-      if($h && $h eq $d) {
-          $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
-      }
-  }
-  
-  my $plantOid = $hash->{HELPER}{PLANTOID};
-  my $errstate = 0; 
-  my %fields   = ("Content-Type" => "application/x-www-form-urlencoded; charset=UTF-8");
-  my $tag      = "switchConsumer";
-  
-  my $cont     = { 
-      'mode'         => $op, 
-      'serialNumber' => $serial, 
-      'SUSyID'       => $susyid, 
-      'plantOid'     => $plantOid
-  }; 
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/SetOperatingMode',
-                                         tag      => $tag,
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractSwitchConsumerData ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
-                                         daref    => $daref
-                                      });
-
-return ($errstate,$state);
-}
-
-################################################################
-#   Consumer Management abhängig von erzeugter PV-Energie
-#   (z.B. EV Charger)
-#   $op:  enthält den Anteil der erzeugten PV der vorhanden
-#         muß bevor der Verbraucher eingeschaltet werden sollen
-#         (der Anteil bezogener Energie ergibt sich aus 
-#          100% - PV)
-################################################################
-sub _manageConsumerByEnergy {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $ua     = $paref->{ua};                                                       # LWP Useragent
-  my $state  = $paref->{state};                  
-  my $daref  = $paref->{daref};                                                    # Referenz zum Datenarray
-  my $d      = $paref->{d};
-  my $susyid = $paref->{susyid};
-  my $op     = $paref->{op};                                                       
-  
-  my $hash  = $defs{$name};
-  
-  my $gcval = $op/100;
-  my $pvval = 1-$gcval;
-  
-  my ($serial,$oid,$oname);
-  
-  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-      my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-      if($h && $h eq $d) {
-          $serial = $hash->{HELPER}{CONSUMER}{$key}{SerialNumber};
-          $oid    = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
-          $oname  = decode("utf8", $hash->{HELPER}{CONSUMER}{$key}{DeviceOrigName});
-      }
-  }
-  
-  my $pvlog = 100-$op;
-  Log3 ($name, 4, qq{$name - Manage consumer "$d" (SuSyID $susyid): switch on if condition GridConsumption=$op% (PV=$pvlog%) is fulfilled });
-  
-  my $plantOid = $hash->{HELPER}{PLANTOID};
-  my $errstate = 0; 
-  my %fields   = ( "Content-Type" => "application/x-www-form-urlencoded",
-                   "Accept"       => "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                 );
-  my $rgb      = "rgba(49,101,255,1)";
-  my $cont     = [
-                   'UsePriceLimit'             => "False", 
-                   'UsesCanFrames'             => "True", 
-                   'ConsumerOid'               => "$oid", 
-                   'DeviceStatus'              => "DeviceActive",
-                   'DataAcceptance'            => ["true", "false"],
-                   'PowerConsumerName'         => "$oname",
-                   'Priority'                  => "1",
-                   'RbTimeframeTypeEnergyPv_0' => "pv",
-                   'MaxPriceAllowedValue'      => 0,
-                   'GridConsumptionValue'      => $gcval,
-                   'PvValue'                   => $pvval,
-                   'LimitedEnergyValue'        => 0,
-                   'ConsumerIcon'              => "/Images/DeviceIcons/ChargingStation.png",
-                   'ConsumerColor.ColorString' => $rgb,
-                 ];
-  my $tag       = "switchConsumer";
-  
-  ($errstate,$state) = __dispatchPost ({ name     => $name,
-                                         ua       => $ua,
-                                         call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/$oid',
-                                         tag      => $tag,
-                                         state    => $state, 
-                                         fnaref   => [ qw( extractManageConsumerByEnergy ) ],
-                                         fields   => \%fields,
-                                         content  => $cont,
-                                         addon    => "$d:$susyid:$op",              # optionales Addon für aufzurufende Funktion
-                                         daref    => $daref
-                                      });
-
-return ($errstate,$state);
-}
-
-################################################################
 #                    Abruf Live Daten
 ################################################################
 sub _getLiveData {                       ## no critic "not used"
@@ -1434,7 +1344,7 @@ sub _getConsumerMasterdata {             ## no critic "not used"
                                         tag      => "consumerMasterdata",
                                         state    => $state, 
                                         fnaref   => [ qw( extractConsumerMasterdata ) ],
-                                        addon    => "noJSONdata",                            # wenn kein Consumer vorhanden wird kein JSON geliefert !
+                                        addon    => "",
                                         daref    => $daref
                                      });
   
@@ -1453,35 +1363,15 @@ sub _getConsumerCurrData {               ## no critic "not used"
   
   my ($reread,$retry,$errstate) = (0,0,0);
   
-  # einfache Verbraucher (z.B Schaltsteckdosen) abfragen
-  ($errstate,$state) = __dispatchGet ({ name   => $name,
-                                        ua     => $ua,
-                                        call   => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
-                                        tag    => "consumerCurrentdata",
-                                        state  => $state, 
-                                        fnaref => [ qw( extractConsumerCurrentdata ) ],
-                                        addon  => "",
-                                        daref  => $daref
+  ($errstate,$state) = __dispatchGet ({ name     => $name,
+                                        ua       => $ua,
+                                        call     => 'https://www.sunnyportal.com/Homan/ConsumerBalance/GetLiveProxyValues',
+                                        tag      => "consumerCurrentdata",
+                                        state    => $state, 
+                                        fnaref   => [ qw( extractConsumerCurrentdata ) ],
+                                        addon    => "",
+                                        daref    => $daref
                                      });
-                                     
-  return ($errstate,$state,$reread,$retry) if($errstate);
-                                     
-  # Verbraucher mit Energymanagement (z.B. SMA EV Charger SUSyID=315 abfragen)
-  my $hash = $defs{$name};
-  
-  for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-      my $susyid      = $hash->{HELPER}{CONSUMER}{$key}{SUSyID};
-      next if($susyid != 315);                                            # nur Auswertung SMA EV Charger
-      
-      my $oid         = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
-      my $d           = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-      
-      $paref->{state} = $state;
-      $paref->{oid}   = $oid;
-      $paref->{addon} = "$d:noJSONdata";                                  # das gemanagte Device in addon mitgeben, noJSONdata -> kein no JSON Fehler auswerten !!
-
-      ($errstate,$state) = _getConsumerEnergySetting ($paref);
-  }
   
 return ($errstate,$state,$reread,$retry); 
 }
@@ -1495,7 +1385,6 @@ sub _getConsumerDayData {                ## no critic "not used"
   my $ua       = $paref->{ua};                     # LWP Useragent
   my $state    = $paref->{state};                  
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate) = (0,0,0);
@@ -1503,7 +1392,7 @@ sub _getConsumerDayData {                ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
-      Log3 ($name, 2, "$name - $state");
+      Log3 $name, 2, "$name - $state";
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -1547,7 +1436,7 @@ sub _getConsumerMonthData {             ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because the plant ID isn't set.};      
-      Log3 ($name, 2, "$name - $state");
+      Log3 $name, 2, "$name - $state";
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -1600,7 +1489,7 @@ sub _getConsumerYearData {              ## no critic "not used"
   if(!$hash->{HELPER}{PLANTOID}) {
       $errstate = 1;
       $state    = qq{The consumer data cannot be retrieved because of the plant ID isn't set.};      
-      Log3 ($name, 2, "$name - $state");
+      Log3 $name, 2, "$name - $state";
       return ($errstate,$state,$reread,$retry);
   }  
   
@@ -1674,6 +1563,8 @@ sub _getBalanceDayData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                                       # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                    # Referenz zum Datenarray
+  
+  # _detailViewOn ($paref);                                                         # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0); 
   
@@ -1756,6 +1647,8 @@ sub _getBalanceMonthData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                          # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                       # Referenz zum Datenarray
+  
+  # _detailViewOn ($paref);                                            # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);   
 
@@ -1852,6 +1745,8 @@ sub _getBalanceYearData {                 ## no critic "not used"
   my $ua    = $paref->{ua};                                                      # LWP Useragent
   my $state = $paref->{state};                  
   my $daref = $paref->{daref};                                                   # Referenz zum Datenarray
+  
+  # _detailViewOn ($paref);                                                        # Detailanzeige einschalten
   
   my ($reread,$retry,$errstate) = (0,0,0);                                 
  
@@ -2033,54 +1928,33 @@ return ($errstate,$state,$reread,$retry);
 }
 
 ################################################################
-#    Abruf Settings eines Consumers mit SUSyID 315
-#    (z.B. nach HTML 302 Weiterleitung)
-################################################################
-sub _getConsumerEnergySetting {                    ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $ua       = $paref->{ua};                     # LWP Useragent
-  my $state    = $paref->{state};                  
-  my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  my $oid      = $paref->{oid};                    # Consumer oid
-  my $addon    = $paref->{addon};                  # optionales AddOn - hier das managed Device 
-  
-  my ($reread,$retry,$errstate) = (0,0,0);    
-  
-  ($errstate,$state) = __dispatchGet ({ name     => $name,
-                                        ua       => $ua,
-                                        call     => 'https://www.sunnyportal.com/HoMan/Consumer/Semp/'.$oid,
-                                        tag      => "consumerCurrentdata",
-                                        state    => $state, 
-                                        fnaref   => [ qw( extractConsumerEnergySetting ) ],
-                                        addon    => $addon,
-                                        daref    => $daref
-                                     });
-  
-return ($errstate,$state,$reread,$retry); 
-}
-
-################################################################
 #                    Dispatcher GET
 ################################################################
 sub __dispatchGet {
   my $paref    = shift;
   my $name     = $paref->{name};
+  my $ua       = $paref->{ua};                     # LWP Useragent
+  my $call     = $paref->{call};                   # Seitenaufruf zur Datenquelle
+  my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
-  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion oder spezielle Steuerungen
+  my $fnaddon  = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate)     = (0,0,0);
   
-  my ($data,$data_cont)             = ___getData ($paref);
-  
-  $paref->{data}     = $data;
-  $paref->{errstate} = $errstate;
+  my ($data,$data_cont)             = ___getData ({ name => $name,
+                                                    ua   => $ua,
+                                                    call => $call,
+                                                    tag  => $tag
+                                                 });
                           
-  ($reread,$retry,$errstate,$state) = ___analyzeData ($paref);
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state,$reread,$retry) if($errstate || $reread || $retry);
   
@@ -2088,7 +1962,7 @@ sub __dispatchGet {
       my @func = @$fnref;
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          &{$fn} ($hash,$daref,$data_cont,$addon,$data);
+          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$data);
       }
       use strict "refs";
   }
@@ -2103,41 +1977,40 @@ sub __dispatchPost {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $ua       = $paref->{ua};                     # LWP Useragent
+  my $call     = $paref->{call};                   # Seitenaufruf zur Datenquelle
   my $tag      = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
   my $state    = $paref->{state};                  
   my $fnref    = $paref->{fnaref};                 # Referenz zu Array der aufzurufenden Funktion(en) zur Datenextraktion
-  my $addon    = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
+  my $fields   = $paref->{fields};                 # Referenz zum Hash der zu übertragenden PUSH Header
+  my $cont     = $paref->{content};                # Content Daten für PUSH (String)
+  my $fnaddon  = $paref->{addon};                  # optionales Addon für aufzurufende Funktion
   my $daref    = $paref->{daref};                  # Referenz zum Datenarray
-  
   my $hash     = $defs{$name};
   
   my ($reread,$retry,$errstate)     = (0,0,0);
                                                    
-  my ($data,$data_cont)             = ___postData ($paref);
-  
-  $paref->{data}     = $data;
-  $paref->{errstate} = $errstate;
+  my ($data,$data_cont)             = ___postData ({ name    => $name,
+                                                     ua      => $ua,
+                                                     call    => $call,
+                                                     tag     => $tag,
+                                                     fields  => $fields,
+                                                     content => $cont
+                                                  });
                                                               
-  ($reread,$retry,$errstate,$state) = ___analyzeData ($paref);
+  ($reread,$retry,$errstate,$state) = ___analyzeData ({ name     => $name,
+                                                        ua       => $ua,
+                                                        errstate => $errstate,
+                                                        state    => $state,
+                                                        data     => $data
+                                                     });
   
   return ($errstate,$state) if($errstate);
   
   if ($data_cont && $data_cont !~ m/undefined/ix) {
       my @func = @$fnref;
-      
-      my $params = {
-          hash      => $hash,
-          ua        => $ua,
-          daref     => $daref,
-          data_cont => $data_cont,
-          data      => $data,
-          addon     => $addon,
-          tag       => $tag
-      };
-      
       no strict "refs";                                  ## no critic 'NoStrict'       
       for my $fn (@func) {
-          $state = &{$fn} ($params) // $state;
+          &{$fn} ($hash,$daref,$data_cont,$fnaddon,$tag);
       }
       use strict "refs";
   }
@@ -2149,11 +2022,11 @@ return ($errstate,$state,$reread,$retry);
 #                      Standard Abruf Daten GET
 ################################################################
 sub ___getData {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $ua      = $paref->{ua};                     # LWP Useragent
-  my $call    = $paref->{call};                   # Seitenaufruf zur Datenquelle
-  my $tag     = $paref->{tag};                    # Kennzeichen der abzurufenen Daten
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ua    = $paref->{ua};
+  my $call  = $paref->{call};
+  my $tag   = $paref->{tag};
   
   my $v5d     = AttrVal($name, "verbose5Data", "none");
   my $verbose = AttrVal($name, "verbose", 3);
@@ -2169,7 +2042,8 @@ sub ___getData {
   
   my $data  = $ua->get( $call );  
   my $dcont = $data->content;                                                  
-  $cont     = eval{decode_json($dcont)} or do { $cont = $dcont };               # Test JSON dekodieren und anzeigen
+
+  $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
   if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
@@ -2190,8 +2064,8 @@ sub ___postData {
   my $name    = $paref->{name};
   my $ua      = $paref->{ua};
   my $call    = $paref->{call};
-  my $fields  = $paref->{fields};               # Referenz zum Hash der zu übertragenden PUSH Header
-  my $content = $paref->{content};              # Content Daten für PUSH (String)
+  my $fields  = $paref->{fields};
+  my $content = $paref->{content};
   my $tag     = $paref->{tag};
   
   my $v5d     = AttrVal($name, "verbose5Data", "none");
@@ -2206,9 +2080,11 @@ sub ___postData {
       $ua->add_handler( response_done => sub { shift->dump; return } );
   }
 
-  my $data  = $ua->post( $call, %$fields, Content => $content );    
-  my $dcont = $data->decoded_content;                                                  
-  $cont     = eval{decode_json($dcont)} or do { $cont = $dcont };               # Test JSON dekodieren und anzeigen
+  my $data  = $ua->post( $call, %$fields, Content => $content );
+                         
+  my $dcont = $data->content;                                                  
+
+  $cont = eval{decode_json($dcont)} or do { $cont = $dcont };
   
   if($v5d =~ /$tag/x) {
       Log3 ($name, 5, "$name - Return Code: ".$data->code); 
@@ -2231,16 +2107,12 @@ sub ___analyzeData {                   ## no critic 'complexity'
   my $state           = $paref->{state};
   my $ua              = $paref->{ua};
   my $ad              = $paref->{data};
-  my $addon           = $paref->{addon} // "";                                                        # addon kann Optionen zur Analysesteuerung enthalten
-  
   my $hash            = $defs{$name};
   my ($reread,$retry) = (0,0);
   my $data            = "";
-  my $decerror        = 0;                                                                            # JSON Dekodierfehler
     
   my $v5d             = AttrVal($name, "verbose5Data", "none");
-  my $ad_content      = encode("utf8", $ad->decoded_content);
-  my $rescode         = $ad->code;                                                                    # HTML Code der Antwort 
+  my $ad_content      = encode("utf8", $ad->decoded_content); 
   my $act             = $hash->{HELPER}{RETRIES};                                                     # Index aktueller Wiederholungsversuch
   my $attstr          = "Attempts read data again in $sleepretry s ... ($act of $maxretries)";        # Log vorbereiten
   
@@ -2258,9 +2130,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
                       name => $name,
                    });  
   
-  $data = eval{decode_json($ad_content)} or do { $data     = $ad_content;
-                                                 $decerror = 1;
-                                               };
+  $data = eval{decode_json($ad_content)} or do { $data = $ad_content };
   
   my $jsonerror = $ad->header('Jsonerror') // "";                                                     # Portal meldet keine Verarbeitung des Reaquests möglich (z.B. Jahr 0000 zur Auswertung angefordert)
   
@@ -2270,7 +2140,7 @@ sub ___analyzeData {                   ## no critic 'complexity'
       return ($reread,$retry,$errstate,$state);
   }
   
-  if(!$decerror && ref $data eq "HASH") {                                                            # es wurde JSON empfangen und Ergebnis ist ein HASH
+  if(ref $data eq "HASH") {
       for my $k (keys %{$data}) {
           my $val = $data->{$k};
           next if(!defined $val);
@@ -2316,25 +2186,19 @@ sub ___analyzeData {                   ## no critic 'complexity'
               }
           }
       }
-  }
-  elsif (!$decerror) {                                                                                        # es wurde JSON empfangen aber Ergebnis ist KEIN HASH
-      Log3 ($name, 5, "$name - decoded Content received: ". jboolmap($data));
-  }
+  } 
   else {
-      my $njdat = encode("utf8", $ad->as_string);     
+      my $njdat = encode("utf8", $ad->as_string); 
+      
       if($njdat =~ /401\s-\sUnauthorized/x) {
           Log3 ($name, 2, "$name - ERROR - User logged in but unauthorized");
           my($p1,$p2) = $njdat =~ /<h2>401\s-\sUnauthorized:.(.*)?<\/h2>.*?<h3>(.*)?<\/h3>/sx;
           $state      = ($p1 // "")." ".($p2 // "");          
       }
       
-      $njdat = encode("utf8", $ad->decoded_content);
       Log3 ($name, 5, "$name - No JSON Data received:\n ".$njdat);
-
-      if($rescode != 302 && $addon !~ /noJSONdata/x) {                                                       # 302 -> HTTP-Antwort liefert zusätzlich eine URL im Header-Feld Location. Es soll eine zweite, ansonsten identische Anfrage an die in Location angegebene neue URL gestellt werden.
-          $errstate = 1; 
-          $state    = "ERROR - see logfile for further information";
-      }
+      
+      $errstate = 1;
   }
   
 return ($reread,$retry,$errstate,$state);
@@ -2421,7 +2285,7 @@ sub ParseData {
   readingsEndUpdate($hash, 1);
   
   my $ldlv = $stpl{liveData}{level};
-  # my $cclv = $stpl{consumerCurrentdata}{level};
+  my $cclv = $stpl{consumerCurrentdata}{level};
   my $lddo = $subs{$name}{liveData}{doit};
   
   my $pv   = ReadingsNum($name, "${ldlv}_PV"             , 0);
@@ -2437,11 +2301,11 @@ sub ParseData {
   readingsBeginUpdate($hash);
   
   if(!$errstate) {
-     # if($setp ne "none") {
-     #     my ($d,$susyid,$op) = split(":",$setp);
-     #     $op                 = ($op eq "auto") ? "off (automatic)" : $op;
-     #     readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op) if($susyid == 191);
-     # }
+      if($setp ne "none") {
+          my ($d,$op) = split(":",$setp);
+          $op         = ($op eq "auto") ? "off (automatic)" : $op;
+          readingsBulkUpdate($hash, "${cclv}_${d}_Switch", $op);
+      }
       readingsBulkUpdate($hash, "lastCycleTime",   $ctime   ) if($ctime > 0);
       readingsBulkUpdate($hash, "summary",         $sum." W") if($subs{$name}{liveData}{doit});
       readingsBulkUpdate($hash, "lastSuccessTime", $ts      );
@@ -2790,26 +2654,23 @@ return;
 #                    Total
 ################################################################
 sub extractStatisticData {
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $daref     = $paref->{daref};
-  my $data_cont = $paref->{data_cont};         # empfangene Daten decoded Content
-  my $data      = $paref->{data};              # empfangene Rohdaten
-  my $period    = $paref->{addon};
-  my $tag       = $paref->{tag};
-  
+  my $hash      = shift;
+  my $daref     = shift;
+  my $statistic = shift;
+  my $period    = shift;
+  my $tag       = shift;
   my $name      = $hash->{NAME};
   my $sd;
   
   Log3 ($name, 4, "$name - extracting balance data ");
   
-  $data_cont = eval{decode_json($data_cont)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+  $statistic = eval{decode_json($statistic)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
                                                      return;
                                                    };
   my $lv = $stpl{$tag}{level};
   
-  if(ref $data_cont eq "HASH") {
-      $sd = decode_json ( encode('UTF-8', $data_cont->{d}) );
+  if(ref $statistic eq "HASH") {
+      $sd = decode_json ( encode('UTF-8', $statistic->{d}) );
   }
 
   if($sd && ref $sd eq "ARRAY") {
@@ -2832,9 +2693,7 @@ sub extractPlantMasterData {
   my $forecast = shift;
   my $addon    = shift;
   my $data     = shift;                       # gelieferte Rohdaten
-  
   my $name     = $hash->{NAME};
-  
   my ($amount,$unit);
   
   Log3 ($name, 4, "$name - ##### extracting plant master data #### ");
@@ -2929,7 +2788,6 @@ sub extractConsumerPlanData {
   my $hash     = shift;
   my $daref    = shift;
   my $forecast = shift;
-  
   my $name     = $hash->{NAME};
   my %consumers;
   my ($key,$val);
@@ -3010,10 +2868,9 @@ return;
 ##          Auswertung Consumer Stammdaten
 ################################################################
 sub extractConsumerMasterdata {
-  my $hash  = shift; 
-  my $daref = shift;
-  my $cdata = shift;
-  
+  my $hash      = shift; 
+  my $daref     = shift;
+  my $clivedata = shift;
   my $name      = $hash->{NAME};
   my %consumers;
   my %hcon;
@@ -3021,14 +2878,14 @@ sub extractConsumerMasterdata {
   
   Log3 ($name, 4, "$name - ##### extracting consumer master data #### ");
   
-  $cdata = eval{decode_json($cdata)} or do { Log3 ($name, 4, "$name - No JSON Data were delivered from SMA. Possibly you haven't any consumer integrated."); 
-                                                   return;
-                                                  };
+  $clivedata = eval{decode_json($clivedata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                                     return;
+                                                   };
   my $lv = $stpl{consumerMasterdata}{level};
   
   # allen Consumer Objekten die ID zuordnen
   $i = 0;
-  for my $c (@{$cdata->{'MeasurementData'}}) {
+  for my $c (@{$clivedata->{'MeasurementData'}}) {
       $consumers{"${i}_ConsumerName"} = $c->{'DeviceName'};
       $consumers{"${i}_ConsumerOid"}  = $c->{'Consume'}{'ConsumerOid'};
       $consumers{"${i}_ConsumerLfd"}  = $i;
@@ -3066,7 +2923,6 @@ sub extractConsumerCurrentdata {
   my $hash      = shift; 
   my $daref     = shift;
   my $clivedata = shift;
-  
   my $name      = $hash->{NAME};
   my %consumers;
   my ($i,$res);
@@ -3140,7 +2996,6 @@ sub extractConsumerHistData {                                                  #
   my $daref  = shift;
   my $chdata = shift;
   my $tf     = shift;
-  
   my $name   = $hash->{NAME};
   my %consumers;
   my ($i,$gcr,$gct,$pcr,$pct,$tct,$bcr,$bct);
@@ -3203,151 +3058,26 @@ return;
 }
 
 ################################################################
-#          Auswertung Ergebnis aus Switch Consumer
-################################################################
-sub extractSwitchConsumerData {
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $daref     = $paref->{daref};                # Referenz zum Datenarray
-  my $data_cont = $paref->{data_cont};            # Daten decoded Content
-  my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{addon};                # ein optionales AddOn
-  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine  
-  
-  my $name      = $hash->{NAME};
-  
-  Log3 ($name, 4, "$name - extracting Switch Consumer result ");
-  
-  my ($d,$susyid,$op) = split(":",$addon);                                         # $op -> Verbraucher Manage Operation 
-  Log3 ($name, 3, qq{$name - Set "$d $op" result: $data_cont});
-  
-  my $state;
-  if($data_cont eq "true") {
-      $state = "ok - switched consumer $d to $op";
-      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
-      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
-      
-      my $cclv = $stpl{consumerCurrentdata}{level};
-      $op      = ($op eq "auto") ? "off (automatic)" : $op;
-      push @$daref, "${cclv}_${d}_Switch:$op";
-  } 
-  else {
-      $state = "ERROR - couldn't switch consumer $d to $op";
-  }
- 
-return $state; 
-}
-
-################################################################
-#          Auswertung Ergebnis aus Manage Consumer
-#          By Energy
-################################################################
-sub extractManageConsumerByEnergy {
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $ua        = $paref->{ua};                   # LWP Useragent     
-  my $daref     = $paref->{daref};                # Referenz zum Datenarray
-  my $data_cont = $paref->{data_cont};            # Daten decoded Content
-  my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{addon};                # ein optionales AddOn
-  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine 
-  
-  my $name      = $hash->{NAME};
-  
-  my ($errstate,$reread,$retry) = (0,0,0);
-  
-  Log3 ($name, 4, "$name - extracting manage Consumer by energy result ");
-  
-  my $rescode         = $data->code;                                                                    # HTML Code der Antwort (sollte 302 sein bei Erfolg)
-  my ($d,$susyid,$op) = split(":",$addon);                                                              # $op -> eingestellter Gridconsomption Schwellenwert
-  my $pvlog           = 100-$op;
-  
-  my $state;
-  if($rescode == 302) {
-      my $location = $data->header('Location');
-      $state       = qq{ok - Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%) is fulfilled};
-      
-      Log3 ($name, 3, qq{$name - $state});
-      Log3 ($name, 3, qq{$name - next step: GET "$location" to read the new values are set });
-      
-      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "GETTER:all" ], 1);
-      BlockingInformParent("FHEM::SMAPortal::setFromBlocking", [$name, "NULL", "SETTER:none"], 1);
-      
-      for my $key (keys %{$hash->{HELPER}{CONSUMER}}) {
-          my $h = $hash->{HELPER}{CONSUMER}{$key}{DeviceName};
-          if($h && $h eq $d) {
-              $paref->{oid} = $hash->{HELPER}{CONSUMER}{$key}{ConsumerOid};
-          }
-      }
-      
-      $paref->{name}  = $name;
-      $paref->{state} = $state;
-      $paref->{addon} = "$d:noJSONdata";                                                               # das gemanagte Device in addon mitgeben
-      
-      ($errstate,$state,$reread,$retry) = _getConsumerEnergySetting ($paref);
-  } 
-  else {
-      $state = qq{ERROR - couldn't set Consumer "$d" set to condition: switch on if GridConsumption=$op% (PV=$pvlog%)};
-  }
- 
-return $state; 
-}
-
-################################################################
-#  Abruf der aktuell eingestellten Energy Management Settings
-#  von Verbrauchern des Typs 315 (z.B. SMA EV Charger)
-################################################################
-sub extractConsumerEnergySetting {
-  my $hash      = shift;
-  my $daref     = shift;
-  my $data_cont = shift;                       # gelieferter data content
-  my $addon     = shift;
-  my $data      = shift;                       # gelieferte Rohdaten
-  
-  my $name      = $hash->{NAME};
-  
-  my ($errstate,$reread,$retry) = (0,0,0);
-  
-  Log3 ($name, 4, "$name - extracting current Consumer energy settings ");
-  
-  my ($d)     = split ":", $addon; 
-  my $cclv    = $stpl{consumerCurrentdata}{level}; 
-  my $dcont   = encode("utf8", $data->decoded_content);  
-
-  my ($gcval) = $dcont =~ /var\sgridConsumptionValue\s=\s(.*?);/x;
-  my ($pvval) = $dcont =~ /var\spvValue\s=\s(.*?);/x;
-  
-  $gcval      = sprintf("%.2f",$gcval) * 100;
-  $pvval      = sprintf("%.2f",$pvval) * 100;
-  
-  push @$daref, "${cclv}_${d}_SwitchCondition:GridConsumption=$gcval% PV=$pvval%";
-  
-return; 
-}
-
-################################################################
 #          Auswertung Daten aus Hilfsroutinen
 ################################################################
 sub extractHelperData {
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $daref     = $paref->{daref};                # Referenz zum Datenarray
-  my $data_cont = $paref->{data_cont};            # Daten decoded Content
-  my $data      = $paref->{data};                 # empfangene Rohdaten
-  my $addon     = $paref->{addon};                # ein optionales AddOn
-  my $tag       = $paref->{tag};                  # Kennzeichen der abgerufenen Daten/ der Abrufroutine            
+  my $hash      = shift;
+  my $daref     = shift;             # Referenz zum Datenarray
+  my $jdata     = shift;             # empfangene JSON-Daten
+  my $addon     = shift;             # ein optionales AddOn
+  my $tag       = shift;             # Kennzeichen der abgerufenen Daten/ der Abrufroutine
   
   my $name      = $hash->{NAME};
   my $sd;
   
   Log3 ($name, 4, "$name - extracting Helper data ");
   
-  my $decd = eval{decode_json($data_cont)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
-                                                   return;
-                                                 };
+  my $data = eval{decode_json($jdata)} or do { Log3 ($name, 2, "$name - ERROR - can't decode JSON Data"); 
+                                               return;
+                                             };
 
-  if(ref $decd eq "HASH") {
-      while (my ($k,$v) = each %$decd) {
+  if(ref $data eq "HASH") {
+      while (my ($k,$v) = each %$data) {
           push @$daref, "$tag:$v";
       }
   }
@@ -3394,13 +3124,13 @@ sub setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23105 2020-11-05 22:24:21Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAPortal.pm 23105 2020-11-05 22:24:21Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -3646,28 +3376,6 @@ sub replaceJunkSigns {
   $rn = makeReadingName($rn);  
   
 return($rn);
-}
-
-###############################################################################
-#                       JSON Boolean Test und Mapping
-#   $var  = Variante der boolean Auswertung:
-#           "char": Rückgabe von true / false für wahr / falsch
-#           "bin" : Rückgabe von 1 / 0 für wahr / falsch
-###############################################################################
-sub jboolmap { 
-  my $bool = shift;
-  my $var  = shift // "char";
-  
-  my $true  = ($var eq "char") ? "true"  : 1;
-  my $false = ($var eq "char") ? "false" : 0;
-  
-  my $is_boolean = JSON::is_bool($bool);
-  
-  if($is_boolean) {
-      $bool = $bool ? $true : $false;
-  }
-  
-return $bool;
 }
 
 ###############################################################################
@@ -4539,8 +4247,9 @@ return;
 <h3>SMAPortal</h3>
 <ul>
 
-   With this module, data can be retrieved from the <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> and 
-   devices which are registered in the SMA Portal can be controlled. <br><br>
+   With this module it is possible to fetch data from the <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> and switch
+   consumers (e.g. bluetooth plug sockets) if any are present.
+   At the momentent that are the following data: <br><br>
    <ul>
     <ul>
      <li>Live data (Consumption and PV-Generation) </li>
@@ -4549,7 +4258,6 @@ return;
      <li>Weather data delivered from SMA for the facility location </li>
      <li>Forecast data (Consumption and PV-Generation) inclusive suggestion times to switch comsumers on </li>
      <li>the planned times by the Sunny Home Manager to switch consumers on and the current state of consumers (if present) </li>
-     <li>Control of devices registered with SMA Home Manager or SMA Portal </li>
     </ul> 
    </ul>
    <br>
@@ -4627,10 +4335,18 @@ return;
      <br>
      
      <ul>
-     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> <br> 
+     <li><b> credentials &lt;username&gt; &lt;password&gt; </b> </li>  
      Set Username / Password used for the login into the SMA Sunny Portal.   
      </ul> 
-     </li> 
+     <br>
+     
+     <ul>
+     <a name="consumer"></a>
+     <li><b> &lt;consumer name&gt; &lt;on | off | auto&gt; </b> <br> 
+     Once consumer data are available, the consumer are shown in the Set and can be switched to on, off or the automatic mode (auto)
+     that means the consumer are controlled by the Sunny Home Manager.    
+     </li>      
+     </ul>
      <br>
      
      <ul>
@@ -4639,29 +4355,9 @@ return;
      Identical to the "get data" command. Simplifies the use of the attribute "webCmd" in the FHEMWEB.  
      </ul> 
      </li>
-     <br>
-     
-     <ul>
-     <a name="consumer"></a>
-     <li><b> &lt;consumer name&gt; &lt;on | off | auto | GC&gt; </b> <br> 
-     The consumers connected to the SMA Sunny Homemanager are offered as soon as they are detected by the module. 
-	 Different types of consumers are recognized by the module and consumer specific actions are offered.  
-     <br><br>
-       
-       <ul>   
-       <table>  
-       <colgroup> <col width=25%> <col width=75%> </colgroup>
-          <tr><td> <b>SMA Bluetoth Sockets</b> </td><td><b>on</b> switch on, <b>off</b> switch off, <b>auto</b> control by the Sunny Home Manager             </td></tr>
-          <tr><td> <b>SMA EV Charger</b>       </td><td><b>GC</b> Percentage of grid reference to be accepted for charging the electric vehicle (0..100)      </td></tr>
-       </table>
-       </ul>
-     
-     </li>     
-     </ul>
-     <br>
    
    </ul>
-   <br>
+   <br><br>
    
    <a name="SMAPortalGet"></a>
    <b>Get</b>
@@ -4877,8 +4573,8 @@ return;
 <h3>SMAPortal</h3>
 <ul>
 
-   Mit diesem Modul können Daten aus dem <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> abgerufen und die am SMA 
-   Home Manager bzw. im SMA Portal registrierten Geräte gesteuert werden. <br><br>
+   Mit diesem Modul können Daten aus dem <a href="https://www.sunnyportal.com">SMA Sunny Portal</a> abgerufen werden.
+   Momentan sind es: <br><br>
    <ul>
     <ul>
      <li>Live-Daten (Verbrauch und PV-Erzeugung) </li>
@@ -4887,7 +4583,6 @@ return;
      <li>Wetter-Daten von SMA für den Anlagenstandort </li>
      <li>Prognosedaten (Verbrauch und PV-Erzeugung) inklusive Verbraucherempfehlung </li>
      <li>die durch den Sunny Home Manager geplanten Schaltzeiten und aktuellen Status von Verbrauchern (sofern vorhanden) </li>
-     <li>Steuerung von am SMA Home Manager bzw. SMA Portal registrierten Geräten </li>
     </ul> 
    </ul>
    <br>
@@ -4982,20 +4677,11 @@ return;
      
      <ul>
      <a name="Verbrauchername"></a>
-     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto | GC&gt; </b> <br>  
-     Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher angeboten sobald sie vom
-     Modul erkannt wurden. Es werden verschiedene Arten von Verbrauchern durch das Modul erkannt und auf den Verbrauchertyp
-     angepasste Aktionen angeboten.
-     <br><br>
-       
-       <ul>   
-       <table>  
-       <colgroup> <col width=25%> <col width=75%> </colgroup>
-          <tr><td> <b>SMA Bluetoth Steckdosen</b> </td><td><b>on</b> einschalten, <b>off</b> ausschalten, <b>auto</b> Steuerung durch den Sunny Home Manager             </td></tr>
-          <tr><td> <b>SMA EV Charger</b>          </td><td><b>GC</b> Anteil des Netzbezugs in Prozent, der für das Laden des E-Fahrzeugs akzeptiert werden soll (0..100) </td></tr>
-       </table>
-       </ul>
-     
+     <li><b> &lt;Verbrauchername&gt; &lt;on | off | auto&gt; </b> <br>  
+     Es werden die an den SMA Sunny Homemanager angeschlossene Verbraucher (Bluetooth Steckdosen) angeboten sobald sie vom
+     Modul erkannt wurden.
+     Sobald diese Daten vorliegen, werden die vorhandenen Verbraucher im Set angezeigt und können eingeschaltet, ausgeschaltet
+     bzw. auf die Steuerung durch den Sunny Home Manager umgeschaltet werden (auto). 
      </li>     
      </ul>
    
