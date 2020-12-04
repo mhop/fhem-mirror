@@ -1960,7 +1960,7 @@ sub MAX_Parse
   readingsBulkUpdate($shash, 'state',        $state);
 
   if (exists($shash->{'.desiredTemperature'})
-      && substr($shash->{'.desiredTemperature'},0,1) ne 'o')
+      && (substr($shash->{'.desiredTemperature'},0,1) ne 'o')
       && ($shash->{'.desiredTemperature'} != ReadingsNum($sname,'windowOpenTemperature',0))
       && AttrNum($sname,'windowOpenCheck',0))
   {
