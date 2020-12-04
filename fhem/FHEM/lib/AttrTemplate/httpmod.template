@@ -98,23 +98,24 @@ setreading DEVICE attrTemplateVersion 20201129
 #Contributed by subseven & yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754
 name:fuel_oil_check
 filter:TYPE=HTTPMOD
-desc: checks fuel oil prices via easyoil.com<br>Define a HTTPMOD device like<br>define heizoelpreis HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= 3600 <a href="https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754">Source: Forum</a>
+desc: checks fuel oil prices via easyoil.com<br />Define a HTTPMOD device like<br>define heizoelpreis HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge) and unloading points (Entladestellen), hose length (Schlauchlaenge) and truck trailer accessibility (mit Anhaenger moeglich) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754">this FHEM forum thread</a>
 order:FUEL03
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
+par:ZIPCODE;German ZIP Code / deutsche Postleitzahl; {AttrVal("DEVICE","replacement01Value",undef)}
+par:ORDERVOLUME;fuel order volume in litre / Bestellmenge in Liter; {AttrVal("DEVICE","replacement02Value",undef)}
 defmod DEVICE HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= INTERVAL
-attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value replacement04Mode:reading,internal,text,expression,key replacement04Regex replacement04Value replacement05Mode:reading,internal,text,expression,key replacement05Regex replacement05Value
+attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value:1,2,3,4,5,6,7,8,9,10 replacement04Mode:reading,internal,text,expression,key replacement04Regex replacement04Value:40m,60m,80m replacement05Mode:reading,internal,text,expression,key replacement05Regex replacement05Value:pr-truck-type=,pr-truck-type=short_vehicle
 attr DEVICE enableControlSet 1
-attr DEVICE group Spritpeise
 attr DEVICE reading010Name Heizoelpreis
 attr DEVICE reading010OExpr $val =~ s/,/\./;; $val;;
 attr DEVICE reading010Regex ([\d\,]+)[\s]+€
 attr DEVICE replacement01Mode text
 attr DEVICE replacement01Regex %%PLZ%%
-attr DEVICE replacement01Value 12345
+attr DEVICE replacement01Value ZIPCODE
 attr DEVICE replacement02Mode text
 attr DEVICE replacement02Regex %%MENGE%%
-attr DEVICE replacement02Value 3000
+attr DEVICE replacement02Value ORDERVOLUME
 attr DEVICE replacement03Mode text
 attr DEVICE replacement03Regex %%ENTLADESTELLEN%%
 attr DEVICE replacement03Value 1
@@ -123,22 +124,78 @@ attr DEVICE replacement04Regex %%SCHLAUCHLAENGE%%
 attr DEVICE replacement04Value 40m
 attr DEVICE replacement05Mode text
 attr DEVICE replacement05Regex %%ANHAENGER%%
-attr DEVICE replacement05Value pr-truck-type=short_vehicle
+attr DEVICE replacement05Value pr-truck-type=
 attr DEVICE room WHICHROOM
 attr DEVICE stateFormat {	my $price = 0.0;;\
 	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;;\
-	my $ret = "<div>".ReadingsTimestamp($name,"Heizoelpreis","-");;\
-	$ret .= "&nbsp;;<b><a href=\"".InternalVal($name,"displayurl","https://www.esyoil.com")."\" rel=\"noopener noreferrer\" target=\"_blank\">";;\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
+	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";;\
+	my $link = "https://www.esyoil.com/preisausgabe.php?";;\
+		$link .= "pr-unloading-points=".AttrVal($name,"replacement03Value","");;\
+		$link .= "&pr-product=8&pr-payment-type=2";;\
+		$link .= "&".AttrVal($name,"replacement05Value","");;\
+		$link .= "&pr-hose-length=".AttrVal($name,"replacement04Value","");;\
+		$link .= "&pr-app=1&pr-zip=".AttrVal($name,"replacement01Value","");;\
+		$link .= "&pr-amount=".AttrVal($name,"replacement02Value","");;\
+		$link .= "&submit=";;\
+	$ret .= "&nbsp;;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;;\">";;\
 	$ret .= ReadingsVal($name,"Heizoelpreis","-");;\
-	$ret .= "&euro;;</a></b>/100l";;\
+	$ret .= "&euro;;</a>/100l";;\
 	$ret .= "&nbsp;;(".AttrVal($name,"replacement02Value","0")."l = ";;\
 	$ret .= sprintf("%.2f",$price);;\
 	$ret .= "&euro;;)</div>";;\
 	return $ret;;\
 }
 attr DEVICE webCmd reread
+attr DEVICE timeout 10
 attr DEVICE model fuel_oil_check
-setreading DEVICE attrTemplateVersion 20201129
+setreading DEVICE attrTemplateVersion 20201204
+
+#Contributed by yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1055334.html#msg1055334
+name:fuel_oil_check_heizoel24
+filter:TYPE=HTTPMOD
+desc: checks fuel oil prices via heizoel24.de<br />Define a HTTPMOD device like<br />https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge) and unloading points (Entladestellen) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1055334.html#msg1055334">this FHEM forum thread</a>
+order:FUEL04
+par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
+par:ZIPCODE;German ZIP Code / deutsche Postleitzahl; {AttrVal("DEVICE","replacement01Value",undef)}
+par:ORDERVOLUME;fuel order volume in litre / Bestellmenge in Liter; {AttrVal("DEVICE","replacement02Value",undef)}
+defmod DEVICE HTTPMOD https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% 3600
+attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value:1,2,3,4,5,6,7,8,9,10
+attr DEVICE enableControlSet 1
+attr DEVICE reading010Name Heizoelpreis
+attr DEVICE reading010OExpr $val =~ s/,/\./;; $val;;
+attr DEVICE reading010Regex <span class="unitprice">([\d\,]+)[\s]+<span
+attr DEVICE replacement01Mode text
+attr DEVICE replacement01Regex %%PLZ%%
+attr DEVICE replacement01Value ZIPCODE
+attr DEVICE replacement02Mode text
+attr DEVICE replacement02Regex %%MENGE%%
+attr DEVICE replacement02Value ORDERVOLUME
+attr DEVICE replacement03Mode text
+attr DEVICE replacement03Regex %%ENTLADESTELLEN%%
+attr DEVICE replacement03Value 1
+attr DEVICE room WHICHROOM
+attr DEVICE stateFormat {	my $price = 0.0;;\
+	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;;\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
+	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";;\
+	my $link = "https://www.heizoel24.de/heizoelpreise-direkt";;\
+		$link .= "/".AttrVal($name,"replacement01Value","");;\
+		$link .= "/".AttrVal($name,"replacement02Value","");;\
+		$link .= "/".AttrVal($name,"replacement03Value","");;\
+	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;;\">";;\
+	$ret .= ReadingsVal($name,"Heizoelpreis","-");;\
+	$ret .= "&euro;</a>/100l";;\
+	$ret .= "&nbsp;(".AttrVal($name,"replacement02Value","0")."l = ";;\
+	$ret .= sprintf("%.2f",$price);;\
+	$ret .= "&euro;)</div>";;\
+	return $ret;;\
+}
+attr DEVICE timeout 10
+attr DEVICE webCmd reread
+attr DEVICE model fuel_oil_check_heizoel24
+setreading DEVICE attrTemplateVersion 20201204
 
 
 #German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
@@ -358,9 +415,11 @@ setreading DEVICE attrTemplateVersion 20201129
 # Pharmacy Emergency Service Germany, Forum: https://forum.fhem.de/index.php?topic=87234.0
 name:pharmacy_emergency_service_germany
 filter:TYPE=HTTPMOD
-desc: Gets the current emergency service of a pharmacy closeby your postal code<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD http://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=1337 0<br />Change the postalcode (1337 in this example) to yours<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html">Source: Forum</a><br />Hint: The emergency service changes every day at 09:00 CET, thus create a AT like this to update the DEVICE timely:<br />defmod UPDATE_EMERGENCY_SERVICE at *09:15:00 set EMERGENCY_HTTPMOD_DEVICE reread
+desc: Gets the current emergency service of a pharmacy closeby your postal code from apothekenfinder.mobi<br />Define an empty HTTPMOD device with <br />define DEVICE HTTPMOD none 0<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html">Source: Forum</a><br />Hint: The emergency service changes every day at 09:00 CET, thus create a AT like this to update the DEVICE timely:<br />defmod UPDATE_EMERGENCY_SERVICE at *09:15:00 set EMERGENCY_HTTPMOD_DEVICE reread
 order:DIV01
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+par:SEARCHZIPCODE;Zip code of the city you want to search around;
+defmod DEVICE HTTPMOD http://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=SEARCHZIPCODE 0
 attr DEVICE userattr get01Encode get01JSON get01Name get02ExtractAllJSON:0,1 getURL reading01Encode reading01JSON reading01Name reading02JSON reading02Name reading03JSON reading03Name reading04JSON reading04Name reading05JSON reading05Name reading06JSON reading06Name reading07JSON reading07Name reading07OExpr reading08JSON reading08Name reading08OExpr reading09JSON reading09Name reading10JSON reading10Name reading11JSON reading11Name readingEncode requestHeader requestHeader1 requestHeader2 requestHeader3 requestHeader4 requestHeader5 requestHeader6 requestHeader7
 attr DEVICE reading01Encode UTF-8
 attr DEVICE reading01JSON result_01_name
@@ -377,10 +436,10 @@ attr DEVICE reading06JSON result_01_fax
 attr DEVICE reading06Name Telefax
 attr DEVICE reading07JSON result_01_start
 attr DEVICE reading07Name Beginn
-attr DEVICE reading07OExpr strftime "%a %e.%m.%Y %H:%M", localtime($val)
+attr DEVICE reading07OExpr FmtDateTime($val)
 attr DEVICE reading08JSON result_01_end
 attr DEVICE reading08Name Ende
-attr DEVICE reading08OExpr strftime "%a %e.%m.%Y %H:%M", localtime($val)
+attr DEVICE reading08OExpr FmtDateTime($val)
 attr DEVICE reading09JSON result_01_lng
 attr DEVICE reading09Name Laengengrad
 attr DEVICE reading10JSON result_01_lat
@@ -404,9 +463,12 @@ setreading DEVICE attrTemplateVersion 20201129
 #Pharmacy emergency service Germany - aponet, Forum https://forum.fhem.de/index.php/topic,87234.0.html
 name:aponet_pharmacy_emergency_service_germany
 filter:TYPE=HTTPMOD
-desc: Gets the current emergency service of a pharmacy closeby your postal code<br />Define a HTTPMOD device like <br />define DEVICE HTTPMOD https://www.aponet.de/apotheke/notdienstsuche?tx_aponetpharmacy_search[action]=result&tx_aponetpharmacy_search[controller]=Search&tx_aponetpharmacy_search[search][plzort]=91320&tx_aponetpharmacy_search[search][date]=&tx_aponetpharmacy_search[search][street]=&tx_aponetpharmacy_search[search][radius]=15&tx_aponetpharmacy_search[search][lat]=&tx_aponetpharmacy_search[search][lng]=&type=1982 0<br />Change the postalcode (91320 in this example) and the radius (15 in this example) to yours<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html">Source: Forum</a><br />
+desc: Gets the current emergency service of a pharmacy closeby your postal code from aponet.de<br />Define an empty HTTPMOD device with <br />define DEVICE HTTPMOD none 0<br /><a href="https://forum.fhem.de/index.php/topic,87234.0.html">Source: Forum</a><br />
 order:DIV02
+par:SEARCHZIPCODE;Zip code of the city you want to search around;
+par:SEARCHRADIUS;Radius in km for the search;
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
+defmod DEVICE HTTPMOD https://www.aponet.de/apotheke/notdienstsuche?tx_aponetpharmacy_search[action]=result&tx_aponetpharmacy_search[controller]=Search&tx_aponetpharmacy_search[search][plzort]=SEARCHZIPCODE&tx_aponetpharmacy_search[search][date]=&tx_aponetpharmacy_search[search][street]=&tx_aponetpharmacy_search[search][radius]=SEARCHRADIUS&tx_aponetpharmacy_search[search][lat]=&tx_aponetpharmacy_search[search][lng]=&type=1982 0
 attr DEVICE reading01Name NotName
 attr DEVICE reading01Regex class="name">(.*?)<\/h4>
 attr DEVICE reading02Name NotdienstVon
@@ -675,7 +737,7 @@ setreading DEVICE attrTemplateVersion 20201129
 #Contributed by Pfriemler, mcp & yersinia, see https://forum.fhem.de/index.php/topic,78501.msg1104534.html#msg1104534
 name:hm_fw_check_v2
 filter:TYPE=HTTPMOD
-desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com) and includes HmIP adaption provided by mcp<br />Define a HTTPMOD device like <br>define DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br /><a href="https://forum.fhem.de/index.php/topic,78501.msg1104534.html#msg1104534">Source: Forum</a>
+desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com) and includes HmIP adaption provided by mcp<br />Define an HTTPMOD device like <br>define DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,78501.msg1106499.html#msg1106499">this FHEM forum thread</a>
 order:TECHZ04
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to one day (86400s); {InternalVal("DEVICE","Interval",86400)}
@@ -684,11 +746,11 @@ attr DEVICE userattr reading01AutoNumLen reading01Name reading01RegOpt reading01
 attr DEVICE do_not_notify 1
 attr DEVICE enableControlSet 1
 attr DEVICE icon hm_ccu
-attr DEVICE reading01AutoNumLen 2
+attr DEVICE reading01AutoNumLen 3
 attr DEVICE reading01Name hmfw-type
 attr DEVICE reading01RegOpt g
 attr DEVICE reading01Regex (?i)"type":"((?:\w+[-]*){1,})
-attr DEVICE reading02AutoNumLen 2
+attr DEVICE reading02AutoNumLen 3
 attr DEVICE reading02Name hmfw-version
 attr DEVICE reading02RegOpt g
 attr DEVICE reading02Regex (?si)"version":"(\d+[.]\d+[.]\d+)
@@ -698,11 +760,11 @@ attr DEVICE showError 1
 attr DEVICE showMatched 1
 attr DEVICE showNewFWOnly yes
 attr DEVICE stateFormat {   my $ret ="";;\
-    my $lastCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(ReadingsTimestamp($name,"MATCHED_READINGS","2000-01-01 00:00:00"))));;\
-	my $nextCheck = POSIX::strftime("%d.%m. %H:%M",localtime(time_str2num(InternalVal($name,"TRIGGERTIME_FMT","2000-01-01 00:00:00"))));;\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
+	my $nextCheck = FmtDateTime(InternalVal($name,".TRIGGERTIME",0));;\
 	my $cellstyle = "padding:3pt;;border-bottom:1px dotted lightgray;;";;\
     $ret .= '<div style="text-align:left;;">';;\
-    $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html">homematic</a>-fw-check => '.$lastCheck;;\
+    $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html" rel="noopener noreferrer" target="_blank">homematic</a>-fw-check => '.$lastCheck;;\
     $ret .= '</div>';;\
     my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");;\
     if($check eq "no fw-updates needed!") {\
@@ -757,7 +819,7 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
   if (ReadingsVal($name,"UNMATCHED_READINGS","?") eq "") {\
     my @eq3FwList = map { \
 		sprintf(uc(ReadingsVal($name,"hmfw-type-".$_,"?")).":".ReadingsVal($name,"hmfw-version-".$_,"?").":".$_);;\
-	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d)/g;;\
+	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d\d)/g;;\
 	\
 	foreach my $dev (devspec2array("TYPE=CUL_HM|HMCCUDEV:FILTER=DEF=(......|..............):FILTER=subType!=virtual")) {\
 	my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));;\
@@ -780,11 +842,11 @@ attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model hm_fw_check_v2
-setreading DEVICE attrTemplateVersion 20201202
+setreading DEVICE attrTemplateVersion 20201204
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
 name:aculfw_fw_check
-filter:TYPE=X_01d
+filter:TYPE=HTTPMOD
 desc: checks a-culfw firmware updates<br />Define a HTTPMOD device like<br />define aculfw_fw_check HTTPMOD https://github.com/heliflieger/a-culfw/blob/master/CHANGELOG 86400<br /><a href="https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829">Source: Forum</a>
 order:TECHZ05
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
