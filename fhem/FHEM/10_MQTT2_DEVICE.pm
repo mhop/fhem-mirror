@@ -1057,12 +1057,13 @@ zigbee2mqtt_devStateIcon255($;$$)
       Notes:
       <ul>
         <li>arguments to the set command will be appended to the message
-          published (not for the perl expression)</li>
+          published (this is not valid not for the perl expression)</li>
         <li>the command arguments are available as $EVENT, $EVTPART0, etc., 
           the name of the device as $NAME, both in the perl expression and the
           "normal" topic variant.</li>
         <li>the perl expression must return a string containing the topic and
-          the message separated by a space.</li>
+          the message separated by a space. If it returns "", undef or 0, no
+          MQTT message will be sent.</li>
         <li>SetExtensions is activated</li>
         <li>if the topic name ends with :r, then the retain flag is set</li>
       </ul>
