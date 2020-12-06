@@ -96,9 +96,9 @@ attr DEVICE model clever_tanken_multi_station
 setreading DEVICE attrTemplateVersion 20201129
 
 #Contributed by subseven & yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754
-name:fuel_oil_check
+name:fuel_oil_check_esyoil
 filter:TYPE=HTTPMOD
-desc: checks fuel oil prices via easyoil.com<br />Define a HTTPMOD device like<br>define heizoelpreis HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge) and unloading points (Entladestellen), hose length (Schlauchlaenge) and truck trailer accessibility (mit Anhaenger moeglich) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754">this FHEM forum thread</a>
+desc: checks fuel oil prices via easyoil.com<br />Define a HTTPMOD device like<br>define heizoelpreis HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-points=%%ENTLADESTELLEN%%&pr-product=8&pr-payment-type=2&%%ANHAENGER%%&pr-hose-length=%%SCHLAUCHLAENGE%%&pr-app=1&pr-zip=%%PLZ%%&pr-amount=%%MENGE%%&submit= 3600<br />Maintain Attributes for ZIP (PLZ), order volume (Bestellmenge), unloading points (Entladestellen), hose length (Schlauchlaenge) and truck trailer accessibility (mit Anhaenger moeglich) before senseful values can be retrieved.<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,107189.msg1017754.html#msg1017754">this FHEM forum thread</a>
 order:FUEL03
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
@@ -108,7 +108,7 @@ defmod DEVICE HTTPMOD https://www.esyoil.com/preisausgabe.php?pr-unloading-point
 attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value:1,2,3,4,5,6,7,8,9,10 replacement04Mode:reading,internal,text,expression,key replacement04Regex replacement04Value:40m,60m,80m replacement05Mode:reading,internal,text,expression,key replacement05Regex replacement05Value:pr-truck-type=,pr-truck-type=short_vehicle
 attr DEVICE enableControlSet 1
 attr DEVICE reading010Name Heizoelpreis
-attr DEVICE reading010OExpr $val =~ s/,/\./;; $val;;
+attr DEVICE reading010OExpr $val =~ s/,/\./; $val;
 attr DEVICE reading010Regex ([\d\,]+)[\s]+€
 attr DEVICE replacement01Mode text
 attr DEVICE replacement01Regex %%PLZ%%
@@ -126,30 +126,30 @@ attr DEVICE replacement05Mode text
 attr DEVICE replacement05Regex %%ANHAENGER%%
 attr DEVICE replacement05Value pr-truck-type=
 attr DEVICE room WHICHROOM
-attr DEVICE stateFormat {	my $price = 0.0;;\
-	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;;\
-	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
-	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";;\
-	my $link = "https://www.esyoil.com/preisausgabe.php?";;\
-		$link .= "pr-unloading-points=".AttrVal($name,"replacement03Value","");;\
-		$link .= "&pr-product=8&pr-payment-type=2";;\
-		$link .= "&".AttrVal($name,"replacement05Value","");;\
-		$link .= "&pr-hose-length=".AttrVal($name,"replacement04Value","");;\
-		$link .= "&pr-app=1&pr-zip=".AttrVal($name,"replacement01Value","");;\
-		$link .= "&pr-amount=".AttrVal($name,"replacement02Value","");;\
-		$link .= "&submit=";;\
-	$ret .= "&nbsp;;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;;\">";;\
-	$ret .= ReadingsVal($name,"Heizoelpreis","-");;\
-	$ret .= "&euro;;</a>/100l";;\
-	$ret .= "&nbsp;;(".AttrVal($name,"replacement02Value","0")."l = ";;\
-	$ret .= sprintf("%.2f",$price);;\
-	$ret .= "&euro;;)</div>";;\
-	return $ret;;\
+attr DEVICE stateFormat {	my $price = 0.0;\
+	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));\
+	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";\
+	my $link = "https://www.esyoil.com/preisausgabe.php?";\
+		$link .= "pr-unloading-points=".AttrVal($name,"replacement03Value","");\
+		$link .= "&pr-product=8&pr-payment-type=2";\
+		$link .= "&".AttrVal($name,"replacement05Value","");\
+		$link .= "&pr-hose-length=".AttrVal($name,"replacement04Value","");\
+		$link .= "&pr-app=1&pr-zip=".AttrVal($name,"replacement01Value","");\
+		$link .= "&pr-amount=".AttrVal($name,"replacement02Value","");\
+		$link .= "&submit=";\
+	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;\">";\
+	$ret .= ReadingsVal($name,"Heizoelpreis","-");\
+	$ret .= "&euro;</a>/100l";\
+	$ret .= "&nbsp;(".AttrVal($name,"replacement02Value","0")."l = ";\
+	$ret .= sprintf("%.2f",$price);\
+	$ret .= "&euro;)</div>";\
+	return $ret;\
 }
 attr DEVICE webCmd reread
 attr DEVICE timeout 10
-attr DEVICE model fuel_oil_check
-setreading DEVICE attrTemplateVersion 20201204
+attr DEVICE model fuel_oil_check_esyoil
+setreading DEVICE attrTemplateVersion 20201206
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,107189.msg1055334.html#msg1055334
 name:fuel_oil_check_heizoel24
@@ -160,11 +160,11 @@ par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE",
 par:INTERVAL;Actual interval for updating, defaults to hourly (3600s); {InternalVal("DEVICE","Interval",3600)}
 par:ZIPCODE;German ZIP Code / deutsche Postleitzahl; {AttrVal("DEVICE","replacement01Value",undef)}
 par:ORDERVOLUME;fuel order volume in litre / Bestellmenge in Liter; {AttrVal("DEVICE","replacement02Value",undef)}
-defmod DEVICE HTTPMOD https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% 3600
+defmod DEVICE HTTPMOD https://www.heizoel24.de/heizoelpreise-direkt/%%PLZ%%/%%MENGE%%/%%ENTLADESTELLEN%% INTERVAL
 attr DEVICE userattr reading010Name reading010OExpr reading010Regex replacement01Mode:reading,internal,text,expression,key replacement01Regex replacement01Value replacement02Mode:reading,internal,text,expression,key replacement02Regex replacement02Value replacement03Mode:reading,internal,text,expression,key replacement03Regex replacement03Value:1,2,3,4,5,6,7,8,9,10
 attr DEVICE enableControlSet 1
 attr DEVICE reading010Name Heizoelpreis
-attr DEVICE reading010OExpr $val =~ s/,/\./;; $val;;
+attr DEVICE reading010OExpr $val =~ s/,/\./; $val;
 attr DEVICE reading010Regex <span class="unitprice">([\d\,]+)[\s]+<span
 attr DEVICE replacement01Mode text
 attr DEVICE replacement01Regex %%PLZ%%
@@ -176,27 +176,26 @@ attr DEVICE replacement03Mode text
 attr DEVICE replacement03Regex %%ENTLADESTELLEN%%
 attr DEVICE replacement03Value 1
 attr DEVICE room WHICHROOM
-attr DEVICE stateFormat {	my $price = 0.0;;\
-	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;;\
-	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
-	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";;\
-	my $link = "https://www.heizoel24.de/heizoelpreise-direkt";;\
-		$link .= "/".AttrVal($name,"replacement01Value","");;\
-		$link .= "/".AttrVal($name,"replacement02Value","");;\
-		$link .= "/".AttrVal($name,"replacement03Value","");;\
-	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;;\">";;\
-	$ret .= ReadingsVal($name,"Heizoelpreis","-");;\
-	$ret .= "&euro;</a>/100l";;\
-	$ret .= "&nbsp;(".AttrVal($name,"replacement02Value","0")."l = ";;\
-	$ret .= sprintf("%.2f",$price);;\
-	$ret .= "&euro;)</div>";;\
-	return $ret;;\
+attr DEVICE stateFormat {	my $price = 0.0;\
+	$price = (AttrNum($name,"replacement02Value",0)*ReadingsNum($name,"Heizoelpreis",0))/100;\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));\
+	my $ret = "<div style=\"text-align: left;;\">".$lastCheck.":";\
+	my $link = "https://www.heizoel24.de/heizoelpreise-direkt";\
+		$link .= "/".AttrVal($name,"replacement01Value","");\
+		$link .= "/".AttrVal($name,"replacement02Value","");\
+		$link .= "/".AttrVal($name,"replacement03Value","");\
+	$ret .= "&nbsp;<a href=\"".$link."\" rel=\"noopener noreferrer\" target=\"_blank\" style=\"font-weight:bold;\">";\
+	$ret .= ReadingsVal($name,"Heizoelpreis","-");\
+	$ret .= "&euro;</a>/100l";\
+	$ret .= "&nbsp;(".AttrVal($name,"replacement02Value","0")."l = ";\
+	$ret .= sprintf("%.2f",$price);\
+	$ret .= "&euro;)</div>";\
+	return $ret;\
 }
 attr DEVICE timeout 10
 attr DEVICE webCmd reread
 attr DEVICE model fuel_oil_check_heizoel24
-setreading DEVICE attrTemplateVersion 20201204
-
+setreading DEVICE attrTemplateVersion 20201206
 
 #German weather warnings from DWD, Forum: https://forum.fhem.de/index.php/topic,45176.msg905879.html#msg905879
 name:DWD_weather_warnings
@@ -737,7 +736,7 @@ setreading DEVICE attrTemplateVersion 20201129
 #Contributed by Pfriemler, mcp & yersinia, see https://forum.fhem.de/index.php/topic,78501.msg1104534.html#msg1104534
 name:hm_fw_check_v2
 filter:TYPE=HTTPMOD
-desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com) and includes HmIP adaption provided by mcp<br />Define an HTTPMOD device like <br>define DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,78501.msg1106499.html#msg1106499">this FHEM forum thread</a>
+desc: check for homematic firmware updates; based on new link provided by Pfriemler (switch from eq-3.de to update.homematic.com) and includes HmIP adaption provided by mcp<br />Define an HTTPMOD device like <br />define DEVICE HTTPMOD https://update.homematic.com/firmware/api/firmware/search/DEVICE 86400<br />Further information and documentation can be found in <a href="https://forum.fhem.de/index.php/topic,78501.msg1106499.html#msg1106499">this FHEM forum thread</a>
 order:TECHZ04
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:INTERVAL;Actual interval for updating, defaults to one day (86400s); {InternalVal("DEVICE","Interval",86400)}
@@ -759,90 +758,90 @@ attr DEVICE readingMaxAgeReplacementMode delete
 attr DEVICE showError 1
 attr DEVICE showMatched 1
 attr DEVICE showNewFWOnly yes
-attr DEVICE stateFormat {   my $ret ="";;\
-	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));;\
-	my $nextCheck = FmtDateTime(InternalVal($name,".TRIGGERTIME",0));;\
-	my $cellstyle = "padding:3pt;;border-bottom:1px dotted lightgray;;";;\
-    $ret .= '<div style="text-align:left;;">';;\
-    $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html" rel="noopener noreferrer" target="_blank">homematic</a>-fw-check => '.$lastCheck;;\
-    $ret .= '</div>';;\
-    my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");;\
+attr DEVICE stateFormat {   my $ret ="";\
+	my $lastCheck = FmtDateTime(InternalVal($name,".LastUpdate",0));\
+	my $nextCheck = FmtDateTime(InternalVal($name,".TRIGGERTIME",0));\
+	my $cellstyle = "padding:3pt;border-bottom:1px dotted lightgray;";\
+    $ret .= '<div style="text-align:left;">';\
+    $ret .= '<div>last <a title="eq3-downloads" href="http://www.eq-3.de/service/downloads.html" rel="noopener noreferrer" target="_blank">homematic</a>-fw-check => '.$lastCheck;\
+    $ret .= '</div>';\
+    my $check = ReadingsVal($name,"newFwForDevices","error => no or wrong data from eq3-server!");\
     if($check eq "no fw-updates needed!") {\
-      $ret .= '<div style="color:limegreen;;font-weight:bold;;">';;\
-      $ret .= $check;;\
-      $ret .= '</div>';;\
+      $ret .= '<div style="color:limegreen;font-weight:bold;">';\
+      $ret .= $check;\
+      $ret .= '</div>';\
     } elsif($check eq "error => no or wrong data from eq3-server!") {\
-      $ret .= '<div style="color:red;;font-weight:bold;;">';;\
-      $ret .= $check;;\
-      $ret .= '</div>';;\
+      $ret .= '<div style="color:red;font-weight:bold;">';\
+      $ret .= $check;\
+      $ret .= '</div>';\
     } else {\
-		$ret .= '<div style="display:table;;width:100%;;">';;\
-		$ret .= '<div style="display:table-row;;">';;\
-	      $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:50%;;font-weight:bold;;">device</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:40%;;font-weight:bold;;">model</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:5%;;font-weight:bold;;">current</div>';;\
-		  $ret .= '<div style="display:table-cell;;'.$cellstyle.'width:5%;;font-weight:bold;;">new</div>';;\
-		$ret .= '</div>';; #header\
-      my @devices = split(',',$check);;\
+		$ret .= '<div style="display:table;width:100%;">';\
+		$ret .= '<div style="display:table-row;">';\
+	      $ret .= '<div style="display:table-cell;'.$cellstyle.'width:50%;font-weight:bold;">device</div>';\
+		  $ret .= '<div style="display:table-cell;'.$cellstyle.'width:40%;font-weight:bold;">model</div>';\
+		  $ret .= '<div style="display:table-cell;'.$cellstyle.'width:5%;font-weight:bold;">current</div>';\
+		  $ret .= '<div style="display:table-cell;'.$cellstyle.'width:5%;font-weight:bold;">new</div>';\
+		$ret .= '</div>'; #header\
+      my @devices = split(',',$check);\
       foreach my $devStr (@devices) {\
-		my ($dev,$idx) = $devStr =~ m/([^\s]+)\s[(](\d+)[)]/;;\
-		my $md = ReadingsVal($name,("hmfw-type-".$idx),"?");;\
-		my $ofw = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
-		my $nfw = ReadingsVal($name,("hmfw-version-".$idx),"none");;\
-        my $fw_link = "https://ccu3-update.homematic.com/firmware/download?cmd=download&serial=0&product=".$md;;\
-		$ret .= '<div style="display:table-row;;">';;\
-		$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:50%;;">';;\
-        $ret .= '<a href="/fhem?detail='.$dev.'" target="_blank">';;\
-		$ret .= AttrVal($dev,"alias",$dev);;\
-        $ret .= '</a></div>';;\
-		$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:30%;;font-weight:bold;;color:lightgrey;;">';;\
-        $ret .= $md;;\
-        $ret .= '</div>';;\
-		$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:10%;;font-weight:bold;;color:lightgrey;;">';;\
-        $ret .= $ofw;;\
-        $ret .= '</div>';;\
-		$ret .= '<div style="display:table-cell;;'.$cellstyle.'width:10%;;font-weight:bold;;color:red;;">';;\
-        $ret .= '<a title="download firmware file" href="'.$fw_link.'" rel="noopener noreferrer" target="_blank" style="color:red;;">';;\
-        $ret .= $nfw;;\
-        $ret .= '</a></div>';;\
-        $ret .= '</div>';; #row\
+		my ($dev,$idx) = $devStr =~ m/([^\s]+)\s[(](\d+)[)]/;\
+		my $md = ReadingsVal($name,("hmfw-type-".$idx),"?");\
+		my $ofw = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));\
+		my $nfw = ReadingsVal($name,("hmfw-version-".$idx),"none");\
+        my $fw_link = "https://ccu3-update.homematic.com/firmware/download?cmd=download&serial=0&product=".$md;\
+		$ret .= '<div style="display:table-row;">';\
+		$ret .= '<div style="display:table-cell;'.$cellstyle.'width:50%;">';\
+        $ret .= '<a href="/fhem?detail='.$dev.'" target="_blank">';\
+		$ret .= AttrVal($dev,"alias",$dev);\
+        $ret .= '</a></div>';\
+		$ret .= '<div style="display:table-cell;'.$cellstyle.'width:30%;font-weight:bold;color:lightgrey;">';\
+        $ret .= $md;\
+        $ret .= '</div>';\
+		$ret .= '<div style="display:table-cell;'.$cellstyle.'width:10%;font-weight:bold;color:lightgrey;">';\
+        $ret .= $ofw;\
+        $ret .= '</div>';\
+		$ret .= '<div style="display:table-cell;'.$cellstyle.'width:10%;font-weight:bold;color:red;">';\
+        $ret .= '<a title="download firmware file" href="'.$fw_link.'" rel="noopener noreferrer" target="_blank" style="color:red;">';\
+        $ret .= $nfw;\
+        $ret .= '</a></div>';\
+        $ret .= '</div>'; #row\
       }\
-	  $ret .= '</div>';; #table\
+	  $ret .= '</div>'; #table\
     }\
-	$ret .= "<br \/><div style=\"text-align:left;;\">(next check: ".$nextCheck.")</div>";;\
-    $ret .= '</div>';;\
-  return $ret;;\
+	$ret .= "<br \/><div style=\"text-align:left;\">(next check: ".$nextCheck.")</div>";\
+    $ret .= '</div>';\
+  return $ret;\
 }
 attr DEVICE userReadings newFwForDevices:MATCHED_READINGS.* {\
-  my $ret = "";;\
-  my $newfwonly = AttrVal($name,"showNewFWOnly","yes");;\
+  my $ret = "";\
+  my $newfwonly = AttrVal($name,"showNewFWOnly","yes");\
   if (ReadingsVal($name,"UNMATCHED_READINGS","?") eq "") {\
     my @eq3FwList = map { \
-		sprintf(uc(ReadingsVal($name,"hmfw-type-".$_,"?")).":".ReadingsVal($name,"hmfw-version-".$_,"?").":".$_);;\
-	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d\d)/g;;\
+		sprintf(uc(ReadingsVal($name,"hmfw-type-".$_,"?")).":".ReadingsVal($name,"hmfw-version-".$_,"?").":".$_);\
+	} ReadingsVal($name,"MATCHED_READINGS","?")=~ m/hmfw-version-(\d\d\d)/g;\
 	\
 	foreach my $dev (devspec2array("TYPE=CUL_HM|HMCCUDEV:FILTER=DEF=(......|..............):FILTER=subType!=virtual")) {\
-	my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));;\
-	my $v = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));;\
-        my ($h,$l) = split('\.',$v);;\
+	my $md = uc(InternalVal($dev,"ccutype",AttrVal($dev,"model","?")));\
+	my $v = InternalVal($dev,"firmware",AttrVal($dev,"firmware","0.0"));\
+        my ($h,$l) = split('\.',$v);\
         foreach my $newFW (grep m/^${md}:/i,@eq3FwList) {\
-		my ($fwmd, $fwv, $idx) = $newFW =~ m/([^:]+):(\d+[.]\d+[.]\d+):(\d+)$/;;\
-		my ($fwh, $fwl) = split('\.',$fwv);;\
+		my ($fwmd, $fwv, $idx) = $newFW =~ m/([^:]+):(\d+[.]\d+[.]\d+):(\d+)$/;\
+		my ($fwh, $fwl) = split('\.',$fwv);\
 		if(($newfwonly eq "no") || (($fwh > $h) || (($fwh == $h) && ($fwl > $l)))) {\
-		  $ret .= "," if($ret ne "");;\
-		  $ret .= $dev." (".$idx.")";;\
+		  $ret .= "," if($ret ne "");\
+		  $ret .= $dev." (".$idx.")";\
         }\
       }\
     }\
   } else {\
-    $ret = "error => no or wrong data from eq3-server!";;\
+    $ret = "error => no or wrong data from eq3-server!";\
   }\
-  return ($ret eq "")?"no fw-updates needed!":$ret;;\
+  return ($ret eq "")?"no fw-updates needed!":$ret;\
 }
 attr DEVICE webCmd reread
 attr DEVICE room WHICHROOM
 attr DEVICE model hm_fw_check_v2
-setreading DEVICE attrTemplateVersion 20201204
+setreading DEVICE attrTemplateVersion 20201206
 
 #Contributed by yersinia, see https://forum.fhem.de/index.php/topic,97694.msg1045829.html#msg1045829
 name:aculfw_fw_check
