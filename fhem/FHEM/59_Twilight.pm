@@ -589,8 +589,8 @@ sub Twilight_calc {
     my $hash = shift;
     my $deg  = shift;
     my $idx  = shift // return;
-
-    my $now = time();
+    my $now  = shift // time();
+    
     my $midnight = $now - secondsSinceMidnight( $now );
     my $lat      = $hash->{helper}{'.LATITUDE'};
     my $long     = $hash->{helper}{'.LONGITUDE'};
@@ -1005,9 +1005,19 @@ sub Twilight_CompassPoint {
 }
 
 sub twilight {
-    my ( $twilight, $reading, $min, $max ) = @_;
+    my ( $twilight, $reading, $min, $max, $cloudCover ) = @_;
+    my $hash = $defs{$twilight};
+    return "unknown device $twilight" if !defined $hash;
+    
+    my $t;
+    
+    $t = hms2h( ReadingsVal( $twilight, $reading, 0 ) ) if $reading ne "sr_tomorrow" and $reading ne "ss_tomorrow";
 
-    my $t = hms2h( ReadingsVal( $twilight, $reading, 0 ) );
+    if ($reading eq "sr_tomorrow" or $reading eq "ss_tomorrow") {
+        my $wh = Twilight_getWeatherHorizon( $hash, $cloudCover // 50, 0);
+        my ($sr, $ss) = Twilight_calc( $hash, $wh, "7", time() + DAYSECONDS );
+        $t = hms2h( FmtTime( $reading eq "sr_tomorrow" ? $sr : $ss ) );
+    }
 
     $t = hms2h($min) if ( defined($min) && ( hms2h($min) > $t ) );
     $t = hms2h($max) if ( defined($max) && ( hms2h($max) < $t ) );
@@ -1143,6 +1153,8 @@ __END__
     <code>5 - weather twilight, sun is between indoor_horizon and a virtual weather horizon (the weather horizon depends on weather conditions (optional)</code><br>
     <code>6 - maximum daylight</code><br>
     <br>
+    <b>state</b> will reflect the current virtual "day phase" (0 = after midnight, 1 = sr_astro has passed, ...12 = ss_astro has passed)<br>
+    
  <b>Azimut, Elevation, Twilight</b>
  <br>
    The module calculates additionally the <b>azimuth</b> and the <b>elevation</b> of the sun. The values can be used to control a roller shutter.
@@ -1285,8 +1297,7 @@ Example:
     <br><br>
   <b>indoor_horizon</b>
   <br>
-    Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der f&uuml;r die Berechnung der D&auml;mmerung innerhalb von R&auml;men genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile D&auml;mmerung). Bei 0 fallen
-       indoor- und realer D&aumlmmerungswert zusammen. Werte gr&oumlsser 0 ergeben fr&uumlhere Werte für den Abend bzw. sp&aumltere f&uumlr den Morgen.
+     Der Parameter <b>indoor_horizon</b> bestimmt einen virtuellen Horizont, der für die Berechnung der Dämmerung innerhalb von Räumen genutzt werden kann. Minimalwert ist -6 (ergibt gleichen Wert wie Zivile Dämmerung). Bei 0 fallen indoor- und realer Dämmerungswert zusammen. Werte größer 0 ergeben frühere Werte für den Abend bzw. spätere für den Morgen.
     <br><br>
   <b>weatherDevice:Reading</b>
   <br>
@@ -1301,7 +1312,7 @@ Example:
     <br>
     Ein Twilight-Device berechnet periodisch die D&auml;mmerungszeiten und -phasen w&auml;hrend des Tages.
     Es berechnet ein virtuelles "Licht"-Element das einen Indikator f&uuml;r die momentane Tageslichtmenge ist.
-    Neben der Position auf der Erde wird es vom sog. "indoor horizon" (Beispielsweise hohe Geb&auml;de oder Berge)
+    Neben der Position auf der Erde wird es vom sog. "indoor horizon" (Beispielsweise hohe Gebäude oder Berge)
     und dem Wetter beeinflusst. Schlechtes Wetter f&uuml;hrt zu einer Reduzierung des Tageslichts f&uuml;r den ganzen Tag.
     Das berechnete Licht liegt zwischen 0 und 6 wobei die Werte folgendes bedeuten:<br><br>
   <b>light</b>
@@ -1314,6 +1325,8 @@ Example:
     <code>5 - Wetterbedingte D&auml;mmerung, die Sonne ist zwischen indoor_horizon und einem virtuellen Wetter-Horizonz (der Wetter-Horizont ist Wetterabh&auml;ngig (optional)</code><br>
     <code>6 - Maximales Tageslicht</code><br>
     <br>
+    <b>state</b> entspricht der aktuellen virtuellen "Tages-Phase" (0 = nach Mitternacht, 1 = nach sr_astro, ...12 = nach ss_astro)<br>
+    
  <b>Azimut, Elevation, Twilight (Seitenwinkel, Höhenwinkel, D&auml;mmerung)</b>
  <br>
    Das Modul berechnet zus&auml;tzlich Azimuth und Elevation der Sonne. Diese Werte k&ouml;nnen zur Rolladensteuerung verwendet werden.<br><br>
@@ -1381,7 +1394,7 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt; [&lt;usercode&gt;]</b></li>
     Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
-    Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b><a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
+    Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b> <a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
     Wettereffekte wie Starkregen oder Gewitter k&umlnnen derzeit f&uumlr die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen werden.<br>
     Durch Angabe von <b>usercode</b> (Achtung: experimentelles feature! Kann auch schiefgehen...) kann die Berechnung der sr_weather und ss_weather-Zeiten verbessert werden, indem die zum jeweils zugehörigen indoor-Zeitpunkt gehörenden Vorhersage-Werte zurückgegeben werden. Das Rückgabe-Format der Funktion muss sein:<br>
     <pre>
@@ -1414,6 +1427,9 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
      <tr><td><b>$min</b></td><td>Parameter min time - optional</td></tr>
      <tr><td><b>$max</b></td><td>Parameter max time - optional</td></tr>
      </table>
+     <br><br>
+     Optional ist es möglich, auch die morgigen sr_weather bzw. ss_weather abzufragen, dafür werden die "fiktiven" Reading-Namen "sr_tomorrow" bzw. "ss_tomorrow" verwendet. Als Bedeckungsgrad wird dabei ein fiktiver Wert von "50" angenommen, dieser kann mit (optionalem) 5. Parameter auch abweichend (Bereich: 0-100) angegeben werden. Beispiel:<br>
+     <code>{ twilight('tw_test1','sr_tomorrow','08:00','09:10',100) }</code>
   </ul>
   <br>
 Anwendungsbeispiel:
