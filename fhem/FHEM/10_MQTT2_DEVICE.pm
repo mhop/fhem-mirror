@@ -944,16 +944,17 @@ zigbee2mqtt_devStateIcon255($;$$)
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
     <a name="getList"></a>
-    <li>getList cmd [topic|perl-Expression] ...<br>
-      When the FHEM command cmd is issued, publish the topic, wait for the
-      answer (the specified reading), and show it in the user interface.
-      Multiple triples can be specified, each of them separated by newline, the
-      newline does not have to be entered in the FHEMWEB frontend.<br>
+    <li>getList cmd reading [topic|perl-Expression] ...<br>
+      When the FHEM command cmd is issued, publish the topic (and optional
+      message, which is separated by space from the topic), wait for the answer
+      which must contain the specified reading, and show the result in the user
+      interface.<br>
+      Multiple triples can be specified, each of them separated by newline.
       Example:<br>
       <code>
         &nbsp;&nbsp;attr dev getList\<br>
         &nbsp;&nbsp;&nbsp;&nbsp;temp temperature myDev/cmd/getstatus\<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;hum  hum  myDev/cmd/getStatus
+        &nbsp;&nbsp;&nbsp;&nbsp;hum humReading myDev/cmd/getHumidity now
       </code><br>
       This example defines 2 get commands (temp and hum), which both publish
       the same topic, but wait for different readings to be set.<br>
