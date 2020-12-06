@@ -36,7 +36,7 @@ eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 
 # Versions History by DS_Starter 
 our %SMAEM_vNotesIntern = (
-  "4.3.0" => "28.11.2020  attribute serialNumber may contain multiple serial numbers ",
+  "4.3.0" => "06.12.2020  attribute serialNumber may contain multiple serial numbers, extend logging with serial number ",
   "4.2.0" => "14.04.2020  delete 'use bignum' ",
   "4.1.0" => "17.03.2020  add define option <interface> ",
   "4.0.1" => "10.02.2020  fix perl warning Forum: https://forum.fhem.de/index.php/topic,51569.msg1021988.html#msg1021988",
@@ -271,8 +271,8 @@ return;
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
 sub SMAEM_DelayedShutdown {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
+  my $hash = shift;
+  my $name = $hash->{NAME};
   
   if($hash->{HELPER}{RUNNING_PID}) {
       Log3($name, 2, "$name - Quit background process due to shutdown ...");
@@ -368,7 +368,7 @@ return;
 ###############################################################
 # called from the global loop, when the select for hash->{FD} reports data
 sub SMAEM_Read {
-  my ($hash)  = @_;
+  my $hash    = shift;
   my $name    = $hash->{NAME};
   my $socket  = $hash->{TCPDev};
   my $timeout = AttrVal($name, "timeout", 60);
@@ -441,7 +441,7 @@ sub SMAEM_Read {
       }
   } 
   else {
-	  Log3 $hash, 5, "SMAEM $name - received ".$dl." bytes but interval $hash->{INTERVAL}s isn't expired.";
+	  Log3 ($hash, 5, qq{SMAEM $name - received $dl bytes from "$smaserial" but interval $hash->{INTERVAL}s isn't expired.});
   }
   
 return;
