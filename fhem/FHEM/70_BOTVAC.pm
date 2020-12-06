@@ -95,6 +95,8 @@ my %opcode = (    # Opcode interpretation of the ws "Payload data
     'pong'         => 0x0A
 );
 
+my $clientId = '298e186d502fb6007b969f2f21b590ef32e4de1b2c665851';
+
 ###################################
 sub Initialize {
     my ($hash) = @_;
@@ -198,12 +200,19 @@ sub GetStatus {
         or ReadingsVal( $name, "pollingMode", 1 ) == 0 );
 
     # check device availability
-    if ( !$update ) {
+    if ( !$update && $::init_done) {
         my @time = localtime();
         my $secs = ( $time[2] * 3600 ) + ( $time[1] * 60 ) + $time[0];
 
         # update once per day
-        push( @successor, [ "dashboard", undef ] ) if ( $secs <= $interval );
+        if ( $secs <= $interval ) {
+            if (ReadingsVal($name, '.idToken', '') eq '') {
+                push( @successor, [ 'dashboard', undef ] );
+            }
+            else {
+                push( @successor, [ 'dashboard2', undef ] );
+            }
+        }
 
         push( @successor, [ "messages", "getSchedule" ] );
         push( @successor, [ "messages", "getGeneralInfo" ] )
@@ -251,9 +260,28 @@ sub Get {
             return "maps for $what are not available yet";
         }
     }
+    elsif ( $what =~ /^(securityTokens)$/x ) {
+        my $rowCount = 1;
+        my $return = '<html><table class="block wide">';
+        foreach my $token ( '.accessToken', '.secretKey', '.idToken', '.authToken' ) {
+            my $value = ReadingsVal($name, $token, '');
+            if ( $value ne '' ) {
+                $return .= '<tr class="column ';
+                $return .= ( $rowCount % 2 ? "odd" : "even" );
+                $return .= '"><td>';
+                $return .= substr($token, 1);
+                $return .= '</td><td>';
+                $return .= join ('<br>',  ( $value =~ /.{1,50}/gsxms ));
+                $return .= '</td></tr>';
+                $rowCount++;
+            }
+        }
+        $return .= '</table></html>';
+        return $return;
+    }
     else {
         return
-"Unknown argument $what, choose one of batteryPercent:noArg statistics:noArg";
+"Unknown argument $what, choose one of batteryPercent:noArg statistics:noArg securityTokens:noArg";
     }
 }
 
@@ -276,6 +304,8 @@ sub Set {
     my $usage = "Unknown argument " . $a[1] . ", choose one of";
 
     $usage .= " password";
+    $usage .= " requestVerification:noArg sendVerification"
+        if ($hash->{VENDOR} eq 'vorwerk');
     if ( ReadingsVal( $name, ".start", "0" ) ) {
         $usage .= " startCleaning:";
         if ( $houseCleaningSrv eq "basic-4" ) {
@@ -496,7 +526,12 @@ sub Set {
     elsif ( $a[1] eq "syncRobots" ) {
         Log3( $name, 2, "BOTVAC set $name $arg" );
 
-        SendCommand( $hash, "dashboard" );
+        if (ReadingsVal($name, '.idToken', '') eq '') {
+            SendCommand( $hash, "dashboard" );
+        }
+        else {
+            SendCommand( $hash, "dashboard2" );
+        }
     }
 
     # statusRequest
@@ -606,6 +641,29 @@ sub Set {
         return "No password given" if ( !defined( $a[2] ) );
 
         StorePassword( $hash, $a[2] );
+    }
+
+    # requestVerification
+    elsif ( $a[1] eq 'requestVerification' ) {
+        Log3( $name, 2, "BOTVAC set $name " . $a[1] );
+
+        SendCommand( $hash, 'requestVerification' );
+    }
+
+    # sendVerification
+    elsif ( $a[1] eq 'sendVerification' ) {
+        Log3( $name, 2, "BOTVAC set $name $arg" );
+
+        return 'No verification code given' if ( !defined( $a[2] ) );
+
+        SendCommand( $hash, 'sendVerification', $a[2] );
+    }
+
+    # getProducts
+    elsif ( $a[1] eq 'getProducts' ) {
+        Log3( $name, 2, "BOTVAC set $name " . $a[1] );
+
+        SendCommand( $hash, 'getProducts' );
     }
 
     # pollingMode
@@ -757,7 +815,7 @@ sub SendCommand {
     my ( $hash, $service, $cmd, $option, @successor ) = @_;
     my $name      = $hash->{NAME};
     my $email     = $hash->{EMAIL};
-    my $password  = ReadPassword($hash);
+    my $password  = ReadingsVal($name, '.idToken', '') eq '' ? ReadPassword($hash) : '';
     my $timestamp = gettimeofday();
     my $timeout   = 180;
     my $keepalive = 0;
@@ -765,13 +823,24 @@ sub SendCommand {
     my $URL       = "https://";
     my %sslArgs   = ();
     my %header;
+    my $method;
     my $data;
     my $response;
     my $return;
 
     Log3( $name, 5, "BOTVAC $name: called function SendCommand()" );
 
-    if ( $service ne "sessions" && $service ne "dashboard" ) {
+    my @registrationServices = qw(
+        sessions
+        dashboard.*
+        firmwares
+        .*Verification
+        profileLogin
+        getProducts
+    );
+    my $re = join( '|', @registrationServices );
+    $re = qr/($re)/xms;
+    if ( $service !~ /$re/xms ) {
         return
           if (
             CheckRegistration( $hash, $service, $cmd, $option, @successor ) );
@@ -811,7 +880,7 @@ sub SendCommand {
             return;
         }
         my $token = createUniqueId() . createUniqueId();
-        $URL .= GetBeehiveHost( $hash->{VENDOR} );
+        $URL .= GetBeehiveHost($hash);
         $URL .= "/sessions";
         $data =
 "{\"platform\": \"ios\", \"email\": \"$email\", \"token\": \"$token\", \"password\": \"$password\"}";
@@ -820,19 +889,35 @@ sub SendCommand {
     elsif ( $service eq "dashboard" ) {
         $header{Authorization} =
           "Token token=" . ReadingsVal( $name, ".accessToken", "" );
-        $URL .= GetBeehiveHost( $hash->{VENDOR} );
+        $URL .= GetBeehiveHost($hash);
         $URL .= "/dashboard";
 
     }
+    elsif ( $service eq 'dashboard2' ) {
+        $header{Authorization} =
+          'Auth0Bearer ' . ReadingsVal( $name, '.idToken', '' );
+        $URL .= GetBeehiveHost($hash);
+        $URL .= '/users/me/robots';
+
+    }
+    elsif ( $service eq 'firmwares' ) {
+        $header{Authorization} =
+          'Auth0Bearer ' . ReadingsVal( $name, '.idToken', '' );
+        $URL .= GetBeehiveHost($hash);
+        $URL .= '/firmwares/recent';
+
+    }
     elsif ( $service eq "robots" ) {
-        my $serial = ReadingsVal( $name, "serial", "" );
+        my $serial = ReadingsVal( $name, 'serial', '' );
         return if ( $serial eq "" );
 
-        $header{Authorization} =
-          "Token token=" . ReadingsVal( $name, ".accessToken", "" );
-        $URL .= GetBeehiveHost( $hash->{VENDOR} );
+        my $idToken = ReadingsVal( $name, '.idToken', '' );
+        $header{Authorization} = $idToken eq '' ?
+            'Token token=' . ReadingsVal( $name, '.accessToken', '' ):
+            "Auth0Bearer $idToken";
+        $URL .= GetBeehiveHost($hash);
         $URL .= "/users/me/robots/$serial/";
-        $URL .= ( defined($cmd) ? $cmd : "maps" );
+        $URL .= ( defined($cmd) ? $cmd : 'maps' );
 
     }
     elsif ( $service eq "messages" ) {
@@ -968,10 +1053,50 @@ sub SendCommand {
     elsif ( $service eq "loadmap" ) {
         $URL = $cmd;
     }
+    elsif ( $service eq 'requestVerification' ) {
+        $URL = 'https://mykobold.eu.auth0.com/passwordless/start';
+        $data  = '{';
+        $data .= '"client_id": "' . encode_base64(pack('H*', $clientId), '') . '",';
+        $data .= '"connection": "email",';
+        $data .= "\"email\": \"$email\",";
+        $data .= '"send": "code"';
+        $data .= '}';
+    }
+    elsif ( $service eq 'sendVerification' ) {
+        $URL = 'https://mykobold.eu.auth0.com/oauth/token';
+        $data  = '{';
+        $data .= '"audience": "https://mykobold.eu.auth0.com/userinfo",';
+        $data .= '"client_id": "' . encode_base64(pack('H*', $clientId), '') . '",';
+        $data .= '"country_code": "DE",';
+        $data .= '"grant_type": "http://auth0.com/oauth/grant-type/passwordless/otp",';
+        $data .= '"locale": "de",';
+        $data .= "\"otp\": \"$cmd\",";
+        $data .= '"platform": "ios",';
+        $data .= '"prompt": "login",';
+        $data .= '"realm": "email",';
+        $data .= '"scope": "openid email profile read:current_user",';
+        $data .= '"source": "vorwerk_auth0",';
+        $data .= "\"username\": \"$email\"";
+        $data .= '}';
+    }
+    elsif ( $service eq 'profileLogin' ) {
+        $method = 'POST';
+        $URL = 'https://api-2-prod.companion.kobold.vorwerk.com/api/v1/profile/login';
+        $header{Authorization} = 'Bearer ' . ReadingsVal($name, '.idToken', '');
+        delete( $header{Accept} );
+    }
+    elsif ( $service eq 'getProducts' ) {
+        $URL = 'https://api-2-prod.companion.kobold.vorwerk.com/api/v1/profile/products';
+        $header{Authorization} = ReadingsVal($name, '.authToken', '');
+        $header{'Accept-Language'} = 'de_DE';
+        delete( $header{Accept} );
+    }
 
     # send request via HTTP-POST method
     Log3( $name, 5, "BOTVAC $name: POST $URL (" . ::urlDecode($data) . ")" )
       if ( defined($data) );
+    Log3( $name, 5, "BOTVAC $name: POST $URL" )
+      if ( defined($method) && $method eq 'POST' );
     Log3( $name, 5, "BOTVAC $name: GET $URL" )
       if ( !defined($data) );
     Log3( $name, 5,
@@ -985,6 +1110,7 @@ sub SendCommand {
         noshutdown => 1,
         keepalive  => $keepalive,
         header     => \%header,
+        method     => $method,
         data       => $data,
         hash       => $hash,
         service    => $service,
@@ -1093,7 +1219,7 @@ sub ReceiveCommand {
                 readingsDelete( $hash, ".accessToken" );
                 readingsEndUpdate( $hash, 1 );
 
-                if ( $service ne "sessions" ) {
+                if ( $service ne "sessions" && ReadingsVal($name, '.idToken', '') eq '') {
 
                     # put last command back into queue
                     unshift( @successor, [ $service, $cmd ] );
@@ -1547,6 +1673,51 @@ sub ReceiveCommand {
             }
         }
 
+        #dashboard vorwerk
+        elsif ( $service eq 'dashboard2' ) {
+            if ( ref($return) eq 'ARRAY' ) {
+                my @robotList = ();
+                my @robots    = @{$return};
+                for ( my $i = 0 ; $i < @robots ; $i++ ) {
+                    my $r = {
+                        'name'      => $robots[$i]->{name},
+                        'model'     => $robots[$i]->{model},
+                        'serial'    => $robots[$i]->{serial},
+                        'secretKey' => $robots[$i]->{secret_key},
+                        'macAddr'   => $robots[$i]->{mac_address},
+                        'nucleoUrl' => $robots[$i]->{nucleo_url}
+                    };
+                    push( @robotList, $r );
+                }
+                $hash->{helper}{ROBOTS} = \@robotList;
+                if (@robotList) {
+                    # follow registration procedure first
+                    unshift( @successor, [ 'firmwares' ] );
+                }
+                else {
+                    Log3( $name, 3, "BOTVAC $name: no robots found" );
+                    Log3( $name, 4, "BOTVAC $name: drop successors" );
+                    LogSuccessors( $hash, @successor );
+                    @successor = ();
+                }
+            }
+        }
+
+        #firmwares
+        elsif ( $service eq 'firmwares' ) {
+            if ( ref($return) eq 'HASH' ) {
+                my @robotList = @{ $hash->{helper}{ROBOTS} };
+                foreach my $r ( @robotList ) {
+                    my $firmware = $return->{ $r->{model} };
+                    $r->{recentFirmware} = $firmware->{version} if defined($firmware);
+                }
+                if (@robotList) {
+                    SetRobot( $hash, ReadingsNum( $name, 'robot', 0 ) );
+                    push( @successor, [ 'robots', 'maps' ] );
+                }
+            }
+        }
+
         # robots
         elsif ( $service eq "robots" ) {
             if ( $cmd eq "maps" ) {
@@ -1654,6 +1825,43 @@ sub ReceiveCommand {
         # loadmap
         elsif ( $service eq "loadmap" ) {
             readingsBulkUpdate( $hash, ".map_cache", $data );
+        }
+
+        # requestVerification
+        elsif ( $service eq 'requestVerification' ) {
+            # nothing to do
+        }
+
+        # sendVerification
+        elsif ( $service eq 'sendVerification' ) {
+            if ( ref($return) eq 'HASH' ) {
+                readingsBulkUpdateIfChanged( $hash, '.accessToken',
+                    $return->{access_token} )
+                        if ( defined( $return->{access_token} ) );
+                if ( defined( $return->{id_token} ) ) {
+                    readingsBulkUpdateIfChanged( $hash, '.idToken',
+                        $return->{id_token} );
+                    push( @successor, [ 'profileLogin' ] );
+                }
+            }
+        }
+
+        # profileLogin
+        elsif ( $service eq 'profileLogin' ) {
+            if ( $respHeader =~ /Authorization:\s(Bearer\s[^\s]*)/xms ) {
+                readingsBulkUpdateIfChanged( $hash, '.authToken', $1 );
+                # follow registration procedure first
+                unshift( @successor, [ 'getProducts' ] );
+            }
+        }
+
+        # getProdcts
+        elsif ( $service eq 'getProducts' ) {
+            if ( ref($return) eq 'ARRAY' ) {
+                # take data from dashboard
+                # follow registration procedure first
+                unshift( @successor, [ 'dashboard2' ] );
+            }
         }
 
         # all other command results
@@ -1854,17 +2062,25 @@ sub CheckRegistration {
     my ( $hash, $service, $cmd, $option, @successor ) = @_;
     my $name = $hash->{NAME};
 
-    if ( ReadingsVal( $name, ".secretKey", "" ) eq "" ) {
+    if ( ReadingsVal( $name, '.secretKey', '' ) eq '' ) {
         my @nextCmd = ( $service, $cmd, $option );
         unshift( @successor, [ $service, $cmd, $option ] );
 
         Log3( $name, 4, "BOTVAC $name: register account" );
         LogSuccessors( $hash, @successor );
 
-        SendCommand( $hash, "sessions", undef, undef, @successor )
-          if ( ReadingsVal( $name, ".accessToken", "" ) eq "" );
-        SendCommand( $hash, "dashboard", undef, undef, @successor )
-          if ( ReadingsVal( $name, ".accessToken", "" ) ne "" );
+        if ( ReadingsVal( $name, '.idToken', '' ) eq '' ) {
+            SendCommand( $hash, 'sessions', undef, undef, @successor )
+            if ( ReadingsVal( $name, '.accessToken', '' ) eq '' );
+            SendCommand( $hash, 'dashboard', undef, undef, @successor )
+            if ( ReadingsVal( $name, '.accessToken', '' ) ne '' );
+        }
+        else {
+            SendCommand( $hash, 'profileLogin', undef, undef, @successor )
+            if ( ReadingsVal( $name, '.authToken', '' ) eq '' );
+            SendCommand( $hash, 'dashboard2', undef, undef, @successor )
+            if ( ReadingsVal( $name, '.authToken', '' ) ne '' );
+        }
 
         return 1;
     }
@@ -2088,10 +2304,15 @@ sub GetAuthStatusText {
 }
 
 sub GetBeehiveHost {
-    my ($vendor) = @_;
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $vendor = $hash->{VENDOR};
     my $vendors = {
         'neato'   => 'beehive.neatocloud.com',
-        'vorwerk' => 'vorwerk-beehive-production.herokuapp.com',
+        'vorwerk' =>
+            ReadingsVal($name, '.idToken', '') eq '' ?
+                'vorwerk-beehive-production.herokuapp.com' :
+                'beehive.ksecosys.com',
     };
 
     if ( defined( $vendors->{$vendor} ) ) {
@@ -2657,334 +2878,149 @@ sub wsMasking {
 
 =begin html
 
-<a name="BOTVAC"></a>
+<p><a name="BOTVAC"></a></p>
 <h3>BOTVAC</h3>
 <ul>
-  This module controls Neato Botvac Connected and Vorwerk Robot Vacuums.<br/>
-  For issuing commands or retrieving Readings it's necessary to fetch the information from the NEATO/VORWERK Server.
-  In this way, it can happen, that it's not possible to send commands to the Robot until the corresponding Values are fetched.
-  This means, it can need some time until your Robot will react on your command.
-  <br/><br/>
 
-<a name="BOTVACDefine"></a>
-<b>Define</b>
+<p>This module controls Neato Botvac Connected and Vorwerk Robot Vacuums.<br />
+For issuing commands or retrieving Readings it's necessary to fetch the information from the NEATO/VORWERK Server. In this way, it can happen, that it's not possible to send commands to the Robot until the corresponding Values are fetched. This means, it can need some time until your Robot will react on your command.</p>
+<p><strong><a name="BOTVACdefine"></a>Define</strong></p>
 <ul>
-  <br>
-  <code>define &lt;name&gt; BOTVAC &lt;email&gt; [NEATO|VORWERK] [&lt;polling-interval&gt;]</code>
-  <br/><br/>
-  Example:&nbsp;<code>define myNeato BOTVAC myemail@myprovider.com NEATO 300</code>
-  <br/><br/>
 
-  After defining the Device, it's necessary to enter the password with "set &lt;name&gt; password &lt;password&gt;"<br/>
-  It is exactly the same Password as you use on the Website or inside the App.
-  <br/><br/>
-  Example:&nbsp;<code>set NEATO passwort mySecretPassword</code>
-  <br/><br/>
+<p><code>define &lt;name&gt; BOTVAC &lt;email&gt; [NEATO|VORWERK] [&lt;polling-interval&gt;]</code></p>
+<p>Example: <code>define myNeato BOTVAC myemail@myprovider.com NEATO 300</code></p>
+<p>After defining the Device, it's necessary to log in into your account which is linked to your email address.</p>
+<ul>
+<li><p>If you have a password, enter it with <code>set &lt;name&gt; password &lt;password&gt;</code><br />
+It is exactly the same Password as you use on the Website or inside the App.</p>
+<p>Example: <code>set NEATO passwort mySecretPassword</code></p></li>
+<li><p>If authentication without a password is provided, you have to following the registration process.</p>
+<ol type="1">
+<li>Ask for an one-time password by <code>set &lt;name&gt; requestVerification</code></li>
+<li>Provide one-time password from email <code>set &lt;name&gt; sendVerification &lt;code&gt;</code></li>
+</ol></li>
+</ul>
 </ul>
 
-<a name="BOTVACget"></a>
-<b>Get</b>
+<p><strong><a name="BOTVACget"></a>Get</strong></p>
 <ul>
-<br>
-  <a name="batteryPercent"></a>
-  <li><code>get &lt;name&gt; batteryPercent</code>
-  <br>
-  requests the state of the battery from Robot
-  </li>
-<br>
-  <a name="statistics"></a>
-  <li><code>get &lt;name&gt; statistics</code>
-  <br>
-  display statistical data, extracted from available maps of recent cleanings
-  </li>
-<br>
+<li><a name="batteryPercent"></a><code>get &lt;name&gt; batteryPercent</code><br />
+requests the state of the battery from Robot</li>
+<li><a name="securityTokens"></a><code>get &lt;name&gt; securityTokens</code><br />
+list of all tokens stored by the module. The tokens are relevant for user authentication and to get access to robot data.</li>
+<li><a name="statistics"></a><code>get &lt;name&gt; statistics</code><br />
+display statistical data, extracted from available maps of recent cleanings</li>
 </ul>
-
-<a name="BOTVACset"></a>
-<b>Set</b>
+<p><strong><a name="BOTVACset"></a>Set</strong></p>
 <ul>
-<br>
-  <li>
-  <a name="findMe"></a>
-  <code> set &lt;name&gt; findMe</code>
-  <br>
-  plays a sound and let the LED light for easier finding of a stuck robot
-  </li>
-<br>
-  <li>
-  <a name="dismissCurrentAlert"></a>
-  <code> set &lt;name&gt; dismissCurrentAlert</code>
-  <br>
-        reset an actual Warning (e.g. dustbin full)
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningMode"></a>
-  <code> set &lt;name&gt; nextCleaningMode</code>
-  <br>
-  Depending on Model, there are Arguments available: eco/turbo
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningModifier"></a>
-  <code> set &lt;name&gt; nextCleaningModifier</code>
-  <br>
-   The modifier is used for next spot cleaning.
-   Depending on Model, there are Arguments available: normal/double
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningNavigationMode"></a>
-  <code> set &lt;name&gt; nextCleaningNavigationMode</code>
-  <br>
-   The navigation mode is used for the next house cleaning.
-   Depending on Model, there are Arguments available: normal/extraCare/deep
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningZone"></a>
-  <code> set &lt;name&gt; nextCleaningZone</code>
-  <br>
-  Depending on Model, the ID of the zone that will be used for the next zone cleaning can be set.
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningSpotHeight"></a>
-  <code> set &lt;name&gt; nextCleaningSpotHeight</code>
-  <br>
-  Is defined as number between 100 - 400. The unit is cm.
-  </li>
-<br>
-  <li>
-  <a name="nextCleaningSpotWidth"></a>
-  <code> set &lt;name&gt; nextCleaningSpotWidth</code>
-  <br>
-  Is defined as number between 100 - 400. The unit is cm.
-  </li>
-<br>
-  <li>
-  <a name="password"></a>
-  <code> set &lt;name&gt; password &lt;password&gt;</code>
-  <br>
-        set the password for the NEATO/VORWERK account
-  </li>
-<br>
-  <li>
-  <a name="pause"></a>
-  <code> set &lt;name&gt; pause</code>
-  <br>
-        interrupts the cleaning
-  </li>
-<br>
-  <li>
-  <a name="pauseToBase"></a>
-  <code> set &lt;name&gt; pauseToBase</code>
-  <br>
-  stops cleaning and returns to base
-  </li>
-<br>
-  <li>
-  <a name="reloadMaps"></a>
-  <code> set &lt;name&gt; reloadMaps</code>
-  <br>
-        load last map from server into the cache of the module. no file is stored!
-  </li>
-<br>
-  <li>
-  <a name="resume"></a>
-  <code> set &lt;name&gt; resume</code>
-  <br>
-  resume cleaning after pause
-  </li>
-<br>
-  <li>
-  <a name="schedule"></a>
-  <code> set &lt;name&gt; schedule</code>
-  <br>
-        on and off, switch time control
-  </li>
-<br>
-  <li>
-  <a name="sendToBase"></a>
-  <code> set &lt;name&gt; sendToBase</code>
-  <br>
-  send roboter back to base
-  </li>
-<br>
-  <li>
-  <a name="setBoundariesOnFloorplan"></a>
-  <code> set &lt;name&gt; setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name|{JSON String}&gt;</code>
-  <br>
-    Set boundaries/nogo lines in the corresponding floor plan.<br>
-    The paramter can either be a name, which is already defined by attribute "boundaries", or alternatively a JSON string.
-    (A comma-separated list of names is also possible.)<br>
-    Description of syntax at <a href>https://developers.neatorobotics.com/api/robot-remote-protocol/maps</a><br>
-    <br>
-    Examples:<br>
-    set &lt;name&gt; setBoundariesOnFloorplan_0 Bad<br>
-    set &lt;name&gt; setBoundariesOnFloorplan_0 Bad,Kueche<br>
-    set &lt;name&gt; setBoundariesOnFloorplan_0 {"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]],
-      "name":"Bad","color":"#E54B1C","enabled":true}
-  </li>
-<br>
-  <li>
-  <a name="setRobot"></a>
-  <code> set &lt;name&gt; setRobot</code>
-  <br>
-  choose robot if more than one is registered at the used account
-  </li>
-<br>
-  <li>
-  <a name="startCleaning"></a>
-  <code> set &lt;name&gt; startCleaning ([house|map|zone])</code>
-  <br>
-  start the Cleaning from the scratch.
-  If the robot supports boundaries/nogo lines/zones, the additional parameter can be used as:
-  <ul>
-  <li><code>house</code> - cleaning without a persisted map</li>
-  <li><code>map</code> - cleaning with a persisted map</li>
-  <li><code>zone</code> - cleaning in a specific zone, set zone with nextCleaningZone</li>
-  </ul>
-  </li>
-<br>
-  <li>
-  <a name="startSpot"></a>
-  <code> set &lt;name&gt; startSpot</code>
-  <br>
-  start spot-Cleaning from actual position.
-  </li>
-<br>
-  <li>
-  <a name="startManual"></a>
-  <code> set &lt;name&gt; startManual</code>
-  <br>
-  start Manual Cleaning. This cleaning mode opens a direct websocket connection to the robot.
-  Therefore robot and FHEM installation has to reside in the same LAN.
-  Even though an internet connection is necessary as the initialization is triggered by a remote call.
-  <br>
-  <em>Note:</em> If the robot does not receive any messages for 30 seconds it will exit Manual Cleaning,
-  but it will not close the websocket connection automatically.
-  </li>
-<br>
-  <li>
-  <a name="statusRequest"></a>
-  <code> set &lt;name&gt; statusRequest</code>
-  <br>
-  pull update of all readings. necessary because NEATO/VORWERK does not send updates at their own.
-  </li>
-<br>
-  <li>
-  <a name="stop"></a>
-  <code> set &lt;name&gt; stop</code>
-  <br>
-  stop cleaning and in case of manual cleaning mode close also the websocket connection.
-  </li>
-<br>
-  <li>
-  <a name="syncRobots"></a>
-  <code> set &lt;name&gt; syncRobots</code>
-  <br>
-  sync robot data with online account. Useful if one has more then one robot registered.
-  </li>
-<br>
-  <li>
-  <a name="pollingMode"></a>
-  <code> set &lt;name&gt; pollingMode &lt;on|off&gt;</code>
-  <br>
-  set polling on (default) or off like attribut disable.
-  </li>
-<br>
-  <li>
-  <a name="robotSounds"></a>
-  <code> set &lt;name&gt; robotSounds &lt;on|off&gt;</code>
-  <br>
-  set sounds on or off.
-  </li>
-<br>
-  <li>
-  <a name="dirtbinAlertReminderInterval"></a>
-  <code> set &lt;name&gt; dirtbinAlertReminderInterval &lt;30|60|90|120|150&gt;</code>
-  <br>
-  set alert intervall in minutes.
-  </li>
-<br>
-  <li>
-  <a name="filterChangeReminderInterval"></a>
-  <code> set &lt;name&gt; filterChangeReminderInterval &lt;1|2|3&gt;</code>
-  <br>
-  set alert intervall in months.
-  </li>
-<br>
-  <li>
-  <a name="brushChangeReminderInterval"></a>
-  <code> set &lt;name&gt; brushChangeReminderInterval &lt;4|5|6|7|8&gt;</code>
-  <br>
-  set alert intervall in months.
-  </li>
-<br>
-  <li>
-  <a name="wsCommand"></a>
-  <code> set &lt;name&gt; wsCommand</code>
-  <br>
-  Commands start or stop cleaning activities.
-  <ul>
-  <li><code>eco-on</code></li>
-  <li><code>eco-off</code></li>
-  <li><code>turbo-on</code></li>
-  <li><code>turbo-off</code></li>
-  <li><code>brush-on</code></li>
-  <li><code>brush-off</code></li>
-  <li><code>vacuum-on</code></li>
-  <li><code>vacuum-off</code></li>
-  </ul>
-  </li>
-<br>
-  <li>
-  <a name="wsCombo"></a>
-  <code> set &lt;name&gt; wsCombo</code>
-  <br>
-  Combos specify a behavior on the robot. They need to be sent with less than 1Hz frequency.
-  If the robot doesn't receive a combo with the specified frequency it will stop moving.
-  <ul>
-  <li><code>forward</code> issues a continuous forward motion.</li>
-  <li><code>back</code> issues a discontinuous backward motion in ~30cm intervals as a safety measure since the robot has no sensors at the back.</li>
-  <li><code>arc-left</code> issues a 450 turn counter-clockwise while going forward.</li>
-  <li><code>arc-right</code> issues a 450 turn clockwise while going forward.</li>
-  <li><code>pivot-left</code> issues a 900 turn counter-clockwise.</li>
-  <li><code>pivot-right</code> issues a 900 turn clockwise.</li>
-  <li><code>stop</code> issues an immediate stop.</li>
-  </ul>
-  Also, if the robot does not receive any messages for 30 seconds it will exit Manual Cleaning.
-  </li>
-<br>
-</ul>
-<a name="BOTVACattr"></a>
-<b>Attributes</b>
+<li><a name="findMe"></a><code>set &lt;name&gt; findMe</code><br />
+plays a sound and let the LED light for easier finding of a stuck robot</li>
+<li><a name="dismissCurrentAlert"></a><code>set &lt;name&gt; dismissCurrentAlert</code><br />
+reset an actual Warning (e.g. dustbin full)</li>
+<li><a name="nextCleaningMode"></a><code>set &lt;name&gt; nextCleaningMode</code><br />
+Depending on Model, there are Arguments available: eco/turbo</li>
+<li><a name="nextCleaningModifier"></a><code>set &lt;name&gt; nextCleaningModifier</code><br />
+The modifier is used for next spot cleaning. Depending on Model, there are Arguments available: normal/double</li>
+<li><a name="nextCleaningNavigationMode"></a><code>set &lt;name&gt; nextCleaningNavigationMode</code><br />
+The navigation mode is used for the next house cleaning. Depending on Model, there are Arguments available: normal/extraCare/deep</li>
+<li><a name="nextCleaningZone"></a><code>set &lt;name&gt; nextCleaningZone</code><br />
+Depending on Model, the ID of the zone that will be used for the next zone cleaning can be set.</li>
+<li><a name="nextCleaningSpotHeight"></a><code>set &lt;name&gt; nextCleaningSpotHeight</code><br />
+Is defined as number between 100 - 400. The unit is cm.</li>
+<li><a name="nextCleaningSpotWidth"></a><code>set &lt;name&gt; nextCleaningSpotWidth</code><br />
+Is defined as number between 100 - 400. The unit is cm.</li>
+<li><a name="password"></a><code>set &lt;name&gt; password &lt;password&gt;</code><br />
+set the password for the NEATO/VORWERK account</li>
+<li><a name="pause"></a><code>set &lt;name&gt; pause</code><br />
+interrupts the cleaning</li>
+<li><a name="pauseToBase"></a><code>set &lt;name&gt; pauseToBase</code><br />
+stops cleaning and returns to base</li>
+<li><a name="reloadMaps"></a><code>set &lt;name&gt; reloadMaps</code><br />
+load last map from server into the cache of the module. no file is stored!</li>
+<li><a name="resume"></a><code>set &lt;name&gt; resume</code><br />
+resume cleaning after pause</li>
+<li><a name="requestVerification"></a><code>set &lt;name&gt; requestVerification</code><br />
+Request one-time password for account verfication.<br />
+One-time password will be sent to the account's email address.</li>
+<li><a name="schedule"></a><code>set &lt;name&gt; schedule</code><br />
+on and off, switch time control</li>
+<li><a name="sendToBase"></a><code>set &lt;name&gt; sendToBase</code><br />
+send roboter back to base</li>
+<li><a name="sendVerification"></a><code>set &lt;name&gt; sendVerification &lt;code&gt;</code><br />
+Use one-time password from email as code to log in into your account, see <a href="#requestVerification">requestVerification</a>.</li>
+<li><a name="setBoundariesOnFloorplan"></a><code>set &lt;name&gt; setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name|{JSON String}&gt;</code><br />
+Set boundaries/nogo lines in the corresponding floor plan. The paramter can either be a name, which is already defined by attribute "boundaries", or alternatively a JSON string. (A comma-separated list of names is also possible.)<br />
+<a href="https://developers.neatorobotics.com/api/robot-remote-protocol/maps">Description of syntax</a><br />
+Examples:<br />
+<code>set &lt;name&gt; setBoundariesOnFloorplan_0 Bad</code><br />
+<code>set &lt;name&gt; setBoundariesOnFloorplan_0 Bad,Kueche</code><br />
+<code>set &lt;name&gt; setBoundariesOnFloorplan_0 {"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]], "name":"Bad","color":"#E54B1C","enabled":true}</code></li>
+<li><a name="setRobot"></a><code>set &lt;name&gt; setRobot</code><br />
+choose robot if more than one is registered at the used account</li>
+<li><a name="startCleaning"></a><code>set &lt;name&gt; startCleaning ([house|map|zone])</code><br />
+start the Cleaning from the scratch. If the robot supports boundaries/nogo lines/zones, the additional parameter can be used as:
 <ul>
-<br>
-  <li>
-  <a name="actionInterval"></a>
-  <code>actionInterval</code>
-  <br>
-  time in seconds between status requests while Device is working
-  </li>
-<br>
-  <li>
-  <a name="boundaries"></a>
-  <code>boundaries</code>
-  <br>
-  Boundary entries separated by whitespace in JSON format, e.g.<br>
-  {"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]],"name":"Bad","color":"#E54B1C","enabled":true}<br>
-  {"type":"polyline","vertices":[[0.7139,0.4101],[0.7135,0.4282],[0.4326,0.3322],[0.4326,0.2533],[0.3931,0.2533],
-    [0.3931,0.3426],[0.7452,0.4637],[0.7617,0.4196]],"name":"Kueche","color":"#000000","enabled":true}<br>
-  For description of syntax see: <a href>https://developers.neatorobotics.com/api/robot-remote-protocol/maps</a><br>
-  The value of paramter "name" is used as setListe for "setBoundariesOnFloorplan_&lt;floor plan&gt;".
-  It is also possible to save more than one boundary with the same name.
-  The command "setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name&gt;" sends all boundary with the same name.
-  </li>
-<br>
+<li><code>house</code> - cleaning without a persisted map</li>
+<li><code>map</code> - cleaning with a persisted map</li>
+<li><code>zone</code> - cleaning in a specific zone, set zone with nextCleaningZone</li>
+</ul></li>
+<li><a name="startSpot"></a><code>set &lt;name&gt; startSpot</code><br />
+start spot-Cleaning from actual position.</li>
+<li><a name="startManual"></a><code>set &lt;name&gt; startManual</code><br />
+start Manual Cleaning. This cleaning mode opens a direct websocket connection to the robot. Therefore robot and FHEM installation has to reside in the same LAN. Even though an internet connection is necessary as the initialization is triggered by a remote call.<br />
+<em>Note:</em> If the robot does not receive any messages for 30 seconds it will exit Manual Cleaning, but it will not close the websocket connection automaticaly.</li>
+<li><a name="statusRequest"></a><code>set &lt;name&gt; statusRequest</code><br />
+pull update of all readings. necessary because NEATO/VORWERK does not send updates at their own.</li>
+<li><a name="stop"></a><code>set &lt;name&gt; stop</code><br />
+stop cleaning and in case of manual cleaning mode close also the websocket connection</li>
+<li><a name="syncRobots"></a><code>set &lt;name&gt; syncRobots</code><br />
+sync robot data with online account. Useful if one has more then one robot registered</li>
+<li><a name="pollingMode"></a><code>set &lt;name&gt; pollingMode &lt;on|off&gt;</code><br />
+set polling on (default) or off like attribut disable.</li>
+<li><a name="robotSounds"></a><code>set &lt;name&gt; robotSounds &lt;on|off&gt;</code><br />
+set sounds on or off.</li>
+<li><a name="dirtbinAlertReminderInterval"></a><code>set &lt;name&gt; dirtbinAlertReminderInterval &lt;30|60|90|120|150&gt;</code><br />
+set alert intervall in minutes.</li>
+<li><a name="filterChangeReminderInterval"></a><code>set &lt;name&gt; filterChangeReminderInterval &lt;1|2|3&gt;</code><br />
+set alert intervall in months.</li>
+<li><a name="brushChangeReminderInterval"></a><code>set &lt;name&gt; brushChangeReminderInterval &lt;4|5|6|7|8&gt;</code><br />
+set alert intervall in months.</li>
+<li><a name="wsCommand"></a><code>set &lt;name&gt; wsCommand</code><br />
+Commands start or stop cleaning activities.
+<ul>
+<li><code>eco-on</code></li>
+<li><code>eco-off</code></li>
+<li><code>turbo-on</code></li>
+<li><code>turbo-off</code></li>
+<li><code>brush-on</code></li>
+<li><code>brush-off</code></li>
+<li><code>vacuum-on</code></li>
+<li><code>vacuum-off</code></li>
+</ul></li>
+<li><a name="wsCombo"></a><code>set &lt;name&gt; wsCombo</code><br />
+Combos specify a behavior on the robot.<br />
+They need to be sent with less than 1Hz frequency. If the robot doesn't receive a combo with the specified frequency it will stop moving. Also, if the robot does not receive any messages for 30 seconds it will exit Manual Cleaning.
+<ul>
+<li><code>forward</code> - issues a continuous forward motion.</li>
+<li><code>back</code> - issues a discontinuous backward motion in ~30cm intervals as a safety measure since the robot has no sensors at the back.</li>
+<li><code>arc-left</code> - issues a 450 turn counter-clockwise while going forward.</li>
+<li><code>arc-right</code> - issues a 450 turn clockwise while going forward.</li>
+<li><code>pivot-left</code> - issues a 900 turn counter-clockwise.</li>
+<li><code>pivot-right</code> - issues a 900 turn clockwise.</li>
+<li><code>stop</code> - issues an immediate stop.</li>
+</ul></li>
 </ul>
-
+<p><strong><a name="BOTVACattr"></a>Attributes</strong></p>
+<ul>
+<li><a name="actionInterval"></a><code>actionInterval</code><br />
+time in seconds between status requests while Device is working</li>
+<li><a name="boundaries"></a><code>boundaries</code><br />
+Boundary entries separated by space in JSON format, e.g.<br />
+<code>{"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]],"name":"Bad","color":"#E54B1C","enabled":true}</code><br />
+<code>{"type":"polyline","vertices":[[0.7139,0.4101],[0.7135,0.4282],[0.4326,0.3322],[0.4326,0.2533],[0.3931,0.2533],[0.3931,0.3426],[0.7452,0.4637],[0.7617,0.4196]],"name":"Kueche","color":"#000000","enabled":true}</code><br />
+<a href="https://developers.neatorobotics.com/api/robot-remote-protocol/maps">Description of syntax</a><br />
+The value of paramter <code>name</code> is used as setListe for <code>setBoundariesOnFloorplan_&lt;floor plan&gt;</code>. It is also possible to save more than one boundary with the same name. The command <code>setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name&gt;</code> sends all boundary with the same name.</li>
+</ul>
 </ul>
 
 =end html
