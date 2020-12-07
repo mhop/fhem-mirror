@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.20.7   change to defined ... in sub _addSendqueueSimple
 # 1.20.6   delete $hash->{OPMODE} in checkSendRetry
 
 package FHEM::SynoModules::SMUtils;                                          
@@ -45,7 +46,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.6');
+use version; our $VERSION = version->declare('1.20.7');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -1453,15 +1454,15 @@ sub _addSendqueueSimple {
    };
    
    # optionale Zusatzfelder 
-   $entry->{params}   = $params    if($params);
-   $entry->{dest}     = $dest      if($dest);
-   $entry->{reqtype}  = $reqtype   if($reqtype);
-   $entry->{header}   = $header    if($header);
-   $entry->{postdata} = $postdata  if($postdata);
-   $entry->{lclFile}  = $lclFile   if($lclFile);
-   $entry->{remFile}  = $remFile   if($remFile);
-   $entry->{remDir}   = $remDir    if($remDir);
-   $entry->{timeout}  = $timeout   if($timeout);
+   $entry->{params}   = $params    if(defined $params);
+   $entry->{dest}     = $dest      if(defined $dest);
+   $entry->{reqtype}  = $reqtype   if(defined $reqtype);
+   $entry->{header}   = $header    if(defined $header);
+   $entry->{postdata} = $postdata  if(defined $postdata);
+   $entry->{lclFile}  = $lclFile   if(defined $lclFile);
+   $entry->{remFile}  = $remFile   if(defined $remFile);
+   $entry->{remDir}   = $remDir    if(defined $remDir);
+   $entry->{timeout}  = $timeout   if(defined $timeout);
    
    __addSendqueueEntry ($hash, $entry);                          # den Datensatz zur Sendqueue hinzufügen                                                       # updaten Länge der Sendequeue     
    
