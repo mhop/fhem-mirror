@@ -414,8 +414,8 @@ my %ra = (
   "deleteattr" => { Fn=>"CommandDeleteAttr",
            Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "deletereading" => { Fn=>"CommandDeleteReading",
-            Hlp=>"<devspec> [<readingname>],delete user defined reading for ".
-                 "<devspec>" },
+            Hlp=>"<devspec> <readingname> [older-than-seconds],".
+                 "delete user defined readings" },
   "delete"  => { Fn=>"CommandDelete",
             Hlp=>"<devspec>,delete the corresponding definition(s)"},
   "displayattr"=> { Fn=>"CommandDisplayAttr",
@@ -2378,11 +2378,14 @@ CommandDeleteReading($$)
     $def = $1;
   }
 
-  my @a = split(" ", $def, 2);
-  return "Usage: deletereading [-q] <name> <reading>\n$namedef" if(@a != 2);
+  my @a = split(" ", $def, 3);
+  return "Usage: deletereading [-q] <name> <reading> [older-than-seconds]\n".
+                $namedef if(@a < 2);
 
   eval { "" =~ m/$a[1]/ };
   return "Bad regexp $a[1]: $@" if($@);
+  return "Bad older-than-seconds format $a[2]"
+        if(defined($a[2]) && $a[2] !~ m/^\d+$/);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0],$cl)) {
@@ -2397,6 +2400,7 @@ CommandDeleteReading($$)
 
     foreach my $reading (grep { /$readingspec/ }
                                 keys %{$defs{$sdev}{READINGS}} ) {
+      next if(defined($a[2]) && ReadingsAge($sdev, $reading, 0) <= $a[2]);
       readingsDelete($defs{$sdev}, $reading);
       push @rets, "Deleted reading $reading for device $sdev";
     }

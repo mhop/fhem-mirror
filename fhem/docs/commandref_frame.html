@@ -839,11 +839,13 @@ The following local attributes are used by a wider range of devices:
 <a name="deletereading"></a>
 <h3>deletereading</h3>
 <ul>
-  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;</code> <br>
+  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;
+        [&lt;older-than-seconds&gt;]</code> <br>
   <br>
   Delete the reading &lt;readingname&gt; 
-  for a device. &lt;readingname&gt; is a perl regular expression that must match the whole name of the reading.
-  Use with greatest care! FHEM might crash if you delete vital readings of a device.
+  for a device. &lt;readingname&gt; is a perl regular expression that must
+  match the whole name of the reading.  Use with greatest care! FHEM might
+  crash if you delete vital readings of a device.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.<br>
   <br>

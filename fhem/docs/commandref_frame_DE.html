@@ -867,11 +867,14 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="deletereading"></a>
 <h3>deletereading</h3>
 <ul>
-  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;</code> <br>
+  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;
+        [&lt;older-than-seconds&gt;]</code> <br>
   <br>
   Entfernt das Reading &lt;readingname&gt; f&uuml;r das spezifizierte
   Ger&auml;t.  &lt;readingname&gt; ist ein perl Regular-Expression, was den
   vollst&auml;ndigen Namen des Readings erfassen muss.
+  Falls &lt;older-than-seconds&gt; spezifiziert ist, werden nur readings
+  entfernt, die aelter als dieser Zahl (in Sekunden) sind.<br>
 
   Mit gr&ouml;&szlig;ter Sorgfalt verwenden! FHEM kann abst&uuml;rzen, falls
   man lebenswichtige Readings entfernt.<br>
