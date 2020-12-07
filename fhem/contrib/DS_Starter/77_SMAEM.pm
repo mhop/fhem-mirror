@@ -389,6 +389,7 @@ sub SMAEM_Read {
   else {
       $model = "unknown";
       Log3 ($name, 3, "SMAEM $name - Buffer length ".$dl." is not usual. May be your meter has been updated with a new firmware.");
+      return;
   }
 
   return if (time() <= $hash->{HELPER}{STARTTIME}+30);
