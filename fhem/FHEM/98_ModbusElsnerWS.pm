@@ -565,6 +565,13 @@ sub ModbusElsnerWS_Attr(@) {
         }
       }
     }
+  } elsif ($attrName eq "customCmdPriority") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^down|up$/) {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
   } elsif ($attrName eq "signOfLife") {
     if (!defined $attrVal) {
 
@@ -907,10 +914,10 @@ sub ModbusElsnerWS_Delete($$) {
       <li>Day/night signal</li>
       <li>Display of date, time, sun azimuth, sun elevation, longitude and latitude</li>
       <li>Execution of custom alarm commands, see <a href="#ModbusElsnerWS_customCmdAlarmOff">customCmdAlarmOff</a> and
-      <a href="#ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a></li>
+      <a href="#ModbusElsnerWS_customCmdAlarmOn">customCmdAlarmOn</a>.</li>
       <li>Execution of custom up and down commands that can be triggered by the readings dayNight, isRaining, isStormy,
       isSunny, isSunnyEast, isSunnySouth, isSunnyWest and isWindy, see <a href="#ModbusElsnerWS_customCmdDown">customCmdDown</a> and
-      <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a></li>
+      <a href="#ModbusElsnerWS_customCmdUp">customCmdUp</a>.</li>
     </ul><br>
 
     <b>Prerequisites</b>
@@ -1018,8 +1025,8 @@ sub ModbusElsnerWS_Delete($$) {
           else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
           and the current readings<br>
           $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
-          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
-          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $NAME, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $TYPE, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
           The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
           is available as a local variable in perl, as environment variable for shell
           scripts, and will be textually replaced for Fhem commands.<br>
@@ -1033,8 +1040,8 @@ sub ModbusElsnerWS_Delete($$) {
           else it is a "plain" fhem.pl command (chain). In the &lt;command&gt; you can access the name of the device by using $NAME, $TYPE
           and the current readings<br>
           $BRIGHTNESS, $DATE, $DAYNIGHT, $HEMISPHERE, $ISRAINING, $ISSTORMY, $ISSUNNY, $ISSUNNYEAST, $ISSUNNYSOUTH",
-          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
-          $TIMEZONE, $TWILIGHT, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
+          $ISSUNNYWEST, $ISWINDY, $LATITUDE, $LONGITUDE, $NAME, $SUNAZIMUTH, $SUNEAST, $SUNELAVATION, $SUNSOUTH, $SUNWEST, $TEMPERATURE, $TIME,
+          $TIMEZONE, $TWILIGHT, $TYPE, $WEEKDAY, $WINDAVG2MIN, $WINDGUST10MIN, $WINDGUSTCURRNT, $WINDPEAK10MIN, $WINDSPEED, $WINDSTENGTH.<br>
           The <a href="#eventMap">eventMap</a> replacements are taken into account. This data
           is available as a local variable in perl, as environment variable for shell
           scripts, and will be textually replaced for Fhem commands.<br>
