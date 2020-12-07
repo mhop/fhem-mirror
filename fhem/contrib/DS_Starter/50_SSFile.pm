@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.5"  => "07.12.2020  minor fix avoid overtakers ",
   "0.7.4"  => "30.11.2020  add mtime, crtime to uploaded files ",
   "0.7.3"  => "29.11.2020  fix (prepare)Download without dest= option",
   "0.7.2"  => "22.11.2020  undef variables containing a lot of data in execOp ",
@@ -1345,6 +1346,11 @@ sub getApiSites {
        $ret = "Sendqueue is empty. Nothing to do ...";
        Log3($name, 4, "$name - $ret"); 
        return $ret;  
+   }
+   
+   if($hash->{OPMODE}) {                                   # Überholer vermeiden wenn eine Operation läuft (V. 0.7.5" => "07.12.2020)
+       Log3($name, 4, qq{$name - Operation "$hash->{OPMODE} (idx: $hash->{OPIDX})" is still running. Next operation start postponed}); 
+       return;                                  
    }
    
    # den nächsten Eintrag aus "SendQueue" selektieren und ausführen wenn nicht forbidSend gesetzt ist
