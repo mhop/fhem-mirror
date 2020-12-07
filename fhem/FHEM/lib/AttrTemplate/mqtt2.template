@@ -783,6 +783,29 @@ set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE attrTemplateVersion 20201014
 
+name:zigbee2mqtt_thermostat_with_weekrofile
+desc: stub of a version for <a href="https://www.zigbee2mqtt.io/devices/SPZB0001.html">Eurotronic SPZB0001</a> via zigbee2mqtt <br>Not yet tested... <br>tbd (?): map eurotronic_system_mode to readings (userReadings?)
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17a
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }
+attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}
+attr DEVICE stateFormat Measured: measured-temp Battery: batteryPercent %
+attr DEVICE webCmd desired-temp
+attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:measured-temp Battery:batteryPercent
+attr DEVICE setStateList on off
+attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith).*
+setreading DEVICE attrTemplateVersion 20201207
+
 
 ###########################################
 # TASMOTA
@@ -3653,10 +3676,11 @@ desc:use this with an OpenMQTTGateway. For further details visit https://github.
 order:X_02a
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
+par:ICON;ICON as set, defaults to bluetooth;{ AttrVal("DEVICE","icon","bluetooth") }
 attr DEVICE readingList\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+):.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+),; json2nameValue($EVENT,"$1"."_") }\
   BASE_ID/DEVNAME/BTtoMQTT/([0-9A-Z]+)/[^:]+:.* { $TOPIC =~ m,BTtoMQTT/([0-9A-Z]+)/([^:]+),; { "${1}_$2"=>$EVENT }}\
-  BASE_ID/home_presence/DEVNAME:.* { return unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),;; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_");; {"last"=>uc($1.$2.$3.$4.$5.$6)}}
+  BASE_ID/home_presence/DEVNAME:.* { return unless $EVENT =~ m,(..):(..):(..):(..):(..):(..),; json2nameValue($EVENT,"BT_".uc($1.$2.$3.$4.$5.$6)."_"); {"last"=>uc($1.$2.$3.$4.$5.$6)}}
 attr DEVICE setList\
   BT_scan_now:noArg BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":0}\
   BT_scan_interval:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"interval":$EVTPART1}\
@@ -3670,11 +3694,11 @@ attr DEVICE model OpenMQTTGateway_BT_scanner
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:OpenMQTTGateway_BT_gtag
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
-desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your gtag. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
+desc:For detection of a bluetooth precence dongle like the gtag via OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your gtag. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02a1
-#par:READINGLISTOLD;copy readingList to new device for later resolving parameters;{ AttrVal("DEVICE","readingList","")}
+par:ICON;ICON as set, defaults to rfid_tag;{ AttrVal("DEVICE","icon","rfid_tag") }
 par:BT_ID;Pls. enter your bluetooth device ID; {return}
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : return }
 par:NEWDEVROOM;Room of the calling device; {AttrVal("DEVICE","room","MQTT2_\DEVICE" )}
@@ -3683,19 +3707,19 @@ defmod OMG_BT_ID MQTT2_\DEVICE BT_ID
 deletereading -q OMG_BT_ID (?!associatedWith).*
 attr OMG_BT_ID autocreate 0
 attr OMG_BT_ID readingList\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,;; json2nameValue($EVENT, "${1}_") }\
-  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,;; {"last_IO"=>"$1"}}
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; json2nameValue($EVENT, "${1}_") }\
+  BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT/BT_ID:.* { $TOPIC =~ m,BASE_ID/(O[^/]*M[^/]*G[^/]*)/BTtoMQTT,; {"last_IO"=>"$1"}}
 attr OMG_BT_ID event-min-interval 300
-attr OMG_BT_ID icon temperature_humidity
+attr OMG_BT_ID icon ICON
 attr OMG_BT_ID stateFormat Last IO: last_IO
 attr OMG_BT_ID room NEWDEVROOM
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=OMG_BT_ID'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 attr OMG_BT_ID model OpenMQTTGateway_BT_gtag
-setreading OMG_BT_ID attrTemplateVersion 20200522 or prior
+setreading OMG_BT_ID attrTemplateVersion 20201207
 
 
 name:OpenMQTTGateway_BT_mi_flora_sensor
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your mi flora device. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02a2
@@ -3719,7 +3743,7 @@ setreading OMG_BT_ID attrTemplateVersion 20200522 or prior
 
 
 name:OpenMQTTGateway_simple_RF433_switch
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02a
@@ -3748,7 +3772,7 @@ attr OMG_DEVCID model OpenMQTTGateway_simple_RF433_switch
 setreading OMG_DEVCID attrTemplateVersion 20200522 or prior
 
 name:OpenMQTTGateway_bme
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02b
@@ -3764,7 +3788,7 @@ attr DEVICE model OpenMQTTGateway_bme
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:OpenMQTTGateway_ir
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: Initial version, not yet tested, just build according to https://forum.fhem.de/index.php/topic,103737.0.html<br>Adopt settings to your needs.<br>NOTE: this might create a new device!
 order:X_02c
@@ -3780,7 +3804,7 @@ attr DEVICE model OpenMQTTGateway_ir
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
 name:OpenMQTTGateway_BT_temp_hum_sensor
-prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");;return 1 if $devices[0];;return 0}
+prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*/O[^/]*M[^/]*G[^/]*/.*
 desc:use this with an OpenMQTTGateway for temp/hum sensors like LYWSD03MMC and LYWSDCGQ. For further details visit https://github.com/1technophile/OpenMQTTGateway/wiki<br>Recommended structure of the topic pattern home/OpenMQTTGateway/.*.<br>NOTE: You'll be asked to provide the HEX address of your sensor. Best start with looking at what "OpenMQTTGateway_BT_scanner" povides, e.g. if you have a reading name like "6C697244245E_id", "6C697244245E" (without quotes) is what you want to enter...<br>NOTE: this will create a new device!
 order:X_02d
@@ -3808,16 +3832,17 @@ setreading OMG_BT_ID attrTemplateVersion 20200913
 #OwnTracks
 # an OwnTracks device
 #contributed by Loredo
-#source post: https://forum.fhem.de/index.php/topic,94495.msg1020111.html#msg1020111
+#source post: https://forum.fhem.de/index.php/topic,99666.msg1019884.html#msg1019884
 name:owntracks_device
 desc:A device tracked by OwnTracks
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~owntracks.*
 order:O_01
-par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/]([^/:]+).*:, ? $1 : undef }
-par:DEV_ID;DeviceID;{ AttrVal("DEVICE","readingList","") =~ m,[^/:]+[/][^/:]+[/]([^/:]+).*:, ? $1 : undef }
+par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/:]+[/]([^/:]+).*:, ? $1 : undef }
+par:DEV_ID;DeviceID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/:]+[/][^/:]+[/]([^/:]+).*:, ? $1 : undef }
 par:WHICHROOM;Actual room of the device, defaults to OwnTracks; {AttrVal("DEVICE","room","OwnTracks" )}
 attr DEVICE room WHICHROOM
 attr DEVICE icon location_sign
+attr DEVICE devicetopic owntracks/TRACKER_ID/DEV_ID
 attr DEVICE jsonMap\
   _type:lastUpdateType acc:accuracy alt:altitude batt:batteryPercent bs:batteryState cog:direction conn:connection lat:latitude lon:longitude rad:radius\
   p:pressure t:trigger tid:trackerId tst:timestamp vac:accuracyVertical vel:velocity\
@@ -3827,24 +3852,24 @@ attr DEVICE jsonMap\
   waypoints__type:lastUpdateType waypoints__creator:waypoints_creator\
   config__type:lastUpdateType
 attr DEVICE readingList\
-  owntracks/TRACKER_ID/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  owntracks/TRACKER_ID/DEV_ID/event:.* { json2nameValue($EVENT,'event_',$JSONMAP) }\
-  owntracks/TRACKER_ID/DEV_ID/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
-  owntracks/TRACKER_ID/DEV_ID/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
-  owntracks/TRACKER_ID/DEV_ID/waypoints:.* { json2nameValue($EVENT,'waypoints_',$JSONMAP) }\
-  owntracks/TRACKER_ID/DEV_ID/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
+  $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/event:.* { json2nameValue($EVENT,'event_',$JSONMAP) }\
+  $\DEVICETOPIC/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
+  $\DEVICETOPIC/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
+  $\DEVICETOPIC/waypoints:.* { json2nameValue($EVENT,'waypoints_',$JSONMAP) }\
+  $\DEVICETOPIC/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
 attr DEVICE getList\
-  location:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"reportLocation"}\
-  steps:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"reportSteps"}\
-  config:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"dump"}\
-  waypoints:noArg raw owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"waypoints"}
+  location:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportLocation"}\
+  steps:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportSteps"}\
+  config:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"dump"}\
+  waypoints:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"waypoints"}
 attr DEVICE setList\
-  config owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
-  waypoints owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":$EVTPART1}\
-  action owntracks/TRACKER_ID/DEV_ID/cmd {"_type":"cmd","action":"action",$EVTPART1}
+  config $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
+  waypoints $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
+  action $\DEVICETOPIC/cmd {"_type":"cmd","action":"action",$EVTPART1}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model owntracks_device
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20201207
 
 
 name:roborock
