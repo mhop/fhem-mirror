@@ -139,6 +139,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.7"  => "08.12.2020  fix handle code recognition in createAtDevices as single line ",
   "2.4.6"  => "06.11.2020  bugfix weekly byDay ",
   "2.4.5"  => "03.11.2020  fix commandref wiki link ",
   "2.4.4"  => "06.10.2020  use addSendqueue from SMUtils, delete local addSendqueue ",
@@ -2628,7 +2629,7 @@ sub createAtDevices {
       $location   = ReadingsVal($name, $bnr."_35_Location",  $room);                                       # Location wird als room gesetzt
       $id         = ReadingsVal($name, $bnr."_98_EventId",      "");  
 
-      if($begin && $status =~ /upcoming|alarmed/x && $desc =~ /^\s*\{(.*)\}\s*$/x) {                       # ein at-Device erstellen wenn Voraussetzungen erfüllt
+      if($begin && $status =~ /upcoming|alarmed/x && $desc =~ /^\s*\{(.*)\}\s*$/xs) {                      # ein at-Device erstellen wenn Voraussetzungen erfüllt
           my $cmd = $1;
           $begin  =~ s/\s/T/x;                                                                             # Formatierung nach ISO8601 (YYYY-MM-DDTHH:MM:SS) für at-Devices
           my $ao  = $begin;
