@@ -539,11 +539,11 @@ desc: Human motion sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia human RT
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_08
 set DEVICE attrTemplate zigbee2mqtt_human_body_movement_illuminance
-attr DEVICE jsonMap battery:batteryPercent battery:batterymV
+attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
 attr DEVICE stateFormat Motion: occupancy\
  Battery: batteryPercent%
 attr DEVICE model zigbee2mqtt_human_body_movement
-setreading DEVICE attrTemplateVersion 20201203
+setreading DEVICE attrTemplateVersion 20201208
 
 #source post: https://forum.fhem.de/index.php/topic,94495.msg898198.html#msg898198, addon by TomLee, https://forum.fhem.de/index.php/topic,116310.msg1105927.html#msg1105927
 name:zigbee2mqtt_human_body_movement_illuminance
@@ -556,14 +556,14 @@ par:ICON;ICON as set, defaults to people_sensor;{ AttrVal("DEVICE","icon","peopl
 attr DEVICE icon ICON
 attr DEVICE devStateIcon Motion..true:people_sensor Motion..false:motion_detector
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE jsonMap battery:batteryPercent battery:batteryVoltage illuminance_lux:0
+attr DEVICE jsonMap battery:batteryPercent voltage:batterymV illuminance_lux:0
 attr DEVICE stateFormat Motion: occupancy\
  Luminance: illuminance Battery: batteryPercent%
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_human_body_movement_illuminance
-setreading DEVICE attrTemplateVersion 20201203
+setreading DEVICE attrTemplateVersion 20201208
 
 name:zigbee2mqtt_Light_Intensity_Sensor
 desc: Light Intensity Sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia light intensity sensor GZCGQ01LM
@@ -675,11 +675,11 @@ attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click Action: action
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE jsonMap battery:batteryPercent battery:batterymV
+attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
 attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_Wireless_Button
-setreading DEVICE attrTemplateVersion 20201203
+setreading DEVICE attrTemplateVersion 20201208
 
 name:zigbee2mqtt_wireless_button_old
 desc: Wireless button without gyro via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG11LM wireless button
@@ -1996,11 +1996,11 @@ attr DEVICE icon ICON
 attr DEVICE comment For forther configuration use e.g. stateFormat attribtue like T: temperature°C | H: humidity% | B: batteryPercent%
 attr DEVICE readingList \
 TELETOPIC:.* { $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
-attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batterymV Temperature:temperature Humidity:humidity
+attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature Humidity:humidity
 deletereading -q DEVICE (?!associatedWith).*
 option:{ CALLSPEECHRECOGN }
 attr DEVICE model tasmota_zigbee2tasmota_generic_battery_sensor
-setreading DEVICE attrTemplateVersion 20201202
+setreading DEVICE attrTemplateVersion 20201208
 
 
 name:tasmota_zigbee2tasmota_remote_control
@@ -2014,10 +2014,10 @@ par:ICON;ICON as set, defaults to tradfri_remote;{ AttrVal("DEVICE","icon","trad
 attr DEVICE icon ICON
 attr DEVICE readingList \
 TELETOPIC:.* { $EVENT =~ m,(([0-9])([0-9])([0-9])([0-9])!([0-9][0-9])), ? { 'state'=>"${5}${4}${3}${2}$6" } : $EVENT =~ m,^.*(..Device.+)..$, ?  json2nameValue($1,'',$JSONMAP) : $EVENT =~ m,0xDEV_ID.:(.*).., ?  json2nameValue($1,'',$JSONMAP) : undef }
-attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batterymV Temperature:temperature 
+attr DEVICE jsonMap Device:0 Battery:0 BatteryPercentage:batteryPercent BatteryVoltage:batteryVoltage Temperature:temperature 
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model tasmota_zigbee2tasmota_remote_control
-setreading DEVICE attrTemplateVersion 20201202
+setreading DEVICE attrTemplateVersion 20201208
 
 
 name:tasmota_zigbee2tasmota_window_contact
@@ -3652,7 +3652,8 @@ attr DEVICE readingList\
   BASE_ID/DEVNAME/LWT:.* LWT\
   BASE_ID/DEVNAME/version:.* version\
   BASE_ID/DEVNAME/SYStoMQTT[:/].* { json2nameValue($EVENT,'Sys_')}\
-  homeassistant/[^/]*sensor/[^/]+/config:.* { }
+  BASE_ID/home_presence/.* {}/
+  homeassistant/.+?/config:.* { }
 attr DEVICE setList\
   restart:noArg BASE_ID/DEVNAME/commands/MQTTtoSYS/config {"cmd":"restart"}
 attr DEVICE stateFormat <a href="http://Sys_ip" target="_blank">\
@@ -3661,7 +3662,7 @@ LWT\
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20200716
+setreading DEVICE attrTemplateVersion 20201208
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
@@ -3682,11 +3683,11 @@ attr DEVICE setList\
   BT_blacklist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"black-list":[$EVTPART1]}\
   BT_whitelist:textField BASE_ID/DEVNAME/commands/MQTTtoBT/config {"white-list":[$EVTPART1]}\
   BT_minrssi:slider,-110,1,0 BASE_ID/DEVNAME/commands/MQTTtoBT/config {"minrssi":$EVTPART1}}\
-  deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith).*"}
+  deleteReadings:noArg {fhem "deletereading -q $NAME (?!associatedWith|attrTemplateVersion).* 86400"}
 attr DEVICE periodicCmd deleteReadings:1440
 attr DEVICE stateFormat Last: last
 attr DEVICE model OpenMQTTGateway_BT_scanner
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20201208
 
 name:OpenMQTTGateway_BT_gtag
 prereq:{my @devices=devspec2array("model=OpenMQTTGateway_MCU");return 1 if $devices[0];return 0}
@@ -3832,8 +3833,8 @@ name:owntracks_device
 desc:A device tracked by OwnTracks
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~owntracks.*
 order:O_01
-par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/:]+[/]([^/:]+).*:, ? $1 : undef }
-par:DEV_ID;DeviceID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/:]+[/][^/:]+[/]([^/:]+).*:, ? $1 : undef }
++par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/([^/]+)/, ? $1 : undef }
++par:DEV_ID;DeviceID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/[^/]+/([^/]+), ? $1 : undef }
 par:WHICHROOM;Actual room of the device, defaults to OwnTracks; {AttrVal("DEVICE","room","OwnTracks" )}
 attr DEVICE room WHICHROOM
 attr DEVICE icon location_sign
@@ -3847,11 +3848,12 @@ attr DEVICE jsonMap\
   waypoints__type:lastUpdateType waypoints__creator:waypoints_creator\
   config__type:lastUpdateType
 attr DEVICE readingList\
+  $\DEVICETOPIC.* raw\
   $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/event:.* { json2nameValue($EVENT,'event_',$JSONMAP) }\
   $\DEVICETOPIC/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
   $\DEVICETOPIC/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
-  $\DEVICETOPIC/waypoints:.* { json2nameValue($EVENT,'waypoints_',$JSONMAP) }\
+  $\DEVICETOPIC/waypoints:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
 attr DEVICE getList\
   location:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportLocation"}\
@@ -3859,12 +3861,12 @@ attr DEVICE getList\
   config:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"dump"}\
   waypoints:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"waypoints"}
 attr DEVICE setList\
-  config $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
-  waypoints $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  action $\DEVICETOPIC/cmd {"_type":"cmd","action":"action",$EVTPART1}
+  config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
+  waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
+  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"action",$EVTPART1}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model owntracks_device
-setreading DEVICE attrTemplateVersion 20201207
+setreading DEVICE attrTemplateVersion 20201208
 
 
 name:roborock
