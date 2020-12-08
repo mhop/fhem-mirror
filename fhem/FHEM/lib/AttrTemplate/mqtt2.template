@@ -26,23 +26,18 @@ farewell:As you are using MQTT2_CLIENT, you should consider also setting an appr
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp \
-  (tele|stat)[/]([^/]+)[/].*:.* "$2"\
-  shellies[/]([^/]+)[/].*:.* "$1"\
-  (zigbee2mqtt)/bridge/.*:.* "$1"\
+  (tele|stat|shellies|valetudo|Advantech)/([^/]+)/.*:.* "$2"\
+  zigbee2mqtt/bridge/.*:.* "zigbee2mqtt"\
+  sonos/connected.* "sonos"\
+  tvheadend/[^/:]+.* "tvheadend"\
+  milight/LWT:.* "milight"\
   (ESPClient_[^/]+)/.*:.* "$1"\
-  (ebusd)/global/.*:.* "$1"\
-  valetudo[/]([^/]+)[/].*:.* "$1"\
-  [^/]+[/](ems-esp[^/]*)/start:.* "$1"\
-  /(ems-esp[^/]*)/start:.* "$1"\
-  wallpanel[/]([^/]+)[/].*:.* "wallpanel_$1"\
-  (wled)[/]([^/]+)[/].*:.* "$1_$2"\
-  (go-eCharger)[/]([^/]+)[/].*:.* "go_eCharger_$2"\
-  (owntracks)[/]([^/:]+)[/]([^/:]+).*:.* "$1_$2$3"\
-  Advantech[/]([^/]+)[/].*:.* "$1"\
-  (sonos)/connected.* "$1"\
-  (tvheadend)[/][^/:]+.* "$1"\
+  (ebusd[^/]*)/global/.*:.* "$1"\
+  [^/]+/(ems-esp[^/]+)/start:.* "$1"\
   (mygateway[\d]+)-(in|out)/.* "$1"\
-  (milight)/LWT:.* "$1"\
+  (wallpanel|wled)/([^/]+)/.*:.* "$1_$2"\
+  go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
+  owntracks/([^/]+)/([^/]+).*:.* "owntracks_$1$2"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
   homeassistant/.*/config:.* ""
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith).*");return undef}
@@ -51,7 +46,7 @@ attr DEVICE comment Do not use very open bridgeRegexp expressions! This might le
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20200625_2
+setreading DEVICE attrTemplateVersion 20201208
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -784,7 +779,7 @@ deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE attrTemplateVersion 20201014
 
 name:zigbee2mqtt_thermostat_with_weekrofile
-desc: stub of a version for <a href="https://www.zigbee2mqtt.io/devices/SPZB0001.html">Eurotronic SPZB0001</a> via zigbee2mqtt <br>Not yet tested... <br>tbd (?): map eurotronic_system_mode to readings (userReadings?)
+desc: stub of a version for <a href="https://zigbee.blakadder.com/Moes_HY368-ZB.html">Model HY368-ZB manufactured by Moes</a> via zigbee2mqtt <br>Not yet tested... <br>To contribute, participate in <a href="https://forum.fhem.de/index.php/topic,116535.0.html">Forum Thread</a>
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_17a
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
