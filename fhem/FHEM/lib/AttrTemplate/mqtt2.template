@@ -37,7 +37,7 @@ attr DEVICE bridgeRegexp \
   (mygateway[\d]+)-(in|out)/.* "$1"\
   (wallpanel|wled)/([^/]+)/.*:.* "$1_$2"\
   go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
-  owntracks/([^/]+)/([^/]+).*:.* "owntracks_$1$2"\
+  owntracks/[^/]+/([^/:]+).* "owntracks_$1"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
   homeassistant/.*/config:.* ""
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith).*");return undef}
@@ -761,7 +761,7 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   boost:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"boost": $EVTPART1 }}\
-  child_protection:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\
+  child_lock:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
   daytemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"occupied_heating_setpoint": $EVTPART1 }\
   nighttemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"unoccupied_heating_setpoint": $EVTPART1 }\
@@ -771,12 +771,12 @@ attr DEVICE setList \
 attr DEVICE stateFormat Measured: measured-temp Battery: battery %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp current_heating_setpoint:desired-temp local_temperature:measured-temp
+attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:child_lock current_heating_setpoint:desired-temp local_temperature:measured-temp
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_eurotronic_spirit
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201014
+setreading DEVICE attrTemplateVersion 20201209
 
 name:zigbee2mqtt_thermostat_with_weekrofile
 desc: stub of a version for <a href="https://zigbee.blakadder.com/Moes_HY368-ZB.html">Model HY368-ZB manufactured by Moes</a> via zigbee2mqtt <br>Not yet tested... <br>To contribute, participate in <a href="https://forum.fhem.de/index.php/topic,116535.0.html">Forum Thread</a>
@@ -787,11 +787,14 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devi
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE readingList $\DEVICETOPIC:.* { my %h; my $temp = $EVENT; $temp =~ s/,?("(holidays|workdays)":.([^]]+))./$h{$2}=$3/ge; $EVENT =~ s/,?("(holidays|workdays)":.([^]]+)).//g; my $h2 = json2nameValue($EVENT,'',$JSONMAP); %h = (%h,%$h2); \%h }
 attr DEVICE setList \
-  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
+  child_lock:LOCK,UNLOCK $DEVICETOPIC/set {"child_lock": "$EVTPART1"}
 attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}
-attr DEVICE stateFormat Measured: measured-temp Battery: batteryPercent %
+attr DEVICE stateFormat child_lock\
+Measured: measured-temp Battery: batteryPercent %
+attr DEVICE devStateIcon LOCKED:secur_lock:child_lock+UNLOCK UNLOCKED:secur_open:child_lock+LOCK
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
 attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:measured-temp Battery:batteryPercent
@@ -799,7 +802,7 @@ attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201207
+setreading DEVICE attrTemplateVersion 20201210
 
 
 ###########################################
@@ -3831,44 +3834,40 @@ setreading OMG_BT_ID attrTemplateVersion 20200913
 # an OwnTracks device
 #contributed by Loredo
 #source post: https://forum.fhem.de/index.php/topic,99666.msg1019884.html#msg1019884
+# modified by Otto123
 name:owntracks_device
-desc:A device tracked by OwnTracks
+desc:A device tracked by OwnTracks, Basics supported for Android
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~owntracks.*
 order:O_01
-+par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/([^/]+)/, ? $1 : undef }
-+par:DEV_ID;DeviceID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/[^/]+/([^/]+), ? $1 : undef }
+par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/([^/]+)/, ? $1 : undef }
+par:DEV_ID;DeviceID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/[^/]+/([^/:]+), ? $1 : undef }
 par:WHICHROOM;Actual room of the device, defaults to OwnTracks; {AttrVal("DEVICE","room","OwnTracks" )}
 attr DEVICE room WHICHROOM
 attr DEVICE icon location_sign
 attr DEVICE devicetopic owntracks/TRACKER_ID/DEV_ID
 attr DEVICE jsonMap\
-  _type:lastUpdateType acc:accuracy alt:altitude batt:batteryPercent bs:batteryState cog:direction conn:connection lat:latitude lon:longitude rad:radius\
-  p:pressure t:trigger tid:trackerId tst:timestamp vac:accuracyVertical vel:velocity\
-  event__type:lastUpdateType event_acc:event_accuracy event_lat:event_latitude event_lon:event_longitude event_t:event_trigger event_tid:event_trackerId event_tst:event_timestamp event_wtst:event_waypointCreationTimestamp\
-  step__type:lastUpdateType step_steps:steps_count step_from:steps_timestampBegin step_to:steps_timestampEnd step_tst:steps_timestampReq\
-  beacon__type:lastUpdateType beacon_acc:beacon_accuracy beacon_prox:beacon_proximity beacon_tst:beacon_timestampReq\
-  waypoints__type:lastUpdateType waypoints__creator:waypoints_creator\
-  config__type:lastUpdateType
+  acc:accuracy alt:altitude batt:batteryPercent lat:latitude lon:longitude vac:accuracyVertical vel:velocity
 attr DEVICE readingList\
   $\DEVICETOPIC.* raw\
   $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  $\DEVICETOPIC/event:.* { json2nameValue($EVENT,'event_',$JSONMAP) }\
-  $\DEVICETOPIC/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
-  $\DEVICETOPIC/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
-  $\DEVICETOPIC/waypoints:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  $\DEVICETOPIC/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
+  $\DEVICETOPIC/event:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/waypoints:.* { my (%h,$cnt); $EVENT=~ s/(\{[^[]*?})/$h{"waypoint_".++$cnt}=$1/ge; \%h }
 attr DEVICE getList\
   location:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportLocation"}\
-  steps:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportSteps"}\
-  config:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"dump"}\
   waypoints:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"waypoints"}
 attr DEVICE setList\
   config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
   waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"action",$EVTPART1}
+  mode:1Quite,2Manual,3Significant,4Move {$EVTPART1=~/(\d)/;my $pl=$1-2;fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$pl}));return undef}\
+  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload)}
+attr DEVICE userReadings\
+  location:lat.* {ReadingsNum($name,'latitude',0).','.ReadingsNum($name,'longitude',0)},\
+  connection:conn.* {my %h=(m=>'mobil',w=>'wifi',o=>'offline'); return $h{ReadingsVal('MQTT2_owntracks_mi6','conn','error')}},\
+  place:event.* {ReadingsVal($name,'event','') eq 'leave'?'away':(ReadingsVal($name,'desc','nowhere'))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model owntracks_device
-setreading DEVICE attrTemplateVersion 20201208
+attr DEVICE comment https://owntracks.org/booklet/tech/json/
+setreading DEVICE attrTemplateVersion 20201210
 
 
 name:roborock
