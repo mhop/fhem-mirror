@@ -70,6 +70,16 @@ FBAHAHTTP_Delete($)
   return $err;
 }
 
+sub 
+FBAHAHTTP_err($$)
+{
+  my ($hash, $err) = @_;
+  $hash->{STATE} = $err;
+  Log 2, "$hash->{NAME} $err";
+  $hash->{CmdStack} = ();
+  return $err;
+}
+
 sub
 FBAHAHTTP_connect($$)
 {
@@ -77,26 +87,20 @@ FBAHAHTTP_connect($$)
   my $name = $hash->{NAME};
   my $dev = $hash->{DEF};
 
-  my $dr = sub {
-    $hash->{STATE} = $_[0];
-    Log 2, $hash->{STATE};
-    $hash->{CmdStack} = ();
-    return $hash->{STATE};
-  };
 
   my $fb_user = AttrVal($name, "fritzbox-user", '');
-  return $dr->("MISSING: attr $name fritzbox-user") if(!$fb_user);
+  return FBAHAHTTP_err($hash, "MISSING attr $name fritzbox-user") if(!$fb_user);
 
   my ($err, $fb_pw) = getKeyValue("FBAHAHTTP_PASSWORD_$name");
-  return $dr->("ERROR: $err") if($err);
-  return $dr->("MISSING: set $name password") if(!$fb_pw);
+  return FBAHAHTTP_err($hash, "ERROR: $err") if($err);
+  return FBAHAHTTP_err($hash, "MISSING: set $name password") if(!$fb_pw);
 
   my $sid = FB_doCheckPW($hash->{DEF}, $fb_user, $fb_pw);
   if(!$sid) {
     $hash->{NEXT_OPEN} = time()+60;
     $readyfnlist{"$name.$dev"} = $hash;
-    return $dr->("$name error: cannot get SID, ".
-                      "check connection/hostname/fritzbox-user/password")
+    return FBAHAHTTP_err($hash, "ERROR: cannot get SID, ".
+                      "check connection/hostname/fritzbox-user/password");
   }
 
   delete($hash->{RetriedCmd});
@@ -331,7 +335,7 @@ FBAHAHTTP_ProcessStack($)
       if($ret eq "") {
         if($hash->{RetriedCmd}) {
           Log3 $name, 1,
-                "No sensible response for $msg after reconnect, giving up";
+              "$name: No sensible response for $msg after reconnect, giving up";
           $hash->{CmdStack} = ();
           return;
         }
@@ -347,7 +351,7 @@ FBAHAHTTP_ProcessStack($)
         my $ad = AttrVal($name, "async_delay", 0);
         InternalTimer(gettimeofday()+$ad, sub(){
           FBAHAHTTP_ProcessStack($hash);
-        }, $hash);
+        }, {});
       }
     }
   });
@@ -362,11 +366,9 @@ FBAHAHTTP_Write($$$)
 
   return if(IsDisabled($name));
 
-  my $sid = $hash->{".SID"};
-  if(!$sid) {
+  if(!$hash->{".SID"}) {
     my $ret = FBAHAHTTP_connect($hash, 1);      # try to reconnect
     return $ret if($ret);
-    $sid = $hash->{".SID"};
   }
   $fn =~ s/ //g;
   push(@{$hash->{CmdStack}}, "ain=$fn&switchcmd=$msg");
