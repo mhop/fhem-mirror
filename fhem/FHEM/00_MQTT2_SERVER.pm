@@ -416,7 +416,7 @@ MQTT2_SERVER_Read($@)
 
   ####################################
   } else {
-    Log 1, "ERROR: Unhandled packet $cpt, disconneting $cname";
+    Log 1, "ERROR: Unhandled packet $cpt, disconnecting $cname";
     return CommandDelete(undef, $cname);
 
   }
