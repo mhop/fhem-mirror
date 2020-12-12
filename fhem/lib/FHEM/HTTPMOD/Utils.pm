@@ -531,8 +531,16 @@ sub ManageUserAttr {
                 $uaHash{$aName . $listAttrHint} = 1;
                 #Log3 $name, 5, "$name: ManageUserAttr adds $aName$listAttrHint";
             }
-            $attr{$name}{userattr} = join(" ", sort keys %uaHash);  # reconstruct userAttr list string
-            Log3 $name, 5, "$name: ManageUserAttr updated userattr list to $attr{$name}{userattr}";
+            my $aString = join(" ", sort keys %uaHash);             # reconstruct userAttr list string
+            if ($aString) {
+                $attr{$name}{userattr} = $aString;
+                Log3 $name, 5, "$name: ManageUserAttr updated userattr list to $aString";
+            } else {
+                if ($attr{$name}{userattr}) {
+                    Log3 $name, 3, "$name: ManageUserAttr removed unnecessary userattr list";
+                    delete $attr{$name}{userattr};
+                }
+            }
         }
     }
     return;
