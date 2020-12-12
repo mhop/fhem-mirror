@@ -1249,26 +1249,30 @@ FW_detailSelect(selEl, mayMissing)
   var div = $(selEl).closest("div.makeSelect");
   if(!div.attr("list"))      // hiddenRoom=input
     return;
-  var arg,
+  var argAndPar, fnd,
       listArr = $(div).attr("list").split(" "),
       devName = $(div).attr("dev"),
       cmd = $(div).attr("cmd");
 
-  var i1;
-  for(i1=0; i1<listArr.length; i1++) {
-    arg = listArr[i1];
-    if(arg.indexOf(selVal) == 0 &&
-       (arg.length == selVal.length || arg[selVal.length] == ':'))
-      break;
+  if(selVal != null && selVal != undefined) {
+    for(var i1=0; i1<listArr.length; i1++) {
+      argAndPar = listArr[i1].split(":");
+      if(selVal.match(new RegExp(argAndPar[0]))) {
+        fnd = true;
+        if(argAndPar.length > 2) {
+          var re = shift(argAndPar);
+          argAndPar = [re, argAndPar.join(":")];
+        }
+        break;
+      }
+    }
   }
 
   var vArr = [];
-  if(i1==listArr.length && !mayMissing)
+  if(!fnd && !mayMissing)
     return;
-  if(i1<listArr.length) {
-    if(arg.length > selVal.length)
-      vArr = arg.substr(selVal.length+1).split(","); 
-  }
+  if(fnd && argAndPar[1])
+    vArr = argAndPar[1].split(",");
 
   FW_replaceWidget($(selEl).next(), devName, vArr,undefined,selVal,
     undefined, undefined, undefined,
