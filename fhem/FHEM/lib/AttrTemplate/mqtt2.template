@@ -795,7 +795,7 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   boost:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"boost": $EVTPART1 }}\
-  child_lock:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\
+  btnLock:true,false $\DEVICETOPIC/set {"eurotronic_host_flags": {"child_protection": $EVTPART1 }}\
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
   daytemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"occupied_heating_setpoint": $EVTPART1 }\
   nighttemp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"unoccupied_heating_setpoint": $EVTPART1 }\
@@ -805,7 +805,7 @@ attr DEVICE setList \
 attr DEVICE stateFormat Measured: measured-temp Battery: battery %
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:child_lock current_heating_setpoint:desired-temp local_temperature:measured-temp
+attr DEVICE jsonMap occupied_heating_setpoint:daytemp unoccupied_heating_setpoint:nighttemp child_protection:btnLock current_heating_setpoint:desired-temp local_temperature:measured-temp
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_eurotronic_spirit
 set DEVICE attrTemplate speechcontrol_type_thermostat
@@ -824,19 +824,26 @@ attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { my %h; my $temp = $EVENT; $temp =~ s/,?("(holidays|workdays)":.([^]]+))./$h{$2}=$3/ge; $EVENT =~ s/,?("(holidays|workdays)":.([^]]+)).//g; my $h2 = json2nameValue($EVENT,'',$JSONMAP); %h = (%h,%$h2); \%h }
 attr DEVICE setList \
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
-  child_lock:LOCK,UNLOCK $DEVICETOPIC/set {"child_lock": "$EVTPART1"}
-attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}
-attr DEVICE stateFormat child_lock\
+  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  boost:noArg $\DEVICETOPIC/set {"preset": "boost"}\
+  mode:schedule,manual,boost,complex,comfort,eco $\DEVICETOPIC/set {"preset": "$EVTPART1"}
+  x_send_set_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set $payload)}
+attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}\
+  measured-temp:noArg measured-temp $\DEVICETOPIC/get {"local_temperature": ""}\
+  preset:noArg preset $\DEVICETOPIC/get {"preset": ""}
+attr DEVICE periodicCmd measured-temp:55
+attr DEVICE stateFormat btnLock\
 Measured: measured-temp Battery: batteryPercent %
-attr DEVICE devStateIcon LOCKED:secur_lock:child_lock+UNLOCK UNLOCKED:secur_open:child_lock+LOCK
+attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
 attr DEVICE webCmd desired-temp
 attr DEVICE widgetOverride desired-temp:knob,min:5,max:30,angleArc:180,width:40,height:40,fgColor:#FF9900,bgColor:#CCCCCC,step:0.5,lineCap:round,angleOffset:225
-attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:measured-temp Battery:batteryPercent
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:measured-temp Battery:batteryPercent preset:mode
 attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201210
+setreading DEVICE attrTemplateVersion 20201212
 
 
 ###########################################
@@ -3893,7 +3900,8 @@ attr DEVICE getList\
 attr DEVICE setList  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":$EVTPART1}\
   config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
   waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  mode:Quite,Manual,Significant,Move {my %h=(Quite=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}}$  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload)}
+  mode:Quite,Manual,Significant,Move { my %h=(Quite=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}})) }\
+  x_raw_payload:textField { my $payload = $EVENT; $payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload) }
 attr DEVICE userReadings\
   location:lat.* {ReadingsNum($name,'latitude',0).','.ReadingsNum($name,'longitude',0)},\
   connection:conn.* {my %h=(m=>'mobil',w=>'wifi',o=>'offline',e=>'unknown'); return $h{ReadingsVal('MQTT2_owntracks_mi6','conn','e')}},\
@@ -3901,7 +3909,7 @@ attr DEVICE userReadings\
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model owntracks_device
 attr DEVICE comment https://owntracks.org/booklet/tech/json/
-setreading DEVICE attrTemplateVersion 20201212
+setreading DEVICE attrTemplateVersion 20201212_2
 
 name:owntracks_extend_IOS
 desc:Extend the owntracks device for IOS Readings, use owntracks_device first
