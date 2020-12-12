@@ -116,6 +116,21 @@ MQTT2_DEVICE_checkSubscr()
 
 #############################
 sub
+MQTT2_DEVICE_getRegexpHash($$$)
+{
+  my ($step, $cid, $topic) = @_;
+
+  return $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}
+    if($step == 1); # regexp for cid:topic:msg
+  return $modules{MQTT2_DEVICE}{defptr}{"re"}
+    if($step == 2); # regExp for topic:msg
+  return $modules{MQTT2_DEVICE}{defptr}{"re:$cid:$topic"}
+    if($step == 3); # regExp for msg, for specific cid:topic
+  return $modules{MQTT2_DEVICE}{defptr}{"re:*:$topic"}
+    if($step == 4); # regExp for msg, for specific topic
+}
+
+sub
 MQTT2_DEVICE_Parse($$)
 {
   my ($iodev, $msg) = @_;
@@ -139,9 +154,12 @@ MQTT2_DEVICE_Parse($$)
   }
 
   my ($cid, $topic, $value) = split("\0", $msg, 3);
-  for my $step (1,2) {
-    next if($step == 1 && !$modules{MQTT2_DEVICE}{defptr}{"re:$cid"});
-    my $dp = $modules{MQTT2_DEVICE}{defptr}{$step==1 ? "re:$cid" : "re"};
+  return "" if(!defined($topic));
+  for my $step (1,2,3,4) {
+
+    my $dp = MQTT2_DEVICE_getRegexpHash($step, $cid, $topic);
+    next if(!$dp);
+
     foreach my $re (keys %{$dp}) {
       my $reAll = $re;
       $reAll =~ s/\$DEVICETOPIC/\.\*/g;
@@ -561,16 +579,17 @@ MQTT2_DEVICE_delReading($)
   my ($name) = @_;
   my $cid = $defs{$name}{CID};
   $cid = "" if(!defined($cid));
-  for my $step (1,2) {
-    next if($step == 1 && !$modules{MQTT2_DEVICE}{defptr}{"re:$cid"});
-    my $dp = $modules{MQTT2_DEVICE}{defptr}{$step==1 ? "re:$cid" : "re"};
+  for my $key1 (sort keys %{$modules{MQTT2_DEVICE}{defptr}}) {
+    next if($key1 !~ m/^re/);
+    my $dp = $modules{MQTT2_DEVICE}{defptr}{$key1};
     foreach my $re (keys %{$dp}) {
-      foreach my $key (keys %{$dp->{$re}}) {
-        if($key =~ m/^$name,/) {
-          delete($dp->{$re}{$key});
-          delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
-        }
+      foreach my $key2 (keys %{$dp->{$re}}) {
+        delete($dp->{$re}{$key2}) if($key2 =~ m/^$name,/);
       }
+      delete($dp->{$re}) if(!int(keys %{$dp->{$re}}));
+    }
+    if(!int(keys %{$modules{MQTT2_DEVICE}{defptr}{$key1}}) && $key1 ne "re") {
+      delete($modules{MQTT2_DEVICE}{defptr}{$key1});
     }
   }
 }
@@ -586,10 +605,19 @@ MQTT2_DEVICE_addReading($$)
     return "Bad line >$line< for $name" if(!defined($code));
     my $errMsg = CheckRegexp($re, "readingList attribute for $name");
     return $errMsg if($errMsg);
+
     if($cid && $re =~ m/^$cid:/) {
-      $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
+      if($re =~ m/^$cid:([^\?.*\[\](|)]+):\.\*$/) { # cid:topic:.*
+        $modules{MQTT2_DEVICE}{defptr}{"re:$cid:$1"}{$re}{"$name,$code"} = 1;
+      } else {
+        $modules{MQTT2_DEVICE}{defptr}{"re:$cid"}{$re}{"$name,$code"} = 1;
+      }
     } else {
-      $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = 1;
+      if($re =~ m/^([^\?.*\[\](|)]+):\.\*$/) {
+        $modules{MQTT2_DEVICE}{defptr}{"re:*:$1"}{$re}{"$name,$code"} = 1;
+      } else {
+        $modules{MQTT2_DEVICE}{defptr}{re}{$re}{"$name,$code"} = 1;
+      }
     }
   }
   return undef;
