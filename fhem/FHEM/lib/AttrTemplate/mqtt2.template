@@ -466,7 +466,7 @@ setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200929
 name:zigbee2mqtt_2channel_split_w_buttons
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 desc:For zigbee2mqtt 2 channel device with 2 buttons. <br>NOTE: a second device will be created for the second channel<br>NOTE: Untested version, should work with Xiaomi QBKG12LM
-order:L_05d
+order:Steckerleiste »Zigbee Smart Home«L_05d
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
@@ -484,6 +484,40 @@ attr DEVICE_CH2 setList \
 attr DEVICE_CH2 jsonMap state_left:0 state_right:state state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE,DEVICE_CH2 model zigbee2mqtt_2channel_split_w_buttons
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200904
+
+# zigbee2mqtt 3 channel device
+name:zigbee2mqtt_3channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:For zigbee2mqtt 3 channel device like Silvercrest Steckerleiste »Zigbee Smart Home«. <br>NOTE: Two additional devices will be created for further channels.<br>NOTE: Untested updated version 
+order:L_05e
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal("DEVICE","icon","message_socket") }
+attr DEVICE icon ICON
+attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap state:availability state_1:state state_2:0 state_3:0 
+attr DEVICE setList \
+  on:noArg $\DEVICETOPIC/1/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/1/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/1/set {"state":"TOGGLE"}
+attr DEVICE setStateList on off toggle
+deletereading -q DEVICE (?!associatedWith).*
+set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
+attr DEVICE_CH2 setList \
+  on:noArg $\DEVICETOPIC/2/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/2/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/2/set {"state":"TOGGLE"}
+attr DEVICE_CH2 jsonMap state_2:state state_1:0 state_3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE_CH3 setList \
+  on:noArg $\DEVICETOPIC/3/set {"state":"ON"}\
+  off:noArg $\DEVICETOPIC/3/set {"state":"OFF"}\
+  toggle:noArg $\DEVICETOPIC/3/set {"state":"TOGGLE"}
+attr DEVICE_CH2 jsonMap state_3:state state_1:0 state_2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
+attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20201211
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
@@ -3836,7 +3870,7 @@ setreading OMG_BT_ID attrTemplateVersion 20200913
 #source post: https://forum.fhem.de/index.php/topic,99666.msg1019884.html#msg1019884
 # modified by Otto123
 name:owntracks_device
-desc:A device tracked by OwnTracks, Basics supported for Android
+desc:A device tracked by OwnTracks, basic Device for support Android and IOS
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~owntracks.*
 order:O_01
 par:TRACKER_ID;TrackerID;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,/([^/]+)/, ? $1 : undef }
@@ -3846,7 +3880,8 @@ attr DEVICE room WHICHROOM
 attr DEVICE icon location_sign
 attr DEVICE devicetopic owntracks/TRACKER_ID/DEV_ID
 attr DEVICE jsonMap\
-  acc:accuracy alt:altitude batt:batteryPercent lat:latitude lon:longitude vac:accuracyVertical vel:velocity
+  acc:accuracy alt:altitude batt:batteryPercent lat:latitude lon:longitude vac:accuracyVertical vel:velocity\
+  _type:lastUpdateType tst:timestamp tid:trackerId
 attr DEVICE readingList\
   $\DEVICETOPIC.* raw\
   $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -3855,19 +3890,41 @@ attr DEVICE readingList\
 attr DEVICE getList\
   location:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportLocation"}\
   waypoints:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"waypoints"}
-attr DEVICE setList\
+attr DEVICE setList  action:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":$EVTPART1}\
   config:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setConfiguration","configuration":$EVTPART1}\
   waypoints:textField $\DEVICETOPIC/cmd {"_type":"cmd","action":"setWaypoints","waypoints":{"_type":"waypoints","waypoints":[$EVTPART1]}}\
-  mode:1Quite,2Manual,3Significant,4Move {$EVTPART1=~/(\d)/;my $pl=$1-2;fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$pl}));return undef}\
-  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload)}
+  mode:Quite,Manual,Significant,Move {my %h=(Quite=>'-1',Manual=>'0',Significant=>'1',Move=>'2');fhem("set $NAME config ".qq({"_type":"configuration","monitoring":$h{$EVTPART1}}$  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/cmd $payload)}
 attr DEVICE userReadings\
   location:lat.* {ReadingsNum($name,'latitude',0).','.ReadingsNum($name,'longitude',0)},\
-  connection:conn.* {my %h=(m=>'mobil',w=>'wifi',o=>'offline'); return $h{ReadingsVal('MQTT2_owntracks_mi6','conn','error')}},\
+  connection:conn.* {my %h=(m=>'mobil',w=>'wifi',o=>'offline',e=>'unknown'); return $h{ReadingsVal('MQTT2_owntracks_mi6','conn','e')}},\
   place:event.* {ReadingsVal($name,'event','') eq 'leave'?'away':(ReadingsVal($name,'desc','nowhere'))}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model owntracks_device
 attr DEVICE comment https://owntracks.org/booklet/tech/json/
-setreading DEVICE attrTemplateVersion 20201210
+setreading DEVICE attrTemplateVersion 20201212
+
+name:owntracks_extend_IOS
+desc:Extend the owntracks device for IOS Readings, use owntracks_device first
+filter:TYPE=MQTT2_DEVICE:FILTER=model=owntracks_.*
+order:O_02
+par:JMAP;jsonMap;{my $s=AttrVal("DEVICE","jsonMap","");$s=~s/\n/\\\n/g;return $s}
+par:READINGLIST;ReadingList;{my $s=AttrVal("DEVICE","readingList","");$s=~s/\n/\\\n/g;return $s}
+par:GETLIST;GetList;{my $s=AttrVal("DEVICE","getList","");$s=~s/\n/\\\n/g;return $s}
+attr DEVICE jsonMap JMAP\
+  config__type:lastUpdateType event__type:lastUpdateType step__type:lastUpdateType beacon__type:lastUpdateType\
+  bs:batteryState p:pressure t:trigger cog:direction\
+  event_acc:event_accuracy event_lat:event_latitude event_lon:event_longitude\
+  event_t:event_trigger event_tid:event_trackerId event_tst:event_timestamp\
+  event_wtst:event_waypointCreationTimestamp\
+  step_steps:steps_count step_from:steps_timestampBegin step_to:steps_timestampEnd step_tst:steps_timestampReq\
+  beacon_acc:beacon_accuracy beacon_prox:beacon_proximity beacon_tst:beacon_timestampReq
+attr DEVICE readingList READINGLIST\
+  $\DEVICETOPIC/step:.* { json2nameValue($EVENT,'step_',$JSONMAP) }\
+  $\DEVICETOPIC/beacon:.* { json2nameValue($EVENT,'beacon_',$JSONMAP) }\
+  $\DEVICETOPIC/dump:.* { json2nameValue($EVENT,'config_',$JSONMAP) }
+attr DEVICE getList GETLIST\
+  steps:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"reportSteps"}\
+  config:noArg raw $\DEVICETOPIC/cmd {"_type":"cmd","action":"dump"}
 
 
 name:roborock
