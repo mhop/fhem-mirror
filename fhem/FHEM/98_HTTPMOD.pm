@@ -76,6 +76,7 @@ our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 BEGIN {
     GP_Import( qw(
+        fhem
         CommandAttr
         CommandDeleteAttr
         addToDevAttrList
@@ -140,7 +141,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.0.12 - 24.10.2020';
+my $Module_Version = '4.0.16 - 5.12.2020';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -827,17 +828,25 @@ sub DoReplacement {
         next if (!$regex);
 
         my $value = "";         # value can be specific for a get / set / auth step (with a number in $type)
+
+        #Log3 $name, 5, "$name: Replace: check value as ${type}Replacement${rNum}Value";
         if ($context && defined ($attr{$name}{"${type}Replacement${rNum}Value"})) {
             # get / set / auth mit individuellem Replacement für z.B. get01
             $value = $attr{$name}{"${type}Replacement${rNum}Value"};
-        } 
-        elsif ($context && defined ($attr{$name}{"${context}Replacement${rNum}Value"})) {
-            # get / set / auth mit generischem Replacement für alle gets / sets (without the number)
-            $value = $attr{$name}{"${context}Replacement${rNum}Value"};
-        } 
-        elsif (defined ($attr{$name}{"replacement${rNum}Value"})) {
-            # ganz generisches Replacement
-            $value = $attr{$name}{"replacement${rNum}Value"};
+        } else {
+            #Log3 $name, 5, "$name: Replace: check value as ${context}Replacement${rNum}Value";
+            if ($context && defined ($attr{$name}{"${context}Replacement${rNum}Value"})) {
+                # get / set / auth mit generischem Replacement für alle gets / sets (without the number)
+                $value = $attr{$name}{"${context}Replacement${rNum}Value"};
+            } else {
+                #Log3 $name, 5, "$name: Replace: check value as replacement${rNum}Value";
+                if (defined ($attr{$name}{"replacement${rNum}Value"})) {
+                    # ganz generisches Replacement
+                    $value = $attr{$name}{"replacement${rNum}Value"};
+                } else {
+                    #Log3 $name, 5, "$name: Replace: no matching value attribute found";
+                }
+            }
         }
         Log3 $name, 5, "$name: Replace called for type $type, regex $regex, mode $mode, " .
             ($value ? "value $value" : "empty value") . " input: $string";
@@ -873,7 +882,9 @@ sub DoReplacement {
             }
         } 
         elsif ($mode eq 'expression') {
-            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: Replacement $rNum with expression $value (s/$regex/$value/gee) created warning: @_"; };
+            $value = 'package main; ' . ($value // '');
+            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: Replacement $rNum with expression $value and regex $regex created warning: @_"; };
+            # if expression calls other fhem functions, creates readings or other, then the warning handler will create misleading messages!
             $match = eval { $string =~ s/$regex/$value/gee };
             if ($@) {
                 Log3 $name, 3, "$name: Replace: invalid regex / expression: /$regex/$value/gee - $@";
@@ -2262,7 +2273,7 @@ sub ReadCallback {
     my $type    = $request->{'type'};           # type of request that was sent (like get01, update or auth01)
     my $header  = $huHash->{httpheader} // '';  # HTTP headers received
     delete $huHash->{DEVHASH};
-    $hash->{HttpUtils} = $huHash;               # make the httpUtils hash available in case anyone wants tu use variables
+    $hash->{HttpUtils} = $huHash;               # make the httpUtils hash available in case anyone wants to use variables
     $hash->{BUSY}      = 0;
 
     Log3 $name, 5, "$name: ReadCallback called from " . FhemCaller();
