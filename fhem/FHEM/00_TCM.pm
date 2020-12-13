@@ -1,4 +1,3 @@
-##############################################
 # $Id$
 
 # This modules handles the communication with a TCM 120 or TCM 310 / TCM 400J /
@@ -13,6 +12,10 @@ use strict;
 use warnings;
 use DevIo;
 use Time::HiRes qw(gettimeofday usleep);
+my $dupTimeout = 0.6;
+my $modulesHash = \%modules;
+my $modulesType = 'TCM';
+
 sub TCM_Read($);
 sub TCM_ReadAnswer($$);
 sub TCM_Ready($);
@@ -24,8 +27,7 @@ sub TCM_CSUM($);
 
 sub TCM_Initialize($) {
   my ($hash) = @_;
-
-# Provider
+  # Provider
   $hash->{ReadFn}  = "TCM_Read";
   $hash->{WriteFn} = "TCM_Write";
   $hash->{ReadyFn} = "TCM_Ready";
@@ -34,8 +36,7 @@ sub TCM_Initialize($) {
     "1:EnOcean"   => "^EnOcean:",
   );
   $hash->{MatchList} = \%matchList;
-
-# Normal devices
+  # Normal devices
   $hash->{DefFn}    = "TCM_Define";
   $hash->{FingerprintFn} = "TCM_Fingerprint";
   $hash->{UndefFn}  = "TCM_Undef";
@@ -43,27 +44,24 @@ sub TCM_Initialize($) {
   $hash->{SetFn}    = "TCM_Set";
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn}   = "TCM_Attr";
-  $hash->{AttrList} = "baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
+  $hash->{AttrList} = "assignIODev:select,no,yes baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
                       "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
+  $hash->{ShutdownFn} = "TCM_Shutdown";
   $hash->{NotifyOrderPrefix} = "45-";
 }
 
 # Define
-sub TCM_Define($$){
+sub TCM_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $a[0];
   my $model = $a[2];
-
-  return "TCM: wrong syntax, correct is: define <name> TCM [ESP2|ESP3] ".
-                        "{devicename[\@baudrate]|ip:port|none}"
-    if(@a != 4 || $model !~ m/^(ESP2|ESP3|120|310)$/);
-
-  $hash->{NOTIFYDEV} = "global";
+  return "TCM: wrong syntax, correct is: define <name> TCM [ESP2|ESP3] {devicename[\@baudrate]|ip:port|none}"
+    if (@a != 4 || $model !~ m/^(ESP2|ESP3|120|310)$/);
   DevIo_CloseDev($hash);
-  my $dev  = $a[3];
+  my $dev = $a[3];
   $hash->{DeviceName} = $dev;
   # old model names replaced
   $model = "ESP2" if ($model eq "120");
@@ -71,8 +69,10 @@ sub TCM_Define($$){
   $hash->{MODEL} = $model;
   $hash->{BaseID} = "00000000";
   $hash->{LastID} = "00000000";
+  $hash->{NOTIFYDEV} = "global";
+  $modules{$modulesType}{devHash}{$name} = $hash;
   if($dev eq "none") {
-    Log3 undef, 1, "TCM $name device is none, commands will be echoed only";
+    Log3 $name, 1, "TCM $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -134,18 +134,27 @@ sub TCM_InitSerialCom($) {
   } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
     my @getBaseID = ("get", "baseID");
     if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
-      $hash->{BaseID} = sprintf "%08X", hex $&;
+      $baseID = sprintf "%08X", hex $&;
+      $hash->{BaseID} = $baseID;
       $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
     } else {
-      $hash->{BaseID} = "00000000";
-      $hash->{LastID} = "00000000";
+      $baseID = '0' x 8;
+      $hash->{BaseID} = $baseID;
+      $hash->{LastID} = '0' x 8;
     }
   }
+  #push(@{$modules{"$hash->{TYPE}"}{BaseID}}, 'F' x 8);
+  push(@{$modules{"$hash->{TYPE}"}{BaseID}}, $baseID) if (!grep(/^$baseID$/, @{$modules{"$hash->{TYPE}"}{BaseID}}));
+  #push(@{$modules{"$hash->{TYPE}"}{BaseID}}, '0' x 8);
+  @{$hash->{helper}{BaseID}} = @{$modules{"$hash->{TYPE}"}{BaseID}};
   if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
     # get chipID
     my @getChipID = ('get', 'version');
     if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
-      $hash->{ChipID} = sprintf "%08X", hex $1;
+      my $chipID = sprintf "%08X", hex $1;
+      $hash->{ChipID} = $chipID;
+      push(@{$modules{"$hash->{TYPE}"}{ChipID}}, $hash->{ChipID}) if (!grep(/^$chipID$/, @{$modules{"$hash->{TYPE}"}{ChipID}}));
+      @{$hash->{helper}{ChipID}} = @{$modules{"$hash->{TYPE}"}{ChipID}};
     }
   }
   # default transceiver parameter
@@ -192,37 +201,53 @@ sub TCM_Fingerprint($$) {
   my ($IODev, $msg) = @_;
   return ($IODev, $msg) if (AttrVal($IODev, "fingerprint", 'off') eq 'off');
   my @msg = split(":", $msg);
-
   if ($msg[1] == 1) {
+    # RADIO_ERP1
     #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
     substr($msg[5], 1, 1, "0");
     substr($msg[6], 0, 2, "01");
     substr($msg[6], 10, 4, "0000");
+
   } elsif ($msg[1] == 2) {
+    # RESPONSE
     #EnOcean:PacketType:ResposeCode:MessageData:OptionalData
+    # no dispatch
 
   } elsif ($msg[1] == 3) {
+    # RADIO_SUB_TEL
+    # no dispatch
 
   } elsif ($msg[1] == 4) {
+    # EVENT
     #EnOcean:PacketType:eventCode:MessageData
+    # no manipulation of the data necessary
 
   } elsif ($msg[1] == 5) {
+    # COMMON_COMMAND
+    # no dispatch
 
   } elsif ($msg[1] == 6) {
+    # SMART_ACK_COMMAND
     #EnOcean:PacketType:smartAckCode:MessageData
+    # no manipulation of the data necessary
 
   } elsif ($msg[1] == 7) {
+    # REMOTE_MAN_COMMAND
     #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
     substr($msg[8], 0, 2, "00");
     substr($msg[9], 0, 2, "00");
+
   } elsif ($msg[1] == 9) {
+    # RADIO_MESSAGE
+    # no dispatch
 
   } elsif ($msg[1] == 10) {
+    # RADIO_ERP2
+    # no dispatch
 
   } else {
 
   }
-
   $msg = join(":", @msg);
   #Log3 $IODev, 2, "TCM $IODev <TCM_Fingerprint> PacketType: $msg[1] Data: $msg";
   return ($IODev, $msg);
@@ -296,12 +321,9 @@ sub TCM_Write($$$$) {
 
 # ESP2 CRC
 # Used in the TCM120
-sub
-TCM_CSUM($)
-{
+sub TCM_CSUM($) {
   my $msg = shift;
   my $ml = length($msg);
-
   my @data;
   for(my $i = 0; $i < $ml; $i += 2) {
     push(@data, ord(pack('H*', substr($msg, $i, 2))));
@@ -336,12 +358,9 @@ my @u8CRC8Table = (
 
 # ESP3 CRC
 # Used in the TCM310
-sub
-TCM_CRC8($)
-{
+sub TCM_CRC8($) {
   my $msg = shift;
   my $ml = length($msg);
-
   my @data;
   for(my $i = 0; $i < $ml; $i += 2) {
     push(@data, ord(pack('H*', substr($msg, $i, 2))));
@@ -353,17 +372,12 @@ TCM_CRC8($)
 
 # Read
 # called from the global loop, when the select for hash->{FD} reports data
-sub
-TCM_Read($)
-{
+sub TCM_Read($) {
   my ($hash) = @_;
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
   my $blockSenderID = AttrVal($name, "blockSenderID", "own");
-  my $chipID = exists($hash->{ChipID}) ? hex $hash->{ChipID} : 0;
-  my $baseID = exists($hash->{BaseID}) ? hex $hash->{BaseID} : 0;
-  my $lastID = exists($hash->{LastID}) ? hex $hash->{LastID} : 0;
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   Log3 $name, 5, "TCM $name received ESP: $data";
 
@@ -396,9 +410,7 @@ TCM_Read($)
           # extract db_0
           $d1 = substr($d1, 0, 2);
         }
-        if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
-          Log3 $name, 4, "TCM $name own telegram from $id blocked.";
-        } else {
+        if (!defined TCM_BlockSenderID($hash, $blockSenderID, $id)) {
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef) if (exists $hash->{helper}{init_done});
         }
 
@@ -419,9 +431,7 @@ TCM_Read($)
             # extract db_0
             $d1 = substr($d1, 0, 2);
           }
-          if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
-            Log3 $name, 4, "TCM $name own telegram from $id blocked.";
-          } else {
+          if (!defined TCM_BlockSenderID($hash, $blockSenderID, $id)) {
             Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:01FFFFFFFF0000", undef)  if (exists $hash->{helper}{init_done});
           }
          }
@@ -483,9 +493,7 @@ TCM_Read($)
         );
         $hash->{RSSI} = -$RSSI;
 
-        if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
-          Log3 $name, 4, "TCM $name own telegram from $id blocked.";
-        } else {
+        if (!defined TCM_BlockSenderID($hash, $blockSenderID, $id)) {
           #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
           Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals) if (exists $hash->{helper}{init_done});
         }
@@ -587,9 +595,7 @@ TCM_Read($)
         $hash->{RSSI} = -hex($RSSI);
         $packetType = sprintf "%01X", $packetType;
 
-        if ($blockSenderID eq "own" && ((hex($2) >= $baseID && hex($2) <= $lastID) || $chipID == hex($2))) {
-          Log3 $name, 4, "TCM $name own telegram from $2 blocked.";
-        } else {
+        if (!defined TCM_BlockSenderID($hash, $blockSenderID, $2)) {
           #EnOcean:PacketType:RORG:MessageData:SourceID:DestinationID:FunctionNumber:ManufacturerID:RSSI:Delay
           Dispatch($hash, "EnOcean:$packetType:C5:$messageData:$2:$1:$function:$manufID:$RSSI:$4", \%addvals) if (exists $hash->{helper}{init_done});
         }
@@ -599,7 +605,7 @@ TCM_Read($)
         Log3 $name, 2, "TCM: $name packet type RADIO_MESSAGE not supported: $data";
 
       } elsif ($packetType == 10) {
-        # packet type RADIO_ADVANCED
+        # packet type RADIO_ERP2
         Log3 $name, 2, "TCM $name packet type RADIO_ADVANCED not supported: $data";
 
       } else {
@@ -690,7 +696,7 @@ TCM_Parse310($$$)
 {
   my ($hash,$rawmsg,$ptr) = @_;
   my $name = $hash->{NAME};
-  Log3 $name, 5, "TCM_Parse $rawmsg";
+  Log3 $name, 5, "TCM $name TCM_Parse $rawmsg";
   my $rc = substr($rawmsg, 0, 2);
   my $msg = "";
   if($rc ne "00") {
@@ -755,10 +761,14 @@ TCM_Parse310($$$)
 # Ready
 sub TCM_Ready($) {
   my ($hash) = @_;
-
-  return DevIo_OpenDev($hash, 1, undef)
-#    if($hash->{STATE} ne "opened");
-    if($hash->{STATE} eq "disconnected");
+  my $ret;
+  if ($hash->{STATE} eq "disconnected") {
+  #if($hash->{STATE} ne "opened") {
+    $ret = DevIo_OpenDev($hash, 1, undef);
+    return $ret if (defined $ret);
+    TCM_InitSerialCom($hash) if (DevIo_IsOpen($hash));
+    return $ret;
+  }
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
@@ -793,9 +803,7 @@ my %gets310 = (
 );
 
 # Get
-sub
-TCM_Get($@)
-{
+sub TCM_Get($@) {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
   return if (AttrVal($name, "comType", "TCM") eq "RS485" || $hash->{DeviceName} eq "none");
@@ -816,20 +824,27 @@ TCM_Get($@)
   } else {
     # TCM 310
     my $cmdhash = $gets310{$cmd};
-    return "Unknown argument $cmd, choose one of " . join(':noArg ', sort keys %gets310) . ':noArg' if(!defined($cmdhash));
+    if (!defined($cmdhash) && $cmd !~ m/^getFreeID|getUsedID$/) {
+      return "Unknown argument $cmd, choose one of getFreeID:noArg getUsedID:noArg " . join(':noArg ', sort keys %gets310) . ':noArg';
+    }
     Log3 $name, 3, "TCM $name get $cmd";
-    my $cmdHex = $cmdhash->{cmd};
-    my $oCmdHex = '';
-    $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
-    $hash->{helper}{SetAwaitCmdResp} = 1;
-    #TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
-    TCM_Write($hash, $hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
-    ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
-    $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
-
+    if ($cmd eq 'getFreeID') {
+      $msg = substr(EnOcean_CheckSenderID('getFreeID', $name, 8 x '0'), 1);
+    } elsif ($cmd eq 'getUsedID') {
+      $msg = EnOcean_CheckSenderID('getUsedID', $name, 8 x '0');
+    } else {
+      my $cmdHex = $cmdhash->{cmd};
+      my $oCmdHex = '';
+      $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
+      $hash->{helper}{SetAwaitCmdResp} = 1;
+      #TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
+      TCM_Write($hash, $hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
+      ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
+      $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
+    }
   }
   if($err) {
-    Log3 undef, 2, "TCM $name $err";
+    Log3 $name, 2, "TCM $name $err";
     return $err;
   }
   readingsSingleUpdate($hash, $cmd, $msg, 1);
@@ -837,17 +852,20 @@ TCM_Get($@)
 }
 
 # clear teach in flag
-sub TCM_ClearTeach($)
-{
+sub TCM_ClearTeach($) {
   my $hash = shift;
-  delete($hash->{Teach});
+  foreach my $iName (keys %defs) {
+    delete $defs{$iName}{Teach} if ($defs{$iName}{TYPE} eq 'TCM');
+  }
+  #delete($hash->{Teach});
+  delete($modules{"$hash->{TYPE}"}{Teach});
 }
 
 # clear Smart ACK teach in flag
-sub TCM_ClearSmartAckLearn($)
-{
+sub TCM_ClearSmartAckLearn($) {
   my $hash = shift;
   delete($hash->{SmartAckLearn});
+  delete($modules{"$hash->{TYPE}"}{SmartAckLearn});
   readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 00 Extended: 00", 1);
 }
 
@@ -890,8 +908,7 @@ my %sets310 = (
 );
 
 # Set
-sub TCM_Set($@)
-{
+sub TCM_Set($@) {
   my ($hash, @a) = @_;
   my $name = $hash->{NAME};
   return if (AttrVal($name, "comType", "TCM") eq "RS485" || $hash->{DeviceName} eq "none");
@@ -940,12 +957,22 @@ sub TCM_Set($@)
   if($cmd eq "teach") {
     if ($arg == 0) {
       RemoveInternalTimer($hash, "TCM_ClearTeach");
-      delete $hash->{Teach};
+      while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
+        Log3 $name, 3, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
+        delete $defs{"$iHash->{NAME}"}->{Teach};
+      }
+      delete $modules{"$hash->{TYPE}"}{Teach};
       return;
     } else {
+      while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
+        #Log3 $name, 2, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
+        delete $defs{"$iHash->{NAME}"}->{Teach};
+      }
+      $hash->{Teach} = 1;
+      $modules{"$hash->{TYPE}"}{Teach} = $hash;
+      #Log3 $name, 2, "TCM $name set Teach flag ioHash: " . $modules{"$hash->{TYPE}"}{Teach};
       RemoveInternalTimer($hash, "TCM_ClearTeach");
       InternalTimer(gettimeofday() + $arg, "TCM_ClearTeach", $hash, 1);
-      $hash->{Teach} = 1;
       return;
     }
   }
@@ -984,16 +1011,19 @@ sub TCM_Set($@)
           # end Smart ACK learnmode
           RemoveInternalTimer($hash, "TCM_ClearSmartAckLearn");
           delete $hash->{SmartAckLearn};
+          delete $modules{"$hash->{TYPE}"}{SmartAckLearn};
         } else {
           RemoveInternalTimer($hash, "TCM_ClearSmartAckLearn");
           InternalTimer(gettimeofday() + hex(substr($arg, 4, 8)) * 0.001, "TCM_ClearSmartAckLearn", $hash, 1);
           $hash->{SmartAckLearn} = 1;
+          $modules{"$hash->{TYPE}"}{SmartAckLearn} = $hash;
+          Log3 $name, 3, "TCM $name set SmartAckLearn flag ioHash: " . $modules{"$hash->{TYPE}"}{SmartAckLearn};
         }
       }
     }
   }
   if($err) {
-    Log3 undef, 2, "TCM $name $err";
+    Log3 $name, 2, "TCM $name $err";
     return $err;
   }
 
@@ -1010,15 +1040,11 @@ sub TCM_Set($@)
 }
 
 # read command response data
-sub TCM_ReadAnswer($$)
-{
+sub TCM_ReadAnswer($$) {
   my ($hash, $arg) = @_;
   return ("No FD", undef) if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
   my $name = $hash->{NAME};
   my $blockSenderID = AttrVal($name, "blockSenderID", "own");
-  my $chipID = exists($hash->{ChipID}) ? hex $hash->{ChipID} : 0;
-  my $baseID = exists($hash->{BaseID}) ? hex $hash->{BaseID} : 0;
-  my $lastID = exists($hash->{LastID}) ? hex $hash->{LastID} : 0;
   my ($data, $rin, $buf) = ($hash->{PARTIAL}, "", "");
   # 2 seconds timeout
   my $to = 2;
@@ -1141,9 +1167,7 @@ sub TCM_ReadAnswer($$)
           );
           $hash->{RSSI} = -$RSSI;
 
-          if ($blockSenderID eq "own" && ((hex($id) >= $baseID && hex($id) <= $lastID) || $chipID == hex($id))) {
-            Log3 $name, 4, "TCM $name own telegram from $id blocked.";
-          } else {
+          if (!defined TCM_BlockSenderID($hash, $blockSenderID, $id)) {
             #EnOcean:PacketType:RORG:MessageData:SourceID:Status:OptionalData
             Dispatch($hash, "EnOcean:$packetType:$org:$d1:$id:$status:$odata", \%addvals) if (exists $hash->{helper}{init_done});
           }
@@ -1220,6 +1244,25 @@ sub TCM_ReadAnswer($$)
   }
 }
 
+sub TCM_BlockSenderID($$$) {
+  my ($hash, $blockSenderID, $senderID) = @_;
+  return undef if ($blockSenderID eq 'no');
+  my $name = $hash->{NAME};
+  foreach (@{$modules{"$hash->{TYPE}"}{BaseID}}) {
+    if (hex($_) == (hex($senderID) & 0xFFFFFF80)) {
+      Log3 $name, 4, "TCM $name received own telegram from SenderID $senderID blocked.";
+      return 1;
+    }
+  }
+  foreach (@{$modules{"$hash->{TYPE}"}{ChipID}}) {
+    if (hex($_) == hex($senderID)) {
+      Log3 $name, 4, "TCM $name received own telegram from $senderID blocked.";
+      return 1;
+    }
+  }
+  return undef;
+}
+
 #
 sub TCM_Attr(@) {
   my ($cmd, $name, $attrName, $attrVal) = @_;
@@ -1227,23 +1270,42 @@ sub TCM_Attr(@) {
   # return if attribute list is incomplete
   return undef if (!$init_done);
 
-  if ($attrName eq "blockSenderID") {
+  if ($attrName eq "assignIODev") {
     if (!defined $attrVal) {
-
-    } elsif ($attrVal !~ m/^own|no$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      if (exists $modules{TCM}{assignIODev}) {
+        delete($modules{TCM}{assignIODev}) if ($modules{TCM}{assignIODev} eq $hash);
+      }
+    } elsif ($attrVal eq 'no') {
+      if (exists $modules{TCM}{assignIODev}) {
+        delete($modules{TCM}{assignIODev}) if ($modules{TCM}{assignIODev} eq $hash);
+      }
+    } elsif ($attrVal eq 'yes') {
+      $modules{TCM}{assignIODev} = $hash;
+    } else {
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
+      if (exists $modules{TCM}{assignIODev}) {
+        delete($modules{TCM}{assignIODev}) if ($modules{TCM}{assignIODev} eq $hash);
+      }
     }
 
   } elsif ($attrName eq "baseID") {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^[Ff]{2}[\dA-Fa-f]{6}$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     } else {
       $hash->{BaseID} = $attrVal;
       $hash->{LastID} = sprintf "%08X", (hex $attrVal) + 127;
+    }
+
+  } elsif ($attrName eq "blockSenderID") {
+    if (!defined $attrVal) {
+
+    } elsif ($attrVal !~ m/^own|no$/) {
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "comModeUTE") {
@@ -1258,7 +1320,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^TCM|RS485$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1266,7 +1328,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^off|on$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1274,7 +1336,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^all|teachMsg$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1282,7 +1344,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^always|demand|nearfield$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1290,7 +1352,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif (($attrVal + 0) < 0 || ($attrVal + 0) > 250) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong or out of range";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong or out of range";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1298,7 +1360,7 @@ sub TCM_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^simple|advance|advanceSelectRep$/) {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
   } elsif ($attrName eq "smartAckMailboxMax") {
@@ -1307,7 +1369,7 @@ sub TCM_Attr(@) {
     } elsif (($attrVal + 0) >= 0 && ($attrVal + 0) <= 20) {
       TCM_Set($hash, ("set", "smartAckMailboxMax", $attrVal));
     } else {
-      Log3 $name, 2, "EnOcean $name attribute-value [$attrName] = $attrVal wrong or out of range";
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong or out of range";
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
@@ -1318,8 +1380,39 @@ sub TCM_Attr(@) {
 #
 sub TCM_Notify(@) {
   my ($hash, $dev) = @_;
-  if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
+  if ($dev->{TYPE} eq 'Global' && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
+  #if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
     TCM_InitSerialCom($hash);
+    my $assignIODevFlag = AttrVal($hash->{NAME}, 'assignIODev', undef);
+    if (defined $assignIODevFlag) {
+      if ($assignIODevFlag eq 'yes') {
+        $modules{TCM}{assignIODev} = $hash;
+      } else {
+        if (exists $modules{TCM}{assignIODev}) {
+          delete($modules{TCM}{assignIODev}) if ($modules{TCM}{assignIODev} eq $hash);
+        }
+      }
+    }
+    if (exists $modules{$modulesType}{ChipID}) {
+      if (@{$modules{$modulesType}{ChipID}} <= 1) {
+        # one transmitter currently registered
+        #$attr{$hash->{NAME}}{fingerprint} = 'off';
+        #Log3 $hash->{NAME}, 2, "TCM $hash->{NAME} Atribute fingerprint: off";
+      } else {
+        # more then one transmitter currently registered
+        if (!exists $attr{$dev->{NAME}}{dupTimeout}) {
+          $attr{$dev->{NAME}}{dupTimeout} = $dupTimeout;
+          Log3 $dev->{NAME}, 2, "$dev->{TYPE} $dev->{NAME} Attribute dupTimeout: $attr{$dev->{NAME}}{dupTimeout}";
+        }
+        while (my ($iDev, $iHash) = each (%{$modules{$modulesType}{devHash}})) {
+          if (!exists $attr{$iDev}{fingerprint}) {
+            $attr{$iDev}{fingerprint} = 'on';
+            Log3 $iDev, 2, "TCM $iDev Attribute fingerprint: $attr{$iDev}{fingerprint}";
+          }
+        }
+      }
+      Log3 $hash->{NAME}, 2, "TCM registered transceiver BaseID: " . join(':', @{$modules{"$hash->{TYPE}"}{BaseID}}) . " ChipID: " . join(':', @{$modules{"$hash->{TYPE}"}{ChipID}});
+    }
   }
   return undef;
 }
@@ -1328,19 +1421,36 @@ sub TCM_Notify(@) {
 sub TCM_Undef($$) {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
-
   foreach my $d (sort keys %defs) {
-    if(defined($defs{$d}) &&
-       defined($defs{$d}{IODev}) &&
-       $defs{$d}{IODev} == $hash)
-      {
-        my $lev = ($reread_active ? 4 : 2);
-        Log3 $name, $lev, "TCM deleting port for $d";
-        delete $defs{$d}{IODev};
-      }
+    if(defined($defs{$d}) && defined($defs{$d}{IODev}) && $defs{$d}{IODev} == $hash) {
+      my $lev = ($reread_active ? 4 : 2);
+      Log3 $name, $lev, "TCM $name deleting port for $d";
+      delete $defs{$d}{IODev};
+    }
   }
   DevIo_CloseDev($hash);
+  for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{BaseID}}; $i++) {
+    if (${$modules{"$hash->{TYPE}"}{BaseID}}[$i] eq $hash->{BaseID}) {
+      Log3 $name, 4, "TCM $name remove module BaseID: " . ${$modules{"$hash->{TYPE}"}{BaseID}}[$i];
+      splice(@{$modules{"$hash->{TYPE}"}{BaseID}}, $i, 1);
+      last;
+    }
+  }
+  for (my $i = 0; $i <= @{$modules{"$hash->{TYPE}"}{ChipID}}; $i++) {
+    if (${$modules{"$hash->{TYPE}"}{ChipID}}[$i] eq $hash->{ChipID}) {
+      Log3 $name, 4, "TCM $name remove module ChipID: " . ${$modules{"$hash->{TYPE}"}{ChipID}}[$i];
+      splice(@{$modules{"$hash->{TYPE}"}{ChipID}}, $i, 1);
+      last;
+    }
+  }
   delete $hash->{helper}{init_done};
+  return undef;
+}
+
+# Shutdown
+sub TCM_Shutdown($) {
+  my ($hash) = @_;
+  DevIo_CloseDev($hash);
   return undef;
 }
 
@@ -1374,6 +1484,9 @@ sub TCM_Undef($$) {
   of commands depends on the hardware and the firmware version. A firmware update
   is usually not provided.
   <br><br>
+
+  <b>Eltako RS485 bus</b>
+  <ul>
   The TCM module enables also a wired connection to Eltako actuators over the
   Eltako RS485 bus in the switchboard or distribution box via Eltako FGW14 RS232-RS485
   gateway modules. These actuators are linked to an associated wireless antenna module
@@ -1386,7 +1499,58 @@ sub TCM_Undef($$) {
   event-min-interval.
   The Eltako bus uses the EnOcean Serial Protocol version 2 (ESP2). For this reason,
   a FGW14 can be configured as a ESP2. The attribute <a href="#TCM_comType">comType</a>
-  must be set to RS485.<br><br>
+  must be set to RS485.
+  </ul>
+  <br>
+
+  <b>Multi-transceiver operation</b>
+  <ul>
+  It is possible to operate multiple transceivers in one Fhem instance in parallel.
+  EnOcean repeaters meet the usual requirements for increasing range in homes much more
+  easily than a multi-transceiver instance. It is interesting to operate several transceivers
+  but with extensive building complexes. In addition, the radio channel utilization can be
+  reduced compared to the use of several repeaters when self-contained spatial zones are formed.
+  After all, multiple transceivers can increase the number of available SenderIDs in Fhem.<br><br>
+  Within an Fhem installation with multiple transceivers, one of these transceivers sends the
+  outgoing telegrams. The transceiver is assigned to IODev when an EnOcean device is set up. One of
+  the enabled transceivers can be specifically selected as the transmitting device (IODev) for manual
+  setup of EnOcean devices. For this purpose, the attribute<br>
+  <ul><code>attr &lt;name&gt; assignIODev yes</code></ul>
+  must be set.
+  <br><br>
+  For teach-in sensors or actuators, the desired transceiver must be set by<br>
+  <ul><code>set &lt;name&gt; teach &lt;t/s&gt;</code></ul>
+  into learning mode.
+  <br><br>
+  Incoming telegrams are received by all transceivers. Duplicates are determined and
+  suppressed by the fingerprint function. This function must be used for each transceiver using the<br>
+  <ul><code>attr &lt;name&gt; fingerprint on</code></ul>
+  activated. Furthermore, the global attribute must be<br>
+  <ul><code>attr global dupTimeout 0.6</code></ul>
+  or larger. The attributes are set automatically if they have not already been manually defined.
+  <br><br>
+  Transceivers on remote servers have been tested with the Linux service ser2net. For example,
+  ser2net can be set up on a Raspberry PI Remote server for a transceiver on the
+  /dev/ttyUSB0@57600 USB port (8, 'none', 1) in the following steps:<br><br>
+  Package provisioning<br>
+  <ul><code>sudo apt install ser2net</code></ul>
+  Configuration in the file: /etc/ser2net.conf<br>
+  <ul><code>7000:raw:0:/dev/ttyUSB0:57600 8DATABITS NONE 1STOPBIT HANGUP_WHEN_DONE</code></ul>
+  Program start for a test<br>
+  <ul><code>sudo ser2net -n</code></ul>
+  Automatically boot (insert script /etc/init.d/ser2net into startup procedure)<br>
+  <ul><code>sudo update-rc.d ser2net defaults</code></ul>
+  Take program from the autostart<br>
+  <ul><code>sudo update-rc.d -f ser2net remove</code></ul><br>
+  On the remote server, ser2net and Fhem should not be active in parallel.
+  During Fhem start, the autocreate function may inadvertently integrate the transceiver
+  into Fhem and then errors occur.<br><br>
+  On the target system, the transceiver is then connected to the IP address of the remote server via<br>
+  <ul><code>define TCM_Remote TCM ESP3 &lt;ip1&gt;.&lt;ip2&gt;.<ip3>&lt;ip3&gt;.&lt;ip4&gt;:7000</code></ul>
+  set up.<br><br>
+  Only ESP3 transceivers have been tested.
+  </ul>
+  <br>
 
   <a name="TCMdefine"></a>
   <b>Define</b>
@@ -1550,6 +1714,10 @@ sub TCM_Undef($$) {
     <li>freqencyInfo<br>
       Reads Frequency and protocol of the Device, see
       <a href="https://www.enocean.com/esp">EnOcean Serial Protocol 3 (ESP3)</a></li>
+    <li>getFreeID<br>
+      Get free Transceiver SenderIDs.</li>
+    <li>getUsedID<br>
+      Get used Transceiver SenderIDs.</li>
     <li>numSecureDev<br>
       Read number of teached in secure devices.</li>
     <li>remanRepeating<br>
@@ -1576,10 +1744,14 @@ sub TCM_Undef($$) {
   <a name="TCMattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a name="TCM_assignIODev">assignIODev</a> &lt;no|yes&gt;,
+      [assignIODev] = no is default.<br>
+      Transceiver used as IO device (IODev) for manually set up EnOcean devices.
+    </li>
     <li><a name="TCM_blockSenderID">blockSenderID</a> &lt;own|no&gt;,
       [blockSenderID] = own is default.<br>
       Block receiving telegrams with a TCM SenderID sent by repeaters.
-      </li>
+    </li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a name="TCM_baseID">baseID</a> &lt;FF800000 ... FFFFFF80&gt;,
       [baseID] = <none> is default.<br>
