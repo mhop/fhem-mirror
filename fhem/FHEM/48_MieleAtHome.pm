@@ -35,7 +35,7 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "1.0.0";
+my $version = "1.0.1";
 
 my $MAH_hasMimeBase64 = 1;
 
@@ -1311,7 +1311,7 @@ sub MAH_setProcessAction($$)
 	my ($hash, $processActionName) = @_;
 	my $name = $hash->{NAME};
 
-	my $processActionId = grep{ PROCESS_ACTIONS->{$_} eq $processActionName } keys %{PROCESS_ACTIONS()};
+	my ($processActionId) = grep{ PROCESS_ACTIONS->{$_} eq $processActionName } keys %{PROCESS_ACTIONS()};
 	if (!defined $processActionId) {
 		return "invalid processAction: '${processActionName}'";
 	}
@@ -1332,7 +1332,7 @@ sub MAH_setLight($$)
 	my ($hash, $lightActionName) = @_;
 	my $name = $hash->{NAME};
 
-	my $lightActionId = grep{ LIGHT_ACTIONS->{$_} eq $lightActionName } keys %{LIGHT_ACTIONS()};
+	my ($lightActionId) = grep{ LIGHT_ACTIONS->{$_} eq $lightActionName } keys %{LIGHT_ACTIONS()};
 	if (!defined $lightActionId) {
 		return "invalid light action: '${lightActionName}'";
 	}
@@ -1353,7 +1353,7 @@ sub MAH_setVentilationStep($$)
 	my ($hash, $ventilationStepName) = @_;
 	my $name = $hash->{NAME};
 
-	my $ventilationStepId = grep{ VENTILATION_STEPS->{$_} eq $ventilationStepName } keys %{VENTILATION_STEPS()};
+	my ($ventilationStepId) = grep{ VENTILATION_STEPS->{$_} eq $ventilationStepName } keys %{VENTILATION_STEPS()};
 	if (!defined $ventilationStepId) {
 		return "invalid ventilation step: '${ventilationStepName}'";
 	}
