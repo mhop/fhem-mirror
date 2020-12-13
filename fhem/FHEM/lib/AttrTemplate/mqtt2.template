@@ -497,7 +497,7 @@ attr DEVICE icon ICON
 attr DEVICE eventMap { dev=>{ON=>'on',OFF=>'off'} }
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE jsonMap state:availability state_1:state state_2:0 state_3:0 
+attr DEVICE jsonMap state:availability state_l1:state state_l2:0 state_l3:0 
 attr DEVICE setList \
   on:noArg $\DEVICETOPIC/1/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/1/set {"state":"OFF"}\
@@ -509,15 +509,15 @@ attr DEVICE_CH2 setList \
   on:noArg $\DEVICETOPIC/2/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/2/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/2/set {"state":"TOGGLE"}
-attr DEVICE_CH2 jsonMap state_2:state state_1:0 state_3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 attr DEVICE_CH3 setList \
   on:noArg $\DEVICETOPIC/3/set {"state":"ON"}\
   off:noArg $\DEVICETOPIC/3/set {"state":"OFF"}\
   toggle:noArg $\DEVICETOPIC/3/set {"state":"TOGGLE"}
-attr DEVICE_CH2 jsonMap state_3:state state_1:0 state_2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
+attr DEVICE_CH2 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20201211
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20201213
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
@@ -825,13 +825,12 @@ attr DEVICE readingList $\DEVICETOPIC:.* { my %h; my $temp = $EVENT; $temp =~ s/
 attr DEVICE setList \
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
   btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
-  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
   boost:noArg $\DEVICETOPIC/set {"preset": "boost"}\
   mode:schedule,manual,boost,complex,comfort,eco $\DEVICETOPIC/set {"preset": "$EVTPART1"}
   x_send_set_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set $payload)}
 attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}\
   measured-temp:noArg measured-temp $\DEVICETOPIC/get {"local_temperature": ""}\
-  preset:noArg preset $\DEVICETOPIC/get {"preset": ""}
+  mode:noArg mode $\DEVICETOPIC/get {"preset": ""}
 attr DEVICE periodicCmd measured-temp:55
 attr DEVICE stateFormat btnLock\
 Measured: measured-temp Battery: batteryPercent %
@@ -843,7 +842,7 @@ attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201212
+setreading DEVICE attrTemplateVersion 20201213
 
 
 ###########################################
