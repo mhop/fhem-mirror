@@ -49,6 +49,7 @@ BEGIN {
           devspec2array
           deviceEvents
           Debug
+          fhemTimeLocal
           FmtDateTime
           FmtTime
           FW_makeImage
@@ -537,6 +538,7 @@ sub Notify {
   }
   
   sumNextHours ($myHash, $chour, \@da);                                                            # Zusammenfassung nächste 4 Stunden erstellen
+  calcVariance ($params);                                                                          # Autokorrektur berechnen
   
   readingsSingleUpdate($myHash, "state", "updated", 1);                                            # Abschluß state 
  
@@ -641,7 +643,7 @@ sub _transferInverterValues {
   if($chour == $tlim) {
       my @allrds = keys %{$myHash->{READINGS}};
       for my $key(@allrds) {
-          readingsDelete($myHash, $key) if($key =~ m/^Hour_\d{2}_PVreal$/x);
+          readingsDelete($myHash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
       }
   }
   
@@ -657,12 +659,12 @@ sub _transferInverterValues {
 
   my $edaypast   = 0;
   for my $h (0..int($chour)-1) {                                                          # alle bisherigen Erzeugungen des Tages summieren                                            
-      $edaypast += ReadingsNum ($myName, "Hour_".sprintf("%02d",$h)."_PVreal", 0);
+      $edaypast += ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
   my $ethishour  = $etoday - $edaypast;
   
-  push @$daref, "Hour_${chour}_PVreal:". $ethishour." Wh" if($chour != $tlim);            # nicht setzen wenn Stunde 23 des Tages
+  push @$daref, "Today_Hour${chour}_PVreal:". $ethishour." Wh" if($chour != $tlim);            # nicht setzen wenn Stunde 23 des Tages
   
   ## Meter extrahieren
   #########################   
@@ -1541,15 +1543,15 @@ return $ret;
 #
 ###############################################################################
 sub formatVal6 {
-  my ($v,$kw,$w)  = @_;
-  my $n           = '&nbsp;';                               # positive Zahl
+  my ($v,$kw,$w) = @_;
+  my $n          = '&nbsp;';                                # positive Zahl
 
-  if ($v < 0) {
+  if($v < 0) {
       $n = '-';                                             # negatives Vorzeichen merken
       $v = abs($v);
   }
 
-  if ($kw eq 'kWh') {                                       # bei Anzeige in kWh muss weniger aufgefüllt werden
+  if($kw eq 'kWh') {                                        # bei Anzeige in kWh muss weniger aufgefüllt werden
       $v  = sprintf('%.1f',($v/1000));
       $v  += 0;                                             # keine 0.0 oder 6.0 etc
 
@@ -1557,7 +1559,7 @@ sub formatVal6 {
 
       my $t = $v - int($v);                                 # Nachkommstelle ?
 
-      if (!$t) {                                            # glatte Zahl ohne Nachkommastelle
+      if(!$t) {                                             # glatte Zahl ohne Nachkommastelle
           if(!$v) { 
               return '&nbsp;';                              # 0 nicht anzeigen, passt eigentlich immer bis auf einen Fall im Typ diff
           } 
@@ -1578,7 +1580,7 @@ sub formatVal6 {
       }
   }
 
-  return ($n eq '-')?($v*-1):$v if defined($w);
+  return ($n eq '-') ? ($v*-1) : $v if defined($w);
 
   # Werte bleiben in Watt
   if    (!$v)         { return '&nbsp;'; }                            ## no critic "Cascading" # keine Anzeige bei Null 
@@ -1703,6 +1705,41 @@ return $pv." Wh";
 }
 
 ################################################################
+#       Abweichung PVreal / PVforecast berechnen
+################################################################
+sub calcVariance {               
+  my $paref   = shift;
+  my $myHash  = $paref->{myHash};
+  my $myName  = $paref->{myName};
+
+  my $idts = $myHash->{HELPER}{INVERTERDEFTS};                                            # Start oder Definitionstimestamp des Inverterdevice
+  return if(!$idts);
+  
+  my $t = time;                                                                           # aktuelle Unix-Zeit
+
+  if($t - $idts < 86400) {
+      my $rmh = sprintf "%.1f" , ( (86400 - ($t - $idts)) / 3600);
+      Log3($myName, 4, "$myName - Variance calculation in standby. Calculation is possible in $rmh hours."); 
+      return;      
+  }  
+
+  my @da;
+  for my $h (1..23) {
+      my $fcval = $myHash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
+      my $fcnum = int ((split " ", $fcval)[0]);
+      next if(!$fcnum);
+      
+      my $pvval  = ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $factor = $pvval / $fcnum;                                                      # Faktor reale PV / Prognose
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor;
+  }
+  
+  createReadings ($myHash, \@da);
+      
+return;
+}
+
+################################################################
 #               Zusammenfassungen erstellen
 ################################################################
 sub sumNextHours {            
@@ -1771,6 +1808,8 @@ sub createNotifyDev {
       my $indev = ReadingsVal($name, "currentInverterDev", "");      # Inverter device
       my $medev = ReadingsVal($name, "currentMeterDev",    "");      # Meter device
       
+      $hash->{HELPER}{INVERTERDEFTS} = time if($indev);              # Timestamp der Inverterdefinition speichern für calcVariance
+      
       push @nd, $fcdev;
       push @nd, $indev;
       push @nd, $medev;
@@ -1800,7 +1839,7 @@ return;
 <h3>SolarForecast</h3>
 
 <br>
-Das Modul SolarForecast erstellt auf Grundlage der Werte aus Modulen vom Typ DWD_OpenData, SMAInverter und SMAEM eine Vorhersage 
+Das Modul SolarForecast erstellt auf Grundlage der Werte aus Devices vom Typ DWD_OpenData, SMAInverter und SMAEM eine Vorhersage 
 für den solaren Ertrag und weitere Informationen als Grundlage für abhängige Steuerungen. <br>
 Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem 
 <a href="https://wiki.fhem.de/wiki/FTUI_Widget_SolarForecast">"SolarForecast Widget"</a> integriert werden. <br><br>
