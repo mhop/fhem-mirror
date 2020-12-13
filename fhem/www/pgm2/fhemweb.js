@@ -1256,14 +1256,14 @@ FW_detailSelect(selEl, mayMissing)
 
   if(selVal != null && selVal != undefined) {
     for(var i1=0; i1<listArr.length; i1++) {
-      argAndPar = listArr[i1].split(":");
-      if(selVal.match(new RegExp(argAndPar[0]))) {
-        fnd = true;
-        if(argAndPar.length > 2) {
-          var re = shift(argAndPar);
-          argAndPar = [re, argAndPar.join(":")];
+      var aap = listArr[i1].split(":");
+      if(selVal.match(new RegExp(aap[0]))) {
+        if(aap.length > 2) {
+          var re = shift(aap);
+          aap = [re, aap.join(":")];
         }
-        break;
+        argAndPar = aap;
+        fnd = true;
       }
     }
   }
