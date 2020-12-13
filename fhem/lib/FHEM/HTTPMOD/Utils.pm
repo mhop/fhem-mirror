@@ -513,15 +513,11 @@ sub ManageUserAttr {
                 #Log3 $name, 5, "$name: ManageUserAttr compares userattr name $userAttrName with passed attr name $aName";
                 if ($userAttrName eq $aName) {
                     #Log3 $name, 5, "$name: ManageUserAttr compares hints from userattr $userAttrHint with hint from list $listAttrHint";
-                    next UALOOP if (!$userAttrHint && !$listAttrHint);  # no hints -> no need for userattr to sepcify a regex attr (new)
-                    if ($userAttrHint && !$listAttrHint) {
+                    $found = 1;
+                    if ($userAttrHint && $userAttrHint ne ($listAttrHint // '')) {
                         $uaHash{$userAttr} = 1;                     # keep $userAttr with hint if module attr has no hint
                         #Log3 $name, 5, "$name: ManageUserAttr keeps userattr $userAttr with different hint";
-                    } else {
-                        $uaHash{$aName . $listAttrHint} = 1;        # replace userAttr with attr from module list
-                        #Log3 $name, 5, "$name: ManageUserAttr uses $aName$listAttrHint with hint from module attr list";
                     }
-                    $found = 1;
                 } else {
                     $uaHash{$userAttr} = 1;                         # keep userattr with different names
                     #Log3 $name, 5, "$name: ManageUserAttr keeps other existing userattr $userAttr";
@@ -537,7 +533,7 @@ sub ManageUserAttr {
                 Log3 $name, 5, "$name: ManageUserAttr updated userattr list to $aString";
             } else {
                 if ($attr{$name}{userattr}) {
-                    Log3 $name, 3, "$name: ManageUserAttr removed unnecessary userattr list";
+                    Log3 $name, 3, "$name: ManageUserAttr removed useless userattr list";
                     delete $attr{$name}{userattr};
                 }
             }
