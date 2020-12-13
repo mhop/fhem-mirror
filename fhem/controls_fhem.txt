@@ -1,4 +1,4 @@
-REV 23328
+REV 23336
 DIR unused
 UPD 2020-12-09_07:45:03 354969 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -63,7 +63,7 @@ UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
 UPD 2018-10-08_07:45:02 83806 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2020-12-05_07:45:03 111758 FHEM/10_MAX.pm
-UPD 2020-12-07_07:45:03 34480 FHEM/10_MQTT2_DEVICE.pm
+UPD 2020-12-13_07:45:03 35359 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2019-06-29_07:45:02 167185 FHEM/10_MQTT_GENERIC_BRIDGE.pm
@@ -479,7 +479,7 @@ UPD 2020-05-10_07:45:03 30585 FHEM/98_GOOGLECAST.pm
 UPD 2020-04-01_07:45:03 11523 FHEM/98_GoogleAuth.pm
 UPD 2020-10-26_07:45:03 194653 FHEM/98_HMinfo.pm
 UPD 2019-04-01_07:45:02 31631 FHEM/98_HMtemplate.pm
-UPD 2020-10-25_07:45:02 190047 FHEM/98_HTTPMOD.pm
+UPD 2020-12-13_07:45:03 190719 FHEM/98_HTTPMOD.pm
 UPD 2016-04-26_07:45:11 33223 FHEM/98_HourCounter.pm
 UPD 2019-01-26_07:45:02 67684 FHEM/98_Hyperion.pm
 UPD 2017-01-04_07:45:02 21573 FHEM/98_IF.pm
@@ -637,7 +637,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-12-07_07:45:03 70503 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-12-12_07:45:03 300258 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-12-13_07:45:03 300705 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
@@ -739,8 +739,8 @@ UPD 2020-12-11_07:45:07 4385544 docs/commandref.html
 UPD 2020-12-11_07:45:10 2713015 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2020-12-12_07:45:10 234027 docs/commandref_modular.html
-UPD 2020-12-12_07:45:11 244786 docs/commandref_modular_DE.html
+UPD 2020-12-13_07:45:10 234027 docs/commandref_modular.html
+UPD 2020-12-13_07:45:11 244786 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -761,7 +761,7 @@ UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
 UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
-UPD 2020-10-26_07:45:03 31591 lib/FHEM/HTTPMOD/Utils.pm
+UPD 2020-12-13_07:45:03 38150 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
 UPD 2020-11-03_07:45:03 14279 lib/FHEM/SynoModules/ErrCodes.pm
 UPD 2020-12-08_07:45:02 68274 lib/FHEM/SynoModules/SMUtils.pm
@@ -2282,7 +2282,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2020-08-23_07:45:02 31126 www/pgm2/f18.js
 UPD 2020-10-01_07:45:03 10057 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2020-12-03_07:45:02 62247 www/pgm2/fhemweb.js
+UPD 2020-12-13_07:45:03 62364 www/pgm2/fhemweb.js
 UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
