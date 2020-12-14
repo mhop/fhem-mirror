@@ -1259,7 +1259,7 @@ FW_detailSelect(selEl, mayMissing)
       var aap = listArr[i1].split(":");
       if(selVal.match(new RegExp(aap[0]))) {
         if(aap.length > 2) {
-          var re = shift(aap);
+          var re = aap.shift();
           aap = [re, aap.join(":")];
         }
         argAndPar = aap;
