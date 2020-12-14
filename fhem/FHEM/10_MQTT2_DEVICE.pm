@@ -436,6 +436,7 @@ MQTT2_DEVICE_Attr($$)
 
   if($attrName eq "devicetopic") {
     $hash->{DEVICETOPIC} = ($type eq "del" ? $hash->{NAME} : $param);
+    MQTT2_DEVICE_addReading($dev, AttrVal($dev, "readingList", ""));
     return undef;
   }
 
@@ -600,12 +601,14 @@ MQTT2_DEVICE_addReading($$)
   my ($name, $param) = @_;
   MQTT2_DEVICE_delReading($name);
   my $cid = $defs{$name}{CID};
+  my $dt = $defs{$name}{DEVICETOPIC};
   foreach my $line (split("\n", $param)) {
     my ($re,$code) = split(" ", $line,2);
     return "Bad line >$line< for $name" if(!defined($code));
     my $errMsg = CheckRegexp($re, "readingList attribute for $name");
     return $errMsg if($errMsg);
 
+    $re =~ s/\$DEVICETOPIC/$dt/g;
     if($cid && $re =~ m/^$cid:/) {
       if($re =~ m/^$cid:([^\?.*\[\](|)]+):\.\*$/) { # cid:topic:.*
         $modules{MQTT2_DEVICE}{defptr}{"re:$cid:$1"}{$re}{"$name,$code"} = 1;
