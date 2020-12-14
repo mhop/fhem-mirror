@@ -177,14 +177,13 @@ sub weekprofile_getDeviceType($$;$)
       Log3 $me, 4, "$me(getDeviceType): $devHash->{NAME} is readonly - ignored";
       return undef;
     }
-    
-	  my $model = $devHash->{ccutype};
+    my $model = $devHash->{ccutype};
     if (!defined($model)) {
       Log3 $me, 2, "$me(getDeviceType): ccutype not defined - take HM-xxx (HMCCU_HM)";
       $model = "HM-xxx";
     }
     Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model";
-	  $type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
+	$type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
     $type = "HMCCU_HM" if ( $model =~ m/HM-.*/ );
   }
 
@@ -479,6 +478,7 @@ sub weekprofile_sendDevProfile(@)
     my $k=0;
     my $dayCnt = scalar(@dayToTransfer);
     my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_SUNDAY_1",$me);
+    $prefix = "" if ($type eq "HMCCU_HM"); # no prefix by set see topic,46117.msg1104569.html#msg1104569
     if (!defined($prefix)) {
       Log3 $me, 3, "$me(sendDevProfile): no prefix found"; 
       $prefix = ""; 
