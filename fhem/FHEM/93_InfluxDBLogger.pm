@@ -8,6 +8,7 @@ use warnings;
 use HttpUtils;
 
 my $total_writes_name = "total_writes";
+my $total_events_name = "total_events";
 my $succeeded_writes_name = "succeeded_writes";
 my $failed_writes_name = "failed_writes";
 my $dropped_writes_name = "dropped_writes";
@@ -22,7 +23,7 @@ sub InfluxDBLogger_Initialize($) {
     $hash->{NotifyFn} = "InfluxDBLogger_Notify";
     $hash->{SetFn} = "InfluxDBLogger_Set";
     $hash->{RenameFn} = "InfluxDBLogger_Rename";
-    $hash->{AttrList} = "disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields";
+    $hash->{AttrList} = "disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields api:v1,v2 org precision:ms,s,us,ns";
     Log3 undef, 2, "InfluxDBLogger: Initialized new";
 }
 
@@ -79,9 +80,14 @@ sub InfluxDBLogger_Send($$$)
 
     if ( $data ne "" ) {
         my $total_writes = ReadingsVal($name,$total_writes_name,0);
-        $total_writes+=$rows;
-        my $rv = readingsSingleUpdate($own_hash, $total_writes_name, $total_writes, 1);
-        InfluxDBLogger_UpdateState($own_hash,$name);
+        my $total_events = ReadingsVal($name,$total_events_name,0);
+        $total_writes+=1;
+        $total_events+=$rows;
+        readingsBeginUpdate($own_hash);
+        readingsBulkUpdate($own_hash, $total_writes_name, $total_writes);
+        readingsBulkUpdate($own_hash, $total_events_name, $total_events);
+        readingsBulkUpdate($own_hash, "state", InfluxDBLogger_BuildState($own_hash,$name));
+        readingsEndUpdate($own_hash, 1);
 
         my $reqpar = {
                     url => InfluxDBLogger_BuildUrl($own_hash),
@@ -229,23 +235,31 @@ sub InfluxDBLogger_GetFieldSet($$$)
     return $field_set;
 }
 
-sub InfluxDBLogger_BuildDataClassic($$$)
-{
-    my ($hash, $dev_hash, $device, $reading, $value) = @_;
-    my $name = $hash->{NAME};
-
-    my $measurement = $reading;
-    my $tag_set = AttrVal($name, "deviceTagName", "site_name")."=".$device;
-    my $field_set = "value=".$value;
-
-    return "$measurement,$tag_set $field_set";
-}
-
 sub InfluxDBLogger_BuildUrl($)
 {
     my ($hash) = @_;
-    return $hash->{URL}."/write?db=".urlEncode($hash->{DATABASE});
-}
+    my $name = $hash->{NAME};
+    my $url = $hash->{URL};
+    my $api = AttrVal($name, "api", "v1");
+
+    if ($api eq "v1") {
+        $url .= "/write?db=".urlEncode($hash->{DATABASE});
+    } elsif ($api eq "v2") {
+        my $org = AttrVal($name, "org", "privat");
+        my $bucket = $hash->{DATABASE};
+        $url .= "/api/v2/write?org=".urlEncode($org)."&bucket=".urlEncode($bucket);
+    } else {
+        Log3 $name, 1, "InfluxDBLogger: [$name] unsupported api";
+        $url = undef;
+    }
+
+    my $precision = AttrVal($name, "precision", undef);
+    if ( defined($url) && defined($precision) )
+    {
+        $url .= "&precision=".$precision;
+    }
+    return $url;
+ }
 
 sub InfluxDBLogger_Map($$$$)
 {
@@ -305,10 +319,17 @@ sub InfluxDBLogger_HttpCallback($$$)
     }
     InfluxDBLogger_UpdateState($hash,$name);
 }
+
+sub InfluxDBLogger_BuildState($$)
+{
+    my ($hash, $name) = @_;
+    return "Statistics: t=".ReadingsVal($name,$total_writes_name,0)." s=".ReadingsVal($name,$succeeded_writes_name,0)." f=".ReadingsVal($name,$failed_writes_name,0) ." e=".ReadingsVal($name,$total_events_name,0);
+}
+
 sub InfluxDBLogger_UpdateState($$)
 {
     my ($hash, $name) = @_;
-    my $new_state = "Statistics: t=".ReadingsVal($name,$total_writes_name,0)." s=".ReadingsVal($name,$succeeded_writes_name,0)." f=".ReadingsVal($name,$failed_writes_name,0);
+    my $new_state = InfluxDBLogger_BuildState($hash, $name);
     readingsSingleUpdate($hash,"state",$new_state,1);
 }
 
@@ -377,14 +398,14 @@ sub InfluxDBLogger_ResetStatistics($)
     my ( $hash, $name ) = @_;
     readingsBeginUpdate($hash);
     readingsBulkUpdate($hash, $total_writes_name, 0);
+    readingsBulkUpdate($hash, $total_events_name, 0);
     readingsBulkUpdate($hash, $succeeded_writes_name, 0);
     readingsBulkUpdate($hash, $failed_writes_name, 0);
     readingsBulkUpdate($hash, $dropped_writes_name, 0);
     readingsBulkUpdate($hash, $droppeed_writes_last_message_name, "<none>");
     readingsBulkUpdate($hash, $failed_writes_last_error_name, "<none>");
+    readingsBulkUpdate($hash, "state", InfluxDBLogger_BuildState($hash,$name));
     readingsEndUpdate($hash, 1);
-
-    InfluxDBLogger_UpdateState($hash, $name);
 }
 
 sub InfluxDBLogger_IsBasicAuth($)
@@ -522,7 +543,8 @@ sub InfluxDBLogger_Rename($$) {
         <li>A <i>tag</i> called 'site_name' will be used for each device</li>
         <li>A <i>field</i> called 'value' will be used for each reading value</li>
    </ul>
-    To use this module with InfluxDB 2, the buckets needs to be mapped to databases. <a href="https://docs.influxdata.com/influxdb/v2.0/query-data/influxql/#map-unmapped-buckets">link</a>
+   The default API version is v1. To change this, set the api-attribute.
+   Another way to use this module with InfluxDB 2 is to map the buckets to databases. <a href="https://docs.influxdata.com/influxdb/v2.0/query-data/influxql/#map-unmapped-buckets">see here</a>
 
    <a name="InfluxDBLogger_Define"></a>
    <h4>Define</h4>
@@ -591,6 +613,16 @@ sub InfluxDBLogger_Rename($$) {
             The keyword $READINGVALUE will be replaced by the reading-value.
             Default is value=$READINGVALUE.
         </li>
+        <li><b>api</b> <code>attr &lt;name&gt; api [v1|v2]</code><br />
+            The api-Version to use. Default is v1.
+            Using API Version v2 the database name is used as the bucket-name.
+        </li>
+        <li><b>org</b> <code>attr &lt;name&gt; org &lt;org&gt;</code><br />
+            Using API Version v2 the organisation is specified by this. Default is "privat".
+        </li>
+        <li><b>precision</b> <code>attr &lt;name&gt; precision [ms|s|us|ns]</code><br />
+            The time precision is specified by this. Default is none.
+        </li>
     </ul>
 
     <a name="InfluxDBLogger_Readings"></a>
@@ -612,7 +644,7 @@ sub InfluxDBLogger_Rename($$) {
             Total number of dropped writes due to non numeric value. See conversions to fix.
         </li>
         <li><b>state</b><br />
-            Statistics: t=total_writes s=succeeded_writes f=failed_writes
+            Statistics: t=total_writes s=succeeded_writes f=failed_writes e=events
         </li>
     </ul>
 </ul>
@@ -624,14 +656,15 @@ sub InfluxDBLogger_Rename($$) {
 <a name="InfluxDBLogger"></a>
 <h3>InfluxDBLogger</h3>
 <ul>
-   Modul zum Loggen in eine InfluxDB Zeitreihendatenbank
+   Modul zum Loggen in eine InfluxDB Zeitreihendatenbank.
    Entsprechend der <i>InfluxDB Terminologie</i>, hier die Standardzuordnung, die mittels Attribute frei verändert werden kann:
    <ul>
         <li>Ein <i>measurement</i> wird für jeden reading namen erzeugt.</li>
         <li>Ein <i>tag</i> namens 'site_name' wird für jedes device verwendet</li>
         <li>Ein <i>field</i> namens 'value' wird für die reading Werte genutzt</li>
    </ul>
-   Um das Modul mit InfluxDB 2 zu nutzen, müssen die Buckets auf Datenbanken gemapped werden. <a href="https://docs.influxdata.com/influxdb/v2.0/query-data/influxql/#map-unmapped-buckets">link</a>
+   Das Modul arbeitet standardmäßig mit der InfluxDB API v1, dies kann mit dem Attribut api geändert werden.
+   Ein weiterer Weg um das Modul mit InfluxDB 2 zu nutzen ist es, die Buckets auf Datenbanken zu mappen. <a href="https://docs.influxdata.com/influxdb/v2.0/query-data/influxql/#map-unmapped-buckets">Siehe hier</a>
 
    <a name="InfluxDBLogger_Define"></a>
    <h4>Define</h4>
@@ -671,11 +704,11 @@ sub InfluxDBLogger_Rename($$) {
             Wird nur genutzt wenn das security Attribut auf basic_auth gesetzt wurde<br>
         </li>
         <li><b>readingInclude</b> <code>attr &lt;name&gt; readingInclude &lt;regex&gt;</code><br />
-            nur Ereignisse die zutreffen werden geschrieben(inklusiv). Hinweis - das Format eines Ereignisses sieht so aus: 'state: on'<br></li>
+            Nur Ereignisse die zutreffen werden geschrieben(inklusiv). Hinweis - das Format eines Ereignisses sieht so aus: 'state: on'<br></li>
         <li><b>readingExclude</b> <code>attr &lt;name&gt; readingExclude &lt;regex&gt;</code><br />
-            nur Ereignisse die nicht zutreffen werden geschrieben(inklusiv). Hinweis - das Format eines Ereignisses sieht so aus: 'state: on'<br></li>
+            Nur Ereignisse die nicht zutreffen werden geschrieben(inklusiv). Hinweis - das Format eines Ereignisses sieht so aus: 'state: on'<br></li>
         <li><b>deviceTagName</b> <code>attr &lt;name&gt; deviceTagName &lt;deviceTagName&gt;</code><br />
-            das ist der Name des tags wo der Gerätename gespeichert wird. Standard ist 'site_name'
+            Das ist der Name des tags, in dem der Gerätename gespeichert wird. Standard ist 'site_name'
         </li>
         <li><b>conversions</b> <code>attr &lt;name&gt; conversions &lt;conv1,conv2&gt;</code><br />
             Kommagetrennte Liste von Ersetzungen e.g. open=1,closed=0,tilted=2 oder true|on|yes=1,false|off|no=0
@@ -696,9 +729,19 @@ sub InfluxDBLogger_Rename($$) {
         </li>
         <li><b>fields</b> <code>attr &lt;name&gt; fields &lt;val=$READINGVALUE&gt;</code><br />
             Dies ist the Liste der fields die an InfluxDB gesendet werden.
-             Das Schlüsselwort $READINGNAME wird ersetzt durch den Readingnamen.
-             Das Schlüsselwort $READINGVALUE wird ersetzt durch den Readingwert.
-             Standard ist value=$READINGVALUE.
+            Das Schlüsselwort $READINGNAME wird ersetzt durch den Readingnamen.
+            Das Schlüsselwort $READINGVALUE wird ersetzt durch den Readingwert.
+            Standard ist value=$READINGVALUE.
+        </li>
+        <li><b>api</b> <code>attr &lt;name&gt; api [v1|v2]</code><br />
+            Die zu verwendende API Version von InfluxDB. Standard ist v1.
+            Bei v2 wird als bucket der Datenbankname verwendet.
+        </li>
+        <li><b>org</b> <code>attr &lt;name&gt; org &lt;org&gt;</code><br />
+            Bei API Version v2 wird hiermit die Organisation angegeben. Standard ist "privat".
+        </li>
+        <li><b>precision</b> <code>attr &lt;name&gt; precision [ms|s|us|ns]</code><br />
+            Die Zeit-Präzision wird hiermit angegeben. Standard ist keine Vorgabe.
         </li>
     </ul>
 
@@ -721,7 +764,7 @@ sub InfluxDBLogger_Rename($$) {
             Anzahl von nicht getätigten Schreibvorgängen aufgrund da nicht numerisch. Siehe conversions um es zu beheben.
         </li>
         <li><b>state</b><br />
-            Statistics: t=total_writes s=succeeded_writes f=failed_writes
+            Statistics: t=total_writes s=succeeded_writes f=failed_writes e=events
         </li>
     </ul>
 </ul>
