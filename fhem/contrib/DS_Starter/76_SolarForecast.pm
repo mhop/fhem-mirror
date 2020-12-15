@@ -640,18 +640,14 @@ sub _transferForecastValues {
   push @$daref, "Tomorrow_HourSunRise:".$fc1_SunRise;
   push @$daref, "Tomorrow_HourSunSet:". $fc1_SunSet;
   
-  for my $num (0..23) {                      
+  for my $num (0..47) {                      
       my $fh = $chour + $num; 
+      $fd    = int ($fh / 24) ;
+      $fh    = $fh - ($fd * 24); 
       
-      if($fh < 24) {
-          $fd = 0;
-      }
-      else {
-          $fd = 1;
-          $fh = $fh-24;
-      }   
+      next if($fd > 1);
       
-      Log3($myName, 5, "$myName - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww ");
+      Log3($myName, 5, "$myName - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww");
 
       $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
@@ -1797,7 +1793,7 @@ sub calcVariance {
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
-      Log3($myName, 4, "$myName - Variance calculation in standby. Calculation is possible in $rmh hours."); 
+      Log3($myName, 4, "$myName - Variance calculation in standby. It starts in $rmh hours."); 
       return;      
   }  
 
@@ -1846,7 +1842,7 @@ sub sumNextHours {
   $next4HoursSum->{PV} = $thforecast;
   $restOfDaySum->{PV}  = $thforecast;
   
-  for my $h (1..23) {
+  for my $h (1..47) {
       $next4HoursSum->{PV} += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= 3);
       $restOfDaySum->{PV}  += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= $rdh);
       $tomorrowSum->{PV}   += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h >  $rdh);
@@ -2057,8 +2053,8 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
       <a name="pvCorrectionFactor_Auto"></a>
       <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br> 
       Schaltet die automatische Vorhersagekorrektur ein / aus. <br>
-      Ist die Auomatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
-      ein Korrekturfaktor der Solarvohersage berechnet und angewendet.
+      Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
+      ein Korrekturfaktor der Solarvorhersage berechnet und auf die Erwartung des kommenden Tages angewendet.
       Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde vergleichen und
       daraus eine Korrektur abgeleitet. <br>      
       (default: off)      
