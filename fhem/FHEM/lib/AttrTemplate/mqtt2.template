@@ -120,7 +120,7 @@ attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE bridgeRegexp\
   BASE_TOPIC/([A-Za-z0-9._]+)[/]?.*:.* "zigbee_$1"
 attr DEVICE getList\
-  devicelist:noArg log $\DEVICETOPIC/bridge/config/devices\
+  devicelist:noArg log $\DEVICETOPIC/bridge/config/devices/get\
   networkmap_raw:noArg raw $\DEVICETOPIC/bridge/networkmap raw\
   networkmap_graphviz:noArg graphviz $\DEVICETOPIC/bridge/networkmap graphviz
 attr DEVICE readingList\
@@ -160,7 +160,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20200701
+setreading DEVICE attrTemplateVersion 20201215
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -819,14 +819,21 @@ order:L_17a
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 par:ICON;ICON as set, defaults to hm-cc-rt-dn;{ AttrVal("DEVICE","icon","hm-cc-rt-dn") }
+par:WPNAME;weekprofile attr value, defaults to device name;{ AttrVal("DEVICE","weekprofile","DEVICE") }
+farewell:template has been applied successfully. <br>NOTE: code has been downloaded from svn (contrib). <br>For use with weekprofile, additional configuration is needed!
+{ Svn_GetFile("contrib/AttrTemplate/99_attrT_z2m_thermostat_Utils.pm", "FHEM/99_attrT_z2m_thermostat_Utils.pm", sub(){ CommandReload(undef, "99_attrT_z2m_thermostat_Utils.pm") }) }
+attr DEVICE comment For use with weekprofile, additional configuration is needed
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE userattr weekprofile
+attr DEVICE weekprofile WPNAME
 attr DEVICE readingList $\DEVICETOPIC:.* { my %h; my $temp = $EVENT; $temp =~ s/,?("(holidays|workdays)":.([^]]+))./$h{$2}=$3/ge; $EVENT =~ s/,?("(holidays|workdays)":.([^]]+)).//g; my $h2 = json2nameValue($EVENT,'',$JSONMAP); %h = (%h,%$h2); \%h }
 attr DEVICE setList \
   desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": $EVTPART1 }\
   btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
   boost:noArg $\DEVICETOPIC/set {"preset": "boost"}\
-  mode:schedule,manual,boost,complex,comfort,eco $\DEVICETOPIC/set {"preset": "$EVTPART1"}
+  mode:schedule,manual,boost,complex,comfort,eco $\DEVICETOPIC/set {"preset": "$EVTPART1"}\
+  weekprofile { FHEM::attrT_z2m_thermostat_Utils::z2t_send_weekprofile($NAME, $EVTPART1, $EVTPART2) }\
   x_send_set_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //; qq($\DEVICETOPIC/set $payload)}
 attr DEVICE getList desired-temp:noArg desired-temp $\DEVICETOPIC/get {"current_heating_setpoint": ""}\
   measured-temp:noArg measured-temp $\DEVICETOPIC/get {"local_temperature": ""}\
@@ -842,7 +849,7 @@ attr DEVICE setStateList on off
 attr DEVICE model zigbee2mqtt_thermostat_with_weekrofile
 set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201213
+setreading DEVICE attrTemplateVersion 20201215
 
 
 ###########################################
@@ -2738,6 +2745,7 @@ attr DEVICE icon ICON
 attr DEVICE setList\
   off:noArg shellies/DEVNAME/color/0/command off\
   on:noArg shellies/DEVNAME/color/0/command on\
+  brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/0/set {"mode":"white","brightness":"$EVTPART1"}\
   white:colorpicker,BRI,0,1,255 shellies/DEVNAME/color/0/set {"white":"$EVTPART1"}\
   gain:colorpicker,BRI,0,1,100 shellies/DEVNAME/color/0/set {"gain":"$EVTPART1"}\
   rgb:colorpicker,RGB {$EVTPART1=~/(..)(..)(..)/;if($1 ne $2 || $2 ne $3) {"shellies/DEVNAME/color/0/set {\"mode\":\"color\",\"red\":".hex($1).",\"green\":".hex($2).",\"blue\":".hex($3)."}"}else{"shellies/DEVNAME/color/0/set {\"turn\":\"on\",\"mode\":\"white\",\"brightness\":".int(hex($1)/2.55)."}"}}\
@@ -2758,9 +2766,9 @@ attr DEVICE webCmd on:off:white:gain:rgb:effect
 attr DEVICE setStateList on off
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"power","unknown"); "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>Verbrauch: $cons</div>"}
 set DEVICE x_mqttcom announce
-set DEVICE attrTemplate speechcontrol_type_light
+set DEVICE attrTemplate speechcontrol_type_light_255
 attr DEVICE model shelly2rgbw_color
-setreading DEVICE attrTemplateVersion 20200831
+setreading DEVICE attrTemplateVersion 20201215
 
 #contributed by user sledge
 name:shelly2rgbw_4w_split
@@ -2782,7 +2790,7 @@ attr DEVICE setList off:noArg shellies/DEVNAME/white/0/command off\
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20200531
+setreading DEVICE attrTemplateVersion 20201215
 attr DEVICE model shelly2rgbw_4w_split
 attr DEVICE setStateList on off
 set DEVICE attrTemplate set_associatedWith \CHANNELS=4 \MAKECOPIES=1
@@ -2813,7 +2821,7 @@ attr DEVICE_CH4 setList off:noArg shellies/DEVNAME/white/3/command off\
   on:noArg shellies/DEVNAME/white/3/command on\
   brightness:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/3/set {"mode":"white","brightness":"$EVTPART1"}\
   brightness_on:colorpicker,BRI,0,1,255 shellies/DEVNAME/white/3/set {"ison":"true","mode":"white","brightness":"$EVTPART1"}
-set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_switch
+set DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplate speechcontrol_type_light_255
   
 #shellydimmer
 # contributed by zeppelin, https://forum.fhem.de/index.php/topic,94495.msg994764.html#msg994764
