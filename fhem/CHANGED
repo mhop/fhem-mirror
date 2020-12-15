@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_weekprofile: add support for MQTT2_DEVICE (txl Beta-User)
  - feature: 89_FULLY: Added support for sensor information
  - bugfix: 98_weekprofile: HMCCU-HM send profile without prefix (Forum #1104569)
  - bugfix: 70_DENON_AVR: serial connection issues
