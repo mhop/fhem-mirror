@@ -2088,6 +2088,15 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
       </li>      
     </ul>
     <br>
+    
+    <ul>
+      <a name="data"></a>
+      <li><b>data </b> <br>  
+      Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
+      </li>      
+    </ul>
+    <br>
+    
   </ul>
   <br>
 
