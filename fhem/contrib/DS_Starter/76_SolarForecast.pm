@@ -1782,8 +1782,8 @@ sub calcVariance {
   my $myHash  = $paref->{myHash};
   my $myName  = $paref->{myName};
   
-  my $dcauto = ReadingsVal ($myName, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varainzkalkulation
-  if($dcauto eq "off") {
+  my $dcauto = ReadingsVal ($myName, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
+  if($dcauto =~ /^off/x) {
       Log3($myName, 4, "$myName - automatic Variance calculation is switched off."); 
       return;      
   }
@@ -1796,6 +1796,7 @@ sub calcVariance {
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
       Log3($myName, 4, "$myName - Variance calculation in standby. It starts in $rmh hours."); 
+      readingsSingleUpdate($myHash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
   }  
 
