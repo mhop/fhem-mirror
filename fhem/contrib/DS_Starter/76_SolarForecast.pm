@@ -640,6 +640,8 @@ sub _transferForecastValues {
   push @$daref, "Tomorrow_HourSunRise:".$fc1_SunRise;
   push @$daref, "Tomorrow_HourSunSet:". $fc1_SunSet;
   
+  deleteReadingspec ($myHash, "NextHour.*");
+  
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
       $fd    = int ($fh / 24) ;
@@ -1872,6 +1874,23 @@ sub createReadings {
   }
 
   readingsEndUpdate($hash, 1);
+  
+return;
+}
+
+################################################################
+#    alle Readings eines Devices oder nur Reaging-Regex 
+#    löschen
+################################################################
+sub deleteReadingspec {
+  my $hash = shift;
+  my $spec = shift // ".*";
+  
+  my $readingspec = '^'.$spec.'$';
+  
+  for my $reading ( grep { /$readingspec/ } keys %{$hash->{READINGS}} ) {
+      readingsDelete($hash, $reading);
+  }
   
 return;
 }
