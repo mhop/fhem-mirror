@@ -416,7 +416,7 @@ sub HUEBridge_fillBridgeInfo($$)
 
   if( defined($config->{websocketport}) ) {
     $hash->{websocketport} = $config->{websocketport};
-    HUEBridge_openWebsocket($hash);
+    HUEBridge_openWebsocket($hash) if( !defined($hash->{CD}) );
   }
 
   if( $hash->{apiversion} ) {
