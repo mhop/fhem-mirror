@@ -1257,7 +1257,7 @@ FW_detailSelect(selEl, mayMissing)
   if(selVal != null && selVal != undefined) {
     for(var i1=0; i1<listArr.length; i1++) {
       var aap = listArr[i1].split(":");
-      if(selVal.match(new RegExp(aap[0]))) {
+      if(selVal.match(new RegExp("^"+aap[0]+"$"))) {
         if(aap.length > 2) {
           var re = aap.shift();
           aap = [re, aap.join(":")];
