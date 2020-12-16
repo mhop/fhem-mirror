@@ -671,6 +671,10 @@ sub _transferForecastValues {
       
       $myHash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $calcpv;              # Vorhersagedaten zur Berechnung Korrekturfaktor in Helper speichern           
       
+      if($fd == 0 && $calcpv > 0) {                                                           # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv";               
+      }
+      
       ## Wetter Forecast
       ###################
 
@@ -707,13 +711,14 @@ sub _transferInverterValues {
   $indev      = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
-  my $tlim = "0|23";                                                                          # Stunde 23 -> bestimmte Aktionen
+  my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen
   
   if($chour =~ /^($tlim)$/x) {
-      my @allrds = keys %{$myHash->{READINGS}};
-      for my $key(@allrds) {
-          readingsDelete($myHash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
-      }
+      deleteReadingspec ($myHash, "Today_Hour.*_PV.*");
+      #my @allrds = keys %{$myHash->{READINGS}};
+      #for my $key(@allrds) {
+      #    readingsDelete($myHash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
+      #}
   }
   
   ## aktuelle PV-Erzeugung
@@ -1798,6 +1803,9 @@ sub calcVariance {
       Log3($myName, 4, "$myName - Variance calculation in standby. It starts in $rmh hours."); 
       readingsSingleUpdate($myHash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
+  }
+  else {
+      readingsSingleUpdate($myHash, "pvCorrectionFactor_Auto", "on", 0);
   }  
 
   my @da;
