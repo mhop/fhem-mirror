@@ -705,9 +705,9 @@ sub _transferInverterValues {
   $indev      = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
-  my $tlim = "0|23";                                                                      # Stunde 23 -> bestimmte Aktionen
+  my $tlim = "0|23";                                                                          # Stunde 23 -> bestimmte Aktionen
   
-  if($chour =~ /$tlim/x) {
+  if($chour =~ /^($tlim)$/x) {
       my @allrds = keys %{$myHash->{READINGS}};
       for my $key(@allrds) {
           readingsDelete($myHash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
@@ -716,27 +716,27 @@ sub _transferInverterValues {
   
   ## aktuelle PV-Erzeugung
   #########################
-  my ($pvread,$pvunit) = split ":", $h->{pv};                                             # Readingname/Unit für aktuelle PV Erzeugung
-  my ($edread,$edunit) = split ":", $h->{etoday};                                         # Readingname/Unit für Tagesenergie
+  my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
+  my ($edread,$edunit) = split ":", $h->{etoday};                                             # Readingname/Unit für Tagesenergie
   
   Log3($myName, 5, "$myName - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etoday=$edread ($edunit)");
   
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
-  my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                  # aktuelle Erzeugung (W)  
+  my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
       
   push @$daref, "Current_PV:". $pv." W";                                          
   
   my $eduf   = $edunit =~ /^kWh$/xi ? 1000 : 1;
-  my $etoday = ReadingsNum ($indev, $edread, 0) * $eduf;                                  # aktuelle Erzeugung (W) 
+  my $etoday = ReadingsNum ($indev, $edread, 0) * $eduf;                                      # aktuelle Erzeugung (W) 
   
   my $edaypast   = 0;
-  for my $h (0..int($chour)-1) {                                                          # alle bisherigen Erzeugungen des Tages summieren                                            
+  for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
       $edaypast += ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
   my $ethishour  = $etoday - $edaypast;
   
-  push @$daref, "Today_Hour${chour}_PVreal:". $ethishour." Wh" if($chour !~ /$tlim/x);    # nicht setzen wenn Stunde 23 des Tages
+  push @$daref, "Today_Hour${chour}_PVreal:". $ethishour." Wh" if($chour !~ /^($tlim)$/x);    # nicht setzen wenn Stunde 23 des Tages
       
 return;
 }
