@@ -69,6 +69,7 @@ use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
 use Encode;
+use utf8;
 use Blocking;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;                 ## no critic 'eval'
@@ -139,6 +140,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.4.8"  => "16.12.2020  accep umlauts in calendar name ",
   "2.4.7"  => "08.12.2020  fix handle code recognition in createAtDevices as single line ",
   "2.4.6"  => "06.11.2020  bugfix weekly byDay ",
   "2.4.5"  => "03.11.2020  fix commandref wiki link ",
@@ -1401,7 +1403,7 @@ sub calOp_parse {                                                   ## no critic
                 $out    .= "<tr><td>  </td><td> </td><td> </td><td> </td><td> </td><td></tr>";
                 
                 while ($data->{data}[$i]) {
-                    $dnm = $data->{data}[$i]{cal_displayname};
+                    $dnm = encode("UTF-8", $data->{data}[$i]{cal_displayname});
                     next if (!$dnm);
                     $typ = "Event" if($data->{data}[$i]{is_evt});
                     $typ = "ToDo"  if($data->{data}[$i]{is_todo});
@@ -2352,7 +2354,7 @@ sub writeValuesToArray {                                                   ## no
       my @days;
       (undef, undef, undef, undef, undef, undef, $bWday, undef, undef) = localtime($btimes);
       if($lang eq "DE") {
-          @days = qw(Sontag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
+          @days = qw(Sonntag Montag Dienstag Mittwoch Donnerstag Freitag Samstag);
       } 
       else {
           @days = qw(Sunday Monday Tuesday Wednesday Thursday Friday Saturday);
