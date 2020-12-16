@@ -132,6 +132,21 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_20   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_21   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
+  moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
+);
+
+my %htilt = (                                                               # Neigungswinkel der Solarmodule
+  "0"  => 1.00,                                                               # https://www.labri.fr/perso/billaud/travaux/Helios/Helios2/resources/de04/Chapter_4_DE.pdf
+  "10" => 1.06,
+  "20" => 1.15,
+  "30" => 1.35,
+  "40" => 1.43,
+  "45" => 1.44,
+  "50" => 1.47,
+  "60" => 1.50,
+  "70" => 1.44,
+  "80" => 1.35,
+  "90" => 1.26
 );
 
 my @chours      = (5..21);                                                  # Stunden des Tages mit möglichen Korrekturwerten                              
@@ -240,6 +255,8 @@ sub Set {
       push @cfs, "pvCorrectionFactor_".sprintf("%02d",$h); 
   }
   $cf = join " ", @cfs if(@cfs);
+  
+  my $tilt = join ",", sort keys %htilt;
 
   $setlist = "Unknown argument $opt, choose one of ".
              "forecastDevice:$fcd ".
@@ -248,6 +265,7 @@ sub Set {
              "meterDevice ".
              "moduleArea ".
              "moduleEfficiency ".
+             "moduleTiltAngle:$tilt ".
              "pvCorrectionFactor_Auto:on,off ".
              $cf
              ;
@@ -379,6 +397,24 @@ sub _setmoduleEfficiency {               ## no critic "not used"
   $prop =~ s/,/./x;
 
   readingsSingleUpdate($hash, "moduleEfficiency", $prop, 1);
+
+return;
+}
+
+################################################################
+#                      Setter moduleTiltAngle
+################################################################
+sub _setmoduleTiltAngle {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no tilt angle was provided};
+
+  if($prop !~ /[0-9]/x) {
+      return qq{The tilt angle must be specified by numbers};
+  }
+
+  readingsSingleUpdate($hash, "moduleTiltAngle", $prop, 1);
 
 return;
 }
@@ -648,10 +684,10 @@ sub _transferForecastValues {
       $fh    = $fh - ($fd * 24); 
       
       next if($fd > 1);
-      
-      Log3($myName, 5, "$myName - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww");
 
       $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
+      
+      Log3($myName, 5, "$myName - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww, Val=$v");
       
       ## PV Forecast
       ###############
@@ -666,12 +702,12 @@ sub _transferForecastValues {
       
       my $calcpv = calcPVforecast ($myName, $v, $fh);                                         # Vorhersage gewichtet kalkulieren
       
-      push @$daref, "${time_str}_PVforecast:".$calcpv;
+      push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust     ($epoche);                       # Zeit fortschreiben 
       
-      $myHash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $calcpv;              # Vorhersagedaten zur Berechnung Korrekturfaktor in Helper speichern           
+      $myHash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";             # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
-      if($fd == 0 && $calcpv > 0) {                                                           # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+      if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv";               
       }
       
@@ -1770,13 +1806,18 @@ sub calcPVforecast {
   my $fh   = shift;                                                                     # Stunde des Tages 
   
   my $ma = ReadingsNum ($name, "moduleArea",                              0        );   # Solar Modulfläche (gesamt)
+  my $ta = ReadingsNum ($name, "moduleTiltAngle",                         45       );   # Neigungswinkel Solarmodule
   my $me = ReadingsNum ($name, "moduleEfficiency",                        $defpvme );   # Solar Modul Wirkungsgrad (%)
   my $ie = ReadingsNum ($name, "inverterEfficiency",                      $definve );   # Solar Inverter Wirkungsgrad (%)
   my $hc = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
   
-  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $me/100 * $ie/100 * $hc * 1000);
+  $hc    = 1 if(1*$hc == 0);
   
-return $pv." Wh";
+  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * 1000);
+ 
+  Log3($name, 5, "$name - calcPVforecast - Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", pvCorrectionFactor: $hc");
+  
+return $pv;
 }
 
 ################################################################
@@ -1786,7 +1827,7 @@ sub calcVariance {
   my $paref   = shift;
   my $myHash  = $paref->{myHash};
   my $myName  = $paref->{myName};
-  
+
   my $dcauto = ReadingsVal ($myName, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
       Log3($myName, 4, "$myName - automatic Variance calculation is switched off."); 
@@ -1814,9 +1855,14 @@ sub calcVariance {
       my $fcnum = int ((split " ", $fcval)[0]);
       next if(!$fcnum);
       
-      my $oldfac = ReadingsNum ($myName, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
       my $pvval  = ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      next if(!$pvval);
+      
+      my $oldfac = ReadingsNum ($myName, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
+      $oldfac    = 1 if(1*$oldfac == 0);
+      
       my $factor = sprintf "%.2f", ($pvval / $fcnum);                                             # Faktor reale PV / Prognose
+      Log3($myName, 5, "$myName - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
       
       if(abs($factor - $oldfac) > $maxvariance) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvariance : $oldfac - $maxvariance);
@@ -2073,6 +2119,15 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
       <li><b>moduleEfficiency &lt;Zahl&gt; </b> <br> 
       Wirkungsgrad der Solarmodule in %.  <br>
       (default: 16.52)      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="moduleTiltAngle"></a>
+      <li><b>moduleTiltAngle </b> <br> 
+      Neigungswinkel der Solarmodule (0 = waagerecht, 90 = senkrecht). <br>
+      (default: 45)      
       </li>
     </ul>
     <br>
