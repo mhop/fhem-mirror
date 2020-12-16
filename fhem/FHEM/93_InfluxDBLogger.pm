@@ -23,7 +23,7 @@ sub InfluxDBLogger_Initialize($) {
     $hash->{NotifyFn} = "InfluxDBLogger_Notify";
     $hash->{SetFn} = "InfluxDBLogger_Set";
     $hash->{RenameFn} = "InfluxDBLogger_Rename";
-    $hash->{AttrList} = "disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields api:v1,v2 org precision:ms,s,us,ns";
+    $hash->{AttrList} = "disable:1,0 security:basic_auth,none,token username readingInclude readingExclude conversions deviceTagName measurement tags fields api:v1,v2 org precision:ms,s,us,ns " . $readingFnAttributes;
     Log3 undef, 2, "InfluxDBLogger: Initialized new";
 }
 
