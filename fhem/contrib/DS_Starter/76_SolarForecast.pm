@@ -153,7 +153,7 @@ my @chours      = (5..21);                                                  # St
 my $defpvme     = 16.52;                                                    # default Wirkungsgrad Solarmodule
 my $definve     = 98.3;                                                     # default Wirkungsgrad Wechselrichter
 my $kJtokWh     = 0.00027778;                                               # Umrechnungsfaktor kJ in kWh
-my $maxvariance = 0.6;                                                      # max. Varianz pro Durchlauf Berechnung Autokorrekturfaktor
+my $maxvariance = 0.3;                                                      # max. Varianz pro Durchlauf Berechnung Autokorrekturfaktor
 my $definterval = 70;                                                       # Standard Abfrageintervall
   
 ################################################################
@@ -1828,6 +1828,7 @@ sub calcVariance {
   my $paref   = shift;
   my $myHash  = $paref->{myHash};
   my $myName  = $paref->{myName};
+  my $chour   = $paref->{chour};
 
   my $dcauto = ReadingsVal ($myName, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
@@ -1852,13 +1853,14 @@ sub calcVariance {
 
   my @da;
   for my $h (1..23) {
+      next if(!$chour || $h >= $chour);
       my $fcval = $myHash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
       my $fcnum = int ((split " ", $fcval)[0]);
       next if(!$fcnum);
-      
+ 
       my $pvval  = ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
-      
+
       my $oldfac = ReadingsNum ($myName, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
       $oldfac    = 1 if(1*$oldfac == 0);
       
@@ -1870,7 +1872,7 @@ sub calcVariance {
           Log3($myName, 4, "$myName - Use new limited Variance factor: $factor for hour: $h");
       }
       else {
-          Log3($myName, 4, "$myName - new Variance factor: $factor for hour: $h calculated");
+          Log3($myName, 4, "$myName - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
       }
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
