@@ -565,7 +565,8 @@ FW_Read($$)
   $arg = "" if(!defined($arg));
   Log3 $FW_wname, 4, "$name $method $arg; BUFLEN:".length($hash->{BUF});
   my $pf = AttrVal($FW_wname, "plotfork", undef);
-  $pf = 1 if(!defined($pf) && AttrVal($FW_wname, "plotEmbed", 0) == 2);
+  $pf = 1 if(!defined($pf) &&
+              AttrVal($FW_wname, "plotEmbed", ($numCPUs>1 ? 2:0)) == 2);
   if($pf) {
     my $p = $data{FWEXT};
     if(grep { $p->{$_}{FORKABLE} && $arg =~ m+^$FW_ME$_+ } keys %{$p}) {
@@ -2028,7 +2029,7 @@ FW_showRoom()
 
   # Now the "atEnds"
   my $doBC = (AttrVal($FW_wname, "plotfork", 0) &&
-              AttrVal($FW_wname, "plotEmbed", 0) == 0);
+              AttrVal($FW_wname, "plotEmbed", ($numCPUs>1 ? 2:0)) == 0);
   my %res;
   my ($idx,$svgIdx) = (1,1);
   @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
@@ -4040,10 +4041,11 @@ FW_log($$)
     <a name="plotEmbed"></a>
     <li>plotEmbed<br>
         If set to 1, SVG plots will be rendered as part of &lt;embed&gt;
-        tags, as in the past this was the only way to display SVG.  Setting
-        plotEmbed to 0 (the default) will render SVG in-place.<br>
+        tags, as in the past this was the only way to display SVG. Setting
+        plotEmbed to 0 will render SVG in-place.<br>
         Setting plotEmbed to 2 will load the SVG via JavaScript, in order to
         enable parallelization without the embed tag.
+        Default is 2 for multi-CPU hosts on Linux, and 0 everywhere else.
     </li><br>
 
     <a name="plotfork"></a>
@@ -4798,10 +4800,11 @@ FW_log($$)
     <li>plotEmbed<br>
         Falls 1, dann werden SVG Grafiken mit &lt;embed&gt; Tags
         gerendert, da auf &auml;lteren Browsern das die einzige
-        M&ouml;glichkeit war, SVG dastellen zu k&ouml;nnen. Falls 0 (die
-        Voreinstellung), dann werden die SVG Grafiken "in-place" gezeichnet.
-        Falls 2, dann werden die Grafiken per JavaScript nachgeladen, um eine
-        Parallelisierung auch ohne embed Tags zu erm&ouml;glichen.
+        M&ouml;glichkeit war, SVG dastellen zu k&ouml;nnen. Falls 0, dann
+        werden die SVG Grafiken "in-place" gezeichnet.  Falls 2, dann werden
+        die Grafiken per JavaScript nachgeladen, um eine Parallelisierung auch
+        ohne embed Tags zu erm&ouml;glichen.
+        Die Voreinstellung ist 2 auf Mehrprozessor-Linux-Rechner und 0 sonst.
     </li><br>
 
     <a name="plotfork"></a>

@@ -269,6 +269,7 @@ use vars qw(@authenticate);     # List of authentication devices
 use vars qw(@authorize);        # List of authorization devices
 use vars qw(@intAtA);           # Internal timer array
 use vars qw(@structChangeHist); # Contains the last 10 structural changes
+use vars qw($numCPUs);          # Number of CPUs on Linux, else 1
 
 use constant {
   DAYSECONDS    => 86400,
@@ -306,6 +307,8 @@ $init_done = 0;
 $lastDefChange = 0;
 $readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 $featurelevel = 6.0; # see also GlobalAttr
+$numCPUs = `grep -c ^processor /proc/cpuinfo 2>&1` if($^O eq "linux");
+$numCPUs = ($numCPUs && $numCPUs =~ m/(\d+)/ ? $1 : 1);
 
 
 $modules{Global}{ORDER} = -1;

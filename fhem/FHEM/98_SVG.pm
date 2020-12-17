@@ -195,7 +195,7 @@ SVG_getplotsize($)
 sub
 SVG_embed()
 {
-  return AttrVal($FW_wname, "plotEmbed", 0);
+  return AttrVal($FW_wname, "plotEmbed", ($numCPUs>1 ? 2:0));
 }
 
 sub
