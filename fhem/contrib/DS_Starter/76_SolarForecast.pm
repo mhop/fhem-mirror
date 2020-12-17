@@ -463,8 +463,8 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   my $fcdev  = ReadingsVal($name, "currentForecastDev", "");                                        # aktuelles Forecast Device
   
   my $params = {
-      myHash  => $hash,
-      myName  => $name,
+      hash  => $hash,
+      name  => $name,
       t       => $t,
       chour   => $chour,
       daref   => \@da
@@ -612,11 +612,11 @@ sub centralTask {
       my $chour = strftime "%H", localtime($t);                                                    # aktuelle Stunde
             
       my $params = {
-          myHash  => $hash,
-          myName  => $name,
-          t       => $t,
-          chour   => $chour,
-          daref   => \@da
+          hash  => $hash,
+          name  => $name,
+          t     => $t,
+          chour => $chour,
+          daref => \@da
       };
       
       _transferForecastValues ($params);                                                             # Forecast Werte übertragen                                           
@@ -654,29 +654,29 @@ return $interval;
 #    Werte Forecast Device ermitteln und übertragen
 ################################################################
 sub _transferForecastValues {               
-  my $paref   = shift;
-  my $myHash  = $paref->{myHash};
-  my $myName  = $paref->{myName};
-  my $t       = $paref->{t};
-  my $chour   = $paref->{chour};
-  my $daref   = $paref->{daref};
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
   
-  my $fcname  = ReadingsVal($myName, "currentForecastDev", "");                                 # aktuelles Forecast Device
+  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
   return if(!$fcname || !$defs{$fcname});
   
   my ($time_str,$epoche,$fd,$v);
   
-  my $fc0_SunRise = (split ":", ReadingsVal($fcname, "fc0_SunRise", "00:00"))[0];               # Sonnenaufgang heute    (hh)
-  my $fc0_SunSet  = (split ":", ReadingsVal($fcname, "fc0_SunSet",  "00:00"))[0];               # Sonnenuntergang heute  (hh)
-  my $fc1_SunRise = (split ":", ReadingsVal($fcname, "fc1_SunRise", "00:00"))[0];               # Sonnenaufgang morgen   (hh)
-  my $fc1_SunSet  = (split ":", ReadingsVal($fcname, "fc1_SunSet",  "00:00"))[0];               # Sonnenuntergang morgen (hh)
+  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
+  my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute  
+  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen   
+  my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen 
   
-  push @$daref, "Today_HourSunRise:".   $fc0_SunRise;
-  push @$daref, "Today_HourSunSet:".    $fc0_SunSet;
-  push @$daref, "Tomorrow_HourSunRise:".$fc1_SunRise;
-  push @$daref, "Tomorrow_HourSunSet:". $fc1_SunSet;
+  push @$daref, "Today_SunRise:".   $fc0_SunRise;
+  push @$daref, "Today_SunSet:".    $fc0_SunSet;
+  push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
+  push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
   
-  deleteReadingspec ($myHash, "NextHour.*");
+  deleteReadingspec ($hash, "NextHour.*");
   
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
@@ -687,7 +687,7 @@ sub _transferForecastValues {
 
       $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
-      Log3($myName, 5, "$myName - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww, Val=$v");
+      Log3($name, 5, "$name - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww, Val=$v");
       
       ## PV Forecast
       ###############
@@ -700,12 +700,12 @@ sub _transferForecastValues {
           $epoche   = $t + (3600*$num);
       }
       
-      my $calcpv = calcPVforecast ($myName, $v, $fh);                                         # Vorhersage gewichtet kalkulieren
+      my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
       
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust     ($epoche);                       # Zeit fortschreiben 
       
-      $myHash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";             # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
+      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";               # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";               
@@ -725,7 +725,7 @@ sub _transferForecastValues {
           $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
       }
       
-      $myHash->{HELPER}{"${time_str}_WeatherId"} = $wid;
+      $hash->{HELPER}{"${time_str}_WeatherId"} = $wid;
   }
       
 return;
@@ -735,25 +735,25 @@ return;
 #    Werte Inverter Device ermitteln und übertragen
 ################################################################
 sub _transferInverterValues {               
-  my $paref   = shift;
-  my $myHash  = $paref->{myHash};
-  my $myName  = $paref->{myName};
-  my $t       = $paref->{t};
-  my $chour   = $paref->{chour};
-  my $daref   = $paref->{daref};  
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};  
 
-  my $indev   = ReadingsVal($myName, "currentInverterDev", "");
-  my ($a,$h)  = parseParams ($indev);
-  $indev      = $a->[0] // "";
+  my $indev  = ReadingsVal($name, "currentInverterDev", "");
+  my ($a,$h) = parseParams ($indev);
+  $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
   my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen
   
   if($chour =~ /^($tlim)$/x) {
-      deleteReadingspec ($myHash, "Today_Hour.*_PV.*");
-      #my @allrds = keys %{$myHash->{READINGS}};
+      deleteReadingspec ($hash, "Today_Hour.*_PV.*");
+      #my @allrds = keys %{$hash->{READINGS}};
       #for my $key(@allrds) {
-      #    readingsDelete($myHash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
+      #    readingsDelete($hash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
       #}
   }
   
@@ -762,7 +762,7 @@ sub _transferInverterValues {
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$edunit) = split ":", $h->{etoday};                                             # Readingname/Unit für Tagesenergie
   
-  Log3($myName, 5, "$myName - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etoday=$edread ($edunit)");
+  Log3($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etoday=$edread ($edunit)");
   
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
   my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
@@ -774,8 +774,8 @@ sub _transferInverterValues {
   
   my $edaypast = 0;
   for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      deleteReadingspec ($myHash, "Today_Hour00_PV.*");
-      $edaypast += ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      deleteReadingspec ($hash, "Today_Hour00_PV.*");
+      $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
   my $ethishour  = $etoday - $edaypast;
@@ -789,23 +789,23 @@ return;
 #    Werte Meter Device ermitteln und übertragen
 ################################################################
 sub _transferMeterValues {               
-  my $paref   = shift;
-  my $myHash  = $paref->{myHash};
-  my $myName  = $paref->{myName};
-  my $t       = $paref->{t};
-  my $chour   = $paref->{chour};
-  my $daref   = $paref->{daref};  
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};  
 
-  my $medev   = ReadingsVal($myName, "currentMeterDev", "");                              # aktuelles Meter device
-  my ($a,$h)  = parseParams ($medev);
-  $medev      = $a->[0] // "";
+  my $medev  = ReadingsVal($name, "currentMeterDev", "");                              # aktuelles Meter device
+  my ($a,$h) = parseParams ($medev);
+  $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
   
   ## aktuelle Consumption
   #########################
   my ($gc,$gcunit) = split ":", $h->{gcon};                                               # Readingname/Unit für aktuellen Netzbezug
   
-  Log3($myName, 5, "$myName - collect Meter data: device=$medev, gcon=$gc ($gcunit)");
+  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit)");
   
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                        # aktueller Bezug (-) oder Einspeisung
@@ -820,7 +820,7 @@ return;
 ################################################################
 sub FwFn {
   my ($FW_wname, $d, $room, $pageHash) = @_;                       # pageHash is set for summaryFn.
-  my $hash   = $defs{$d};
+  my $hash = $defs{$d};
   my $height;
   
   RemoveInternalTimer($hash, \&pageRefresh);
@@ -859,8 +859,8 @@ return $ret;
 
 ################################################################
 sub pageRefresh { 
-  my ($hash) = @_;
-  my $d      = $hash->{NAME};
+  my $hash = shift;
+  my $d    = $hash->{NAME};
   
   # Seitenrefresh festgelegt durch SolarForecast-Attribut "autoRefresh" und "autoRefreshFW"
   my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
@@ -920,8 +920,9 @@ return;
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
 sub pageAsHtml { 
-  my ($hash,$ftui) = @_;
-  my $name         = $hash->{NAME};
+  my $hash = shift;
+  my $ftui = shift;
+  my $name = $hash->{NAME};
   my $height;
   
   my $link  = forecastGraphic ($name, $ftui);
@@ -1826,59 +1827,59 @@ return $pv;
 ################################################################
 sub calcVariance {               
   my $paref   = shift;
-  my $myHash  = $paref->{myHash};
-  my $myName  = $paref->{myName};
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $chour   = $paref->{chour};
 
-  my $dcauto = ReadingsVal ($myName, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
+  my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
-      Log3($myName, 4, "$myName - automatic Variance calculation is switched off."); 
+      Log3($name, 4, "$name - automatic Variance calculation is switched off."); 
       return;      
   }
   
-  my $idts = $myHash->{HELPER}{INVERTERDEFTS};                                            # FHEM Start oder Definitionstimestamp des Inverterdevice
+  my $idts = $hash->{HELPER}{INVERTERDEFTS};                                            # FHEM Start oder Definitionstimestamp des Inverterdevice
   return if(!$idts);
   
   my $t = time;                                                                           # aktuelle Unix-Zeit
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
-      Log3($myName, 4, "$myName - Variance calculation in standby. It starts in $rmh hours."); 
-      readingsSingleUpdate($myHash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
+      Log3($name, 4, "$name - Variance calculation in standby. It starts in $rmh hours."); 
+      readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
   }
   else {
-      readingsSingleUpdate($myHash, "pvCorrectionFactor_Auto", "on", 0);
+      readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on", 0);
   }  
 
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h >= $chour);
-      my $fcval = $myHash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
+      my $fcval = $hash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
       my $fcnum = int ((split " ", $fcval)[0]);
       next if(!$fcnum);
  
-      my $pvval  = ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvval  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
 
-      my $oldfac = ReadingsNum ($myName, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
+      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
       $oldfac    = 1 if(1*$oldfac == 0);
       
       my $factor = sprintf "%.2f", ($pvval / $fcnum);                                             # Faktor reale PV / Prognose
-      Log3($myName, 5, "$myName - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
+      Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
       
       if(abs($factor - $oldfac) > $maxvariance) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvariance : $oldfac - $maxvariance);
-          Log3($myName, 4, "$myName - Use new limited Variance factor: $factor for hour: $h");
+          Log3($name, 4, "$name - Use new limited Variance factor: $factor for hour: $h");
       }
       else {
-          Log3($myName, 4, "$myName - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
+          Log3($name, 4, "$name - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
       }
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
   }
   
-  createReadings ($myHash, \@da);
+  createReadings ($hash, \@da);
       
 return;
 }
