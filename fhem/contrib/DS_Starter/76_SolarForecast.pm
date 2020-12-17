@@ -455,7 +455,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   
   $prop =~ s/,/./x;
   
-  readingsSingleUpdate($hash, $opt, $prop." (manual set)", 1);
+  readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
   
   my @da;
   my $t      = time;                                                                                # aktuelle Unix-Zeit 
@@ -708,7 +708,7 @@ sub _transferForecastValues {
       $myHash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";             # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv";               
+          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";               
       }
       
       ## Wetter Forecast
@@ -772,8 +772,9 @@ sub _transferInverterValues {
   my $eduf   = $edunit =~ /^kWh$/xi ? 1000 : 1;
   my $etoday = ReadingsNum ($indev, $edread, 0) * $eduf;                                      # aktuelle Erzeugung (W) 
   
-  my $edaypast   = 0;
+  my $edaypast = 0;
   for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
+      deleteReadingspec ($myHash, "Today_Hour00_PV.*");
       $edaypast += ReadingsNum ($myName, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
@@ -1872,7 +1873,7 @@ sub calcVariance {
           Log3($myName, 4, "$myName - new Variance factor: $factor for hour: $h calculated");
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (auto calc)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
   }
   
   createReadings ($myHash, \@da);
