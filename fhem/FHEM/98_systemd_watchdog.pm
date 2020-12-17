@@ -48,6 +48,7 @@ sub systemd_watchdog_Initialize($) {
   $hash->{UndefFn}    = "watchdog_client_Undefine";
   $hash->{ShutdownFn} = "watchdog_client_Shutdown";
   $hash->{NotifyFn}   = "watchdog_client_Notify";
+  $hash->{AttrList}   = $readingFnAttributes;
 
   #Log3($hash->{NAME},5,"Watchdog Client: Debug: watchdog_client_Initialize");
   RemoveInternalTimer($hash);
@@ -86,7 +87,7 @@ sub watchdog_client_Define($$) {
   } else {
     $hash->{'systemd-watchdog'}="not available";
     $hash->{'.systemd'}=undef;
-    Log3($hash->{NAME},1,"Watchdog Client: systemd watchdog is not available. Module inactiv.");
+    Log3($hash->{NAME},1,"Watchdog Client: systemd watchdog is not available. Module inactive.");
   }
   # Initialize
   watchdog_client_Start($hash);
@@ -160,7 +161,7 @@ sub watchdog_client_Start($) {
   
   unless (watchdog_client_IsWDAvailable($hash)) {
     Log3($hash->{NAME},2,"Watchdog Client: no systemd watchdog available");
-    readingsSingleUpdate($hash,"state","inactiv",1);
+    readingsSingleUpdate($hash,"state","inactive",1);
     readingsSingleUpdate($hash,"next","none",1);
     return;
   }
