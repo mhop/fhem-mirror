@@ -603,8 +603,9 @@ MQTT2_DEVICE_addReading($$)
   my $cid = $defs{$name}{CID};
   my $dt = $defs{$name}{DEVICETOPIC};
   foreach my $line (split("\n", $param)) {
+    next if($line eq "");
     my ($re,$code) = split(" ", $line,2);
-    return "Bad line >$line< for $name" if(!defined($code));
+    return "ERROR: empty code in line >$line< for $name" if(!defined($code));
     my $errMsg = CheckRegexp($re, "readingList attribute for $name");
     return $errMsg if($errMsg);
 
