@@ -972,6 +972,8 @@ sub RSS_returnIMG($$) {
                     $defs{$name}{fhem}{bgnr} = $bgnr;
                     my $bgfile = $bgdir . "/" . $bgfiles[$bgnr];
                     my $filetype = ( split( /\./, $bgfile ) )[-1];
+                    readingsSingleUpdate($defs{$name}, "bgFilename", $bgfile, 1);
+                    readingsSingleUpdate($defs{$name}, "bgFiletype", $filetype, 1);
                     my $bg;
                     $bg = newFromGif GD::Image($bgfile)
                       if $filetype =~ m/^gif$/i;
@@ -1012,8 +1014,7 @@ sub RSS_returnIMG($$) {
                     }
                     else {
                         undef $S;
-                        $reason =
-"Something was wrong with background image \"$bgfile\".";
+                        $reason = "Something was wrong with background image \"$bgfile\".";
                     }
                 }
             }
