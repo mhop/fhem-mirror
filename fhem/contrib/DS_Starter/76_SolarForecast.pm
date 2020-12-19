@@ -754,10 +754,6 @@ sub _transferInverterValues {
   
   if($chour =~ /^($tlim)$/x) {
       deleteReadingspec ($hash, "Today_Hour.*_PV.*");
-      #my @allrds = keys %{$hash->{READINGS}};
-      #for my $key(@allrds) {
-      #    readingsDelete($hash, $key) if($key =~ m/^Today_Hour\d{2}_PVreal$/x);
-      #}
   }
   
   ## aktuelle PV-Erzeugung
