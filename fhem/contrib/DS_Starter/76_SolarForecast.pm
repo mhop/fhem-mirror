@@ -749,6 +749,9 @@ sub _transferInverterValues {
   
   my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen
   
+  my $sr = (split ":", ReadingsVal($name, "Today_SunRise", "00:00"))[0];                    
+  my $ss = (split ":", ReadingsVal($name, "Today_SunSet",  "00:00"))[0];                   
+  
   if($chour =~ /^($tlim)$/x) {
       deleteReadingspec ($hash, "Today_Hour.*_PV.*");
       #my @allrds = keys %{$hash->{READINGS}};
@@ -774,7 +777,10 @@ sub _transferInverterValues {
   
   my $edaypast = 0;
   for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      deleteReadingspec ($hash, "Today_Hour00_PV.*");
+      if($h <= int($sr)-3) {
+          readingsSingleUpdate($hash, "Today_Hour".sprintf("%02d",$h)."_PVreal", "0 Wh", 0);
+          next;
+      }
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
