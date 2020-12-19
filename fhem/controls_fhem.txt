@@ -1,4 +1,4 @@
-REV 23374
+REV 23378
 DIR unused
 UPD 2020-12-17_07:45:03 355302 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -63,7 +63,7 @@ UPD 2016-02-05_07:45:11 4427 FHEM/10_Itach_IR.pm
 UPD 2018-10-08_07:45:02 83806 FHEM/10_KNX.pm
 UPD 2016-12-22_07:45:02 36655 FHEM/10_KOPP_FC.pm
 UPD 2020-12-05_07:45:03 111758 FHEM/10_MAX.pm
-UPD 2020-12-15_07:45:02 35500 FHEM/10_MQTT2_DEVICE.pm
+UPD 2020-12-19_07:45:03 35543 FHEM/10_MQTT2_DEVICE.pm
 UPD 2018-09-18_07:45:02 11022 FHEM/10_MQTT_BRIDGE.pm
 UPD 2018-09-18_07:45:02 13548 FHEM/10_MQTT_DEVICE.pm
 UPD 2019-06-29_07:45:02 167185 FHEM/10_MQTT_GENERIC_BRIDGE.pm
@@ -637,7 +637,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2020-12-07_07:45:03 70503 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2020-12-16_07:45:03 301529 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2020-12-19_07:45:03 301764 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2020-03-24_07:45:03 10478 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
@@ -739,8 +739,8 @@ UPD 2020-12-18_07:45:06 4395310 docs/commandref.html
 UPD 2020-12-18_07:45:09 2714178 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2020-12-18_07:45:10 234272 docs/commandref_modular.html
-UPD 2020-12-18_07:45:11 245031 docs/commandref_modular_DE.html
+UPD 2020-12-19_07:45:10 234272 docs/commandref_modular.html
+UPD 2020-12-19_07:45:11 245031 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
