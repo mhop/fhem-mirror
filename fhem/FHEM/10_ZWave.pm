@@ -744,22 +744,22 @@ ZWave_Initialize($)
     classes
     disable:0,1
     disabledForIntervals
-    do_not_notify:noArg
-    dummy:noArg
+    do_not_notify:1,0
+    dummy:1,0
     eventForRaw
     extendedAlarmReadings:0,1,2
-    ignore:noArg
-    ignoreDupMsg:noArg
+    ignore:1,0
+    ignoreDupMsg:1,0
     neighborListPos
-    noExplorerFrames:noArg
-    noWakeupForApplicationUpdate:noArg
+    noExplorerFrames:1,0
+    noWakeupForApplicationUpdate:1,0
     secure_classes
     setExtensionsEvent:1,0
     setList
-    showtime:noArg
+    showtime:1,0
     vclasses
-    useMultiCmd:noArg
-    useCRC16:noArg
+    useMultiCmd:1,0
+    useCRC16:1,0
     zwaveRoute
   );
   use warnings 'qw';
