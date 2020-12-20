@@ -1271,12 +1271,11 @@ name:tasmota_2ch_shutter_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs some configuration of firmware compilation to operate, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_1 instead. 
 order:A_02b1
-par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
-set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 BCKLGCMND="LedState 2;; SetOption80 1;; Interlock 1,2;; Interlock ON;; SetOption81 1;; switchmode1 3;; switchmode2 3;; PulseTime1 0;; PulseTime2 0;; ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterInvert1 0;; SaveData 1;;" 
+par:BCKLGCMND;Command to be issued for configuration via backlog;{q(LedState 2;; SetOption80 1;; Interlock 1,2;; Interlock ON;; SetOption81 1;; switchmode1 3;; switchmode2 3;; PulseTime1 0;; PulseTime2 0;; ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterInvert1 0;; SaveData 1;;)} 
+set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 \BCKLGCMND=BCKLGCMND
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
 attr DEVICE model tasmota_2ch_shutter_invert_0
-setreading DEVICE attrTemplateVersion 20201219
+setreading DEVICE attrTemplateVersion 20201220
 
 
 # tasmota 4ch as double shutter device.
@@ -1285,10 +1284,10 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a four channel tasmota device as two shutters; needs some additional configuration via web-interface to operate properly, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,115859.0.html">Forum Thread</a><br>NOTE: This template will configure the shutters in Homematic-style with pct 100% = open. 
 order:A_02b2
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
-set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 CALLSPEECHRECOGN=0 BCKLGCMND="SetOption26 1;; SetOption80 1;; SetOption81 1;; ShutterRelay1 1;; ShutterRelay2 3;; PulseTime1 0;; PulseTime2 0;; PulseTime3 0;; PulseTime4 0;; SwitchMode1 3;; SwitchMode2 3;; SwitchMode3 3;; SwitchMode4 3;; Interlock 1,2 3,4;; Interlock 1;; StateText1 off ;; StateText2 on;; StateText3 toggle;; StateText4 hold;; ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterOpenDuration2 20;; ShutterCloseDuration2 20;; ShutterInvert1 0;; SaveData 1;;"
+par:BCKLGCMND;Command to be issued for configuration via backlog;{q(SetOption26 1;; SetOption80 1;; SetOption81 1;; ShutterRelay1 1;; ShutterRelay2 3;; PulseTime1 0;; PulseTime2 0;; PulseTime3 0;; PulseTime4 0;; SwitchMode1 3;; SwitchMode2 3;; SwitchMode3 3;; SwitchMode4 3;; Interlock 1,2 3,4;; Interlock 1;; StateText1 off ;; StateText2 on;; StateText3 toggle;; StateText4 hold;; ShutterOpenDuration1 20;; ShutterCloseDuration1 20;; ShutterOpenDuration2 20;; ShutterCloseDuration2 20;; ShutterInvert1 0;; SaveData 1;;)}
+set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 CALLSPEECHRECOGN=0 \BCKLGCMND=BCKLGCMND
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
 attr DEVICE_CH2 devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
@@ -1309,7 +1308,7 @@ attr DEVICE_CH2 readingList \
    STATTOPIC/SHUTTER2:.* state\
    STATTOPIC/SHUTTER2:.* pct
 attr DEVICE,DEVICE_CH2 model tasmota_4ch_two_shutters_invert_0
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20201219
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20201220
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
  
 
