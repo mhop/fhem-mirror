@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "2.19";
+my $version = "2.20";
 
 #-- these we may get on request
 my %gets = (
@@ -105,7 +105,8 @@ my %shelly_models = (
     "shellyplug" => [1,0,0,1],
     "shelly4" => [4,0,0,4],
     "shellyrgbw" => [0,0,4,1],
-    "shellydimmer" => [0,0,1,1]
+    "shellydimmer" => [0,0,1,1],
+    "shellyem" => [1,0,0,2]
     );
     
 my %shelly_regs = (
@@ -953,8 +954,8 @@ sub Shelly_pwd($){
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
   
-  #-- we have a Shelly 1/1pw, Shelly 4, Shelly 2/2.5  or ShellyPlug switch type device
-  if( ($model =~ /shelly1.*/) || ($model eq "shellyplug") || ($model eq "shelly4") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
+  #-- we have a Shelly 1/1pw, Shelly 4, Shelly 2/2.5,  ShellyPlug or ShellyEM switch type device
+  if( ($model =~ /shelly1.*/) || ($model eq "shellyplug") || ($model eq "shelly4") || ($model eq "shellyem") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
     for( my $i=0;$i<$channels;$i++){
       $subs = (($channels == 1) ? "" : "_".$i);
       $ison       = $jhash->{'relays'}[$i]{'ison'};
@@ -962,19 +963,25 @@ sub Shelly_pwd($){
       $ison =~ s/1|(true)/on/;
       $overpower = $jhash->{'relays'}[$i]{'overpower'};
       readingsBulkUpdateIfChanged($hash,"relay".$subs,$ison);
-      readingsBulkUpdateIfChanged($hash,"overpower".$subs,$overpower);
+      readingsBulkUpdateIfChanged($hash,"overpower".$subs,$overpower)
+        if(defined($overpower));
       if($model =~ /shelly(1|(plug)).*/){
         readingsBulkUpdateIfChanged($hash,"state",$ison)
       }else{
         readingsBulkUpdateIfChanged($hash,"state","OK");
       } 
     }
+    my $metern = ($model eq "shellyem")?"emeters":"meters";
     for( my $i=0;$i<$meters;$i++){
       $subs  = ($meters == 1) ? "" : "_".$i;
-      $power = $jhash->{'meters'}[$i]{'power'};
-      $energy = int($jhash->{'meters'}[$i]{'total'}/6)/10;
+      $power = $jhash->{$metern}[$i]{'power'};
+      $energy = int($jhash->{$metern}[$i]{'total'}/6)/10;
       readingsBulkUpdateIfChanged($hash,"power".$subs,$power);
       readingsBulkUpdateIfChanged($hash,"energy".$subs,$energy);
+      if ($model eq "shellyem") {
+        my $voltage = $jhash->{$metern}[$i]{'voltage'};
+        readingsBulkUpdateIfChanged($hash,'voltage'.$subs,$voltage);
+      }
     }
     
   #-- we have a Shelly 2 roller type device
@@ -1476,7 +1483,7 @@ sub Shelly_updown2($){
                 <br />set the value of a configuration register</li>
         <li>password &lt;password&gt;<br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
-        For Shelly switching devices (model=shelly1|shelly1pm|shelly4|shellyplug or (model=shelly2/2.5 and mode=relay)) 
+        For Shelly switching devices (model=shelly1|shelly1pm|shelly4|shellyplug|shellyem or (model=shelly2/2.5 and mode=relay)) 
         <ul>
             <li>
                 <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
