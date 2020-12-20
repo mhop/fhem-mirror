@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
   "0.7.5"  => "07.12.2020  minor fix avoid overtakers ",
   "0.7.4"  => "30.11.2020  add mtime, crtime to uploaded files ",
   "0.7.3"  => "29.11.2020  fix (prepare)Download without dest= option",
@@ -1673,7 +1674,8 @@ sub execOp_parse {
             };
             
             if($hmodep{$opmode} && defined &{$hmodep{$opmode}{fn}}) {
-                $ret = &{$hmodep{$opmode}{fn}} ($params) // q{};              
+                $ret = &{$hmodep{$opmode}{fn}} ($params) // q{};
+                undef $params;                
             } 
             else {
                 Log3($name, 1, qq{$name - ERROR - no operation parse function found for "$opmode"});
