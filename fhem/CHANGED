@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  Device::Firmata removed, use CPAN version (forum #114552)
  - bugfix:  10_FRM: Device::Firmata check (forum #114552 msg #1112141)
  - bugfix:  55_DWD_OpenData: forecast rotation (forum #83097 msg #1108423)
  - feature: 02_RSS: added readings to show filename and type of background
