@@ -28,25 +28,25 @@ sub TCM_CSUM($);
 sub TCM_Initialize($) {
   my ($hash) = @_;
   # Provider
-  $hash->{ReadFn}  = "TCM_Read";
+  $hash->{ReadFn} = "TCM_Read";
   $hash->{WriteFn} = "TCM_Write";
   $hash->{ReadyFn} = "TCM_Ready";
   $hash->{Clients} = ":EnOcean:";
   my %matchList= (
-    "1:EnOcean"   => "^EnOcean:",
+    "1:EnOcean" => "^EnOcean:",
   );
   $hash->{MatchList} = \%matchList;
   # Normal devices
-  $hash->{DefFn}    = "TCM_Define";
+  $hash->{DefFn} = "TCM_Define";
   $hash->{FingerprintFn} = "TCM_Fingerprint";
-  $hash->{UndefFn}  = "TCM_Undef";
-  $hash->{GetFn}    = "TCM_Get";
-  $hash->{SetFn}    = "TCM_Set";
+  $hash->{UndefFn} = "TCM_Undef";
+  $hash->{GetFn} = "TCM_Get";
+  $hash->{SetFn} = "TCM_Set";
   $hash->{NotifyFn} = "TCM_Notify";
-  $hash->{AttrFn}   = "TCM_Attr";
+  $hash->{AttrFn} = "TCM_Attr";
   $hash->{AttrList} = "assignIODev:select,no,yes baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
-                      "sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
+                      "msgCounter:select,off,on sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
   $hash->{ShutdownFn} = "TCM_Shutdown";
   $hash->{NotifyOrderPrefix} = "45-";
@@ -76,6 +76,7 @@ sub TCM_Define($$) {
     $attr{$name}{dummy} = 1;
     return undef;
   }
+  InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
   my $ret = DevIo_OpenDev($hash, 0, undef);
   return $ret;
 }
@@ -314,6 +315,7 @@ sub TCM_Write($$$$) {
     #Log3 $name, 5, "TCM $name awaitCmdResp: " . join(' ', @{$hash->{helper}{awaitCmdResp}});
   }
   Log3 $name, 5, "TCM $name sent ESP: $bstring";
+  push(@{$hash->{helper}{sndCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
   usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
@@ -437,6 +439,7 @@ sub TCM_Read($) {
          }
       }
       $data = $rest;
+      push(@{$hash->{helper}{rcvCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     }
 
     if(length($data) >= 4) {
@@ -614,6 +617,7 @@ sub TCM_Read($) {
       }
 
       $data = $rest;
+      push(@{$hash->{helper}{rcvCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     }
 
     if(length($data) >= 4) {
@@ -1247,19 +1251,67 @@ sub TCM_ReadAnswer($$) {
 sub TCM_BlockSenderID($$$) {
   my ($hash, $blockSenderID, $senderID) = @_;
   return undef if ($blockSenderID eq 'no');
-  my $name = $hash->{NAME};
+  return undef if (!exists $modules{"$hash->{TYPE}"}{BaseID});
   foreach (@{$modules{"$hash->{TYPE}"}{BaseID}}) {
     if (hex($_) == (hex($senderID) & 0xFFFFFF80)) {
-      Log3 $name, 4, "TCM $name received own telegram from SenderID $senderID blocked.";
+      Log3 $hash->{NAME}, 4, "TCM $hash->{NAME} received own telegram from SenderID $senderID blocked.";
       return 1;
     }
   }
+  return undef if (!exists $modules{"$hash->{TYPE}"}{ChipID});
   foreach (@{$modules{"$hash->{TYPE}"}{ChipID}}) {
     if (hex($_) == hex($senderID)) {
-      Log3 $name, 4, "TCM $name received own telegram from $senderID blocked.";
+      Log3 $hash->{NAME}, 4, "TCM $hash->{NAME} received own telegram from $senderID blocked.";
       return 1;
     }
   }
+  return undef;
+}
+
+#
+sub TCM_msgCounter($) {
+  my $hash = shift(@_);
+  my $timeNow = gettimeofday();
+  my ($count, $countPerDay, $countPerHour, $countPerMin);
+  RemoveInternalTimer($hash, 'TCM_msgCounter');
+  if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'off') {
+    delete $hash->{MsgRcvPerDay};
+    delete $hash->{MsgRcvPerHour};
+    delete $hash->{MsgRcvPerMin};
+    delete $hash->{MsgSndPerDay};
+    delete $hash->{MsgSndPerHour};
+    delete $hash->{MsgSndPerMin};
+    return undef;
+  }
+  # receive counter
+  if (exists $hash->{helper}{rcvCounter}) {
+    ($count, $countPerDay, $countPerHour, $countPerMin) = (0, 0, 0, 0);
+    foreach my $timestamp (@{$hash->{helper}{rcvCounter}}) {
+      $countPerDay = $count if ($timestamp < $timeNow - 86400);
+      $countPerHour = $count if ($timestamp < $timeNow - 3600);
+      $countPerMin = $count if ($timestamp < $timeNow - 60);
+      $count ++;
+    }
+    splice(@{$hash->{helper}{rcvCounter}}, 0, $countPerDay);
+    $hash->{MsgRcvPerDay} = $#{$hash->{helper}{rcvCounter}};
+    $hash->{MsgRcvPerHour} = $hash->{MsgRcvPerDay} + $countPerDay - $countPerHour;
+    $hash->{MsgRcvPerMin} = $hash->{MsgRcvPerDay} + $countPerDay - $countPerMin;
+  }
+  # send counter
+  if (exists $hash->{helper}{sndCounter}) {
+    ($count, $countPerDay, $countPerHour, $countPerMin) = (0, 0, 0, 0);
+    foreach my $timestamp (@{$hash->{helper}{sndCounter}}) {
+      $countPerDay = $count if ($timestamp < $timeNow - 86400);
+      $countPerHour = $count if ($timestamp < $timeNow - 3600);
+      $countPerMin = $count if ($timestamp < $timeNow - 60);
+      $count ++;
+    }
+    splice(@{$hash->{helper}{sndCounter}}, 0, $countPerDay);
+    $hash->{MsgSndPerDay} = $#{$hash->{helper}{sndCounter}};
+    $hash->{MsgSndPerHour} = $hash->{MsgSndPerDay} + $countPerDay - $countPerHour;
+    $hash->{MsgSndPerMin} = $hash->{MsgSndPerDay} + $countPerDay - $countPerMin;
+  }
+  InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
   return undef;
 }
 
@@ -1348,6 +1400,19 @@ sub TCM_Attr(@) {
       CommandDeleteAttr(undef, "$name $attrName");
     }
 
+  } elsif ($attrName eq "msgCounter") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal eq 'off') {
+      RemoveInternalTimer($hash, 'TCM_msgCounter');
+    } elsif ($attrVal eq 'on') {
+      RemoveInternalTimer($hash, 'TCM_msgCounter');
+      InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
+    } else {
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
   } elsif ($attrName eq "sendInterval") {
     if (!defined $attrVal){
 
@@ -1382,6 +1447,8 @@ sub TCM_Notify(@) {
   my ($hash, $dev) = @_;
   if ($dev->{TYPE} eq 'Global' && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
   #if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
+    RemoveInternalTimer($hash, 'TCM_msgCounter');
+    InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     TCM_InitSerialCom($hash);
     my $assignIODevFlag = AttrVal($hash->{NAME}, 'assignIODev', undef);
     if (defined $assignIODevFlag) {
@@ -1411,7 +1478,9 @@ sub TCM_Notify(@) {
           }
         }
       }
-      Log3 $hash->{NAME}, 2, "TCM registered transceiver BaseID: " . join(':', @{$modules{"$hash->{TYPE}"}{BaseID}}) . " ChipID: " . join(':', @{$modules{"$hash->{TYPE}"}{ChipID}});
+      if (exists($modules{"$hash->{TYPE}"}{BaseID}) && exists($modules{"$hash->{TYPE}"}{ChipID})) {
+       Log3 $hash->{NAME}, 2, "TCM registered transceiver BaseID: " . join(':', @{$modules{"$hash->{TYPE}"}{BaseID}}) . " ChipID: " . join(':', @{$modules{"$hash->{TYPE}"}{ChipID}});
+      }
     }
   }
   return undef;
@@ -1443,6 +1512,7 @@ sub TCM_Undef($$) {
       last;
     }
   }
+  RemoveInternalTimer($hash, 'TCM_msgCounter');
   delete $hash->{helper}{init_done};
   return undef;
 }
@@ -1785,6 +1855,11 @@ sub TCM_Shutdown($) {
       [learningMode] = always: Teach-In/Teach-Out telegrams always accepted, with the exception of bidirectional devices<br>
       [learningMode] = demand: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode, see also <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br>
       [learningMode] = nearfield: Teach-In/Teach-Out telegrams accepted if Fhem is in learning mode and the signal strength RSSI >= -60 dBm.<be>
+    </li>
+    <li><a name="TCM_msgCounter">msgCounter</a> &lt;off|on&gt;,
+      [msgCounter] = off is default.<br>
+      Counts the received and sent messages in the last day, last hour, and minute, see internals MsgRcvPerDay, MsgSndPerDay,
+      MsgRcvPerHour, MsgSndPerHour, MsgRcvPerMin MsgSndPerMin.
     </li>
     <li><a name="TCM_sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
       ESP2: [sendInterval] = 100 ms is default.<br>
