@@ -2933,7 +2933,7 @@ sub EnOcean_Set($@) {
           readingsEndUpdate($hash, 0);
           # stop PID regulator
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointTempSet");
+          readingsDelete($hash, "setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
         } else {
@@ -2952,7 +2952,7 @@ sub EnOcean_Set($@) {
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'off') eq 'on' ? 'start' : 'stop';
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointSet");
+          readingsDelete($hash, "setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
         } else {
@@ -2967,8 +2967,8 @@ sub EnOcean_Set($@) {
         readingsEndUpdate($hash, 0);
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTempSet");
         Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
 
@@ -2991,7 +2991,7 @@ sub EnOcean_Set($@) {
           readingsEndUpdate($hash, 0);
           # stop PID regulator
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointTempSet");
+          readingsDelete($hash, "setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
         } else {
@@ -3010,7 +3010,7 @@ sub EnOcean_Set($@) {
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 'start' : 'stop';
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointSet");
+          readingsDelete($hash, "setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
         } else {
@@ -3024,8 +3024,8 @@ sub EnOcean_Set($@) {
         readingsEndUpdate($hash, 0);
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTempSet");
         Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
 
@@ -3050,7 +3050,7 @@ sub EnOcean_Set($@) {
           readingsEndUpdate($hash, 0);
           # stop PID regulator
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointTempSet");
+          readingsDelete($hash, "setpointTempSet");
           Log3 $name, 3, "EnOcean set $name $cmd $a[1]";
           shift(@a);
         } else {
@@ -3069,7 +3069,7 @@ sub EnOcean_Set($@) {
           # PID regulator active
           my $activatePID = AttrVal($name, 'pidCtrl', 'off') eq 'on' ? 'start' : 'stop';
           ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, $activatePID, undef, 'temperature', 'setpoint', 'Temp');
-          CommandDeleteReading(undef, "$name setpointSet");
+          readingsDelete($hash, "setpointSet");
           Log3 $name, 3, "EnOcean set $name $cmd $setpointTemp";
           shift(@a);
         } else {
@@ -3084,9 +3084,9 @@ sub EnOcean_Set($@) {
         readingsEndUpdate($hash, 0);
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name alarm");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "alarm");
         RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
         Log3 $name, 3, "EnOcean set $name $cmd";
         $updateState = 2;
@@ -4096,12 +4096,12 @@ sub EnOcean_Set($@) {
         $updateState = 0;
       } elsif ($ctrlFuncID == 1) {
         # off
-        CommandDeleteReading(undef, "$name scene");
+        readingsDelete($hash, "scene");
         SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 2) {
         # on
-        CommandDeleteReading(undef, "$name scene");
+        readingsDelete($hash, "scene");
         SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 3 || $ctrlFuncID == 4) {
@@ -4119,12 +4119,12 @@ sub EnOcean_Set($@) {
         $ctrlParam3 = $rampTime & 0xFF;
         $ctrlParam2 = ($rampTime & 0xFF00) >> 8;
         readingsSingleUpdate($hash, "rampTime", $rampTime, 1);
-        CommandDeleteReading(undef, "$name scene");
+        readingsDelete($hash, "scene");
         SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 5) {
         # stop
-        CommandDeleteReading(undef, "$name scene");
+        readingsDelete($hash, "scene");
         SetExtensionsCancel($hash);
         $updateState = 0;
       } elsif ($ctrlFuncID == 6) {
@@ -4147,7 +4147,7 @@ sub EnOcean_Set($@) {
         }
         $ctrlParam3 = $rampTime & 0xFF;
         $ctrlParam2 = ($rampTime & 0xFF00) >> 8;
-        CommandDeleteReading(undef, "$name scene");
+        readingsDelete($hash, "scene");
         readingsSingleUpdate($hash, "rampTime", $rampTime, 1);
         SetExtensionsCancel($hash);
         $updateState = 0;
@@ -4383,8 +4383,8 @@ sub EnOcean_Set($@) {
         } elsif ($cmd eq "stop") {
           # stop
           # delete readings, as they are undefined
-          CommandDeleteReading(undef, "$name anglePos");
-          CommandDeleteReading(undef, "$name position");
+          readingsDelete($hash, "anglePos");
+          readingsDelete($hash, "position");
           readingsSingleUpdate($hash, "endPosition", "not_reached", 1);
           readingsSingleUpdate($hash, "state", "stop", 1);
           $shutCmd = 0;
@@ -5836,7 +5836,7 @@ sub EnOcean_Set($@) {
         }
 
       } elsif ($cmd eq "clearCmds") {
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "waitingCmds");
         Log3 $name, 3, "EnOcean set $name $cmd";
 
       } else {
@@ -5902,7 +5902,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "state", "T: $temperature H: $humidity SPT: $setpointTemp F: $fanSpeed");
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 1);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointTemp $a[1]";
             shift(@a);
           } else {
@@ -5926,7 +5926,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "setpointShiftMax", $setpointShiftMax);
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 2);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointShiftMax $a[1]";
             shift(@a);
           } else {
@@ -5944,7 +5944,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "setpointType", $setpointType);
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x80);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name setpointType $a[1]";
             shift(@a);
           } else {
@@ -5963,7 +5963,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "state", "T: $temperature H: $humidity SPT: $setpointTemp F: $fanSpeed");
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 4);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name fanSpeed $a[1]";
             shift(@a);
           } else {
@@ -5985,7 +5985,7 @@ sub EnOcean_Set($@) {
             }
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x20);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name cooling $a[1]";
             shift(@a);
          } else {
@@ -6007,7 +6007,7 @@ sub EnOcean_Set($@) {
             }
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x40);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name heating $a[1]";
             shift(@a);
           } else {
@@ -6025,7 +6025,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "occupancy", $a[1]);
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 8);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name occupancy $a[1]";
             shift(@a);
          } else {
@@ -6043,7 +6043,7 @@ sub EnOcean_Set($@) {
             readingsBulkUpdate($hash, "window", $a[1]);
             readingsBulkUpdate($hash, "waitingCmds", $waitingCmds |= 0x10);
             readingsEndUpdate($hash, 1);
-            CommandDeleteReading(undef, "$name smartAckMailbox");
+            readingsDelete($hash, "smartAckMailbox");
             Log3 $name, 3, "EnOcean set $name window $a[1]";
             shift(@a);
          } else {
@@ -7827,7 +7827,7 @@ sub EnOcean_Parse($$) {
           EnOcean_CommandSave(undef, undef);
         }
         push @event, "3:state:" . ($db[0] & 1 ? "closed" : "open");
-        CommandDeleteReading(undef, "$name alarm");
+        readingsDelete($hash, "alarm");
         if (AttrVal($name, "signOfLife", 'off') eq 'on') {
           RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
           @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
@@ -8034,7 +8034,7 @@ sub EnOcean_Parse($$) {
       push @event, "3:energyStorage:$energyStorage";
       my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       if ($db[2] & 4) {
-        CommandDeleteReading(undef, "$name roomTemp");
+        readingsDelete($hash, "roomTemp");
       } else {
         $roomTemp = $db[1] * 40 / 255;
         push @event, "3:roomTemp:" . sprintf "%0.1f", $roomTemp;
@@ -8055,13 +8055,13 @@ sub EnOcean_Parse($$) {
       my $functionSelect = 0;
       my $setpointSelect = 0;
       my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
-      CommandDeleteReading(undef, "$name setpointSetRestore");
+      readingsDelete($hash, "setpointSetRestore");
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
       my $temperature = ReadingsVal($name, 'temperature', $roomTemp);
       if (!defined(AttrVal($name, "temperatureRefDev", undef))) {
         if ($db[2] & 4) {
-          CommandDeleteReading(undef, "$name temperature");
+          readingsDelete($hash, "temperature");
         } else {
           $temperature = $roomTemp;
           readingsSingleUpdate($hash, 'temperature', sprintf("%0.1f", $temperature), 1);
@@ -8093,7 +8093,7 @@ sub EnOcean_Parse($$) {
         # ignore all commands
         if ($waitingCmds ne "summerMode") {
           $waitingCmds = "no_change";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
         }
         if ($manufID eq '049') {
           $wakeUpCycle = 28800;
@@ -8103,7 +8103,7 @@ sub EnOcean_Parse($$) {
       }
       readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
       # set alarm timer
-      CommandDeleteReading(undef, "$name alarm");
+      readingsDelete($hash, "alarm");
       RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
       @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
       InternalTimer(gettimeofday() + $wakeUpCycle * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
@@ -8166,10 +8166,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:valveOpend:runInit";
         push @event, "3:operationMode:off";
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $functionSelect = 1;
         $waitingCmds = 0x20;
 
@@ -8191,15 +8191,15 @@ sub EnOcean_Parse($$) {
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
           push @event, "3:maintenanceMode:valveClosed";
           push @event, "3:operationMode:off";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
           $functionSelect = 1;
           $waitingCmds = 0x10;
         }
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
 
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
@@ -8213,10 +8213,10 @@ sub EnOcean_Parse($$) {
         push @event, "3:maintenanceMode:runInit";
         push @event, "3:operationMode:off";
         push @event, "3:waitingCmds:$operationMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        #CommandDeleteReading(undef, "$name setpointTemp");
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        #CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        #readingsDelete($hash, "setpointTemp");
+        #readingsDelete($hash, "setpointTempSet");
+        #readingsDelete($hash, "waitingCmds");
         $functionSelect = 1;
         $waitingCmds = 0x80;
 
@@ -8232,10 +8232,10 @@ sub EnOcean_Parse($$) {
         push @event, "3:maintenanceMode:listSet";
         push @event, "3:operationMode:off";
         push @event, "3:waitingCmds:$operationMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        #CommandDeleteReading(undef, "$name setpointTemp");
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        #CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        #readingsDelete($hash, "setpointTemp");
+        #readingsDelete($hash, "setpointTempSet");
+        #readingsDelete($hash, "waitingCmds");
         $functionSelect = 1;
         $waitingCmds = 0x40;
 
@@ -8254,9 +8254,9 @@ sub EnOcean_Parse($$) {
           $db[2] = (40 - $temperature) * 255 / 40;
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpoint";
-          CommandDeleteReading(undef, "$name setpointTemp");
-          CommandDeleteReading(undef, "$name setpointTempSet");
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "setpointTemp");
+          readingsDelete($hash, "setpointTempSet");
+          readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8288,7 +8288,7 @@ sub EnOcean_Parse($$) {
           push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpointTemp";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8303,10 +8303,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } elsif ($operationMode eq "setpoint") {
@@ -8376,10 +8376,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:valveOpend:runInit";
         push @event, "3:operationMode:off";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        #CommandDeleteReading(undef, "$name setpointTemp");
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        #CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        #readingsDelete($hash, "setpointTemp");
+        #readingsDelete($hash, "setpointTempSet");
+        #readingsDelete($hash, "waitingCmds");
         $functionSelect = 1;
         $waitingCmds = 0x20;
 
@@ -8391,10 +8391,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:valveClosed";
         push @event, "3:operationMode:off";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        #CommandDeleteReading(undef, "$name setpointTemp");
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        #CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        #readingsDelete($hash, "setpointTemp");
+        #readingsDelete($hash, "setpointTempSet");
+        #readingsDelete($hash, "waitingCmds");
         $functionSelect = 1;
         $waitingCmds = 0x10;
 
@@ -8447,7 +8447,7 @@ sub EnOcean_Parse($$) {
       } else {
         if ($db[0] & 0x80) {
           # temperature measurement inactive
-          CommandDeleteReading(undef, "$name feedTemp");
+          readingsDelete($hash, "feedTemp");
         } else {
           $feedTemp = $db[2] * 60 / 255 + 20;
           push @event, "3:feedTemp:" . sprintf("%0.1f", $feedTemp);
@@ -8459,17 +8459,17 @@ sub EnOcean_Parse($$) {
           push @event, "3:alarm:" . $failureCode{$db[1]};
           $battery = "empty" if ($db[1] == 18);
         } else {
-          CommandDeleteReading(undef, "$name alarm");
+          readingsDelete($hash, "alarm");
         }
       } else {
         if ($db[0] & 0x80) {
           # temperature measurement inactive
-          CommandDeleteReading(undef, "$name roomTemp");
+          readingsDelete($hash, "roomTemp");
         } else {
           # room temperature
           $roomTemp = sprintf("%0.1f", ($db[1] * 20 / 255 + 10));
           push @event, "3:roomTemp:$roomTemp";
-          CommandDeleteReading(undef, "$name alarm");
+          readingsDelete($hash, "alarm");
         }
       }
       if (!defined(AttrVal($name, "temperatureRefDev", undef))) {
@@ -8514,7 +8514,7 @@ sub EnOcean_Parse($$) {
       } elsif ($summerMode eq 'on') {
         if ($waitingCmds ne "summerMode") {
           $waitingCmds = "no_change";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
         }
         $setpointSet = 100;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
@@ -8553,10 +8553,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:valveOpend:runInit";
         push @event, "3:operationMode:off";
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 1;
 
       } elsif ($waitingCmds eq "valveCloses") {
@@ -8571,14 +8571,14 @@ sub EnOcean_Parse($$) {
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
           push @event, "3:maintenanceMode:valveClosed";
           push @event, "3:operationMode:off";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
           $waitingCmds = 3;
         }
         # stop PID regulator
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
 
       } elsif ($waitingCmds eq "runInit") {
         # deactivate PID regulator
@@ -8587,10 +8587,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:runInit";
         push @event, "3:operationMode:off";
-        CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 2;
 
       } elsif ($waitingCmds eq "setpoint") {
@@ -8605,10 +8605,10 @@ sub EnOcean_Parse($$) {
         } else {
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpoint";
-          #CommandDeleteReading(undef, "$name setpointSet");
-          CommandDeleteReading(undef, "$name setpointTemp");
-          CommandDeleteReading(undef, "$name setpointTempSet");
-          CommandDeleteReading(undef, "$name waitingCmds");
+          #readingsDelete($hash, "setpointSet");
+          readingsDelete($hash, "setpointTemp");
+          readingsDelete($hash, "setpointTempSet");
+          readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8629,9 +8629,9 @@ sub EnOcean_Parse($$) {
           push @event, "3:setpointTemp:$setpointTemp";
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpointTemp";
-          #CommandDeleteReading(undef, "$name setpointSet");
-          #CommandDeleteReading(undef, "$name setpointTempSet");
-          CommandDeleteReading(undef, "$name waitingCmds");
+          #readingsDelete($hash, "setpointSet");
+          #readingsDelete($hash, "setpointTempSet");
+          readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8642,10 +8642,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } elsif ($operationMode eq "setpoint") {
@@ -8660,10 +8660,10 @@ sub EnOcean_Parse($$) {
         } else {
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpoint";
-          #CommandDeleteReading(undef, "$name setpointSet");
-          #CommandDeleteReading(undef, "$name setpointTemp");
-          #CommandDeleteReading(undef, "$name setpointTempSet");
-          #CommandDeleteReading(undef, "$name waitingCmds");
+          #readingsDelete($hash, "setpointSet");
+          #readingsDelete($hash, "setpointTemp");
+          #readingsDelete($hash, "setpointTempSet");
+          #readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8683,9 +8683,9 @@ sub EnOcean_Parse($$) {
           push @event, "3:setpointTemp:$setpointTemp";
           push @event, "3:maintenanceMode:off";
           push @event, "3:operationMode:setpointTemp";
-          #CommandDeleteReading(undef, "$name setpointSet");
-          #CommandDeleteReading(undef, "$name setpointTempSet");
-          #CommandDeleteReading(undef, "$name waitingCmds");
+          #readingsDelete($hash, "setpointSet");
+          #readingsDelete($hash, "setpointTempSet");
+          #readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
 
@@ -8696,10 +8696,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        #CommandDeleteReading(undef, "$name setpointTemp");
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        #CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        #readingsDelete($hash, "setpointTemp");
+        #readingsDelete($hash, "setpointTempSet");
+        #readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } else {
@@ -8737,11 +8737,11 @@ sub EnOcean_Parse($$) {
       if ($db[0] & 0x80) {
         $feedTemp = $db[1] / 2;
         push @event, "3:feedTemp:" . sprintf "%0.1f", $db[1] / 2;
-        CommandDeleteReading(undef, "$name roomTemp");
+        readingsDelete($hash, "roomTemp");
       } else {
         $roomTemp = $db[1] / 2;
         push @event, "3:roomTemp:" . sprintf "%0.1f", $db[1] / 2;
-        CommandDeleteReading(undef, "$name feedTemp");
+        readingsDelete($hash, "feedTemp");
       }
       my $setpoint = $db[3];
       push @event, "3:setpoint:$setpoint";
@@ -8753,7 +8753,7 @@ sub EnOcean_Parse($$) {
       my $functionSelect = 0;
       my $setpointSelect = 0;
       my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
-      CommandDeleteReading(undef, "$name setpointSetRestore");
+      readingsDelete($hash, "setpointSetRestore");
       my $setpointTemp = ReadingsVal($name, "setpointTemp", 20);
       my $setpointTempSet = ReadingsVal($name, "setpointTempSet", $setpointTemp);
       my %setpointTempOffset = (0 => 0, 1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 0x7B => -5, 0x7C => -4, 0x7D => -3, 0x7E => -2, 0x7F => -1);
@@ -8774,7 +8774,7 @@ sub EnOcean_Parse($$) {
       my $temperature = ReadingsVal($name, 'temperature', $roomTemp);
       if (!defined(AttrVal($name, "temperatureRefDev", undef))) {
         if ($db[0] & 0x80) {
-          CommandDeleteReading(undef, "$name temperature");
+          readingsDelete($hash, "temperature");
         } else {
           $temperature = $roomTemp;
           readingsSingleUpdate($hash, 'temperature', sprintf("%0.1f", $temperature), 1);
@@ -8806,13 +8806,13 @@ sub EnOcean_Parse($$) {
         # ignore all commands
         if ($waitingCmds ne "summerMode") {
           $waitingCmds = "no_change";
-          CommandDeleteReading(undef, "$name waitingCmds");
+          readingsDelete($hash, "waitingCmds");
         }
         $wakeUpCycle = 28800;
       }
       readingsSingleUpdate($hash, 'wakeUpCycle', $wakeUpCycle, 1);
       # set alarm timer
-      CommandDeleteReading(undef, "$name alarm");
+      readingsDelete($hash, "alarm");
       if ($waitingCmds ne "standby") {
         RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3);
@@ -8898,9 +8898,9 @@ sub EnOcean_Parse($$) {
         ($err, $logLevel, $response) = EnOcean_setPID(undef, $hash, 'stop', undef, 'temperature', 'setpoint', 'Temp');
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:setpoint";
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } elsif ($waitingCmds eq "setpointTemp") {
@@ -8919,8 +8919,8 @@ sub EnOcean_Parse($$) {
         push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:setpointTemp";
-        #CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } elsif ($waitingCmds eq "summerMode") {
@@ -8933,10 +8933,10 @@ sub EnOcean_Parse($$) {
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
         push @event, "3:maintenanceMode:off";
         push @event, "3:operationMode:summerMode";
-        #CommandDeleteReading(undef, "$name setpointSet");
-        CommandDeleteReading(undef, "$name setpointTemp");
-        CommandDeleteReading(undef, "$name setpointTempSet");
-        CommandDeleteReading(undef, "$name waitingCmds");
+        #readingsDelete($hash, "setpointSet");
+        readingsDelete($hash, "setpointTemp");
+        readingsDelete($hash, "setpointTempSet");
+        readingsDelete($hash, "waitingCmds");
         $waitingCmds = 0;
 
       } elsif ($operationMode eq "setpoint") {
@@ -9211,7 +9211,6 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "vocSensor.01") {
       # Gas Sensor, VOC Sensor (EEP A5-09-05, A5-09-0C)
-      # [untested]
       # $db[3]_bit_7 ... $db[2]_bit_0 is the VOC concentration where 0 = 0 ppb ... 65535 = 65535 ppb
       # $db[1] is the VOC identification
       # $db[0]_bit_1 ... $db[0]_bit_0 is the scale multiplier
@@ -9270,7 +9269,7 @@ sub EnOcean_Parse($$) {
         push @event, "3:vocName:unknown";
       }
       push @event, "3:concentration:$vocConc";
-      push @event, "3:concentrationUnit:" . $db[0] & 4 ? 'ug/m3' : 'ppb';
+      push @event, "1:concentrationUnit:" . ($db[0] & 4 ? 'ug/m3' : 'ppb');
       push @event, "3:state:$vocConc";
 
     } elsif ($st eq "particlesSensor.01") {
@@ -9792,7 +9791,7 @@ sub EnOcean_Parse($$) {
       push @event, "3:humidity:$humi";
       push @event, "3:temperature:$temp";
       push @event, "3:telegramType:" . ($db[0] & 1 ? "event" : "heartbeat");
-      CommandDeleteReading(undef, "$name alarm");
+      readingsDelete($hash, "alarm");
       if (AttrVal($name, "signOfLife", 'off') eq 'on') {
         RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
@@ -9878,7 +9877,7 @@ sub EnOcean_Parse($$) {
         push @event, "3:temperature:$temperature";
       } else {
         $temperature = '-';
-        CommandDeleteReading(undef, "$name temperature");
+        readingsDelete($hash, "temperature");
       }
       my $brightness;
       if ($db[0] & 1) {
@@ -9886,7 +9885,7 @@ sub EnOcean_Parse($$) {
         push @event, "3:brightness:$brightness";
       } else {
         $brightness = '-';
-        CommandDeleteReading(undef, "$name brightness");
+        readingsDelete($hash, "brightness");
       }
       my $energyStorage = sprintf "%d", ($db[0] >> 4) * 100 / 15;
       my $battery;
@@ -11770,7 +11769,7 @@ sub EnOcean_Parse($$) {
           $blinkInterval = $blinkInterval =~ m/^\d+$/ ? $blinkInterval : 0;
           CommandDeleteReading(undef, "$name .*Set");
         }
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "waitingCmds");
         $data = sprintf "80%02X%04X%02X", $waitingCmds, $updateInterval, $blinkInterval;
         EnOcean_SndRadio(undef, $hash, $packetType, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
         #EnOcean_multisensor_01Snd($ctrl, $hash, $packetType);
@@ -12309,14 +12308,14 @@ sub EnOcean_Parse($$) {
         if ($airQuatity <= 100) {
           push @event, "3:airQuality1:$airQuatity";
         } else {
-          CommandDeleteReading(undef, "$name airQuality1");
+          readingsDelete($hash, "airQuality1");
         }
         push @event, "3:deviceMode:" . ($db[9] & 0x80 ? 'slave' : 'master');
         $airQuatity = $db[9] & 0x7F;
         if ($airQuatity <= 100) {
           push @event, "3:airQuality2:$airQuatity";
         } else {
-          CommandDeleteReading(undef, "$name airQuality2");
+          readingsDelete($hash, "airQuality2");
         }
         my $outdoorTemp = ($db[8] & 0xFE) >> 1;
         #$outdoorTemp -= $outdoorTemp if ($outdoorTemp & 0x40);
@@ -12410,7 +12409,7 @@ sub EnOcean_Parse($$) {
             push @event, "3:loadLink:" . ($db[1] & 16 ? "connected" : "disconnected");
             push @event, "3:loadOperation:3-wire";
             push @event, "3:loadState:" . ($db[1] & 64 ? "on" : "off");
-            CommandDeleteReading(undef, "$name getParam");
+            readingsDelete($hash, "getParam");
           } elsif ($getParam == 7) {
             if ($db[0] & 4) {
               push @event, "3:devTempState:warning";
@@ -12425,17 +12424,17 @@ sub EnOcean_Parse($$) {
             } else {
               push @event, "3:devTemp:" . $db[1];
             }
-            CommandDeleteReading(undef, "$name getParam");
+            readingsDelete($hash, "getParam");
           } elsif ($getParam == 9) {
             push @event, "3:voltage:" . sprintf("%.2f", (hex(substr($data, 4, 4)) * 0.01));
-            CommandDeleteReading(undef, "$name getParam");
+            readingsDelete($hash, "getParam");
           } elsif ($getParam == 0x81) {
             $hash->{READINGS}{serialNumber}{VAL} = substr($data, 4, 4);
             $hash->{READINGS}{getParam}{VAL} = 0x82;
             EnOcean_SndRadio(undef, $hash, $packetType, "D1", "033182", AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
           } elsif ($getParam == 0x82) {
             push @event, "3:serialNumber:" . $hash->{READINGS}{serialNumber}{VAL} . substr($data, 4, 4);
-            CommandDeleteReading(undef, "$name getParam");
+            readingsDelete($hash, "getParam");
           }
         }
       } elsif ($manufID eq "046") {
@@ -14629,7 +14628,7 @@ sub EnOcean_Notify(@) {
         $modules{EnOcean}{defptr}{$attr{$name}{remoteID}} = $hash;
       }
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "waitingCmds");
       }
       if (exists $attr{$name}{subType}) {
         if ($attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
@@ -14657,7 +14656,7 @@ sub EnOcean_Notify(@) {
         $modules{EnOcean}{defptr}{$attr{$name}{remoteID}} = $hash;
       }
       if (AttrVal($name ,"subType", "") eq "roomCtrlPanel.00") {
-        CommandDeleteReading(undef, "$name waitingCmds");
+        readingsDelete($hash, "waitingCmds");
       }
       if (exists $attr{$name}{subType}) {
         if ($attr{$name}{subType} =~ m/^hvac\.0(1|4|6)$/) {
@@ -15202,7 +15201,6 @@ sub EnOcean_calcPID($) {
   my $dPortion = ReadingsVal($name, 'p_d', "");
   my $stateStr = "";
   readingsDelete($hash, 'pidAlarm');
-  #CommandDeleteReading(undef, "$name pidAlarm");
   my $deltaOld = ReadingsVal($name, 'delta', 0);
   my $delta = "";
   my $deltaGradient = $hash->{helper}{deltaGradient} ? $hash->{helper}{deltaGradient} : 0;
@@ -15552,9 +15550,7 @@ EnOcean_roomCtrlPanel_00Snd($$$$$$$$)
 }
 
 # generate command to Room Control Panel (EEP D2-10-xx)
-sub
-EnOcean_roomCtrlPanel_00Cmd($$$$)
-{
+sub EnOcean_roomCtrlPanel_00Cmd($$$$) {
   my ($ctrl, $hash, $mcf, $messagePart) = @_;
   my $name = $hash->{NAME};
   my $data = "0000";
@@ -15581,22 +15577,22 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
       if (defined ReadingsVal($name, "setpointComfortTempSet", undef)) {
         $db1 = ReadingsVal($name, "setpointComfortTempSet", 0) * 255 / 40;
         $db0 = $db0 | 1;
-        CommandDeleteReading(undef, "$name setpointComfortTempSet");
+        readingsDelete($hash, "setpointComfortTempSet");
       }
       if (defined ReadingsVal($name, "setpointEconomyTempSet", undef)) {
         $db2 = ReadingsVal($name, "setpointEconomyTempSet", 0) * 255 / 40;
         $db0 = $db0 | 2;
-        CommandDeleteReading(undef, "$name setpointEconomyTempSet");
+        readingsDelete($hash, "setpointEconomyTempSet");
       }
       if (defined ReadingsVal($name, "setpointPreComfortTempSet", undef)) {
         $db3 = ReadingsVal($name, "setpointPreComfortTempSet", 0) * 255 / 40;
         $db0 = $db0 | 4;
-        CommandDeleteReading(undef, "$name setpointPreComfortTempSet");
+        readingsDelete($hash, "setpointPreComfortTempSet");
       }
       if (defined ReadingsVal($name, "setpointBuildingProtectionTempSet", undef)) {
         $db4 = ReadingsVal($name, "setpointBuildingProtectionTempSet", 0) * 255 / 40;
         $db0 = $db0 | 8;
-        CommandDeleteReading(undef, "$name setpointBuildingProtectionTempSet");
+        readingsDelete($hash, "setpointBuildingProtectionTempSet");
       }
       $data = sprintf "%02X%02X%02X%02X%02X%02X", $db5, $db4, $db3, $db2, $db1, $db0;
       # clear command
@@ -15688,7 +15684,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
       if (defined ReadingsVal($name, "setpointTempSet", undef)) {
         $db1 = ReadingsVal($name, "setpointTempSet", 0) * 255 / 40;
         $db2 |= 2;
-        CommandDeleteReading(undef, "$name setpointTempSet");
+        readingsDelete($hash, "setpointTempSet");
       }
 
       my $heatingSet;
@@ -15707,7 +15703,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
         $heatingSet = 3;
       }
       $db2 |= $heatingSet << 4;
-      CommandDeleteReading(undef, "$name heatingSet");
+      readingsDelete($hash, "heatingSet");
 
       my $coolingSet;
       if (defined ReadingsVal($name, "coolingSet", undef)) {
@@ -15725,7 +15721,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
         $coolingSet = 3;
       }
       $db2 |= $coolingSet << 6;
-      CommandDeleteReading(undef, "$name coolingSet");
+      readingsDelete($hash, "coolingSet");
 
       my $roomCtrlModeSet;
       if (defined ReadingsVal($name, "roomCtrlModeSet", undef)) {
@@ -15743,7 +15739,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
         $roomCtrlModeSet = 3;
       }
       $db2 |= $roomCtrlModeSet << 2;
-      CommandDeleteReading(undef, "$name roomCtrlModeSet");
+      readingsDelete($hash, "roomCtrlModeSet");
 
       my $windowSet;
       if (defined ReadingsVal($name, "windowSet", undef)) {
@@ -15761,7 +15757,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
         $windowSet = 3;
       }
       $db4 |= $windowSet;
-      CommandDeleteReading(undef, "$name windowSet");
+      readingsDelete($hash, "windowSet");
 
       my $fanSpeedModeSet;
       if (defined ReadingsVal($name, "fanSpeedModeSet", undef)) {
@@ -15770,12 +15766,12 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
         $fanSpeedModeSet = ReadingsVal($name, "fanSpeedMode", 0);
       }
       $db4 |= 64 if ($fanSpeedModeSet eq "local");
-      CommandDeleteReading(undef, "$name fanSpeedModeSet");
+      readingsDelete($hash, "fanSpeedModeSet");
 
       if (defined ReadingsVal($name, "fanSpeedSet", undef)) {
         $db5 = ReadingsVal($name, "fanSpeedSet", 0);
         $db4 |= 128;
-        CommandDeleteReading(undef, "$name fanSpeedSet");
+        readingsDelete($hash, "fanSpeedSet");
       }
 
       $data = sprintf "%02X%02X%02X%02X%02X%02X%02X%02X", $db7, $db6, $db5, $db4, $db3, $db2, $db1, $db0;
@@ -15884,7 +15880,7 @@ EnOcean_roomCtrlPanel_00Cmd($$$$)
     }
 
     if ($waitingCmds == 0) {
-      CommandDeleteReading(undef, "$name waitingCmds");
+      readingsDelete($hash, "waitingCmds");
     } else {
       readingsSingleUpdate($hash, "waitingCmds", $waitingCmds, 0);
     }
@@ -16358,8 +16354,7 @@ sub EnOcean_ReadingScaled($$$$)
 }
 
 # Reorganize Strings
-sub EnOcean_ReorgList($)
-{
+sub EnOcean_ReorgList($) {
   my ($list) = @_;
   my @list = split("[ \t][ \t]*", $list);
   my %list;
@@ -16369,15 +16364,13 @@ sub EnOcean_ReorgList($)
 }
 
 # EnOcean_Set called from sub InternalTimer()
-sub EnOcean_TimerSet($)
-{
+sub EnOcean_TimerSet($) {
   my ($par) = @_;
   EnOcean_Set($par->{hash}, @{$par->{timerCmd}});
 }
 
 #
-sub EnOcean_InternalTimer($$$$$)
-{
+sub EnOcean_InternalTimer($$$$$) {
   my ($modifier, $tim, $callback, $hash, $waitIfInitNotDone) = @_;
   my $mHash = {};
   my $timerName = "$hash->{NAME}_$modifier";
@@ -16399,8 +16392,7 @@ sub EnOcean_InternalTimer($$$$$)
 }
 
 #
-sub EnOcean_RemoveInternalTimer($$)
-{
+sub EnOcean_RemoveInternalTimer($$) {
   my ($modifier, $hash) = @_;
   my $mHash = {};
   my $timerName = "$hash->{NAME}_$modifier";
@@ -16418,8 +16410,7 @@ sub EnOcean_RemoveInternalTimer($$)
 }
 
 #
-sub EnOcean_observeInit($$@)
-{
+sub EnOcean_observeInit($$@) {
   #init observe
   my ($ctrl, $hash, @cmdValue) = @_;
   my ($err, $name) = (undef, $hash->{NAME});
@@ -16456,8 +16447,7 @@ sub EnOcean_observeInit($$@)
 }
 
 #
-sub EnOcean_observeParse($$@)
-{
+sub EnOcean_observeParse($$@) {
   # observe acknowledge
   my ($ctrl, $hash, @cmdValue) = @_;
   my ($err, $name) = (undef, $hash->{NAME});
@@ -16515,8 +16505,7 @@ sub EnOcean_observeParse($$@)
 }
 
 #
-sub EnOcean_observeRepeat($)
-{
+sub EnOcean_observeRepeat($) {
   #timer expires without acknowledgment telegram, repeat command
   my ($functionHash) = @_;
   my $hash = $functionHash->{hash};
@@ -16736,15 +16725,14 @@ sub EnOcean_RLTResult($$$$) {
     readingsBulkUpdate($hash, 'rssiMasterAvg', (sprintf "%0.1f", $rssiMasterAvg / $msgCntr));
     readingsEndUpdate($hash, 1);
   } else {
-    CommandDeleteReading(undef, "$name msgLost");
-    CommandDeleteReading(undef, "$name rssiMasterAvg");
+    readingsDelete($hash, "msgLost");
+    readingsDelete($hash, "rssiMasterAvg");
   }
   return ($err, $logLevel, $response);
 }
 
 #
-sub EnOcean_energyManagement_01Parse($@)
-{
+sub EnOcean_energyManagement_01Parse($@) {
   my ($hash, @db) = @_;
   my $name = $hash->{NAME};
   # [drLevel] = 15 : no requests for reduction in power consumptions
@@ -16793,7 +16781,7 @@ sub EnOcean_energyManagement_01Parse($@)
     $month = $month < 10 ? $ month = "0". $month : $month;
     readingsBulkUpdate($hash, "timeout", "$year-$month-$day $hour:$min:$sec");
   } else {
-    CommandDeleteReading(undef, "$name timeout");
+    readingsDelete($hash, "timeout");
   }
   if ($randomStart eq "yes" && ReadingsVal($name, "level", 15) == 15) {
     readingsBulkUpdate($hash, "state", "waiting_for_start");
@@ -16811,8 +16799,7 @@ sub EnOcean_energyManagement_01Parse($@)
 }
 
 #
-sub EnOcean_demandResponseExec($)
-{
+sub EnOcean_demandResponseExec($) {
   my ($functionHash) = @_;
   my $function = $functionHash->{function};
   my $hash = $functionHash->{hash};
@@ -16862,8 +16849,7 @@ sub EnOcean_demandResponseExec($)
 }
 
 #
-sub EnOcean_demandResponseTimeout($)
-{
+sub EnOcean_demandResponseTimeout($) {
   my ($functionHash) = @_;
   my $function = $functionHash->{function};
   my $hash = $functionHash->{hash};
@@ -16872,7 +16858,7 @@ sub EnOcean_demandResponseTimeout($)
   my $data;
   my $timeoutLevel = AttrVal($name, "demandRespTimeoutLevel", "max");
   RemoveInternalTimer($functionHash);
-  CommandDeleteReading(undef, "$name timeout");
+  readingsDelete($hash, "timeout");
   my $drLevel = 15;
   my $powerUsage = 100;
   my $powerUsageLevel = "max";
