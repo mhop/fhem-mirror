@@ -43,7 +43,6 @@ use strict;
 use warnings;
 
 use vars qw{%attr %defs};
-use GPUtils qw(:all);
 use DevIo;
 
 #add FHEM/lib to @INC if it's not already included. Should rather be in fhem.pl than here though...
@@ -180,14 +179,16 @@ sub FRM_Define {
   }
 
   # check if Device::Firmata module is properly installed
-  $deviceFirmataStatus = FRM_Get_Device_Firmata_Status();
+  FRM_Get_Device_Firmata_Status();
   given($deviceFirmataStatus) {
     when(FRM_DEVICE_FIRMATA_STATUS_INSTALLED) {
       delete $main::defs{$name}{DRIVER_STATUS};
+      $main::defs{$name}{DRIVER_VERSION} = $Device::Firmata::VERSION;
     }
 
     when(FRM_DEVICE_FIRMATA_STATUS_NOT_INSTALLED) {
       $main::defs{$name}{DRIVER_STATUS} = 'Perl module Device::Firmata not found, see Commandref for details how to fix';
+      delete $main::defs{$name}{DRIVER_VERSION};
       main::Log3 $name, 1, "$name ERROR: " . $main::defs{$name}{DRIVER_STATUS};
       readingsSingleUpdate($hash, 'state', 'error', 1);
       return undef;
@@ -195,8 +196,8 @@ sub FRM_Define {
 
     when(FRM_DEVICE_FIRMATA_STATUS_WRONG_VERSION) {
       $main::defs{$name}{DRIVER_STATUS} = 'Perl module Device::Firmata version ' . FRM_MIN_DEVICE_FIRMATA_VERSION . ' or higher required, see Commandref for details how to fix';
+      $main::defs{$name}{DRIVER_VERSION} = $Device::Firmata::VERSION;
       main::Log3 $name, 2, "$name WARNING: " . $main::defs{$name}{DRIVER_STATUS};
-
       $deviceFirmataStatus = FRM_DEVICE_FIRMATA_STATUS_INSTALLED;
       # @TODO readingsSingleUpdate($hash, 'state', 'error', 1);
       # @TODO $deviceFirmataStatus = FRM_DEVICE_FIRMATA_STATUS_WRONG_VERSION;
@@ -204,7 +205,7 @@ sub FRM_Define {
     }
 
     default {
-      main::Log3 $name, 1, "$name ERROR: Validation of Perl module Device::Firmata failed";
+      main::Log3 $name, 1, "$name ERROR: validation of Perl module Device::Firmata failed";
       readingsSingleUpdate($hash, 'state', 'error', 1);
       return undef;
     }
@@ -991,7 +992,7 @@ sub FRM_SetupDevice {
 sub FRM_Get_Device_Firmata_Status {
 
   # check if Device::Firmata module is properly installed
-  if ($deviceFirmataStatus == FRM_DEVICE_FIRMATA_STATUS_UNDEFINED) {
+  if ($deviceFirmataStatus != FRM_DEVICE_FIRMATA_STATUS_INSTALLED) {
     eval {
       require Device::Firmata;
       require Device::Firmata::Constants;
@@ -1119,11 +1120,13 @@ sub FRM_Client_Define {
   my $cname = $chash->{NAME};
 
   # check if Device::Firmata module is properly installed
+  FRM_Get_Device_Firmata_Status();
   if ($deviceFirmataStatus > 0) {
+    delete $main::defs{$cname}{IODev_ERROR};
     readingsSingleUpdate($chash, 'state', 'defined', 1);
   } else {
     $main::defs{$cname}{IODev_ERROR} = 1;
-    readingsSingleUpdate($chash, 'state', 'error: Perl module Device::Firmata not properly installed', 1);
+    readingsSingleUpdate($chash, 'state', 'error: Perl module Device::Firmata not properly installed, check IODev for more details', 1);
   }
 
   if ($main::init_done) {
@@ -2258,9 +2261,15 @@ sub FRM_Serial_Close {
   04.10.2020 jensb
     o wrapped Device::Firmata check into sub FRM_Get_Device_Firmata_Status() for use in other modules
     o annotaded module help of attributes for FHEMWEB
-    
+
   30.10.2020 jensb
     o "require DevIO" replaced with "use DevIO" (forum 110125)
+
+  23.11.2020 jensb
+    o fix missing internal "DRIVER_VERSION"
+    o delete internal IODev_ERROR of FRM client if Device::Firmata check yields STATUS_INSTALLED
+    o reevaluate Device::Firmata check if last check did not yield STATUS_INSTALLED
+    o execute Device::Firmata check in FRM_Client_Define
 
 =cut
 
