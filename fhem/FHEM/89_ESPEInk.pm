@@ -1,5 +1,10 @@
 # $Id$
 
+# Änderungen Viegener - 2020-05-04
+#   Umstellung verzögerte berechnung der Pixel erst beim upload
+#   blocktext (ESPEInk_FormatBlockText) korrigiert für Behandlung von \\n
+#   text height ($th) is potentially wrong if text is wrapped to multiple lines so text height shoul dbe calced from one char only (addobjects)
+
 package main;
 use strict;
 use warnings;
@@ -45,7 +50,8 @@ my %ESPEInk_devices = (
 #	"7.8inch_e-Paper_HAT"			=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	23},
 #	"6inch_e-Paper_HAT"				=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	22},
 #	"2.9inch_e-Paper_HAT_(D)"		=>	{width	=>	200,	height	=>	200,	pindex	=>	10,	id	=>	21},
-	"7.5inch_e-Paper_HAT_V2_(B)"	=>	{width	=>	800,	height	=>	480,	pindex	=>	5,	id	=>	23},
+	"7.5inch_e-Paper_HAT_(B)_HD"	=>	{width	=>	880,	height	=>	528,	pindex	=>	1,	id	=>	24},
+	"7.5inch_e-Paper_HAT_V2_(B)"	=>	{width	=>	800,	height	=>	480,	pindex	=>	1,	id	=>	23},
 	"7.5inch_e-Paper_HAT_V2"		=>	{width	=>	800,	height	=>	480,	pindex	=>	0,	id	=>	22},
 	"7.5inch_e-Paper_HAT_(C)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	5,	id	=>	21},
 	"7.5inch_e-Paper_HAT_(B)"		=>	{width	=>	640,	height	=>	384,	pindex	=>	1,	id	=>	20},
@@ -86,6 +92,7 @@ my %ESPEInk_sets = (
 	"upload"		=> "noArg",				# perform upload of converted picture to EInk Display via WLAN
 	"addtext"		=> "textFieldNL",		# add text to picture at given position (see set for details)
 	"addicon"		=> "textFieldNL",		# add icon to picture at given position (see set for details)
+	"addsymbol"		=> "textFieldNL",		# add symbol (line, rectangle, ellipse) to picture at given position (see set for details)
 	"iconreading"	=> "textFieldNL",		# add text to picture at given position (see set for details)
 	"textreading"	=> "textFieldNL"		# add text to picture at given position (see set for details)
 );
@@ -260,12 +267,13 @@ sub ESPEInk_Set($@) {
 		return "Unknown argument $opt, choose one of " . join(" ", map{ "$_:".$ESPEInk_sets{$_}} keys %ESPEInk_sets);
 	}
     
-	if ($opt eq 'addtext' || $opt eq 'textreading' || $opt eq 'addicon' || $opt eq 'iconreading') {
+	if ($opt eq 'addtext' || $opt eq 'textreading' || $opt eq 'addicon' || $opt eq 'iconreading' || $opt eq 'addsymbol') {
 		my ($text, $x, $y, $size, $angle, $color, $font, $linegap, $blockwidth) = split("#",$value);
 		return "No text defined, use format: 'addtext text#x#y#size#angle#color#font'" if (!$text && ($opt eq 'addtext'));
 		return "No reading defined, use format: 'textreading device:reading#x#y#size#angle#color#font'" if (!$text && ($opt eq 'textreading'));
 		return "No icon defined, use format: 'addicon icon#x#y#size#angle#color'" if (!$text && ($opt eq 'addicon'));
 		return "No reading defined, use format: 'iconreading device:reading#x#y#size#angle#color'" if (!$text && ($opt eq 'iconreading'));
+		return "No symbol defined, use format: 'addsymbol symbol#x#y#size#angle#color#width#height#arc'" if (!$text && ($opt eq 'addsymbol'));
 		my($texts,$eval) = split("{",$text);
 		my ($device,$reading) = split(':',$texts);
 		$reading = "state" if (!$reading);
@@ -288,8 +296,14 @@ sub ESPEInk_Set($@) {
 		if ($opt eq 'iconreading' || $opt eq 'addicon') {
 			readingsBulkUpdate($hash,$itext."-icon",$text) if ($opt eq 'iconreading');
 			readingsBulkUpdate($hash,$itext."-isIcon",1);
-		} elsif ($opt eq 'textreading' || $opt eq 'addtext') {
-			readingsBulkUpdate($hash,$itext."-isIcon",0)
+			readingsBulkUpdate($hash,$itext."-isSymbol",0);
+		} elsif ($opt eq 'textreading' || $opt eq 'addtext' || $opt eq 'addsymbol') {
+			readingsBulkUpdate($hash,$itext."-isIcon",0);
+			if ($opt eq 'addsymbol') {
+				readingsBulkUpdate($hash,$itext."-isSymbol",1);
+			} else {
+				readingsBulkUpdate($hash,$itext."-isSymbol",0);
+			}
 		}
 
 		$x = 0 if (!$x || (($x !~ '-?\d+')&&($x !~ '(left|mid|right)')));
@@ -299,21 +313,25 @@ sub ESPEInk_Set($@) {
 
 		$color = "000000" if (!$color || !ESPEInk_CheckColorString($color));
 
-		$font = "medium" if (!ESPEInk_CheckFontString($font));
+		$font = "medium" if (!ESPEInk_CheckFontString($font) and ($opt ne 'addsymbol'));
 		$linegap = 0 if (!$linegap || ($linegap !~ '\d+'));
 		$blockwidth = 0 if (!$blockwidth || ($blockwidth !~ '\d+'));
 
 		readingsBulkUpdate($hash,$itext."-def",$opt."#".$value);
 		readingsBulkUpdate($hash,$itext."-text",$text) if ($opt eq 'addtext');
+		readingsBulkUpdate($hash,$itext."-symbol",$text) if ($opt eq 'addsymbol');
 		readingsBulkUpdate($hash,$itext."-icon",$text) if ($opt eq 'addicon');
 		readingsBulkUpdate($hash,$itext."-x",$x);
 		readingsBulkUpdate($hash,$itext."-y",$y);
 		readingsBulkUpdate($hash,$itext."-size",$size);
 		readingsBulkUpdate($hash,$itext."-angle",$angle);
 		readingsBulkUpdate($hash,$itext."-color",$color);
-		readingsBulkUpdate($hash,$itext."-font",$font) if ($opt eq 'addtext' || $opt eq 'textreading');
-		readingsBulkUpdate($hash,$itext."-linegap",$linegap);
-		readingsBulkUpdate($hash,$itext."-blockwidth",$blockwidth);
+		readingsBulkUpdate($hash,$itext."-font",$font) if (($opt eq 'addtext' || $opt eq 'textreading') and $opt ne 'addsymbol');
+		readingsBulkUpdate($hash,$itext."-linegap",$linegap) if ($opt ne 'addsymbol');;
+		readingsBulkUpdate($hash,$itext."-blockwidth",$blockwidth) if ($opt ne 'addsymbol');;
+		readingsBulkUpdate($hash,$itext."-width",$font) if ($opt eq 'addsymbol'); # parameter number 7 is width instead of font for symbols
+		readingsBulkUpdate($hash,$itext."-height",$linegap) if ($opt eq 'addsymbol'); # parameter number 8 is height instead of linegap for symbols
+		readingsBulkUpdate($hash,$itext."-arc",$blockwidth) if ($opt eq 'addsymbol'); # parameter number 9 is height instead of linegap for symbols
 
 		ESPEInk_AddTextAttributes($name,$itext);
 
@@ -455,9 +473,10 @@ sub ESPEInk_Attr(@) {
 		} elsif($attr_name =~ '.*-trigger') {
 			my ($ind,$cmd) = split("-",$attr_name);
 			my ($type,$trigger) = split("#",ReadingsVal($name,$ind."-def",""));
-			readingsDelete($hash,"$ind-trigger") if ($type eq 'addtext' || $type eq 'addicon');
+			readingsDelete($hash,"$ind-trigger") if ($type eq 'addtext' || $type eq 'addicon' || $type eq 'addsymbol');
 			readingsSingleUpdate( $hash, "$ind-icon", $trigger, 1 ) if ($trigger && ReadingsVal($name,"$ind-isIcon",0));
-			readingsSingleUpdate( $hash, "$ind-text", $trigger, 1 ) if ($trigger && !ReadingsVal($name,"$ind-isIcon",0));
+			readingsSingleUpdate( $hash, "$ind-text", $trigger, 1 ) if ($trigger && !ReadingsVal($name,"$ind-isIcon",0) && $type eq 'addtext');
+			readingsSingleUpdate( $hash, "$ind-sybmol", $trigger, 1 ) if ($trigger && !ReadingsVal($name,"$ind-isIcon",0) && $type eq 'addsymbol');
 			Log3 $hash, 5, "$name: deleted attribute $attr_name for triggering reset to initial definition";
 		} elsif($attr_name =~ '^\d+-.*') {
 			my ($ind,$cmd) = split("-",$attr_name);
@@ -467,6 +486,8 @@ sub ESPEInk_Attr(@) {
 
 			if ($cmd =~ "text") {
 				readingsSingleUpdate( $hash, "$ind-text", $text, 1 ) if ($text);
+			} elsif ($cmd =~ "sybmol") {
+				readingsSingleUpdate( $hash, "$ind-symbol", $text, 1 ) if ($text);
 			} elsif ($cmd =~ "icon") {
 				readingsSingleUpdate( $hash, "$ind-icon", $text, 1 ) if ($text);
 			} elsif ($cmd =~ "x") {
@@ -493,6 +514,15 @@ sub ESPEInk_Attr(@) {
 			} elsif ($cmd =~ "blockwidth" && !ReadingsVal($name,"$ind-isIcon",0)) {
 				readingsSingleUpdate( $hash, "$ind-blockwidth", $blockwidth, 1 ) if ($blockwidth);
 				readingsSingleUpdate( $hash, "$ind-blockwidth", 0, 1 ) if (!$blockwidth);
+			} elsif ($cmd =~ "width" && !ReadingsVal($name,"$ind-isIcon",0)) {
+				readingsSingleUpdate( $hash, "$ind-width", $font, 1 ) if ($font);
+				readingsSingleUpdate( $hash, "$ind-width", 0, 1 ) if (!$font);
+			} elsif ($cmd =~ "height" && !ReadingsVal($name,"$ind-isIcon",0)) {
+				readingsSingleUpdate( $hash, "$ind-height", $linegap, 1 ) if ($linegap);
+				readingsSingleUpdate( $hash, "$ind-height", 0, 1 ) if (!$linegap);
+			} elsif ($cmd =~ "arc" && !ReadingsVal($name,"$ind-isIcon",0)) {
+				readingsSingleUpdate( $hash, "$ind-arc", $blockwidth, 1 ) if ($blockwidth);
+				readingsSingleUpdate( $hash, "$ind-arc", 0, 1 ) if (!$blockwidth);
 			}
 
 			Log3 $hash, 5, "$name: deleted attribute $attr_name reset to default if in initial definition (set ".$name." ".$type.")";
@@ -807,7 +837,8 @@ sub ESPEInk_CheckIconString($) {
 # Add all new attributes (text, position, size, angle, color, font) for a text object 
 sub ESPEInk_AddTextAttributes($$) {
 	my ($name,$itext) = @_;
-	addToDevAttrList($name, "$itext-text") if (!ReadingsVal($name,"$itext-isIcon",0));
+	addToDevAttrList($name, "$itext-text") if (!ReadingsVal($name,"$itext-isIcon",0) and !ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-symbol") if (!ReadingsVal($name,"$itext-isIcon",0) and ReadingsVal($name,"$itext-isSymbol",0));
 	addToDevAttrList($name, "$itext-icon") if (ReadingsVal($name,"$itext-isIcon",0));
 	addToDevAttrList($name, "$itext-trigger");
 	addToDevAttrList($name, "$itext-x");
@@ -815,9 +846,12 @@ sub ESPEInk_AddTextAttributes($$) {
 	addToDevAttrList($name, "$itext-size");
 	addToDevAttrList($name, "$itext-angle");
 	addToDevAttrList($name, "$itext-color:colorpicker,RGB");
-	addToDevAttrList($name, "$itext-font") if (!ReadingsVal($name,"$itext-isIcon",0));
-	addToDevAttrList($name, "$itext-linegap") if (!ReadingsVal($name,"$itext-isIcon",0));
-	addToDevAttrList($name, "$itext-blockwidth") if (!ReadingsVal($name,"$itext-isIcon",0));
+	addToDevAttrList($name, "$itext-font") if (!ReadingsVal($name,"$itext-isIcon",0) && !ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-linegap") if (!ReadingsVal($name,"$itext-isIcon",0) && !ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-blockwidth") if (!ReadingsVal($name,"$itext-isIcon",0) && !ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-width") if (!ReadingsVal($name,"$itext-isIcon",0) && ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-height") if (!ReadingsVal($name,"$itext-isIcon",0) && ReadingsVal($name,"$itext-isSymbol",0));
+	addToDevAttrList($name, "$itext-arc") if (!ReadingsVal($name,"$itext-isIcon",0) && ReadingsVal($name,"$itext-isSymbol",0));
 }
 
 #---------------------------------------------------------------------------------------------------
@@ -883,9 +917,11 @@ sub ESPEInk_RemoveTextReadings($$){
 	if ($itext <= $deftexts) {
 	
 		my $isicon = ReadingsVal($name,"$itext-isIcon",0);
+		my $issymbol = ReadingsVal($name,"$itext-isSymbol",0);
 
 		readingsDelete($hash,$itext."-def");
 		readingsDelete($hash,$itext."-text");
+		readingsDelete($hash,$itext."-symbol");
 		readingsDelete($hash,$itext."-icon");
 		readingsDelete($hash,$itext."-trigger");
 		readingsDelete($hash,$itext."-x");
@@ -897,13 +933,19 @@ sub ESPEInk_RemoveTextReadings($$){
 		readingsDelete($hash,$itext."-linegap");
 		readingsDelete($hash,$itext."-blockwidth");
 		readingsDelete($hash,$itext."-isIcon");
+		readingsDelete($hash,$itext."-isSymbol");
+		readingsDelete($hash,$itext."-width");
+		readingsDelete($hash,$itext."-height");
+		readingsDelete($hash,$itext."-arc");
 		readingsBeginUpdate($hash);
 
 		for (my $i=$itext; $i<$deftexts; $i++) {
 			$isicon = ReadingsVal($name,"$i-isIcon",0) if ($i > $itext);
+			$issymbol = ReadingsVal($name,"$i-isSymbol",0) if ($i > $itext);
 
 			readingsBulkUpdate($hash,$i."-def",ReadingsVal($name,($i+1)."-def",""));
-			readingsBulkUpdate($hash,$i."-text",ReadingsVal($name,($i+1)."-text","")) if (!ReadingsVal($name,($i+1)."-isIcon",0));
+			readingsBulkUpdate($hash,$i."-text",ReadingsVal($name,($i+1)."-text","")) if (!ReadingsVal($name,($i+1)."-isIcon",0) and !ReadingsVal($name,($i+1)."-isSymbol",0));
+			readingsBulkUpdate($hash,$i."-sybmol",ReadingsVal($name,($i+1)."-symbol","")) if (!ReadingsVal($name,($i+1)."-isIcon",0) and ReadingsVal($name,($i+1)."-isSymbol",0));
 			readingsBulkUpdate($hash,$i."-icon",ReadingsVal($name,($i+1)."-icon","")) if (ReadingsVal($name,($i+1)."-isIcon",0));
 			readingsBulkUpdate($hash,$i."-trigger",ReadingsVal($name,($i+1)."-trigger","")) if (ReadingsVal($name,($i+1)."-trigger",undef));
 			readingsBulkUpdate($hash,$i."-x",ReadingsVal($name,($i+1)."-x",""));
@@ -914,13 +956,25 @@ sub ESPEInk_RemoveTextReadings($$){
 			readingsBulkUpdate($hash,$i."-font",ReadingsVal($name,($i+1)."-font","")) if (ReadingsVal($name,($i+1)."-font",undef));
 			readingsBulkUpdate($hash,$i."-linegap",ReadingsVal($name,($i+1)."-linegap","")) if (ReadingsVal($name,($i+1)."-linegap",undef));
 			readingsBulkUpdate($hash,$i."-blockwidth",ReadingsVal($name,($i+1)."-blockwidth","")) if (ReadingsVal($name,($i+1)."-blockwidth",undef));
+			readingsBulkUpdate($hash,$i."-width",ReadingsVal($name,($i+1)."-width","")) if (ReadingsVal($name,($i+1)."-width",undef));
+			readingsBulkUpdate($hash,$i."-height",ReadingsVal($name,($i+1)."-height","")) if (ReadingsVal($name,($i+1)."-height",undef));
+			readingsBulkUpdate($hash,$i."-arc",ReadingsVal($name,($i+1)."-arc","")) if (ReadingsVal($name,($i+1)."-arc",undef));
 
-			addToDevAttrList($name, "$i-font") if ($isicon && !ReadingsVal($name,($i+1)."-isIcon",0));
-			delFromDevAttrList($name, "$i-font") if (ReadingsVal($name,($i+1)."-isIcon",0));
+			addToDevAttrList($name, "$i-font") if ($isicon && !ReadingsVal($name,($i+1)."-isIcon",0) && !ReadingsVal($name,($i+1)."-isSymbol",0));
+			delFromDevAttrList($name, "$i-font") if (ReadingsVal($name,($i+1)."-isIcon",0) && !ReadingsVal($name,($i+1)."-isSymbol",0));
+
+			addToDevAttrList($name, "$i-width") if ($isicon && !ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
+			delFromDevAttrList($name, "$i-width") if (ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
+			addToDevAttrList($name, "$i-height") if ($isicon && !ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
+			delFromDevAttrList($name, "$i-height") if (ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
+			addToDevAttrList($name, "$i-arc") if ($isicon && !ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
+			delFromDevAttrList($name, "$i-arc") if (ReadingsVal($name,($i+1)."-isIcon",0) && ReadingsVal($name,($i+1)."-isSymbol",0));
 
 			readingsBulkUpdate($hash,$i."-isIcon",ReadingsVal($name,($i+1)."-isIcon",""));
+			readingsBulkUpdate($hash,$i."-isSymbol",ReadingsVal($name,($i+1)."-isSymbol",""));
 
 			if (defined(AttrVal($name,($i+1).'-text',undef))) {fhem("attr $name $i-text ".AttrVal($name,($i+1)."-text",""))} else {delFromDevAttrList($name, "$i-text")};
+			if (defined(AttrVal($name,($i+1).'-sybmol',undef))) {fhem("attr $name $i-sybmol ".AttrVal($name,($i+1)."-sybmol",""))} else {delFromDevAttrList($name, "$i-sybmol")};
 			if (defined(AttrVal($name,($i+1).'-icon',undef))) {fhem("attr $name $i-icon ".AttrVal($name,($i+1)."-icon",""))} else {delFromDevAttrList($name, "$i-icon")};
 			if (defined(AttrVal($name,($i+1).'-trigger',undef))) {fhem("attr $name $i-trigger ".AttrVal($name,($i+1)."-trigger",""))} else {delFromDevAttrList($name, "$i-trigger")};
 			if (defined(AttrVal($name,($i+1).'-x',undef))) {fhem("attr $name $i-x ".AttrVal($name,($i+1)."-x",0))} else {delFromDevAttrList($name, "$i-x")};
@@ -931,6 +985,9 @@ sub ESPEInk_RemoveTextReadings($$){
 			if (defined(AttrVal($name,($i+1).'-font',undef))) {fhem("attr $name $i-font ".AttrVal($name,($i+1)."-font","medium"))} else {delFromDevAttrList($name, "$i-font")};
 			if (defined(AttrVal($name,($i+1).'-linegap',undef))) {fhem("attr $name $i-linegap ".AttrVal($name,($i+1)."-linegap",0))} else {delFromDevAttrList($name, "$i-linegap")};
 			if (defined(AttrVal($name,($i+1).'-blockwidth',undef))) {fhem("attr $name $i-blockwidth ".AttrVal($name,($i+1)."-blockwidth",0))} else {delFromDevAttrList($name, "$i-blockwidth")};
+			if (defined(AttrVal($name,($i+1).'-width',undef))) {fhem("attr $name $i-width ".AttrVal($name,($i+1)."-width",0))} else {delFromDevAttrList($name, "$i-width")};
+			if (defined(AttrVal($name,($i+1).'-height',undef))) {fhem("attr $name $i-height ".AttrVal($name,($i+1)."-height",0))} else {delFromDevAttrList($name, "$i-height")};
+			if (defined(AttrVal($name,($i+1).'-arc',undef))) {fhem("attr $name $i-arc ".AttrVal($name,($i+1)."-arc",0))} else {delFromDevAttrList($name, "$i-arc")};
 		}
 
 		readingsBulkUpdate($hash,"deftexts",($deftexts-1));
@@ -938,6 +995,7 @@ sub ESPEInk_RemoveTextReadings($$){
 
 		readingsDelete($hash,"$deftexts-def");
 		readingsDelete($hash,"$deftexts-text");
+		readingsDelete($hash,"$deftexts-symbol");
 		readingsDelete($hash,"$deftexts-icon");
 		readingsDelete($hash,"$deftexts-trigger");
 		readingsDelete($hash,"$deftexts-x");
@@ -949,8 +1007,13 @@ sub ESPEInk_RemoveTextReadings($$){
 		readingsDelete($hash,"$deftexts-linegap");
 		readingsDelete($hash,"$deftexts-blockwidth");
 		readingsDelete($hash,"$deftexts-isIcon");
+		readingsDelete($hash,"$deftexts-isSymbol");
+		readingsDelete($hash,"$deftexts-width");
+		readingsDelete($hash,"$deftexts-height");
+		readingsDelete($hash,"$deftexts-arc");
 
         delFromDevAttrList($name, "$deftexts-text");
+        delFromDevAttrList($name, "$deftexts-symbol");
         delFromDevAttrList($name, "$deftexts-icon");
         delFromDevAttrList($name, "$deftexts-trigger");
         delFromDevAttrList($name, "$deftexts-x");
@@ -961,8 +1024,11 @@ sub ESPEInk_RemoveTextReadings($$){
         delFromDevAttrList($name, "$deftexts-font");
         delFromDevAttrList($name, "$deftexts-linegap");
         delFromDevAttrList($name, "$deftexts-blockwidth");
+        delFromDevAttrList($name, "$deftexts-width");
+        delFromDevAttrList($name, "$deftexts-height");
+        delFromDevAttrList($name, "$deftexts-arc");
 
-		Log3 $hash, 5, "$name: Removed readings for ".(ReadingsVal($name,"$deftexts-isIcon",0)?"icon":"text");
+		Log3 $hash, 5, "$name: Removed readings for ".(ReadingsVal($name,"$deftexts-isIcon",0)?"icon":(ReadingsVal($name,"$deftexts-isSymbol",0)?"symbol":"text"));
 	}
 	
 	
@@ -1084,50 +1150,51 @@ sub ESPEInk_FormatBlockText($$$$$$$) {
 	my $text = $txt;
 
 	if ($blockwidth) {		# insert additional \n if width of text reaches maximum width
+    
 		my @words;
 		my $xoffset = 0;
 		my ($wspc, $ww, $wh);
 		my $newline = 1;
 		($wspc, $wh) = ESPEInk_GetStringPixelWidth($name," ",$fnt,$angle,$size);
+    
+    $text =~ s/\n/\\n/gm;
+#    Debug "text :$text:";
+    
+    
 		@words = split(/[ ]/,$text);
 		$text = "";
 		foreach my $word (@words) {
+      my $ww2;
+      my $wd;
+      while ( $word =~ /(.*)\\n(.*)/ ) {
+        $wd = $1;
+        $word = $2;
+				my ($ww2, $wh) = ESPEInk_GetStringPixelWidth($name,$wd,$fnt,$angle,$size);
+#      Debug " offset :$xoffset: width :$ww2:  spacew :$wspc:   text :$wd: ";  
+        if (($xoffset+$ww2) <= $blockwidth) {
+          $wd = (($newline)?"":" ") . $wd;
+        } else {
+          $wd = "\\n" . $wd;
+        }
+        $xoffset = 0;
+        $newline = 1;
+        $text = $text . $wd . "\\n";
+      }
+      
 			($ww, $wh) = ESPEInk_GetStringPixelWidth($name,$word,$fnt,$angle,$size);
+#      Debug " offset :$xoffset: width :$ww:  spacew :$wspc:   text :$word: ";  
 			Log3 $defs{$name}, 5, "--->> Width (outer) of $word (lengt ".length($word).") is: $ww, Width of Space is: $wspc, Text offset is: $xoffset";
-			if ($word =~ /.*\\n.*/) {
-				my $ww2;
-				foreach my $wd (split(/[\\n]/,$word)) {
-					($ww2, $wh) = ESPEInk_GetStringPixelWidth($name,$wd,$fnt,$angle,$size);
-					Log3 $defs{$name}, 5, "--->> Width (inner) of $wd (lengt ".length($wd).") is: $ww2, Width of Space is: $wspc, Text offset is: $xoffset";
-					if (length($wd) > 0) {
-						if (($xoffset+$ww2) <= $blockwidth) {
-							$wd = (($xoffset==0)?"":" ") . $wd;
-							$xoffset = $xoffset + $ww2 + $wspc;
-							$newline = 0;
-						} else {
-							$wd = "\\n" . $wd . " " if (!$newline);
-							$wd = $wd . "\\n" if ($newline);
-							$xoffset = $ww2 + $wspc;
-							$newline = 1;
-						}
-					}
-					$xoffset = 0 if (length($wd) == 0);
-					$wd = $wd . "\\n" if (length($wd) == 0);
-					$text = $text . $wd;
-				}
-			} else {
-				if (($xoffset+$ww) <= $blockwidth) {
-					$word = (($newline)?"":" ") . $word;
-					$xoffset = $xoffset + $ww + $wspc;
-					$newline = 0;
-				} else {
-					$word = "\\n" . $word . " ";
-					# $word = $word . "\\n" if ($newline);
-					$xoffset = $ww + $wspc;
-					$newline = 1;
-				}
-				$text = $text . $word;
-			}
+      if (($xoffset+$ww) <= $blockwidth) {
+        $word = (($newline)?"":" ") . $word;
+        $xoffset = $xoffset + $ww + $wspc;
+        $newline = 0;
+      } else {
+        $word = "\\n" . $word . " ";
+        # $word = $word . "\\n" if ($newline);
+        $xoffset = $ww + $wspc;
+        $newline = 1;
+      }
+      $text = $text . $word;
 		}
 		Log3 $defs{$name}, 5, "--->> Text is: $text";
 	}
@@ -1173,18 +1240,18 @@ sub ESPEInk_AddObjects($$) {
 			$linegap = int($linegap) if ($linegap);
 			$blockwidth = int($blockwidth) if ($blockwidth);
 
+			next if (!defined $type);
+			next if (!defined $text);
+
 			$x = 0 if (!$x || (($x !~ '-?\d+')&&($x !~ '(left|mid|right)')));
 			$y = 0 if (!$y || (($y !~ '-?\d+')&&($y !~ '(top|mid|bottom)')));
 			$size = 10 if (!$size || ($size !~ '-?\d+'));
 			$ang = 0 if (!$ang || ($ang !~ '-?\d+'));
 			$docolor = $col?1:0;
 			$col = "000000" if (!$col || !ESPEInk_CheckColorString($col));
-			$fnt = "medium" if (!ESPEInk_CheckFontString($fnt));
+			$fnt = "medium" if (!ESPEInk_CheckFontString($fnt) && $type ne "addsymbol");
 			$angle = $ang/180*(4*atan2(1,1));
 			$color = $col;
-
-			next if (!defined $type);
-			next if (!defined $text);
 
 			if ($type eq "iconreading" || $type eq "textreading") {
 				my $eval=0;
@@ -1284,15 +1351,20 @@ sub ESPEInk_AddObjects($$) {
 					($x,$y) = ESPEInk_CorrectXY($name,$type,"$dw#$dh",$fnt,$ang,$size,$iw,$ih,$x,$y);
 					$image->copyResized($icon_img_rot,$x,$y,0,0,$dw,$dh,$srw,$srh);
 				}
-			} else {
+			} elsif ($type ne "addsymbol") {
 				$font = gdGiantFont if ($fnt eq "giant");
 				$font = gdLargeFont if ($fnt eq "large");
 				$font = gdMediumBoldFont if ($fnt eq "medium");
 				$font = gdSmallFont if ($fnt eq "small");
 				my ($dw,$dh) = $image->getBounds;
 				my $ly = $y;
-				my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,$text,$fnt,$ang,$size);
+        
+        # Do not use full text here, since only height is relevant here and this can be calced from one char
+        # 
+				my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,"A",$fnt,$ang,$size);
+#        Debug "line height : $th :";
 				$th += $linegap if ($linegap);
+#        Debug "line height after : $th :";
 
 				$text = ESPEInk_FormatBlockText($name,$text,$fnt,$ang,$size,$blockwidth,$th);
 				
@@ -1309,6 +1381,49 @@ sub ESPEInk_AddObjects($$) {
 						}
 					}
 					$ly += $th;
+				}
+			} else {
+				my ($sym,$s1,$s2) = ("","","");
+				($sym,$s1,$s2) = split("-",$text);
+				my $width = $fnt;
+				my $height = $linegap;
+				$image->setStyle($color);
+				if ($sym eq "line") {
+					my $angle = atan2($height,$width);
+					for (my $i=0;$i<$size;$i++) {
+						$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+						$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+						$image->line($x,$y,$x+$width,$y+$height,gdStyled);
+						$x+=sin($angle);
+						$y-=cos($angle);
+					}
+				} elsif ($sym eq "rectangle") {
+					$image->setThickness($size);
+					$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+					$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+					if ($s1 eq "filled" or $s2 eq "filled") {
+						$image->filledRectangle($x,$y,$x+$width,$y+$height,gdStyled);
+					} else {
+						$image->rectangle($x,$y,$x+$width,$y+$height,gdStyled);
+					}
+				} elsif ($sym eq "ellipse") {
+					$image->setThickness($size);
+					$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+					$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+					if ($s1 eq "filled" or $s2 eq "filled") {
+						$image->filledEllipse($x+$width/2,$y+$height/2,$width,$height,gdStyled);
+					} else {
+						$image->ellipse($x+$width/2,$y+$height/2,$width,$height,gdStyled);
+					}
+				} elsif ($sym eq "arc") {
+					$image->setThickness($size);
+					$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+					$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+					if ($s1 eq "filled" or $s2 eq "filled") {
+						$image->filledArc($x+$width/2,$y+$height/2,$width,$height,$ang,$ang+$blockwidth,gdStyled,gdEdged);
+					} else {
+						$image->arc($x+$width/2,$y+$height/2,$width,$height,$ang,$ang+$blockwidth,gdStyled);
+					}
 				}
 			}
 		}
@@ -1397,7 +1512,7 @@ sub ESPEInk_AddObjects($$) {
 				my ($x,$y) = ESPEInk_CorrectXY($name,"icon","$dw#$dh",ReadingsVal($name,"$itext-font",""),ReadingsVal($name,"$itext-angle",""),ReadingsVal($name,"$itext-size",""),$iw,$ih,ReadingsVal($name,"$itext-x",0),ReadingsVal($name,"$itext-y",0));
 				$image->copyResized($icon_img_rot,$x,$y,0,0,$dw,$dh,$srw,$srh);
 			}
-		} else {
+		} elsif (!ReadingsVal($name,"$itext-isSymbol",0)) {
 			$font = undef;
 			$font = gdGiantFont if (ReadingsVal($name,"$itext-font","") eq "giant");
 			$font = gdLargeFont if (ReadingsVal($name,"$itext-font","") eq "large");
@@ -1405,7 +1520,9 @@ sub ESPEInk_AddObjects($$) {
 			$font = gdSmallFont if (ReadingsVal($name,"$itext-font","") eq "small");
 			my ($dw,$dh) = $image->getBounds;
 			my $ly = ReadingsVal($name,"$itext-y",0);
-			my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,ReadingsVal($name,"$itext-text",""),ReadingsVal($name,"$itext-font","small"),ReadingsVal($name,"$itext-angle",0),ReadingsVal($name,"$itext-size",10));
+      # Do not use full text here, since only height is relevant here and this can be calced from one char
+      # 
+			my ($tw, $th) = ESPEInk_GetStringPixelWidth($name,"A",ReadingsVal($name,"$itext-font","small"),ReadingsVal($name,"$itext-angle",0),ReadingsVal($name,"$itext-size",10));
 			$th += int(ReadingsVal($name,"$itext-linegap",0));
 
 			my $text = ESPEInk_FormatBlockText($name,ReadingsVal($name,"$itext-text",""),ReadingsVal($name,"$itext-font","small"),ReadingsVal($name,"$itext-angle",0),ReadingsVal($name,"$itext-size",10),int(ReadingsVal($name,"$itext-blockwidth",0)),$th);
@@ -1423,6 +1540,54 @@ sub ESPEInk_AddObjects($$) {
 					}
 				}
 				$ly += $th;
+			}
+		} else {
+			my ($sym,$s1,$s2) = ("","","");
+			($sym,$s1,$s2) = split("-",ReadingsVal($name,"$itext-symbol",""));
+			my $size = ReadingsVal($name,"$itext-size","");
+			my $width = ReadingsVal($name,"$itext-width",0);
+			my $height = ReadingsVal($name,"$itext-height",0);
+			my $ang = ReadingsVal($name,"$itext-angle",0);
+			my $arc = ReadingsVal($name,"$itext-arc",0);
+			my $x = ReadingsVal($name,"$itext-x",0);
+			my $y = ReadingsVal($name,"$itext-y",0);
+			$image->setStyle($color);
+			if ($sym eq "line") {
+				my $angle = atan2($height,$width);
+				for (my $i=0;$i<$size;$i++) {
+					$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+					$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+					$image->line($x,$y,$x+$width,$y+$height,gdStyled);
+					$x+=sin($angle);
+					$y-=cos($angle);
+				}
+			} elsif ($sym eq "rectangle") {
+				$image->setThickness($size);
+				$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+				$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+				if ($s1 eq "filled" or $s2 eq "filled") {
+					$image->filledRectangle($x,$y,$x+$width,$y+$height,gdStyled);
+				} else {
+					$image->rectangle($x,$y,$x+$width,$y+$height,gdStyled);
+				}
+			} elsif ($sym eq "ellipse") {
+				$image->setThickness($size);
+				$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+				$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+				if ($s1 eq "filled" or $s2 eq "filled") {
+					$image->filledEllipse($x+$width/2,$y+$height/2,$width,$height,gdStyled);
+				} else {
+					$image->ellipse($x+$width/2,$y+$height/2,$width,$height,gdStyled);
+				}
+			} elsif ($sym eq "arc") {
+				$image->setThickness($size);
+				$image->setStyle($color,$color,$color,$color,gdTransparent,gdTransparent,gdTransparent,gdTransparent) if ($s1 eq "dashed" or $s2 eq "dashed");
+				$image->setStyle($color,$color,gdTransparent,gdTransparent) if ($s1 eq "dotted" or $s2 eq "dotted");
+				if ($s1 eq "filled" or $s2 eq "filled") {
+					$image->filledArc($x+$width/2,$y+$height/2,$width,$height,$ang,$ang+$arc,gdStyled,gdEdged);
+				} else {
+					$image->arc($x+$width/2,$y+$height/2,$width,$height,$ang,$ang+$arc,gdStyled);
+				}
 			}
 		}
 	}
@@ -1635,9 +1800,21 @@ sub ESPEInk_DoConvert(@) {
 }
 
 #---------------------------------------------------------------------------------------------------
+# get pixel from image
+sub ESPEInk_getPixel($$$$) {
+	my ($image, $w, $h, $indx ) = @_;
+
+  my $iy = int( $indx / $w );
+  my $ix = $indx % $w;
+  my ($r,$g,$b) = $image->rgb($image->getPixel($ix,$iy));
+
+  return ($r==0&&$g==0)?0:(($r==255&&$g==255)?1:(($r==127&&$g==127)?2:3));	#convert color values to values between 0 and 3
+}
+
+#---------------------------------------------------------------------------------------------------
 # helper function for coding picture pixels to EInk bit settings
-sub ESPEInk_CodePixel2Bits($$$$$) {
-	my ($indx,$bits,$comp,$imax,$array) = @_;
+sub ESPEInk_CodePixel2BitsImage($$$$$$$$) {
+	my ($indx,$bits,$comp,$imax,$image,$w,$h,$isize) = @_;
 	my $v;
 	my $x;
 	my $str;
@@ -1650,7 +1827,7 @@ sub ESPEInk_CodePixel2Bits($$$$$) {
 				while ($x < 122) {
 					$v = 0;
 					for (my $i=0; $i<$bits&&$x<122; $i++,$x++) {
-						if ((${$array}[$indx]!=0)) {
+						if ((ESPEInk_getPixel($image,$w,$h,$indx)!=0)) {
 							$v|=(128>>$i);
 						}
 						$indx++;
@@ -1662,7 +1839,7 @@ sub ESPEInk_CodePixel2Bits($$$$$) {
 		} else {
 			$v = 0;
 			for (my $i=0; $i<$bits; $i++) {
-				if (($indx<@{$array})&&(${$array}[$indx]!=$comp)) {
+				if (($indx<$isize)&&(ESPEInk_getPixel($image,$w,$h,$indx)!=$comp)) {
 					$v|=(128>>$i);
 				}
 				$indx++;
@@ -1672,14 +1849,61 @@ sub ESPEInk_CodePixel2Bits($$$$$) {
 	} elsif ($bits == 16) {
 		$v = 0;
 		for (my $i=0; $i<$bits; $i+=2) {
-			if ($indx<@{$array}) {
-				$v|=(${$array}[$indx]<<$i);
+			if ($indx<$isize) {
+				$v|=(ESPEInk_getPixel($image,$w,$h,$indx)<<$i);
 			}
 			$indx++;
 		}
 		return ($indx, ESPEInk_Word2String($v));
 	}
 }
+
+# #---------------------------------------------------------------------------------------------------
+# # helper function for coding picture pixels to EInk bit settings
+# sub ESPEInk_CodePixel2Bits($$$$$) {
+	# my ($indx,$bits,$comp,$imax,$array) = @_;
+	# my $v;
+	# my $x;
+	# my $str;
+	
+	# if ($bits == 8) {
+		# if ($comp == -1) {
+			# $str = "";
+			# while (($indx < $imax)) {
+				# $x = 0;
+				# while ($x < 122) {
+					# $v = 0;
+					# for (my $i=0; $i<$bits&&$x<122; $i++,$x++) {
+						# if ((${$array}[$indx]!=0)) {
+							# $v|=(128>>$i);
+						# }
+						# $indx++;
+					# }
+					# $str .= ESPEInk_Byte2String($v);
+				# }
+			# }
+			# return ($indx, $str);
+		# } else {
+			# $v = 0;
+			# for (my $i=0; $i<$bits; $i++) {
+				# if (($indx<@{$array})&&(${$array}[$indx]!=$comp)) {
+					# $v|=(128>>$i);
+				# }
+				# $indx++;
+			# }
+			# return ($indx, ESPEInk_Byte2String($v));
+		# }
+	# } elsif ($bits == 16) {
+		# $v = 0;
+		# for (my $i=0; $i<$bits; $i+=2) {
+			# if ($indx<@{$array}) {
+				# $v|=(${$array}[$indx]<<$i);
+			# }
+			# $indx++;
+		# }
+		# return ($indx, ESPEInk_Word2String($v));
+	# }
+# }
 
 #---------------------------------------------------------------------------------------------------
 # helper function for converting a byte value to a string readable by EInk display
@@ -1697,14 +1921,19 @@ sub ESPEInk_Word2String($) {
 
 #---------------------------------------------------------------------------------------------------
 # helper function to encode the picture pixels to the right values for the EIknk display
-sub ESPEInk_Encode4Upload($$$$) {
-	my($param,$bits,$comp,$data) = @_;
+sub ESPEInk_Encode4UploadImage($$$) {
+	my($param,$bits,$comp) = @_;
 	my $i = int($param->{control}{srcindex});
 	my $ret = "";
 	my $imax;
+  
+  my $image = $param->{image};
+  my $w = $param->{imagew};
+  my $h = $param->{imageh};
+  my $isize = $param->{imagesize};
 
-	if (($i+int($param->{maxulsize})*($bits==8?4:2)) > (@{$data}-1)) {
-		$imax = @{$data}-1;
+	if (($i+int($param->{maxulsize})*($bits==8?4:2)) > ($isize-1)) {
+		$imax = $isize-1;
 	} else {
 		$imax = $i+int($param->{maxulsize})*($bits==8?4:2);
 	}
@@ -1715,11 +1944,37 @@ sub ESPEInk_Encode4Upload($$$$) {
 
 	my $postdata = "";
 	while ($i < $imax) {
-		($i, $ret) = ESPEInk_CodePixel2Bits($i,$bits,$comp,$imax,\@{$data});
+		($i, $ret) = ESPEInk_CodePixel2BitsImage($i,$bits,$comp,$imax,$image, $w, $h, $isize);
 		$postdata .= $ret;
 	}
 	return ($i,$postdata.ESPEInk_Word2String(length($postdata))."LOAD");
 }
+
+# #---------------------------------------------------------------------------------------------------
+# # helper function to encode the picture pixels to the right values for the EIknk display
+# sub ESPEInk_Encode4Upload($$$$) {
+	# my($param,$bits,$comp,$data) = @_;
+	# my $i = int($param->{control}{srcindex});
+	# my $ret = "";
+	# my $imax;
+
+	# if (($i+int($param->{maxulsize})*($bits==8?4:2)) > (@{$data}-1)) {
+		# $imax = @{$data}-1;
+	# } else {
+		# $imax = $i+int($param->{maxulsize})*($bits==8?4:2);
+	# }
+	
+	# if ($param->{device} == 3) {
+		# $imax = $i+int($param->{maxulsize})*($bits==8?4:2)-(($param->{board} eq "ESP8266")?366:122);
+	# }
+
+	# my $postdata = "";
+	# while ($i < $imax) {
+		# ($i, $ret) = ESPEInk_CodePixel2Bits($i,$bits,$comp,$imax,\@{$data});
+		# $postdata .= $ret;
+	# }
+	# return ($i,$postdata.ESPEInk_Word2String(length($postdata))."LOAD");
+# }
 
 #---------------------------------------------------------------------------------------------------
 # callback function for the http calls. Here all upload logic is happening
@@ -1763,10 +2018,10 @@ sub ESPEInk_HTTPCallbackA(@) {
 				$bits = 8;
 				$param->{command} = "LOAD";									# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
-				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4Upload($param,$bits,$comp,\@{$param->{outarray}});
+				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4UploadImage($param,$bits,$comp);
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{data}.'_' if ($param->{board} eq "ESP32");
 				$param->{data} = '' if ($param->{board} eq "ESP32");
-				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= @{$param->{outarray}});	# complete array has been coded and sent, go to next step
+				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= $param->{imagesize});	# complete array has been coded and sent, go to next step
 				$cparams->{$name} = $param;
 				$cparams->{data} = $param->{data};
 				HttpUtils_NonblockingGet($cparams);
@@ -1797,10 +2052,10 @@ sub ESPEInk_HTTPCallbackA(@) {
 				$bits = 8;
 				$param->{command} = "LOAD";									# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
-				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4Upload($param,$bits,$comp,\@{$param->{outarray}});
+				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4UploadImage($param,$bits,$comp);
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{data}.'_' if ($param->{board} eq "ESP32");
 				$param->{data} = '' if ($param->{board} eq "ESP32");
-				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= @{$param->{outarray}});	# complete array has been coded and sent, go to next step
+				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= $param->{imagesize});	# complete array has been coded and sent, go to next step
 				$cparams->{$name} = $param;
 				$cparams->{data} = $param->{data};
 				HttpUtils_NonblockingGet($cparams);
@@ -1823,10 +2078,10 @@ sub ESPEInk_HTTPCallbackA(@) {
 				$bits = 16;
 				$param->{command} = "LOAD";									# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
-				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4Upload($param,$bits,$comp,\@{$param->{outarray}});
+				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4UploadImage($param,$bits,$comp);
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{data}.'_' if ($param->{board} eq "ESP32");
 				$param->{data} = '' if ($param->{board} eq "ESP32");
-				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= @{$param->{outarray}});	# complete array has been coded and sent, go to next step
+				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= $param->{imagesize});	# complete array has been coded and sent, go to next step
 				$cparams->{$name} = $param;
 				$cparams->{data} = $param->{data};
 				HttpUtils_NonblockingGet($cparams);
@@ -1857,10 +2112,10 @@ sub ESPEInk_HTTPCallbackA(@) {
 				}
 				$param->{command} = "LOAD";									# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
-				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4Upload($param,$bits,$comp,\@{$param->{outarray}});
+				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4UploadImage($param,$bits,$comp);
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{data}.'_' if ($param->{board} eq "ESP32");
 				$param->{data} = '' if ($param->{board} eq "ESP32");
-				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= @{$param->{outarray}});	# complete array has been coded and sent, go to next step
+				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= $param->{imagesize});	# complete array has been coded and sent, go to next step
 				$cparams->{$name} = $param;
 				$cparams->{data} = $param->{data};
 				HttpUtils_NonblockingGet($cparams);
@@ -1881,10 +2136,10 @@ sub ESPEInk_HTTPCallbackA(@) {
 				$bits = 8;
 				$param->{command} = "LOAD";								# start uploading black channel
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{command};
-				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4Upload($param,$bits,$comp,\@{$param->{outarray}});
+				($param->{control}{srcindex},$param->{data}) = ESPEInk_Encode4UploadImage($param,$bits,$comp);
 				$cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$param->{data}.'_' if ($param->{board} eq "ESP32");
 				$param->{data} = '' if ($param->{board} eq "ESP32");
-				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= @{$param->{outarray}});	# complete array has been coded and sent, go to next step
+				$param->{control}{stepindex}++ if ($param->{control}{srcindex} >= $param->{imagesize});	# complete array has been coded and sent, go to next step
 				$cparams->{$name} = $param;
 				$cparams->{data} = $param->{data};
 				HttpUtils_NonblockingGet($cparams);
@@ -1907,14 +2162,22 @@ sub ESPEInk_HTTPCallbackA(@) {
 
 #---------------------------------------------------------------------------------------------------
 # initialization of upload and first http call (rest is cared for in the callback function)
-sub ESPEInk_PostToDevice($$$$$) {
-	my ($hash,$command,$devind,$control,@outarray) = @_;
+sub ESPEInk_PostToDeviceImage($$$$$) {
+	my ($hash,$command,$devind,$control,$image) = @_;
     my $name = $hash->{NAME};
+
+    
+		my ($w,$h) = $image->getBounds if ( defined( $image ) ); # JV
+
 
 	my $params = {
 			command		=> $command,
 			device		=> $devind,
-			outarray	=> @outarray,
+#			outarray	=> @outarray,
+			image	=> $image,  # JV
+      imagew => $w,     # JV
+      imageh => $h,     # JV
+      imagesize => $w*$h, # JV
 			board		=> ($command eq "EPDx_")?"ESP32":"ESP8266",
     		hash		=> $hash,
 			control		=> $control,
@@ -1945,6 +2208,46 @@ sub ESPEInk_PostToDevice($$$$$) {
 	HttpUtils_NonblockingGet($cparams);
 }
 
+# #---------------------------------------------------------------------------------------------------
+# # initialization of upload and first http call (rest is cared for in the callback function)
+# sub ESPEInk_PostToDevice($$$$$) {
+	# my ($hash,$command,$devind,$control,@outarray) = @_;
+    # my $name = $hash->{NAME};
+
+	# my $params = {
+			# command		=> $command,
+			# device		=> $devind,
+			# outarray	=> @outarray,
+			# board		=> ($command eq "EPDx_")?"ESP32":"ESP8266",
+    		# hash		=> $hash,
+			# control		=> $control,
+			# maxulsize	=> ($command eq "EPDx_")?1000:1500
+	# };
+
+	# my $cparams = {
+    		# method		=> "POST",
+    		# header		=> "Content-Type: text/plain\r\nUser-Agent: fhem\r\nAccept: */*",
+			# data		=> ESPEInk_Byte2String($devind),
+			# callback	=> \&ESPEInk_HTTPCallbackA,
+			# devname		=> $name
+  	# };
+
+	# if ($params->{board} eq "ESP32") {
+		# if ($params->{device} == 3) {											# special treatment for this device
+			# $params->{command} =~ s/x_/d_/g;
+		# } else {																# treatment for all smaller color capable displays
+			# my $subst = chr($params->{device}+97)."_";
+			# $params->{command} =~ s/x_/$subst/g;
+		# }
+	# }
+
+	# $cparams->{url} = 'http://'.ESPEInk_GetSetting($name,"url").'/'.$params->{command};
+	# $cparams->{data} = '' if ($params->{board} eq "ESP32");
+	# $cparams->{$name} = $params;
+	# Log3 ($hash, 3, "$name: sending HTTP request to $cparams->{url} with data: $cparams->{data}");
+	# HttpUtils_NonblockingGet($cparams);
+# }
+
 #---------------------------------------------------------------------------------------------------
 # code converted picture and send it to eInk driver board (and thus to the connected eInk display)
 sub ESPEInk_Upload(@) {
@@ -1971,31 +2274,33 @@ sub ESPEInk_Upload(@) {
 
 	my $rootname = $FW_dir; #File::Spec->rel2abs($FW_dir); # get Filename of FHEMWEB root
 	my $filename = catfile($rootname,$hash->{SUBFOLDER},$name,"result.png");
+  my $image;  # JV
 	if (!open(RESULT,$filename)) {
 		Log3 $hash, 1, "File $filename cannot be opened";
 		return "Error opening image file $filename for upload";
-	} else {
-		close RESULT;
-		my $image = GD::Image->newFromPng($filename);
-		my ($w,$h) = $image->getBounds;
-		my ($r,$g,$b);
-		my $i = 0;
+	} # else {
+  close RESULT;
+    # my $image = GD::Image->newFromPng($filename); # JV
+		$image = GD::Image->newFromPng($filename);    # JV
+		# my ($w,$h) = $image->getBounds;
+		# my ($r,$g,$b);
+		# my $i = 0;
 
-		for (my $iy=0; $iy<$h; $iy++) {
-			for (my $ix=0; $ix<$w; $ix++) {
-				($r,$g,$b) = $image->rgb($image->getPixel($ix,$iy));
-				$outarray[$i] = ($r==0&&$g==0)?0:(($r==255&&$g==255)?1:(($r==127&&$g==127)?2:3));	#convert color values to values between 0 and 3
-				$i++;
-			}
-		}
-	}
+		# for (my $iy=0; $iy<$h; $iy++) {
+			# for (my $ix=0; $ix<$w; $ix++) {
+				# ($r,$g,$b) = $image->rgb($image->getPixel($ix,$iy));
+				# $outarray[$i] = ($r==0&&$g==0)?0:(($r==255&&$g==255)?1:(($r==127&&$g==127)?2:3));	#convert color values to values between 0 and 3
+				# $i++;
+			# }
+		# }
+#	}
 
 	$ESPEInk_uploadcontrol{"retries"} = 0;									# actual number of retries
 	$ESPEInk_uploadcontrol{"maxretries"} = AttrVal($name,"maxretries",3);	# maximum number of retries
 	$ESPEInk_uploadcontrol{"timeout"} = AttrVal($name,"timeout",10);		# timout for HTTP calls
 	$ESPEInk_uploadcontrol{"stepindex"} = 0;								# step currently performed (for multi color displays each color is transferred separately)
 	$ESPEInk_uploadcontrol{"srcindex"} = 0;									# index of source array currently transferred (we might need to split due to the limit on arduino code in data transfer length via HTTP)
-	ESPEInk_PostToDevice($hash,($boardtype eq "ESP32")?'EPDx_':'EPD',$devind,\%ESPEInk_uploadcontrol,\@outarray);	# convert data from conversion result in appropriate format and send it to the device via HTTP
+	ESPEInk_PostToDeviceImage($hash,($boardtype eq "ESP32")?'EPDx_':'EPD',$devind,\%ESPEInk_uploadcontrol,$image);	# convert data from conversion result in appropriate format and send it to the device via HTTP
 	return $hash->{STATE};
 }
 
@@ -2085,6 +2390,24 @@ sub ESPEInk_Upload(@) {
 				  <br><code>color</code> is an RGB hex string that specifies the RGB values of the color respectively (e.g. 00FF00 for green)
 				  <br>For each of the specified icons a list of readings and attributes is added to the device. The readings are holding the parameters finally taken for the generation of the output picture. 
 				  The attributes allow an easy change of the readings (see details in the description below). Once at least one icon is specified, the set option <code>removeobject</code> is added.
+				  <br>
+			  </li>
+              <li><i>addsymbol</i><br>
+                  This option allows to specify an symbols (lines, ellipses, rectangles, arcs) that should be added to the template picture at any position.
+				  <br>The value must be given in the form: <code>symbol#x#y#thickness#angle#color#width#height#segment</code>
+				  <br>where:
+				  <br><code>symbol</code> is specifying which symbol should be drawn. Possible values are line or rectangle or ellipse or arc. If -filled is added, the symbol is filled, if -dotted or -dashed is added, the line is drawn dotted or dashed.
+				  For example a symbol value given as 'line-dotted' will draw a dotted line, 'rectangle-filled' will draw a filled rectangle.
+				  <br><code>x</code> is the x-position of the lower left corner of the symbol relative to the lower left corner of the display area
+				  <br><code>y</code> is the y-position of the lower left corner of the symbol relative to the lower left corner of the display area
+				  <br><code>thickness</code> is the thickness of lines or outlines of the symbols drawn.
+				  <br><code>angle</code> is the rotation angle (counterclockwise) that should be used when drawing the symbol.
+				  <br><code>color</code> is an RGB hex string that specifies the RGB values of the color respectively (e.g. 00FF00 for green)
+				  <br><code>width</code> is the width of the symbol (in case of lines, the line is drawn width pixels in x direction and height pixels in y direction).
+				  <br><code>height</code> is the width of the symbol (in case of lines, the line is drawn width pixels in x direction and height pixels in y direction).
+				  <br><code>segment</code> is only used for arc type symbols. In this case angle (see above) specifies the start of the arc and segment specifices the width of the arc.
+				  <br>For each of the specified symbols a list of readings and attributes is added to the device. The readings are holding the parameters finally taken for the generation of the output picture. 
+				  The attributes allow an easy change of the readings (see details in the description below). Once at least one symbol is specified, the set option <code>removeobject</code> is added.
 				  <br>
 			  </li>
               <li><i>textreading</i><br>
@@ -2219,13 +2542,13 @@ sub ESPEInk_Upload(@) {
 				The url of the WLAN driver board the eInk display is connected to (typically an IP address but could also be a Web-URL)
             </li>
             <li><i>definition</i><br>
-				This is an alternative to using the set addtext/addicon/textreadin/iconreading command. The attribute contains a list of defintions separated by newline.
-				The syntax of the defintion is the same as in the reading <i>[0-n]-def</i>. It contains the command (addtext or addicon or textreading or iconreading) followed by '#' and then the same defintion values as statet in set (addtext ...) above.
+				This is an alternative to using the set addtext/addicon/addsymbol/textreadin/iconreading command. The attribute contains a list of defintions separated by newline.
+				The syntax of the defintion is the same as in the reading <i>[0-n]-def</i>. It contains the command (addtext or addicon or addsymbol or textreading or iconreading) followed by '#' and then the same defintion values as statet in set (addtext ...) above.
 				Lines starting with a <code>#</code> are ignored and treated as comment lines. Example: <code>addtext#Hello#10#10#12#0#000000#giant</code>
             </li>
             <li><i>definitionFile</i><br>
-				This is another alternative to using the set addtext/addicon/textreadin/iconreading command. The attribute holdes the name of a text file containing a list of defintions separated by newline.
-				The syntax of the defintion is the same as in the reading <i>[0-n]-def</i>. It contains the command (addtext or addicon or textreading or iconreading) followed by '#' and then the same defintion values as statet in set (addtext ...) above.
+				This is another alternative to using the set addtext/addicon/addsymbol/textreadin/iconreading command. The attribute holdes the name of a text file containing a list of defintions separated by newline.
+				The syntax of the defintion is the same as in the reading <i>[0-n]-def</i>. It contains the command (addtext or addicon or addsymbol or textreading or iconreading) followed by '#' and then the same defintion values as statet in set (addtext ...) above.
 				Lines starting with a <code>#</code> are ignored and treated as comment lines. Example: <code>addtext#Hello#10#10#12#0#000000#giant</code>
             </li>
             <li><i>interval</i><br>
