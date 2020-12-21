@@ -129,7 +129,7 @@ sub TCM_InitSerialCom($) {
   usleep(750 * 1000);
   # read transceiver IDs
   my $baseID = AttrVal($name, "baseID", undef);
-  if (defined($baseID)) {
+  if (defined $baseID) {
     $hash->{BaseID} = $baseID;
     $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
   } elsif ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
@@ -144,10 +144,10 @@ sub TCM_InitSerialCom($) {
       $hash->{LastID} = '0' x 8;
     }
   }
-  #push(@{$modules{"$hash->{TYPE}"}{BaseID}}, 'F' x 8);
-  push(@{$modules{"$hash->{TYPE}"}{BaseID}}, $baseID) if (!grep(/^$baseID$/, @{$modules{"$hash->{TYPE}"}{BaseID}}));
-  #push(@{$modules{"$hash->{TYPE}"}{BaseID}}, '0' x 8);
-  @{$hash->{helper}{BaseID}} = @{$modules{"$hash->{TYPE}"}{BaseID}};
+  if (defined $baseID) {
+    push(@{$modules{"$hash->{TYPE}"}{BaseID}}, $baseID) if (!grep(/^$baseID$/, @{$modules{"$hash->{TYPE}"}{BaseID}}));
+    @{$hash->{helper}{BaseID}} = @{$modules{"$hash->{TYPE}"}{BaseID}};
+  }
   if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
     # get chipID
     my @getChipID = ('get', 'version');
@@ -1479,7 +1479,7 @@ sub TCM_Notify(@) {
         }
       }
       if (exists($modules{"$hash->{TYPE}"}{BaseID}) && exists($modules{"$hash->{TYPE}"}{ChipID})) {
-       Log3 $hash->{NAME}, 2, "TCM registered transceiver BaseID: " . join(':', @{$modules{"$hash->{TYPE}"}{BaseID}}) . " ChipID: " . join(':', @{$modules{"$hash->{TYPE}"}{ChipID}});
+        Log3 $hash->{NAME}, 2, "TCM registered transceiver BaseID: " . join(':', @{$modules{"$hash->{TYPE}"}{BaseID}}) . " ChipID: " . join(':', @{$modules{"$hash->{TYPE}"}{ChipID}});
       }
     }
   }
