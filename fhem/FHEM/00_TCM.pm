@@ -1402,7 +1402,7 @@ sub TCM_Attr(@) {
 
   } elsif ($attrName eq "msgCounter") {
     if (!defined $attrVal){
-
+      RemoveInternalTimer($hash, 'TCM_msgCounter');
     } elsif ($attrVal eq 'off') {
       RemoveInternalTimer($hash, 'TCM_msgCounter');
     } elsif ($attrVal eq 'on') {
