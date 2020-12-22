@@ -555,6 +555,7 @@ FW_csrfRefresh(callback)
   });
 }
 
+var FW_cmdStack=[];
 function
 FW_cmd(arg, callback, rep)
 {
@@ -573,13 +574,16 @@ FW_cmd(arg, callback, rep)
         callback(req.responseText);
       else if(req.responseText)
         FW_errmsg(req.responseText, 5000);
+      var todo = FW_cmdStack.shift();
+      if(todo) {
+        log("FW_cmd retry #"+todo.rep);
+        FW_cmd(todo.arg, todo.callback, todo.rep);
+      }
     },
     error:function(xhr, status, err) {
       // iOS 13+ is not queueing requests, have to do it myself. Forum #116962
       if(xhr.status == 0 && xhr.readyState == 0 && (!rep || rep < 10)) {
-        rep = (rep ? rep+1 : 1);
-        log("FW_cmd retry #"+rep);
-        setTimeout(function(){FW_cmd(arg, callback, rep)}, 200);
+        FW_cmdStack.push({ arg:arg, callback:callback, rep:(rep?rep+1:1)});
 
       } else if(xhr.status == 400 && typeof FW_csrfToken != "undefined") {
         FW_csrfToken = "";
