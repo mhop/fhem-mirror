@@ -179,8 +179,8 @@ sub weekprofile_getDeviceType($$;$)
     }
     my $model = $devHash->{ccutype};
     if (!defined($model)) {
-      Log3 $me, 2, "$me(getDeviceType): ccutype not defined - take HM-xxx (HMCCU_HM)";
-      $model = "HM-xxx";
+      Log3 $me, 4, "$me(getDeviceType): ccutype not defined";
+      return undef;
     }
     Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model";
 	$type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
