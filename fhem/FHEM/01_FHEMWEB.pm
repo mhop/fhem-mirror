@@ -179,6 +179,7 @@ FHEMWEB_Initialize($)
     hiddenroomRegexp
     httpHeader
     iconPath
+    jsLog:1,0
     longpoll:0,1,websocket
     longpollSVG:1,0
     logDevice
@@ -420,10 +421,12 @@ FW_Read($$)
       my $idx = 0;
       $data = pack("C*", map { $_ ^ $m[$idx++ % 4] } unpack("C*", $data));
     }
-    $hash->{BUF} = "";
+
     my $ret = FW_fC($data);
     FW_addToWritebuffer($hash,
                        FW_longpollInfo("JSON", defined($ret) ? $ret : "")."\n");
+    $hash->{BUF} = substr($hash->{BUF}, $i+$len);
+    FW_Read($hash, 1) if($hash->{BUF});
     return;
   }
 
@@ -1198,6 +1201,7 @@ FW_dataAttr()
   }
 
   return
+    addParam("jsLog", 0).
     addParam("confirmDelete", 1).
     addParam("confirmJSError", 1).
     addParam("addHtmlTitle", 1).
@@ -3966,6 +3970,12 @@ FW_log($$)
         each HTTP Header X can be accessed via %{X}i.
        </li><br>
 
+    <a name="jsLog"></a>
+    <li>jsLog [1|0]<br>
+        if set, and longpoll is websocket, send the browser console log
+        messages to the FHEM log. Useful for debugging tablet/phone problems.
+       </li><br>
+
     <a name="longpoll"></a>
     <li>longpoll [0|1|websocket]<br>
         If activated, the browser is notifed when device states, readings or
@@ -4725,6 +4735,13 @@ FW_log($$)
         mit %{X} den HTTP-Header-Eintrag X spezifizieren.
        </li><br>
 
+
+    <a name="jsLog"></a>
+    <li>jsLog [1|0]<br>
+        falls gesetzt, und longpoll=websocket, dann werden Browser
+        Konsolenmeldungen in das FHEM-Log geschrieben. N&uuml;tzlich bei der
+        Fehlersuche auf Tablets oder Handys.
+       </li><br>
 
     <a name="longpoll"></a>
     <li>longpoll [0|1|websocket]<br>

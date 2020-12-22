@@ -3,10 +3,13 @@ var FW_version={};
 FW_version["fhemweb.js"] = "$Id$";
 
 var FW_serverGenerated;
+var FW_jsLog;
 var FW_serverFirstMsg = (new Date()).getTime()/1000;
 var FW_serverLastMsg = FW_serverFirstMsg;
 var FW_isIE = (navigator.appVersion.indexOf("MSIE") > 0);
-var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/);
+var FW_isiOS = navigator.userAgent.match(/(iPad|iPhone|iPod)/) ||
+               (navigator.platform === 'MacIntel' && 
+                navigator.maxTouchPoints > 1); /* iPad OS 13+ */
 var FW_scripts = {}, FW_links = {};
 var FW_docReady = false, FW_longpollType, FW_csrfToken, FW_csrfOk=true;
 var FW_root = "/fhem";  // root
@@ -80,9 +83,11 @@ FW_jqueryReadyFn()
   if(FW_docReady)       // loading fhemweb.js twice is hard to debug
     return;
   FW_docReady = true;
-  FW_serverGenerated = $("body").attr("generated");
 
+  FW_serverGenerated = $("body").attr("generated");
+  FW_jsLog = $("body").attr("data-jsLog");
   FW_longpollType = $("body").attr("longpoll");
+
   var ajs = $("body").attr("data-availableJs");
   if(ajs) {
     ajs = ajs.split(",");
@@ -500,16 +505,27 @@ FW_delayedStart()
 }
     
 
-
+var FW_logStack=[];
 function
 log(txt)
 {
   var d = new Date();
   var ms = ("000"+(d.getMilliseconds()%1000));
   ms = ms.substr(ms.length-3,3);
-  txt = d.toTimeString().substring(0,8)+"."+ms+" "+txt;
+  var lTxt = d.toTimeString().substring(0,8)+"."+ms+" "+txt;
   if(typeof window.console != "undefined")
-    console.log(txt);
+    console.log(lTxt);
+
+  if(FW_jsLog && FW_longpollType == "websocket") {
+    FW_logStack.push(txt);
+    if(FW_pollConn && FW_pollConn.readyState == FW_pollConn.OPEN) {
+      while(FW_logStack.length) {
+        txt = '{Log 1, "jsLog: '+FW_logStack.shift().replace(/"/g, "'")+'"}';
+        console.log(txt);
+        FW_pollConn.send(txt);
+      }
+    }
+  }
 }
 
 function
@@ -540,7 +556,7 @@ FW_csrfRefresh(callback)
 }
 
 function
-FW_cmd(arg, callback)
+FW_cmd(arg, callback, rep)
 {
   if(arg.length < 120)
     log("FW_cmd:"+arg);
@@ -548,6 +564,8 @@ FW_cmd(arg, callback)
     log("FW_cmd:"+arg.substr(0,120)+"...");
   $.ajax({
     url:addcsrf(arg)+'&fw_id='+$("body").attr('fw_id'),
+    headers: { "cache-control": "no-cache" },
+    dataType: "text",
     method:'POST',
     success: function(data, textStatus, req){
       FW_csrfOk = true;
@@ -557,9 +575,18 @@ FW_cmd(arg, callback)
         FW_errmsg(req.responseText, 5000);
     },
     error:function(xhr, status, err) {
-      if(xhr.status == 400 && typeof FW_csrfToken != "undefined") {
+      // iOS 13+ is not queueing requests, have to do it myself. Forum #116962
+      if(xhr.status == 0 && xhr.readyState == 0 && (!rep || rep < 10)) {
+        rep = (rep ? rep+1 : 1);
+        log("FW_cmd retry #"+rep);
+        setTimeout(function(){FW_cmd(arg, callback, rep)}, 200);
+
+      } else if(xhr.status == 400 && typeof FW_csrfToken != "undefined") {
         FW_csrfToken = "";
         FW_csrfRefresh(function(){FW_cmd(arg, callback)});
+
+      } else {
+        log("FW_cmd error: "+status+"/"+JSON.stringify(xhr));
       }
     }
   });
@@ -1098,7 +1125,8 @@ FW_doUpdate(evt)
     var l = input.substr(FW_longpollOffset, nOff-FW_longpollOffset);
     FW_longpollOffset = nOff+1;
 
-    log("Rcvd: "+(l.length>132 ? l.substring(0,132)+"...("+l.length+")":l));
+    if(l != '[""]') // jsLog answer
+      log("Rcvd: "+(l.length>132 ? l.substring(0,132)+"...("+l.length+")":l));
     if(!l.length)
       continue;
     if(l.indexOf("<")== 0) {  // HTML returned by proxy, if FHEM behind is dead
