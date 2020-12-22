@@ -36,6 +36,7 @@
 # 05.03.19 GA fix reading maxOffTimeCalculation was set but not used
 # 30.12.19 GA fix access to ReadingsVal via $name (reported by stromer-12)
 # 26.05.20 GA fix division by zero if minRoomsOn is >0  and roomsCounted is zero
+# 22.12.20 GA fix maxOffTime for P calculation never activated
 
 ##############################################
 # $Id$
@@ -901,7 +902,7 @@ PWM_CalcRoom(@)
        return ("on", $newpulse, $cycletime, $actorV); 
     }
 
-    if ($newpulse == 0) {
+    if ($newpulse == 0 or ($maxOffTimeApply > 0 and $room->{c_PID_useit} eq 0)) {
 
       # ----------------
       # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
