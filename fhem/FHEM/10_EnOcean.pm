@@ -868,7 +868,7 @@ sub EnOcean_Define($$) {
   #Log3 $name, 2, "EnOcean $name Teach IODev: $ioDev" if (defined $ioDev);
 
   my ($autocreateFilelog, $autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
-     ('./log/' . $name . '-%Y.log', undef, 'autocreate', 'EnOcean', 'Plots');
+     ('./log/' . $name . '-%Y.log', undef, undef, 'EnOcean', 'Plots');
   my ($cmd, $eep, $ret);
   my $filelogName = "FileLog_$name";
   $def = "00000000";
@@ -883,7 +883,7 @@ sub EnOcean_Define($$) {
     $autocreateDeviceRoom = AttrVal($name, "room", $autocreateDeviceRoom);
     if ($init_done) {
       Log3 $name, 2, "EnOcean define " . join(' ', @a);
-      if (!defined(AttrVal($autocreateName, "disable", undef)) && !exists($defs{$filelogName})) {
+      if (defined($autocreateName) && !defined(AttrVal($autocreateName, "disable", undef)) && !exists($defs{$filelogName})) {
         # create FileLog
         $autocreateFilelog = $attr{$autocreateName}{filelog} if (exists $attr{$autocreateName}{filelog});
         $autocreateFilelog =~ s/%NAME/$name/g;
@@ -15907,7 +15907,7 @@ sub EnOcean_CreateSVG($$$) {
   my ($ctrl, $hash, $eepSVG) = @_;
   my $name = $hash->{NAME};
   my ($autocreateHash, $autocreateName, $autocreateDeviceRoom, $autocreateWeblinkRoom) =
-     (undef, 'autocreate', 'EnOcean', 'Plots');
+     (undef, undef, 'EnOcean', 'Plots');
   my $filelogName = "FileLog_$name";
   my ($cmd, $eep, $weblinkName, $weblinkHash, $ret);
   if (defined($eepSVG) && $eepSVG =~ m/^([A-Za-z0-9]{2})-([A-Za-z0-9]{2})-([A-Za-z0-9]{2})$/i) {
@@ -15930,7 +15930,7 @@ sub EnOcean_CreateSVG($$$) {
       }
     }
   }
-  if (!defined(AttrVal($autocreateName, "disable", undef)) && exists($defs{$filelogName})) {
+  if (defined($autocreateName) && !defined(AttrVal($autocreateName, "disable", undef)) && exists($defs{$filelogName})) {
     if (exists $EnO_eepConfig{$eep}{GPLOT}) {
       # add GPLOT parameters
       $attr{$filelogName}{logtype} = $EnO_eepConfig{$eep}{GPLOT} . $attr{$filelogName}{logtype}
