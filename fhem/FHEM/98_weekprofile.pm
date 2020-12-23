@@ -179,8 +179,9 @@ sub weekprofile_getDeviceType($$;$)
     }
     my $model = $devHash->{ccutype};
     if (!defined($model)) {
-      Log3 $me, 4, "$me(getDeviceType): ccutype not defined";
-      return undef;
+      Log3 $me, 4, "$me(getDeviceType): ccutype not defined for device $device - take NAME";
+      $model = $devHash->{NAME};
+      return undef if (!defined($model));
     }
     Log3 $me, 5, "$me(getDeviceType): $devHash->{NAME}, $model";
 	$type = "HMCCU_IP" if ( $model =~ m/HmIP.*/ );
@@ -494,6 +495,7 @@ sub weekprofile_sendDevProfile(@)
     my $dayCnt = scalar(@dayToTransfer);
     my $prefix = weekprofile_get_prefix_HM($device,"ENDTIME_SUNDAY_1",$me);
     $prefix = "" if ($type eq "HMCCU_HM"); # no prefix by set see topic,46117.msg1104569.html#msg1104569
+    $prefix = ""; # TEST always no prefix by set #msg1113658 
     if (!defined($prefix)) {
       Log3 $me, 3, "$me(sendDevProfile): no prefix found"; 
       $prefix = ""; 
@@ -1579,8 +1581,14 @@ sub weekprofile_editOnNewpage(@)
   my $editDaysInRow = AttrVal($device, "widgetEditDaysInRow", undef);
   $editDaysInRow = $daysInRow if (defined($daysInRow));
   
-  my $args = "weekprofile,MODE:EDIT,JMPBACK:1";  
+  my $tempON = AttrVal($device, "tempON", undef);
+  my $tempOFF = AttrVal($device, "tempOFF", undef);
+  
+  my $args = "weekprofile,MODE:EDIT,JMPBACK:1";
   $args .= ",DAYINROW:$editDaysInRow" if (defined($editDaysInRow));
+  $args .= ",TEMP_ON:$tempON"         if (defined($tempON));
+  $args .= ",TEMP_OFF:$tempOFF"       if (defined($tempOFF));
+  
   
   my $html;
   $html .= "<html>";
