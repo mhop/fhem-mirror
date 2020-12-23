@@ -584,10 +584,16 @@ function FW_weekprofileEditDay(widget,day)
     for (var k=tempOff; k <= tempOn; k+=.5)
     {
         var selected = (k == temps[i]) ? "selected " : "";
-        if (k == widget.TEMP_OFF)
+        if (k == widget.TEMP_OFF) {
+          // currently weekprofile save on|off into json data
+          selected = (temps[i] == "off") ? "selected " : "";
           html += "<option "+selected+"value=\"off\">off</option>";
-        else if (k == widget.TEMP_ON)
+        }
+        else if (k == widget.TEMP_ON) {
+          // currently weekprofile save on|off into json data
+          selected = (temps[i] == "on") ? "selected " : "";  
           html += "<option "+selected+"value=\"on\">on</option>";
+        }
         else
           html += "<option "+selected+"value=\""+k.toFixed(1)+"\">"+k.toFixed(1)+"</option>";
     }
