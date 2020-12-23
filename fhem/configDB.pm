@@ -1124,7 +1124,7 @@ sub _cfgDB_findDef {
 }
 
 sub _cfgDB_type { 
-   return "$cfgDB_dbtype (b64)";
+   return $cfgDB_dbtype;
 }
 
 sub _cfgDB_dump {
