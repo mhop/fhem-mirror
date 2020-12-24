@@ -1,9 +1,9 @@
-REV 23409
+REV 23413
 DIR unused
 UPD 2020-12-23_07:45:03 355663 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-12-11_07:45:03 42746 ./MAINTAINER.txt
-UPD 2020-10-21_07:45:03 41442 ./configDB.pm
+UPD 2020-12-24_07:45:04 41434 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2020-12-18_07:45:11 166396 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
@@ -552,7 +552,7 @@ UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
 UPD 2020-12-22_07:45:02 89942 FHEM/98_vitoconnect.pm
 UPD 2018-03-01_07:45:03 5808 FHEM/98_weblink.pm
-UPD 2020-12-23_07:45:03 67670 FHEM/98_weekprofile.pm
+UPD 2020-12-24_07:45:04 68047 FHEM/98_weekprofile.pm
 UPD 2020-09-19_07:45:02 21537 FHEM/99_SUNRISE_EL.pm
 UPD 2020-08-03_07:45:02 11647 FHEM/99_Utils.pm
 UPD 2020-10-19_07:45:03 11772 FHEM/AttrTemplate.pm
@@ -732,8 +732,8 @@ UPD 2020-12-23_07:45:06 4398662 docs/commandref.html
 UPD 2020-12-23_07:45:09 2714434 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2020-12-23_12:08:50 234293 docs/commandref_modular.html
-UPD 2020-12-23_12:08:51 245052 docs/commandref_modular_DE.html
+UPD 2020-12-24_07:45:11 234293 docs/commandref_modular.html
+UPD 2020-12-24_07:45:13 245052 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2288,7 +2288,7 @@ UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
 UPD 2017-10-04_07:45:02 9001 www/pgm2/fhemweb_sortable.js
 UPD 2019-02-01_07:45:03 26140 www/pgm2/fhemweb_uzsu.js
-UPD 2019-01-07_07:45:02 28595 www/pgm2/fhemweb_weekprofile.js
+UPD 2020-12-24_07:45:04 28866 www/pgm2/fhemweb_weekprofile.js
 UPD 2015-07-28_14:05:34 223 www/pgm2/floorplan_click.js
 UPD 2015-07-28_14:05:34 3246 www/pgm2/floorplan_drag.js
 UPD 2015-07-28_14:05:34 418 www/pgm2/images/ui-bg_diagonals-thick_18_b81900_40x40.png
