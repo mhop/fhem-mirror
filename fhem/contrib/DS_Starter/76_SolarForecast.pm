@@ -153,7 +153,7 @@ my @chours      = (5..21);                                                  # St
 my $defpvme     = 16.52;                                                    # default Wirkungsgrad Solarmodule
 my $definve     = 98.3;                                                     # default Wirkungsgrad Wechselrichter
 my $kJtokWh     = 0.00027778;                                               # Umrechnungsfaktor kJ in kWh
-my $maxvariance = 0.3;                                                      # max. Varianz pro Durchlauf Berechnung Autokorrekturfaktor
+my $maxvariance = 0.6;                                                      # max. Varianz pro Durchlauf Berechnung Autokorrekturfaktor
 my $definterval = 70;                                                       # Standard Abfrageintervall
   
 ################################################################
@@ -747,10 +747,7 @@ sub _transferInverterValues {
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
-  my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen
-  
-  my $sr = (split ":", ReadingsVal($name, "Today_SunRise", "00:00"))[0];                    
-  my $ss = (split ":", ReadingsVal($name, "Today_SunSet",  "00:00"))[0];                   
+  my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen                  
   
   if($chour =~ /^($tlim)$/x) {
       deleteReadingspec ($hash, "Today_Hour.*_PV.*");
@@ -772,18 +769,23 @@ sub _transferInverterValues {
   my $etoday = ReadingsNum ($indev, $edread, 0) * $eduf;                                      # aktuelle Erzeugung (W) 
   
   my $edaypast = 0;
+  deleteReadingspec ($hash, "Today_Hour00_PVreal");
   for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      if($h <= int($sr)-3) {
-          readingsSingleUpdate($hash, "Today_Hour".sprintf("%02d",$h)."_PVreal", "0 Wh", 0);
-          next;
-      }
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
   my $ethishour  = $etoday - $edaypast;
   
-  push @$daref, "Today_Hour${chour}_PVreal:". $ethishour." Wh" if($chour !~ /^($tlim)$/x);    # nicht setzen wenn Stunde 23 des Tages
-      
+  #if($ethishour < 0) {                                                                        # fehlerhaft berechnete etoday eliminieren
+  #    push @$daref, "Today_Hour".sprintf("%02d",$chour-1)."_PVreal:0 Wh";
+  #    push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
+  if($chour <= 3 && $ethishour > 0) {
+      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
+  }
+  else {
+      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:". $ethishour." Wh" if($chour !~ /^($tlim)$/x); # nicht setzen wenn Stunde 23 des Tages
+  }  
+  
 return;
 }
 
@@ -1097,6 +1099,8 @@ sub forecastGraphic {                                                           
   my $pvRe = ReadingsNum ($name,"RestOfDay_PV",            0); 
   my $pvTo = ReadingsNum ($name,"Tomorrow_PV",             0);
   my $pvCu = ReadingsNum ($name,"Current_PV",              0);
+  
+  my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -1129,14 +1133,16 @@ sub forecastGraphic {                                                           
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, "ThisHour_PVforecast", "0000-00-00 00:00:00");         # letzter Forecast Update  
       
-      my $lupt    = "last update:";  
+      my $lupt    = "last update:";
+      my $autoct  = "automatic correction:";  
       my $lblPv4h = "next&nbsp;4h:";
       my $lblPvRe = "remain today:";
       my $lblPvTo = "tomorrow:";
       my $lblPvCu = "actual";
      
       if(AttrVal("global", "language", "EN") eq "DE") {                                             # Header globales Sprachschema Deutsch
-          $lupt    = "Stand:"; 
+          $lupt    = "Stand:";
+          $autoct  = "automatische Korrektur:";          
           $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
           $lblPvRe = "Rest heute:";
           $lblPvTo = "morgen:";
@@ -1164,8 +1170,10 @@ sub forecastGraphic {                                                           
           }
           
           my $upstate  = ReadingsVal($name, "state", "");
-          my $upicon;
           
+          ## Update-Icon
+          ##############
+          my $upicon;
           if ($upstate =~ /updated/ix) {
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
           } 
@@ -1178,8 +1186,29 @@ sub forecastGraphic {                                                           
           else {
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
           }
+          
+          ## Autokorrektur-Icon
+          ######################
+          my $acicon;
+          if ($pcfa eq "on") {
+              $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+          } 
+          elsif ($pcfa eq "off") {
+              $acicon = "off";
+          } 
+          elsif ($pcfa =~ /standby/ix) {
+              my ($rtime) = $pcfa =~ /for (.*?) hours/x;
+              $acicon     = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">&nbsp;(Start in ".$rtime." h)";
+          } 
+          else {
+              $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+          }
+          
   
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"right\">(".$lupt."&nbsp;".$lup.")&nbsp;".$upicon."</td></tr>";
+          ## erste Header-Zeilen
+          #######################
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td></tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td></tr>";
       }
       
       ########################
@@ -1732,6 +1761,7 @@ sub weather_icon {
      '60' => 'weather_rain_light',                  # Sonne, Wolke mit Regen (1 Tropfen)                    # vorhanden
      '61' => 'weather_rain',                        # Sonne, Wolke mit Regen (2 Tropfen)                    # vorhanden
      '62' => 'weather_rain_heavy',                  # Sonne, Wolke mit Regen (3 Tropfen)                    # vorhanden
+     '68' => 'weather_rain_snow_light',             # leichter Schneeregen (Tag)                            # vorhanden     
      '70' => 'weather_snow_light',                  # Sonne, Wolke mit Schnee (1 Flocke)                    # vorhanden
      '71' => 'weather_snow_heavy',                  # Sonne, Wolke mit Schnee (3 Flocken)                   # vorhanden
      '80' => 'weather_thunderstorm',                # Wolke mit Blitz                                       # vorhanden
@@ -1757,6 +1787,7 @@ sub weather_icon {
     '160' => 'weather_night_rain_light',            # Mond, Wolke mit Regen (1 Tropfen) - Nacht             # neu
     '161' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
     '162' => 'weather_night_rain_heavy',            # Mond, Wolke mit Regen (3 Tropfen) - Nacht             # neu
+    '168' => 'weather_night_rain_snow_light',       # leichter Schneeregen (Tag)                            # vorhanden 
     '170' => 'weather_night_snow_rain',             # Mond, Wolke mit Schnee (1 Flocke) - Nacht             # neu
     '171' => 'weather_night_snow_heavy',            # Mond, Wolke mit Schnee (3 Flocken) - Nacht            # neu
     '180' => 'weather_night_thunderstorm_light',    # Wolke mit Blitz - Nacht                               # neu
@@ -1842,7 +1873,7 @@ sub calcVariance {
   my $idts = $hash->{HELPER}{INVERTERDEFTS};                                            # FHEM Start oder Definitionstimestamp des Inverterdevice
   return if(!$idts);
   
-  my $t = time;                                                                           # aktuelle Unix-Zeit
+  my $t = time;                                                                         # aktuelle Unix-Zeit
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
@@ -1857,8 +1888,9 @@ sub calcVariance {
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h >= $chour);
-      my $fcval = $hash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
-      my $fcnum = int ((split " ", $fcval)[0]);
+      # my $fcval = $hash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
+      my $fcnum = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      # my $fcnum = int ((split " ", $fcval)[0]);
       next if(!$fcnum);
  
       my $pvval  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
