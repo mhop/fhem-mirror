@@ -1404,6 +1404,7 @@ sub CUL_HM_Parse($$) {#########################################################
         $mh{dstH}->{"prot"."ErrIoAttack"} =
           ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef);
       }
+      
       Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:$mh{dstH}->{helper}{cSnd}:".$tm;
       CUL_HM_eventP($mh{dstH},"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoAttack"},2);
@@ -4359,6 +4360,18 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
         $ret .= "\n   $shtxt: $txt";
         $ret .= "\n      =>$_" foreach(split("\n",$hash->{helper}{cfgChk}{$_}));
       }
+    }
+    return $ret;
+  }
+  elsif($cmd eq "list"){  ###############################################
+    my $globAttr = AttrVal("global","showInternalValues","undef");
+    $attr{global}{showInternalValues} = $a[2] eq "full" ? 1 : 0;
+    my $ret = CommandList(undef,$name);
+    if ($globAttr eq "undef"){
+      delete $attr{global}{showInternalValues};
+    }
+    else{
+      $attr{global}{showInternalValues} = $globAttr;
     }
     return $ret;
   }
@@ -8117,27 +8130,22 @@ sub CUL_HM_protState($$){
 
 ###################-----------helper and shortcuts--------#####################
 ################### Peer Handling ################
-sub CUL_HM_ID2PeerList ($$$) {
+sub CUL_HM_ID2PeerList ($$$) { # {CUL_HM_ID2PeerList ("lvFrei","12345678",1)}
   my($name,$peerID,$set) = @_;
-  my $peerIDs = AttrVal($name,"peerIDs","peerUnread");
-  $peerIDs =~ s/peerUnread//;
-  return if (!$peerID && !$peerIDs); # nothing to do
-  my $hash = $defs{$name};
-  $peerIDs =~ s/$peerID//g;          #avoid duplicate, support unset
+  $peerID = ' ' if (!defined($peerID) || $peerID eq '');  # no peer
   $peerID =~ s/^000000../00000000/;  #correct end detector
-  $peerIDs.= $peerID."," if($set);
-  my %tmpHash = map { $_ => 1 } split(",",$peerIDs);#remove duplicates
-  $peerIDs = "";                                    #clear list
-  my $peerNames = "";                               #prepare names
+
   my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
-  foreach my $pId (sort(keys %tmpHash)){
-    next if ($pId !~ m/^[0-9A-Fx]{8}$/);            #ignore non-channel IDs
-    $peerIDs .= $pId.",";                           #append ID
-    next if ($pId eq "00000000");                   # and end detection
-    $peerNames .= CUL_HM_peerChName($pId,$dId).",";
-  }
+  my $peerIDs = AttrVal($name,"peerIDs","peerUnread");
+  $peerIDs =~ s/(peerUnread|$peerID)//g;            #avoid duplicate, support unset
+  $peerIDs.= ",$peerID" if($set);
+
+  my %tmpHash   = map { $_ => 1 } grep/^[0-9A-Fx]{8}$/,split(",",$peerIDs);#remove duplicates
+  $peerIDs      = join(",",sort(keys %tmpHash)).',';
+  my $peerNames = join(",",map{CUL_HM_peerChName($_,$dId)} sort(grep !/00000000/,keys %tmpHash));
   $attr{$name}{peerIDs} = $peerIDs ? $peerIDs : "peerUnread";                 # make it public
 
+  my $hash = $defs{$name};
   my $dHash = CUL_HM_getDeviceHash($hash);
   my $st = AttrVal($dHash->{NAME},"subType","");
   my $md = AttrVal($dHash->{NAME},"model","");
@@ -8198,9 +8206,8 @@ sub CUL_HM_ID2PeerList ($$$) {
         CUL_HM_UpdtReadSingle($hash,"state","peered",0);
       }
     }
-    elsif( ($md =~ m/^HM-CC-RT-DN/     && $chn =~ m/^(03|06)$/)
-         ||($md eq "HM-TC-IT-WM-W-EU"  && $chn =~ m/^(03|06)$/)){
-      if (AttrVal($hash,"state","unpeered") eq "unpeered"){
+    elsif( $chn =~ m/^(03|06)$/ && $md =~ m/^(HM-CC-RT-DN|HM-TC-IT-WM-W-EU)/ ){
+      if (ReadingsVal($name,"state","unpeered") eq "unpeered"){ 
         CUL_HM_UpdtReadSingle($hash,"state","unknown",0);
       }
     }
@@ -11850,6 +11857,9 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
            prior to rewrite data to an entity it is necessary to pair the device with FHEM.<br>
            restore will not delete any peered channels, it will just add peer channels.<br>
            </li>
+       <li><B>list (normal|hidden);</B><a name="CUL_HMlist"><br>
+           issue list command for the fiven entity normal or including the hidden parameter
+           </li>       
        <li><B>listDevice</B><br>
            <ul>
                 <li>when used with ccu it returns a list of Devices using the ccu service to assign an IO.<br>
@@ -13278,19 +13288,22 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
         vor dem zur&uuml;ckschreiben der Daten eines Eintrags muss das Ger&auml;t mit FHEM verbunden werden.<br>
         "restore" l&ouml;scht keine verkn&uuml;pften Kan&auml;le, es f&uuml;gt nur neue Peers hinzu.<br>
       </li>
-      <li><B>listDevice</B><br>
-          <ul>
-              <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
-                </li>
-              <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
-                  get ActionDetector listDevice          # returns alle assigned entities<br>
-                  get ActionDetector listDevice notActive# returns entities ohne status alive<br>
-                  get ActionDetector listDevice alive    # returns entities mit status alive<br>
-                  get ActionDetector listDevice unknown  # returns entities mit status unknown<br>
-                  get ActionDetector listDevice dead     # returns entities mit status dead<br>
-                  </li>
-              </ul>
-          </li>
+       <li><B>list (normal|hidden);</B><a name="CUL_HMlist"><br>
+           triggern des list commandos fuer die entity normal oder inclusive der verborgenen parameter
+           </li>       
+       <li><B>listDevice</B><br>
+           <ul>
+               <li>bei einer CCU gibt es eine Liste der Devices, welche den ccu service zum zuweisen der IOs zurück<br>
+                 </li>
+               <li>beim ActionDetector wird eine Komma geteilte Liste der Entities zurückgegeben<br>
+                   get ActionDetector listDevice          # returns alle assigned entities<br>
+                   get ActionDetector listDevice notActive# returns entities ohne status alive<br>
+                   get ActionDetector listDevice alive    # returns entities mit status alive<br>
+                   get ActionDetector listDevice unknown  # returns entities mit status unknown<br>
+                   get ActionDetector listDevice dead     # returns entities mit status dead<br>
+                   </li>
+               </ul>
+           </li>
     </ul><br>
     <a name="CUL_HMattr"></a><b>Attribute</b>
     <ul>
