@@ -139,7 +139,7 @@ my $K_actDetID = '000000'; # id of actionDetector
  ,"0037" => {name=>"HM-RC-19"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b'    ,lst=>'1,4:1p.2p.3p.4p.5p.6p.7p.8p.9p.10p.11p.12p.13p.14p.15p.16p'
                                                                                                                         ,chn=>"Btn:1:17,Disp:18:18",}
  ,"0038" => {name=>"HM-RC-19-B"              ,alias=>"HM-RC-19"}
- ,"0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",}
+ ,"0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w:f'  ,lst=>'p:1p.2p,5:2.3p,6:2',chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",}
  ,"003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w'    ,lst=>'p,5'          ,chn=>"",}
  ,"003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'      ,lst=>'1,4'          ,chn=>"Btn:1:4",}
  ,"003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:f'    ,lst=>'p'            ,chn=>"",} #:w  todo should be wakeup, does not react
@@ -1677,7 +1677,8 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
                        cmdList    => "[({short}|long)]",
                        saveConfig => "[-filename-]",
                        deviceInfo => "[({short}|long)]",
-                       tplInfo    => ""
+                       tplInfo    => "",
+                       list       => "[({normal}|full)]"
                       );
 %culHmVrtGets       = (
                        param      => "-param-",
@@ -1762,16 +1763,16 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,statusRequest  =>""
                                           ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                          }
-                     ,dimmer           =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{0})]"
-                                          ,"on-till"      =>"-time- [(-ramptime-|{0})]"
+                     ,dimmer           =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{})]"
+                                          ,"on-till"      =>"-time- [(-ramptime-|{})]"
                                           ,on             =>""
                                           ,off            =>""
                                           ,old            =>""
                                           ,toggle         =>""
-                                          ,pct            =>"(-value-|old) [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,pct            =>"(-value-|old) [(-ontime-|{})] [(-ramptime-|{})]"
                                           ,stop           =>""
-                                          ,up             =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
-                                          ,down           =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
+                                          ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                           ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
                                           ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
@@ -1782,8 +1783,8 @@ $culHmSubTypeDevSets{blindActuator}     = $culHmSubTypeDevSets{switch};
                                           ,toggleDir      =>""
                                           ,pct            =>"-value- [-ontime-]"
                                           ,stop           =>""
-                                          ,up             =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
-                                          ,down           =>"[(-changeValue-|{10})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                          ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
+                                          ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                           ,inhibit        =>"[(on|{off})]"
                                           ,statusRequest  =>""
                                           ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
@@ -1929,7 +1930,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                }
                      ,"HM-OU-CFM-PL01"       =>{ led            =>"(redL|greenL|orangeL|redS|greenS|orangeS|pause)[,(-color2-...)] 'rep:' [(1..255;1|{1})]"}
                      ,"HM-OU-CFM-PL02"       =>{ playTone       =>"[{replay}|-MP3No-[,-MP3No-...]] 'rep:' [(1..255;1|{1})] 'vol:' [(0..10;1|{10})] 'dur:' [(-duration-|{108000})]"
-                                                ,pct            =>"[-value- [-ontime-]"}
+                                                ,pct            =>"-value- [-ontime-]"}
                      ,"HM-DIS-EP-WM5503"     =>{ displayEP      =>"[(-text1,icon1:text2,icon2:text3,icon3-|{help})]"
                                                                  ." [({off}|longlong|longshort|long2short|short|shortshort|long)]"
                                                                  ." 'rep:' [(1..16;1|{1})]"
@@ -1953,27 +1954,27 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
 #                     ,"HM-ES-PMSW1-PL00"     =>{ getSerial      => ""
 #                                                ,getDevInfo     => ""
 #                                               }
-                     ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{0})]"
-                                                ,"on-till"      =>"-time- [(-ramptime-|{0})]"
+                     ,"HM-LC-RGBW-WM01"      =>{ "on-for-timer" =>"-ontime- [(-ramptime-|{})]"
+                                                ,"on-till"      =>"-time- [(-ramptime-|{})]"
                                                 ,on             =>""
                                                 ,off            =>""
                                                 ,toggle         =>""
-                                                ,pct            =>"-value- [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,pct            =>"-value- [(-ontime-|{})] [(-ramptime-|{})]"
                                                 ,stop           =>""
-                                                ,up             =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
-                                                ,down           =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
+                                                ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                                 ,inhibit        =>"[(on|{off})]"
                                                 ,statusRequest  =>""
                                                 ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                                }
-                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"-bright[0-100]- -colVal[0-100]- -duration- -ramp- ..."
-                                                ,color          =>"-colVal[0-100]-"
+                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"'bright:'(0..100;1|{100}) 'colVal:' (0..100;1|{100}) [(-ontime-|{})] [(-ramp-|{})]"
+                                                ,color          =>"(0..100;1|{100})"
                                                 ,on             =>""
                                                 ,off            =>""
-                                                ,up             =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
-                                                ,down           =>"[(-changeValue-|{0})] [(-ontime-|{0})] [(-ramptime-|{0})]"
+                                                ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
+                                                ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                                }
-                     ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- [(-min-|{})] [(-max-|{})] [(-duration-|{})] [(-ramp-|{})]"
+                     ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- [(-min-|{})] [(-max-|{})] [(-ontime-|{})] [(-ramp-|{})]"
                                                 ,colProgram     =>"[(0..255;1|{0})]"
                                                }
                      ,"HM-SEC-SIR-WM01"      =>{ on             =>""
