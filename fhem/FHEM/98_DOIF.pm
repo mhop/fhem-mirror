@@ -4757,7 +4757,7 @@ sub cylinder
   $dec=1 if (!defined $dec);
   my $format='%1.'.$dec.'f';  
   
-  $height=12+@values*12 if (!defined $height or $height eq "");
+  $height=10+@values*10 if (!defined $height or $height eq "");
   
   if (!defined $header or $header eq "") {
     $trans=5;
@@ -4770,6 +4770,7 @@ sub cylinder
   if (!defined $bwidth or $bwidth eq "") {
     my $lenmax=0;
     for (my $i=0;$i<@values;$i+=3){
+      $values[$i+2]="" if (!defined $values[$i+2]);
       $lenmax=length($values[$i+2]) if (length($values[$i+2]) > $lenmax);
     }
     $bwidth=90+$lenmax*4.3;
@@ -4806,14 +4807,19 @@ sub cylinder
   $out.= sprintf('<rect x="15" y="0"  width="%d" height="4" rx="20" ry="2" fill="url(#grad0)"/>',$width);
 
   ($y,$val1,$null)=y_h(0,$min,$max,$height);
-  $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',$height+3,$min);
+  $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',$height+5,$min);
   $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',$null+6,0) if (defined $null);
-  $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',8,$max);  
+  $out.= sprintf('<text x="48" y="%d" style="fill:white; font-size:10px">%s</text>',6,$max);  
 
-  my $yBegin=14+($height-@values*12)/2;
+  my $yBegin=13+($height-@values*10)/2;
   for (my $i=0;$i<@values;$i+=3){
-    my $yValue=$yBegin+12;
+    my $yValue=$yBegin+9;
     my $value=$values[$i];
+    my $val=$value;
+    if (!defined $value or $value eq "") {
+      $val="N/A";
+      $value=0;
+    }
     my $color=$values[$i+1];
     my $text=$values[$i+2];
     
@@ -4823,10 +4829,10 @@ sub cylinder
     $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="%s" stroke-width="0.5"/>',$y,$width,hsl_color($color,15));
 
     if (defined $text and $text ne "") {
-      $out.= sprintf('<text x="60" y="%d" style="fill:%s; font-size:12px">%s</text>',$yBegin+$i*12,hsl_color($color),$text.":");
+      $out.= sprintf('<text x="60" y="%d" style="fill:%s; font-size:12px">%s</text>',$yBegin+$i*10,hsl_color($color),$text.":");
       $yValue+=7;
     }
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:16px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*12,hsl_color ($color),sprintf($format,$value),$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:16px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*10,hsl_color ($color),($val eq "N/A" ? $val:sprintf($format,$val)),$unit);
   }  
 
   $out.= sprintf('<rect x="15" y="0"  width="%d" height="4" rx="20" ry="2" fill="none" stroke="rgb(137, 137, 137)" stroke-width="0.5"/>',$width);
