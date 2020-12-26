@@ -466,17 +466,17 @@ MQTT2_CLIENT_Read($@)
       $val = "" if(!defined($val));
 
       my $ir = AttrVal($name, "ignoreRegexp", undef);
-      next if(defined($ir) && "$tp:$val" =~ m/$ir/);
+      if(!defined($ir) || "$tp:$val" !~ m/$ir/) {
+        my $ac = AttrVal($name, "autocreate", "no");
+        $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
 
-      my $ac = AttrVal($name, "autocreate", "no");
-      $ac = $ac eq "1" ? "simple" : ($ac eq "0" ? "no" : $ac); # backward comp.
+        my $cid = makeDeviceName($hash->{clientId});
+        $tp =~ s/:/_/g; # 96608
+        Dispatch($hash, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no");
 
-      my $cid = makeDeviceName($hash->{clientId});
-      $tp =~ s/:/_/g; # 96608
-      Dispatch($hash, "autocreate=$ac\0$cid\0$tp\0$val", undef, $ac eq "no");
-
-      my $re = AttrVal($name, "rawEvents", undef);
-      DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
+        my $re = AttrVal($name, "rawEvents", undef);
+        DoTrigger($name, "$tp:$val") if($re && $tp =~ m/$re/);
+      }
     }
 
   } else {
