@@ -410,8 +410,10 @@ svg_init_one(embed, svg)
     return;
   svg_initialized[sid] = true;
   $("text.legend", svg).click(function(e){sv_menu(e, embed)});
-  for(var i in svgCallback)
+  for(var i in svgCallback) {
+    if(!svg.getAttribute) svg.getAttribute = function(){ return true }; // fix for flex.js crash
     svgCallback[i](svg);
+  }
 }
 
 function
