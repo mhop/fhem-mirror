@@ -187,17 +187,18 @@ sub Initialize {
                                 "headerDetail:all,co,pv,pvco,statusLink ".
                                 "hourCount:slider,4,1,24 ".
                                 "hourStyle ".
-                                "maxPV ".
                                 "htmlStart ".
                                 "htmlEnd ".
                                 "interval ".
+                                "layoutType:pv,co,pvco,diff ".
+                                "maxVariancePerDay ".
+                                "maxPV ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
                                 "showLink:1,0 ".
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
                                 "spaceSize ".   
-                                "layoutType:pv,co,pvco,diff ".
                                 "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".                                
                                 $readingFnAttributes;
@@ -402,6 +403,8 @@ sub _setreset {                          ## no critic "not used"
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
   }
+  
+  createNotifyDev ($hash);
 
 return;
 }
@@ -429,7 +432,7 @@ return;
 ################################################################
 #                      Setter moduleTiltAngle
 ################################################################
-sub _setmoduleTiltAngle {                      ## no critic "not used"
+sub _setmoduleTiltAngle {                ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -582,7 +585,11 @@ sub Attr {
         if ($aName eq "interval") {
             unless ($aVal =~ /^[0-9]+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
             InternalTimer(gettimeofday()+1.0, "FHEM::SolarForecast::centralTask", $hash, 0);
-        }          
+        }  
+        
+        if ($aName eq "maxVariancePerDay") {
+            unless ($aVal =~ /^[0-9.]+$/x) {return "The value for $aName is not valid. Use only numbers with optional decimal places !";}
+        }         
     }
 
 return;
@@ -1953,7 +1960,9 @@ sub calcVariance {
   }
   else {
       readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on", 0);
-  }  
+  }
+
+  my $maxvar = AttrVal($name, "maxVariancePerDay", $defmaxvar);                         # max. Korrekturvarianz
 
   my @da;
   for my $h (1..23) {
@@ -1977,8 +1986,8 @@ sub calcVariance {
       
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
       
-      if(abs($factor - $oldfac) > $defmaxvar) {
-          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+      if(abs($factor - $oldfac) > $maxvar) {
+          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
           Log3($name, 3, "$name - new limited Variance factor: $factor for hour: $h");
       }
       else {
@@ -2461,6 +2470,13 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
        <li><b>maxPV &lt;0...val&gt; </b><br>
          Maximaler Ertrag in einer Stunde zur Berechnung der Balkenhöhe. <br>
          (default: 0 -> dynamisch)
+       </li>
+       <br>
+       
+       <a name="maxVariancePerDay"></a>
+       <li><b>maxVariancePerDay &lt;Zahl&gt; </b><br>
+         Maximale Änderungsgröße des PV Vorhersagefaktors (Reading pvCorrectionFactor_XX) pro Tag. <br>
+         (default: 0.5)
        </li>
        <br>
        
