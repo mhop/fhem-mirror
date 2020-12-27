@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.21.0   new sub timestringToTimestamp / createReadingsFromArray
 # 1.20.7   change to defined ... in sub _addSendqueueSimple
 # 1.20.6   delete $hash->{OPMODE} in checkSendRetry
 
@@ -53,6 +54,7 @@ our @EXPORT_OK = qw(
                      getClHash
                      delClHash
                      delReadings
+                     createReadingsFromArray
                      trim
                      slurpFile
                      moduleVersion
@@ -81,6 +83,7 @@ our @EXPORT_OK = qw(
                      checkSendRetry
                      purgeSendqueue
                      updQueueLength
+                     timestringToTimestamp
                    );
                      
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -100,6 +103,7 @@ BEGIN {
           CancelDelayedShutdown
           devspec2array
           FmtDateTime
+          fhemTimeLocal
           setKeyValue
           getKeyValue
           InternalTimer
@@ -265,6 +269,46 @@ sub slurpFile {
   }
 
 return ($errorcode, $content);
+}
+
+###############################################################################
+#  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix 
+#  Timestamp umwandeln
+###############################################################################
+sub timestringToTimestamp {            
+  my $hash    = shift // carp $carpnohash                     && return; 
+  my $tstring = shift // carp "got no time string to convert" && return;
+  my $name    = $hash->{NAME};
+
+  my($y, $mo, $d, $h, $m, $s) = $tstring =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;
+  return if(!$mo || !$y);
+  
+  my $timestamp = fhemTimeLocal($s, $m, $h, $d, $mo-1, $y-1900);
+  
+return $timestamp;
+}
+
+###############################################################################
+#                   Readings aus Array erstellen
+#       $daref:  Referenz zum Array der zu erstellenden Readings
+#                muß Paare <Readingname>:<Wert> enthalten
+#       $doevt:  1-Events erstellen, 0-keine Events erstellen
+###############################################################################
+sub createReadingsFromArray {
+  my $hash  = shift // carp $carpnohash                      && return;
+  my $daref = shift // carp "got no reading array reference" && return;
+  my $doevt = shift // 0;  
+  
+  readingsBeginUpdate($hash);
+  
+  for my $elem (@$daref) {
+      my ($rn,$rval) = split ":", $elem, 2;
+      readingsBulkUpdate($hash, $rn, $rval);      
+  }
+
+  readingsEndUpdate($hash, $doevt);
+  
+return;
 }
 
 #############################################################################################
