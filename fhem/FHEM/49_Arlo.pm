@@ -43,12 +43,17 @@ sub Arlo_Define($$) {
        $mailPasswd = Arlo_decrypt($a[5]);
        $hash->{helper}{mailPassword} = $mailPasswd;
     }
+    if (@a > 6) {
+       $hash->{helper}{mailUser} = $a[6];
+    } else {
+       $hash->{helper}{mailUser} = $user;
+    }
     $modules{$MODULE}{defptr}{"account"} = $hash;
     
     my $cryptUser = Arlo_encrypt($user);
     my $cryptPasswd = Arlo_encrypt($passwd);
     my $cryptMailPasswd = Arlo_encrypt($mailPasswd);
-    $hash->{DEF} = "ACCOUNT $cryptUser $cryptPasswd $cryptMailPasswd";
+    $hash->{DEF} = "ACCOUNT $cryptUser $cryptPasswd $cryptMailPasswd $a[6]";
     InternalTimer(gettimeofday() + 3, "Arlo_Login", $hash);
 
   } elsif (($subtype eq 'BASESTATION' || $subtype eq 'ROUTER') && @a == 5) {
@@ -857,7 +862,7 @@ sub Arlo_CheckBasestationsInactive() {
   my %defptr = %{$modules{$MODULE}{defptr}};
   foreach my $key (keys %defptr) {
     if (substr($key, 0, 1) eq 'B') {
-      my $state = %defptr{$key}->{STATE};
+      my $state = $defptr{$key}->{STATE};
       if ($state ne 'disarmed' && $state ne 'offline') {
         return \0;
       }
@@ -1540,14 +1545,14 @@ sub Arlo_Check2FAMail($) {
   
   my $mailServer = AttrVal($name, 'mailServer', '');
   if ($mailServer eq '') {
-    Log3 $name, 1, 'Bei 2-Faktor-Authentifizierung muss das Attribute mailServer gesetzt sein, damit die Mail mit dem Authentifizerungs-Code abgerufen werden kann.';
+    Log3 $name, 1, 'Bei 2-Faktor-Authentifizierung muss das Attribut mailServer gesetzt sein, damit die Mail mit dem Authentifizerungs-Code abgerufen werden kann.';
     return;
   }
 
-  my $username = $hash->{helper}{username};
+  my $mail_user = $hash->{helper}{mailUser};
   my $mail_password = $hash->{helper}{mailPassword};
   my $socket = IO::Socket::SSL->new(PeerAddr => $mailServer, PeerPort => 993, Timeout => 10);
-  my $client = Mail::IMAPClient->new(Socket => $socket, User => $username, Password => $mail_password,	Timeout => 10);
+  my $client = Mail::IMAPClient->new(Socket => $socket, User => $mail_user, Password => $mail_password,	Timeout => 10);
   
   if (!$client->IsAuthenticated()) {
     Log3 $name, 2, "E-Mail authentication error.";
@@ -1646,11 +1651,12 @@ sub Arlo_decrypt($) {
 
   <p><a name="ArloDefine"></a> <b>Define</b></p>
   <ul>
-    <code>define Arlo_Cloud Arlo ACCOUNT &lt;hans.mustermann@xyz.de&gt; &lt;myArloPassword&gt; &lt;myEmailPassword&gt;</code>
+    <code>define Arlo_Cloud Arlo ACCOUNT &lt;hans.mustermann@xyz.de&gt; &lt;myArloPassword&gt; &lt;myEmailPassword&gt; &lt;myEmailUsername&gt;</code>
     
 	<p>Please replace hans.mustermann@xyz.de by the e-mail address you have registered at Arlo and myArloPassword by the password used there.
     For the 2 factor authentication you also have to set the password of the email account. The email server which receives the Arlo mails has to be set
-    with attr Arlo_Cloud mailServer imap.gmx.net, where imap.gmx.net has to be replaced by the IMAP server of your mail provider. Only IMAP with encryption is supported.</p>
+    with attr Arlo_Cloud mailServer imap.gmx.net, where imap.gmx.net has to be replaced by the IMAP server of your mail provider. Only IMAP with encryption is supported.
+    You can skip the parameter myEmailUsername if the username matches the email address.</p>
     
   <p>After you have successfully created the account definition, you can call <code>set Arlo_Cloud autocreate</code>.
     Now the base station(s) and cameras which are assigned to the Arlo account will be created in FHEM. All new devices are created in the room Arlo.</p>
@@ -1821,12 +1827,13 @@ sub Arlo_decrypt($) {
 
   <p><a name="ArloDefine"></a> <b>Define</b></p>
   <ul>
-    <code>define Arlo_Cloud Arlo ACCOUNT &lt;hans.mustermann@xyz.de&gt; &lt;meinArloPasswort&gt; &lt;meinEmailPasswort&gt;</code>
+    <code>define Arlo_Cloud Arlo ACCOUNT &lt;hans.mustermann@xyz.de&gt; &lt;meinArloPasswort&gt; &lt;meinEmailPasswort&gt; &lt;meinEmailBenutzername&gt;</code>
     
 	<p>hans.mustermann@xyz.de durch die E-Mail-Adresse ersetzen, mit der man bei Arlo registriert ist, meinArloPasswort durch das Passwort bei Arlo. 
     Für die 2-Faktor-Authentifizierung wird zusätzlich das Passwort des E-Mail-Accounts benötigt. Der E-Mail-Server, von dem die Arlo-Mails abgerufen werden sollen,
     muss mit attr Arlo_Cloud mailServer imap.gmx.net angegeben werden, wobei imap.gmx.net durch den IMAP-Mailserver des Providers ersetzt werden muss, bei dem
-    das E-Mail-Konto liegt. Es wird ausschließlich IMAP mit Verschlüsselung unterstützt.</p>
+    das E-Mail-Konto liegt. Es wird ausschließlich IMAP mit Verschlüsselung unterstützt. Der Parameter meinEmailBenutzername muss nur angegeben werden, falls
+    der Benutzernamen, mit dem man sich am Mailserver anmeldet, von der E-Mail-Adresse abweicht.</p>
     
   <p>Nach der erfolgreichen Definition des Account kann auf dem neu erzeugten Device <code>set Arlo_Cloud autocreate</code> aufgerufen werden. 
     Dies legt die Basistation(en) und Kameras an, die zu dem Arlo Account zugeordnet sind. Die neuen Devices befinden sich initial im Raum Arlo.</p>
