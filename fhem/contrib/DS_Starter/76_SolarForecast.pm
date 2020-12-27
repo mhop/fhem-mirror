@@ -108,12 +108,12 @@ my %vNotesIntern = (
 # Voreinstellungen
 
 my %hset = (                                                                # Hash der Set-Funktion
-  forecastDevice          => { fn => \&_setforecastDevice         },
+  currentForecastDev      => { fn => \&_setcurrentForecastDev     },
   moduleArea              => { fn => \&_setmoduleArea             },
   moduleEfficiency        => { fn => \&_setmoduleEfficiency       },
   inverterEfficiency      => { fn => \&_setinverterEfficiency     },
-  inverterDevice          => { fn => \&_setinverterDevice         },
-  meterDevice             => { fn => \&_setmeterDevice            },
+  currentInverterDev      => { fn => \&_setinverterDevice         },
+  currentMeterDev         => { fn => \&_setmeterDevice            },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_06   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_07   => { fn => \&_setpvCorrectionFactor     },
@@ -132,11 +132,12 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_20   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_21   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
+  reset                   => { fn => \&_setreset                  },
   moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
 );
 
-my %htilt = (                                                               # Neigungswinkel der Solarmodule
-  "0"  => 1.00,                                                               # https://www.labri.fr/perso/billaud/travaux/Helios/Helios2/resources/de04/Chapter_4_DE.pdf
+my %htilt = (                                                               # Faktor für Neigungswinkel der Solarmodule
+  "0"  => 1.00,                                                             # https://www.labri.fr/perso/billaud/travaux/Helios/Helios2/resources/de04/Chapter_4_DE.pdf
   "10" => 1.06,
   "20" => 1.15,
   "30" => 1.35,
@@ -153,7 +154,7 @@ my @chours      = (5..21);                                                  # St
 my $defpvme     = 16.52;                                                    # default Wirkungsgrad Solarmodule
 my $definve     = 98.3;                                                     # default Wirkungsgrad Wechselrichter
 my $kJtokWh     = 0.00027778;                                               # Umrechnungsfaktor kJ in kWh
-my $maxvariance = 0.6;                                                      # max. Varianz pro Durchlauf Berechnung Autokorrekturfaktor
+my $defmaxvar   = 0.5;                                                      # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval = 70;                                                       # Standard Abfrageintervall
   
 ################################################################
@@ -259,14 +260,15 @@ sub Set {
   my $tilt = join ",", sort keys %htilt;
 
   $setlist = "Unknown argument $opt, choose one of ".
-             "forecastDevice:$fcd ".
-             "inverterDevice ".
+             "currentForecastDev:$fcd ".
+             "currentInverterDev:textField-long ".
+             "currentMeterDev:textField-long ".
              "inverterEfficiency ".
-             "meterDevice ".
              "moduleArea ".
              "moduleEfficiency ".
              "moduleTiltAngle:$tilt ".
              "pvCorrectionFactor_Auto:on,off ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev ".
              $cf
              ;
             
@@ -289,9 +291,9 @@ return "$setlist";
 }
 
 ################################################################
-#                      Setter forecastDevice
+#                      Setter currentForecastDev
 ################################################################
-sub _setforecastDevice {                 ## no critic "not used"
+sub _setcurrentForecastDev {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -308,7 +310,7 @@ return;
 }
 
 ################################################################
-#                      Setter inverterDevice
+#                      Setter currentInverterDev
 ################################################################
 sub _setinverterDevice {                 ## no critic "not used"
   my $paref = shift;
@@ -335,7 +337,7 @@ return;
 }
 
 ################################################################
-#                      Setter meterDevice
+#                      Setter currentMeterDev
 ################################################################
 sub _setmeterDevice {                    ## no critic "not used"
   my $paref = shift;
@@ -376,7 +378,30 @@ sub _setmoduleArea {                     ## no critic "not used"
   
   $prop =~ s/,/./x;
 
-  readingsSingleUpdate($hash, "moduleArea", $prop, 1);
+  readingsSingleUpdate($hash, "moduleArea", $prop." qm", 1);
+
+return;
+}
+
+################################################################
+#                      Setter reset
+################################################################
+sub _setreset {                          ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no reading to reset specified};
+
+  readingsDelete($hash, $prop);
+  
+  if($prop eq "currentMeterDev") {
+      readingsDelete($hash, "Current_GridConsumption");
+  }
+  
+  if($prop eq "currentInverterDev") {
+      readingsDelete    ($hash, "Current_PV");
+      deleteReadingspec ($hash, ".*_PVreal" );
+  }
 
 return;
 }
@@ -470,11 +495,11 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
       daref   => \@da
   };
   
-  _transferForecastValues ($params);
+  _transferDWDForecastValues ($params);
   
   if(@da) {
       push @da, "state:updated";                                                                   # Abschluß state 
-      createReadings ($hash, \@da);
+      createReadingsFromArray ($hash, \@da, 1);
   }
 
 return;
@@ -619,18 +644,19 @@ sub centralTask {
           daref => \@da
       };
       
-      _transferForecastValues ($params);                                                             # Forecast Werte übertragen                                           
-      _transferInverterValues ($params);                                                             # WR Werte übertragen
-      _transferMeterValues    ($params);
+      _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen 
+      _transWeatherValues        ($params);                                                        # Wetterwerte übertragen 
+      _transferInverterValues    ($params);                                                        # WR Werte übertragen
+      _transferMeterValues       ($params);
       
       if(@da) {
-          createReadings ($hash, \@da);
+          createReadingsFromArray ($hash, \@da, 1);
       }
       
-      sumNextHours ($hash, $chour, \@da);                                                            # Zusammenfassung nächste 4 Stunden erstellen
-      calcVariance ($params);                                                                        # Autokorrektur berechnen
+      sumNextHours ($hash, $chour, \@da);                                                          # Zusammenfassung nächste 4 Stunden erstellen
+      calcVariance ($params);                                                                      # Autokorrektur berechnen
       
-      readingsSingleUpdate($hash, "state", "updated", 1);                                            # Abschluß state 
+      readingsSingleUpdate($hash, "state", "updated", 1);                                          # Abschluß state 
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -651,9 +677,10 @@ return $interval;
 }
 
 ################################################################
-#    Werte Forecast Device ermitteln und übertragen
+#    Forecast Werte Device (DWD_OpenData) ermitteln und 
+#    übertragen
 ################################################################
-sub _transferForecastValues {               
+sub _transferDWDForecastValues {               
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -664,33 +691,21 @@ sub _transferForecastValues {
   my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
   return if(!$fcname || !$defs{$fcname});
   
-  my ($time_str,$epoche,$fd,$v);
-  
-  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
-  my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute  
-  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen   
-  my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen 
-  
-  push @$daref, "Today_SunRise:".   $fc0_SunRise;
-  push @$daref, "Today_SunSet:".    $fc0_SunSet;
-  push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
-  push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
+  my ($time_str,$epoche);
   
   deleteReadingspec ($hash, "NextHour.*");
   
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
-      $fd    = int ($fh / 24) ;
+      my $fd = int ($fh / 24) ;
       $fh    = $fh - ($fd * 24); 
       
       next if($fd > 1);
 
-      $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
+      my $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect DWD data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, wid=fc${fd}_${fh}_ww, Val=$v");
+      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
-      ## PV Forecast
-      ###############
       if($num == 0) {          
           $time_str = "ThisHour";
           $epoche   = $t;                                                                     # Epoche Zeit
@@ -703,19 +718,64 @@ sub _transferForecastValues {
       my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
       
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-      push @$daref, "${time_str}_Time:"      .TimeAdjust     ($epoche);                       # Zeit fortschreiben 
+      push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";               # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";               
       }
+  }
       
-      ## Wetter Forecast
-      ###################
+return;
+}
+
+################################################################
+#    Wetter Werte aus dem angebenen Wetterdevice extrahieren
+################################################################
+sub _transWeatherValues {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};
+  my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
+  
+  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
+  return if(!$fcname || !$defs{$fcname});
+  
+  my ($time_str,$epoche);
+  
+  my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
+  my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute  
+  my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen   
+  my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen 
+  
+  push @$daref, "Today_SunRise:".   $fc0_SunRise;
+  push @$daref, "Today_SunSet:".    $fc0_SunSet;
+  push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
+  push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
+  
+  
+  for my $num (0..47) {                      
+      my $fh = $chour + $num; 
+      my $fd = int ($fh / 24) ;
+      $fh    = $fh - ($fd * 24); 
+      
+      next if($fd > 1);
+      
+      if($num == 0) {          
+          $time_str = "ThisHour";
+          $epoche   = $t;                                                                     # Epoche Zeit
+      }
+      else {
+          $time_str = "NextHour".sprintf "%02d", $num;
+          $epoche   = $t + (3600*$num);
+      }
 
       my $wid   = ReadingsVal($fcname, "fc${fd}_${fh}_ww", 0);
       $wid      = sprintf "%02d", $wid;                                                       # führende 0 einfügen wenn nötig
+      
       my $fhstr = sprintf "%02d", $fh;
       
       if($fd == 0 && ($fhstr lt $fc0_SunRise || $fhstr gt $fc0_SunSet)) {                     # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
@@ -724,6 +784,8 @@ sub _transferForecastValues {
       elsif ($fd == 1 && ($fhstr lt $fc1_SunRise || $fhstr gt $fc1_SunSet)) {                 # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
           $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
       }
+      
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid");
       
       $hash->{HELPER}{"${time_str}_WeatherId"} = $wid;
   }
@@ -747,7 +809,7 @@ sub _transferInverterValues {
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
-  my $tlim = "0|23";                                                                          # Stunde 0/23 -> bestimmte Aktionen                  
+  my $tlim = "00|23";                                                                         # Stunde 00/23 -> bestimmte Aktionen                  
   
   if($chour =~ /^($tlim)$/x) {
       deleteReadingspec ($hash, "Today_Hour.*_PV.*");
@@ -776,14 +838,13 @@ sub _transferInverterValues {
   
   my $ethishour  = $etoday - $edaypast;
   
-  #if($ethishour < 0) {                                                                        # fehlerhaft berechnete etoday eliminieren
-  #    push @$daref, "Today_Hour".sprintf("%02d",$chour-1)."_PVreal:0 Wh";
-  #    push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
-  if($chour <= 3 && $ethishour > 0) {
-      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
-  }
-  else {
-      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:". $ethishour." Wh" if($chour !~ /^($tlim)$/x); # nicht setzen wenn Stunde 23 des Tages
+  if($chour !~ /^($tlim)$/x) {                                                                # nicht setzen wenn Stunde 23 des Tages
+      if($ethishour < 0) {
+          push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
+      }
+      else {
+          push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:". $ethishour." Wh"; 
+      }
   }  
   
 return;
@@ -992,10 +1053,10 @@ sub forecastGraphic {                                                           
       $ret   .= "<td>";
       
       if(!$fcdev) {
-          $ret .= qq{Please select a Solar Forecast device of Type "DWD_OpenData" with "set $name forecastDevice"};
+          $ret .= qq{Please select a Solar Forecast device of Type "DWD_OpenData" with "set $name currentForecastDev"};
       }
       elsif(!$indev) {
-          $ret .= qq{Please select an Inverter device with "set $name inverterDevice"};   
+          $ret .= qq{Please select an Inverter device with "set $name currentInverterDev"};   
       }
       elsif(!$ma) {
           $ret .= qq{Please specify the total module area with "set $name moduleArea"};   
@@ -1761,6 +1822,7 @@ sub weather_icon {
      '60' => 'weather_rain_light',                  # Sonne, Wolke mit Regen (1 Tropfen)                    # vorhanden
      '61' => 'weather_rain',                        # Sonne, Wolke mit Regen (2 Tropfen)                    # vorhanden
      '62' => 'weather_rain_heavy',                  # Sonne, Wolke mit Regen (3 Tropfen)                    # vorhanden
+     '63' => 'weather_rain',                        # Sonne, Wolke mit Regen (2 Tropfen)                    # vorhanden
      '68' => 'weather_rain_snow_light',             # leichter Schneeregen (Tag)                            # vorhanden     
      '70' => 'weather_snow_light',                  # Sonne, Wolke mit Schnee (1 Flocke)                    # vorhanden
      '71' => 'weather_snow_heavy',                  # Sonne, Wolke mit Schnee (3 Flocken)                   # vorhanden
@@ -1787,6 +1849,7 @@ sub weather_icon {
     '160' => 'weather_night_rain_light',            # Mond, Wolke mit Regen (1 Tropfen) - Nacht             # neu
     '161' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
     '162' => 'weather_night_rain_heavy',            # Mond, Wolke mit Regen (3 Tropfen) - Nacht             # neu
+    '163' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
     '168' => 'weather_night_rain_snow_light',       # leichter Schneeregen (Tag)                            # vorhanden 
     '170' => 'weather_night_snow_rain',             # Mond, Wolke mit Schnee (1 Flocke) - Nacht             # neu
     '171' => 'weather_night_snow_heavy',            # Mond, Wolke mit Schnee (3 Flocken) - Nacht            # neu
@@ -1859,10 +1922,10 @@ return $pv;
 #       Abweichung PVreal / PVforecast berechnen
 ################################################################
 sub calcVariance {               
-  my $paref   = shift;
+  my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $chour   = $paref->{chour};
+  my $chour = $paref->{chour};
 
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
@@ -1870,8 +1933,15 @@ sub calcVariance {
       return;      
   }
   
-  my $idts = $hash->{HELPER}{INVERTERDEFTS};                                            # FHEM Start oder Definitionstimestamp des Inverterdevice
+  my $tlim = "00";                                                                      # Stunde 00 -> löschen aller Autocalc Statusreadings des Tages                  
+  
+  if($chour =~ /^($tlim)$/x) {
+      deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
+  }
+  
+  my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
   return if(!$idts);
+  $idts    = timestringToTimestamp ($hash, $idts);
   
   my $t = time;                                                                         # aktuelle Unix-Zeit
 
@@ -1888,32 +1958,38 @@ sub calcVariance {
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h >= $chour);
-      # my $fcval = $hash->{HELPER}{"fc0_".sprintf("%02d",$h)."_PVforecast"} // 0;
       my $fcnum = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      # my $fcnum = int ((split " ", $fcval)[0]);
       next if(!$fcnum);
  
-      my $pvval  = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
+      
+      my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
+      if($cdone eq "done") {
+          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h));
+          next;
+      }
 
-      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);           # bisher definierter Korrekturfaktor
+      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);             # bisher definierter Korrekturfaktor
       $oldfac    = 1 if(1*$oldfac == 0);
       
-      my $factor = sprintf "%.2f", ($pvval / $fcnum);                                             # Faktor reale PV / Prognose
+      my $factor = sprintf "%.2f", ($pvval / $fcnum);                                             # Faktorberechnung: reale PV / Prognose
+      
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
       
-      if(abs($factor - $oldfac) > $maxvariance) {
-          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvariance : $oldfac - $maxvariance);
-          Log3($name, 4, "$name - Use new limited Variance factor: $factor for hour: $h");
+      if(abs($factor - $oldfac) > $defmaxvar) {
+          $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $defmaxvar : $oldfac - $defmaxvar);
+          Log3($name, 3, "$name - new limited Variance factor: $factor for hour: $h");
       }
       else {
-          Log3($name, 4, "$name - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
+          Log3($name, 3, "$name - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
       }
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc:done";
   }
   
-  createReadings ($hash, \@da);
+  createReadingsFromArray ($hash, \@da, 1);
       
 return;
 }
@@ -1947,17 +2023,38 @@ sub sumNextHours {
   push @$daref, "RestOfDay_PV:".   (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PV:".    (int $tomorrowSum->{PV}).  " Wh";
 
-  createReadings ($hash, $daref);
+  createReadingsFromArray ($hash, $daref, 1);
   
 return;
 }
 
 ################################################################
-#                   Readings erstellen
+#  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix 
+#  Timestamp umwandeln
 ################################################################
-sub createReadings {
+sub timestringToTimestamp {            
+  my $hash    = shift;
+  my $tstring = shift;
+  my $name    = $hash->{NAME};
+
+  my($y, $mo, $d, $h, $m, $s) = $tstring =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;
+  return if(!$mo || !$y);
+  
+  my $timestamp = fhemTimeLocal($s, $m, $h, $d, $mo-1, $y-1900);
+  
+return $timestamp;
+}
+
+################################################################
+#                   Readings aus Array erstellen
+#       $daref:  Referenz zum Array der zu erstellenden Readings
+#                muß Paare <Readingname>:<Wert> enthalten
+#       $doevt:  1-Events erstellen, 0-keine Events erstellen
+################################################################
+sub createReadingsFromArray {
   my $hash  = shift;
   my $daref = shift;
+  my $doevt = shift // 0;  
   
   readingsBeginUpdate($hash);
   
@@ -1966,7 +2063,7 @@ sub createReadings {
       readingsBulkUpdate($hash, $rn, $rval);      
   }
 
-  readingsEndUpdate($hash, 1);
+  readingsEndUpdate($hash, $doevt);
   
 return;
 }
@@ -2001,24 +2098,27 @@ sub createNotifyDev {
       my @nd;
       my ($a,$h);
       
-      my $fcdev = ReadingsVal($name, "currentForecastDev", "");      # Forecast Device
-      my $indev = ReadingsVal($name, "currentInverterDev", "");      # Inverter Device
+      my $fcdev = ReadingsVal($name, "currentForecastDev", "");              # Forecast Device
+      ($a,$h) = parseParams ($fcdev);
+      $fcdev  = $a->[0] // "";      
       
+      my $indev = ReadingsVal($name, "currentInverterDev", "");              # Inverter Device
       ($a,$h) = parseParams ($indev);
       $indev  = $a->[0] // "";
       
-      my $medev = ReadingsVal($name, "currentMeterDev",    "");      # Meter Device
+      my $medev = ReadingsVal($name, "currentMeterDev",    "");              # Meter Device
       
       ($a,$h) = parseParams ($medev);
       $medev  = $a->[0] // "";
-      
-      $hash->{HELPER}{INVERTERDEFTS} = time if($indev);              # Timestamp der Inverterdefinition speichern für calcVariance
       
       push @nd, $fcdev;
       push @nd, $indev;
       push @nd, $medev;
       
-      $hash->{NOTIFYDEV} = join ",", @nd if(@nd);
+      if(@nd) {
+          $hash->{NOTIFYDEV} = join ",", @nd;
+          readingsSingleUpdate ($hash, ".associatedWith", join(" ",@nd), 0);
+      }
   } 
   else {
       InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
@@ -2041,8 +2141,8 @@ return;
 
 <a name="SolarForecast"></a>
 <h3>SolarForecast</h3>
-
 <br>
+
 Das Modul SolarForecast erstellt auf Grundlage der Werte aus Devices vom Typ DWD_OpenData sowie weiteren Input-Devices eine 
 Vorhersage für den solaren Ertrag und weitere Informationen als Grundlage für abhängige Steuerungen. <br>
 Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem 
@@ -2080,8 +2180,8 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
   <b>Set</b> 
   <ul>
     <ul>
-      <a name="forecastDevice"></a>
-      <li><b>forecastDevice </b> <br> 
+      <a name="currentForecastDev"></a>
+      <li><b>currentForecastDev </b> <br> 
       Legt das Device (Typ DWD_OpenData) fest, welches die Daten der solaren Vorhersage liefert. Ist noch kein Device dieses Typs
       vorhanden, muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
@@ -2089,32 +2189,46 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
       <ul>
          <table>  
          <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                  </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R600,ww,SunUp,SunRise,SunSet        </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                  </td></tr>         
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt; </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R600,ww,SunUp,SunRise,SunSet                                                   </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>         
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
+            <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte forecastStation muß Strahlungswerte (Rad1h Readings) liefern. </td></tr>
          </table>
-      </ul>
-      <br>
-
-      <b>Hinweis:</b> Die ausgewählte forecastStation muß Strahlungswerte (Rad1h Readings) liefern.       
+      </ul>      
       </li>
     </ul>
     <br>
     
     <ul>
-      <a name="inverterDevice"></a>
-      <li><b>inverterDevice &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etoday=&lt;Reading Energieerzeugung aktueller Tag&gt;:&lt;Einheit&gt;  </b> <br> 
+      <a name="currentInverterDev"></a>
+      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etoday=&lt;Reading Energieerzeugung aktueller Tag&gt;:&lt;Einheit&gt;  </b> <br> 
       Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. 
       Es ist anzugeben, welche Readings die aktuelle PV-Leistung und die erzeugte Energie des aktuellen Tages liefern sowie deren Einheit (W,kW,Wh,kWh).
       <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; inverterDevice STP5000 pv=total_pac:kW etoday=etoday:kWh <br>
+        set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etoday=etoday:kWh <br>
         # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Energie im 
           Reading "etoday" (kWh)
       </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="currentMeterDev"></a>
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; </b> <br> 
+      Legt ein beliebiges Device zur Messung des aktuellen Energiebezugs fest. 
+      Es ist das Reading anzugeben welches die aktuell aus dem Netz bezogene Leistung liefert sowie dessen Einheit (W,kW).
+      <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W <br>
+        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W)
+      </ul>      
       </li>
     </ul>
     <br>
@@ -2122,24 +2236,8 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
     <ul>
       <a name="inverterEfficiency"></a>
       <li><b>inverterEfficiency &lt;Zahl&gt; </b> <br> 
-      Wirkungsgrad des Wechselrichters (inverterDevice) in %. <br>
+      Wirkungsgrad des Wechselrichters (currentInverterDev) in %. <br>
       (default: 98.3)      
-      </li>
-    </ul>
-    <br>
-    
-    <ul>
-      <a name="meterDevice"></a>
-      <li><b>meterDevice &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; </b> <br> 
-      Legt ein beliebiges Device zur Messung des aktuellen Energiebezugs fest. 
-      Es ist das Reading anzugeben welches die aktuell aus dem Netz bezogene Leistung liefert sowie dessen Einheit (W,kW).
-      <br><br>
-      
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; meterDevice SMA_Energymeter gcon=Bezug_Wirkleistung:W <br>
-        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W)
-      </ul>      
       </li>
     </ul>
     <br>
@@ -2224,7 +2322,7 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
      <ul>
         <a name="alias"></a>
         <li><b>alias </b><br>
-          In Verbindung mit "showLink" ein beliebiger Abzeigename.
+          In Verbindung mit "showLink" ein beliebiger Anzeigename.
         </li>
         <br>  
        
