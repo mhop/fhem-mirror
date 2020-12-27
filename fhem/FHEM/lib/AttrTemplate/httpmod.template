@@ -418,7 +418,7 @@ desc: Gets the current emergency service of a pharmacy closeby your postal code 
 order:DIV01
 par:WHICHROOM;Actual room of the device, defaults to HTTPMOD; {AttrVal("DEVICE","room","HTTPMOD" )}
 par:SEARCHZIPCODE;Zip code of the city you want to search around;
-defmod DEVICE HTTPMOD http://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=SEARCHZIPCODE 0
+defmod DEVICE HTTPMOD https://apothekenfinder.mobi/interface/json.php?device=web&source=not&search=SEARCHZIPCODE 0
 attr DEVICE userattr get01Encode get01JSON get01Name get02ExtractAllJSON:0,1 getURL reading01Encode reading01JSON reading01Name reading02JSON reading02Name reading03JSON reading03Name reading04JSON reading04Name reading05JSON reading05Name reading06JSON reading06Name reading07JSON reading07Name reading07OExpr reading08JSON reading08Name reading08OExpr reading09JSON reading09Name reading10JSON reading10Name reading11JSON reading11Name readingEncode requestHeader requestHeader1 requestHeader2 requestHeader3 requestHeader4 requestHeader5 requestHeader6 requestHeader7
 attr DEVICE reading01Encode UTF-8
 attr DEVICE reading01JSON result_01_name
