@@ -1,4 +1,4 @@
-REV 23421
+REV 23428
 DIR unused
 UPD 2020-12-23_07:45:03 355663 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -256,7 +256,7 @@ UPD 2020-06-06_07:45:03 26210 FHEM/46_TeslaPowerwall2AC.pm
 UPD 2019-02-16_07:45:06 37067 FHEM/47_OBIS.pm
 UPD 2020-08-08_07:45:02 100783 FHEM/48_BlinkCamera.pm
 UPD 2020-12-14_07:45:03 69032 FHEM/48_MieleAtHome.pm
-UPD 2020-10-26_07:45:03 78026 FHEM/49_Arlo.pm
+UPD 2020-12-28_07:45:03 78464 FHEM/49_Arlo.pm
 UPD 2019-02-06_07:45:03 27160 FHEM/49_IPCAM.pm
 UPD 2020-11-30_07:45:03 759035 FHEM/49_SSCam.pm
 UPD 2020-08-15_07:45:02 58131 FHEM/49_SSCamSTRM.pm
@@ -634,7 +634,7 @@ UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
 UPD 2020-06-18_07:45:02 7778 FHEM/lib/AttrTemplate/general_use.template
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
-UPD 2020-12-07_07:45:03 70503 FHEM/lib/AttrTemplate/httpmod.template
+UPD 2020-12-28_07:45:03 70504 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
 UPD 2020-12-22_07:45:02 301831 FHEM/lib/AttrTemplate/mqtt2.template
@@ -728,12 +728,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2020-12-27_07:45:07 4398843 docs/commandref.html
-UPD 2020-12-27_07:45:09 2714639 docs/commandref_DE.html
+UPD 2020-12-28_07:45:07 4398957 docs/commandref.html
+UPD 2020-12-28_07:45:10 2714835 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2020-12-27_07:45:10 234304 docs/commandref_modular.html
-UPD 2020-12-27_07:45:12 245063 docs/commandref_modular_DE.html
+UPD 2020-12-28_07:45:11 234304 docs/commandref_modular.html
+UPD 2020-12-28_07:45:12 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -757,7 +757,7 @@ UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2020-12-14_07:45:03 37764 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
 UPD 2020-11-03_07:45:03 14279 lib/FHEM/SynoModules/ErrCodes.pm
-UPD 2020-12-08_07:45:02 68274 lib/FHEM/SynoModules/SMUtils.pm
+UPD 2020-12-28_07:45:03 69955 lib/FHEM/SynoModules/SMUtils.pm
 UPD 2017-01-16_07:45:02 1175 www/codemirror/LICENSE
 UPD 2017-01-16_07:45:02 857 www/codemirror/autorefresh.js
 UPD 2015-10-26_07:45:11 1931 www/codemirror/blackboard.css
@@ -2349,7 +2349,7 @@ UPD 2017-01-17_07:45:03 18745 www/pgm2/sorttable.js
 UPD 2018-12-17_07:45:02 789397 www/pgm2/sscam_hls.js
 UPD 2018-12-16_07:45:03 36555 www/pgm2/sscam_tooltip.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
-UPD 2020-10-01_07:45:03 14568 www/pgm2/svg.js
+UPD 2020-12-28_07:45:03 14671 www/pgm2/svg.js
 UPD 2019-06-20_10:05:58 6801 www/pgm2/svg_defs.svg
 UPD 2019-06-20_10:05:58 5637 www/pgm2/svg_style.css
 UPD 2020-01-25_07:45:03 18394 www/pgm2/todoist.js
