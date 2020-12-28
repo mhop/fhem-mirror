@@ -1857,7 +1857,7 @@ sub weather_icon {
     '161' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
     '162' => 'weather_night_rain_heavy',            # Mond, Wolke mit Regen (3 Tropfen) - Nacht             # neu
     '163' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
-    '168' => 'weather_night_rain_snow_light',       # leichter Schneeregen (Tag)                            # vorhanden 
+    '168' => 'weather_night_snow_rain_light',       # leichter Schneeregen (Tag)                            # vorhanden 
     '170' => 'weather_night_snow_rain',             # Mond, Wolke mit Schnee (1 Flocke) - Nacht             # neu
     '171' => 'weather_night_snow_heavy',            # Mond, Wolke mit Schnee (3 Flocken) - Nacht            # neu
     '180' => 'weather_night_thunderstorm_light',    # Wolke mit Blitz - Nacht                               # neu
