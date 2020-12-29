@@ -212,9 +212,10 @@ telnet_Read($)
   my $sname = ($hash->{isClient} ? $name : $hash->{SNAME});
   if(!defined($hash->{Authenticated}) || $hash->{Authenticated}) {
     $buf =~ s/\xff..//g;              # Telnet IAC stuff
-    $buf =~ s/\xfd(.)//;              # Telnet Do ?
-    syswrite($hash->{CD}, sprintf("%c%c%c", 0xff, 0xfc, ord($1)))
-                      if(defined($1)) # Wont / ^C handling
+    if($buf =~ m/\xfd./) { # Telnet Do ? Wont / ^C handling
+      $buf =~ s/\xfd(.)//;
+      syswrite($hash->{CD}, sprintf("%c%c%c", 0xff, 0xfc, ord($1)))
+    }
   }
   $hash->{BUF} .= $buf;
   my @ret;
