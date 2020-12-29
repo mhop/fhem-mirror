@@ -1,4 +1,4 @@
-REV 23428
+REV 23431
 DIR unused
 UPD 2020-12-23_07:45:03 355663 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -732,8 +732,8 @@ UPD 2020-12-28_07:45:07 4398957 docs/commandref.html
 UPD 2020-12-28_07:45:10 2714835 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2020-12-28_07:45:11 234304 docs/commandref_modular.html
-UPD 2020-12-28_07:45:12 245063 docs/commandref_modular_DE.html
+UPD 2020-12-29_07:45:10 234304 docs/commandref_modular.html
+UPD 2020-12-29_07:45:12 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2175,6 +2175,7 @@ UPD 2015-07-28_14:05:33 2346 www/images/openautomation/weather_moon_phases_7_hal
 UPD 2015-07-28_14:05:33 2518 www/images/openautomation/weather_moon_phases_8.svg
 UPD 2015-07-28_14:05:33 1522 www/images/openautomation/weather_moonrise.svg
 UPD 2015-07-28_14:05:33 1546 www/images/openautomation/weather_moonset.svg
+UPD 2020-12-29_07:45:03 2967 www/images/openautomation/weather_night_cloudy_heavy.svg
 UPD 2015-07-28_14:05:33 7637 www/images/openautomation/weather_pollen.svg
 UPD 2015-07-28_14:05:33 2771 www/images/openautomation/weather_rain.svg
 UPD 2015-07-28_14:05:33 4456 www/images/openautomation/weather_rain_gauge.svg
