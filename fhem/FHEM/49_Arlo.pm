@@ -43,8 +43,10 @@ sub Arlo_Define($$) {
        $mailPasswd = Arlo_decrypt($a[5]);
        $hash->{helper}{mailPassword} = $mailPasswd;
     }
+    my $mailUser = '';
     if (@a > 6) {
-       $hash->{helper}{mailUser} = $a[6];
+       $mailUser = $a[6];
+       $hash->{helper}{mailUser} = $mailUser;
     } else {
        $hash->{helper}{mailUser} = $user;
     }
@@ -53,7 +55,7 @@ sub Arlo_Define($$) {
     my $cryptUser = Arlo_encrypt($user);
     my $cryptPasswd = Arlo_encrypt($passwd);
     my $cryptMailPasswd = Arlo_encrypt($mailPasswd);
-    $hash->{DEF} = "ACCOUNT $cryptUser $cryptPasswd $cryptMailPasswd $a[6]";
+    $hash->{DEF} = "ACCOUNT $cryptUser $cryptPasswd $cryptMailPasswd $mailUser";
     InternalTimer(gettimeofday() + 3, "Arlo_Login", $hash);
 
   } elsif (($subtype eq 'BASESTATION' || $subtype eq 'ROUTER') && @a == 5) {
