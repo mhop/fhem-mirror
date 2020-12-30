@@ -76,7 +76,7 @@ sub TCM_Define($$) {
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
+  InternalTimer(time() + 60, 'TCM_msgCounter', $hash, 0);
   my $ret = DevIo_OpenDev($hash, 0, undef);
   return $ret;
 }
@@ -315,7 +315,7 @@ sub TCM_Write($$$$) {
     #Log3 $name, 5, "TCM $name awaitCmdResp: " . join(' ', @{$hash->{helper}{awaitCmdResp}});
   }
   Log3 $name, 5, "TCM $name sent ESP: $bstring";
-  push(@{$hash->{helper}{sndCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
+  push(@{$hash->{helper}{sndCounter}}, time() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
   DevIo_SimpleWrite($hash, $bstring, 1);
   # next commands will be sent with a delay
   usleep(int(AttrVal($name, "sendInterval", 100)) * 1000);
@@ -439,7 +439,7 @@ sub TCM_Read($) {
          }
       }
       $data = $rest;
-      push(@{$hash->{helper}{rcvCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
+      push(@{$hash->{helper}{rcvCounter}}, time() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     }
 
     if(length($data) >= 4) {
@@ -617,7 +617,7 @@ sub TCM_Read($) {
       }
 
       $data = $rest;
-      push(@{$hash->{helper}{rcvCounter}}, gettimeofday() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
+      push(@{$hash->{helper}{rcvCounter}}, time() + 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     }
 
     if(length($data) >= 4) {
@@ -1271,7 +1271,7 @@ sub TCM_BlockSenderID($$$) {
 #
 sub TCM_msgCounter($) {
   my $hash = shift(@_);
-  my $timeNow = gettimeofday();
+  my $timeNow = time();
   my ($count, $countPerDay, $countPerHour, $countPerMin);
   RemoveInternalTimer($hash, 'TCM_msgCounter');
   if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'off') {
@@ -1311,7 +1311,7 @@ sub TCM_msgCounter($) {
     $hash->{MsgSndPerHour} = $hash->{MsgSndPerDay} + $countPerDay - $countPerHour;
     $hash->{MsgSndPerMin} = $hash->{MsgSndPerDay} + $countPerDay - $countPerMin;
   }
-  InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
+  InternalTimer(time() + 60, 'TCM_msgCounter', $hash, 0);
   return undef;
 }
 
@@ -1407,7 +1407,7 @@ sub TCM_Attr(@) {
       RemoveInternalTimer($hash, 'TCM_msgCounter');
     } elsif ($attrVal eq 'on') {
       RemoveInternalTimer($hash, 'TCM_msgCounter');
-      InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0);
+      InternalTimer(time() + 60, 'TCM_msgCounter', $hash, 0);
     } else {
       Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
@@ -1448,7 +1448,7 @@ sub TCM_Notify(@) {
   if ($dev->{TYPE} eq 'Global' && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
   #if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}})){
     RemoveInternalTimer($hash, 'TCM_msgCounter');
-    InternalTimer(gettimeofday() + 60, 'TCM_msgCounter', $hash, 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
+    InternalTimer(time() + 60, 'TCM_msgCounter', $hash, 0) if (AttrVal($hash->{NAME}, 'msgCounter', 'off') eq 'on');
     TCM_InitSerialCom($hash);
     my $assignIODevFlag = AttrVal($hash->{NAME}, 'assignIODev', undef);
     if (defined $assignIODevFlag) {
