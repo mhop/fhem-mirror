@@ -86,6 +86,9 @@
 #   document deleteOnly
 # 0.7 2018-03-11   deleteonly lists / internal changes
   
+#   show entry content in response for add/del 
+#   start list with peerid und chatid als Parameter
+
 #   
 ##############################################################################
 # TASKS 
@@ -270,8 +273,12 @@ sub TBot_List_Set($@)
       if ( $numberOfArgs == 2 ) {
         $tchat = ReadingsVal( $tbot, "msgChatId", undef );
         $tpeer = ReadingsVal( $tbot, "msgPeerId", "" );
+      } elsif ( $numberOfArgs == 4 ) {
+        $tpeer = AnalyzeCommandChain( $hash, "get $tbot peerId ".$args[1] );
+        $tchat = AnalyzeCommandChain( $hash, "get $tbot peerId ".$args[2] );
       } else {
         $tpeer = AnalyzeCommandChain( $hash, "get $tbot peerId ".$args[1] );
+        $tchat = undef;
       }
       $ret = "No peer found or specified :$tbot: ".(( $numberOfArgs == 2 )?"":$args[1]) if ( ! $tpeer );
     }  
@@ -945,7 +952,7 @@ sub TBot_List_handler($$$$;$)
     if ( ( $no >= 0 ) && ( $no < scalar(@list) ) ) {
     
       # remove from array the entry with the index 
-      splice(@list, $no, 1);    
+      my $rementry = splice(@list, $no, 1);    
 
       my $text = join(",", @list );
       
@@ -953,7 +960,7 @@ sub TBot_List_handler($$$$;$)
       AnalyzeCommandChain( $hash, "set ".TBot_List_getConfigPostMe($hash)." add $lname $text" );
       
       # show updated list -> call recursively
-      TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Eintrag geloescht" );
+      TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Eintrag \"".$rementry."\" geloescht" );
     
     }
     
@@ -1156,7 +1163,7 @@ sub TBot_List_handler($$$$;$)
       AnalyzeCommandChain( $hash, "set ".TBot_List_getConfigPostMe($hash)." add $lname ".$addentry );
       # show list again -> call recursively
       if ( defined($msgId ) ) {
-        TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Eintrag hinzugefuegt" );
+        TBot_List_handler( $hash,  "list_edit", $tbot, $peer, " Eintrag \"".$addentry."\" hinzugefuegt" );
       } else {
         $ret = "TBot_List_handler: $name - $tbot  ERROR no msgId known for peer :$peer: chat :$chatId:  cmd :$cmd:  ".(defined($arg)?"arg :$arg:":"");
       }
@@ -1348,7 +1355,7 @@ sub TBot_List_Setup($) {
     where &lt;what&gt; / &lt;value&gt; is one of
 
   <br><br>
-    <li><code>start &lt;telegrambot name&gt; [ &lt;peerid&gt; ]</code><br>Initiate a new dialog for the given peer (or the last peer sending a message on the given telegrambot)
+    <li><code>start &lt;telegrambot name&gt; [ &lt;peerid&gt; [ &lt;chatid&gt; ] ]</code><br>Initiate a new dialog for the given peer (or the last peer sending a message on the given telegrambot - if communication should happen in a group then both chatid with the groupid and peerid with the user id need to be specified)
     </li>
     <li><code>end &lt;telegrambot name&gt; &lt;peerid&gt;</code><br>Finalize a new dialog for the given peer  on the given telegrambot
     </li>
