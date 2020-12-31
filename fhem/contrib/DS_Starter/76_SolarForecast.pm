@@ -700,7 +700,7 @@ sub _transferDWDForecastValues {
   
   my ($time_str,$epoche);
   
-  deleteReadingspec ($hash, "NextHour.*");
+  # deleteReadingspec ($hash, "NextHour.*");
   
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
@@ -763,6 +763,10 @@ sub _transWeatherValues {
   push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
   push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
   
+  my $fc0_SunRise_round = (sprintf "%02d", (split ":", $fc0_SunRise)[0] - 1);
+  my $fc0_SunSet_round  = (sprintf "%02d", (split ":", $fc0_SunSet)[0] + 1);
+  
+  Log3($name, 1, "$name - round: $fc0_SunRise_round, $fc0_SunSet_round");
   
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
@@ -785,10 +789,10 @@ sub _transWeatherValues {
       
       my $fhstr = sprintf "%02d", $fh;
       
-      if($fd == 0 && ($fhstr lt $fc0_SunRise || $fhstr gt $fc0_SunSet)) {                     # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
+      if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {         # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
           $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
       }
-      elsif ($fd == 1 && ($fhstr lt $fc1_SunRise || $fhstr gt $fc1_SunSet)) {                 # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
+      elsif ($fd == 1 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {     # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
           $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
       }
       
@@ -1212,7 +1216,7 @@ sub forecastGraphic {                                                           
           $lupt    = "Stand:";
           $autoct  = "automatische Korrektur:";          
           $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
-          $lblPvRe = "Rest heute:";
+          $lblPvRe = "Rest&nbsp;heute:";
           $lblPvTo = "morgen:";
           $lblPvCu = "aktuell";
       }  
@@ -1919,6 +1923,11 @@ sub calcPVforecast {
   $hc    = 1 if(1*$hc == 0);
   
   my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * 1000);
+  
+  my $kw =  AttrVal ($name, 'Wh/kWh', 'Wh');
+  if($kw eq "Wh") {
+      $pv = int $pv;
+  }
  
   Log3($name, 5, "$name - calcPVforecast - Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", pvCorrectionFactor: $hc");
   
