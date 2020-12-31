@@ -37,6 +37,7 @@
 # 30.12.19 GA fix access to ReadingsVal via $name (reported by stromer-12)
 # 26.05.20 GA fix division by zero if minRoomsOn is >0  and roomsCounted is zero
 # 22.12.20 GA fix maxOffTime for P calculation never activated
+# 28.12.20 GA fix maxOffTime; maxOffTimeApply is now only set if no heating is required
 
 ##############################################
 # $Id$
@@ -902,28 +903,28 @@ PWM_CalcRoom(@)
        return ("on", $newpulse, $cycletime, $actorV); 
     }
 
-    if ($newpulse == 0 or ($maxOffTimeApply > 0 and $room->{c_PID_useit} eq 0)) {
+    # ----------------
+    # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
+    # $maxOffTImeApply will only be set if no heating is required
 
-      # ----------------
-      # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
+    if ($maxOffTimeApply > 0 and ReadingsVal($name, "maxOffTimeCalculation", "off") eq "on") {
 
-      if ($maxOffTimeApply > 0 and ReadingsVal($name, "maxOffTimeCalculation", "off") eq "on") {
+      ## wz > 2:00
+      if ($maxOffTimeAct >= $maxOffTime) {
 
-        ## wz > 2:00
-        if ($maxOffTimeAct >= $maxOffTime) {
-
-          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F17 maxOffTime protection");
-          return ("on_mop", $newpulse, $cycletime, $actorV); 
-        }
-
-        ## wz > 2:00 / 2
-        if ($maxOffTimeAct >= $maxOffTime / 2) {
-
-          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F18 maxOffTime protection (possible)");
-          return ("on_mop_maybe", $newpulse, $cycletime, $actorV); 
-        }
+        Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F17 maxOffTime protection");
+        return ("on_mop", $newpulse, $cycletime, $actorV); 
       }
 
+      ## wz > 2:00 / 2
+      if ($maxOffTimeAct >= $maxOffTime / 2) {
+
+        Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F18 maxOffTime protection (possible)");
+        return ("on_mop_maybe", $newpulse, $cycletime, $actorV); 
+      }
+    }
+
+    if ($newpulse == 0) {
       Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F11 stay off (0)");
       return ("", $newpulse, $cycletime, $actorV); 
     }
