@@ -54,6 +54,7 @@
 # 20.11.18 GA add change default for w_regexp from ".*Open.*" to ".*[Oo]pen.*" to fit for MAX window contacts
 # 11.02.19 GA add redesign of maxOffTime
 # 21.01.20 GA fix remove default tempRule if only tempRule1 or tempRule2 is defined
+# 28.12.20 GA fix reset maxOffTimeApply to 0 if heating is needed (decision depends on calculation model) 
 
 
 # module for PWM (Pulse Width Modulation) calculation
@@ -967,6 +968,8 @@ PWMR_ReadRoom(@)
   my ($temperaturV, $actorV, $factor, $oldpulse, $newpulse, $newpulsePID, $prevswitchtime, $windowV, $maxOffTimeApply, $maxOffTime, $maxOffTimePeriod, $maxOffTimeAct) = 
     (99, "off", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
+  my $maxOffTimeApplyPossible = 0;
+
   #Log3 ($room, 4, "PWMR_ReadRoom $name <$room->{t_sensor}> <$room->{actor}>");
 
   if ($room->{t_sensor})
@@ -1095,6 +1098,8 @@ PWMR_ReadRoom(@)
     Log3 ($room, 4, "PWMR_ReadRoom $name: desT($desiredTemp), actT($temperaturV von($temperaturT)), state($actorV)");
     Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulse/$PWMOnTime), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
 
+    $maxOffTimeApplyPossible = 1 if ($temperaturV >= $desiredTemp); # equals $newpulse == 0 for PID calculation model
+
   } elsif ($room->{c_PID_useit} eq 1) {
 
     ### PID calculation
@@ -1176,6 +1181,8 @@ PWMR_ReadRoom(@)
 
     $newpulse = $newpulsePID;
 
+    $maxOffTimeApplyPossible = 1 if ($newpulse == 0);
+
   } elsif($room->{c_PID_useit} >= 2) {
 
     my $DBuffer = $room->{helper}{PID_D_previousTemps};
@@ -1236,6 +1243,8 @@ PWMR_ReadRoom(@)
     Log3 ($room, 4, "PWMR_ReadRoom $name: newpulse($newpulsePID/$PWMOnTimePID), oldpulse($oldpulse), lastSW($prevswitchtime = $prevswitchtimeT), window($windowV)");
 
     $newpulse = $newpulsePID;
+
+    $maxOffTimeApplyPossible = 1 if ($newpulse == 0);
   }
 
   readingsEndUpdate($room, 1);
@@ -1269,6 +1278,13 @@ PWMR_ReadRoom(@)
             my $time = sprintf ("%02d:%02d:%02d", $maxOffTimeAct / 60 / 60, ($maxOffTimeAct / 60) % 60, $maxOffTimeAct % 60);
             Log3 ($room, 4, "PWMR_ReadRoom $name: candidate for maxOffTime actor($actorV) since $time");
           }
+
+          # reset maxOffTimeApply based on calculation model 
+          # generally: if heating is required this calculation is preceeding; only if no heating is required maxOffTime should be taken into account
+          # for PID calculation maxOffTime is possible if $newpulse == 0 
+          # for P calculation maxOffTime is possible if desiredTemp is already reached
+          #
+          $maxOffTimeApply = 0 if ($maxOffTimeApplyPossible == 0);
         }
       }
     }
