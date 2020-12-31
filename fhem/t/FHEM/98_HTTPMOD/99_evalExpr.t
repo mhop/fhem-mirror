@@ -1,5 +1,5 @@
 ##############################################
-# test evalExpr Util function
+# test evalExpr and other Util functions
 ##############################################
 use strict;
 use warnings;
@@ -14,21 +14,30 @@ my @array = (1,2,3);
 my %tHash = (a => 10, b => 20);
 my $exp   = '$val * 2';
 
-my $result = EvalExpr($hash, $exp, {'$val' => $val, '@array' => \@array});
+my $result = EvalExpr($hash, {expr => $exp, '$val' => $val, '@array' => \@array});
 #Log3 $name, 3, "$name: result of EvalExpr test 1 = $result";
 is $result, 10, "simple expression with one scalar in list";
 
 $exp   = '$array[1] * 2';
-$result = EvalExpr($hash, $exp, {'$val' => $val, '@array' => \@array});
+$result = EvalExpr($hash, {expr => $exp, '$val' => $val, '@array' => \@array});
 is $result, 4, "simple expression with array ref in hash";
 
 $exp   = '$hash{a} * 2';
-$result = EvalExpr($hash, $exp, {'$val' => $val, '%hash' => \%tHash});
+$result = EvalExpr($hash, {expr => $exp, '$val' => $val, '%hash' => \%tHash});
 is $result, 20, "simple expression with hash ref in hash";
 
 $exp   = '$hash->{a} * 2';
-$result = EvalExpr($hash, $exp, {'$val' => $val, '$hash' => \%tHash});
+$result = EvalExpr($hash, {expr => $exp, '$val' => $val, '$hash' => \%tHash});
 is $result, 20, "simple expression with hash ref as ref in hash";
+
+my $format = '';
+$val = undef;
+$result = FormatVal($hash, {val => $val, format => $format});        
+is $result, undef, "FormatVal with empty format and undef value";
+
+$format = '%.2f';
+$result = FormatVal($hash, {val => $val, format => $format});        
+is $result, "0.00", "FormatVal with empty format and undef value";
 
 done_testing;
 exit(0);

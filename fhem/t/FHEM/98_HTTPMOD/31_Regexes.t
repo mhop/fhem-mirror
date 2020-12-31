@@ -21,7 +21,7 @@ $modVersion =~ /^([0-9]+)\./;
 my $major = $1;
 
 if ($major && $major >= 4) {
-    plan tests => 13;
+    plan tests => 14;
 } else {
     plan skip_all => "This test only works for HTTPMOD version 4 or later, installed is $modVersion";
 }
@@ -46,6 +46,16 @@ is(FhemTestUtils_gotLog(qr/H2: reading20Regex Regex: Bad regexp/), 2, "validatio
 
 fhem('set H3 reread');
 is(FhemTestUtils_gotEvent(qr/H3:TestReading:\s466/xms), 1, "preProcessRegex");
+
+FhemTestUtils_resetEvents();
+FhemTestUtils_resetLogs();
+
+fhem('attr H1 reading01DeleteIfUnmatched 1');
+fhem('attr H1 reading01Regex \"SampleColor\",\"([^\"]+)\"');
+fhem('set H1 reread');
+
+is(FhemTestUtils_gotLog('delete reading TestReading1'), 1, "DeleteIfUnmatched");
+
 
 fhem('set H4 reread');
 
