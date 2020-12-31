@@ -532,6 +532,7 @@ if(int(@ARGV) > 1 && $ARGV[$#ARGV] ne "-i") {
     syswrite($client, $ARGV[$i]."\n");
   }
   shutdown($client, 1);
+  alarm(30); #117226
   while(sysread($client, $buf, 256) > 0) {
     $buf =~ s/\xff\xfb\x01Password: //;
     $buf =~ s/\xff\xfc\x01\r\n//;
