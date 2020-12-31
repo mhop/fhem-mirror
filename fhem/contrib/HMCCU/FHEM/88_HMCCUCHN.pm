@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.029
+#  Version 4.4.031
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -47,12 +47,12 @@ sub HMCCUCHN_Initialize ($)
 	$hash->{parseParams} = 1;
 
 	$hash->{AttrList} = 'IODev ccucalculate '.
-		'ccuflags:multiple-strict,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings '.
+		'ccuflags:multiple-strict,ackState,logCommand,noReadings,trace,showMasterReadings,showLinkReadings,showDeviceReadings,showServiceReadings '.
 		'ccureadingfilter:textField-long '.
 		'ccureadingformat:name,namelc,address,addresslc '.
 		'ccureadingname:textField-long ccuSetOnChange ccuReadingPrefix '.
-		'ccuscaleval ccuverify:0,1,2 ccuget:State,Value controldatapoint '.
-		'disable:0,1 hmstatevals:textField-long statedatapoint statevals substitute:textField-long '.
+		'ccuscaleval ccuverify:0,1,2 ccuget:State,Value '.
+		'disable:0,1 hmstatevals:textField-long statevals substitute:textField-long '.
 		'substexcl stripnumber peer:textField-long traceFilter '. $readingFnAttributes;
 }
 
@@ -158,13 +158,16 @@ sub HMCCUCHN_InitDevice ($$)
 	$devHash->{ccutype}     = $dt;
 	$devHash->{ccudevstate} = 'active';
 	
+	# Initialize user attributes
+	HMCCU_SetSCAttributes ($ioHash, $devHash);
+
 	if ($init_done) {
 		# Interactive device definition
 		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
 		HMCCU_UpdateDevice ($ioHash, $devHash);
 		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
 		
-		my ($sc, $sd, $cc, $cd, $sdCnt, $cdCnt) = HMCCU_GetSpecialDatapoints ($devHash);
+		my ($sc, $sd, $cc, $cd, $sdCnt, $cdCnt) = HMCCU_GetSCDatapoints ($devHash);
 		
 		HMCCU_UpdateRoleCommands ($ioHash, $devHash, $cc);
 		HMCCU_UpdateAdditionalCommands ($ioHash, $devHash, $cc, $cd);
@@ -252,13 +255,13 @@ sub HMCCUCHN_Set ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt  = shift @$a // return 'No set command specified';
-	$opt = lc($opt);
+	my $lcopt = lc($opt);
 
 	# Check device state
 	return "Device state doesn't allow set commands"
 		if (!defined($hash->{ccudevstate}) ||
 			$hash->{ccudevstate} eq 'pending' || !defined($hash->{IODev}) ||
-			($hash->{readonly} eq 'yes' && $opt !~ /^(\?|clear|config|defaults)$/) ||
+			($hash->{readonly} eq 'yes' && $lcopt !~ /^(\?|clear|config|defaults)$/) ||
 			AttrVal ($name, 'disable', 0) == 1);
 
 	my $ioHash = $hash->{IODev};
@@ -267,7 +270,7 @@ sub HMCCUCHN_Set ($@)
 		if (HMCCU_IsRPCStateBlocking ($ioHash));
 
 	# Get state and control datapoints
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
+	my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($hash);
 	
 	# Additional commands, including state commands
 	my $cmdList = $hash->{hmccu}{cmdlist}{set} // '';
@@ -275,7 +278,7 @@ sub HMCCUCHN_Set ($@)
 	# Some commands require a control datapoint
 	if ($opt =~ /^(control|toggle)$/) {
 		return HMCCU_SetError ($hash, -14) if ($cd eq '');
-		return HMCCU_SetError ($hash, -8)
+		return HMCCU_SetError ($hash, -8, $cd)
 			if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr}, $cd, 2));
 	}
 	
@@ -286,7 +289,7 @@ sub HMCCUCHN_Set ($@)
 	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a))
 		if ($opt ne '?' && (HMCCU_IsFlag ($name, 'logCommand') || HMCCU_IsFlag ($ioName, 'logCommand')));
 	
-	if ($opt eq 'control') {
+	if ($lcopt eq 'control') {
 		my $value = shift @$a // return HMCCU_SetError ($hash, "Usage: set $name control {value}");
 		my $stateVals = HMCCU_GetStateValues ($hash, $cd, $cc);
 		$rc = HMCCU_SetMultipleDatapoints ($hash,
@@ -294,10 +297,10 @@ sub HMCCUCHN_Set ($@)
 		);
 		return HMCCU_SetError ($hash, HMCCU_Min(0, $rc));
 	}
-	elsif ($opt eq 'datapoint') {
+	elsif ($lcopt eq 'datapoint') {
 		return HMCCU_ExecuteSetDatapointCommand ($hash, $a, $h, $cc, $cd);
 	}
-	elsif ($opt eq 'toggle') {
+	elsif ($lcopt eq 'toggle') {
 		return HMCCU_ExecuteToggleCommand ($hash, $cc, $cd);
 	}
 	elsif (exists($hash->{hmccu}{roleCmds}{set}{$opt})) {
@@ -306,10 +309,10 @@ sub HMCCUCHN_Set ($@)
 	elsif ($opt eq 'clear') {
 		return HMCCU_ExecuteSetClearCommand ($hash, $a);
 	}
-	elsif ($opt =~ /^(config|values)$/) {
-		return HMCCU_ExecuteSetParameterCommand ($ioHash, $hash, $opt, $a, $h);
+	elsif ($lcopt =~ /^(config|values)$/) {
+		return HMCCU_ExecuteSetParameterCommand ($ioHash, $hash, $lcopt, $a, $h);
 	}
-	elsif ($opt eq 'defaults') {
+	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
 		$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, ctrlChn => $cc });
 		$rc = HMCCU_SetDefaults ($hash) if (!$rc);
@@ -319,10 +322,14 @@ sub HMCCUCHN_Set ($@)
 	else {
 		my $retmsg = "clear defaults:reset,update";
 		if ($hash->{readonly} ne 'yes') {
-			$retmsg .= ' config datapoint';
+			$retmsg .= ' config';
+			my ($a, $c) = split(":", $hash->{ccuaddr});
+			my $dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 2);
+			$retmsg .= ' datapoint' if ($dpCount > 0);
 			$retmsg .= " $cmdList" if ($cmdList ne '');
 		}
-		return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
+		# return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
+		return $retmsg;
 	}
 }
 
@@ -335,7 +342,7 @@ sub HMCCUCHN_Get ($@)
 	my ($hash, $a, $h) = @_;
 	my $name = shift @$a;
 	my $opt = shift @$a // return 'No get command specified';
-	$opt = lc($opt);
+	my $lcopt = lc($opt);
 
 	return undef if (!defined ($hash->{ccudevstate}) || $hash->{ccudevstate} eq 'pending' ||
 		!defined ($hash->{IODev}));
@@ -353,7 +360,7 @@ sub HMCCUCHN_Get ($@)
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSpecialDatapoints ($hash);
+	my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($hash);
 
 	# Additional commands, including state commands
 	my $cmdList = $hash->{hmccu}{cmdlist}{get} // '';
@@ -365,45 +372,40 @@ sub HMCCUCHN_Get ($@)
 	HMCCU_Log ($hash, 3, "get $name $opt ".join (' ', @$a))
 		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand')); 
 
-	if ($opt eq 'datapoint') {
+	if ($lcopt eq 'datapoint') {
 		my $objname = shift @$a // return HMCCU_SetError ($hash, "Usage: get $name datapoint {datapoint}");		
-		return HMCCU_SetError ($hash, -8)
+		return HMCCU_SetError ($hash, -8, $objname)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, $ccuaddr, $objname, 1));
 
 		$objname = $ccuif.'.'.$ccuaddr.'.'.$objname;
 		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 		return $rc < 0 ? HMCCU_SetError ($hash, $rc, $result) : $result;
 	}
-	elsif ($opt eq 'deviceinfo') {
+	elsif ($lcopt eq 'deviceinfo') {
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		return HMCCU_ExecuteGetDeviceInfoCommand ($ioHash, $hash, $devAddr, $sc, $sd, $cc, $cd);
 	}
-	elsif ($opt =~ /^(config|values|update)$/) {
+	elsif ($lcopt =~ /^(config|values|update)$/) {
 		my ($devAddr, undef) = HMCCU_SplitChnAddr ($ccuaddr);
 		my @addList = ($devAddr, "$devAddr:0", $ccuaddr);	
-		my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $opt, \@addList);
+		my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $lcopt, \@addList);
 		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($resp));
 		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $resp);
 	}
-	elsif ($opt eq 'paramsetdesc') {
+	elsif ($lcopt eq 'paramsetdesc') {
 		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
 	elsif (exists($hash->{hmccu}{roleCmds}{get}{$opt})) {
 		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $cc, $a, $h);
 	}
-	elsif ($opt eq 'defaults') {
-		return HMCCU_GetDefaults ($hash, 0);
-	}
 	else {
-		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of defaults:noArg datapoint";
-		
+		my $retmsg = "HMCCUCHN: Unknown argument $opt, choose one of";
+		$retmsg .= ' update:noArg deviceInfo:noArg config:noArg paramsetDesc:noArg values:noArg';	
 		my ($a, $c) = split(":", $hash->{ccuaddr});
-		my @valuelist;
-		my $valuecount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@valuelist);	
-		$retmsg .= ":".join(",",@valuelist) if ($valuecount > 0);
-		$retmsg .= " update:noArg deviceInfo:noArg config:noArg".
-			" paramsetDesc:noArg values:noArg";
+		my @dpList;
+		my $dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 1, \@dpList);	
+		$retmsg .= ' datapoint:'.join(",",@dpList) if ($dpCount > 0);
 		$retmsg .= " $cmdList" if ($cmdList ne '');
 		
 		return $retmsg;
@@ -422,8 +424,8 @@ sub HMCCUCHN_Get ($@)
 <h3>HMCCUCHN</h3>
 <ul>
    The module implements Homematic CCU channels as client devices for HMCCU. A HMCCU I/O device must
-   exist before a client device can be defined. If a CCU channel is not found execute command
-   'get devicelist' in I/O device. This will synchronize devices and channels between CCU
+   exist before a client device can be defined. If a CCU channel is not found, execute command
+   'get ccuConfig' in I/O device. This will synchronize devices and channels between CCU
    and HMCCU.
    </br></br>
    <a name="HMCCUCHNdefine"></a>
@@ -440,9 +442,23 @@ sub HMCCUCHN_Get ($@)
       <code>define window_living HMCCUCHN WIN-LIV-1 readonly</code><br/>
       <code>define temp_control HMCCUCHN BidCos-RF.LEQ1234567:1</code>
       <br/><br/>
-      The interface part of a channel address is optional.
-      Channel addresses can be found with command 'get deviceinfo &lt;CCU-DeviceName&gt;' executed
-      in I/O device.
+      The interface part of a channel address is optional. Channel addresses can be found with command
+	  'get deviceinfo &lt;CCU-DeviceName&gt;' executed in I/O device.<br/><br/>
+	  Internals:<br/>
+	  <ul>
+	  	<li>ccuaddr: Address of channel in CCU</li>
+		<li>ccudevstate: State of device in CCU (active/inactive/dead)</li>
+		<li>ccuif: Interface of device</li>
+	  	<li>ccuname: Name of channel in CCU</li>
+		<li>ccurole: Role of channel</li>
+		<li>ccusubtype: Homematic subtype of device (different from ccutype for HmIP devices)</li>
+		<li>ccutype: Homematic type of device</li>
+		<li>readonly: Indicates whether FHEM device is writeable</li>
+		<li>receiver: List of peered devices with role 'receiver'. If no FHEM device exists for a receiver, the
+		name of the CCU device is displayed preceeded by 'ccu:'</li> 
+		<li>sender: List of peered devices with role 'sender'. If no FHEM device exists for a sender, the
+		name of the CCU device is displayed preceeded by 'ccu:'</li> 
+	  </ul>
    </ul>
    <br/>
    
@@ -480,7 +496,7 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <li><b>set &lt;name&gt; datapoint &lt;datapoint&gt; &lt;value&gt; | &lt;datapoint&gt=&lt;value&gt; [...]</b><br/>
         Set datapoint values of a CCU channel. If value contains blank characters it must be
-        enclosed in double quotes.<br/><br/>
+        enclosed in double quotes. This command is only available, if channel contains a writeable datapoint.<br/><br/>
         Examples:<br/>
         <code>set temp_control datapoint SET_TEMPERATURE 21</code><br/>
         <code>set temp_control datapoint AUTO_MODE 1 SET_TEMPERATURE=21</code>
@@ -523,14 +539,14 @@ sub HMCCUCHN_Get ($@)
       	channel contains a datapoint STOP.
       </li><br/>
       <li><b>set &lt;name&gt; toggle</b><br/>
-			Toggle state datapoint between values defined by attribute 'statevals'. This command is
-			only available if state values can be detected or are defined by using attribute
-			'statevals'. Toggling supports more than two state values.<br/><br/>
-			Example: Toggle blind actor<br/>
-			<code>
-			attr myswitch statevals up:100,down:0<br/>
-			set myswitch toggle
-			</code>
+		Toggle state datapoint between values defined by attribute 'statevals'. This command is
+		only available if state values can be detected or are defined by using attribute
+		'statevals'. Toggling supports more than two state values.<br/><br/>
+		Example: Toggle blind actor<br/>
+		<code>
+		attr myswitch statevals up:100,down:0<br/>
+		set myswitch toggle
+		</code>
       </li><br/>
       <li><b>set &lt;name&gt; up [&lt;value&gt;]</b><br/>
       	[blind,dimmer] Increment value of datapoint LEVEL. This command is only available
@@ -549,38 +565,51 @@ sub HMCCUCHN_Get ($@)
    <b>Get</b><br/><br/>
    <ul>
       <li><b>get &lt;name&gt; config</b><br/>
-         Get configuration parameters of device and channel.
-         Values related to configuration or link parameters are stored as readings beginning
-         with "R-" for MASTER parameter set and "L-" for LINK parameter set. 
-         Prefixes can be modified with attribute 'ccuReadingPrefix'. Whether parameters are
-         stored as readings or not, can be controlled by setting the following flags in
-         attribute ccuflags:<br/>
-         noReadings: Do not store any reading.<br/>
-         showMasterReadings: Store configuration readings of current channel.<br/>
-         showDeviceReadings: Store readings of device and channel 0.<br/>
-         showLinkReadings: Store readings of links.<br/>
-         If non of the flags is set, only readings belonging to parameter set VALUES (datapoints)
-         are stored.
+		Get configuration parameters of device and channel.
+		Values related to configuration or link parameters are stored as readings beginning
+		with "R-" for MASTER parameter set and "L-" for LINK parameter set. 
+		Prefixes "R-" and "L-" can be modified with attribute 'ccuReadingPrefix'. Whether parameters are
+		stored as readings or not, can be controlled by setting the following flags in
+		attribute ccuflags:<br/>
+		<ul>
+			<li>noReadings: Do not store any reading.</li>
+			<li>showMasterReadings: Store configuration readings of parameter set 'MASTER' of current channel.</li>
+			<li>showDeviceReadings: Store configuration readings of device and value readings of channel 0.</li>
+			<li>showLinkReadings: Store readings of links.</li>
+			<li>showServiceReadings: Store readings of parameter set 'SERVICE'</li>
+		</ul>
+		If non of the flags is set, only readings belonging to parameter set VALUES (datapoints)
+		are stored.
       </li><br/>
       <li><b>get &lt;name&gt; datapoint &lt;datapoint&gt;</b><br/>
-         Get value of a CCU channel datapoint.
+        Get value of a CCU channel datapoint. Format of <i>datapoint</i> is ChannelNo.DatapointName.
+		For HMCCUCHN devices the ChannelNo is not needed. This command is only available if a 
+		readable datapoint exists.
       </li><br/>
       <li><b>get &lt;name&gt; defaults</b><br/>
-      	Display default attributes for CCU device type.
+      	This command has been removed in version 4.4. The default attributes are included in the
+		output of command 'get deviceInfo'.
       </li><br/>
       <li><b>get &lt;name&gt; deviceInfo</b><br/>
-         Display information about device and channels:<br/>
-         <ul>
-         <li>all channels and datapoints of device with datapoint values and types</li>
-         <li>statedatapoint and controldatapoint</li>
-         <li>device and channel description</li>
-         </ul>
+		Display information about device type and channels:<br/>
+		<ul>
+			<li>all channels and datapoints of device with datapoint values and types</li>
+			<li>statedatapoint and controldatapoint</li>
+			<li>device and channel description</li>
+			<li>default attributes (if device is not supported by built in functionality)</li>
+		</ul>
+		The output of this command is helpful to gather information about new / not yet supported devices.
+		Please add this information to your post in the FHEM forum, if you have a question about
+		the integration of a new device. See also command 'get paramsetDesc'.
       </li><br/>
       <li><b>get &lt;name&gt; paramsetDesc</b><br/>
-         Display description of parameter sets of channel and device.
+		Display description of parameter sets of channel and device. The output of this command
+		is helpful to gather information about new / not yet supported devices. Please add this
+		information to your post in the FHEM forum, if you have a question about
+		the integration of a new device. See also command 'get deviceInfo'.
       </li><br/>
       <li><b>get &lt;name&gt; update</b><br/>
-         Update all readings for all parameters of all parameter sets (MASTER, LINK, VALUES).
+        Update all readings for all parameters of all parameter sets (MASTER, LINK, VALUES).
       </li><br/>
       <li><b>get &lt;name&gt; values</b><br/>
       	Update all readings for all parameters of parameter set VALUES (datapoints).
@@ -624,6 +653,7 @@ sub HMCCUCHN_Get ($@)
       	showDeviceReadings: Show readings of device and channel 0.<br/>
       	showLinkReadings: Show link readings.<br/>
       	showMasterReadings: Show configuration readings.<br/>
+			showServiceReadings: Show service readings (HmIP only)<br/>
       	trace: Write log file information for operations related to this device.
       </li><br/>
       <a name="ccuget"></a>
@@ -686,8 +716,12 @@ sub HMCCUCHN_Get ($@)
       </li><br/>
       <a name="ccuReadingPrefix"></a>
       <li><b>ccuReadingPrefix &lt;paramset&gt;:&lt;prefix&gt;[,...]</b><br/>
-      	Set reading name prefix for parameter sets. The special parameter set 'peer' can
-      	be used for link readings.
+      	Set reading name prefix for parameter sets. Default values for parameter sets are:<br/>
+			VALUES (state values): No prefix<br/>
+			MASTER (configuration parameters): 'R-'<br/>
+			LINK (links parameters): 'L-'<br/>
+			PEER (peering parameters): 'P-'<br/>
+			SERVICE (service parameters): S-<br/>
       </li><br/>
       <a name="ccuscaleval"></a>
       <li><b>ccuscaleval &lt;[channelno.]datapoint&gt;:&lt;factor&gt;[,...]</b><br/>
