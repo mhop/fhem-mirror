@@ -1671,7 +1671,7 @@ sub HMinfo_GetFn($@) {#########################################################
       $list =~ s/p//;
       my $chan = "";
       foreach (split",",$th->{$modelId}{chn}){
-        my ($n,$s,$e) = split(":",$modelId);
+        my ($n,$s,$e) = split(":",$_);
         $chan .= $s.(($s eq $e)?"":("-".$e))." ".$n.", ";
       }
       push @model,sprintf("%-16s %-24s %4s %-24s %-5s %-5s %s"
