@@ -200,7 +200,8 @@ sub Initialize {
                                 "showWeather:1,0 ".
                                 "spaceSize ".   
                                 "Wh/kWh:Wh,kWh ".
-                                "weatherColor:colorpicker,RGB ".                                
+                                "weatherColor:colorpicker,RGB ".
+                                "weatherColor_night:colorpicker,RGB ".                                
                                 $readingFnAttributes;
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -782,16 +783,15 @@ sub _transWeatherValues {
           $epoche   = $t + (3600*$num);
       }
 
-      my $wid   = ReadingsVal($fcname, "fc${fd}_${fh}_ww", 0);
-      $wid      = sprintf "%02d", $wid;                                                       # führende 0 einfügen wenn nötig
+      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww", 99);                               # 55_DWD -> 0 .. 98 definiert , 99 ist nicht vorhanden                                                    # führende 0 einfügen wenn nötig
       
       my $fhstr = sprintf "%02d", $fh;
       
       if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {         # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
-          $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
+          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
       }
       elsif ($fd == 1 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {     # Zeit vor Sonnenaufgang oder nach Sonnenuntergang morgen
-          $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
+          $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
       }
       
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh}_wwd", '');
@@ -1152,7 +1152,8 @@ sub forecastGraphic {                                                           
   my $show_night =  AttrNum ($name, 'showNight',              0   );                      # alle Balken (Spalten) anzeigen ?
   my $show_diff  =  AttrVal ($name, 'showDiff',            'no'   );                      # zusätzliche Anzeige $di{} in allen Typen
   my $weather    =  AttrNum ($name, 'showWeather',            1   );
-  my $colorw     =  AttrVal ($name, 'weatherColor',       undef   );
+  my $colorw     =  AttrVal ($name, 'weatherColor',       undef   );                      # Wetter Icon Farbe
+  my $colorwn    =  AttrVal ($name, 'weatherColor_night', $colorw );                      # Wetter Icon Farbe Nacht
 
   my $wlalias    =  AttrVal ($name, 'alias',              $name   );
   my $header     =  AttrNum ($name, 'showHeader',             1   ); 
@@ -1314,12 +1315,12 @@ sub forecastGraphic {                                                           
   ##########################
   # Werte aktuelle Stunde
   ##########################
-  $pv{0} = ReadingsNum($name, "ThisHour_PVforecast",  0);
-  $co{0} = ReadingsNum($name, "ThisHour_Consumption", 0);
-  $di{0} = $pv{0} - $co{0}; 
-  $is{0} = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
-  $we{0} = $hash->{HELPER}{"ThisHour_WeatherId"} if($weather);                                   # für Wettericons 
-  $we{0} //= 999;
+  $pv{0}   = ReadingsNum($name, "ThisHour_PVforecast",  0);
+  $co{0}   = ReadingsNum($name, "ThisHour_Consumption", 0);
+  $di{0}   = $pv{0} - $co{0}; 
+  $is{0}   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
+  $we{0}   = $hash->{HELPER}{"ThisHour_WeatherId"} if($weather);                                 # für Wettericons 
+  $we{0} //= 99;
 
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name, "ThisHour_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
@@ -1390,19 +1391,18 @@ sub forecastGraphic {                                                           
   my $minDif = $di{0};                                                                           # für Typ diff
 
   for my $i (1..$maxhours-1) {
-     $pv{$i} = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_PVforecast",  0);              # Erzeugung
-     $co{$i} = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_Consumption", 0);              # Verbrauch
-     $di{$i} = $pv{$i} - $co{$i};
+     $pv{$i}   = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_PVforecast",  0);            # Erzeugung
+     $co{$i}   = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_Consumption", 0);            # Verbrauch
+     $di{$i}   = $pv{$i} - $co{$i};
 
-     $maxVal = $pv{$i} if ($pv{$i} > $maxVal); 
-     $maxCon = $co{$i} if ($co{$i} > $maxCon);
-     $maxDif = $di{$i} if ($di{$i} > $maxDif);
-     $minDif = $di{$i} if ($di{$i} < $minDif);
+     $maxVal   = $pv{$i} if ($pv{$i} > $maxVal); 
+     $maxCon   = $co{$i} if ($co{$i} > $maxCon);
+     $maxDif   = $di{$i} if ($di{$i} > $maxDif);
+     $minDif   = $di{$i} if ($di{$i} < $minDif);
 
-     $is{$i} = (ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
-     $we{$i} = $hash->{HELPER}{"NextHour".   sprintf("%02d",$i)."_WeatherId"} if($weather);    # für Wettericons 
-     
-     $we{$i} //= 999;
+     $is{$i}   = (ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
+     $we{$i}   = $hash->{HELPER}{"NextHour".   sprintf("%02d",$i)."_WeatherId"} if($weather);    # für Wettericons 
+     $we{$i} //= 99;
 
      if(AttrVal("global","language","EN") eq "DE") {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
@@ -1447,15 +1447,18 @@ sub forecastGraphic {                                                           
 
       for my $i (0..$maxhours-1) {                                                           # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
           if ($pv{$i} || $show_night || ($type eq 'pvco') || ($type eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
+              my $night     = ($we{$i} > 99) ? 1 : 0;
+              $we{$i}      -= 100  if ($night);
               my $icon_name = weather_icon($we{$i});                                         # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
-              Log3($name, 4, "$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
+              Log3($name, 3, "$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
               
-              $icon_name .='@'.$colorw if (defined($colorw));
+              $icon_name .='@'.$colorw  if (defined($colorw)  && !$night);
+              $icon_name .='@'.$colorwn if (defined($colorwn) && $night);
               $val        = FW_makeImage($icon_name);
       
               if ($val eq $icon_name) {                                                      # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
                   $val  ='<b>???<b/>';                                                       
-                  Log3($name, 4, qq{$name - the icon $we{$i} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+                  Log3($name, 3, qq{$name - the icon $we{$i} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
               
               $ret .= "<td title='$we_txt{$i}' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
@@ -1823,59 +1826,45 @@ sub weather_icon {
   my $id = shift;
 
   my %weather_ids = (
-     '00' => 'weather_sun',                         # Sonne (klar)                                          # vorhanden
-     '01' => 'weather_cloudy_light',                # leichte Bewölkung (1/3)                               # vorhanden
-     '02' => 'weather_cloudy',                      # mittlere Bewölkung (2/3)                              # vorhanden
-     '03' => 'weather_cloudy_heavy',                # starke Bewölkung (3/3)                                # vorhanden
+     '0'  => 'weather_sun',                         # Sonne (klar)                                          # vorhanden
+     '1'  => 'weather_cloudy_light',                # leichte Bewölkung (1/3)                               # vorhanden
+     '2'  => 'weather_cloudy',                      # mittlere Bewölkung (2/3)                              # vorhanden
+     '3'  => 'weather_cloudy_heavy',                # starke Bewölkung (3/3)                                # vorhanden
+     # 4 - 9 fehlt
      '10' => 'weather_fog',                         # Nebel                                                 # neu
      '11' => 'weather_rain_fog',                    # Nebel mit Regen                                       # neu
+     # 12 - 19 fehlt
      '20' => 'weather_rain_heavy',                  # Regen (viel)                                          # vorhanden
      '21' => 'weather_rain_snow_heavy',             # Regen (viel) mit Schneefall                           # neu
+     # 22 - 29 fehlt
      '30' => 'weather_rain_light',                  # leichter Regen (1 Tropfen)                            # vorhanden
      '31' => 'weather_rain',                        # leichter Regen (2 Tropfen)                            # vorhanden
      '32' => 'weather_rain_heavy',                  # leichter Regen (3 Tropfen)                            # vorhanden
+     # 33 - 39 fehlt
      '40' => 'weather_rain_snow_light',             # leichter Regen mit Schneefall (1 Tropfen)             # neu
      '41' => 'weather_rain_snow',                   # leichter Regen mit Schneefall (3 Tropfen)             # neu
+     # 42 - 49 fehlt
      '50' => 'weather_snow_light',                  # bewölkt mit Schneefall (1 Flocke)                     # vorhanden
      '51' => 'weather_snow',                        # bewölkt mit Schneefall (2 Flocken)                    # vorhanden
      '52' => 'weather_snow_heavy',                  # bewölkt mit Schneefall (3 Flocken)                    # vorhanden
+     # 53 - 59 fehlt
      '60' => 'weather_rain_light',                  # Sonne, Wolke mit Regen (1 Tropfen)                    # vorhanden
      '61' => 'weather_rain',                        # Sonne, Wolke mit Regen (2 Tropfen)                    # vorhanden
      '62' => 'weather_rain_heavy',                  # Sonne, Wolke mit Regen (3 Tropfen)                    # vorhanden
      '63' => 'weather_rain',                        # Sonne, Wolke mit Regen (2 Tropfen)                    # vorhanden
+     # 64 - 67 fehlt
      '68' => 'weather_rain_snow_light',             # leichter Schneeregen (Tag)                            # vorhanden     
+     # 69 fehlt 
      '70' => 'weather_snow_light',                  # Sonne, Wolke mit Schnee (1 Flocke)                    # vorhanden
      '71' => 'weather_snow_heavy',                  # Sonne, Wolke mit Schnee (3 Flocken)                   # vorhanden
+     # 72 - 79 fehlt
      '80' => 'weather_thunderstorm',                # Wolke mit Blitz                                       # vorhanden
      '81' => 'weather_storm',                       # Wolke mit Blitz und Starkregen                        # vorhanden
+     # 82 - 89 fehlt
      '90' => 'weather_sun',                         # Sonne (klar)                                          # vorhanden
      '91' => 'weather_sun',                         # Sonne (klar) wie 90                                   # vorhanden
-    '100' => 'weather_night',                       # Mond - Nacht                                          # neu
-    '101' => 'weather_night_cloudy_light',          # Mond mit Wolken -                                     # neu
-    '102' => 'weather_night_cloudy',                # Wolken mittel (2/2) - Nacht                           # neu
-    '103' => 'weather_night_cloudy_heavy',          # Wolken stark (3/3) - Nacht                            # neu
-    '110' => 'weather_night_fog',                   # Nebel - Nacht                                         # neu
-    '111' => 'weather_night_rain_fog',              # Nebel mit Regen (3 Tropfen) - Nacht                   # neu
-    '120' => 'weather_night_rain_heavy',            # Regen (viel) - Nacht                                  # neu
-    '121' => 'weather_night_snow_rain_heavy',       # Regen (viel) mit Schneefall - Nacht                   # neu
-    '130' => 'weather_night_rain_light',            # leichter Regen (1 Tropfen) - Nacht                    # neu
-    '131' => 'weather_night_rain',                  # leichter Regen (2 Tropfen) - Nacht                    # neu
-    '132' => 'weather_night_rain_heavy',            # leichter Regen (3 Tropfen) - Nacht                    # neu
-    '140' => 'weather_night_snow_rain_light',       # leichter Regen mit Schneefall (1 Tropfen) - Nacht     # neu
-    '141' => 'weather_night_snow_rain_heavy',       # leichter Regen mit Schneefall (3 Tropfen) - Nacht     # neu
-    '150' => 'weather_night_snow_light',            # bewölkt mit Schneefall (1 Flocke) - Nacht             # neu
-    '151' => 'weather_night_snow',                  # bewölkt mit Schneefall (2 Flocken) - Nacht            # neu
-    '152' => 'weather_night_snow_heavy',            # bewölkt mit Schneefall (3 Flocken) - Nacht            # neu
-    '160' => 'weather_night_rain_light',            # Mond, Wolke mit Regen (1 Tropfen) - Nacht             # neu
-    '161' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
-    '162' => 'weather_night_rain_heavy',            # Mond, Wolke mit Regen (3 Tropfen) - Nacht             # neu
-    '163' => 'weather_night_rain',                  # Mond, Wolke mit Regen (2 Tropfen) - Nacht             # neu
-    '168' => 'weather_night_snow_rain_light',       # leichter Schneeregen (Tag)                            # vorhanden 
-    '170' => 'weather_night_snow_rain',             # Mond, Wolke mit Schnee (1 Flocke) - Nacht             # neu
-    '171' => 'weather_night_snow_heavy',            # Mond, Wolke mit Schnee (3 Flocken) - Nacht            # neu
-    '180' => 'weather_night_thunderstorm_light',    # Wolke mit Blitz - Nacht                               # neu
-    '181' => 'weather_night_thunderstorm',          # Wolke mit Blitz und Starkregen - Nacht                # neu
-    '999' => '1px-spacer'                           # Dummy - keine Anzeige Wettericon                      # vorhanden
+     # 92 - 98 fehlt
+     '99' => '1px-spacer'                           # Dummy - keine Anzeige Wettericon                      # vorhanden
   );
   
 return $weather_ids{$id} if(defined($weather_ids{$id}));
@@ -2590,6 +2579,12 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
        <a name="weatherColor"></a>
        <li><b>weatherColor </b><br>
          Farbe der Wetter-Icons.
+       </li>
+       <br> 
+
+       <a name="weatherColor_night"></a>
+       <li><b>weatherColor_night </b><br>
+         Farbe der Wetter-Icons für die Nachtstunden.
        </li>
        <br>        
 
