@@ -301,7 +301,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
   my $prop  = $paref->{prop} // return qq{no PV forecast device specified};
 
   if(!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData") {
-      return qq{Forecast device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};
+      return qq{Forecast device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
   }
 
   readingsSingleUpdate($hash, "currentForecastDev", $prop, 1);
@@ -794,9 +794,12 @@ sub _transWeatherValues {
           $wid = "1".$wid;                                                                    # "1" der WeatherID voranstellen wenn Nacht
       }
       
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid");
+      my $txt = ReadingsVal($fcname, "fc${fd}_${fh}_wwd", '');
       
-      $hash->{HELPER}{"${time_str}_WeatherId"} = $wid;
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt");
+      
+      $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
+      $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
   }
       
 return;
@@ -1037,7 +1040,7 @@ sub forecastGraphic {                                                           
   my ($val,$height);
   my ($z2,$z3,$z4);
   my $he;                                                                                  # Balkenhöhe
-  my (%pv,%is,%t,%we,%di,%co);
+  my (%pv,%is,%t,%we,%we_txt,%di,%co);                                                     # statt zusätzlich %we_txt , we verwenden und umbauen ?
   my @pgCDev;
   
   ##########################################################
@@ -1316,16 +1319,18 @@ sub forecastGraphic {                                                           
   $di{0} = $pv{0} - $co{0}; 
   $is{0} = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
   $we{0} = $hash->{HELPER}{"ThisHour_WeatherId"} if($weather);                                   # für Wettericons 
-  $we{0} = $we{0} // 999;
+  $we{0} //= 999;
 
   if(AttrVal("global","language","EN") eq "DE") {
       (undef,undef,undef,$t{0}) = ReadingsVal($name, "ThisHour_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+      $we_txt{0}                = $hash->{HELPER}{"ThisHour_WeatherTxt"} if($weather);
   } 
   else {
       (undef,undef,undef,$t{0}) = ReadingsVal($name, "ThisHour_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   }
   
-  $t{0} = int($t{0});                                                                            # zum Rechnen Integer ohne führende Null
+  $we_txt{0} //= '';
+  $t{0}        = int($t{0});                                                                     # zum Rechnen Integer ohne führende Null
 
   ###########################################################
   # get consumer list and display it in portalGraphics
@@ -1395,17 +1400,20 @@ sub forecastGraphic {                                                           
      $minDif = $di{$i} if ($di{$i} < $minDif);
 
      $is{$i} = (ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
-     $we{$i} = $hash->{HELPER}{"NextHour".   sprintf("%02d",$i)."_WeatherId"} if($weather);      # für Wettericons 
-     $we{$i} = $we{$i} // 999;
+     $we{$i} = $hash->{HELPER}{"NextHour".   sprintf("%02d",$i)."_WeatherId"} if($weather);    # für Wettericons 
+     
+     $we{$i} //= 999;
 
      if(AttrVal("global","language","EN") eq "DE") {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+        $we_txt{$i}                = $hash->{HELPER}{"NextHour".  sprintf("%02d",$i)."_WeatherTxt"} if($weather);                                         # für Wettericons 
      } 
      else {
         (undef,undef,undef,$t{$i}) = ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
      }
 
-     $t{$i} = int($t{$i});                                  # keine führende 0
+     $we_txt{$i} //= '';
+     $t{$i}        = int($t{$i});                                  # keine führende 0
   }
 
   ######################################
@@ -1440,14 +1448,17 @@ sub forecastGraphic {                                                           
       for my $i (0..$maxhours-1) {                                                           # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
           if ($pv{$i} || $show_night || ($type eq 'pvco') || ($type eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
               my $icon_name = weather_icon($we{$i});                                         # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
-              Log3($name, 3, "$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
+              Log3($name, 4, "$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
               
               $icon_name .='@'.$colorw if (defined($colorw));
               $val        = FW_makeImage($icon_name);
       
-              $val  ='<b>???<b/>' if ($val eq $icon_name);                                   # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-              $ret .= "<td class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
-          
+              if ($val eq $icon_name) {                                                      # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+                  $val  ='<b>???<b/>';                                                       
+                  Log3($name, 4, qq{$name - the icon $we{$i} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+              }
+              
+              $ret .= "<td title='$we_txt{$i}' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
           } 
           else {                                                                             # Kein Ertrag oder show_night = 0
               $ret .= "<td></td>"; $we{$i} = undef; 
