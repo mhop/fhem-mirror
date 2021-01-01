@@ -1289,13 +1289,17 @@ FW_detailSelect(selEl, mayMissing)
   if(selVal != null && selVal != undefined) {
     for(var i1=0; i1<listArr.length; i1++) {
       var aap = listArr[i1].split(":");
-      if(selVal.match(new RegExp("^"+aap[0]+"$"))) {
-        if(aap.length > 2) {
-          var re = aap.shift();
-          aap = [re, aap.join(":")];
+      try {
+        if(selVal.match(new RegExp("^"+aap[0]+"$"))) {
+          if(aap.length > 2) {
+            var re = aap.shift();
+            aap = [re, aap.join(":")];
+          }
+          argAndPar = aap;
+          fnd = true;
         }
-        argAndPar = aap;
-        fnd = true;
+      } catch(e){
+        log("Problem building regexp from "+listArr[i1]);
       }
     }
   }
