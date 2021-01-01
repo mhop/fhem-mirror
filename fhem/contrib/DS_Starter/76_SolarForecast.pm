@@ -766,8 +766,6 @@ sub _transWeatherValues {
   my $fc0_SunRise_round = (sprintf "%02d", (split ":", $fc0_SunRise)[0] - 1);
   my $fc0_SunSet_round  = (sprintf "%02d", (split ":", $fc0_SunSet)[0] + 1);
   
-  Log3($name, 1, "$name - round: $fc0_SunRise_round, $fc0_SunSet_round");
-  
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
       my $fd = int ($fh / 24) ;
@@ -1442,7 +1440,7 @@ sub forecastGraphic {                                                           
       for my $i (0..$maxhours-1) {                                                           # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
           if ($pv{$i} || $show_night || ($type eq 'pvco') || ($type eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
               my $icon_name = weather_icon($we{$i});                                         # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
-              Log3($name, 3,"$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
+              Log3($name, 3, "$name - unknown weather id: ".$we{$i}.", please inform the maintainer") if($icon_name eq 'unknown');
               
               $icon_name .='@'.$colorw if (defined($colorw));
               $val        = FW_makeImage($icon_name);
