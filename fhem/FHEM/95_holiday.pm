@@ -310,12 +310,12 @@ holiday_Get($@)
     $t += 86400 if($a[1] eq "tomorrow");
     $t -= 86400 if($a[1] eq "yesterday");
     my @a = localtime($t);
-    $arg = sprintf("%02d-%02d", $a[4]+1, $a[3]);
+    $arg = sprintf("%04d-%02d-%02d", $a[5]+1900, $a[4]+1, $a[3]);
 
   } elsif($a[1] eq "days") {
     my $t = time() + ($a[2] ? int($a[2]) : 0)*86400;
     my @a = localtime($t);
-    $arg = sprintf("%02d-%02d", $a[4]+1, $a[3]);
+    $arg = sprintf("%04d-%02d-%02d", $a[5]+1900, $a[4]+1, $a[3]);
 
   } else {
     return "unknown argument $a[1], choose one of ".
