@@ -80,6 +80,7 @@ eventTypes_Define($$)
       Log3 undef, 2, "eventTypes: $f: bogus line $l";
       next;
     }
+    next if(!$h1{$l[1]} && !goodDeviceName($l[1])); # Sanitizing: 117259
     et_addEvt(\%h1, $l[1], $l[2], $l[0]);
   }
 
