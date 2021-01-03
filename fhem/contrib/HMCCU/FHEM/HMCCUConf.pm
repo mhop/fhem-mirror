@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.015
+#  Version 4.8.016
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.015';
+$HMCCU_CONFIG_VERSION = '4.8.016';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -194,8 +194,8 @@ $HMCCU_CONFIG_VERSION = '4.8.015';
 
 %HMCCU_ROLECMDS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		'on' => 'V:MOTION_DETECTION_ACTIVE:active=true',
-		'off' => 'V:MOTION_DETECTION_ACTIVE:active=false'
+		'on' => 'V:MOTION_DETECTION_ACTIVE:active=1',
+		'off' => 'V:MOTION_DETECTION_ACTIVE:active=0'
 	},
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'
