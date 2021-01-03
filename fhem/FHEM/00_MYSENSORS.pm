@@ -68,39 +68,44 @@ sub Initialize {
   $hash->{SetFn}    = \&Set;
   $hash->{AttrFn}   = \&Attr;
 
-   my @attrList = qw(
-    autocreate:1
-    requestAck:1
-    first-sensorid
-    last-sensorid
-    stateFormat
-    OTA_firmwareConfig
-    disable:0,1
+   my @attrList = (
+    'disable:0,1',
+    qw(
+      autocreate:1
+      requestAck:1
+      first-sensorid
+      last-sensorid
+      stateFormat
+      OTA_firmwareConfig
+    )
   );
   $hash->{AttrList} = $hash->{AttrList} = join(" ", @attrList);
   return;
 }
 
 
-BEGIN {GP_Import(qw(
-  init_done
-  defs
-  CommandDefine
-  CommandModify
-  CommandAttr
-  gettimeofday
-  readingsSingleUpdate
-  DevIo_OpenDev
-  DevIo_SimpleWrite
-  DevIo_SimpleRead
-  DevIo_CloseDev
-  RemoveInternalTimer
-  InternalTimer
-  AttrVal
-  Log3
-  FileRead
-  IsDisabled
-  ))};
+BEGIN { GP_Import(
+  qw(
+    init_done
+    defs
+    CommandDefine
+    CommandModify
+    CommandAttr
+    gettimeofday
+    readingsSingleUpdate
+    DevIo_OpenDev
+    DevIo_SimpleWrite
+    DevIo_SimpleRead
+    DevIo_CloseDev
+    RemoveInternalTimer
+    InternalTimer
+    AttrVal
+    Log3
+    FileRead
+    IsDisabled
+  )
+  )
+};
 
 my %sensorAttr = (
   LIGHT => ['setCommands on:V_LIGHT:1 off:V_LIGHT:0' ],
