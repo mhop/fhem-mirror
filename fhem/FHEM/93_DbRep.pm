@@ -3,7 +3,7 @@
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2020 by Heiko Maaz
+#       (c) 2016-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -57,7 +57,9 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.42.1"  => "22.11.2020  fix delete \$hash->{HELPER}{REDUCELOG} Forum:#116057",
+  "8.42.3"  => "03.01.2021  set fastStart as default for TYPE Client ",
+  "8.42.2"  => "03.01.2021  sumValue - create 0 instaed of '-' if value of DS is 0, Forum:#index.php/topic,53584.msg1116910.html#msg1116910 ",
+  "8.42.1"  => "22.11.2020  fix delete \$hash->{HELPER}{REDUCELOG} Forum:#116057 ",
   "8.42.0"  => "14.11.2020  new vals next_day_begin, next_day_end for time attr Forum: https://forum.fhem.de/index.php/topic,53584.msg1100040.html#msg1100040 ",
   "8.41.0"  => "08.11.2020  new attrbute avgDailyMeanGWSwithGTS for Grassland temperature sum, minor bugfixes in create time array ",
   "8.40.8"  => "17.09.2020  sqlCmd supports PREPARE statament Forum: #114293, commandRef revised ",
@@ -95,6 +97,7 @@ my %DbRep_vNotesIntern = (
 
 # Version History extern:
 my %DbRep_vNotesExtern = ( 
+  "8.42.3"  => "03.01.2021 The attribute fastStart is set now as default for TYPE Client. This way the DbRep device only connects to the database when it has to process a task and not immediately when FHEM is started. ",
   "8.40.7"  => "03.09.2020 The get Command \"dbValue\" has been renamed to \"sqlCmdBlocking\. You can use \"dbValue\" furthermore in your scripts, but it is ".
                            "deprecated and will be removed soon. Please change your scripts to use \"sqlCmdBlocking\" instead. ",
   "8.40.4"  => "23.07.2020 The new aggregation type 'minute' is now available. ",
@@ -339,7 +342,7 @@ sub DbRep_Initialize {
                        "executeBeforeProc ".
                        "executeAfterProc ".
                        "expimpfile ".
-                       "fastStart:1,0 ".
+                       "fastStart:0,1 ".
                        "fetchRoute:ascent,descent ".
                        "fetchMarkDuplicates:red,blue,brown,green,orange ".
                        "fetchValueFn:textField-long ".
@@ -1145,7 +1148,6 @@ sub DbRep_Attr {
                          executeBeforeProc
                          executeAfterProc
                          expimpfile
-                         fastStart
                          ftpUse
                          ftpUser
                          ftpUseSSL
@@ -1457,7 +1459,7 @@ sub DbRep_Notify {
  return if(!$events);
 
  foreach my $event (@{$events}) {
-     $event = "" if(!defined($event));
+     $event  = "" if(!defined($event));
      my @evl = split("[ \t][ \t]*", $event);
      
      if($event =~ /DELETED/) {
@@ -1469,13 +1471,12 @@ sub DbRep_Notify {
          # wenn Rolle "Agent" Verbeitung von RENAMED Events
          next if ($event !~ /RENAMED/);
          
-         my $strucChanged;
-         # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
+         my $strucChanged;                                             # altes in neues device in der DEF des angeschlossenen DbLog-device ändern (neues device loggen)
          my $dblog_name = $own_hash->{HELPER}{DBLOGDEVICE};            # Name des an den DbRep-Agenten angeschlossenen DbLog-Dev
          my $dblog_hash = $defs{$dblog_name};
          
          if ( $dblog_hash->{DEF} =~ m/( |\(|\|)$evl[1]( |\)|\||:)/ ) {
-             $dblog_hash->{DEF} =~ s/$evl[1]/$evl[2]/;
+             $dblog_hash->{DEF}    =~ s/$evl[1]/$evl[2]/;
              $dblog_hash->{REGEXP} =~ s/$evl[1]/$evl[2]/;
              # Definitionsänderung wurde vorgenommen
              $strucChanged = 1;
@@ -1572,22 +1573,26 @@ return;
 #        Verbindung zur DB aufbauen und Datenbankeigenschaften ermitteln 
 ###################################################################################
 sub DbRep_firstconnect {
-  my ($string)     = @_;
-  my ($name,$opt,$prop,$fret) = split("\\|", $string);
-  my $hash      = $defs{$name};
-  my $to        = AttrVal($name, "timeout", "86400");
-  my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
-  my $dbconn    = $dbloghash->{dbconn};
-  my $dbuser    = $dbloghash->{dbuser};
+  my $string    = shift;
   
-  RemoveInternalTimer($hash, "DbRep_firstconnect");
+  my ($name,$opt,$prop,$fret) = split("\\|", $string);
+  my $hash                    = $defs{$name};
+  my $to                      = AttrVal($name, "timeout", "86400");
+  
+  RemoveInternalTimer ($hash, "DbRep_firstconnect");
   return if(IsDisabled($name));
    
   if ($init_done == 1) {
-      if (AttrVal($name, "fastStart", 0) && $prop eq "onBoot" ) {
+      my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
+      my $dbconn    = $dbloghash->{dbconn};
+      my $dbuser    = $dbloghash->{dbuser};
+      my $fadef     = $hash->{MODEL} eq "Client" ? 1 : 0;                      # fastStart default immer 1 für Clients (0 für Agenten)
+      
+      if (AttrVal($name, "fastStart", $fadef) && $prop eq "onBoot" ) {
           $hash->{LASTCMD} = "initial database connect stopped due to attribute 'fastStart'";
           return;
       } 
+      
       # DB Struktur aus DbLog Instanz übernehmen
       $hash->{HELPER}{DBREPCOL}{COLSET}  = $dbloghash->{HELPER}{COLSET};
       $hash->{HELPER}{DBREPCOL}{DEVICE}  = $dbloghash->{HELPER}{DEVICECOL};
@@ -1599,9 +1604,11 @@ sub DbRep_firstconnect {
       
       # DB Strukturelemente abrufen      
       Log3 ($name, 3, "DbRep $name - Connectiontest to database $dbconn with user $dbuser") if($hash->{LASTCMD} ne "minTimestamp");
+      
       $hash->{HELPER}{RUNNING_PID} = BlockingCall("DbRep_getInitData", "$name|$opt|$prop|$fret", "DbRep_getInitDataDone", $to, "DbRep_getInitDataAborted", $hash);        
       $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
-  } else {
+  } 
+  else {
       InternalTimer(time+1, "DbRep_firstconnect", "$name|$opt|$prop|$fret", 0);
   }
 
@@ -4278,10 +4285,10 @@ return;
 }
 
 ####################################################################################################
-# nichtblockierende DB-Abfrage sumValue
+#                             nichtblockierende DB-Abfrage sumValue
 ####################################################################################################
 sub sumval_DoParse {
- my ($string) = @_;
+ my $string = shift;
  my ($name,$device,$reading,$prop,$ts) = split("\\§", $string);
  my $hash       = $defs{$name};
  my $dbloghash  = $defs{$hash->{HELPER}{DBLOGDEVICE}};
@@ -4289,6 +4296,7 @@ sub sumval_DoParse {
  my $dbuser     = $dbloghash->{dbuser};
  my $dblogname  = $dbloghash->{NAME};
  my $dbpassword = $attr{"sec$dblogname"}{secret};
+ 
  my ($dbh,$sql,$sth,$err,$selspec);
 
  # Background-Startzeit
@@ -4301,42 +4309,40 @@ sub sumval_DoParse {
      return "$name|''|$device|$reading|''|$err|''";
  }
      
- # only for this block because of warnings if details of readings are not set
- no warnings 'uninitialized'; 
-  
- # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef) 
- my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash); 
+ no warnings 'uninitialized';                                                        # only for this block because of warnings if details of readings are not set
+   
+ my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                            # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
  Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet"); 
  
- # Timestampstring to Array
- my @ts = split("\\|", $ts);
+ my @ts = split("\\|", $ts);                                                         # Timestampstring to Array
  Log3 ($name, 5, "DbRep $name - Timestamp-Array: \n@ts"); 
  
- #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
- if ($dbloghash->{MODEL} eq "POSTGRESQL") {
+ if ($dbloghash->{MODEL} eq "POSTGRESQL") {                                          #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
      $selspec = "SUM(VALUE::numeric)";
- } elsif ($dbloghash->{MODEL} eq "MYSQL") {
+ } 
+ elsif ($dbloghash->{MODEL} eq "MYSQL") {
      $selspec = "SUM(VALUE)";
- } elsif ($dbloghash->{MODEL} eq "SQLITE") {
+ } 
+ elsif ($dbloghash->{MODEL} eq "SQLITE") {
      $selspec = "SUM(VALUE)";
- } else {
+ } 
+ else {
      $selspec = "SUM(VALUE)";
  }
     
- # SQL-Startzeit
- my $st = [gettimeofday];  
+ my $st = [gettimeofday];                                                            # SQL-Startzeit
 
- # DB-Abfrage zeilenweise für jeden Array-Eintrag
  my ($arrstr,$wrstr,@rsf,@rsn,@wsf,@wsn);
- foreach my $row (@ts) {
-     my @a                     = split("#", $row);
-     my $runtime_string        = $a[0];
-     my $runtime_string_first  = $a[1];
-     my $runtime_string_next   = $a[2];       
+ for my $row (@ts) {                                                                 # DB-Abfrage zeilenweise für jeden Array-Eintrag
+     my @a                    = split("#", $row);
+     my $runtime_string       = $a[0];
+     my $runtime_string_first = $a[1];
+     my $runtime_string_next  = $a[2];       
      
      if ($IsTimeSet || $IsAggrSet) {
          $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,"'$runtime_string_first'","'$runtime_string_next'",'');
-     } else {
+     } 
+     else {
          $sql = DbRep_createSelectSql($hash,"history",$selspec,$device,$reading,undef,undef,'');
      }
      Log3 ($name, 4, "DbRep $name - SQL execute: $sql");
@@ -4351,8 +4357,7 @@ sub sumval_DoParse {
          return "$name|''|$device|$reading|''|$err|''";
      }
      
-     # DB-Abfrage -> Ergebnis in @arr aufnehmen
-     my @line = $sth->fetchrow_array();
+     my @line = $sth->fetchrow_array();                                              # DB-Abfrage -> Ergebnis in @arr aufnehmen
      
      Log3 ($name, 5, "DbRep $name - SQL result: $line[0]") if($line[0]);     
      
@@ -4360,7 +4365,8 @@ sub sumval_DoParse {
          @rsf     = split(/[ :]/,$runtime_string_first);
          @rsn     = split(/[ :]/,$runtime_string_next);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."_".$rsf[1]."|";
-     } else {
+     } 
+     else {
          @rsf     = split(" ",$runtime_string_first);
          @rsn     = split(" ",$runtime_string_next);
          $arrstr .= $runtime_string."#".$line[0]."#".$rsf[0]."|";
@@ -4373,11 +4379,9 @@ sub sumval_DoParse {
  $sth->finish;
  $dbh->disconnect;
  
- # SQL-Laufzeit ermitteln
- my $rt = tv_interval($st);
+ my $rt = tv_interval($st);                                                          # SQL-Laufzeit ermitteln
  
- # Ergebnisse in Datenbank schreiben
- my ($wrt,$irowdone);
+ my ($wrt,$irowdone);                                                                # Ergebnisse in Datenbank schreiben
  if($prop =~ /writeToDB/) {
      ($wrt,$irowdone,$err) = DbRep_OutputWriteToDB($name,$device,$reading,$wrstr,"sum");
      if ($err) {
@@ -4388,12 +4392,10 @@ sub sumval_DoParse {
      $rt = $rt+$wrt;
  }
   
- # Daten müssen als Einzeiler zurückgegeben werden
- $arrstr = encode_base64($arrstr,"");
+ $arrstr = encode_base64($arrstr,"");                                                # Daten müssen als Einzeiler zurückgegeben werden
  $device = encode_base64($device,"");
  
- # Background-Laufzeit ermitteln
- my $brt = tv_interval($bst);
+ my $brt = tv_interval($bst);                                                        # Background-Laufzeit ermitteln
 
  $rt = $rt.",".$brt;
  
@@ -4404,7 +4406,7 @@ sub sumval_DoParse {
 # Auswertungsroutine der nichtblockierenden DB-Abfrage sumValue
 ####################################################################################################
 sub sumval_ParseDone {
-  my ($string) = @_;
+  my $string     = shift;
   my @a          = split("\\|",$string);
   my $hash       = $defs{$a[0]};
   my $name       = $hash->{NAME};
@@ -4415,53 +4417,53 @@ sub sumval_ParseDone {
      $reading    =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my $bt         = $a[4];
   my ($rt,$brt)  = split(",", $bt);
-  my $err        = $a[5]?decode_base64($a[5]):undef;
+  my $err        = $a[5] ? decode_base64($a[5]) : undef;
   my $irowdone   = $a[6];
-  my $reading_runtime_string;
-  my $erread;
+  
+  my ($reading_runtime_string,$erread);
   
   delete($hash->{HELPER}{RUNNING_PID});
   
-  # Befehl nach Procedure ausführen
-  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");
+  $erread = DbRep_afterproc($hash, "$hash->{LASTCMD}");                          # Befehl nach Procedure ausführen
   
    if ($err) {
       ReadingsSingleUpdateValue ($hash, "errortext", $err, 1);
-      ReadingsSingleUpdateValue ($hash, "state", "error", 1);
+      ReadingsSingleUpdateValue ($hash, "state",  "error", 1);
       return;
   }
   
-  # only for this block because of warnings if details of readings are not set
-  no warnings 'uninitialized'; 
+  no warnings 'uninitialized';                                                   # only for this block because of warnings if details of readings are not set
   
-  # Readingaufbereitung
-  my $state = $erread?$erread:"done";
-  readingsBeginUpdate($hash);
+  my $state = $erread // "done";
+  
+  readingsBeginUpdate ($hash);
 
   my @arr = split("\\|", $arrstr);
-  foreach my $row (@arr) {
-      my @a                = split("#", $row);
-      my $runtime_string   = $a[0];
-      my $c                = $a[1];
-      my $rsf              = $a[2]."__";
+  for my $row (@arr) {
+      my @a              = split("#", $row);
+      my $runtime_string = $a[0];
+      my $c              = $a[1] // "";
+      my $rsf            = $a[2]."__";
       
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
-      } else {
-          my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);
+      } 
+      else {
+          my $ds                  = $device. "__" if ($device);
+          my $rds                 = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."SUM__".$runtime_string;
       }
-         
-      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c?sprintf("%.4f",$c):"-");
+
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ne "" ? sprintf "%.4f", $c : "-");
   }
   
-  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
-  ReadingsBulkUpdateTimeState($hash,$brt,$rt,$state);
-  readingsEndUpdate($hash, 1); 
+  ReadingsBulkUpdateValue     ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
+  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, $state);
+  
+  readingsEndUpdate           ($hash, 1); 
   
 return;
-}
+}  
 
 ####################################################################################################
 # nichtblockierendes DB delete
@@ -14042,8 +14044,8 @@ sub bdump {
                                 retrieve some important informations and the reading "state" switches to "connected" on success.
                                 If this attrbute is set, the initial database connection is executed not till then the 
                                 DbRep device is processing its first command. <br>
-                                While the reading "state" is remaining in state "initialized" after FHEM-start. 
-                                This approach my be helpful if a lot of DbRep devices are defined.                                
+                                While the reading "state" is remaining in state "initialized" after FHEM-start. <br>
+                                (default: 1 for TYPE Client)                                
                                 </li> <br>
                                 
   <a name="fetchMarkDuplicates"></a>
@@ -16692,8 +16694,8 @@ sub bdump {
                                 benötigte Informationen abzurufen und das Reading "state" springt bei Erfolg auf "connected". 
                                 Ist dieses Attribut gesetzt, erfolgt die initiale Datenbankverbindung erst dann wenn das 
                                 DbRep-Device sein erstes Kommando ausführt. <br>
-                                Das Reading "state" verbleibt nach FHEM-Start solange im Status "initialized". Diese Einstellung
-                                kann hilfreich sein wenn viele DbRep-Devices definiert sind.                                
+                                Das Reading "state" verbleibt nach FHEM-Start solange im Status "initialized". <br>
+                                (default: 1 für TYPE Client)                                
                                 </li> <br>
                                 
   <a name="fetchMarkDuplicates"></a>
