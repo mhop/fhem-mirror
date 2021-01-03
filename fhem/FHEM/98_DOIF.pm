@@ -929,6 +929,7 @@ sub AggrIntDoIf
   my $name;
   my $devname;
   my $err;
+  my ($median, @median_values);
   my $ret;
   my $result;
   my @devices;
@@ -943,8 +944,8 @@ sub AggrIntDoIf
   my $place;
   my $number;
   my $readingRegex;
-  
-  if ($modeType =~ /.(sum|average|max|min)?[:]?(?:(a|d)?(\d)?)?/) {
+
+  if ($modeType =~ /.(sum|average|max|min|median)?[:]?(?:(a|d)?(\d)?)?/) {
     $type = (defined $1)? $1 : "";
     $format= (defined $2)? $2 : "";
     $place= $3;
@@ -1032,6 +1033,10 @@ sub AggrIntDoIf
                 $extrem=$number;
                 @devices=($devname);
               }
+          } elsif ($type eq "median") {
+            $num++;
+            push @median_values, $number;
+            push (@devices,$devname);
           }
         }
       }
@@ -1049,6 +1054,21 @@ sub AggrIntDoIf
     if ($num>0) {
       $result=($sum/$num)
     }
+  } elsif ($type eq "median"){
+
+      $result = &{ sub {
+            return 0 if $num == 0;
+
+            my @vals = sort{  $a <=> $b } @median_values;
+
+            # odd amount of values, return the middle one
+            return $vals[int($num / 2)] if ( $num % 2);
+
+            # even amount of values, return the median
+             return  ( $vals[int($num / 2) - 1] + $vals[int($num / 2)] ) / 2;
+        }
+      };
+
   } else {
     $result=$num;
   }
@@ -1083,7 +1103,7 @@ sub AggregateDoIf
   my $mode=substr($modeType,0,1);
   my $type=substr($modeType,1);
   my $splittoken=",";
-  if ($modeType =~ /.(?:sum|average|max|min)?[:]?[^s]*(?:s\((.*)\))?/) {
+  if ($modeType =~ /.(?:sum|average|max|min|median)?[:]?[^s]*(?:s\((.*)\))?/) {
     $splittoken=$1 if (defined $1);
   } 
   if ($mode eq "#") {
@@ -5369,6 +5389,7 @@ Syntax:<br>
 <b>#max</b>  höchster Wert<br>
 <b>#min</b>  niedrigster Wert<br>
 <b>#average</b>  Durchschnitt<br>
+<b>#median</b> Medianwert<br>
 <b>@max</b>  Device des höchsten Wertes<br>
 <b>@min</b>  Device de niedrigsten Wertes<br>
 <br>
@@ -5416,6 +5437,10 @@ Kleinster Wert der Readings des Devices "abfall", in deren Namen "Gruenschnitt" 
 Durchschnitt von Readings aller Devices, die mit "T_" beginnen, in deren Reading-Namen "temp" vorkommt:<br>
 <br>
 <code>[#average:"^T_":"temp"]</code><br>
+<br>
+Medianwert (gewichtetes Mittel) von Readings aller Devices, die mit "T_" beginnen, in deren Reading-Namen "temp" vorkommt:<br>
+<br>
+<code>[#median:"^T_":"temp"]</code><br>
 <br>
 In der Aggregationsbedingung <condition> können alle in FHEM definierten Perlfunktionen genutzt werden. Folgende Variablen sind vorbelegt und können ebenfalls benutzt werden:<br>
 <br>
@@ -5704,10 +5729,17 @@ Schalten mit Zeitfunktionen, hier: bei Sonnenaufgang und Sonnenuntergang:<br>
 {[{sunset(900,"17:00","21:00")}];fhem_set"outdoorlight on"}</code><br>
 <br>
 <a name="DOIF_Indirekten_Zeitangaben"></a><br>
-<b>Indirekten Zeitangaben</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<b>Indirekte Zeitangaben</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
 <br>
-Oft möchte man keine festen Zeiten im Modul angeben, sondern Zeiten, die man z. B. über Dummys über die Weboberfläche verändern kann.
-Statt fester Zeitangaben können Status, Readings oder Internals angegeben werden. Diese müssen eine Zeitangabe im Format HH:MM oder HH:MM:SS oder eine Zahl beinhalten.<br>
+Statt fester Zeitangaben kann ein Status oder ein Reading angegeben werden, welches eine Zeitangabe beinhaltet. Die Angaben werden in doppelte eckige Klammern gesetzt. Eine Änderung der Zeit im angegebenen Reading bzw. Status führt zu sofortiger Neuberechnung der Zeit im DOIF.<br>
+<br>
+Syntax:<br>
+<br>
+<code>[[&lt;Device&gt;:&lt;Reading&gt;]]</code> bzw. bei Statusangabe <code>[[&lt;Device&gt;]]</code><br>
+<br>
+Bei relativen Zeitangaben (hier wird die Zeitangabe zu aktueller Zeit hinzuaddiert):<br>
+<br>
+<code>[+[&lt;Device&gt;:&lt;Reading&gt;]]</code> bzw. bei Statusangabe <code>[+[&lt;Device&gt;]]</code><br>
 <br>
 <u>Anwendungsbeispiel</u>: Lampe soll zu einer bestimmten Zeit eingeschaltet werden. Die Zeit soll über den Dummy <code>time</code> einstellbar sein:<br>
 <br>
