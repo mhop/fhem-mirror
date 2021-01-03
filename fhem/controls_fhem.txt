@@ -1,4 +1,4 @@
-REV 23455
+REV 23460
 DIR unused
 UPD 2021-01-02_07:45:03 355772 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -23,7 +23,7 @@ UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2020-05-28_07:45:03 31677 FHEM/00_MQTT.pm
 UPD 2020-12-27_07:45:03 23138 FHEM/00_MQTT2_CLIENT.pm
 UPD 2020-12-12_07:45:03 21072 FHEM/00_MQTT2_SERVER.pm
-UPD 2020-11-21_07:45:02 32738 FHEM/00_MYSENSORS.pm
+UPD 2021-01-03_07:45:02 32807 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
 UPD 2019-04-01_07:45:02 35447 FHEM/00_Neuron.pm
 UPD 2019-10-01_07:45:03 60034 FHEM/00_OWX.pm
@@ -433,7 +433,7 @@ UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
 UPD 2020-07-17_07:45:03 15082 FHEM/90_SIGNALduino_un.pm
 UPD 2020-12-03_07:45:02 26496 FHEM/90_at.pm
-UPD 2017-08-14_07:45:02 6980 FHEM/91_eventTypes.pm
+UPD 2021-01-03_07:45:02 7298 FHEM/91_eventTypes.pm
 UPD 2020-03-16_07:45:03 27967 FHEM/91_notify.pm
 UPD 2020-09-22_07:45:02 10752 FHEM/91_sequence.pm
 UPD 2020-08-27_07:45:03 17737 FHEM/91_watchdog.pm
@@ -728,12 +728,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-01-02_07:45:07 4399471 docs/commandref.html
+UPD 2021-01-03_07:45:06 4399518 docs/commandref.html
 UPD 2020-12-28_07:45:10 2714835 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-01-02_07:45:11 234304 docs/commandref_modular.html
-UPD 2021-01-02_07:45:12 245063 docs/commandref_modular_DE.html
+UPD 2021-01-03_07:45:10 234304 docs/commandref_modular.html
+UPD 2021-01-03_07:45:11 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2204,6 +2204,7 @@ UPD 2015-07-28_14:05:33 1824 www/images/openautomation/weather_wind_directions_s
 UPD 2015-07-28_14:05:33 1728 www/images/openautomation/weather_wind_directions_w.svg
 UPD 2015-07-28_14:05:33 2221 www/images/openautomation/weather_wind_speed.svg
 UPD 2015-07-28_14:05:33 3958 www/images/openautomation/weather_winter.svg
+UPD 2021-01-03_07:45:02 4834 www/images/openautomation/xbox.svg
 UPD 2020-10-05_07:45:02 3810 www/images/openautomation/zisterne_00.svg
 UPD 2020-10-05_07:45:02 3968 www/images/openautomation/zisterne_10.svg
 UPD 2020-10-05_07:45:02 3967 www/images/openautomation/zisterne_100.svg
