@@ -3395,9 +3395,10 @@ FW_closeInactiveClients()
 {
   my $now = time();
   foreach my $dev (keys %defs) {
-    next if(!$defs{$dev}{TYPE} || $defs{$dev}{TYPE} ne "FHEMWEB" ||
-            !$defs{$dev}{LASTACCESS} || $defs{$dev}{inform} ||
-            ($now - $defs{$dev}{LASTACCESS}) < 60);
+    my $h = $defs{$dev};
+    next if(!$h->{TYPE} || $h->{TYPE} ne "FHEMWEB" ||
+            !$h->{LASTACCESS} || $h->{inform} ||
+            ($now - $h->{LASTACCESS}) < 60);
     Log3 $FW_wname, 4, "Closing inactive connection $dev";
     FW_Undef($defs{$dev}, undef);
     delete $defs{$dev};
