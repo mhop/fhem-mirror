@@ -1,6 +1,2 @@
-HMCCU last change:
-2016-03-02
- - Improved handling of CCU group devices in HMCCUDEV
- - Added support for virtual devices in HMCCUDEV
- - Added new command get updateccu in HMCCU
- - Removed attribute ccustate
+ - bugfix:  88_HMCCU.pm: Fixed device detection bugs
+
