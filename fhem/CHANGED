@@ -2,7 +2,7 @@
 # Do not insert empty lines here, update check depends on it.
  - change:  93_DbRep: set fastStart as default for TYPE Client
  - bugfix:  93_DbRep: sumValue - create 0 instaed of '-' if value of DS is 0
- - feature: 49_TBot_List: new silentStrt option
+ - feature: 49_TBot_List: new silentStart option
  - change:  49_TBot_List: chat/groupid can be added in start
  - bugfix:  98_weekprofile: Log ccutype not defined (forum #1113306)
  - change:  Device::Firmata removed, use CPAN version (forum #114552)

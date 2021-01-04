@@ -298,7 +298,7 @@ sub TBot_List_Set($@)
     # start uses a botname and an optional peer
     $tpeer .= " ".$tchat if ( defined( $tchat ) );
     
-    my $lstcmd = ($cmd eq 'silentStart')?"list":"listsilent";
+    my $lstcmd = ($cmd eq 'silentStart')?"listsilent":"list";
 
     $ret = TBot_List_handler( $hash, $lstcmd, $tbot, $tpeer ) if ( ! $ret );
 
