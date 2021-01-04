@@ -320,7 +320,7 @@ sub
 FW_Undef($$)
 {
   my ($hash, $arg) = @_;
-  my $ret = TcpServer_Close($hash);
+  my $ret = TcpServer_Close($hash, 0, !$hash->{inform});
   if($hash->{inform}) {
     delete $FW_id2inform{$hash->{FW_ID}} if($hash->{FW_ID});
     %FW_visibleDeviceHash = FW_visibleDevices();
@@ -393,7 +393,7 @@ FW_Read($$)
     if($op == 8) {
       # Close, Normal, empty mask. #104718
       TcpServer_WriteBlocking($hash, pack("CCn",0x88,0x2,1000));
-      TcpServer_Close($hash, 1);
+      TcpServer_Close($hash, 1, !$hash->{inform});
       return;
 
     } elsif($op == 9) { # Ping
@@ -435,7 +435,7 @@ FW_Read($$)
   if(!$hash->{HDR}) {
     if(length($hash->{BUF}) > 1000000) {
       Log3 $FW_wname, 2, "Too much header, terminating $hash->{PEER}";
-      return TcpServer_Close($hash, 1);
+      return TcpServer_Close($hash, 1, !$hash->{inform});
     }
     return if($hash->{BUF} !~ m/^(.*?)(\n\n|\r\n\r\n)(.*)$/s);
     $hash->{HDR} = $1;
@@ -640,7 +640,7 @@ FW_finishRead($$$)
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
       if(!$hash->{isChild});
     FW_closeConn($hash);
-    TcpServer_Close($hash, 1);
+    TcpServer_Close($hash, 1, !$hash->{inform});
   }
   $FW_RET="";
 }
@@ -774,7 +774,7 @@ FW_closeConn($)
     my $cc = AttrVal($hash->{SNAME}, "closeConn",
                      $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
     if(!$FW_httpheader{Connection} || $cc) {
-      TcpServer_Close($hash, 1);
+      TcpServer_Close($hash, 1, !$hash->{inform});
     }
   }
 
@@ -3042,7 +3042,7 @@ FW_logInform($$)
   }
   $msg = FW_htmlEscape($msg);
   if(!FW_addToWritebuffer($ntfy, "<div class='fhemlog'>$msg</div>") ){
-    TcpServer_Close($ntfy, 1);
+    TcpServer_Close($ntfy, 1, !$ntfy->{inform});
     delete $logInform{$me};
   }
 }
@@ -3172,7 +3172,7 @@ FW_Notify($$)
                 join("\n", map { s/\n/ /gm; $_ } @data)."\n") ){
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
-      TcpServer_Close($ntfy, 1);
+      TcpServer_Close($ntfy, 1, !$ntfy->{inform});
     }
   }
 
@@ -3199,7 +3199,7 @@ FW_directNotify($@) # Notify without the event overhead (Forum #31293)
         FW_longpollInfo($ntfy->{inform}{fmt}, @_)."\n")) {
       my $name = $ntfy->{NAME};
       Log3 $name, 4, "Closing connection $name due to full buffer in FW_Notify";
-      TcpServer_Close($ntfy, 1);
+      TcpServer_Close($ntfy, 1, !$ntfy->{inform});
     }
   }
 }

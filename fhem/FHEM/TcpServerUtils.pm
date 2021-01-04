@@ -205,7 +205,7 @@ TcpServer_SetSSL($)
 sub
 TcpServer_Close($@)
 {
-  my ($hash, $dodel) = @_;
+  my ($hash, $dodel, $ignoreNtfy) = @_;
   my $name = $hash->{NAME};
 
   if(defined($hash->{CD})) { # Clients
@@ -213,7 +213,7 @@ TcpServer_Close($@)
     delete($hash->{CD}); 
     delete($selectlist{$name});
     delete($hash->{FD});  # Avoid Read->Close->Write
-    removeFromNtfyHash($name);
+    removeFromNtfyHash($name) if(!$ignoreNtfy); # can be expensive
   }
 
   if(defined($hash->{SERVERSOCKET})) {          # Server
