@@ -1618,7 +1618,7 @@ CommandSetuuid($$)
   my ($cl, $param) = @_;
   return "setuuid cannot be used after FHEM is initialized" if($init_done);
   my @a = split(" ", $param);
-  return "Please define $param first" if(!defined($defs{$a[0]}));
+  return "setuuid: Please define $a[0] first" if(!defined($defs{$a[0]}));
   return "setuuid $a[0]: duplicate value, ignoring it" if($fuuidHash{$a[1]});
   $fuuidHash{$a[1]} = $a[1];
   $defs{$a[0]}{FUUID} = $a[1];

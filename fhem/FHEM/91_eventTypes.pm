@@ -16,6 +16,7 @@ eventTypes_Initialize($)
   $hash->{DefFn}    = "eventTypes_Define";
   $hash->{NotifyFn} = "eventTypes_Notify";
   $hash->{ShutdownFn}="eventTypes_Shutdown";
+  $hash->{UndefFn}  = "eventTypes_Undef";
   $hash->{GetFn}    = "eventTypes_Get";
   $hash->{SetFn}    = "eventTypes_Set";
   $hash->{AttrFn}   = "eventTypes_Attr";
@@ -157,6 +158,13 @@ eventTypes_Attr(@)
 }
 
 ###################################
+sub
+eventTypes_Undef()
+{
+  delete $modules{eventTypes}{ldata};
+  return undef;
+}
+
 sub
 eventTypes_Shutdown($$)
 {
