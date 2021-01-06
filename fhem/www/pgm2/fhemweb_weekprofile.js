@@ -884,6 +884,10 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   //inform profile_count changed
   var prfCnt = $('<div informid="'+devName+'-profile_count" style="display:none">').get(0);
   prfCnt.setValueFn = function(arg){
+    if (widget.MODE == 'EDIT') {
+      // do not update profile data in edit mode
+      return;
+    }
     if (widget.USETOPICS == 1) {
       FW_cmd(FW_root+'?cmd=get '+devName+' topic_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"TOPICNAMES",data);});
     } else {
