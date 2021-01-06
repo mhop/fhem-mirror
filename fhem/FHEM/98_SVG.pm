@@ -1099,7 +1099,7 @@ SVG_doShowLog($$$$;$)
 
   my ($err, $cfg, $plot, $srcDesc) = SVG_readgplotfile($wl, $gplot_pgm, $pm);
   if($err || !$defs{$d}) {
-    my $msg = ($err ? $err : "No Logdevice >$d<");
+    my $msg = ($err ? $err : "No Logdevice /$d/");
     Log3 $FW_wname, 1, $msg;
 
     if($pm && $pm =~ m/SVG/) { # FW_fatal for SVG:
