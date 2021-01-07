@@ -1,6 +1,6 @@
-REV 23475
+REV 23481
 DIR unused
-UPD 2021-01-05_07:45:03 355913 ./CHANGED
+UPD 2021-01-07_07:45:03 355981 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-12-11_07:45:03 42746 ./MAINTAINER.txt
 UPD 2020-12-24_07:45:04 41434 ./configDB.pm
@@ -498,7 +498,7 @@ UPD 2019-08-11_07:45:03 47678 FHEM/98_PHC.pm
 UPD 2016-02-05_07:45:11 34730 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2020-10-26_19:49:05 34325 FHEM/98_RandomTimer.pm
-UPD 2020-12-18_07:45:02 95862 FHEM/98_SVG.pm
+UPD 2021-01-07_07:45:03 95862 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
 UPD 2019-05-13_07:45:02 69009 FHEM/98_Text2Speech.pm
@@ -732,8 +732,8 @@ UPD 2021-01-04_07:45:06 4399484 docs/commandref.html
 UPD 2021-01-04_07:45:09 2715303 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-01-06_07:45:12 234304 docs/commandref_modular.html
-UPD 2021-01-06_07:45:13 245063 docs/commandref_modular_DE.html
+UPD 2021-01-07_07:45:10 234304 docs/commandref_modular.html
+UPD 2021-01-07_07:45:11 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2290,7 +2290,7 @@ UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
 UPD 2017-10-04_07:45:02 9001 www/pgm2/fhemweb_sortable.js
 UPD 2019-02-01_07:45:03 26140 www/pgm2/fhemweb_uzsu.js
-UPD 2020-12-24_07:45:04 28866 www/pgm2/fhemweb_weekprofile.js
+UPD 2021-01-07_07:45:03 28968 www/pgm2/fhemweb_weekprofile.js
 UPD 2015-07-28_14:05:34 223 www/pgm2/floorplan_click.js
 UPD 2015-07-28_14:05:34 3246 www/pgm2/floorplan_drag.js
 UPD 2015-07-28_14:05:34 418 www/pgm2/images/ui-bg_diagonals-thick_18_b81900_40x40.png
