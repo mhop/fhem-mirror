@@ -21,6 +21,7 @@
 #   First version: 25.12.2013
 #
 #   Todo:       
+#               Attribute für Regex und LogLevel zum verstecken bestimmter Fehlermedungen von HttpUtils im ReadCallback
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
 #               get after set um readings zu aktualisieren
@@ -141,7 +142,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.0.16 - 5.12.2020';
+my $Module_Version = '4.0.17 - 31.12.2020';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -239,6 +240,9 @@ my $AttrList = join (' ',
       'sid[0-9]*ParseResponse:0,1',           # parse response as if it was a get
       'clearSIdBeforeAuth:0,1',
       'authRetries',
+      
+      'errLogLevelRegex',
+      'errLogLevel',
       
       'replacement[0-9]+Regex',
       'replacement[0-9]+Mode:reading,internal,text,expression,key',   # defaults to text
@@ -432,6 +436,7 @@ sub AttrFn {
     my $aVal  = shift;                  # attribute value
     my $hash  = $defs{$name};           # reference to the Fhem device hash
     
+    Log3 $name, 5, "$name: attr $name $aName $aVal";
     if ($cmd eq 'set') {        
         if ($aName =~ /^regexDecode$/) {
             delete $hash->{CompiledRegexes};        # recompile everything with the right decoding
@@ -1393,7 +1398,7 @@ sub GetRegex {
     my ($name, $context, $num, $type, $default) = @_; 
     my $hash = $defs{$name};
     my $val;
-    my $regDecode  = AttrVal($name, 'regexDecode', "");                 # implement this even when not compiled regex
+    my $regDecode  = AttrVal($name, 'regexDecode', "");                 # implement this even when not compiled
     my $regCompile = AttrVal($name, 'regexCompile', 1);
 
     #Log3 $name, 5, "$name: Look for Regex $context$num$type";
@@ -1420,7 +1425,7 @@ sub GetRegex {
             $val = $hash->{CompiledRegexes}{$context . $type};
         }    
     } 
-    else {
+    else {                      # no attribute defined
         $val = $default;
         return if (!$val)       # default is not compiled - should only be "" or similar
     }
@@ -2288,8 +2293,14 @@ sub ReadCallback {
         $body   = $2 // '';
         Log3 $name, 5, "$name: HTTPMOD ReadCallback split file body / header at $headerSplit";
     }
-
-    Log3 $name, 3, "$name: Read callback: Error: $err" if ($err);
+    if ($err) {
+        my $lvlRegex = GetRegex($name, '', '', 'errLogLevelRegex', '');
+        my $errLvl   = AttrVal($name, 'errLogLevel', 3);
+        Log3 $name, 5, "$name: Read callback Error LogLvl set to $errLvl, regex " . ($lvlRegex // '');
+        $errLvl      = 3 if ($lvlRegex && $err !~ $lvlRegex);
+        Log3 $name, $errLvl, "$name: Read callback: Error: $err";
+    }
+    
     Log3 $name, 4, "$name: Read callback: request type was $type" . 
         " retry $request->{retryCount}" .
         ($header ? ",\r\nheader: $header" : ", no headers") . 
@@ -3590,6 +3601,11 @@ sub AddToSendQueue {
             Please look into the module source to see how it works and don't use them if you are not sure what you are doing.
         <li><b>preProcessRegex</b></li>
             can be used to fix a broken HTTP response before parsing. The regex should be a replacement regex like s/match/replacement/g and will be applied to the buffer.
+            
+        <li><b>errorLogLevel</b></li>
+            allows to modify the loglevel used to log errors from HttpUtils. by default level 3 is used.
+        <li><b>errorLogLevelRegex</b></li>
+            restricts the effect of errorLogLevel to such error messages that match this regex.
 
         <li><b>Remarks regarding the automatically created userattr entries</b></li>
             Fhemweb allows attributes to be edited by clicking on them. However this does not work for attributes that match to a wildcard attribute. To circumvent this restriction HTTPMOD automatically adds an entry for each instance of a defined wildcard attribute to the device userattr list. E.g. if you define a reading[0-9]Name attribute as reading01Name, HTTPMOD will add reading01Name to the device userattr list. These entries only have the purpose of making editing in Fhemweb easier.

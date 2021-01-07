@@ -147,7 +147,7 @@ sub UpdateTimer {
 
     my $delay = sprintf ("%.1f", $nextUpdate - $now);
     Log3 $name, 4, "$name: UpdateTimer called from " . FhemCaller() . " with cmd $cmd" .
-        " sets timer to call update function in $delay sec at " . FmtDateTime($nextUpdate) . ", interval $intvl";
+        " sets timer to call update function in $delay sec at " . FmtTimeMs($nextUpdate) . ", interval $intvl";
     RemoveInternalTimer("update:$name");
     InternalTimer($nextUpdate, $updFn, "update:$name", 0);  # now set the timer   
     return;
@@ -173,14 +173,13 @@ sub StartQueueTimer {
     my $pFunc  = shift;                                                 # e.g. \&Modbus::ProcessRequestQueue
     my $oRef   = shift;                                                 # optional hash ref for passing options
     my $name   = $ioHash->{NAME};
-    my $pDelay = $oRef->{'delay'} // AttrVal($name, 'queueDelay', 1);   # delay until queue processing call
+    my $delay  = $oRef->{'delay'} // AttrVal($name, 'queueDelay', 1);   # delay until queue processing call
     my $silent = $oRef->{'silent'} // 0;
     my $msg    = $oRef->{'log'} // '';
     my $qlen   = ($ioHash->{QUEUE} ? scalar(@{$ioHash->{QUEUE}}) : 0);
     
     if ($qlen) {        
         my $now   = gettimeofday();
-        my $delay = (defined($pDelay) ? $pDelay : AttrVal($name, 'queueDelay', 1));
         return if ($ioHash->{nextQueueRun} && $ioHash->{nextQueueRun} < $now+$delay);
         Log3 $name, 5, "$name: StartQueueTimer called from " . FhemCaller() . 
             ' sets internal timer to process queue in ' . 
@@ -407,7 +406,7 @@ sub CheckRange {
 
 
 #####################################################################
-# check that a value is in a defined range
+# use sprintf to format a value with a given format string
 sub FormatVal {
     my $hash    = shift;
     my $oRef    = shift;                        # optional hash ref for passing options and variables for use in expressions
@@ -417,7 +416,8 @@ sub FormatVal {
 
     return $val if (!$format);
     my $newVal = sprintf($format, $val // '');
-    Log3 $name, 5, "$name: FormatVal for " . FhemCaller() . " formats $val with $format, result is $newVal";
+    Log3 $name, 5, "$name: FormatVal for " . FhemCaller() . " formats " . ($val // 'undef') . 
+        " with format " . ($format // 'undef') . ", result is " . ($newVal // 'undef');
     return $newVal;
 }
 
@@ -832,7 +832,7 @@ sub Profiler {
         $hash->{profiler}{lastPeriod}  = $pPeriod;
         $hash->{profiler}{start}{$key} = $now;
         $hash->{profiler}{sums}{$key}  = 0 ;
-        Log3 $name, 5, "$name: Profiling $key initialized, start $now";
+        Log3 $name, 5, "$name: Profiling $key initialized, start " . FmtTimeMs($now);
         return;
     } 
     my $lKey  = $hash->{profiler}{lastKey};                 # save last key
@@ -843,20 +843,22 @@ sub Profiler {
         $hash->{profiler}{start}{$key} = $now;              # save start time for new key
     }
     
-    Log3 $name, 5, "$name: Profiling $key, before $lKey, now is $now, $key started at " 
-        . $hash->{profiler}{start}{$key} . ", $lKey started at " . $hash->{profiler}{start}{$lKey};
+    Log3 $name, 5, "$name: Profiling $key, before $lKey, now is " . FmtTimeMs($now) . 
+        ", $key started at "  . FmtTimeMs($hash->{profiler}{start}{$key}) . 
+        ", $lKey started at " . FmtTimeMs($hash->{profiler}{start}{$lKey});
     
     if ($pPeriod != $hash->{profiler}{lastPeriod}) {        # new period
         my $overP = $now - ($pPeriod * $pInterval);         # time over the pPeriod start
         $overP    = 0 if ($overP > $lDiff);                 # if interval was modified things get inconsistant ...
         Log3 $name, 5, "$name: Profiling pPeriod changed, last pPeriod was " . $hash->{profiler}{lastPeriod} . 
-                    " now $pPeriod, total diff for $lKey is $lDiff,  over $overP over the pPeriod";     
-        Log3 $name, 5, "$name: Profiling add " . ($lDiff - $overP) . " to sum for $key";
+                    " now $pPeriod, total diff for $lKey is $lDiff, " . 
+                    sprintf ('%.3f', $overP) . " over the pPeriod";     
+        Log3 $name, 5, "$name: Profiling add " . sprintf('%.3f', $lDiff - $overP) . " to sum for $key";
         $hash->{profiler}{sums}{$lKey} += ($lDiff - $overP);
         
         readingsBeginUpdate($hash);
         foreach my $k (keys %{$hash->{profiler}{sums}}) {
-            my $val = sprintf('%.2f', $hash->{profiler}{sums}{$k});
+            my $val = sprintf('%.3f', $hash->{profiler}{sums}{$k});
             Log3 $name, 5, "$name: Profiling set reading for $k to $val";
             readingsBulkUpdate($hash, 'Profiler_' . $k . '_sum', $val);
             $hash->{profiler}{sums}{$k} = 0;
@@ -868,12 +870,13 @@ sub Profiler {
         $hash->{profiler}{sums}{$lKey} = $overP;
         $hash->{profiler}{lastPeriod}  = $pPeriod;
         $hash->{profiler}{lastKey}     = $key;
-        Log3 $name, 5, "$name: Profiling set new sum for $lKey to $overP";
+        Log3 $name, 5, "$name: Profiling set new sum for $lKey to " . sprintf('%.3f', $overP);
     } 
     else {
         return if ($key eq $hash->{profiler}{lastKey});     # nothing new - take time when key or pPeriod changes
-        Log3 $name, 5, "$name: Profiling add $lDiff to sum for $lKey " .
-            "(now is $now, start for $lKey was $hash->{profiler}{start}{$lKey})";
+        Log3 $name, 5, "$name: Profiling add " . sprintf('%.3f', $lDiff) . " to sum for $lKey " .
+            "(now is " . FmtTimeMs($now) . ", start for $lKey was " . 
+            FmtTimeMs($hash->{profiler}{start}{$lKey}) . ")";
         $hash->{profiler}{sums}{$lKey} += $lDiff;
         $hash->{profiler}{start}{$key} = $now;
         $hash->{profiler}{lastKey}     = $key;
