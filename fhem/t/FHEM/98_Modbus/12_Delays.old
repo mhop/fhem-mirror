@@ -1,0 +1,256 @@
+##############################################
+# test request parsing
+##############################################
+use strict;
+use warnings;
+use Test::More;
+use Time::HiRes     qw( gettimeofday tv_interval);  # return time as float, not just full seconds
+use FHEM::HTTPMOD::Utils qw(:all);
+
+$logInform{'MS'} = \&ReactOnSendingLog;
+
+my %rData = (
+'010403d1000221b6' => '01040400000000fb84',
+'010404c100022107' => '010404000041b4cba3',
+'0104060100022083' => '0104045262419dbb1b',
+'01040691000220ae' => '010404000042524ad9',
+'01040a4100022207' => '010404533c458c19',
+'01040a61000223cd' => '01040400000000fb84',
+'01040a810002223b' => '0104049dff454cd77d',
+'01040aa1000223f1' => '01040400000000fb84',
+'01040ac1000223ef' => '0104044d6345282e78',
+'01040ae100022225' => '010404b6f644980f54',
+'010411d1000224ce' => '01040400000000fb84',
+
+'050303020001240a' => '0503020122c80d',
+'05030309000155c8' => '05030200004984',
+'0503010600016473' => '0503020106c816',
+'05030100000585b1' => '05030a0137110001381100010dac7b',
+'0503010000018472' => '050302013709c2',
+
+'0506030900005808' => '0506030900005808',                   # set hyst mode
+'0506030201182850' => '0506030201182850'                    # set temp soll 28
+);
+
+my $testStep = 0;
+my %results;
+fhem 'attr global mseclog 1';
+
+sub SimReadMS {
+    my $text = shift;
+    my $data = pack ('H*', $text);
+    my $hash = $defs{MS};
+    my $name = 'MS';
+    Log3 undef, 1, "SimReadMS: simulate reception of $text";
+    $hash->{TestInput} = $data;
+    Modbus::ReadFn($hash);
+    #$hash->{READ}{BUFFER} = $data;
+    #$hash->{REMEMBER}{lrecv} = gettimeofday();
+    #Modbus::ParseFrameStart($hash);
+    #Modbus::HandleResponse($hash);
+    Log3 undef, 1, "SimReadMS: look for next step";
+    FINDSTEP: 
+    while (1) {
+        $testStep++;
+        if ($testStep > 99) {
+            InternalTimer(gettimeofday(), "testStepLast", 0);
+            Log3 undef, 1, "SimReadMS: set timer to go to last step and finish testing";
+            last FINDSTEP;
+        }
+        Log3 undef, 1, "SimReadMS: check step $testStep";
+        next FINDSTEP if (!defined (&{"testStep$testStep"}));
+        InternalTimer(gettimeofday(), "testStep$testStep", 0);
+        Log3 undef, 1, "SimReadMS: set timer to call test $testStep";
+        last FINDSTEP;
+    }
+    Log3 undef, 1, "SimReadMS: done.";
+    return;
+}
+
+
+sub ReactOnSendingLog {
+    my $name = shift;
+    my $line = shift;
+    #die "line got: $line";
+    if ($line =~ /MS: Simulate sending to none: (.*)/) {
+        my $send = $1;
+        my $id   = substr ($send, 0,2);
+        my $recv = $rData{$send} // (($id . '800041c0'));
+        Log3 undef, 1, "Test: saw sending $send, id $id, simulate receiving $recv";
+        InternalTimer(gettimeofday() + 0.05, \&SimReadMS, $recv);
+    }
+    return;
+}
+
+
+sub findTimesInLog {
+    $results{'send'.$testStep} = FhemTestUtils_getLogTime('MS:\sSimulate\ssending', 'last');      
+    $results{'recv'.$testStep} = FhemTestUtils_getLogTime('ParseFrameStart\s\(RTU\)\sextracted\sid', 'last');
+    Log3 undef, 1, "TEST$testStep: LogTime for last Sending is " . 
+        ($results{'send'.$testStep} // 'unknown') . " converted: " . FmtTimeMs($results{'send'.$testStep});
+    Log3 undef, 1, "TEST$testStep: LogTime for last Reception is " . 
+        ($results{'recv'.$testStep} // 'unknown') . " converted: " . FmtTimeMs($results{'recv'.$testStep});
+    return;
+}
+
+
+sub calcDelays {
+    my $commDelay = $results{'send' . $testStep} - $results{'recv' . ($testStep - 1)};
+    my $sendDelay = $results{'send' . $testStep} - $results{'send' . ($testStep - 1)};
+    Log3 undef, 1, "TEST$testStep: delay between receive in step " . ($testStep - 1) . " and send in step $testStep is $commDelay, send delay $sendDelay";
+    return ($commDelay, $sendDelay);
+}
+
+
+fhem 'get M1 SolarTemp';
+InternalTimer(gettimeofday()+5, "testStepLast", 0);            # last resort
+
+
+sub testStep1 {
+    Log3 undef, 1, "TEST$testStep: initial step called";
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    
+    is(FhemTestUtils_gotEvent('M1:SolarTemp'), 1, "Event SolarTemp ...");
+    
+    fhem 'get M1 HeatOff';
+    # read simulation is triggered when sending is seen in the log.
+    # next step is called when read simulation is done.
+}
+
+
+sub testStep2 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    # check no delay between read (get SolarTemp) after Step 0 and send (get HeatOff) in step 1
+    ok($commDelay < 0.1, 'normal delay from read solar temp to send get HeatOff smaller than 0.1');
+    
+    fhem 'attr M1 dev-timing-sendDelay 0.2';            # send in step2 should be 0.2 after send in step1
+    fhem 'get M1 HeatOff';
+}
+
+
+sub testStep3 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    # check send delay between read (get HeatOff) after Step 1 and send (get HeatOff) in step 2
+    ok($sendDelay >= 0.2, 'defined send delay from read HeatOff to next send get HeatOff big enough');
+    ok($sendDelay < 0.22, 'defined send delay from read HeatOff to next send get HeatOff not too big');
+    
+    fhem 'get M5 TempWasserEin';
+}
+
+
+sub testStep4 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+
+    # check no send delay between read (get HeatOff) after Step 2 and send (get TempWasserEin to id 5) in step 3
+    ok($sendDelay < 0.1, 'defined send delay on id 1 from read HeatOff to send get TempWasserEin not used for id 5');
+    
+    fhem 'attr MS busDelay 0.2';
+    fhem 'get M5 TempWasserAus';
+}
+
+
+sub testStep5 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    # check bus delay between read (get TempWasserEin) after Step 3 and send (get TempWasserAus) in step 4
+    ok($commDelay >= 0.2, 'defined bus delay big enough');
+    ok($commDelay < 0.22, 'defined bus delay not too big');
+    
+    fhem 'attr MS busDelay 0';
+    fhem 'attr M1 dev-timing-sendDelay 0';
+    fhem 'attr MS clientSwitchDelay 0';
+    fhem 'get M1 SolarTemp';
+}
+
+
+sub testStep6 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    ok($sendDelay < 0.1, 'no delay');
+    fhem 'attr MS clientSwitchDelay 0.2';
+    fhem 'get M5 TempWasserEin';
+}
+
+
+sub testStep7 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    ok($commDelay >= 0.2, 'defined clsw delay big enough');
+    ok($commDelay < 0.22, 'defined clsw delay not too big');
+    
+    fhem 'get M5 TempWasserAus';
+}
+
+
+sub testStep8 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    ok($sendDelay < 0.1, 'no delay for same id');
+    
+    fhem 'attr M5 dev-timing-commDelay 0.2';  
+    fhem 'get M5 TempWasserEin';
+}
+
+
+sub testStep9 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    ok($commDelay >= 0.2, 'defined comm delay big enough');
+    ok($commDelay < 0.22, 'defined comm delay not too big');
+
+    fhem 'attr M5 dev-timing-commDelay 0';  
+    fhem 'get M5 TempWasserEin';
+}
+
+
+sub testStep10 {
+    findTimesInLog();
+    FhemTestUtils_resetLogs();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    ok($commDelay < 0.07, 'zero comm delay');
+    
+    fhem 'attr M5 dev-timing-commDelay 0.2';  
+    fhem 'attr M5 verbose 4';  
+    fhem 'set M5 o1 on';
+}
+
+
+sub testStep11 {
+    findTimesInLog();
+    my ($commDelay, $sendDelay) = calcDelays();
+    
+    is(FhemTestUtils_gotLog('commDelay not over.*sleep'), 1, "sleep message in log");
+    ok($commDelay >0.2, 'forced comm delay big enough');
+    ok($commDelay < 0.22, 'forced comm delay not too big');
+    FhemTestUtils_resetLogs();
+    testStepLast();    
+}
+
+sub testStepLast {
+    done_testing;
+    exit(0);
+};
+
+
+
+1;
