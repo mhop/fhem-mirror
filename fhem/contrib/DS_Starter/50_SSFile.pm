@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       50_SSFile.pm
 #
-#       (c) 2020 by Heiko Maaz
+#       (c) 2020-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module integrate the Synology File Station into FHEM
@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.7"  => "07.01.2021  avoid FHEM crash if Cache file content is not valid JSON format ",
   "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
   "0.7.5"  => "07.12.2020  minor fix avoid overtakers ",
   "0.7.4"  => "30.11.2020  add mtime, crtime to uploaded files ",
@@ -1273,7 +1274,14 @@ sub initOnBoot {
       
       if(!$error) {
           my $json                      = join "", @content;
-          $data{$type}{$name}{uploaded} = decode_json ($json);
+          my $success                   = evaljson ($hash, $json);                               # V0.7.7 07.01.2021
+          
+          if($success) {
+               $data{$type}{$name}{uploaded} = decode_json ($json);
+          }
+          else {
+              Log3($name, 2, qq{$name - WARNING - the content of file "$file" is not readable and may be corrupt});
+          }
       }
       
       readingsBeginUpdate($hash);
@@ -1640,7 +1648,7 @@ sub execOp_parse {
    } 
    elsif ($myjson ne "") {                                                     # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
         if($opmode ne "download") {
-            ($success) = evaljson($hash,$myjson);        
+            $success = evaljson ($hash, $myjson);        
             
             if (!$success) {
                 Log3           ($name, 4, "$name - Data returned: ".$myjson);
