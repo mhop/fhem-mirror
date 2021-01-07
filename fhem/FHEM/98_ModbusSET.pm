@@ -1,5 +1,4 @@
-##############################################
-##############################################
+################################################################################
 # $Id$
 #
 # fhem Modul für Wärmepumpen der Silent Serie von SET mit Modbus-Interface
@@ -53,6 +52,7 @@
 package main;
 use strict;
 use warnings;
+
 sub ModbusSET_Initialize($);
 
 my %SET10parseInfo = (
@@ -92,7 +92,7 @@ my %SET10parseInfo = (
                 },
     "h777"  =>  {   reading => "Hyst_Mode",         # Hex Adr 0309
                     name    => "ST10",
-                    map     => "0:mittig, 1:oberhalb, 2:unterhalb", 
+                    map     => "0:mittig, 1:über, 2:unterhalb", 
                     poll    => "once",              # only poll once (or after a set)
                     set     => 1,
                 },

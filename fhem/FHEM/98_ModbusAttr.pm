@@ -1,7 +1,5 @@
-##############################################
-##############################################
+###########################################################################
 # $Id$
-#
 # generisches fhem Modul für Geräte mit Modbus-Interface
 # verwendet Modbus.pm als Basismodul für die eigentliche Implementation des Protokolls.
 #
@@ -21,50 +19,36 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-#   Changelog:
-#
-#   2015-03-09  initial release
-#   2015-07-22  added documentation for new features introduced in the base module 98_Modbus.pm
-#               that can be used here.
-#   2016-04-16  Load Modbus base module instead of require - avoids messages when fhem reloads Modbus 
-#               because a serial Modbus device is defined afterwards
-#   2016-06-18  added documentation for alignTime and enableControlSet (implemented in the base module 98_Modbus.pm)
-#   2016-07-07  added documentatoin for nextOpenDelay
-#   2016-10-02  fixed typo in documentation (showget has to be showGet)
-#   2016-11-26  added missing documentation pieces
-#   2016-12-18  documentation added
-#   2016-12-24  documentation added
-#   2017-01-02  allowShortResponses documented
-#   2017-01-25  documentation for ignoreExpr
-#   2017-03-12  fixed documentation for logical attrs that were wrongly defined as physical ones
-#   2017-07-15  added documentation for new attributes
-#   2017-07-25  documentation for data type attributes
-#   2018-08-24  started documenting the new features of the base Modbus module version 4
-#   2018-11-10  fixed doku for defSetexpr
-#   2019-01-29  added doku for defSet and defHint
-#   2019-01-30  added once as option for pollDelay in doku
-#   2019-04-05  put require for devio to top
-#
 
-package main;
+package ModbusAttr;
 use strict;
 use warnings;
+use GPUtils         qw(:all);
+
+use Exporter ('import');
+our @EXPORT_OK = qw();
+our %EXPORT_TAGS = (all => [@EXPORT_OK]);
+
+BEGIN {
+    GP_Import( qw(
+        LoadModule
+    ));
+    GP_Export( qw(
+        Initialize
+    ));
+};
 
 #####################################
-sub
-ModbusAttr_Initialize($)
-{
+sub Initialize {
     my ($modHash) = @_;
 
-    require "$attr{global}{modpath}/FHEM/DevIo.pm";
-    #require "$attr{global}{modpath}/FHEM/98_Modbus.pm";
     LoadModule "Modbus";
-
-    ModbusLD_Initialize($modHash);                          # Generic function of the Modbus module does the rest
+    Modbus::InitializeLD($modHash);                         # Generic function of the Modbus module does the rest
     
     $modHash->{AttrList} = $modHash->{AttrList} . " " .     # Standard Attributes like IODEv etc 
         $modHash->{ObjAttrList} . " " .                     # Attributes to add or overwrite parseInfo definitions
         $modHash->{DevAttrList};                            # Attributes to add or overwrite devInfo definitions
+    return;
 }
 
 
@@ -83,7 +67,7 @@ ModbusAttr_Initialize($)
     ModbusAttr uses the low level Modbus module 98_Modbus.pm to provide a generic Modbus module (as master, slave, relay or passive listener) <br>
     that can be configured by attributes similar to the way HTTPMOD works for devices with a web interface. <br>
     ModbusAttr can be used as a Modbus master that queries data from other devices over a serial RS232 / RS485 or TCP connection, <br>
-    it can be used as a Modbus slave that can make readings of Fhem devices available via Modbus to external Modbus masters,<br>
+    it can be used as a Modbus slave (=server) that can make readings of Fhem devices available via Modbus to external Modbus masters,<br>
     it can act as aModbus relay that receives requests over one connection and forwards them over another connection (e.g. from Modbus TCP to serial Modbus RTU)<br>
     or it can passively listen to other devices that communicate over a serial RS485 connection and extract readings from the objects it sees.<br>
     The supported protocols are Modbus RTU, Modbus ASCII or Modbus TCP.<br>
@@ -100,7 +84,7 @@ ModbusAttr_Initialize($)
     <br>
 
     <a name="ModbusAttrDefine"></a>
-    <b>Define as Modbus master</b>
+    <b>Define as Modbus master (=client)</b>
     <ul>
         <code>
         define <iodevice> Modbus /dev/device@baudrate,bits,parity,stop<br>
@@ -144,11 +128,11 @@ ModbusAttr_Initialize($)
     </ul>
     <br>
 
-    <b>Define as Modbus slave</b>
+    <b>Define as Modbus slave (=server)</b>
     <ul>
-        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; slave</code><br>
+        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; slave|server</code><br>
         or<br>
-        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; slave &lt;Address:Port&gt; &lt;RTU|ASCII|TCP&gt;</code><br>
+        <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; slave|server| &lt;Address:Port&gt; &lt;RTU|ASCII|TCP&gt;</code><br>
         <br>
         The module waits for connections from other Modbus masters. It will respond to their requests if the requests contain the given Modbus &lt;Id&gt;<br>
         To provide data with Modbus to external Modbus masters a mapping needs to be defined using attributes. 
@@ -159,7 +143,7 @@ ModbusAttr_Initialize($)
         <br>
         <ul><code>define MRS485 Modbus /dev/ttyUSB2@9600,8,E,1<br>
                   define Data4PLC ModbusAttr 1 slave</code></ul><br>
-        Define Data4PLC as a Modbus slave that communicates through the Modbus serial interface device named MRS485 to listen for Modbus requests with Id 1. The protocol defaults to Modbus RTU<br>
+        Define Data4PLC as a Modbus slave (the old name for sever) that communicates through the Modbus serial interface device named MRS485 to listen for Modbus requests with Id 1. The protocol defaults to Modbus RTU<br>
         or <br>
         <ul><code>define MRS485 Modbus /dev/ttyUSB2@9600,8,E,1<br>
                   define Data4PLC ModbusAttr 20 slave ASCII</code></ul><br>
@@ -178,7 +162,7 @@ ModbusAttr_Initialize($)
     <ul>
         <code>define &lt;name&gt; ModbusAttr &lt;Id&gt; passive &lt;RTU|ASCII|TCP&gt;</code><br>
         <br>
-        The module listens on a serial (RS485) connection for modbus communication with the given Modbus &lt;Id&gt; and extracts readings. It does not send requests by itself but waits for another master to communicate with a slave. So only objects that the other master requests can be seen by Fhem in this configuration. <br>
+        The module listens on a serial (RS485) connection for modbus communication with the given Modbus &lt;Id&gt; and extracts readings. It does not send requests by itself but waits for another master (client) to communicate with a slave (server). So only objects that the other master requests can be seen by Fhem in this configuration. <br>
         The objects that the module recognizes and the readings that it should create from these objects have to be defined with attributes (see below) in the same way as for a Modbus master. <br>
         These attributes will define a mapping from so called "coils", "digital inputs", "input registers" or "holding registers" of the external device to readings inside Fhem together with the data type and format of the values.<br>
         With this mode a Fhem installation can for example Listen to the communication between an energy counter as slave and a solar control system as master if they use Modbus RTU over RS485. Since only one Master is allowed when using Modbus over serial lines, Fhem can not be master itself. As a passive listener it can however see when the master queries e.g. the current power consumption and then also see the reply from the energy meter and store the value in a Fhem reading.
@@ -349,7 +333,7 @@ ModbusAttr_Initialize($)
     <br>
     
     <a name="ModbusAttrConfigurationSlave"></a>
-    <b>Configuration of the module as Modbus slave</b>
+    <b>Configuration of the module as Modbus slave (server)</b>
     <ul>
         Data objects that the module offers to external Modbus masters (holding registers, input registers, coils or discrete inputs) are defined using attributes. 
         If Fhem is Modbus slave, the attributes assign readings of Fhem devices to Modbus objects with their addresses and control how these objects are calculated from the reading values that exist in Fhem.<br>
@@ -625,7 +609,9 @@ ModbusAttr_Initialize($)
         <li><b>dev-c-brokenFC5</b></li> 
             if set the module will use the hex value specified here instead of ff00 as value 1 for setting coils<br>
         <li><b>dev-timing-timeout</b></li> 
-            timeout for the device (defaults to 2 seconds)<br>
+            timeout for the device when a Fhem master waits for a slave response (defaults to 2 seconds)<br>
+        <li><b>dev-timing-serverTimeout</b></li> 
+            timeout for a TCP connected Fhem slave before it closes a TCP connection after inactivity<br>
         <li><b>dev-timing-sendDelay</b></li> 
             delay to enforce between sending two requests to the device. Default ist 0.1 seconds.<br>
         <li><b>dev-timing-commDelay</b></li> 
@@ -636,6 +622,8 @@ ModbusAttr_Initialize($)
             devices that are connected via serial lines but not on logical modbus devices that use another physical device as IODev.<br>
         <li><b>nextOpenDelay</b></li> 
             delay for Modbus-TCP connections. This defines how long the module should wait after a failed TCP connection attempt before the next reconnection attempt. This defaults to 60 seconds.
+        <li><b>nextOpenDelay2</b></li> 
+            delay for Modbus-TCP connections. This defines how long the module should wait after any  TCP connection attempt before the next reconnection attempt. This defaults to 2 seconds.
         <li><b>openTimeout</b></li>     
             timeout to be used when opening a Modbus TCP connection (defaults to 3)
         <li><b>timeoutLogLevel</b></li> 
@@ -647,7 +635,20 @@ ModbusAttr_Initialize($)
         <li><b>nonPrioritizedSet</b></li> 
             if set to 1, then set commands will not be sent on the bus before other queued requests and the response will not be waited for.
         <li><b>sortUpdate</b></li> 
-            if set to 1, the requests during a getUpdate cycle will be sorted before queued.
+            this attribute has become obsolte. The requests during a getUpdate cycle will always be sorted before beeing queued.
+
+        <li><b>propagateVerbose</b></li> 
+            this attribute causes changes to the verbose attribute of a logical device to be propagated to the physical io device 
+            or if the logical device is a relay device to the master device used by the relay.
+        <li><b>connectionsRoom</b></li> 
+            defines to which room a TCP connection device for TCP slaves or relays is assigned to. 
+            When a TCP slave accepts a connection then the new temporary connection device is by default assigned to the room "Connections".
+            If this attribute is set to "none" then no room attribute is set for connection devices by the module 
+            and fhem will automatically use the room 'hidden'.
+
+        <li><b>serverIdExpr</b></li> 
+            sets the server id response to be sent back as client if a server is requesting it via function code 17<br>
+            this is defiend as a perl expression for more flexibility.
             
         <li><b>disable</b></li>
             stop communication with the device while this attribute is set to 1. For Modbus over TCP this also closes the TCP connection.
