@@ -269,7 +269,7 @@ sub SMARTMON_Update($)
 }
 
 # Alle Readings neuerstellen
-sub SMARTMON_refreshReadings($) {
+sub SMARTMON_refreshReadings_($) {
   my ($hash) = @_;
   
   SMARTMON_Log($hash, 5, "Refresh readings");
@@ -308,6 +308,111 @@ sub SMARTMON_refreshReadings($) {
 
   readingsEndUpdate($hash,1); 
 }
+
+# MadMax-Fhem: start non blocking
+# MadMax-Fhem: start non blocking
+# MadMax-Fhem: start non blocking
+sub SMARTMON_refreshReadings($) {
+  my ($hash) = @_;
+
+  my $name = $hash->{NAME};
+
+  if( AttrVal($name, "disable", "") eq "1" )
+  {
+    SMARTMON_Log($hash, 5, "Update disabled");
+    $hash->{STATE} = "Inactive";
+  }
+  else
+  {
+    if(exists($hash->{helper}{RUNNING_PID}))
+    {
+      # should there be additionally a reading indication the error?
+      SMARTMON_Log($hash, 3, "Blocing call already running!");
+    }
+    else
+    {
+      # timeout 30s maybe too long? maybe attribute? / parameter could also be Name instead of hash!?
+      $hash->{helper}{RUNNING_PID} = BlockingCall("SMARTMON_refreshReadingsNonBlocking", $hash, "SMARTMON_refreshReadingsDone", 30, "SMARTMON_refreshReadingsAbort", $hash);
+      SMARTMON_Log($hash, 5, "Blocing call started.");
+    }
+  }
+}
+
+sub SMARTMON_refreshReadingsNonBlocking($)
+{
+  my ($hash) = @_;
+  
+  SMARTMON_Log($hash, 5, "Blocking-fn entered.");
+  
+  my $map = SMARTMON_obtainParameters($hash);
+  
+  # puting the return value together (must be one string when using blocking call)  
+  my $ret = $hash->{NAME} . "|" . encode_json($map);
+
+  SMARTMON_Log($hash, 5, "Blocking-fn return value $ret.");
+
+  return $ret;
+}
+
+sub SMARTMON_refreshReadingsDone($)
+{
+  my ($Data) = @_;
+
+# but who is deleting RUNNING_PID then!?
+  return unless(defined($Data));
+
+  # get the parts from given parameter (must be one string when using blocking call)  
+  my @DataParts = split("\\|", $Data);
+    
+  my $hash = $defs{$DataParts[0]};
+  # and "rebuild" the map
+  my $map = decode_json($DataParts[1]);
+
+  SMARTMON_Log($hash, 5, "Blocing call finished. Updating Readings.");
+  
+  readingsBeginUpdate($hash);
+
+  $hash->{STATE} = "Active";
+
+  foreach my $aName (keys %{$map})
+  {
+    my $value = $map->{$aName};
+    #SMARTMON_Log($hash, 5, "Update: ".$value);
+    # Nur aktualisieren, wenn ein gueltiges Value vorliegt
+    if(defined $value)
+    {
+      readingsBulkUpdate($hash,$aName,$value);
+    }
+  }
+  
+  # Alle anderen Readings entfernen
+  foreach my $rName (sort keys %{$hash->{READINGS}})
+  {
+    if(!defined($map->{$rName}))
+    {
+      delete $hash->{READINGS}->{$rName};
+    }
+  }
+
+  readingsEndUpdate($hash,1); 
+
+  delete($hash->{helper}{RUNNING_PID});
+}
+
+sub SMARTMON_refreshReadingsAbort($)
+{
+  my ($hash) = @_;
+
+  # should there be additionally a reading indication the error?
+  SMARTMON_Log($hash, 1, "Blocing call aborted!");
+  
+  # is there additional things to do? But what?
+  
+  delete($hash->{helper}{RUNNING_PID});
+}
+# MadMax-Fhem: end non blocking
+# MadMax-Fhem: end non blocking
+# MadMax-Fhem: end non blocking
 
 # Alle Readings erstellen
 sub SMARTMON_obtainParameters($) {
