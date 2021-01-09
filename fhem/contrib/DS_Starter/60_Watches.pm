@@ -567,7 +567,7 @@ sub FWebFn {
   $ret   .= "<span>$dlink </span><br>"  if(!AttrVal($d,"hideDisplayName",0));
   if(IsDisabled($d)) {
       if(AttrVal($d,"hideDisplayName",0)) {
-          $ret .= qq{Watch <a href="/fhem?detail=$d">$d</a> is disabled};
+          $ret .= qq{Watch <a href="$FW_ME?detail=$d">$d</a> is disabled};
       } 
       else {
           $ret .= "<html>Watch is disabled</html>";
