@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  59_Twilight: not triggering at startup
  - bugfix:  98_weekprofile: do not update profile data in edit mode
  - change:  93_DbRep: set fastStart as default for TYPE Client
  - bugfix:  93_DbRep: sumValue - create 0 instaed of '-' if value of DS is 0
