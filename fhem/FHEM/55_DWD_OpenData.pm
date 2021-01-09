@@ -63,9 +63,9 @@ use strict;
 use warnings;
 
 use Math::Trig ':pi';
-use POSIX;
-use Time::Local;
-use Time::Piece;
+use POSIX 'floor';
+use Time::Local 'timegm';
+use Time::Piece 'gmtime';
 
 require Exporter;
 our $VERSION   = '1.000001';
@@ -596,28 +596,28 @@ package DWD_OpenData;
 use strict;
 use warnings;
 
-use Encode;
-use File::Temp qw(tempfile);
+use Encode 'encode';
+use File::Temp 'tempfile';
 use IO::Uncompress::Unzip qw(unzip $UnzipError);
-use POSIX;
-use Scalar::Util qw(looks_like_number);
+use POSIX qw(floor strftime);
+use Scalar::Util 'looks_like_number';
 use Storable qw(freeze thaw);
 use Time::HiRes qw(gettimeofday usleep);
-use Time::Local;
-use Time::Piece;
+use Time::Local qw(timelocal timegm);
+use Time::Piece qw(localtime gmtime);
 
 use Blocking;
 use HttpUtils;
 
 use feature qw(switch);
-no if $] >= 5.017011, warnings => 'experimental';
+no if $] >= 5.010001, warnings => 'experimental::smartmatch';
 
 use constant UPDATE_DISTRICTS     => -1;
 use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
 require Exporter;
-our $VERSION   = '1.016001';
+our $VERSION   = '1.016002';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -888,10 +888,10 @@ sub Attr {
   my ($command, $name, $attribute, $value) = @_;
   my $hash = $::defs{$name};
 
-  given($command) {
-    when("set") {
-      given($attribute) {
-        when("disable") {
+  for ($command) {
+    when ("set") {
+      for ($attribute) {
+        when ("disable") {
           # enable/disable polling
           if ($::init_done) {
             if ($value) {
@@ -903,7 +903,7 @@ sub Attr {
             }
           }
         }
-        when("forecastResolution") {
+        when ("forecastResolution") {
           if (defined($value) && looks_like_number($value) && $value > 0) {
             my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
             if ($::init_done && defined($oldForecastResolution) && $oldForecastResolution != $value) {
@@ -913,18 +913,18 @@ sub Attr {
             return "invalid value for forecastResolution (possible values are 1, 3 and 6)";
           }
         }
-        when("forecastStation") {
+        when ("forecastStation") {
           my $oldForecastStation = ::AttrVal($name, 'forecastStation', undef);
           if ($::init_done && defined($oldForecastStation) && $oldForecastStation ne $value) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when("forecastWW2Text") {
+        when ("forecastWW2Text") {
           if ($::init_done && !$value) {
             ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
           }
         }
-        when("timezone") {
+        when ("timezone") {
           if (defined($value) && length($value) > 0) {
             $hash->{'.TZ'} = $value;
           } else {
@@ -934,25 +934,25 @@ sub Attr {
       }
     }
 
-    when("del") {
-      given($attribute) {
-        when("disable") {
+    when ("del") {
+      for ($attribute) {
+        when ("disable") {
           ::readingsSingleUpdate($hash, 'state', 'defined', 1);
           ::InternalTimer(gettimeofday() + 3, 'DWD_OpenData::Timer', $hash, 0);
         }
-        when("forecastResolution") {
+        when ("forecastResolution") {
           my $oldForecastResolution = ::AttrVal($name, 'forecastResolution', 6);
           if ($oldForecastResolution != 6) {
             ::CommandDeleteReading(undef, "$name ^fc.*");
           }
         }
-        when("forecastStation") {
+        when ("forecastStation") {
           ::CommandDeleteReading(undef, "$name ^fc.*");
         }
-        when("forecastWW2Text") {
+        when ("forecastWW2Text") {
           ::CommandDeleteReading(undef, "$name ^fc.*wwd\$");
         }
-        when("timezone") {
+        when ("timezone") {
           $hash->{'.TZ'} = $hash->{FHEM_TZ};
         }
       }
@@ -984,8 +984,8 @@ sub Get {
 
   my $result = undef;
   my $command = lc($a[1]);
-  given($command) {
-    when("alerts") {
+  for ($command) {
+    when ("alerts") {
       my $warncellId = $a[2];
       $warncellId = ::AttrVal($name, 'alertArea', undef) if (!defined($warncellId));
       if (defined($warncellId)) {
@@ -1005,7 +1005,7 @@ sub Get {
       }
     }
 
-    when("forecast") {
+    when ("forecast") {
       my $station = $a[2];
       $station = ::AttrVal($name, 'forecastStation', undef) if (!defined($station));
       if (defined($station)) {
@@ -1021,17 +1021,17 @@ sub Get {
       }
     }
 
-    when("updatealertscache") {
+    when ("updatealertscache") {
       my $updateMode = undef;
       my $option = lc($a[2]);
-      given($option) {
-        when("communeunions") {
+      for ($option) {
+        when ("communeunions") {
           $updateMode = UPDATE_COMMUNEUNIONS;
         }
-        when("districts") {
+        when ("districts") {
           $updateMode = UPDATE_DISTRICTS;
         }
-        when("all") {
+        when ("all") {
           $updateMode = UPDATE_ALL;
         }
         default {
@@ -1420,7 +1420,7 @@ sub RotateForecast {
     }
 
     my $daysForward = sprintf("%0.0f", ($today - $oldToday)/86400.0);  # round() [s] -> [d]
-    ::Log3 $name, 3, "$name: RotateForecast: shifting forward by $daysForward day(s) ($oldToday -> $today)";
+    ::Log3 $name, $daysForward > 0? 4 : 5, "$name: RotateForecast: shifting forward by $daysForward day(s) ($oldToday -> $today)";
     if ($daysForward > 0) {
       # different day
       if ($daysForward < $daysAvailable) {
@@ -2729,8 +2729,11 @@ sub DWD_OpenData_Initialize {
 #
 # CHANGES
 #
+# 03.12.2020 (version 1.16.2) jensb
+# change: increased log level in sub RotateForecast
+#
 # 03.12.2020 (version 1.16.1) jensb
-# bugfix: delete destination reading if source reading is undefined when rotationg forecast at daybreak
+# bugfix: delete destination reading if source reading is undefined when rotating forecast at daybreak
 # feature: new attribute forecastPruning to delete forecast readings that are more than 1 day older than the other readings of the same day
 #
 # 22.11.2020 (version 1.15.0) jensb
@@ -2781,7 +2784,7 @@ sub DWD_OpenData_Initialize {
 # feature: alerts and forecast retrieval error detection improved
 # feature: new readings a_state and fc_state
 # feature: create internal alert on retrieval error
-# bugfix: forecast retrieval timout handling
+# bugfix: forecast retrieval timeout handling
 # bugfix: forecast rotation days calculation
 # bugfix: update scheduling when summertime changes
 #
