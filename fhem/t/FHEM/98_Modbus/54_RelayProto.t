@@ -1,5 +1,5 @@
 ##############################################
-# test master slave end to end
+# test relay with different protocols
 ##############################################
 
 package main;
@@ -12,7 +12,6 @@ use FHEM::HTTPMOD::Utils qw(:all);
 use FHEM::Modbus::TestUtils qw(:all);
 
 fhem 'attr global mseclog 1';
-InternalTimer(gettimeofday()+5, "testStepLast", 0);            # last resort
 NextStep();
 
 sub testStep1 {     # preparation of slave content, enable devices
@@ -116,7 +115,7 @@ sub testStep10 {    # check combined read of holding registers and coils
     LogStep "getUpdate with combine";
     FhemTestUtils_resetEvents();
     fhem ('set Master reread');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep11 {    # check results coming from slave and write coils to slave
@@ -217,14 +216,5 @@ sub testStep21 {
     is(FhemTestUtils_gotLog('Master: read buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
     return;
 }
-
-
-# todo: different protocols (RTU, ASCII, TCP)
-#       data type definition
-#       swap bytes and similar
-#       unpack variations
-
-# then relay mode
-
 
 1;

@@ -1,5 +1,5 @@
 ##############################################
-# test request parsing
+# test queue delays
 ##############################################
 use strict;
 use warnings;
@@ -13,7 +13,6 @@ fhem 'attr global mseclog 1';
 
 SetTestOptions(
     {   IODevice    => 'MS',                                    # for loginform
-        #RespondTo   => 'MS: Simulate sending to none: (.*)',    # auto reponder / go to next step at reception
         Time1Name   => 'busy',
         Time1Regex  => qr{Fhem is still waiting},
         Time2Name   => 'queue run',

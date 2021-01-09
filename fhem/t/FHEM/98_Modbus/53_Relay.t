@@ -1,5 +1,5 @@
 ##############################################
-# test master slave end to end
+# test relay
 ##############################################
 
 package main;
@@ -12,7 +12,6 @@ use FHEM::HTTPMOD::Utils qw(:all);
 use FHEM::Modbus::TestUtils qw(:all);
 
 fhem 'attr global mseclog 1';
-InternalTimer(gettimeofday()+5, "testStepLast", 0);            # last resort
 NextStep();
 
 sub testStep1 {     # preparation of slave content, enable devices
@@ -108,7 +107,7 @@ sub testStep9 {     # check write data
     is(FhemTestUtils_gotLog('0506000a0001698c'), 1, "set o1 on message in log");
     is(FhemTestUtils_gotLog('0506000b0002784d'), 1, "set O2 2 message in log");
     fhem ('attr Master verbose 3');
-    return 0.1;
+    return 0.2;
 }
 
 
@@ -116,7 +115,7 @@ sub testStep10 {    # check combined read of holding registers and coils
     LogStep "getUpdate with combine";
     FhemTestUtils_resetEvents();
     fhem ('set Master reread');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep11 {    # check results coming from slave and write coils to slave
@@ -129,8 +128,9 @@ sub testStep11 {    # check results coming from slave and write coils to slave
 
     fhem ('attr Slave obj-c402-allowWrite 1');
     fhem ('attr Master verbose 5');
+    #fhem ('attr Slave verbose 5');  # todo: remove
     fhem ('set Master c2 1');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep12 {
@@ -144,7 +144,7 @@ sub testStep12 {
     fhem ('attr Slave verbose 3');
     fhem ('attr Master dev-h-write 16');
     fhem ('set Master TempWasserAus 29');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep13 {
@@ -160,7 +160,7 @@ sub testStep14 {
     fhem ('attr Master closeAfterResponse 1');
     fhem ('attr Master verbose 4');
     fhem ('set Master reread');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep15 {
@@ -217,14 +217,6 @@ sub testStep21 {
     is(FhemTestUtils_gotLog('Master: read buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
     return;
 }
-
-
-# todo: different protocols (RTU, ASCII, TCP)
-#       data type definition
-#       swap bytes and similar
-#       unpack variations
-
-# then relay mode
 
 
 1;

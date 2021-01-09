@@ -25,7 +25,7 @@ sub testStep1 {
 
 sub testStep2 {
     LogStep('simulate normal reception');
-    SimRead('MS', \&Modbus::ReadFn, '05030a0137110001381100010dac7b');        # normal response 
+    SimRead('MS', '05030a0137110001381100010dac7b');        # normal response 
     return;
 }
 
@@ -44,7 +44,7 @@ sub testStep3 {
 
 sub testStep4 {
     LogStep('simulate short response');
-    SimRead('MS', \&Modbus::ReadFn, '05030a013711000138110091a8');            # short response
+    SimRead('MS', '05030a013711000138110091a8');            # short response
     return 1.1;         # next step after 1.1 seconds
 }
 
@@ -64,7 +64,7 @@ sub testStep5 {
 
 sub testStep6 {
     LogStep('simulate another short response');
-    SimRead('MS', \&Modbus::ReadFn, '05030a013711000138110091a8');            # short response
+    SimRead('MS', '05030a013711000138110091a8');            # short response
     return;
 }
 
@@ -85,7 +85,7 @@ sub testStep7 {
 
 sub testStep8 {
     LogStep('simulate broken fc3 response');
-    SimRead('MS', \&Modbus::ReadFn, '050301000137110001381100010dd04d');      # response type broken FC3
+    SimRead('MS', '050301000137110001381100010dd04d');      # response type broken FC3
     return;
 }
 

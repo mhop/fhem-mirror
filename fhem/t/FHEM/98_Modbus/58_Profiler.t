@@ -1,5 +1,5 @@
 ##############################################
-# test master slave end to end
+# test profiler (to be implemented!)
 ##############################################
 
 package main;
@@ -12,7 +12,6 @@ use FHEM::HTTPMOD::Utils qw(:all);
 use FHEM::Modbus::TestUtils qw(:all);
 
 fhem 'attr global mseclog 1';
-InternalTimer(gettimeofday()+5, "testStepLast", 0);            # last resort
 NextStep();
 
 sub testStep1 {     # preparation of slave content, enable devices

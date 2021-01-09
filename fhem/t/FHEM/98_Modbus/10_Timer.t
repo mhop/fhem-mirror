@@ -1,6 +1,7 @@
 ##############################################
 # test update timer 
 ##############################################
+package main;
 use strict;
 use warnings;
 use Test::More;

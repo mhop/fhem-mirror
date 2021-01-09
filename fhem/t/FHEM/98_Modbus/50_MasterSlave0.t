@@ -12,7 +12,6 @@ use FHEM::HTTPMOD::Utils qw(:all);
 use FHEM::Modbus::TestUtils qw(:all);
 
 fhem 'attr global mseclog 1';
-InternalTimer(gettimeofday()+5, "testStepLast", 0);            # last resort
 NextStep();
 
 sub testStep1 {     # preparation of slave content, enable devices
@@ -218,14 +217,5 @@ sub testStep21 {
     is(FhemTestUtils_gotLog('Master: read buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
     return;
 }
-
-
-# todo: different protocols (RTU, ASCII, TCP)
-#       data type definition
-#       swap bytes and similar
-#       unpack variations
-
-# then relay mode
-
 
 1;
