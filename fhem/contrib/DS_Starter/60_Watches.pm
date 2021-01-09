@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 60_Watches.pm 22507 2020-08-01 07:54:26Z DS_Starter $
+# $Id: 60_Watches.pm 22591 2020-08-12 21:13:44Z DS_Starter $
 #########################################################################################################################
 #       60_Watches.pm
 #
-#       (c) 2018-2020 by Heiko Maaz
+#       (c) 2018-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -73,8 +73,9 @@ BEGIN {
   );  
 }
 
-# Versions History intern
+# Versions History intern 
 my %vNotesIntern = (
+  "0.27.1" => "09.01.2021  remove usage of sscam_tooltip.js in sub controlPanel ,Forum: https:/topic,93454.msg1119567.html#msg1119567",
   "0.27.0" => "12.08.2020  control buttons, new attr hideButtons, controlButtonSize, some more changes according PBP".
                            "fix Random triggering of alarm or random time display at start / resume ",
   "0.26.0" => "01.08.2020  add attr timeAsReading -> write into reading 'currtime' if time is displayed, ".
@@ -126,17 +127,17 @@ my %hset = (                                                                  # 
   countdownwatch => {set => "alarmSet alarmDel:noArg reset:noArg resume:noArg start:noArg stop:noArg countDownInit" },
   watch          => {set => "alarmSet alarmDel:noArg"                                                               },
   text           => {set => "displayTextSet displayTextDel:noArg textTicker:on,off"                                 },
-  time           => {fn  => "_setTime"                                                                              }, 
-  reset          => {fn  => "_setReset"                                                                             }, 
-  textTicker     => {fn  => "_setTextTicker"                                                                        },
-  displayTextDel => {fn  => "_setDisplayTextDel"                                                                    },
-  displayTextSet => {fn  => "_setDisplayTextSet"                                                                    },
-  stop           => {fn  => "_setStop"                                                                              },
-  resume         => {fn  => "_setResume"                                                                            },
-  countDownInit  => {fn  => "_setCountDownInit"                                                                     },
-  alarmDel       => {fn  => "_setAlarmDel"                                                                          },
-  alarmSet       => {fn  => "_setAlarmSet"                                                                          },
-  start          => {fn  => "_setStart"                                                                             },
+  time           => {fn  => \&_setTime                                                                              }, 
+  reset          => {fn  => \&_setReset                                                                             }, 
+  textTicker     => {fn  => \&_setTextTicker                                                                        },
+  displayTextDel => {fn  => \&_setDisplayTextDel                                                                    },
+  displayTextSet => {fn  => \&_setDisplayTextSet                                                                    },
+  stop           => {fn  => \&_setStop                                                                              },
+  resume         => {fn  => \&_setResume                                                                            },
+  countDownInit  => {fn  => \&_setCountDownInit                                                                     },
+  alarmDel       => {fn  => \&_setAlarmDel                                                                          },
+  alarmSet       => {fn  => \&_setAlarmSet                                                                          },
+  start          => {fn  => \&_setStart                                                                             },
 );
 
 ##############################################################################
@@ -265,7 +266,7 @@ return $setlist;
 ################################################################
 #                      Setter start
 ################################################################
-sub _setStart {                          ## no critic "not used"
+sub _setStart {                          
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -287,7 +288,7 @@ return;
 ################################################################
 #                      Setter alarmSet
 ################################################################
-sub _setAlarmSet {                       ## no critic "not used"
+sub _setAlarmSet {                       
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -311,7 +312,7 @@ return;
 ################################################################
 #                      Setter alarmDel
 ################################################################
-sub _setAlarmDel {                       ## no critic "not used"
+sub _setAlarmDel {                       
   my $paref = shift;
   my $name  = $paref->{name};
   
@@ -324,7 +325,7 @@ return;
 ################################################################
 #                      Setter countDownInit
 ################################################################
-sub _setCountDownInit {                  ## no critic "not used"
+sub _setCountDownInit {                  
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -339,12 +340,12 @@ sub _setCountDownInit {                  ## no critic "not used"
   if($prop && $prop1) {                                                # Format: hh mm ss
       $prop2 = defined $prop2 ? $prop2 : 70;                           # Sekunden
       return $msg if($prop>23 || $prop1>59 || $prop2>59);
-      $ct = $prop*3600 + $prop1*60 + $prop2;                           # in Sekunden umgewandelt !
-      
-  } elsif ($prop && !$prop1) {                                         # Format: Sekundenangabe
-      $ct = $prop;
-      
-  } else {
+      $ct = $prop*3600 + $prop1*60 + $prop2;                           # in Sekunden umgewandelt !     
+  } 
+  elsif ($prop && !$prop1) {                                           # Format: Sekundenangabe
+      $ct = $prop; 
+  } 
+  else {
      return $msg;   
   
   }
@@ -362,7 +363,7 @@ return;
 ################################################################
 #                      Setter resume
 ################################################################
-sub _setResume {                         ## no critic "not used"
+sub _setResume {                         
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -381,7 +382,7 @@ return;
 ################################################################
 #                      Setter stop
 ################################################################
-sub _setStop {                           ## no critic "not used"
+sub _setStop {                           
   my $paref = shift;
   my $hash  = $paref->{hash};
   
@@ -393,7 +394,7 @@ return;
 ################################################################
 #                      Setter displayTextSet
 ################################################################
-sub _setDisplayTextSet {                 ## no critic "not used"
+sub _setDisplayTextSet {                 
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $aref  = $paref->{aref};
@@ -412,7 +413,7 @@ return;
 ################################################################
 #                      Setter displayTextDel
 ################################################################
-sub _setDisplayTextDel {                 ## no critic "not used"
+sub _setDisplayTextDel {                 
   my $paref = shift;
   my $name  = $paref->{name};
   
@@ -424,14 +425,15 @@ return;
 ################################################################
 #                      Setter textTicker
 ################################################################
-sub _setTextTicker {                     ## no critic "not used"
+sub _setTextTicker {                     
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $prop  = $paref->{prop};
   
   if($prop eq "on") {
       readingsSingleUpdate($hash, "displayTextTicker", "on", 1); 
-  } else {
+  } 
+  else {
       readingsSingleUpdate($hash, "displayTextTicker", "off", 1); 
   }
 
@@ -441,7 +443,7 @@ return;
 ################################################################
 #                      Setter reset
 ################################################################
-sub _setReset {                          ## no critic "not used"
+sub _setReset {                          
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -455,7 +457,7 @@ return;
 ################################################################
 #                      Setter time
 ################################################################
-sub _setTime {                           ## no critic "not used"
+sub _setTime {                           
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $opt   = $paref->{opt};
@@ -529,7 +531,8 @@ sub Attr {                                           ## no critic 'complexity'
         
         if($do ne "text") {
             delReadings ($name); 
-        } else {
+        } 
+        else {
             delReadings ($name,undef,"^display.*"); 
         }        
  
@@ -565,10 +568,12 @@ sub FWebFn {
   if(IsDisabled($d)) {
       if(AttrVal($d,"hideDisplayName",0)) {
           $ret .= qq{Watch <a href="/fhem?detail=$d">$d</a> is disabled};
-      } else {
+      } 
+      else {
           $ret .= "<html>Watch is disabled</html>";
       }  
-  } else {
+  } 
+  else {
       $ret .= modernWatch ($d) if($hash->{MODEL} =~ /modern/ix);
       $ret .= stationWatch($d) if($hash->{MODEL} =~ /station/ix);
       $ret .= digitalWatch($d) if($hash->{MODEL} =~ /digital/ix);
@@ -589,11 +594,9 @@ return $ret;
 sub controlPanel {
   my $name     = shift;
   my $pbs      = AttrVal($name,"controlButtonSize", 100);                                       # Größe der Druckbuttons in %
-  my $iconpath = "www/images";
-  my $ttjs     = "/fhem/pgm2/sscam_tooltip.js"; 
+  my $iconpath = "www/images"; 
   my $ret      = "";
   
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>"; 
   $ret .= "<style>TD.controlv1 { padding: 3px 3px; } </style>";
   $ret .= "<style>TD.controlv2 { padding: 8px 8px; } </style>";
   $ret .= "<style>.defsize { font-size:16px; } </style>";
@@ -611,12 +614,13 @@ sub controlPanel {
       
       if ($img =~ m/\.svg/x) {                                                                               # Verwendung für SVG's
           $img = FW_makeImage($img, $cmd, "rc-button");   
-      } else {                                                                                               # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
+      } 
+      else {                                                                                                 # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
           $img = "<img src=\"$FW_ME/$iconpath/$img\" height=\"$pbs%\" width=\"$pbs%\">";  
       }
 
       my $cmd1 = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                                      # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink 
-      $ret    .= "<a onClick=\"$cmd1\" onmouseover=\"Tip('$cmd')\" onmouseout=\"UnTip()\">$img</a>";  
+      $ret    .= "<a onClick=\"$cmd1\" title=\"$cmd\">$img</a>";  
 
       $ret .= "</td>";    
   }
