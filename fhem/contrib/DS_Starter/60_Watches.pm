@@ -55,7 +55,7 @@ BEGIN {
           readingsEndUpdate
           readingFnAttributes
           readingsSingleUpdate   
-          sortTopicNum          
+          sortTopicNum         
         )
   );
   
@@ -561,7 +561,7 @@ sub FWebFn {
   my $hash  = $defs{$d};
   
   my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = qq{<a href="/fhem?detail=$d">$alias</a>}; 
+  my $dlink = qq{<a href="$FW_ME?detail=$d">$alias</a>}; 
   
   my $ret = "";
   $ret   .= "<span>$dlink </span><br>"  if(!AttrVal($d,"hideDisplayName",0));
