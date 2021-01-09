@@ -2736,6 +2736,14 @@ order:A_16c
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 #par:ICON;ICON as set, defaults to fts_window_1w_open;{ AttrVal("DEVICE","icon","fts_window_1w_open") }
 #attr DEVICE icon ICON
+attr DEVICE readingList shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/input/0:.* input_0\
+  shellies/DEVNAME/input/1:.* input_1\
+  shellies/DEVNAME/input/2:.* input_2\
+  shellies/DEVNAME/input_event/0:.* { json2nameValue($EVENT, '0_', $JSONMAP) }\
+  shellies/DEVNAME/input_event/1:.* { json2nameValue($EVENT, '1_', $JSONMAP) }\
+  shellies/DEVNAME/input_event/2:.* { json2nameValue($EVENT, '2_', $JSONMAP) }
 attr DEVICE stateFormat In 1:\
 input_0\
 <br>In 2:\
@@ -2744,7 +2752,7 @@ input_1\
 input_2
 attr DEVICE devStateIcon 0:off 1:on
 attr DEVICE model shelly_ix3
-setreading DEVICE attrTemplateVersion 20201110
+setreading DEVICE attrTemplateVersion 20210108
 
 #shelly2rgbw
 # contributed by dkreutz http://forum.fhem.de/index.php/topic,94060.msg944338.html#msg944338
