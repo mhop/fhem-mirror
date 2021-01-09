@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 98_WeekdayTimer: Add options WDT_sendDelay and WDT_eventMap
+ - change:  98_WeekdayTimer: break compability to Heating_Control
  - change:  59_Twilight: not triggering at startup
  - bugfix:  98_weekprofile: do not update profile data in edit mode
  - change:  93_DbRep: set fastStart as default for TYPE Client
