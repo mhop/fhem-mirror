@@ -28,15 +28,17 @@
 # V 0.0.96
 # - fixed:   74_UnifiSwitch: Log-Messages
 # V 0.0.97
-# - fixed:   74_UnifiSwitch: new readings for general_temperature, overheating, fan_level, cpu and mem
+# - feature:   74_UnifiSwitch: new readings for general_temperature, overheating, fan_level, cpu and mem
 # V 1.0.00
-# - fixed:   74_UnifiSwitch: supports UDM-Switch
+# - feature:   74_UnifiSwitch: supports UDM-Switch
+# V 1.0.01
+# - feature:   74_UnifiSwitch: new setter portProfile
 # 
 # TODOs:
 # - state des USW für weiter state-Numbers korrekt in Worte übersetzen 
 
 package main;
-my $version="1.0.00";
+my $version="1.0.01";
 # Laden evtl. abhängiger Perl- bzw. FHEM-Module
 use strict;
 use warnings;
@@ -134,9 +136,9 @@ sub UnifiSwitch_Set($@){
 	my $portProfileDisableID=AttrVal($name,"portProfileDisableID",undef);
 	my $isPortprofileID = "";
 	$isPortprofileID ="disablePort" if (defined $portProfileDisableID);
-  if($setName !~ /clear|poeMode|disablePort/) {
+  if($setName !~ /clear|poeMode|disablePort|portProfile/) {
 		return "Unknown argument $setName, choose one of "
-           ."clear:all,readings poeMode ".$isPortprofileID; #TODO: PortNamen sowie die Modes als Auswahl anhängen 
+           ."clear:all,readings poeMode ".$isPortprofileID." portProfile"; #TODO: PortNamen sowie die Modes als Auswahl anhängen 
   }elsif ($setName eq 'clear') {
 		if ($setVal eq 'readings' || $setVal eq 'all') {
 			for (keys %{$hash->{READINGS}}) {
@@ -179,6 +181,10 @@ sub UnifiSwitch_Set($@){
 		
 		if( $setName eq 'disablePort' ) {
 			$port_overrides->[$idx]{portconf_id} = $portProfileDisableID;
+			IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides);
+		}
+		if( $setName eq 'portProfile' ) {
+			$port_overrides->[$idx]{portconf_id} = $setVal;
 			IOWrite($hash, "Unifi_DeviceRestJson_Send", $apRef->{device_id}, $port_overrides);
 		}elsif ($setName eq 'poeMode') {
 			return "usage: $setName  <port> <off|auto|passive|passthrough|restart>" if( !$setVal );		  
@@ -233,9 +239,9 @@ sub UnifiSwitch_Get($@){
     elsif ($getName eq 'poeState') {
         my $poeState;
         my $apRef = $hash->{usw};
-        next if( $apRef->{type} ne 'usw' );
-        next if( !$apRef->{port_table} );
-        next if( $getVal && $getVal ne $apRef->{mac} && $getVal ne $apRef->{device_id} && $apRef->{name} !~ $getVal );
+        #next if( $apRef->{type} ne 'usw' );
+        return "no ports?!"  if( !$apRef->{port_table} );
+        return "us with mac, deviceID or deviceName" if( $getVal && $getVal ne $apRef->{mac} && $getVal ne $apRef->{device_id} && $apRef->{name} !~ $getVal );
         $poeState .= "\n" if( $poeState );
         $poeState .= sprintf( "%-20s (mac:%-17s, id:%s)\n", $apRef->{name}, $apRef->{mac}, $apRef->{device_id} );
         $poeState .= sprintf( "  %2s  %-15s", "id", "name" );
@@ -256,20 +262,20 @@ sub UnifiSwitch_Get($@){
     elsif ($getName eq 'portOverrides') {
         my $portOverrides;
         my $apRef = $hash->{usw};
-        next if( $apRef->{type} ne 'usw' );
-        next if( !$apRef->{port_table} );
-        next if( $getVal && $getVal ne $apRef->{mac} && $getVal ne $apRef->{device_id} && $apRef->{name} !~ $getVal );		
+        #next if( $apRef->{type} ne 'usw' );
+        return "no ports?!" if( !$apRef->{port_table} );
+        return "us with mac, deviceID or deviceName" if( $getVal && $getVal ne $apRef->{mac} && $getVal ne $apRef->{device_id} && $apRef->{name} !~ $getVal );		
         $portOverrides .= "\n" if( $portOverrides );
         $portOverrides .= sprintf( "%-20s (mac:%-17s, id:%s)\n", $apRef->{name}, $apRef->{mac}, $apRef->{device_id} );
         $portOverrides .= sprintf( "  %2s  %-15s", "id", "name" );
         $portOverrides .= sprintf( " %-10s %-25s", "poe_mode", "PortConfigID" );
         $portOverrides .= "\n";
         for my $port (@{$apRef->{port_overrides}}) {
-			if(defined $port->{port_idx}){
-				$portOverrides .= sprintf( "  %2i  %-15s", $port->{port_idx}, $port->{name}?$port->{name}:"" );
-				$portOverrides .= sprintf( " %-10s %-25s", $port->{poe_mode}?$port->{poe_mode}:"", $port->{portconf_id}?$port->{portconf_id}:"");
-				$portOverrides .= "\n";
-			}
+          if(defined $port->{port_idx}){
+            $portOverrides .= sprintf( "  %2i  %-15s", $port->{port_idx}, $port->{name}?$port->{name}:"" );
+            $portOverrides .= sprintf( " %-10s %-25s", $port->{poe_mode}?$port->{poe_mode}:"", $port->{portconf_id}?$port->{portconf_id}:"");
+            $portOverrides .= "\n";
+          }
         }
         
         $portOverrides = "====================================================\n". $portOverrides;
@@ -416,8 +422,10 @@ You can use the readings or set features to control your unifi-switch.
     Set PoE mode for &lt;port&gt;. </li>
     <br>
     <li><code>set &lt;name&gt; disablePort &lt;port&gt;</code><br>
-	Only visible when Attr portProfileDisableID is set.<br>
+	  Only visible when Attr portProfileDisableID is set.<br>
     Set the PortProfile from Attr portProfileDisableID for &lt;port&gt;. </li>
+    <li><code>set &lt;name&gt; portProfile &lt;port&gt;</code><br>
+	  Set the PortProfile ID. The ID can be found with get portOverrides. </li>
 </ul>
 
 <h4>Get</h4>

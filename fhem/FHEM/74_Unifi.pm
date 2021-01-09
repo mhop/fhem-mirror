@@ -77,10 +77,14 @@
 #  - feature: 74_Unifi: new setter to start RF-Scan
 # V 3.5.0
 #  - feature: 74_Unifi: support UDM
+# V 3.5.1
+#  - fixed:   74_Unifi: autocreate-naming-fallback for udm fixed to mac (from ip)
+# V 3.5.2
+#  - feature: 74_Unifi: get deviceData hinzugefügt
 
 
 package main;
-my $version="3.5.0";
+my $version="3.5.2";
 # Default für clientReadings setzen. Die Readings waren der Standard vor Einführung des Attributes customClientReadings.
 # Eine Änderung hat Auswirkungen auf (alte) Moduldefinitionen ohne dieses Attribut.
 my $defaultClientReadings=".:^accesspoint|^essid|^hostname|^last_seen|^snr|^uptime"; #ist wegen snr vs rssi nur halb korrekt, wird aber auch nicht wirklich verwendet ;-)
@@ -588,13 +592,14 @@ sub Unifi_Get($@) {
     my $voucherNotes=join(",", keys %voucherNotesHash);
     
     my $clientNames = Unifi_ClientNames($hash);
+    my $deviceNames = Unifi_ApNames($hash);
     
-    if($getName !~ /events|clientData|unarchivedAlerts|voucherList|voucher|showAccount/) {
+    if($getName !~ /events|clientData|unarchivedAlerts|voucherList|voucher|showAccount|deviceData/) {
         return "Unknown argument $getName, choose one of "
                .((defined $hash->{events}[0] && scalar @{$hash->{events}}) ? "events:noArg " : "")
                .((defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) ? "unarchivedAlerts:noArg " : "")
                .(($clientNames) ? "clientData:all,$clientNames " : "")
-               ."voucherList:all,$voucherNotes voucher:$voucherNotes showAccount";
+               ."voucherList:all,$voucherNotes voucher:$voucherNotes showAccount deviceData:all,$deviceNames";
     }
     elsif ($getName eq 'unarchivedAlerts' && defined $hash->{alerts_unarchived}[0] && scalar @{$hash->{alerts_unarchived}}) {
         my $alerts = "====================================================\n";
@@ -703,6 +708,21 @@ sub Unifi_Get($@) {
       $password = Unifi_decrypt( $password );
 
       return "user: $user\npassword: $password";
+    }
+    elsif( $getName eq 'deviceData' ) {
+      my $deviceData = '';
+      if ($getVal && $getVal ne 'all') {
+          $getVal = Unifi_ApNames($hash,$getVal,'makeID');
+      } 
+      if (!$getVal || $getVal eq 'all') {
+          return Unifi_FormatJson(encode_json($hash->{accespoints}));
+      } 
+      elsif(defined($hash->{accespoints}->{$getVal})) {
+          return Unifi_FormatJson(encode_json($hash->{accespoints}->{$getVal}));
+      } 
+      else {
+          return "$hash->{NAME}: Unknown device '$getVal' in command '$getName', choose one of: all,$deviceNames";
+      }
     }
     return undef;
 }
@@ -1264,9 +1284,9 @@ sub Unifi_GetSysinfo_Receive($) {
                 Log3 $name, 5, "$name ($self) - state:'$data->{meta}->{rc}'";
 				
                 for my $h (@{$data->{data}}) {
-					$hash->{UC_VERSION}=$h->{version} if defined $h->{version};
-					Log3 $name, 5, "$name ($self) - uc_version: ".$hash->{UC_VERSION};
-				}
+                  $hash->{UC_VERSION}=$h->{version} if defined $h->{version};
+                  Log3 $name, 5, "$name ($self) - uc_version: ".$hash->{UC_VERSION};
+                }
             }
             else { Unifi_ReceiveFailure($hash,$data->{meta}); }
         } else {
@@ -1436,11 +1456,12 @@ sub Unifi_GetAccesspoints_Receive($) {# TODO Umbenennen in Unifi_GetDevices_Rece
                     $hash->{accespoints}->{$h->{_id}} = $h;
                     #TODO: Switch-Modelle anders festlegen ? Oder passt usw?
                    if (defined $h->{type} && (($h->{type} eq "usw") || ($h->{type} eq "udm"))){
-                         my $usw_name="";
+                        my $usw_name="";
+                        if ($h->{type} eq "udm") { $usw_name="udm_";}
                         if (defined $h->{name}){
-                          $usw_name=makeDeviceName($h->{name});
+                          $usw_name.=makeDeviceName($h->{name});
                         }else{
-                          $usw_name=makeDeviceName($h->{ip});
+                          ($h->{type} eq "udm") ? $usw_name.=makeDeviceName($h->{mac}) : $usw_name.=makeDeviceName($h->{ip});;
                         }
                         Dispatch($hash,"UnifiSwitch_".$usw_name.encode_json($h),undef);
                     }
@@ -1703,6 +1724,7 @@ sub Unifi_SetAccesspointReadings($) {
           readingsBulkUpdate($hash,'-AP_'.$apName.'_utilizationNG',$apRef->{'ng_cu_total'}) if( defined($apRef->{'ng_cu_total'}) );
         }
         readingsBulkUpdate($hash,'-AP_'.$apName.'_locate',(!defined $apRef->{locating}) ? 'unknown' : ($apRef->{locating}) ? 'on' : 'off');
+        readingsBulkUpdate($hash,'-AP-lastUpdate', gmtime(time()));
         #my $poe_power;
         #for my $port (@{$apRef->{port_table}}) {
         #  next if( !$port->{port_poe} );
@@ -2245,11 +2267,11 @@ sub Unifi_ClientNames($@) {
             $ID = $1;
         }elsif ( $attrCustomClientNames && defined $clientRef->{$attrCustomClientNames}){
             $ID = makeReadingName($clientRef->{$attrCustomClientNames});
-		}elsif ( (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
+		    }elsif ( (defined $clientRef->{name} && $clientRef->{name} =~ /^([\w\.\-]+)$/)
               || (defined $clientRef->{hostname} && $clientRef->{hostname} =~ /^([\w\.\-]+)$/)
-			){
+			  ){
             $ID = $1;
-		}
+		    } 
         return $ID;
     }
     elsif (defined $ID && defined $W && $W eq 'makeID') {   # Return ID from Alias
@@ -2414,7 +2436,7 @@ sub Unifi_initCustomClientReadings($){
 
 sub Unifi_initVoucherCache($){
     my ($hash) = @_;
-    #return if ( ! defined $hash->{hotspot}->{voucherCache}->{attr_value});
+    return if ( ! defined $hash->{hotspot}->{voucherCache}->{attr_value});
     my @voucherCaches=split(/,/, $hash->{hotspot}->{voucherCache}->{attr_value});
     my @notes=();
     foreach(@voucherCaches){
@@ -2489,6 +2511,37 @@ sub Unifi_NextUpdateFn($$) {
     }
     $NextUpdateFn->($hash) if($NextUpdateFn);
     return undef;
+}
+###############################################################################
+
+sub Unifi_FormatJson($) {
+    my ($json) = @_;
+    my $ret="";
+    my $deep="";
+    foreach my $char (split('', $json)) {
+      if ($char eq "{" || $char eq "["){
+        $ret=$ret."\n".$deep; 
+      }elsif ($char eq "}" || $char eq "]"){
+        chop($deep);
+        chop($deep);
+        $ret=$ret."\n".$deep; 
+      }
+      
+      $ret=$ret.$char;
+      
+      if ($char eq "{" || $char eq "["){
+        $deep=$deep."  " ;
+        $ret=$ret."\n".$deep; 
+      }elsif ($char eq "}" || $char eq "]"){
+        $ret=$ret."\n".$deep; 
+      }elsif ($char eq ","){
+        $ret=$ret."\n".$deep; 
+      }
+    }
+    #Zeilenvorschübe vorne und hinten entfernen
+    $ret =~ s/^.//; 
+    chop($ret);
+    return $ret;
 }
 ###############################################################################
 
@@ -2735,6 +2788,9 @@ Or you can use the other readings or set and get features to control your unifi-
     <br>
     <li><code>get &lt;name&gt; clientData &lt;all|user_id|controllerAlias|hostname|devAlias&gt;</code><br>
     Show more details about clients.</li>
+    <br>
+    <li><code>get &lt;name&gt; deviceData &lt;all|AP-Name;</code><br>
+    Show data of the specified (or all) device(s) in (simple formatted) json. Can be used for userreadings (use decode_json(..) in myUtils.pm).</li>
     <br>
     <li><code>get &lt;name&gt; events</code><br>
     Show events in specified 'eventPeriod'.</li>
