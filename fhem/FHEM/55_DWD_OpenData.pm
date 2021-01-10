@@ -62,13 +62,13 @@ package AstroSun;
 use strict;
 use warnings;
 
-use Math::Trig ':pi';
+use Math::Trig qw(pi pi2 asin acos tan);
 use POSIX 'floor';
 use Time::Local 'timegm';
 use Time::Piece 'gmtime';
 
 require Exporter;
-our $VERSION   = '1.000001';
+our $VERSION   = '1.000003';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(AzimuthElevation RiseSet);
 our @EXPORT_OK = qw(EpochToJulianDate JulianDateToEpoch);
