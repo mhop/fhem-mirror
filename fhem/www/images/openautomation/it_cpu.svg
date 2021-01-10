@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="400px" height="400px" viewBox="-200 -200 400 400" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" stroke="none" fill="#000000">
+<rect x="-120" y="-120" width="240" height="240" rx="20" ry="20"/>
+<g id="it_cpu_pins">
+<path d="M -130,-170 H 130 A 40,40 0 0 1 170,-130 H 150 A 20,20 0 0 0 130,-150 H -130 Z"/>
+<rect id="it_cpu_pin" x="-10" y="160" width="20" height="40"/>
+<use xlink:href="#it_cpu_pin" transform="translate(-40,0)"/>
+<use xlink:href="#it_cpu_pin" transform="translate(-80,0)"/>
+<use xlink:href="#it_cpu_pin" transform="translate(-120,0)"/>
+<use xlink:href="#it_cpu_pin" transform="translate(40,0)"/>
+<use xlink:href="#it_cpu_pin" transform="translate(80,0)"/>
+<use xlink:href="#it_cpu_pin" transform="translate(120,0)"/>
+</g>
+<use xlink:href="#it_cpu_pins" transform="rotate(90)"/>
+<use xlink:href="#it_cpu_pins" transform="rotate(180)"/>
+<use xlink:href="#it_cpu_pins" transform="rotate(270)"/>
+</svg>

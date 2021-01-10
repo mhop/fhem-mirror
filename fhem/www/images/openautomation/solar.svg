@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="760px" height="360px" viewBox="-380 -180 760 360" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" stroke="none" fill="#000000">
+<defs>
+<g id="solar_panel_cell">
+<polygon points="-25.2,420 25.2,420 28.8,480 -28.8,480"/>
+<polygon points="28,420 32,480 62,465 58,435"/>
+<polygon points="-28,420 -32,480 -62,465 -58,435"/>
+</g>
+<g id="solar_panel_row">
+<use xlink:href="#solar_panel_cell" transform="scale(0.425)"/>
+<use xlink:href="#solar_panel_cell" transform="scale(0.5)"/>
+<use xlink:href="#solar_panel_cell" transform="scale(0.5833)"/>
+</g>
+</defs>
+<path d="M -120,0 A 120,120 0 0 1 120,0 Z"/>
+<polygon id="solar_ray_triangle" points="0,-180 25,-125 -25,-125"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(26)"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(52)"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(78)"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(-26)"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(-52)"/>
+<use xlink:href="#solar_ray_triangle" transform="rotate(-78)"/>
+<g transform="translate(0,-150)">
+<use xlink:href="#solar_panel_row" transform="skewX(8)"/>
+<use xlink:href="#solar_panel_row" transform="skewX(23)"/>
+<use xlink:href="#solar_panel_row" transform="skewX(35.5)"/>
+<use xlink:href="#solar_panel_row" transform="skewX(-8)"/>
+<use xlink:href="#solar_panel_row" transform="skewX(-23)"/>
+<use xlink:href="#solar_panel_row" transform="skewX(-35.5)"/>
+<polygon points="-150,150 150,150 165,165 -165,165"/>
+<polygon points="150,150 165,150 363,330 330,330"/>
+<polygon points="-300,300 300,300 330,330 -330,330"/>
+<polygon points="-150,150 -165,150 -363,330 -330,330"/>
+</g>
+</svg>
