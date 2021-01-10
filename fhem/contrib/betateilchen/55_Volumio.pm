@@ -62,7 +62,7 @@ sub Initialize {
 sub Discover {
   my $hash = shift;
   
-  unless $init_done {
+  unless ($init_done) {
      InternalTimer(time()+3, \&Discover, $hash, 0);  
   } else {
     my $param = {
