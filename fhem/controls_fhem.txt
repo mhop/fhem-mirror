@@ -1,6 +1,6 @@
-REV 23493
+REV 23504
 DIR unused
-UPD 2021-01-09_07:45:04 356170 ./CHANGED
+UPD 2021-01-10_07:45:02 356406 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2020-12-11_07:45:03 42746 ./MAINTAINER.txt
 UPD 2020-12-24_07:45:04 41434 ./configDB.pm
@@ -226,7 +226,7 @@ UPD 2019-02-20_07:45:03 37912 FHEM/41_OREGON.pm
 UPD 2019-06-19_07:45:02 37326 FHEM/42_AptToDate.pm
 UPD 2017-05-26_07:45:02 29928 FHEM/42_Nextion.pm
 UPD 2015-07-28_14:05:31 8038 FHEM/42_RFXMETER.pm
-UPD 2020-10-26_07:45:03 23243 FHEM/42_SMARTMON.pm
+UPD 2021-01-10_07:45:02 25903 FHEM/42_SMARTMON.pm
 UPD 2018-08-30_07:45:03 194137 FHEM/42_SYSMON.pm
 UPD 2020-01-11_07:45:04 61597 FHEM/42_npmjs.pm
 UPD 2015-07-28_14:05:31 19326 FHEM/43_RFXX10REC.pm
@@ -290,7 +290,7 @@ UPD 2019-06-05_07:45:02 18742 FHEM/52_I2C_PCF8574.pm
 UPD 2019-06-05_07:45:02 13038 FHEM/52_I2C_SHT21.pm
 UPD 2016-07-11_07:45:14 12508 FHEM/52_I2C_SHT3x.pm
 UPD 2019-06-05_07:45:02 29777 FHEM/53_GHoma.pm
-UPD 2020-12-21_07:45:02 118941 FHEM/55_DWD_OpenData.pm
+UPD 2021-01-10_07:45:02 119170 FHEM/55_DWD_OpenData.pm
 UPD 2020-04-01_07:45:03 65912 FHEM/55_InfoPanel.pm
 UPD 2019-07-10_07:45:02 22166 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
@@ -309,7 +309,7 @@ UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-10-18_07:45:03 51082 FHEM/59_Weather.pm
 UPD 2019-03-23_07:45:03 44752 FHEM/59_Wunderground.pm
 UPD 2016-08-19_14:49:02 10915 FHEM/60_EM.pm
-UPD 2020-08-13_07:45:03 152747 FHEM/60_Watches.pm
+UPD 2021-01-10_07:45:02 152508 FHEM/60_Watches.pm
 UPD 2019-01-25_07:45:03 18123 FHEM/60_allergy.pm
 UPD 2017-08-14_07:45:02 6284 FHEM/61_EMWZ.pm
 UPD 2017-08-14_07:45:02 4418 FHEM/62_EMEM.pm
@@ -393,9 +393,9 @@ UPD 2019-04-17_07:45:02 34049 FHEM/74_HusqvarnaAutomower.pm
 UPD 2020-01-21_07:45:03 21682 FHEM/74_NUKIDevice.pm
 UPD 2017-04-26_07:45:02 35753 FHEM/74_Nmap.pm
 UPD 2019-03-23_07:45:03 64637 FHEM/74_THINKINGCLEANER.pm
-UPD 2020-10-14_07:45:07 124314 FHEM/74_Unifi.pm
+UPD 2021-01-10_07:45:02 126405 FHEM/74_Unifi.pm
 UPD 2019-08-13_07:45:03 17509 FHEM/74_UnifiClient.pm
-UPD 2020-10-14_07:45:07 19133 FHEM/74_UnifiSwitch.pm
+UPD 2021-01-10_07:45:02 19703 FHEM/74_UnifiSwitch.pm
 UPD 2020-09-27_07:45:02 16113 FHEM/74_UnifiVideo.pm
 UPD 2020-07-27_07:45:02 53954 FHEM/74_XiaomiBTLESens.pm
 UPD 2019-04-19_07:45:03 113063 FHEM/75_MSG.pm
@@ -728,12 +728,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-01-09_07:45:08 4403250 docs/commandref.html
+UPD 2021-01-10_07:45:06 4403624 docs/commandref.html
 UPD 2021-01-04_07:45:09 2715303 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-01-09_07:45:11 234304 docs/commandref_modular.html
-UPD 2021-01-09_07:45:12 245063 docs/commandref_modular_DE.html
+UPD 2021-01-10_07:45:10 234304 docs/commandref_modular.html
+UPD 2021-01-10_07:45:11 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -755,7 +755,7 @@ UPD 2020-06-23_07:45:04 4017 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2021-01-08_07:45:02 37988 lib/FHEM/HTTPMOD/Utils.pm
-UPD 2021-01-08_07:45:03 7370 lib/FHEM/Modbus/TestUtils.pm
+UPD 2021-01-10_07:45:02 11678 lib/FHEM/Modbus/TestUtils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
 UPD 2020-11-03_07:45:03 14279 lib/FHEM/SynoModules/ErrCodes.pm
 UPD 2020-12-28_07:45:03 69955 lib/FHEM/SynoModules/SMUtils.pm
@@ -1935,10 +1935,18 @@ UPD 2015-07-28_14:05:33 1453 www/images/openautomation/fts_window_roof.svg
 UPD 2015-07-28_14:05:33 1460 www/images/openautomation/fts_window_roof_open_1.svg
 UPD 2015-07-28_14:05:33 1575 www/images/openautomation/fts_window_roof_open_2.svg
 UPD 2015-07-28_14:05:33 2638 www/images/openautomation/fts_window_roof_shutter.svg
+UPD 2021-01-10_07:45:02 1562 www/images/openautomation/gefrierschrank.svg
 UPD 2018-11-20_07:45:03 1008 www/images/openautomation/iconalias.txt
 UPD 2015-07-28_14:05:33 1469 www/images/openautomation/it_camera.svg
+UPD 2021-01-10_07:45:02 1028 www/images/openautomation/it_cpu.svg
+UPD 2021-01-10_07:45:02 595 www/images/openautomation/it_drive.svg
+UPD 2021-01-10_07:45:02 851 www/images/openautomation/it_drive_external.svg
+UPD 2021-01-10_07:45:02 660 www/images/openautomation/it_drive_removable.svg
+UPD 2021-01-10_07:45:02 1990 www/images/openautomation/it_drive_usb.svg
 UPD 2015-07-28_14:05:33 2404 www/images/openautomation/it_fax.svg
+UPD 2021-01-10_07:45:02 648 www/images/openautomation/it_hdd.svg
 UPD 2015-07-28_14:05:33 3150 www/images/openautomation/it_internet.svg
+UPD 2021-01-10_07:45:02 915 www/images/openautomation/it_memory.svg
 UPD 2015-07-28_14:05:33 3449 www/images/openautomation/it_nas.svg
 UPD 2015-07-28_14:05:33 1390 www/images/openautomation/it_net.svg
 UPD 2015-07-28_14:05:33 1573 www/images/openautomation/it_network.svg
@@ -1950,6 +1958,8 @@ UPD 2015-07-28_14:05:33 1246 www/images/openautomation/it_satellite_dish.svg
 UPD 2015-07-28_14:05:33 2341 www/images/openautomation/it_satellite_dish_heating.svg
 UPD 2015-07-28_14:05:33 1978 www/images/openautomation/it_server.svg
 UPD 2015-07-28_14:05:33 967 www/images/openautomation/it_smartphone.svg
+UPD 2021-01-10_07:45:02 919 www/images/openautomation/it_storage.svg
+UPD 2021-01-10_07:45:02 1361 www/images/openautomation/it_swap.svg
 UPD 2015-07-28_14:05:33 2374 www/images/openautomation/it_telephone.svg
 UPD 2015-07-28_14:05:33 1021 www/images/openautomation/it_television.svg
 UPD 2015-07-28_14:05:33 2579 www/images/openautomation/it_wifi.svg
@@ -2113,6 +2123,7 @@ UPD 2015-07-28_14:05:33 2745 www/images/openautomation/secur_heat_protection.svg
 UPD 2015-07-28_14:05:33 1258 www/images/openautomation/secur_locked.svg
 UPD 2015-07-28_14:05:33 1353 www/images/openautomation/secur_open.svg
 UPD 2015-07-28_14:05:33 2282 www/images/openautomation/secur_smoke_detector.svg
+UPD 2021-01-10_07:45:02 1776 www/images/openautomation/solar.svg
 UPD 2015-07-28_14:05:33 2903 www/images/openautomation/status_automatic.svg
 UPD 2015-07-28_14:05:33 1604 www/images/openautomation/status_available.svg
 UPD 2015-07-28_14:05:33 1575 www/images/openautomation/status_away_1.svg
