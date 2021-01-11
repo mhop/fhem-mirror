@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.2.0";
+my $version = "1.2.1";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -1006,10 +1006,10 @@ sub WS980_updateRelPressure($)
 	}
 
 	my $relPressure = WS980_calculateRelPressure_QFF(
-		ReadingsVal($name, "temperature", 0.0),
-		ReadingsVal($name, "pressureAbs", 0.0),
+		ReadingsNum($name, "temperature", 0.0),
+		ReadingsNum($name, "pressureAbs", 0.0),
 		$altitude,
-		ReadingsVal($name, "humidity", 0.0));
+		ReadingsNum($name, "humidity", 0.0));
 
 	readingsSingleUpdate($hash, "pressureRel_calculated", sprintf("%.1f", $relPressure), 1);
 }
