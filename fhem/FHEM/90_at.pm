@@ -410,6 +410,20 @@ EOF
   return "$h1$h2</table></div><br>$j1$j2";
 }
 
+sub 
+at_ultimo(;$$$)
+{
+  my ($h,$m,$s) = @_;
+  $h //= 23;
+  $m //= 59;
+  $s //= 0;
+  my $add = $data{AT_RECOMPUTE} ? DAYSECONDS : 0;
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = 
+        localtime(time+$add);
+  my ($nm, $ny) = ($mon == 11) ? (0,$year+1) : ($mon+1,$year);
+  return mktime($s,$m,$h,1,$nm,$ny) - DAYSECONDS;
+}
+
 1;
 
 =pod
@@ -445,7 +459,7 @@ EOF
       any spaces or tabs.<br>
 
       &lt;datespec&gt; is either ISO8601 (YYYY-MM-DDTHH:MM:SS) or number of
-      seconds since 1970.
+      seconds since 1970 or {perlfunc()}.
     </ul>
     <br>
 
