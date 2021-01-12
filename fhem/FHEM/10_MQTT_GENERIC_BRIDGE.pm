@@ -29,6 +29,12 @@
 ###############################################################################
 # 
 # CHANGE LOG
+#
+# 12.01.2021 1.2.7
+# improvement: Anhaengigkeit zu 00_MQTT.pm dynamisch umgebaut
+#              Damit wird kein MQTT.pm mehr gebraucht (und damit kein Module::Pluggable), 
+#              falls als IODev  MQTT2_SERVER/CLIENT verwendet wird.
+#              Danke fuer den Patch an @rudolfkoenig !
 # 
 # 25.06.2019 1.2.6
 # bugfix     : globalPublish ohne funktion
@@ -363,7 +369,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.6 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.7 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -443,8 +449,6 @@ use strict;
 use warnings;
 use GPUtils qw(:all);
 
-use Net::MQTT::Constants;
-
 #if ($DEBUG) {
   use Data::Dumper;
 ##   $gets{"debugInfo"}="noArg";
@@ -452,8 +456,6 @@ use Net::MQTT::Constants;
 #}
 
 BEGIN {
-  main::LoadModule("MQTT");
-  MQTT->import(qw(:all));
 
   GP_Import(qw(
     CommandAttr
@@ -631,7 +633,7 @@ sub Define() {
   # }
   
   # noetig hier beim Anlegen im laufendem Betrieb
-  firstInit($hash);
+  InternalTimer(1, \&firstInit, $hash);
 
   return undef;
 }
@@ -737,6 +739,12 @@ sub firstInit($) {
   
   # IO    
   AssignIoPort($hash);
+
+  if(isIODevMQTT($hash)) {
+    require Net::MQTT::Constants;
+    main::LoadModule("MQTT");
+    MQTT->import(qw(:all));
+  }
 
   if ($main::init_done) {
     $hash->{+HELPER}->{+HS_FLAG_INITIALIZED} = 0;
@@ -949,7 +957,7 @@ sub CreateSingleDeviceTableAttrDefaults($$$$) {
   delete ($map->{$dev}->{':defaults'});
   if(defined $attrVal) {
     # format: [pub:|sub:]base=ha/wz/ [pub:|sub:]qos=0 [pub:|sub:]retain=0
-    my($unnamed, $named) = MQTT::parseParams($attrVal,'\s',' ','='); #main::parseParams($attrVal);
+    my($unnamed, $named) = main::parseParams($attrVal,'\s',' ','='); #main::parseParams($attrVal);
     foreach my $param (keys %{$named}) {
       # my $pr = substr($param, 0, 4);
       # if($pr eq 'sub:' or $pr eq 'pub:') {
@@ -976,7 +984,7 @@ sub CreateSingleDeviceTableAttrAlias($$$$) {
   delete ($map->{$dev}->{':alias'});
   if(defined $attrVal) {
     # format [pub:|sub:]<reading>[=<newName>] ...
-    my($unnamed, $named) = MQTT::parseParams($attrVal,'\s',' ','='); #main::parseParams($attrVal);
+    my($unnamed, $named) = main::parseParams($attrVal,'\s',' ','='); #main::parseParams($attrVal);
     if(defined($named)){
       foreach my $param (keys %{$named}) {
         my $val = $named->{$param};
@@ -1019,7 +1027,7 @@ sub CreateSingleDeviceTableAttrPublish($$$$) {
     #   *:qos=0 *:retain=0 ...
     #   *:topic=<{}> wird jedesmal ausgewertet und ggf. ein passendes Eintrag im Map erzeugt
     #   *:topic=# same as *:topic={"$base/$reading"}
-    my($unnamed, $named) = MQTT::parseParams($attrVal,'\s',' ','=');
+    my($unnamed, $named) = main::parseParams($attrVal,'\s',' ','=');
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] CreateSingleDeviceTableAttrPublish: parseParams: ".Dumper($named));
     if(defined($named)){
       my $autoResend = {};
@@ -1529,7 +1537,7 @@ sub CreateSingleDeviceTableAttrSubscribe($$$$) {
     #   *:expression={...}
     #   *:topic={"$base/$reading/xyz"} => topic = "$base/+/xyz"
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] CreateSingleDeviceTableAttrSubscribe: attrVal: ".Dumper($attrVal));
-    my($unnamed, $named) = MQTT::parseParams($attrVal,'\s',' ','=', undef); #MQTT::parseParams($attrVal, undef, undef, '=', undef);
+    my($unnamed, $named) = main::parseParams($attrVal,'\s',' ','='); #MQTT::parseParams($attrVal, undef, undef, '=', undef);
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] CreateSingleDeviceTableAttrSubscribe: parseParams: named ".Dumper($named));
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] CreateSingleDeviceTableAttrSubscribe: parseParams: unnamed ".Dumper($unnamed));
     if(defined($named)){
@@ -2202,7 +2210,7 @@ sub defineGlobalTypeExclude($;$) {
   # }
 
 
-  my($unnamed, $named) = MQTT::parseParams($valueType,'\s',' ','=', undef);
+  my($unnamed, $named) = main::parseParams($valueType,'\s',' ','=');
   foreach my $val (@$unnamed) {
     next if($val eq '');
     my($dir, $type, $reading) = split(/:/, $val);
@@ -2256,7 +2264,7 @@ sub defineGlobalDevExclude($;$) {
   #   $hash->{+HS_PROP_NAME_GLOBAL_EXCLUDES_DEVICES}->{$dev}=$reading if($dev ne '*');
   # }
 
-  my($unnamed, $named) = MQTT::parseParams($valueName,'\s',' ','=', undef);
+  my($unnamed, $named) = main::parseParams($valueName,'\s',' ','=');
   foreach my $val (@$unnamed) {
     next if($val eq '');
     my($dir, $dev, $reading) = split(/:/, $val);
