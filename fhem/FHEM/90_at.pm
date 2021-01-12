@@ -516,6 +516,19 @@ at_ultimo(;$$$)
           cron or filter the date in a perl expression, see the last example and
           the section <a href="#perl">Perl special</a>.
       </li>
+      <li>To execute a FHEM command on every last day of the month,<br/>
+          the function <code>at_ultimo()</code> can be used as perlfunc for
+          datespec.</br>
+          <code>define at_ultimo at *{at_ultimo()} set lamp1 off</code><br/>
+          This will create an at device which will be executed at 23:59:00
+          on the last day of month.</br>
+          at_ultimo() can take additional parameters to specify an other time
+          on this day<br/>
+          <code>define at_ultimo at *{at_ultimo(12,23,45)} set lamp1
+          off</code><br/>
+          This will create an at device which will be executed ad 12:34:45
+          on the last day of month.<br/>
+      </li>
     </ul>
     <br>
   </ul>
@@ -646,7 +659,7 @@ at_ultimo(;$$$)
       {perlfunc()} darf keine Leerzeichen enthalten.<br>
 
       &lt;datespec&gt; ist entweder ISO8601 (YYYY-MM-DDTHH:MM:SS) oder Anzahl
-      der Sekunden seit 1970.
+      der Sekunden seit 1970 oder {perlfunc()}.
 
     </ul>
     <br>
@@ -704,6 +717,19 @@ at_ultimo(;$$$)
       filtern. Siehe hierzu das letzte Beispiel und das <a href="#perl">Perl
       special</a>.  </li>
 
+      <li>Um einen FHEM Befehl immer am letzten Tag des Monats auszuführen,
+          kann die Funktion <code>at_ultimo()</code> als perlfunc für eine
+          datespec verwendet werden.</br>
+          <code>define at_ultimo at *{at_ultimo()} set lamp1 off</code><br/>
+          Hiermit wird ein at device erzeugt, der immer am letzten Tag des
+          Monats um 23:59:00 Uhr ausgeführt wird.<br/>
+          at_ultimo() kann drei optionale Parameter verarbeiten, um eine andere
+          Uhrzeit anzugeben.<br/>
+          <code>define at_ultimo at *{at_ultimo(12,23,45)} set lamp1
+          off</code><br/>
+          Es wird ein at device erzeugt, das immer um 12:34:45 am Monatsletzten
+          ausgeführt wird.<br/>
+      </li>
     </ul>
     <br>
   </ul>
