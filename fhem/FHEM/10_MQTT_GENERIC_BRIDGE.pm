@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 #
+# 13.01.2021 1.2.8
+# bugfix     : fix perl regex warning - Geschw. Klammern maskieren
+#              (forum https://forum.fhem.de/index.php/topic,117659.msg1121004.html#msg1121004)
+#
 # 12.01.2021 1.2.7
 # improvement: Anhaengigkeit zu 00_MQTT.pm dynamisch umgebaut
 #              Damit wird kein MQTT.pm mehr gebraucht (und damit kein Module::Pluggable), 
@@ -369,7 +373,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.7 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.8 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1363,7 +1367,8 @@ sub _evalValue2($$;$$) {
   # TODO : umbauen $str =~ m/^(.*)({.*})(.*)$/;; $1.$2.$3 - ok
   # TODO : Maskierte Klammern unterstuetzen? $str =~ m/^(.*)(\\{.*\\})(.*)({.*})(.*)$/;; $1.$2.$3.$4.$5 - irgendwie so
   #if($str =~ m/^{.*}$/) {
-  if($str =~ m/^(.*)({.*})(.*)$/) {
+  #if($str =~ m/^(.*)({.*})(.*)$/) {
+  if($str =~ m/^(.*)(\{.*\})(.*)$/) { # forum https://forum.fhem.de/index.php/topic,117659.msg1121004.html#msg1121004
     my $s1=$1; $s1='' unless defined $s1;
     my $s2=$2; $s2='' unless defined $s2;
     my $s3=$3; $s3='' unless defined $s3;
