@@ -113,6 +113,7 @@ my %YAMAHA_MC_setCmdswithoutArgs = (
     "selectPlayMenu"           => "/v1/netusb/setListControl?list_id=main&type=play&index=",
     "selectPlayMenuItem"       => "/v1/netusb/setListControl?list_id=main&type=play&index=",
     "getPlayInfo"              => "/v1/netusb/getPlayInfo",
+	"toggleRepeat"             => "/v1/netusb/toggleRepeat",	
     "playback"                 => "/v1/netusb/setPlayback?playback=",
     "getMenu"                  => "/v1/netusb/getListInfo?input=net_radio&index=0&size=8&lang=en",
     "getMenuItems"             => "/v1/netusb/getListInfo?input=net_radio&index=0&size=8&lang=en",
@@ -174,6 +175,7 @@ my %YAMAHA_MC_setCmdsWithArgs = (
     "selectPlayMenu"                                                                                                            => "/v1/netusb/setListControl?list_id=main&type=play&index=",
     "selectPlayMenuItem"                                                                                                        => "/v1/netusb/setListControl?list_id=main&type=play&selectMenu=",
     "getPlayInfo:noArg"                                                                                                         => "/v1/netusb/getPlayInfo",
+	"toggleRepeat:noArg"                                                                                                        => "/v1/netusb/toggleRepeat",	
     "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end" => "/v1/netusb/setPlayback?playback=",
     "getMenu:noArg"                                                                                                             => "/v1/netusb/getListInfo?input=net_radio&index=0&size=8&lang=en",
     "getMenuItems:noArg"                                                                                                        => "/v1/netusb/getListInfo?input=net_radio&index=0&size=8&lang=en",
@@ -1724,6 +1726,7 @@ sub YAMAHA_MC_UpdateLists($;$) {
         "selectPlayMenu" => "/v1/netusb/setListControl?list_id=main&type=play&index=",
         ( exists( $hash->{helper}{MENUITEMS} ) ? "selectPlayMenuItem:" . $menuitems_comma . " " : "" ) => "/v1/netusb/setListControl?list_id=main&type=play&selectMenu=",
         "getPlayInfo:noArg"                                                                                                         => "/v1/netusb/getPlayInfo",
+		"toggleRepeat:noArg"                                                                                                         => "/v1/netusb/toggleRepeat",		
         "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end" => "/v1/netusb/setPlayback?playback=",
         "getMenu:noArg"                                                                                                             => "/v1/netusb/getListInfo?input=" . $currentInput . "&index=0&size=8&lang=en",
         "getMenuItems:noArg"                                                                                                        => "/v1/netusb/getListInfo?input=" . $currentInput . "&index=0&size=8&lang=en",
@@ -1871,7 +1874,7 @@ sub YAMAHA_MC_Set($$@) {
     my $deviceList_comma = join( ",", @deviceList );
 
     $cmd = "?" unless defined $cmd;
-    my $usage = "Unknown argument $cmd, choose one of " . "on:noArg " . "off:noArg " . "power:on,standby,toggle " . "toggle:noArg " . "setAutoPowerStandby:true,false " . "volume:slider,0,1,100 " . "volumeStraight " . "volumeUp:noArg " . "volumeDown:noArg " . "mute:toggle,true,false,0,1 " . "setSpeakerA:toggle,true,false " . "setSpeakerB:toggle,true,false " . "setToneBass:slider,-10,1,10 " . "setToneMid:slider,-10,1,10 " . "setToneHigh:slider,-10,1,10 " . ( exists( $hash->{helper}{INPUTS} ) ? "input:" . $inputs_comma . " " : "input " ) . ( exists( $hash->{helper}{INPUTS} ) ? "prepareInputChange:" . $inputs_comma . " " : "prepareInputChange " ) . "getStatus:noArg " . "getFeatures:noArg " . "getFuncStatus:noArg " . "selectMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectMenuItem:" . $menuitems_comma . " " : "selectMenuItem " ) . "selectPlayMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectPlayMenuItem:" . $menuitems_comma . " " : "" ) . "getPlayInfo:noArg " . "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end " . "getMenu:noArg " . "getMenuItems:noArg " . "returnMenu:noArg " . "getDeviceInfo:noArg " . "getSoundProgramList:noArg " . ( exists( $hash->{helper}{SOUNDPROGRAMS} ) ? "setSoundProgramList:" . $soundprograms_comma . " " : "" ) . "setFmTunerPreset:slider,0,1,20 " . "setDabTunerPreset:slider,0,1,20 " . "setNetRadioPreset " . "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8 " . "TurnFavServerChannelOn:noArg " . "navigateListMenu " . "NetRadioNextFavChannel:noArg " . "NetRadioPrevFavChannel:noArg " . "sleep:uzsuSelectRadio,0,30,60,90,120 " . "getNetworkStatus:noArg " . "getLocationInfo:noArg " . "getDistributionInfo:noArg " . "getBluetoothInfo:noArg " . "enableBluetooth:true,false " . "setGroupName " . "mcLinkTo:multiple," . $deviceList_comma . " " . "speakfile " . "mcUnLink:multiple," . ReadingsVal( $hash->{NAME}, "linkedClients", "" ) . " " . "setServerInfo " . "setClientInfo " . "startDistribution " . "isNewFirmwareAvailable:noArg " . "statusRequest:noArg ";
+    my $usage = "Unknown argument $cmd, choose one of " . "on:noArg " . "off:noArg " . "power:on,standby,toggle " . "toggle:noArg " . "setAutoPowerStandby:true,false " . "volume:slider,0,1,100 " . "volumeStraight " . "volumeUp:noArg " . "volumeDown:noArg " . "mute:toggle,true,false,0,1 " . "setSpeakerA:toggle,true,false " . "setSpeakerB:toggle,true,false " . "setToneBass:slider,-10,1,10 " . "setToneMid:slider,-10,1,10 " . "setToneHigh:slider,-10,1,10 " . ( exists( $hash->{helper}{INPUTS} ) ? "input:" . $inputs_comma . " " : "input " ) . ( exists( $hash->{helper}{INPUTS} ) ? "prepareInputChange:" . $inputs_comma . " " : "prepareInputChange " ) . "getStatus:noArg " . "getFeatures:noArg " . "getFuncStatus:noArg " . "selectMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectMenuItem:" . $menuitems_comma . " " : "selectMenuItem " ) . "selectPlayMenu " . ( exists( $hash->{helper}{MENUITEMS} ) ? "selectPlayMenuItem:" . $menuitems_comma . " " : "" ) . "getPlayInfo:noArg " . "toggleRepeat:noArg " . "playback:play,stop,pause,play_pause,previous,next,fast_reverse_start,fast_reverse_end,fast_forward_start,fast_forward_end " . "getMenu:noArg " . "getMenuItems:noArg " . "returnMenu:noArg " . "getDeviceInfo:noArg " . "getSoundProgramList:noArg " . ( exists( $hash->{helper}{SOUNDPROGRAMS} ) ? "setSoundProgramList:" . $soundprograms_comma . " " : "" ) . "setFmTunerPreset:slider,0,1,20 " . "setDabTunerPreset:slider,0,1,20 " . "setNetRadioPreset " . "TurnFavNetRadioChannelOn:1,2,3,4,5,6,7,8 " . "TurnFavServerChannelOn:noArg " . "navigateListMenu " . "NetRadioNextFavChannel:noArg " . "NetRadioPrevFavChannel:noArg " . "sleep:uzsuSelectRadio,0,30,60,90,120 " . "getNetworkStatus:noArg " . "getLocationInfo:noArg " . "getDistributionInfo:noArg " . "getBluetoothInfo:noArg " . "enableBluetooth:true,false " . "setGroupName " . "mcLinkTo:multiple," . $deviceList_comma . " " . "speakfile " . "mcUnLink:multiple," . ReadingsVal( $hash->{NAME}, "linkedClients", "" ) . " " . "setServerInfo " . "setClientInfo " . "startDistribution " . "isNewFirmwareAvailable:noArg " . "statusRequest:noArg ";
 
     # delay in Seks for next request after turning on device
     my $powerCmdDelay = AttrVal( $hash->{NAME}, "powerCmdDelay", 3 );
@@ -2546,7 +2549,7 @@ sub YAMAHA_MC_Set($$@) {
     }
 
     # valid "set cmds" are defind in %cmd_hash (see above)
-    elsif ( $cmd =~ /^(prepareInputChange|getStatus|getFeatures|getFuncStatus|getPlayInfo|getDeviceInfo|sleep|getNetworkStatus|getLocationInfo|getDistributionInfo|getSoundProgramList)$/ ) {
+    elsif ( $cmd =~ /^(prepareInputChange|getStatus|getFeatures|getFuncStatus|getPlayInfo|toggleRepeat|getDeviceInfo|sleep|getNetworkStatus|getLocationInfo|getDistributionInfo|getSoundProgramList)$/ ) {
 
         # known cmd, is in cmd_hash but no particular handling above
         # so execute standard url associated
@@ -4000,6 +4003,10 @@ sub YAMAHA_MC_httpRequestParse($$$) {
                         readingsBulkUpdate( $hash, "albumart_id",     $albumart_id,     1 );
                         readingsEndUpdate( $hash, 1 );
                     }
+					 elsif ( $cmd eq "toggleRepeat" ) {
+
+                        Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse Start Handling for toggleRepeat";
+					 }
                     elsif ( $cmd eq "volume" ) {
 
                         Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse Start Handling for volume";
@@ -5117,6 +5124,7 @@ sub YAMAHA_URI_Escape($) {
 <li><b>getNetworkStatus</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current network info like network_name, wlan and wlan strength</li>
 <li><b>getLocationInfo</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current location info like zones</li>
 <li><b>getPlayInfo</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current playback info of the device like play status</li>
+<li><b>toggleRepeat</b> &nbsp;&nbsp;-&nbsp;&nbsp; toggles the Repat Function in netusb Mode</li>
 <li><b>getDeviceInfo</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the current device info of the device like model_name, firmware, device_id</li>
 <li><b>getFeatures</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the general status of the device, creates the possible inputs</li>
 <li><b>getFuncStatus</b> &nbsp;&nbsp;-&nbsp;&nbsp; requests the general functions of the device, creates the possible speakers/headphone</li>
