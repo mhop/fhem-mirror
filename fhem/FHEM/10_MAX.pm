@@ -1730,6 +1730,7 @@ sub MAX_Parse
   elsif($msgtype eq "PushButtonState") 
   {
     my ($bits2, $isopen) = unpack("aC",pack("H*",$args[0]));
+    $isopen //= '?';
     #The meaning of $bits2 is completly guessed based on similarity to other devices, TODO: confirm
     $shash->{'.gateway'} = vec($bits2, 4, 1); # Paired to a CUBE?
     $shash->{'.rferror'} = vec($bits2, 6, 1); # communication with link partner (1 if we did not sent an Ack)
