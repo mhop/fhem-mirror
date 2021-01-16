@@ -68,6 +68,7 @@ sub HMinfo_Initialize($$) {####################################################
                        ."verbCULHM:multiple,none,allSet,allGet,allSetVerb,allGetVerb "
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
+  InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -256,10 +257,17 @@ sub HMinfo_Notify(@){##########################################################
 }
 sub HMinfo_init(){#############################################################
   RemoveInternalTimer("HMinfo_init");# just to be secure...
-  if (defined $modules{CUL_HM}{helper}{initDone} && $modules{CUL_HM}{helper}{initDone}){
-    my ($hm) = devspec2array("TYPE=HMinfo");
-    HMinfo_SetFn($defs{$hm},$hm,"loadConfig") if ( substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0);    
-    $modules{HMinfo}{helper}{initDone} = 1;
+  if ($init_done){
+    if (!defined $modules{HMinfo}{helper}{initDone} || !$modules{HMinfo}{helper}{initDone}){ # && !$modules{HMinfo}{helper}{initDone}){
+      my ($hm) = devspec2array("TYPE=HMinfo");
+      if (substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0){
+        HMinfo_SetFn($defs{$hm},$hm,"loadConfig");
+      }
+      else{
+        $modules{HMinfo}{helper}{initDone} = 1;
+      }
+      HMinfo_listOfTempTemplates();
+    }
   }
   else{
     InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
@@ -562,11 +570,11 @@ sub HMinfo_peerCheck(@) { #####################################################
   my @peerIDsAES;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn});#device has no channels
-    my $peersUsed = CUL_HM_peerUsed($eName);#
+    my $peersUsed = CUL_HM_getPeers($eName,"Config");#
     next if ($peersUsed == 0);# no peers expected
         
-    my $peerIDs = AttrVal($eName,"peerIDs","");
-    $peerIDs =~ s/00000000,//;
+    my $peerIDs = join(",",CUL_HM_getPeers($eName,"IDs"));
+
     foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                            grep /^trigDst_/,
                                            keys %{$defs{$eName}{READINGS}})){
@@ -588,11 +596,9 @@ sub HMinfo_peerCheck(@) { #####################################################
       my $md = AttrVal($devN,"model","");
       next if ($st eq "repeater");
       if ($st eq 'smokeDetector'){
-        push @peeringStrange,"$eName:\t not peered!! add SD to any team !!"
-              if(!$peerIDs);
+        push @peeringStrange,"$eName:\t not peered!! add SD to any team !!" if(!$peerIDs);
       }
-      foreach my $pId (grep !/peerUnread/,split",",$peerIDs){
-        next if ($pId =~m /$devId/);
+      foreach my $pId (CUL_HM_getPeers($eName,"IDsExt")){
         if (length($pId) != 8){
           push @peerIDnotDef,"$eName:\t id:$pId  invalid format";
           next;
@@ -610,9 +616,7 @@ sub HMinfo_peerCheck(@) { #####################################################
         my $pDName = CUL_HM_id2Name($pDid);
         my $pSt = AttrVal($pDName,"subType","");
         my $pMd = AttrVal($pDName,"model","");
-        my $idc = $id;
         if($st =~ m/(pushButton|remote)/){ # type of primary device
-          $idc = $devId;
           if($pChn eq "00"){
             foreach (CUL_HM_getAssChnNames($pDName)){
               $pPlist .= AttrVal($_,"peerIDs","");
@@ -694,17 +698,15 @@ sub HMinfo_burstCheck(@) { ####################################################
   my @peerIDsCond;
   foreach my $eName (@entities){
     next if (!$defs{$eName}{helper}{role}{chn}         #entity has no channels
-          || CUL_HM_peerUsed($eName) != 1              #entity not peered or list incomplete
+          || CUL_HM_getPeers($eName,"Config") != 1              #entity not peered or list incomplete
           || CUL_HM_Get($defs{$eName},$eName,"regList")#option not supported
              !~ m/peerNeedsBurst/);
 
-    my $peerIDs = AttrVal($eName,"peerIDs",undef);    
-    next if(!$peerIDs);                                # no peers assigned
-
     my $devId = substr($defs{$eName}{DEF},0,6);
-    foreach (split",",$peerIDs){
-      next if ($_ eq "00000000" ||$_ =~m /$devId/);
-      my $pn = CUL_HM_id2Name($_);
+    my @peers = CUL_HM_getPeers($eName,"NamesExt");
+    next if(0 == scalar (@peers));                     # no peers assigned
+
+    foreach my $pn (@peers){
       $pn =~ s/_chn:/_chn-/; 
       my $prxt = CUL_HM_getRxType($defs{$pn});
       
@@ -891,7 +893,6 @@ sub HMinfo_tempListTmpl(@) { ##################################################
 
     if   ($tmplDev !~ m/:/) { $tmplDev = $fName.":$tmplDev";}
     elsif($tmplDev !~ m/\//){ $tmplDev = $cfgDir."$tmplDev";}
-  
     my $r = CUL_HM_tempListTmpl($name,$action,$tmplDev);
     HMinfo_regCheck($name);#clean helper data (shadowReg) after restore
     if($action eq "restore"){
@@ -1224,6 +1225,29 @@ sub HMinfo_getMsgStat() { #####################################################
            ;
 }
 
+sub HMinfo_getCfgDefere($){####################################################
+  my $hm = shift;
+  if(  !defined $hm
+     ||!defined $defs{$hm}
+     ||!defined $defs{$hm}{helper}
+     ||!defined $defs{$hm}{helper}{nbPend}
+     ){
+    return;
+   }
+  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".'\^('.join("|",@{$defs{$hm}{helper}{nbPend}}).')\$'.")\$");  
+}
+
+sub HMinfo_startBlocking(@){####################################################
+  my ($name,$fkt,$param) = @_;
+  my $hash = $defs{$name};
+  Log3 $hash,5,"HMinfo $name start blocking:$fkt";
+  my $id = ++$hash->{nb}{cnt};
+  my $bl = BlockingCall($fkt, "$name;$id;$hash->{CL}{NAME},$param", 
+                        "HMinfo_bpPost", 30, 
+                        "HMinfo_bpAbort", "$name:0");
+  $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+}
+
 sub HMinfo_GetFn($@) {#########################################################
   my ($hash,$name,$cmd,@a) = @_;
   my ($opt,$optEmpty,$filter) = ("",1,"");
@@ -1279,7 +1303,7 @@ sub HMinfo_GetFn($@) {#########################################################
         }
         elsif($_ =~m /^[ ,0-9]{1,5}/){
            my ($cnt,$date) = split(":",$_,2);
-           $_ = sprintf("%-5s>%s",$cnt,$date);
+           $_ = sprintf("%-5s>%s",$cnt,$date) if (defined $date);
            $plSum[$c] +=$cnt;
         }
         else{
@@ -1426,13 +1450,27 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "configCheck"){##check peers and register----------------------
     if($modules{HMinfo}{helper}{initDone}){
       if ($hash->{CL}){
-        $defs{$name}{helper}{cfgChkResult} = "";
-        my $id = ++$hash->{nb}{cnt};
-        my $bl = BlockingCall("HMinfo_configCheck", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter)), 
-                              "HMinfo_bpPost", 30, 
-                              "HMinfo_bpAbort", "$name:0");
-        $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
-        $ret = "";
+        if(scalar(keys %{$hash->{nb}}) > 1){
+          my @entities = HMinfo_getEntities($opt,$filter);
+          push @entities,@{$hash->{helper}{nbPend}} if (defined $hash->{helper}{nbPend});
+          @entities = HMinfo_noDup(@entities);
+          if(scalar(@entities) > 0){
+            $hash->{helper}{nbPend} = \@entities;
+            RemoveInternalTimer($name,"HMinfo_getCfgDefere");
+            InternalTimer(gettimeofday()+10,"HMinfo_getCfgDefere", $name, 0);
+          }
+          $ret = "";
+        }
+        else{
+          my @entities = HMinfo_getEntities($opt,$filter);
+          push @entities,@{$hash->{helper}{nbPend}} if (defined $hash->{helper}{nbPend});
+          @entities = HMinfo_noDup(@entities);
+          $filter = '^('.join("|",@entities).')$';
+          $defs{$name}{helper}{cfgChkResult} = "";
+          HMinfo_startBlocking($name,"HMinfo_configCheck", "$opt,$filter");
+          delete $hash->{helper}{nbPend};
+          $ret = "";
+        }
       }
       else{
         (undef,undef,undef,$ret) = split(";",HMinfo_configCheck (join(",",("$name;;",$opt,$filter))),4);
@@ -1440,6 +1478,7 @@ sub HMinfo_GetFn($@) {#########################################################
       }
     }
     else{
+      $ret = "init not complete. configCheck won't be executed";
     }
   }
   elsif($cmd eq "configChkResult"){##check peers and register------------------
@@ -1447,11 +1486,7 @@ sub HMinfo_GetFn($@) {#########################################################
   }
   elsif($cmd eq "templateChk"){##template: see if it applies ------------------
     if ($hash->{CL}){
-      my $id = ++$hash->{nb}{cnt};
-      my $bl = BlockingCall("HMinfo_templateChk_Get", join(",",("$name;$id;$hash->{CL}{NAME}",$opt,$filter,@a)), 
-                            "HMinfo_bpPost", 30, 
-                            "HMinfo_bpAbort", "$name:0");
-      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+      HMinfo_startBlocking($name,"HMinfo_templateChk_Get", join(",",($opt,$filter,@a)));
       $ret = "";
     }
     else{
@@ -1484,8 +1519,7 @@ sub HMinfo_GetFn($@) {#########################################################
     my @fheml = ();
     foreach my $dName (HMinfo_getEntities($opt,$filter)){
       # search for irregular trigger
-      my $peerIDs = AttrVal($dName,"peerIDs","");
-      $peerIDs =~ s/00000000,//;
+      my $peerIDs = join(",", CUL_HM_getPeers($dName,"IDs"));
       my $pType = substr($defs{$dName}{helper}{peerOpt},0,1);
       $pType = ($pType eq '4' ? '1_sender'
                :$pType eq '3' ? '2_actor'
@@ -1497,10 +1531,6 @@ sub HMinfo_GetFn($@) {#########################################################
       foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                               grep /^trigDst_/,
                                               keys %{$defs{$dName}{READINGS}})){
-#        push @peerUndef,"$dName triggers $_"
-#            if(  ($peerIDs && $peerIDs !~ m/$_/)
-#               &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
-        
         $peerFriends{"6_trigger"}{$dName}{$_} = 1
             if(  ($peerIDs && $peerIDs !~ m/$_/)
                &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
@@ -1557,8 +1587,7 @@ sub HMinfo_GetFn($@) {#########################################################
       next if($tmpRegl !~ m/RegL_04/);
 
       # search for irregular trigger
-      my $peerIDs = AttrVal($dName,"peerIDs","");
-      $peerIDs =~ s/00000000,//;
+      my $peerIDs = join(",", CUL_HM_getPeers($dName,"IDs"));
       foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                               grep /^trigDst_/,
                                               keys %{$defs{$dName}{READINGS}})){
@@ -1629,11 +1658,7 @@ sub HMinfo_GetFn($@) {#########################################################
     return HMinfo_templateList($a[0]);
   }
   elsif($cmd eq "register")   {##print register--------------------------------
-    my $id = ++$hash->{nb}{cnt};
-    my $bl = BlockingCall("HMinfo_register", join(",",("$name;$id;$hash->{CL}{NAME}",$name,$opt,$filter)), 
-                          "HMinfo_bpPost", 30, 
-                          "HMinfo_bpAbort", "$name:0");
-    $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+    HMinfo_startBlocking($name,"HMinfo_register", join(",",($name,$opt,$filter)));
     $ret = "";
   }
   elsif($cmd eq "param")      {##print param ----------------------------------
@@ -1705,6 +1730,20 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "showTimer"){
     $ret = join("\n",sort map{sprintf("%8d",int($intAt{$_}{TRIGGERTIME}-gettimeofday())).":$intAt{$_}{FN}\t$intAt{$_}{ARG}"} (keys %intAt));
   }
+  elsif($cmd eq "showChilds"){
+    my ($type) = @a;
+    $type = "all" if(!$type);
+    if ($type eq "all"){
+      $ret = "BlockingCalls:\n".join("\nnext:----------\n",
+              map {(my $foo = $_) =~ s/(Pid:|Fn:|Arg:|Timeout:|ConnectedVia:)/\n   $1/g; $foo;}
+              grep /(CUL_HM|HMinfo)/,BlockingInfo(undef,undef));
+    }
+    else{
+      $ret = "BlockingCalls:\n".join("\nnext:----------\n",
+              map {(my $foo = $_) =~ s/(Pid:|Fn:|Arg:|Timeout:|ConnectedVia:)/\n   $1/g; $foo;}
+              BlockingInfo(undef,undef));
+    }
+  }
   
   elsif($cmd eq "configInfo") {
     $ret = ""  ;
@@ -1743,6 +1782,7 @@ sub HMinfo_GetFn($@) {#########################################################
             ,"templateUsg"
             ,"templateUsgG:sortTemplate,sortPeer,noTmpl,all"
             ,"showTimer:noArg"
+            ,"showChilds:hm,all"
             );
             
     $ret = "Unknown argument $cmd, choose one of ".join (" ",sort @cmdLst);
@@ -1871,11 +1911,7 @@ sub HMinfo_SetFn($@) {#########################################################
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
 
     if ($hash->{CL}){
-      my $id = ++$hash->{nb}{cnt};
-      my $bl = BlockingCall("HMinfo_verifyConfig", join(",",("$name;$id;$hash->{CL}{NAME}",$fn)), 
-                            "HMinfo_bpPost", 30, 
-                            "HMinfo_bpAbort", "$name:$id");
-      $hash->{nb}{$id}{$_} = $bl->{$_} foreach (keys %{$bl});
+      HMinfo_startBlocking($name,"HMinfo_verifyConfig", "$fn");
       $ret = "";
     }
     else{
@@ -1885,7 +1921,7 @@ sub HMinfo_SetFn($@) {#########################################################
   elsif($cmd eq "purgeConfig")     {##action: purgeConfig----------------------
     my $id = ++$hash->{nb}{cnt};
     my $fn = HMinfo_getConfigFile($name,"configFilename",$a[0]);
-
+    HMinfo_startBlocking($name,"HMinfo_purgeConfig", "$fn");
     my $bl = BlockingCall("HMinfo_purgeConfig", join(",",("$name;$id;none",$fn)), 
                           "HMinfo_bpPost", 30, 
                           "HMinfo_bpAbort", "$name:$id");
@@ -2052,6 +2088,7 @@ sub HMInfo_help(){ ############################################################
            ."\n                  list all currently defined templates or the structure of a given template"
            ."\n get configInfo  # information to getConfig status"
            ."\n get showTimer   # list all timer running in FHEM currently"
+           ."\n get showChilds  [(hm|all)]# list all blocking calls"
            ."\n                 "
            ."\n ======= typeFilter options: supress class of devices  ===="
            ."\n set -name- -cmd- [-dcasev] [-f -filter-] [params]"
@@ -2169,7 +2206,7 @@ sub HMinfo_verifyConfig($) {###################################################
   $ret =~ s/\n/-ret-/g;
   return "$id;$ret";
 }
-sub HMinfo_loadConfig($$@) {####################################################
+sub HMinfo_loadConfig($$@) {###################################################
   my ($hash,$filter,$fName)=@_;
   $filter = "." if (!$filter);
   my $ret;
@@ -2180,7 +2217,6 @@ sub HMinfo_loadConfig($$@) {####################################################
   my %changes;
   my @rUpdate;
   my @tmplList = (); #collect template definitions
-  
   $modules{HMinfo}{helper}{initDone} = 0; #supress configCheck while loading
   my ($cntTStart,$cntDef,$cntSet,$cntEWT,$cntPBulk,$cntRBulk) = (0,0,0,0,0,0);
   while(<rFile>){
@@ -2439,7 +2475,8 @@ sub HMinfo_archConfigExec($)  {################################################
   my @archs;
   @eN = ();
   foreach(HMinfo_noDup(@names)){
-    if (CUL_HM_peerUsed($_) ==2 ||HMinfo_regCheck($_)){
+    next if (!defined $_ || !defined $defs{$_} || !defined $defs{$_}{DEF});
+    if (CUL_HM_getPeers($_,"Config") ==2 ||HMinfo_regCheck($_)){
       push @eN,$_;
     }
     else{
@@ -2525,8 +2562,7 @@ sub HMinfo_deviceReplace($$$){
     if ($defs{$newDev}{$i} && defined $defs{$defs{$newDev}{$i}}){
       $rnHash{new}{$i}=$defs{$newDev}{$i};
       return "new channel $i:$rnHash{new}{$i} already has peers: $attr{$rnHash{new}{$i}}{peerIDs}" 
-                                                if(defined $attr{$rnHash{new}{$i}}{peerIDs} 
-                                                   &&      $attr{$rnHash{new}{$i}}{peerIDs} ne "0000000");
+                                                if(defined $defs{$rnHash{new}{$i}}{peerList});
     }
     else{
       return "channel list incompatible for $newDev: $i";
@@ -2569,7 +2605,7 @@ sub HMinfo_deviceReplace($$$){
     foreach my $ch(sort keys %{$rnHash{old}}){
       my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
       next if(!defined $attr{$nameO}{peerIDs});
-      my $peerList = join(",",grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs}));
+      my $peerList = join(",",grep !/^$oldID/, CUL_HM_getPeers($nameO,"IDs"));
       if ($execMode){
         CUL_HM_Set($defs{$nameN},$nameN,"peerBulk",$peerList,"set") if($peerList);
       }
@@ -2613,7 +2649,7 @@ sub HMinfo_deviceReplace($$$){
     foreach my $ch(sort keys %{$rnHash{old}}){
       my ($nameO,$nameN) = ($rnHash{old}{$ch},$rnHash{new}{$ch});
       next if (!$attr{$nameO}{peerIDs});
-      foreach my $pId(grep !/(00000000|$oldID..)/, split(",",$attr{$nameO}{peerIDs})){
+      foreach my $pId(grep !/^$oldID/, CUL_HM_getPeers($nameO,"IDs")){
         my ($oChId,$nChId) = (substr($defs{$nameO}{DEF}."01",0,8)
                              ,substr($defs{$nameN}{DEF}."01",0,8));# obey that device may be channel 01
         my $peerName = CUL_HM_id2Name($pId);
@@ -2788,6 +2824,7 @@ sub HMinfo_register ($){ ######################################################
 sub HMinfo_bpPost($) {#bp finished ############################################
   my ($rep) = @_;
   my ($name,$id,$cl,$ret) = split(";",$rep,4);
+  Log3 $defs{$name},5,"HMinfo $name finish blocking";
 
   my @entityChk;
   my ($test,$testId,$ent,$issue) = ("","","","");
