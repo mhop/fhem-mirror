@@ -1,4 +1,4 @@
-REV 23520
+REV 23523
 DIR unused
 UPD 2021-01-14_07:45:03 356492 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -506,7 +506,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2020-04-23_07:45:04 26890 FHEM/98_WOL.pm
-UPD 2021-01-14_07:45:03 71144 FHEM/98_WeekdayTimer.pm
+UPD 2021-01-16_07:45:03 71408 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -704,7 +704,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2020-11-23_07:45:02 17630 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2020-11-23_07:45:02 149511 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2021-01-16_07:45:03 149628 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2020-11-09_07:45:03 33380 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -732,8 +732,8 @@ UPD 2021-01-14_07:45:07 4404432 docs/commandref.html
 UPD 2021-01-13_07:45:09 2716058 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-01-15_07:45:10 234304 docs/commandref_modular.html
-UPD 2021-01-15_07:45:11 245063 docs/commandref_modular_DE.html
+UPD 2021-01-16_07:45:10 234304 docs/commandref_modular.html
+UPD 2021-01-16_07:45:11 245063 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
