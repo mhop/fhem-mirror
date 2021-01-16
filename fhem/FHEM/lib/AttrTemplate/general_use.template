@@ -127,3 +127,53 @@ setreading DEVICE_CH8 associatedWith DEVICE,DEVICE_CH1,DEVICE_CH2,DEVICE_CH3,DEV
 
 option:{1}
 show DEVICE.*
+
+
+##################
+## MQTT_GENERIC_BRIDGE section
+## 
+name:mgb_thermostat
+prereq:{my @devices=devspec2array("TYPE=dummy");return 1 if $devices[0];return 0}
+filter:TYPE=dummy
+desc:This template is a first showcase for use of AttrTemplate in MQTT_GENERIC_BRIDGE usage context.<br>NOTE: Early testing version, see https://forum.fhem.de/index.php/topic,117423.0.html for details.<br>Might still need some changes!
+order:A_10000
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:RADIO_SENDNOREADINGS;Do not send any readings from device to MQTT server;{ undef }
+par:RADIO_SENDBASICREADINGS;Send only basic readings (desired-temp and temperature) to MQTT server;{ undef }
+par:RADIO_SENDALLREADINGS;Send all Readings from device to MQTT server (not recommended);{ undef }
+par:MQTTPREFIX;prefix used in MGB (soll später aus dem aufrufenden Device automatisch ermittelt werden);{ my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");;return undef if !$devices[0];;InternalVal($devices[0],'prefix',undef) } 
+par:TRGETDEVTYPE;TYPE of target device;{ InternalVal("TARGETDEV",'TYPE',undef) }
+
+option:global
+set DEVICE attrTemplate mgb_thermostat_with_params \TARGETDEV=TARGETDEV \TRGETDEVTYPE=TRGETDEVTYPE SENDNOREADINGS=RADIO_SENDNOREADINGS SENDBASICREADINGS=RADIO_SENDBASICREADINGS SENDALLREADINGS=RADIO_SENDALLREADINGS \MQTTPREFIX=MQTTPREFIX
+
+
+name:mgb_thermostat_with_params
+order:A_10000w
+prereq:{my @devices=devspec2array("TYPE=dummy");return 1 if $devices[0];return 0}
+filter:NAME=mgbTesting
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:SENDNOREADINGS;Do not send any readings from device to MQTT server;{ 0 }
+par:SENDBASICREADINGS;Send only basic readings (desired-temp and temperature) to MQTT server;{ 0 }
+par:SENDALLREADINGS;Send all Readings from device to MQTT server (not recommended);{ 0 }
+par:MQTTPREFIX;prefix used in MGB (soll später aus dem aufrufenden Device automatisch ermittelt werden);{ my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return undef if !$devices[0];InternalVal($devices[0],'prefix',undef) } 
+par:TRGETDEVTYPE;TYPE of target device;{ InternalVal("TARGETDEV",'TYPE',undef) }
+
+attr TARGETDEV MQTTPREFIXSubscribe desired-temp:stopic={"$base/$name"}
+
+option:{SENDNOREADINGS}
+deleteattr TARGETDEV MQTTPREFIXPublish 
+
+option:{ SENDBASICREADINGS && "TRGETDEVTYPE" eq "ZWave" }
+attr TARGETDEV MQTTPREFIXPublish desired-temp|temperature:topic={"$base/$name"} temperature:expression={$value=~m,(-?\d+(\.\d+)?),?::round($1,1):undef}
+
+option:{ SENDBASICREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
+attr TARGETDEV MQTTPREFIXAlias pub:measured-temp=temperature 
+attr TARGETDEV MQTTPREFIXPublish desired-temp|measured-temp:topic={"$base/$name"}
+
+option:{ SENDALLREADINGS && "TRGETDEVTYPE" eq "ZWave" }
+attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$name"} temperature:expression={$value=~m,(-?\d+(\.\d+)?),?::round($1,1):undef}
+
+option:{ SENDALLREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
+attr TARGETDEV MQTTPREFIXAlias pub:measured-temp=temperature 
+attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$name"}
