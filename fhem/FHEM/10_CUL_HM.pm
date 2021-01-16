@@ -309,7 +309,7 @@ sub CUL_HM_updateConfig($){##########################
 
       next;
     }
-    CUL_HM_ID2PeerList($name,"",1); # update peerList out of peerIDs
+    CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
     CUL_HM_getMId($hash); # need to set regLst in helper
     
     my $chn = substr($id."00",6,2);
@@ -537,7 +537,7 @@ sub CUL_HM_updateConfig($){##########################
     CUL_HM_SetList($name,"") if (!defined $defs{$name}{helper}{cmds}{cmdLst});
     CUL_HM_qStateUpdatIfEnab($name) if($hash->{helper}{role}{dev});
     next if (0 == (0x07 & CUL_HM_getAttrInt($name,"autoReadReg")));
-    if(CUL_HM_peerUsed($name) == 2){
+    if(CUL_HM_getPeers($name,"Config") == 2){
       CUL_HM_qAutoRead($name,1);
     }
     else{
@@ -582,6 +582,10 @@ sub CUL_HM_Define($$) {##############################
     $hash->{helper}{role}{chn} = 1;
     delete $hash->{helper}{mId};
     if($chn eq "01"){
+      if (defined $devHash->{helper}{peerIDsH}){
+        $hash->{helper}{peerIDsH}      = $devHash->{helper}{peerIDsH} ;
+        $hash->{helper}{peerIDsState}  = $devHash->{helper}{peerIDsState};
+      }
       $attr{$name}{peerIDs}            = AttrVal($devName, "peerIDs", "peerUnread");
       $hash->{READINGS}{peerList}{VAL} = ReadingsVal($devName,"peerList","peerUnread");
       $hash->{peerList}                = $devHash->{peerList} if($devHash->{peerList});
@@ -591,6 +595,8 @@ sub CUL_HM_Define($$) {##############################
       delete $devHash->{peerList};
       delete $devHash->{READINGS}{peerList};
       delete $attr{$devName}{peerIDs};
+      delete $devHash->{helper}{peerIDsH};
+      delete $devHash->{helper}{peerIDsState};
     }
   }
   else{# define a device
@@ -680,9 +686,9 @@ sub CUL_HM_Rename($$$) {#############################
     foreach my $pId (keys %{$modules{CUL_HM}{defptr}}){#all devices for peer
       my $pH = $modules{CUL_HM}{defptr}{$pId};
       my $pN = $pH->{NAME};
-      my $pPeers = AttrVal($pN, "peerIDs", "");
-      if ($pPeers =~ m/$HMidCh/){
-        CUL_HM_ID2PeerList ($pN,"x",0);
+
+      if (defined $hash->{helper}{peerIDsH}{$HMidCh}){
+        CUL_HM_Attr("set",$pN,"peerIDs",$attr{$pN}{peerIDs}) if (defined $attr{$pN}{peerIDs});# set attr again to update namings
         foreach my $pR (grep /(-|\.)$oldName(-|$)/,keys%{$pH->{READINGS}}){#update reading of the peer
           my $pRn = $pR;
           $pRn =~ s/$oldName/$name/;
@@ -848,21 +854,16 @@ sub CUL_HM_Attr(@) {#################################
   elsif($attrName eq "peerIDs"){
     if ($cmd eq "set"){
       return "$attrName not usable for devices" if(!$hash->{helper}{role}{chn});
-      my @peers = split(',',$attrVal);
-      foreach (split(',',$attrVal)){
-        return "$attrName val:$attrVal element $_ not a peerID. User (peerUnread|[0-9a-fA-Fx]{8})" if($_ !~ m/^(peerUnread|[0-9a-fA-Fx]{8})$/);
-      }
-      return "$attrName val:$attrVal invalid. peerUnread invalid if peers are assigned" if($attrVal =~ m/peerUnread/ && $attrVal ne "peerUnread");
-      my $id = $hash->{DEF};
-      if ($id ne $K_actDetID && $attrVal){# if not action detector
-        my @ids = grep /......../,split(",",$attrVal);
-        $attr{$name}{peerIDs} = join",",@ids if (@ids);
-        CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
+      my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
+      if ($hash->{DEF} ne $K_actDetID && $attrVal){# if not action detector
+        return "new $attrName val:$attrVal element $_ not a peerID. User (peerUnread|[0-9a-fA-Fx]{8})" if(grep!/^(peerUnread|[0-9a-fA-Fx]{8})$/,split(",",$attrVal));
+        CUL_HM_ID2PeerList($name,$_,1) foreach("peerUnread",split(",",$attrVal));#first clear, then setup
       }
     }
     else{# delete
       delete $hash->{peerList};
       delete $hash->{READINGS}{peerList};
+      CUL_HM_ID2PeerList($name," ","clear");
     }
   }
   elsif($attrName eq "msgRepeat"){
@@ -1639,11 +1640,11 @@ sub CUL_HM_Parse($$) {#########################################################
         }
         delete $mh{devH}->{cmdStacAESPend};          
 
-        my @peers = grep !/00000000/,split(",",AttrVal($cName,"peerIDs",""));
+        my @peers = CUL_HM_getPeers($cName,"IDs");
         foreach my $peer (grep /$mh{dst}/,@peers){
           my $pName = CUL_HM_id2Name($peer);
           $pName = CUL_HM_id2Name(substr($peer,0,6)) if (!$defs{$pName});
-          next if (!$defs{$pName});#||substr($peer,0,6) ne $mh{dst}
+          next if (!$defs{$pName});
           push @evtEt,[$defs{$pName},1,"trig_aes_$cName:$aesStat:$bCnt"];
         }
       }
@@ -3113,7 +3114,7 @@ sub CUL_HM_Parse($$) {#########################################################
         next if (!$modules{CUL_HM}{defptr}{$dChId});
         my $dChNo = substr($dChId,6,2);
         my $dChName = CUL_HM_id2Name($dChId);
-        if(($attr{$dChName}{peerIDs} ? $attr{$dChName}{peerIDs} : "peerUnread") =~ m/$recId/){
+        if(AttrVal($dChName,"peerIDs","peerUnread") =~ m/$recId/){
           my $dChHash = $defs{$dChName};
           $sendAck = 1;
           $dChHash->{helper}{trgLgRpt} = 0
@@ -3538,11 +3539,11 @@ sub CUL_HM_parseCommon(@){#####################################################
           if ($reqPeer){
             my $flag = 'A0';
             my $ioId = CUL_HM_IoId($mhp->{devH});
-            my @peerID = split(",",(AttrVal($chnName,"peerIDs","")));
+            my @peerID = CUL_HM_getPeers($chnName,"IDs");
             foreach my $l (split ",",$chnhash->{helper}{getCfgListNo}){
               next if (!$l);
               my $listNo = "0".$l;
-              foreach my $peer (grep (!/00000000/,@peerID)){
+              foreach my $peer (@peerID){
                 next if ($peer =~ m/0x$/ || $peer eq "unread");
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
@@ -3747,19 +3748,17 @@ sub CUL_HM_parseCommon(@){#####################################################
     }
     push @evtEt,[$mhp->{cHash},1,"trigger_cnt:$cnt"];
 
-    my $peerIDs = AttrVal($mhp->{cName},"peerIDs","");
-    if ($peerIDs =~ m/$mhp->{dst}/){# dst is available in the ID list
-      foreach my $peer (grep /^$mhp->{dst}/,split(",",$peerIDs)){
-        my $pName = CUL_HM_id2Name($peer);
-        $pName = CUL_HM_id2Name($mhp->{dst}) if (!$pName || !$defs{$pName}); #$dst - device-id of $peer
-        next if (!$pName || !$defs{$pName});
-        push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:".(ucfirst($level))."_$cnt"];
-        push @evtEt,[$defs{$pName},1,"trigLast:$mhp->{cName}".(($level ne "-")?":$level":"")];
+    my $peersFound = 0;
+    foreach my $pName (CUL_HM_getPeers($mhp->{cName},"Name:$mhp->{dst}")){
+      next if (!$pName || !$defs{$pName});
+      push @evtEt,[$defs{$pName},1,"trig_$mhp->{cName}:".(ucfirst($level))."_$cnt"];
+      push @evtEt,[$defs{$pName},1,"trigLast:$mhp->{cName}".(($level ne "-")?":$level":"")];
 
-        CUL_HM_stateUpdatDly($pName,10) if ($mhp->{mTp} eq "40");#conditional request may not deliver state-req
-      }
+      CUL_HM_stateUpdatDly($pName,10) if ($mhp->{mTp} eq "40");#conditional request may not deliver state-req
+      $peersFound = 1;
     }
-    elsif($mhp->{mFlgH} & 2 # dst can be garbage - but not if answer request
+    if(!$peersFound
+          && ($mhp->{mFlgH} & 2) # dst can be garbage - but not if answer request
           && (  !$mhp->{dstH} 
               || $mhp->{dst} ne CUL_HM_IoId($mhp->{dstH}))
           ){
@@ -3834,7 +3833,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     my $err = hex(substr($p,0,2));
     push @evtEt,[$sHash,1,"teamCall:from $dName:$trgCnt"];
     push @evtEt,[$dHash,1,"battery:"   .(($err&0x80) ? "low":"ok")] if (!$dHash->{helper}{role}{vrt});
-    foreach (split ",",$attr{$sName}{peerIDs}){
+    foreach (keys %{$sHash->{helper}{peerIDsH}}){
       my $tHash = CUL_HM_id2Hash($_);
       push @evtEt,[$tHash,1,"teamCall:from $dName:$trgCnt"];
     }
@@ -3862,7 +3861,7 @@ sub CUL_HM_parseSDteam(@){#handle SD team events
     push @evtEt,[$sHash,1,"eventNo:".$No];
     push @evtEt,[$sHash,1,"smoke_detect:".$smokeSrc];
 
-    foreach (split ",",$attr{$sName}{peerIDs}){
+    foreach (keys %{$sHash->{helper}{peerIDsH}}){
       my $tHash = CUL_HM_id2Hash($_);
       push @evtEt,[$tHash,1,"state:$sProsa"];
       push @evtEt,[$tHash,1,"smoke_detect:$smokeSrc"];
@@ -3897,7 +3896,7 @@ sub CUL_HM_parseSDteam_2(@){#handle SD team events
     return ();# duplicate alarm
   }
   my ($sVal,$sProsa,$smokeSrc) = (hex($state),"off","none");
-  my @tHash = ((map{CUL_HM_id2Hash($_)} grep !/00000000/, split ",",$attr{$sName}{peerIDs})
+  my @tHash = ((map{CUL_HM_id2Hash($_)} grep !/00000000/, keys %{$sHash->{helper}{peerIDsH}})
                ,$sHash);
   
   if ($sVal > 179 ||$sVal <51 ){# need to raise alarm
@@ -3940,8 +3939,8 @@ sub CUL_HM_updtSDTeam(@){#in: TeamName, optional caller name and its new state
   ($sName,$sState) = ("","") if (!$sName || !$sState);
   return undef if (ReadingsVal($name,"state","off") =~ m/smoke-Alarm/);
   my $dStat = "off";
-  foreach my $pId(split(',',AttrVal($name,"peerIDs",""))){#screen teamIDs for Alarm
-    my $pNam = (($pId && $pId ne "00000000") ? CUL_HM_id2Name(substr($pId,0,6)) : "");
+  foreach my $pId(CUL_HM_getPeers($name,"IDs")){#screen teamIDs for Alarm  
+    my $pNam = CUL_HM_id2Name(substr($pId,0,6));
     next if (!$pNam ||!$defs{$pNam});
     my $pStat = ($pNam eq $sName)
                   ?$sState
@@ -4440,7 +4439,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
-    $hash->{helper}{cmds}{lst}{peer} = join",",sort grep/./,split",",InternalVal($name,"peerList","");
+    $hash->{helper}{cmds}{lst}{peer} = join",",sort CUL_HM_getPeers($name,"Names");
     if (grep /^press:/,@arr1){
       if ($roleV){
         push @arr1,"pressS:[(-peer-|{all})]";
@@ -4520,7 +4519,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         if ($modules{CUL_HM}{helper}{updating});
   my $act     = join(" ", @a[1..$#a]);
   my $name    = $hash->{NAME};
-  return "" if (CUL_HM_getAttrInt($name,"ignore"));
+  return "" if (!defined $name || CUL_HM_getAttrInt($name,"ignore"));
   my $devName = InternalVal($name,"device",$name);
   my $st      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{st}   : AttrVal($devName, "subType", "");
   my $md      = defined $defs{$devName}{helper}{mId} ? $culHmModel->{$defs{$devName}{helper}{mId}}{name} : AttrVal($devName, "model"  , "");
@@ -6004,9 +6003,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $msg = '8'.($mCmd{$mode}).$chn;
     $msg .= sprintf("%02X",$temp) if ($temp);
     $msg .= $party if ($party);
-    my @teamList = ( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
-                    ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
-                    ,CUL_HM_name2Id($name)                                                             # myself
+    my @teamList = ( CUL_HM_getPeers(CUL_HM_id2Name($dst."05"),"IDs") # peers of RT team 
+                    ,CUL_HM_getPeers(CUL_HM_id2Name($dst."02"),"IDs") # peers RT/TC team
+                    ,CUL_HM_name2Id($name)                            # myself
                     );
     foreach my $tId (@teamList){
       my $teamC = CUL_HM_id2Name($tId);
@@ -6032,9 +6031,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       my $idTch = ($md =~ m/^HM-CC-RT-DN/ ? $dst."05" : $dst."02");
       my @teamList = ( CUL_HM_name2Id($name)                                      # myself
                       );
-      push @teamList,( split(",",AttrVal(CUL_HM_id2Name($dst."05"),"peerIDs","")) # peers of RT team
-                      ,split(",",AttrVal(CUL_HM_id2Name($dst."02"),"peerIDs","")) # peers RT/TC team
-                      ) if($md =~ m/^HM-CC-RT-DN/) ;
+      push @teamList,( CUL_HM_getPeers(CUL_HM_id2Name($dst."05"),"IDs") # peers of RT team
+                      ,CUL_HM_getPeers(CUL_HM_id2Name($dst."02"),"IDs") # peers RT/TC team
+                     ) if($md =~ m/^HM-CC-RT-DN/) ;
       foreach my $tId (grep !/00000000/,@teamList){
         $tId = substr($tId,0,6);
         my $teamD = CUL_HM_id2Name($tId);
@@ -6165,7 +6164,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
         $attr{$devName}{msgRepeat} = 0;#force no repeat
         if ($cmd eq "valvePos"){
-          my @pId = grep !/^$/,split(',',AttrVal($name,"peerIDs",""));
+          my @pId = CUL_HM_getPeers($name,"IDs");
           return "virtual TC support one VD only. Correct number of peers"
             if (scalar @pId != 1);
           my $ph = CUL_HM_id2Hash($pId[0]);
@@ -6327,7 +6326,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       $peer = ".*" if ($peer eq "all");
       my @peerLchn = map{CUL_HM_name2Id($_)}
                      grep/$peer/,
-                     split(',',InternalVal($name,"peerList",""));
+                     CUL_HM_getPeers($name,"Names");
       my @peerList = grep !/000000/,grep !/^$/
                  ,CUL_HM_noDup(map{substr($_,0,6)} @peerLchn); # peer device IDs - clean
 
@@ -6397,8 +6396,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
       return "condition $a[3] out of range. limit to 0..255" if ($a[3]<0 || $a[3]>255);
     }
     my @peers = ();
-    foreach my $peerItem (grep/$peer/,split",",InternalVal($name,"peerList","")){
-      if($defs{$peerItem}{helper}{role}{vrt}){
+    foreach my $peerItem (grep/$peer/,CUL_HM_getPeers($name,"Names")){
+      if   ($defs{$peerItem}{helper}{role}{vrt}){
       }
       elsif($defs{$peerItem}{helper}{role}{chn}){
         push @peers,$peerItem;  
@@ -6453,7 +6452,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
     $hash->{helper}{count}=$pressCnt;# remember for next round
 
-    my @peerLChn = split(',',AttrVal($name,"peerIDs",""));
+    my @peerLChn = CUL_HM_getPeers($name,"IDs");
     my @peerDev;
     push (@peerDev,substr($_,0,6)) foreach (@peerLChn);
     @peerDev = CUL_HM_noDup(@peerDev);#only once per device!
@@ -6740,10 +6739,9 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         CUL_HM_ID2PeerList ($btnName,$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn},$set); #upd. peerlist
       }
       else{
-        my $pl = AttrVal($PInfo{$myNo}{name},"peerIDs","leer");
-        my $pId = $PInfo{$pNo}{DId}.$PInfo{$pNo}{chn};
-        if(  ($pl =~ m/$pId/ &&  $set)
-           ||($pl !~ m/$pId/ && !$set) ){ # already peered or removed - skip
+        my $pl = scalar (CUL_HM_getPeers($PInfo{$myNo}{name},"ID:".$PInfo{$pNo}{DId}.$PInfo{$pNo}{chn}));
+        if(  ( $pl &&  $set)
+           ||(!$pl && !$set) ){ # already peered or removed - skip
           Log3 $name,2,"peering skip - already done:$PInfo{$pNo}{name} to $PInfo{$myNo}{name}";
           next;
         }
@@ -7498,7 +7496,9 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
         delete $chnhash->{READINGS}{peerList};#empty old list
         delete $chnhash->{peerList};#empty old list
         delete $chnhash->{helper}{peerIDsRaw};
-        $attr{$chnhash->{NAME}}{peerIDs} = '';
+        $attr{$chnhash->{NAME}}{peerIDs} = 'peerUnread';
+        my %peerIDsH;
+        $chnhash->{helper}{peerIDsH} = \%peerIDsH;
       }
       elsif($sTp eq "04"){ #RegisterRead-------
         my ($peer, $list) = unpack 'A8A2',$dat;
@@ -8132,37 +8132,48 @@ sub CUL_HM_protState($$){
 ################### Peer Handling ################
 sub CUL_HM_ID2PeerList ($$$) { # {CUL_HM_ID2PeerList ("lvFrei","12345678",1)}
   my($name,$peerID,$set) = @_;
-  $peerID = ' ' if (!defined($peerID) || $peerID eq '');  # no peer
-  $peerID =~ s/^000000../00000000/;  #correct end detector
-
-  my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
-  my $peerIDs = AttrVal($name,"peerIDs","peerUnread");
-  $peerIDs =~ s/(peerUnread|$peerID)//g;            #avoid duplicate, support unset
-  $peerIDs.= ",$peerID" if($set);
-
-  my %tmpHash   = map { $_ => 1 } grep/^[0-9A-Fx]{8}$/,split(",",$peerIDs);#remove duplicates
-  $peerIDs      = join(",",sort(keys %tmpHash)).',';
-  my $peerNames = join(",",map{CUL_HM_peerChName($_,$dId)} sort(grep !/00000000/,keys %tmpHash));
+  
+  my $peerHash = $defs{$name}{helper};
+  my $peerIDsH = $defs{$name}{helper}{peerIDsH};
+  if($peerID eq "peerUnread"){
+    my %peerH;
+    $peerHash->{peerIDsH} = \%peerH;
+  }
+  elsif (!defined($peerID) || $peerID eq '' || $peerID !~ m/^[0-9a-fA-Fx]{8}$/){ #ignore - perform status update
+  }
+  else{
+      $peerID = "00000000" if($peerID =~ m/^000000..$/);
+      if($set){
+        $peerIDsH->{$peerID} = CUL_HM_peerChName($peerID,substr(CUL_HM_name2Id($name),0,6));
+      }
+      else {
+        delete $peerIDsH->{$peerID};
+      }
+  }
+  if   (defined $peerIDsH->{"00000000"}) {$peerHash->{peerIDsState} = "complete";}
+  elsif(keys %{$peerIDsH})               {$peerHash->{peerIDsState} = "incomplete";}
+  else                                   {$peerHash->{peerIDsState} = "peerUnread";}
+  
+  my $peerIDs   = join(",",sort(CUL_HM_getPeers($name,"IDsRaw")));
+  my $peerNames = join(",",sort(CUL_HM_getPeers($name,"Names" )));
   $attr{$name}{peerIDs} = $peerIDs ? $peerIDs : "peerUnread";                 # make it public
 
-  my $hash = $defs{$name};
+  my $hash  = $defs{$name};
   my $dHash = CUL_HM_getDeviceHash($hash);
-  my $st = AttrVal($dHash->{NAME},"subType","");
-  my $md = AttrVal($dHash->{NAME},"model","");
-  my $chn = InternalVal($name,"chanNo","");
-  if ($peerNames){
-    $peerNames =~ s/_chn-01//g; # channel 01 is part of device
+  my $st    = AttrVal($dHash->{NAME},"subType","");
+  my $md    = AttrVal($dHash->{NAME},"model","");
+  my $chn   = InternalVal($name,"chanNo","");
+  if ($peerNames && $peerNames ne " "){
     $peerNames =~ s/_chn-01//g; # channel 01 is part of device
     CUL_HM_UpdtReadSingle($hash,"peerList",$peerNames,0);
     $hash->{peerList} = $peerNames;
     if ($st eq "virtual"){
       #if any of the peers is an SD we are team master
       my ($tMstr,$tcSim,$thSim) = (0,0,0);
-      foreach (split(",",$peerNames)){
+      foreach (CUL_HM_getPeers($name,"Names" )){
         if(AttrVal($_,"subType","") eq "smokeDetector"){#have smoke detector
           $tMstr = AttrVal($_,"model","") eq "HM-SEC-SD-2"? 2:1;#differentiate SD and SD2
         }
-        
         $tcSim = 1 if(AttrVal($_,"model","")   =~ m/^(HM-CC-VD|ROTO_ZEL-STG-RM-FSA)/);
         my $pch = (substr(CUL_HM_name2Id($_),6,2));
         $thSim = 1 if(AttrVal($_,"model","")   =~ m/^HM-CC-RT-DN/ && $pch eq "01");
@@ -8183,8 +8194,8 @@ sub CUL_HM_ID2PeerList ($$$) { # {CUL_HM_ID2PeerList ("lvFrei","12345678",1)}
       if(!$tMstr)  {delete $hash->{sdTeam};}      
     }
     elsif ($st eq "smokeDetector"){
-      foreach (split(",",$peerNames)){
-        my $tn = ($_ =~ m/self/)?$name:$_;
+      foreach (grep !/broadcast/,values %{$peerIDsH}){
+        my $tn = ($_ =~ m/self/) ? $name : $_;
         next if (!$defs{$tn});
         $defs{$tn}{helper}{fkt} = "sdLead".(AttrVal($name,"model","") eq "HM-SEC-SD-2"? 2:1);
         $defs{$tn}{sdTeam}      = "sdLead" ;
@@ -8561,7 +8572,7 @@ sub CUL_HM_setAssotiat($) {##########################
   my $name = shift;
   my @list = (CUL_HM_getAssChnNames(CUL_HM_getDeviceName($name))
              ,CUL_HM_getDeviceName($name)
-             ,grep!/self/,split(",",InternalVal($name,"peerList","")));
+             ,CUL_HM_getPeers($name,"NamesExt"));
   CUL_HM_UpdtReadSingle($defs{$name},".associatedWith"
                        ,join(",",@list)
                        ,0);
@@ -8709,9 +8720,10 @@ sub CUL_HMTmplSetCmd($){
   my $devId = substr($defs{$name}{DEF},0,6);
   my %a;
   my %tpl;
-
-  my   @peers = map{CUL_HM_id2Name($_)}   grep !/^(00000000|peerUnread|$devId)/,split(",",AttrVal($name,"peerIDs",""));
-  push @peers,  map{"self".substr($_,-2)} grep /^$devId/                       ,split(",",AttrVal($name,"peerIDs",""));
+  my $helper = $defs{$name}{helper};
+  
+  my   @peers = map{$helper->{peerIDsH}{$_}} grep !/^(00000000|$devId)/,keys %{$helper->{peerIDsH}};
+  push @peers,  map{"self".substr($_,-2)}    grep /^$devId/            ,keys %{$helper->{peerIDsH}};
   foreach my $peer($peers[0],"0"){ 
     next if (!defined $peer);
     $peer = "self".substr($peer,-2) if($peer =~ m/^${name}_chn-..$/);
@@ -8879,7 +8891,6 @@ sub CUL_HM_updtRegDisp($$$) {
   $chn = (length($chn) == 8)?substr($chn,6,2):"";
   my @regArr = CUL_HM_getRegN($st,$md,$chn);
   my @changedRead;
-  
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X.",$listNo)
               .($peerId ? CUL_HM_peerChName($peerId,$devId) : "");
@@ -9221,6 +9232,47 @@ sub CUL_HM_getChnList($){ # get reglist assotiated with a channel
   return join(",",sort @chRl );
 }
 
+sub CUL_HM_getPeers($$)   { #return peering information - status and lists
+   my ($name,$type) = @_;
+   my $hashH = $defs{$name}{helper};
+   return () if(!defined $name || !defined $defs{$name}{DEF});
+   my ($devId,$chn) = unpack 'A6A2',$defs{$name}{DEF};
+
+   if    ($type eq "IDs"           ){return                             grep!/00000000/         ,keys%{$hashH->{peerIDsH}};}
+   elsif ($type eq "Names"         ){return map{$hashH->{peerIDsH}{$_}} grep!/00000000/         ,keys%{$hashH->{peerIDsH}};}#all peer names
+   elsif ($type eq "IDsExt"        ){return                             grep!/(00000000|$devId)/,keys%{$hashH->{peerIDsH}};}#only external peers
+   elsif ($type eq "IDsSelf"       ){return                             grep /$devId/           ,keys%{$hashH->{peerIDsH}};}#only own peers
+   elsif ($type eq "NamesExt"      ){return map{$hashH->{peerIDsH}{$_}} grep!/(00000000|$devId)/,keys%{$hashH->{peerIDsH}};}#all external names
+   elsif ($type eq "NamesSelf"     ){return map{$hashH->{peerIDsH}{$_}} grep /$devId/           ,keys%{$hashH->{peerIDsH}};}#all own names
+   elsif ($type eq "IDsRaw"        ){return                                                      keys%{$hashH->{peerIDsH}};}
+   elsif ($type eq "Status"        ){
+       return defined $hashH->{peerIDsH}{"00000000"} ? "complete" : "incomplete";
+       return "peerUnread" if(0 == scalar keys%{$hashH->{peerIDsH}});
+   }
+   elsif ($type eq "Config"        ){
+       # return 0: no peers expected 
+       #        1: peers expected, list valid 
+       #        2: peers expected, list invalid 
+       #        3: peers possible (virtuall actor)
+       return 0 if (!$hashH->{role}{chn});#device has no channels
+       return 3 if ($hashH->{role}{vrt});
+       my $mId = CUL_HM_getMId($defs{$name});
+       return 0 if (!$mId || !$culHmModel->{$mId});
+       my $cNo = hex(substr($defs{$name}{DEF}."01",6,2))."p"; #default to channel 01
+       foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
+         my ($l,$c) = split":",$ls;
+         if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
+             ||($c && $c =~ m/$cNo/       )){
+           return (defined $hashH->{peerIDsH}{"00000000"} ? 1 : 2);
+         }
+       }
+       return 0;
+   }
+   elsif ($type =~ m/^ID:(.{8})$/  ){return $hashH->{peerIDsH}{$1} if (defined $hashH->{peerIDsH}{$1});}
+   elsif ($type =~ m/^ID:(.{6})$/  ){return                             grep /$1../             ,keys%{$hashH->{peerIDsH}};}#peers for a device
+   elsif ($type =~ m/^Name:(.{6})$/){return map{$hashH->{peerIDsH}{$_}} grep /$1../             ,keys%{$hashH->{peerIDsH}};}#peers for a device
+   return ();
+}
 sub CUL_HM_getChnPeers($){ #which peertype am I
   my ($name) = @_;
   my $hash = $defs{$name};
@@ -9260,6 +9312,7 @@ sub CUL_HM_getChnPeerFriend($){ #which are my peerFriends
   
   if    ($peerOpt =~ m/4:/ )                       {push @chPopt,"peerAct","peerVirt"         ;}
   elsif ($peerOpt =~ m/3:/ )                       {push @chPopt,"peerSens","peerVirt"        ;}
+  elsif ($peerOpt eq "p:display" )                 {push @chPopt,"peerAct","peerVirt"         ;}
   elsif ($peerOpt eq "p:smokeDetector" )           {push @chPopt,"peerSD"                     ;}
   elsif ($peerOpt eq "-:virtual" && $chn eq "01" ) {push @chPopt,"peerSD","peerSens","peerAct";}
   elsif ($peerOpt eq "-:virtual"         )         {push @chPopt,"peerSens","peerAct"         ;}
@@ -9276,24 +9329,22 @@ sub CUL_HM_getChnPeerFriend($){ #which are my peerFriends
 sub CUL_HM_getPeerOption($){ #who are my friends
   my ($name)  = @_; 
   CUL_HM_calcPeerOptions() if(!$modules{CUL_HM}{helper}{peerOpt});
-  my $peerFriend = $defs{$name}{helper}{peerFriend};
-  return "" if (!$peerFriend);
-  my $modH = $modules{CUL_HM}{helper}{peerOpt};
 
   my %curPTmp;  
-  $curPTmp{$_} = $_              foreach(grep !/$name/,
+  if($defs{$name}{helper}{peerFriend}){
+      $curPTmp{$_} = $_              foreach(grep !/$name/,
                                          split(",",
                                          join(",",map{$modules{CUL_HM}{helper}{peerOpt}{$_}}
-                                                  split(",",$peerFriend))));
-
-  $curPTmp{$_} = "remove_".$_    foreach(split(",",InternalVal($name,"peerList","")));
-  delete $curPTmp{$_}            foreach (grep /self/,keys %curPTmp);
+                                                  split(",",$defs{$name}{helper}{peerFriend}))));
+  }
+  else{
+      $curPTmp{$_} = "remove_".$_    foreach(grep !/(broadcast|self)/,values %{$defs{$name}{helper}{peerIDsH}});
+  }
   
-  my @peers = values %curPTmp;
-  my @p1 = sort (grep/remove/,@peers);
-  my @p2 = sort (grep!/remove/,@peers);
+  my @peers = sort values %curPTmp;
   
-  return join(",",@p1,@p2);  
+  return join(",",(grep/remove/ ,@peers)   # offer remove first
+                 ,(grep!/remove/,@peers));  
 }
 sub CUL_HM_calcPeerOptions(){ # calculation peering options
   my @peerAct;     # normal actor
@@ -10544,36 +10595,16 @@ sub CUL_HM_getAttrInt($@){#return attrValue as integer
 
 #+++++++++++++++++ external use +++++++++++++++++++++++++++++++++++++++++++++++
 
-sub CUL_HM_peerUsed($) {# are peers expected?
-  # return 0: no peers expected 
-  #        1: peers expected, list valid 
-  #        2: peers expected, list invalid 
-  #        3: peers possible (virtuall actor)
-  my $name = shift;
-  my $hash = $defs{$name};
-  return 0 if (!$hash->{helper}{role}{chn});#device has no channels
-  return 3 if ($hash->{helper}{role}{vrt});
-
-  my $mId = CUL_HM_getMId($hash);
-  my $cNo = hex(substr($hash->{DEF}."01",6,2))."p"; #default to channel 01
-  return 0 if (!$mId || !$culHmModel->{$mId});
-  foreach my $ls (split ",",$culHmModel->{$mId}{lst}){
-    my ($l,$c) = split":",$ls;
-    if (  ($l =~ m/^(p|3|4)$/ && !$c )  # 3,4,p without chanspec
-        ||($c && $c =~ m/$cNo/       )){
-      return (AttrVal($name,"peerIDs","") =~ m/00000000/?1:2);
-    }
-  }
-}
 sub CUL_HM_reglUsed($) {# provide data for HMinfo
   my $name = shift;
+  return () if (!defined $name || !defined $defs{$name} || !defined $defs{$name}{DEF});
   my $hash = $defs{$name};
   my ($devId,$chn) =  unpack 'A6A2',$hash->{DEF}."01";
   return undef if (AttrVal(CUL_HM_id2Name($devId),"subType","") eq "virtual");
 
   my @pNames;
   push @pNames,CUL_HM_peerChName($_,$devId)
-             foreach (grep !/(00000000|x)/,split(",",AttrVal($name,"peerIDs","")));#dont check 'x' peers
+             foreach (grep !/(x)/,CUL_HM_getPeers($name,"IDs"));#dont check 'x' peers
 
   my @lsNo;
   my $mId = CUL_HM_getMId($hash);
@@ -10632,7 +10663,7 @@ sub CUL_HM_complConfig($;$)  {# read config if enabled and not complete
   if ($defs{$devN}{helper}{prt}{sProc} != 0){# we wait till device is idle. 
     CUL_HM_complConfigTest($name);           # requeue and wait patient
   }
-  elsif (CUL_HM_peerUsed($name) == 2){# 2: peer list incomplete
+  elsif (CUL_HM_getPeers($name,"Config") == 2){# 2: peer list incomplete
     CUL_HM_qAutoRead($name,0) if(!$dly);
     CUL_HM_complConfigTest($name);
     delete $modules{CUL_HM}{helper}{cfgCmpl}{$name};
@@ -10698,7 +10729,6 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
                               ? HMinfo_tempListDefFn()
                               : "./tempList.cfg";
   }
-  
   my ($err,@RLines) = FileRead($fName);
   return "file: $fName error:$err"  if ($err);
 #  return "file: $fName for $name does not exist"  if (!(-e $fName));
