@@ -220,6 +220,7 @@ my %DEVID_MODEL = (
 my %DEVID_PREFIX = (
     "SHPLG-S"  => "shelly_plug_s",
     "SHSW-PM"  => "shelly_1pm",
+    "SHSW-L"   => "shelly_1l",
     "SHSW-1"   => "shelly_1",
     "SHSW-21"  => "shelly_2",
     "SHSW-25"  => "shelly_25",
