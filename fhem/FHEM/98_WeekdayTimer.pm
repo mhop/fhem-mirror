@@ -56,6 +56,7 @@ BEGIN {
           readingsEndUpdate
           AttrVal
           ReadingsVal
+          ReadingsNum
           InternalVal
           Value
           IsWe
@@ -1047,7 +1048,8 @@ sub WeekdayTimer_Update {
   } else {
     $activeTimer = isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
     $activeTimerState = $activeTimer;
-    Log3( $hash, 4, "[$name] Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" ) if ( $activeTimer );
+    Log3( $hash, 4, "[$name] Update   - timer seems to be active today: ".join("",@$tage)."|$time|$newParam" ) if ( $activeTimer && (@$tage) );
+    Log3( $hash, 2, "[$name] Daylist is missing!") if !(@$tage);
   }
   #Log3 $hash, 3, "activeTimer------------>$activeTimer";
   #Log3 $hash, 3, "activeTimerState------->$activeTimerState";
@@ -1141,8 +1143,9 @@ sub checkDelayedExecution {
   my $epoch = $hash->{profil}{$time}{EPOCH};
   if (!$epoch) {                             #prevent FHEM crashing when profile is somehow damaged or incomlete, forum #109164
     my $actual_wp_reading = ReadingsVal($name,"weekprofiles","none");
-    Log3( $hash, 0, "[$name] profile $actual_wp_reading, item $time seems to be somehow damaged or incomlete!" );
+    Log3( $hash, 0, "[$name] profile $actual_wp_reading, item $time seems to be somehow damaged or incomplete!" );
     $epoch = int(time()) - 10*MINUTESECONDS;
+    readingsSingleUpdate( $hash, 'corrupt_wp_count', ReadingsNum($name,'corrupt_wp_count', 0) + 1, 1 );
   }
   my $delay = int(time()) - $epoch;
   my $nextDelay = int($delay/60.+1.5)*60;  # round to multiple of 60sec
@@ -1298,17 +1301,20 @@ sub WeekdayTimer_Switch_Device {
 
 ################################################################################
 sub getDaysAsHash {
-  my ($hash, $tage)  = @_;
+  my $hash = shift;
+  my $tage = shift //return {};
 
   my %days = map {$_ => 1} @$tage;
   delete @days{7,8};
 
-  return 'my $days={};map{$days->{$_}=1}'.'('.join (",", sort keys %days).')';
+  return 'my $days={};map{$days->{$_}=1}('.join (",", sort keys %days).')';
 }
 
 ################################################################################
 sub checkWDTCondition {
-  my ($hash, $tage, $overrulewday)  = @_;
+  my $hash = shift;
+  my $tage = shift // return 0;
+  my $overrulewday = shift;
 
   my $name = $hash->{NAME};
   Log3( $hash, 4, "[$name] condition:$hash->{CONDITION} - Tage:".join(",",@$tage) );
