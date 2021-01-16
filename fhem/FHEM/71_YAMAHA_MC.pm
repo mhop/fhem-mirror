@@ -4023,8 +4023,11 @@ sub YAMAHA_MC_httpRequestParse($$$) {
 						
 						Log3 $name, 4, "$type: $name YAMAHA_MC_httpRequestParse toggleRepeat Current=$currentRepeat";
 						if ( $currentRepeat eq "off" ) {
-						  readingsSingleUpdate( $hash, "repeat_status", "on", 1 );
+						  readingsSingleUpdate( $hash, "repeat_status", "all", 1 );
 						}	
+						elsif ( $currentRepeat eq "all" ) {
+						  readingsSingleUpdate( $hash, "repeat_status", "one", 1 );
+						}
 						else {
 						  readingsSingleUpdate( $hash, "repeat_status", "off", 1 );	
 						}  
