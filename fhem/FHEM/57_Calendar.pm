@@ -2056,7 +2056,7 @@ sub Calendar_Get($@) {
               $from *= -1;
             } else {
               $from  = DAYSECONDS - Calendar_GetSecondsFromMidnight();
-              $to    = $from + DAYSECONDS;
+              $to    = $from + DAYSECONDS - 1;
             }
             push @filters, { ref => \&filter_endafter, param => $t+$from };
             push @filters, { ref => \&filter_startbefore, param => $t+$to };

@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  57_Calendar: correct event selection for 
+                         limit:when=tomorrow (forum #97810)
  - feature: 36_ShellyModule: new module to interwork with 36_Shelly
  - bugfix:  98_WeekdayTimer: fix timer admin
  - change:  10_WS980: fix num vs. string
