@@ -21,11 +21,7 @@ MQTT2_SERVER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
-  $hash->{MatchList}= {
-    "1:MQTT2_DEVICE"  => "^.*",
-    "2:MQTT_GENERIC_BRIDGE" => "^.*"
-  };
+  MQTT2_SERVER_resetClients($hash);
   $hash->{ReadFn}  = "MQTT2_SERVER_Read";
   $hash->{DefFn}   = "MQTT2_SERVER_Define";
   $hash->{AttrFn}  = "MQTT2_SERVER_Attr";
@@ -40,6 +36,7 @@ MQTT2_SERVER_Initialize($)
     SSL:0,1
     autocreate:no,simple,complex
     clientId
+    clientOrder
     disable:1,0
     disabledForIntervals
     ignoreRegexp
@@ -51,6 +48,19 @@ MQTT2_SERVER_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+}
+
+sub
+MQTT2_SERVER_resetClients($)
+{
+  my ($hash) = @_;
+
+  $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
+  $hash->{MatchList}= {
+    "1:MQTT2_DEVICE"  => "^.",
+    "2:MQTT_GENERIC_BRIDGE" => "^."
+  };
+  delete($hash->{".clientArray"});
 }
 
 #####################################
@@ -146,6 +156,19 @@ MQTT2_SERVER_Attr(@)
     return "bad $devName ignoreRegexp: $re" if($re eq "1" || $re =~ m/^\*/);
     eval { "Hallo" =~ m/$re/ };
     return "bad $devName ignoreRegexp: $re: $@" if($@);
+  }
+
+  if($attrName eq "clientOrder") {
+    if($type eq "set") {
+      my @p = split(" ", $param[0]);
+      $modules{MQTT2_SERVER}{Clients} = ":".join(":",@p).":";
+      my $cnt = 1;
+      my %h = map { ($cnt++.":$_", "^.") } @p;
+      $modules{MQTT2_SERVER}{MatchList} = \%h;
+      delete($modules{MQTT2_SERVER}{".clientArray"}); # Force a recompute
+    } else {
+      MQTT2_SERVER_resetClients($modules{MQTT2_SERVER});
+    }
   }
 
   return undef;
@@ -643,6 +666,14 @@ MQTT2_SERVER_ReadDebug($$)
       capabilities are greatly reduced in this case, and setting it requires to
       remove the clientId from all existing MQTT2_DEVICE readingList
       attributes.
+      </li></br>
+
+    <a name="MQTT2_SERVERclientOrder"></a>
+    <li>clientOrder [MQTT2_DEVICE] [MQTT_GENERIC_BRIDGE]<br>
+      set the notification order for client modules. This is 
+      relevant when autocreate is active, and the default order
+      (MQTT2_DEVICE MQTT_GENERIC_BRIDGE) is not adequate.
+      Note: Changing the attribute affects _all_ MQTT2_SERVER instances.
       </li></br>
 
     <li><a href="#disable">disable</a><br>

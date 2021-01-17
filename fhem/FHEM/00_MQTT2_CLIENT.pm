@@ -20,11 +20,7 @@ MQTT2_CLIENT_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
-  $hash->{MatchList}= {
-    "1:MQTT2_DEVICE"  => "^.*",
-    "2:MQTT_GENERIC_BRIDGE" => "^.*"
-  };
+  MQTT2_CLIENT_resetClients($hash);
   $hash->{ReadFn}     = "MQTT2_CLIENT_Read";
   $hash->{DefFn}      = "MQTT2_CLIENT_Define";
   $hash->{AttrFn}     = "MQTT2_CLIENT_Attr";
@@ -39,6 +35,7 @@ MQTT2_CLIENT_Initialize($)
   my @attrList = qw(
     autocreate:no,simple,complex
     clientId
+    clientOrder
     disable:1,0
     disabledForIntervals
     disconnectAfter
@@ -59,6 +56,19 @@ MQTT2_CLIENT_Initialize($)
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList)." ".$readingFnAttributes;
+}
+
+sub
+MQTT2_CLIENT_resetClients($)
+{
+  my ($hash) = @_;
+
+  $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
+  $hash->{MatchList}= {
+    "1:MQTT2_DEVICE"  => "^.",
+    "2:MQTT_GENERIC_BRIDGE" => "^."
+  };
+  delete($hash->{".clientArray"});
 }
 
 #####################################
@@ -318,6 +328,20 @@ MQTT2_CLIENT_Attr(@)
         if(!$hash->{FD} && ($type ne "set" || $param[0] eq "0"));
     }, undef, 0);
   }
+
+  if($attrName eq "clientOrder") {
+    if($type eq "set") {
+      my @p = split(" ", $param[0]);
+      $modules{MQTT2_CLIENT}{Clients} = ":".join(":",@p).":";
+      my $cnt = 1;
+      my %h = map { ($cnt++.":$_", "^.") } @p;
+      $modules{MQTT2_CLIENT}{MatchList} = \%h;
+      delete($modules{MQTT2_CLIENT}{".clientArray"}); # Force a recompute
+    } else {
+      MQTT2_CLIENT_resetClients($modules{MQTT2_CLIENT});
+    }
+  }
+
 
   return undef;
 }
@@ -699,6 +723,14 @@ MQTT2_CLIENT_getStr($$)
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId. If not set, the name of the MQTT2_CLIENT instance
       is used, after deleting everything outside 0-9a-zA-Z
+      </li></br>
+
+    <a name="MQTT2_CLIENTclientOrder"></a>
+    <li>clientOrder [MQTT2_DEVICE] [MQTT_GENERIC_BRIDGE]<br>
+      set the notification order for client modules. This is 
+      relevant when autocreate is active, and the default order
+      (MQTT2_DEVICE MQTT_GENERIC_BRIDGE) is not adequate.
+      Note: Changing the attribute affects _all_ MQTT2_CLIENT instances.
       </li></br>
 
     <li><a href="#disable">disable</a><br>
