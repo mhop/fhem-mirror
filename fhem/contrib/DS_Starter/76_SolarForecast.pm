@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       76_SolarForecast.pm
 #
-#       (c) 2020 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
+#       (c) 2020-2021 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module is used by module 76_SMAPortal to create graphic devices.
 #       It can't be used standalone without any SMAPortal-Device.
@@ -34,15 +34,24 @@ use Time::HiRes qw(gettimeofday);
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;         ## no critic 'eval'
 use Encode;
 use utf8;
+eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # Debian: apt-get install libjson-perl
 
+use FHEM::SynoModules::SMUtils qw( evaljson  
+                                   moduleVersion
+                                 );                       # Hilfsroutinen Modul
+
+use Data::Dumper;                                 
+                                 
 # Run before module compilation
 BEGIN {
   # Import from main::
   GP_Import( 
       qw(
+          attr
           AnalyzePerlCommand
           AttrVal
           AttrNum
+          data
           defs
           delFromDevAttrList
           delFromAttrList
@@ -51,6 +60,9 @@ BEGIN {
           Debug
           fhemTimeLocal
           FmtDateTime
+          FileWrite
+          FileRead
+          FileDelete
           FmtTime
           FW_makeImage
           getKeyValue
@@ -102,6 +114,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.2.0"  => "use SMUtils, JSON, implement getter data,html,pvHistory ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -134,6 +147,13 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
   reset                   => { fn => \&_setreset                  },
   moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
+);
+
+my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+  data      => { fn => \&_getdata,          needcred => 0 },
+  html      => { fn => \&_gethtml,          needcred => 0 },
+  ftui      => { fn => \&_getftui,          needcred => 0 },
+  pvHistory => { fn => \&_getlistPVHistory, needcred => 0 },
 );
 
 my %htilt = (                                                               # Faktor für Neigungswinkel der Solarmodule
@@ -264,13 +284,15 @@ my %weather_ids = (
   '99' => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Graupel oder Hagel'                                  },
 );
 
-my @chours      = (5..21);                                                  # Stunden des Tages mit möglichen Korrekturwerten                              
-my $defpvme     = 16.52;                                                    # default Wirkungsgrad Solarmodule
-my $definve     = 98.3;                                                     # default Wirkungsgrad Wechselrichter
-my $kJtokWh     = 0.00027778;                                               # Umrechnungsfaktor kJ in kWh
-my $defmaxvar   = 0.5;                                                      # max. Varianz pro Tagesberechnung Autokorrekturfaktor
-my $definterval = 70;                                                       # Standard Abfrageintervall
-  
+my @chours      = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
+my $defpvme     = 16.52;                                                         # default Wirkungsgrad Solarmodule
+my $definve     = 98.3;                                                          # default Wirkungsgrad Wechselrichter
+my $kJtokWh     = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
+my $defmaxvar   = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
+my $definterval = 70;                                                            # Standard Abfrageintervall
+my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+
+
 ################################################################
 #               Init Fn
 ################################################################
@@ -282,8 +304,10 @@ sub Initialize {
   $hash->{DefFn}              = \&Define;
   $hash->{GetFn}              = \&Get;
   $hash->{SetFn}              = \&Set;
+  $hash->{DeleteFn}           = \&Delete;
   $hash->{FW_summaryFn}       = \&FwFn;
   $hash->{FW_detailFn}        = \&FwFn;
+  $hash->{ShutdownFn}         = \&Shutdown;
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
@@ -335,11 +359,38 @@ sub Define {
   my ($hash, $def) = @_;
 
   my @a = split(/\s+/x, $def);
+  
+  return "Error: Perl module ".$jsonabs." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($jsonabs);
 
+  my $name                       = $hash->{NAME};
+  my $type                       = $hash->{TYPE};
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                           # Modul Meta.pm nicht vorhanden
   
-  setVersionInfo  ($hash);                                                         # Versionsinformationen setzen
+  my $params = {
+      hash        => $hash,
+      notes       => \%vNotesIntern,
+      useAPI      => 0,
+      useSMUtils  => 1,
+      useErrCodes => 0
+  };
+  use version 0.77; our $VERSION = moduleVersion ($params);                        # Versionsinformationen setzen
+
   createNotifyDev ($hash);
+  
+  my $file              = $pvhcache.$name;
+  my ($error, @content) = FileRead ($file);                                        # Cache File der PV History lesen wenn vorhanden
+  
+  if(!$error) {
+      my $json    = join "", @content;
+      my $success = evaljson ($hash, $json);                               
+      
+      if($success) {
+           $data{$type}{$name}{pvhist} = decode_json ($json);
+      }
+      else {
+          Log3($name, 2, qq{$name - WARNING - the content of file "$file" is not readable and may be corrupt});
+      }
+  }
   
   readingsSingleUpdate($hash, "state", "initialized", 1); 
 
@@ -641,29 +692,80 @@ return;
 #                  SolarForecast Get
 ###############################################################
 sub Get {
- my ($hash, @a) = @_;
- return "\"get X\" needs at least an argument" if ( @a < 2 );
- my $name = shift @a;
- my $cmd  = shift @a;
+  my ($hash, @a) = @_;
+  return "\"get X\" needs at least an argument" if ( @a < 2 );
+  my $name = shift @a;
+  my $opt  = shift @a;
+  my $arg  = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
  
- my $getlist = "Unknown argument $cmd, choose one of ".
-               "data:noArg ".
-               "html:noArg ".
-               "ftui:noArg ";
-               
- if ($cmd eq "data") {
-     return centralTask ($hash);
- } 
-       
- if ($cmd eq "html") {
-     return pageAsHtml($hash);
- } 
+  my $getlist = "Unknown argument $opt, choose one of ".
+                "data:noArg ".
+                "html:noArg ".
+                "pvHistory:noArg "
+                ;
+                
+  return if(IsDisabled($name));
+  
+  my $params = {
+      hash  => $hash,
+      name  => $name,
+      opt   => $opt,
+      arg   => $arg
+  };
+  
+  if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
+      my $ret = q{}; 
+      if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {                
+          return qq{Credentials of $name are not set."};
+      }
+      $ret = &{$hget{$opt}{fn}} ($params);
+      return $ret;
+  }
+  
+return $getlist;
+}
+
+###############################################################
+#                       Getter data
+###############################################################
+sub _getdata {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+return centralTask ($hash);
+}
+
+###############################################################
+#                       Getter html
+###############################################################
+sub _gethtml {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+return pageAsHtml ($hash);
+}
+
+###############################################################
+#                       Getter ftui
+#                ohne Eintrag in Get-Liste
+###############################################################
+sub _getftui {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+return pageAsHtml ($hash,"ftui");
+}
+
+###############################################################
+#                       Getter listPVHistory
+###############################################################
+sub _getlistPVHistory {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
  
- if ($cmd eq "ftui") {
-     return pageAsHtml($hash,"ftui");
- } 
- 
-return;
+  my $ret = listPVHistory ($hash);
+                    
+return $ret;
 }
 
 ################################################################
@@ -726,6 +828,55 @@ sub Notify {
   my $events = deviceEvents($dev_hash, 1);  
   return if(!$events);
  
+return;
+}
+
+################################################################
+#                         Shutdown
+################################################################
+sub Shutdown {  
+  my $hash = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if($data{$type}{$name}{pvhist}) {                                                       # Cache File für PV History schreiben
+      my @pvh;
+      
+      my $json  = encode_json ($data{$type}{$name}{pvhist});
+      push @pvh, $json;
+      
+      my $file  = $pvhcache.$name;
+      my $error = FileWrite($file, @pvh);
+      if ($error) {
+          Log3 ($name, 2, qq{$name - ERROR writing cache file "$file": $error}); 
+      }
+  }  
+  
+return; 
+}
+
+#################################################################
+# Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
+# X_Undef aufgerufen um offene Verbindungen zu schließen, 
+# anschließend wird die Funktion X_Delete aufgerufen. 
+# Funktion: Aufräumen von dauerhaften Daten, welche durch das 
+# Modul evtl. für dieses Gerät spezifisch erstellt worden sind. 
+# Es geht hier also eher darum, alle Spuren sowohl im laufenden 
+# FHEM-Prozess, als auch dauerhafte Daten bspw. im physikalischen 
+# Gerät zu löschen die mit dieser Gerätedefinition zu tun haben. 
+#################################################################
+sub Delete {
+  my $hash  = shift;
+  my $arg   = shift;
+  my $name  = $hash->{NAME};
+  
+  my $file  = $pvhcache.$name;
+  my $error = FileDelete($file);                                                 # Cache File der PV History löschen
+  if ($error) {
+      Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
+  }
+      
 return;
 }
 
@@ -845,7 +996,12 @@ sub _transferDWDForecastValues {
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";               # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";               
+          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";         
+      }
+      
+      if($fd == 0 && sprintf("%02d",$fh) eq $chour) {
+          $paref->{calcpv} = $calcpv;
+          setPVhistory ($paref); 
       }
   }
       
@@ -926,7 +1082,7 @@ sub _transferInverterValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $t     = $paref->{t};
+  my $t     = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};  
 
@@ -962,17 +1118,18 @@ sub _transferInverterValues {
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
-  my $ethishour  = $etoday - $edaypast;
+  my $ethishour  = int ($etoday - $edaypast);
   
   if($chour !~ /^($tlim)$/x) {                                                                # nicht setzen wenn Stunde 23 des Tages
       if($ethishour < 0) {
-          push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:0 Wh";
+          $ethishour = 0;
       }
-      else {
-          push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:". $ethishour." Wh"; 
-      }
+      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:".$ethishour." Wh";
+      
+      $paref->{ethishour} = $ethishour;
+      setPVhistory ($paref);
   }  
-  
+    
 return;
 }
 
@@ -1939,6 +2096,8 @@ sub formatVal6 {
 sub weather_icon {
   my $id = shift;
 
+  $id    = int $id;
+  
   if(defined $weather_ids{$id}) {
       return $weather_ids{$id}{icon}, encode("utf8", $weather_ids{$id}{txtd});
   }
@@ -2083,6 +2242,59 @@ sub calcVariance {
   createReadingsFromArray ($hash, \@da, 1);
       
 return;
+}
+
+################################################################
+#   PV und PV Forecast in History-Hash speichern zur 
+#   Berechnung des Korrekturfaktors über mehrere Tage
+################################################################
+sub setPVhistory {               
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $t         = $paref->{t};                                                            # aktuelle Unix-Zeit
+  my $chour     = $paref->{chour};
+  my $ethishour = $paref->{ethishour};
+  my $calcpv    = $paref->{calcpv};
+  
+  my $type = $hash->{TYPE};  
+  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag                                                                    
+  
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);    # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);       # prognostizierter Energieertrag
+    
+return;
+}
+
+################################################################
+#           liefert aktuelle Einträge des PV Cache
+################################################################
+sub listPVHistory {                 
+  my $hash = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  my $sub = sub { 
+      my $day = shift;
+      my $ret;          
+      for my $key (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          $ret .= "\n      " if($ret);
+          $ret .= $key." => pvreal:".$data{$type}{$name}{pvhist}{$day}{$key}{pvrl}.", pvforecast:".$data{$type}{$name}{pvhist}{$day}{$key}{pvfc};
+      }
+      return $ret;
+  };
+        
+  if (!keys %{$data{$type}{$name}{pvhist}}) {
+      return qq{PV cache is empty.};
+  }
+  
+  my $sq;
+  for my $idx (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+      $sq .= $idx." => ".$sub->($idx)."\n";             
+  }
+      
+return $sq;
 }
 
 ################################################################
@@ -2399,6 +2611,15 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
       <a name="data"></a>
       <li><b>data </b> <br>  
       Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="pvHistory"></a>
+      <li><b>pvHistory </b> <br>  
+      Listet die PV Werte der letzten Tage sortiert nach dem Tagesdatum und der Stunde des jeweiligen Tages auf.
+      Dabei sind <b>pvreal</b> der reale und <b>pvforecast</b> der prognostizierte PV Ertrag.
       </li>      
     </ul>
     <br>
