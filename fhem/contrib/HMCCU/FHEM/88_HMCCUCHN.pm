@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUCHN.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.031
+#  Version 4.4.033
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -158,11 +158,9 @@ sub HMCCUCHN_InitDevice ($$)
 	$devHash->{ccutype}     = $dt;
 	$devHash->{ccudevstate} = 'active';
 	
-	# Initialize user attributes
-	HMCCU_SetSCAttributes ($ioHash, $devHash);
-
 	if ($init_done) {
 		# Interactive device definition
+		HMCCU_SetSCAttributes ($ioHash, $devHash);
 		HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
 		HMCCU_UpdateDevice ($ioHash, $devHash);
 		HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
@@ -219,29 +217,30 @@ sub HMCCUCHN_Rename ($$)
 sub HMCCUCHN_Attr ($@)
 {
 	my ($cmd, $name, $attrname, $attrval) = @_;
-	my $hash = $defs{$name};
+	my $clHash = $defs{$name};
+	my $ioHash = HMCCU_GetHash ($clHash);
 
 	if ($cmd eq 'set') {
 		return 'Missing attribute value' if (!defined($attrval));
 		if ($attrname eq 'IODev') {
-			$hash->{IODev} = $defs{$attrval};
+			$clHash->{IODev} = $defs{$attrval};
 		}
 		elsif ($attrname eq 'statevals') {
-			return 'Device is read only' if ($hash->{readonly} eq 'yes');
+			return 'Device is read only' if ($clHash->{readonly} eq 'yes');
 		}
-		elsif ($attrname eq 'statedatapoint') {
-			return "Datapoint $attrval is not valid" if ($init_done &&
-				!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr}, $attrval, 1));
-			$hash->{hmccu}{state}{dpt} = $attrval;
+		elsif ($attrname =~ /^(state|control)datapoint$/) {
+			return "Invalid value $attrval"
+				if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval));
 		}
-		elsif ($attrname eq 'controldatapoint') {
-			return "Datapoint $attrval is not valid" if ($init_done &&
-				!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $hash->{ccuaddr}, $attrval, 2));
-			$hash->{hmccu}{control}{dpt} = $attrval;
+	}
+	elsif ($cmd eq 'del') {
+		if ($attrname =~ /^(state|control)datapoint$/) {
+			# Reset value
+			HMCCU_SetSCDatapoints ($clHash, $attrname);
 		}
 	}
 
-	HMCCU_RefreshReadings ($hash) if ($init_done);
+#	HMCCU_RefreshReadings ($clHash) if ($init_done);
 
 	return undef;
 }
@@ -312,6 +311,12 @@ sub HMCCUCHN_Set ($@)
 	elsif ($lcopt =~ /^(config|values)$/) {
 		return HMCCU_ExecuteSetParameterCommand ($ioHash, $hash, $lcopt, $a, $h);
 	}
+	elsif ($lcopt =~ 'readingfilter') {
+		my $filter = shift @$a // return HMCCU_SetError ($hash, "Usage: set $name readingFilter {datapointList}");
+		$filter =~ s/,/\|/g;
+		$filter = '^('.$filter.')$';
+		return CommandAttr (undef, "$name ccureadingfilter $filter");
+	}
 	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
 		$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, ctrlChn => $cc });
@@ -326,6 +331,9 @@ sub HMCCUCHN_Set ($@)
 			my ($a, $c) = split(":", $hash->{ccuaddr});
 			my $dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 2);
 			$retmsg .= ' datapoint' if ($dpCount > 0);
+			my @dpList = ();
+			$dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, $c, 5, \@dpList);
+			$retmsg .= ' readingFilter:multiple-strict,'.join(',', @dpList) if ($dpCount > 0);
 			$retmsg .= " $cmdList" if ($cmdList ne '');
 		}
 		# return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
@@ -534,6 +542,10 @@ sub HMCCUCHN_Get ($@)
          Example: Turn dimmer on for 600 second. Increase light to 100% over 10 seconds<br>
          <code>set myswitch pct 100 600 10</code>
       </li><br/>
+		<li><b>set &lt;name&gt; readingFilter &lt;datapoint-list&gt;</b><br/>
+			Set attribute ccureadingfilter by selecting a list of datapoints. Parameter <i>datapoint-list</i>
+			is a comma seperated list of datapoints.
+		</li><br/>
       <li><b>set &lt;name&gt; stop</b><br/>
       	[blind] Set datapoint STOP of a channel to true. This command is only available, if the
       	channel contains a datapoint STOP.

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.037
+#  Version 4.4.040
 #
 #  (c) 2020 zap (zap01 <at> t-online <dot> de)
 #
@@ -98,6 +98,7 @@ sub HMCCUDEV_Define ($@)
 	$hash->{hmccu}{group}       = $h->{group} if (exists ($h->{group}));
 	$hash->{hmccu}{nodefaults}  = $init_done ? 0 : 1;
 	$hash->{hmccu}{semDefaults} = 0;
+	$hash->{hmccu}{forcedev}    = 0;
 
 	if (exists($h->{address})) {
 		return 'Option address not allowed' if ($init_done || $devspec ne 'virtual');
@@ -219,20 +220,19 @@ sub HMCCUDEV_InitDevice ($$)
 		$devHash->{ccutype}         = $dt;
 		$devHash->{hmccu}{channels} = $dc;
 
-		# Initialize user attributes
-		my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
-		HMCCU_SetSCAttributes ($ioHash, $devHash, $detect);
-
 		# Inform HMCCU device about client device
 		return 2 if (!HMCCU_AssignIODevice ($devHash, $ioHash->{NAME}));
 
 		$devHash->{ccudevstate} = 'active';
 
 		if ($init_done) {
+		# Initialize user attributes
+			my $detect = HMCCU_DetectDevice ($ioHash, $da, $di);
 			return "Specify option 'force' for HMCCUDEV or use HMCCUCHN instead (recommended). Command: define $name HMCCUCHN $detect->{defAdd}"
 				if (defined($detect) && $detect->{defMod} eq 'HMCCUCHN' && $devHash->{hmccu}{forcedev} == 0);
 			
 			# Interactive device definition
+			HMCCU_SetSCAttributes ($ioHash, $devHash, $detect);
 			HMCCU_AddDevice ($ioHash, $di, $da, $devHash->{NAME});
 			HMCCU_UpdateDevice ($ioHash, $devHash);
 			HMCCU_UpdateDeviceRoles ($ioHash, $devHash);
@@ -352,43 +352,46 @@ sub HMCCUDEV_Rename ($$)
 sub HMCCUDEV_Attr ($@)
 {
 	my ($cmd, $name, $attrname, $attrval) = @_;
-	my $hash = $defs{$name};
+	my $clHash = $defs{$name};
+	my $ioHash = HMCCU_GetHash ($clHash);
 
 	if ($cmd eq 'set') {
 		return "Missing value of attribute $attrname" if (!defined($attrval));
 		if ($attrname eq 'IODev') {
-			$hash->{IODev} = $defs{$attrval};
+			$clHash->{IODev} = $defs{$attrval};
 		}
 		elsif ($attrname eq 'statevals') {
-			return "Device is read only" if ($hash->{readonly} eq 'yes');
+			return "Device is read only" if ($clHash->{readonly} eq 'yes');
 		}
-		elsif ($attrname eq 'statechannel') {
-			$hash->{hmccu}{state}{chn} = $attrval;
-		}
-		elsif ($attrname eq 'statedatapoint') {
-			if ($attrval =~ /^([0-9]{1,2})\.(.+)/) {
-				$hash->{hmccu}{state}{chn} = $1;
-				$hash->{hmccu}{state}{dpt} = $2;
-			}
-			else {
-				$hash->{hmccu}{state}{dpt} = $attrval;
-			}
-		}
-		elsif ($attrname eq 'controlchannel') {
-			$hash->{hmccu}{control}{chn} = $attrval;
-		}
-		elsif ($attrname eq 'controldatapoint') {
-			if ($attrval =~ /^([0-9]{1,2})\.(.+)/) {
-				$hash->{hmccu}{control}{chn} = $1;
-				$hash->{hmccu}{control}{dpt} = $2;
-			}
-			else {
-				$hash->{hmccu}{control}{dpt} = $attrval;
+		elsif ($attrname =~ /^(state|control)(channel|datapoint)$/) {
+			return "Invalid value $attrval"
+				if (!HMCCU_SetSCDatapoints ($clHash, $attrname, $attrval));
+			if ($init_done && exists($clHash->{hmccu}{control}{chn}) && $clHash->{hmccu}{control}{chn} ne '') {
+				HMCCU_UpdateRoleCommands ($ioHash, $clHash, $clHash->{hmccu}{control}{chn});
+				HMCCU_UpdateAdditionalCommands ($ioHash, $clHash, $clHash->{hmccu}{control}{chn}, $clHash->{hmccu}{control}{dpt})
+					if (exists($clHash->{hmccu}{control}{dpt}) && $clHash->{hmccu}{control}{dpt} ne '');
 			}
 		}
 	}
+	elsif ($cmd eq 'del') {
+		if ($attrname =~ /^(state|control)(channel|datapoint)$/) {
+			# Reset value
+			HMCCU_SetSCDatapoints ($clHash, $attrname);
+			delete $clHash->{hmccu}{roleCmds}
+				if (exists($clHash->{hmccu}{roleCmds}) &&
+					(!exists($clHash->{hmccu}{control}{chn}) || $clHash->{hmccu}{control}{chn} eq ''));
+		}
+	}
 
-	HMCCU_RefreshReadings ($hash) if ($init_done);
+# 	if ($init_done && $attrname =~ /^(statechannel|controlchannel|statedatapoint|controldatapoint)$/) {
+# 		my ($sc, $sd, $cc, $cd, $sdCnt, $cdCnt) = HMCCU_GetSCDatapoints ($ioHash);
+# 		if ($cdCnt < 2) {
+# 			HMCCU_UpdateRoleCommands ($ioHash, $clHash, $cc);
+# 			HMCCU_UpdateAdditionalCommands ($ioHash, $clHash, $cc, $cd);
+# 		}
+# 	}
+
+# 	HMCCU_RefreshReadings ($clHash) if ($init_done);
 	
 	return;
 }
@@ -460,6 +463,11 @@ sub HMCCUDEV_Set ($@)
 	elsif ($lcopt =~ /^(config|values)$/) {
 		return HMCCU_ExecuteSetParameterCommand ($ioHash, $hash, $opt, $a, $h);
 	}
+	elsif ($lcopt =~ 'readingfilter') {
+		my $filter = shift @$a // return HMCCU_SetError ($hash, "Usage: set $name readingFilter {datapointList}");
+		$filter = join(';', map { (my $f = $_) =~ s/\.(.+)/\.\^$1\$/; $f } split(',', $filter));
+		return CommandAttr (undef, "$name ccureadingfilter $filter");
+	}
 	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
 		$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, ctrlChn => $cc });
@@ -474,6 +482,9 @@ sub HMCCUDEV_Set ($@)
 			$retmsg .= ' config';
 			my $dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 2);
 			$retmsg .= ' datapoint' if ($dpCount > 0);
+			my @dpList = ();
+			$dpCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 5, \@dpList);
+			$retmsg .= ' readingFilter:multiple-strict,'.join(',', @dpList) if ($dpCount > 0);
 			$retmsg .= " $cmdList" if ($cmdList ne '');
 		}
 		# return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
@@ -692,6 +703,11 @@ sub HMCCUDEV_Get ($@)
       <li><b>set &lt;name&gt; pct &lt;value;&gt; [&lt;ontime&gt; [&lt;ramptime&gt;]]</b><br/>
       	<a href="#HMCCUCHNset">see HMCCUCHN</a>
       </li><br/>
+		<li><b>set &lt;name&gt; readingFilter &lt;datapoint-list&gt;</b><br/>
+			Set attribute ccureadingfilter by selecting a list of datapoints. Parameter <i>datapoint-list</i>
+			is a comma seperated list of datapoints. The datapoints must be specifed in format
+			"channel-number.datapoint-name".
+		</li><br/>
       <li><b>set &lt;name&gt; &lt;statevalue&gt;</b><br/>
          State datapoint of a CCU device channel is set to 'statevalue'. State channel and state
          datapoint must be defined as attribute 'statedatapoint'. Values for <i>statevalue</i>

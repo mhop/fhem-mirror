@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.016
+#  Version 4.8.017
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.016';
+$HMCCU_CONFIG_VERSION = '4.8.017';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -38,6 +38,7 @@ $HMCCU_CONFIG_VERSION = '4.8.016';
 
 %HMCCU_DEF_ROLE = (
 	'ASIR' => 'ALARM_SWITCH_VIRTUAL_RECEIVER',
+	'FSM'  => 'SWITCH_VIRTUAL_RECEIVER',
 	'PSM'  => 'SWITCH_VIRTUAL_RECEIVER',
 	'SD'   => 'SMOKE_DETECTOR'
 );
@@ -92,6 +93,9 @@ $HMCCU_CONFIG_VERSION = '4.8.016';
 	},
 	'SWITCH' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
+	},
+	'SWITCH_TRANSMITTER' => {
+		F => 3, S => 'STATE', C => '', V => '', P => 1
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'STATE', C => 'STATE', V => 'on:true,off:false', P => 2
@@ -416,6 +420,9 @@ $HMCCU_CONFIG_VERSION = '4.8.016';
 		'STATE' => { '0' => 'ok', '1' => 'alarm', 'false' => 'ok', 'true' => 'alarm' }
 	},
 	'SWITCH' => {
+		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
+	},
+	'SWITCH_TRANSMITTER' => {
 		'STATE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on', 'off' => '0', 'on' => '1' },
 	},
 	'SWITCH_VIRTUAL_RECEIVER' => {

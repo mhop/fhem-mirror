@@ -1,2 +1,3 @@
+ - bugfix:  88_HMCCU.pm: Fixed some bugs. New command set readingFilter
  - bugfix:  88_HMCCU.pm: Fixed device detection bugs
 
