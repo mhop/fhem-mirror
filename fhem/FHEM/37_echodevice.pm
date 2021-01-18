@@ -2,6 +2,11 @@
 #
 ##############################################
 #
+# 2021.01.18 v0.2.6
+# - BUG:     item_shopping_delete,item_shopping_add,item_task_delete,item_task.add
+# - FEATURE: Unterstützung A23FPV4BT7FH68 Yamaha YAS-209 Soundbar
+#            Untersützung A265XOI9586NML Fire TV Stick 4K
+#
 # 2020.12.11 v0.2.5
 # - FEATURE: Text Kommando an Amazon schicken "set textcommand"
 #            Unterstützung A2WN1FJ2HG09UN Ultimate Alexa
@@ -439,7 +444,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.5";
+my $ModulVersion     = "0.2.6";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -1056,69 +1061,21 @@ sub echodevice_Set($@) {
 	# Listen
 	elsif($command eq "item_task_delete" ) {
 		return echodevice_getHelpText("no arg") if ( !defined($parameter) );
-		
-		my $json = JSON->new->utf8(1)->encode( {'type' => "TASK",
-												'text' => decode_utf8($parameter),
-										        'createdDate' => int(time),
-											    'itemId' => $hash->{helper}{"ITEMS"}{"TASK"}{"$parameter"},
-											    'complete' => "true",
-											    'deleted' => "true" } );
-
-		$json =~ s/\"true\"/true/g;
-		$json =~ s/\"false\"/false/g;
-		
-		my @TaskList = split(",",$TaskListe);
-		my $Result;
-		foreach my $TaskName (@TaskList) {if ($TaskName ne $parameter) {
-				if ($Result eq "" ){$Result = $TaskName;} else {$Result .= "," .$TaskName;}}
-		}
-		readingsBeginUpdate($hash);
-		
-		if ($Result eq "") {readingsBulkUpdate($hash, "list_SHOPPING_ITEM", "" , 1);}
-		else {readingsBulkUpdate($hash, "list_TASK", $Result , 1);}
-
-		readingsEndUpdate($hash,1);
-		
-		echodevice_SendCommand($hash,"item_task_delete",$json)
+		echodevice_SendCommand($hash,"item_task_delete",$parameter)
 	} 
 
 	elsif($command eq "item_shopping_delete" ) {
 		return echodevice_getHelpText("no arg") if ( !defined($parameter) );
-
-		my $json = JSON->new->utf8(1)->encode( { 'type' => "SHOPPING_ITEM",
-												 'text' => decode_utf8($parameter),
-										  'createdDate' => int(time),
-											   'itemId' => $hash->{helper}{"ITEMS"}{"SHOPPING_ITEM"}{"$parameter"},
-											 'complete' => "true",
-											 'deleted' => "true" } );
-
-		$json =~ s/\"true\"/true/g;
-		$json =~ s/\"false\"/false/g;
-		
-		my @ShoppList = split(",",$ShoppingListe);
-		my $Result;
-		foreach my $ShopName (@ShoppList) {
-			if ($ShopName ne $parameter) {if ($Result eq "" ){$Result = $ShopName;} else {$Result .= "," .$ShopName;}}
-		}
-
-		readingsBeginUpdate($hash);
-		
-		if ($Result eq "") {readingsBulkUpdate($hash, "list_SHOPPING_ITEM", "" , 1);}
-		else {readingsBulkUpdate($hash, "list_SHOPPING_ITEM", $Result , 1);}
-
-		readingsEndUpdate($hash,1);
-		
-		echodevice_SendCommand($hash,"item_shopping_delete",$json)
+		echodevice_SendCommand($hash,"item_shopping_delete",$parameter)
 	} 
 
 	elsif($command eq "item_task_add" ) {
 		return echodevice_getHelpText("no arg") if ( !defined($a[0]) );
-		my $json = JSON->new->utf8(1)->encode( { 'type' => "TASK",
-												 'text' => decode_utf8($parameter),
-										  'createdDate' => int(time),
-											   'itemId' => $hash->{helper}{"ITEMS"}{"TASK"}{"$parameter"},
-											 'complete' => "false",
-											 'deleted' => "false" } );
+													
+		my $json = JSON->new->utf8(1)->encode( {	'createdDateTime'	=> int(time),
+													'listId' 			=> $hash->{helper}{TO_DO_LIST_ID},
+													'completed' 		=> "false",
+													'value' 			=> decode_utf8($parameter) } );
 
 		$json =~ s/\"true\"/true/g;
 		$json =~ s/\"false\"/false/g;
@@ -1129,19 +1086,17 @@ sub echodevice_Set($@) {
 		if ($TaskListe eq "") {readingsBulkUpdate($hash, "list_TASK", $parameter , 1);}
 		else {readingsBulkUpdate($hash, "list_TASK", $parameter . "," . $TaskListe , 1); }
 		readingsEndUpdate($hash,1);
-		
+
 		echodevice_SendCommand($hash,"item_task_add",$json)
 	} 
 
 	elsif($command eq "item_shopping_add" ) {
 		return echodevice_getHelpText("no arg") if ( !defined($parameter) );
 
-		my $json = JSON->new->utf8(1)->encode( { 'type' => "SHOPPING_ITEM",
-												 'text' => decode_utf8($parameter),
-										  'createdDate' => int(time),
-											   'itemId' => $hash->{helper}{"ITEMS"}{"SHOPPING_ITEM"}{"$parameter"},
-											 'complete' => "false",
-											 'deleted' => "false" } );
+		my $json = JSON->new->utf8(1)->encode( {	'createdDateTime'	=> int(time),
+													'listId' 			=> $hash->{helper}{SHOPPING_LIST_ID},
+													'completed' 		=> "false",
+													'value' 			=> decode_utf8($parameter) } );
 
 		$json =~ s/\"true\"/true/g;
 		$json =~ s/\"false\"/false/g;
@@ -1152,7 +1107,7 @@ sub echodevice_Set($@) {
 		if ($ShoppingListe eq "") {readingsBulkUpdate($hash, "list_SHOPPING_ITEM", $parameter , 1);}
 		else {readingsBulkUpdate($hash, "list_SHOPPING_ITEM", $parameter . "," . $ShoppingListe , 1); }
 		readingsEndUpdate($hash,1);
-		
+			
 		echodevice_SendCommand($hash,"item_shopping_add",$json)
 	} 
 		
@@ -1880,15 +1835,58 @@ sub echodevice_SendCommand($$$) {
 		$SendMetode = "POST";		
 	}
 	
+	elsif ($type eq "namedListsIDs") {
+		$SendUrl   .= "/api/namedLists";
+	}
+	
 	elsif ($type eq "listitems_task" || $type eq "listitems_shopping" ) {
         $SendUrl   .= "/api/todos?size=100&startTime=&endTime=&completed=false&type=".$SendData."&deviceSerialNumber=&deviceType=&_=".int(time);
 		$SendDataL  = $SendData ;
 		$SendData   = "";
 	}
+
+	elsif ($type eq "item_shopping_add" ) {
+		$SendUrl   .= "/api/namedLists/" . $hash->{helper}{SHOPPING_LIST_ID} . "/item";
+		$SendMetode = "POST";
+		$SendDataL  = $SendData;
+	}
+
+	elsif ($type eq "item_task_add" ) {
+		$SendUrl   .= "/api/namedLists/" . $hash->{helper}{TO_DO_LIST_ID} . "/item";
+		$SendMetode = "POST";
+		$SendDataL  = $SendData;
+	}
+
+	elsif ($type eq "item_task_delete" ) {
 	
-	elsif ($type eq "item_shopping_delete" || $type eq "item_task_delete" || $type eq "item_task_add" || $type eq "item_shopping_add" ) {
-        $SendUrl   .= "/api/todos/" . $hash->{helper}{".CUSTOMER"};
-		$SendMetode = "PUT";		
+		my $json = JSON->new->utf8(1)->encode( {'value' 			=> $hash->{helper}{"ITEMS"}{TASK}{TEXT}{$SendData},
+												'listId' 			=> $hash->{helper}{TO_DO_LIST_ID},
+											    'id' 				=> $hash->{helper}{"ITEMS"}{TASK}{ID}{$SendData}});
+	
+		$json =~ s/\"true\"/true/g;
+		$json =~ s/\"false\"/false/g;
+	
+		$SendUrl   .= "/api/namedLists/" . $hash->{helper}{TO_DO_LIST_ID} . "/item/" . $hash->{helper}{"ITEMS"}{TASK}{ID}{$SendData};
+		$SendMetode = "DELETE";
+		$SendData   = $json;
+		$SendDataL  = $SendData;
+
+	}
+	
+	elsif ($type eq "item_shopping_delete" ) {
+	
+		my $json = JSON->new->utf8(1)->encode( {'value' 			=> $hash->{helper}{"ITEMS"}{SHOPPING_ITEM}{TEXT}{$SendData},
+												'listId' 			=> $hash->{helper}{SHOPPING_LIST_ID},
+											    'id' 				=> $hash->{helper}{"ITEMS"}{SHOPPING_ITEM}{ID}{$SendData}});
+	
+		$json =~ s/\"true\"/true/g;
+		$json =~ s/\"false\"/false/g;
+	
+		$SendUrl   .= "/api/namedLists/" . $hash->{helper}{SHOPPING_LIST_ID} . "/item/" . $hash->{helper}{"ITEMS"}{SHOPPING_ITEM}{ID}{$SendData};
+		$SendMetode = "DELETE";
+		$SendData   = $json;
+		$SendDataL  = $SendData;
+
 	}
 	
 	elsif ($type eq "account" ) {
@@ -2991,12 +2989,31 @@ sub echodevice_Parse($$$) {
 			$hash->{helper}{"getbehavior"}{$behavior->{automationId}}{status}   = $behavior->{status};
 		}
 	}
+
+	elsif($msgtype eq "namedListsIDs") {
+		
+		if (ref($json) eq "HASH") {
+			if(!defined($json->{lists})) {}
+			elsif (ref($json->{lists}) ne "ARRAY") {}
+			else {
+				foreach my $device (@{$json->{lists}}) {
+					if ($device->{type} eq "SHOPPING_LIST") {$hash->{helper}{SHOPPING_LIST_ID} = $device->{itemId}}
+					if ($device->{type} eq "TO_DO") 		{$hash->{helper}{TO_DO_LIST_ID} = $device->{itemId}}
+				}
+			}
+		}
+		else {
+			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
+		}
+
+	}
 	
 	elsif($msgtype eq "listitems_task" || $msgtype eq "listitems_shopping" ) {
 		my $listtype ;#= $param->{listtype};
 		my @listitems;
 		my $Firststart = "1";
 		my $Text ;
+		my $TextOriginal;
 		
 		$listtype = "TASK" if ($msgtype eq "listitems_task");
 		$listtype = "SHOPPING_ITEM" if ($msgtype eq "listitems_shopping");
@@ -3008,14 +3025,17 @@ sub echodevice_Parse($$$) {
 				$Firststart = "0";
 			}
 		  
+			$TextOriginal = $item->{text};
+		  
 			next if ($item->{complete});
 			$item->{text} =~ s/,/;/g;
 			$item->{text} =~ s/ /_/g;		  
 			$Text = $item->{text};
 			push @listitems, $item->{text};
 
-			$hash->{helper}{"ITEMS"}{$item->{type}}{$item->{text}} = $item->{itemId};
-		  		  
+			$hash->{helper}{"ITEMS"}{$item->{type}}{"ID"}{$item->{text}} = (split("#", $item->{itemId}))[1];
+			$hash->{helper}{"ITEMS"}{$item->{type}}{"TEXT"}{$item->{text}} = $TextOriginal;
+
 		}
 		readingsBeginUpdate($hash);
 		
@@ -3986,6 +4006,7 @@ sub echodevice_GetSettings($) {
 			echodevice_SendCommand($hash,"getisonline","");
 
 			echodevice_SendCommand($hash,"devices","")     if ($hash->{helper}{VERSION} eq "");
+			echodevice_SendCommand($hash,"namedListsIDs","")     if ($hash->{helper}{SHOPPING_LIST_ID} eq "");
 			echodevice_SendCommand($hash,"devicesstate","");
 			
 			echodevice_SendCommand($hash,"account","") if ($hash->{helper}{".COMMSID"} eq "");
@@ -4352,6 +4373,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "ADVBD696BHNV5"  || $ModelNumber eq "Fire TV Stick V1")		{return "Fire TV Stick V1";}
 	elsif($ModelNumber eq "A2LWARUGJLBYEW" || $ModelNumber eq "Fire TV Stick V2")		{return "Fire TV Stick V2";}
 	elsif($ModelNumber eq "AKPGW064GI9HE"  || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
+	elsif($ModelNumber eq "A265XOI9586NML" || $ModelNumber eq "Fire TV Stick 4K")		{return "Fire TV Stick 4K";}
 	elsif($ModelNumber eq "A2JKHJ0PX4J3L3" || $ModelNumber eq "ECHO FireTv Cube 4K")	{return "ECHO FireTv Cube 4K";}
 	elsif($ModelNumber eq "A10L5JEZTKKCZ8" || $ModelNumber eq "VOBOT")           		{return "VOBOT";}
 	elsif($ModelNumber eq "A37SHHQ3NUL7B5" || $ModelNumber eq "Bose Home Speaker 500")	{return "Bose Home Speaker 500";}
@@ -4386,7 +4408,8 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "ABN8JEI7OQF61"  || $ModelNumber eq "Sony WF-1000XM3")		{return "Sony WF-1000XM3";}
 	elsif($ModelNumber eq "A7S41FQ5TWBC9"  || $ModelNumber eq "Sony WH-1000XM4")		{return "Sony WH-1000XM4";}
 	elsif($ModelNumber eq "A2WN1FJ2HG09UN" || $ModelNumber eq "Ultimate Alexa")	        {return "Ultimate Alexa";}
-	
+	elsif($ModelNumber eq "A23FPV4BT7FH68" || $ModelNumber eq "Yamaha YAS-209 Soundbar"){return "Yamaha YAS-209 Soundbar";}
+
 	elsif($ModelNumber eq "")               {return "";}
 	elsif($ModelNumber eq "ACCOUNT")        {return "ACCOUNT";}
 	else {return "unbekannt";}
