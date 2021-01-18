@@ -30,6 +30,10 @@
 # 
 # CHANGE LOG
 #
+# 19.01.2021 1.2.9
+# change     : ParseFn gibt jetzt immer [NEXT] zurueck
+#              Verbessertes Zusammenspiel mit MQTT2-IO
+#
 # 13.01.2021 1.2.8
 # bugfix     : fix perl regex warning - Geschw. Klammern maskieren
 #              (forum https://forum.fhem.de/index.php/topic,117659.msg1121004.html#msg1121004)
@@ -373,7 +377,7 @@ use warnings;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.8 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.2.9 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2796,14 +2800,14 @@ sub Parse($$) {
     # unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
     # return @ret;
     my $fret = onmessage($hash, $topic, $value);
-    return "" unless defined $fret;
+    return ("[NEXT]") unless defined $fret;
     if( ref($fret) eq 'ARRAY' ) {
       my @ret=@{$fret};
-    unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
-    return @ret;
-  }
+      unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
+      return @ret;
+    }
     Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): internal error:  onmessage returned an unexpected value: ".$fret);
-    return "";
+    return ("[NEXT]");
   }
 }
 
