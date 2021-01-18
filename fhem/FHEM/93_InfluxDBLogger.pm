@@ -197,9 +197,16 @@ sub InfluxDBLogger_GetMeasurement($$$)
     my ($hash, $dev_hash, $device, $reading, $value) = @_;
     my $name = $hash->{NAME};
 
-    my $measurement =  AttrVal($name, "measurement", $reading);
-    $measurement =~ s/\$DEVICE/$device/ei;
-    $measurement =~ s/\$READINGNAME/$reading/ei;
+    my $measurement =  AttrVal($name, "measurement", undef);
+
+    if (defined $measurement) {
+        $measurement =~ s/\{(.*)\}/eval($1)/ei;
+        $measurement =~ s/\$DEVICE/$device/ei;
+        $measurement =~ s/\$READINGNAME/$reading/ei;
+    }
+    else {
+       $measurement = $reading;
+    }
 
     return $measurement;
 }
@@ -213,8 +220,8 @@ sub InfluxDBLogger_GetTagSet($$$)
         if ( $tags_set eq "-" ) {
             $tags_set = undef;
         } else {
-            $tags_set =~ s/\{(.*)\}/eval($1) /ei;
-            $tags_set =~ s/\$DEVICE/$device /ei;
+            $tags_set =~ s/\{(.*)\}/eval($1)/ei;
+            $tags_set =~ s/\$DEVICE/$device/ei;
         }
     } else {
       $tags_set = AttrVal($name, "deviceTagName", "site_name")."=".$device;
@@ -598,13 +605,15 @@ sub InfluxDBLogger_Rename($$) {
             The keyword $DEVICE will be replaced by the device-name.
             The keyword $READINGNAME will be replaced by the reading-name
             Default is $READINGNAME.
+            Perl-Expressions can be used in curly braces. $name, $device, $reading, $value are available as variables.
+            attr influx measurement { AttrVal($device, "influx_measurement", $reading)}
         </li>
         <li><b>tags</b> <code>attr &lt;name&gt; tags &lt;x,y&gt;</code><br />
             This is the list of tags that will be sent to InfluxDB. The keyword $DEVICE will be replaced by the device-name.
             If this attribute is set it will override the attribute deviceTagName. If the attribute is set to "-"
             no tags will be written (useful if measurement is set to $DEVICE and fields to $READINGNAME=$READINGVALUE)
             Default is site_name=$DEVICE.
-            Perl-Expression can be used in curly braces to evaluate the alias-attribute as a tag for example. $name, $device, $reading, $value are available as variables.
+            Perl-Expressions can be used in curly braces to evaluate the alias-attribute as a tag for example. $name, $device, $reading, $value are available as variables.
             attr influx tags device={AttrVal($device, "alias", "fallback")}
         </li>
         <li><b>fields</b> <code>attr &lt;name&gt; fields &lt;val=$READINGVALUE&gt;</code><br />
@@ -718,6 +727,8 @@ sub InfluxDBLogger_Rename($$) {
             Das Schlüsselwort $DEVICE wird ersetzt durch den Gerätenamen.
             Das Schlüsselwort $READINGNAME wird ersetzt durch den Readingnamen.
             Standard ist $READINGNAME.
+            Es können Perl-Ausdrücke in geschweiften Klammern verwendet werden. $name, $device, $reading, $value stehen dabei als Variable zur Verfügung.
+            attr influx measurement { AttrVal($device, "influx_measurement", $reading)}
         </li>
         <li><b>tags</b> <code>attr &lt;name&gt; tags &lt;x,y&gt;</code><br />
             Dies ist the Liste der tags die an InfluxDB mitgesendet werden. Das Schlüsselwort $DEVICE wird ersetzt durch den Gerätenamen.
