@@ -971,6 +971,19 @@ sub getDevicesForIp {
   Defined devices are updated in their readings, non-defined devices found are displayed in FHEMWEB
   in a table, where they might be created with a click.
   <br><br>
+
+  <h4>Requirements</h4>
+  ShellyMonitor needs two additional Perl modules:
+  <ul>
+  <li><i>JSON</i><br>
+  For Raspian Buster by <code>sudo apt-get install libjson-perl</code> installable,
+  or by <code>sudo cpan install JSON</code>
+  </li>
+  <li><i>IO::Socket::Multicast</i><br>
+  For Raspian Buster by <code>sudo apt-get install libio-socket-multicast-perl</code> installable,
+  or with <code>sudo cpan install IO::Socket::Multicast</code>
+  </li>
+  </ul>
   <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; ShellyMonitor [interface]</code><br>
@@ -1025,6 +1038,18 @@ sub getDevicesForIp {
   Dieses Modul aktualisiert die Readings von Shelly-Geräten, die ihre Daten im CoIoT-"Standard" (Abwandlung von COAP) im Netzwerk versenden. Die gefundenen Ger&auml;te werden in FHEMWEB in einer Tabelle angezeigt, wo sie sich
   mit einem Klick erzeugen und anschlie&szlig;end ggf. umbenennen lassen.
   <br><br>
+  <h4>Anforderungen</h4>
+  ShellyMonitor ben&ouml;tigt zwei zus&auml;tzliche Perl-Pakete:
+  <ul>
+  <li><i>JSON</i><br>
+  Unter Raspian Buster per <code>sudo apt-get install libjson-perl</code> installierbar,
+  oder per <code>sudo cpan install JSON</code>
+  </li>
+  <li><i>IO::Socket::Multicast</i><br>
+  Unter Raspian Buster per <code>sudo apt-get install libio-socket-multicast-perl</code> installierbar,
+  oder per <code>sudo cpan install IO::Socket::Multicast</code>
+  </li>
+  </ul>
   <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; ShellyMonitor [interface]</code><br>
