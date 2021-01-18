@@ -148,10 +148,10 @@ my $SHELLY_DEF_SEN = {
 "5103" => { "type"=>"S", "desc"=>"colorTemp", "unit"=>"K"},
 # Used by Shelly Duo SHBDUO-1:
 "5104" => { "type"=>"S", "desc"=>"whiteLevel"},
-"5105" => { "type"=>"S", "desc"=>"red"},
-"5106" => { "type"=>"S", "desc"=>"green"},
-"5107" => { "type"=>"S", "desc"=>"blue"},
-"5108" => { "type"=>"S", "desc"=>"white"},
+"5105" => { "type"=>"S", "desc"=>"L-red"},
+"5106" => { "type"=>"S", "desc"=>"L-green"},
+"5107" => { "type"=>"S", "desc"=>"L-blue"},
+"5108" => { "type"=>"S", "desc"=>"L-white"},
 # Used by Shelly RGBW2-white SHRGBW2-white, Shelly 2LED SH2LED-1:
 "5201" => { "type"=>"S", "desc"=>"brightness_1"},
 # Used by Shelly RGBW2-white SHRGBW2-white:
@@ -233,7 +233,7 @@ my %DEVID_PREFIX = (
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
 my %DEVID_ATTRS = (
-    "SHDM-2"   => "webCmd pct:on:off",
+    "SHDM-2"   => "webCmd pct:on:off widgetOverride pct:slider,0,1,100",
     "SHBDUO-1" => "widgetOverride ct:colorpicker,CT,2700,10,6500"
 );
 
@@ -247,9 +247,9 @@ my %ROLLER_STATUS_MAP = (
 );
 
 #####################################
-sub ShellyMonitor_Initialize($)
+sub ShellyMonitor_Initialize
 {
-  my ($hash) = @_;
+  my $hash = shift;
 
   $hash->{Match}   = "^\/(?s:.*)\!\$";
   $hash->{ReadFn}  = "ShellyMonitor_Read";
@@ -271,7 +271,7 @@ sub ShellyMonitor_Initialize($)
   }
 }
 
-sub MCast_Open($$) {
+sub MCast_Open {
   my ($hash, $interface) = @_;
   my $name = $hash->{NAME};
   my $dev = $hash->{".McastInterface"};
@@ -315,11 +315,11 @@ sub MCast_Open($$) {
   $dev = "" if (! defined $dev);
   delete($readyfnlist{"$name.$dev"});
   $selectlist{"$name.$dev"} = $hash;
-  return undef;
+  return;
 }
 
-sub MCast_Close($) {
-  my ($hash) = @_;
+sub MCast_Close {
+  my $hash = shift;
   my $name = $hash->{NAME};
   my $dev = $hash->{".McastInterface"};
   my $conn = $hash->{MCastDev};
@@ -335,8 +335,7 @@ sub MCast_Close($) {
 }
 
 #####################################
-sub ShellyMonitor_Define($$)
-{
+sub ShellyMonitor_Define {
   my ($hash, $def) = @_;
   my ($a, $h) = parseParams($def);
 
@@ -371,23 +370,23 @@ sub ShellyMonitor_Define($$)
   return MCast_Open($hash, $dev);
 }
 
-sub ShellyMonitor_Init($)
+sub ShellyMonitor_Init
 {
   Log 3,"Init done";
-  return undef;
+  return;
 }
 
 #####################################
-sub ShellyMonitor_Undef($$)
+sub ShellyMonitor_Undef
 {
   my ($hash, $arg) = @_;
   MCast_Close($hash);
-  return undef;
+  return;
 }
 
-sub ShellyMonitor_DoRead($)
+sub ShellyMonitor_DoRead
 {
-    my ($hash) = @_;
+    my $hash = shift;
 
     my $name = $hash->{NAME};
     my $conn = $hash->{MCastDev};
@@ -432,12 +431,12 @@ sub ShellyMonitor_DoRead($)
     if ($b1 != 0x50) {
       Log3 $name, 3, "Unexpected byte at pos 0: " . sprintf("0x%X", $b1) . ", expecting Non-Confirm. w/o token";
       $hash->{".ReceivedBroken"}++;
-      return undef;
+      return;
     }
     if ($b2 != 30) {
       $hash->{".ReceivedBroken"}++;
       Log3 $name, 3, "Unexpected byte at pos 1: " . sprintf("0x%X", $b2) . ", expecting Code 30";
-      return undef;
+      return;
     }
     my $option = 0;
 
@@ -483,7 +482,7 @@ sub ShellyMonitor_DoRead($)
       } else {
         $hash->{".ReceivedBroken"}++;
         Log3 $name, 3, "Unexpected option $option, only CoIoT V2-options supported";
-        return undef;
+        return;
       }
     }
 
@@ -502,13 +501,13 @@ sub ShellyMonitor_DoRead($)
       if (! @devices || scalar @devices == 0) {
         Log3 ($name, 4, "Shelly-devices found by IP match ignoreRule");
         $hash->{".Ignored"}++;
-        return undef;
+        return;
       }
     }
 
     Log3 $name, 5, "URI: $uri, global_devid = $global_devid, validity=$validity, serial=$serial";
     my $json = $hash->{".JSON"};
-    return undef unless ($json);
+    return unless ($json);
     $data = $json->decode($remain);
 
     my $shellyCoIoTModel;
@@ -613,6 +612,8 @@ sub ShellyMonitor_DoRead($)
         Log3 $name, 5, "Found device $_->{name}, model $_->{model}";
       }
     }
+    my %rgb = ();
+    my %rgbdevices = ();
     foreach my $i ( keys %{$data}) {
       if ($i ne "G") {
         Log3 $name, 4, "Unexpected JSON array '$i' in data";
@@ -629,7 +630,7 @@ sub ShellyMonitor_DoRead($)
           my $rname = $defarr->{"desc"};
           #$rname .= "(" . $defarr->{"unit"} . ")" if ($defarr->{"unit"});
 
-          if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode)$/) {
+          if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*)$/) {
             my $rtype = $1;
             my $rno = $2;
 
@@ -679,6 +680,10 @@ sub ShellyMonitor_DoRead($)
                 readingsBulkUpdateIfChanged($device, "last_dir", "up") if ($svalue eq "open") ;
               } elsif ($rtype eq "mode" && $haveAutoCreated==1) {
 		CommandAttr ( undef, $_->{name} . ' mode ' . $svalue);
+              } elsif ($rtype =~ /L-(red|green|blue|white)/) {
+                $rgb{$1} = $svalue;
+                $rgbdevices{$_->{name}} = 1;
+                readingsBulkUpdateIfChanged($device, $rtype, $svalue);
               }
             }
           } else {
@@ -700,6 +705,11 @@ sub ShellyMonitor_DoRead($)
     foreach ( @devices ) {
       if ($_->{isDefined}) {
         my $device = $defs{$_->{name}};
+        if ($rgbdevices{$_->{name}} &&
+            defined $rgb{"red"} && defined $rgb{"green"} && defined $rgb{"blue"}) {
+          readingsBulkUpdateIfChanged($device, "rgb",
+             sprintf("%02X%02X%02X", $rgb{"red"},$rgb{"green"},$rgb{"blue"}));
+        }
         readingsEndUpdate($device, 1) if ($device);
       }
     }
@@ -712,7 +722,7 @@ sub ShellyMonitor_DoRead($)
     return(undef);
 }
 
-sub ShellyMonitor_detailFn($$$) {
+sub ShellyMonitor_detailFn {
   my ($FW_wname, $deviceName, $FW_room) = @_;
   my $hash = $defs{$deviceName};
   my $haveUnsupported = 0;
@@ -773,9 +783,9 @@ sub ShellyMonitor_detailFn($$$) {
 
 
 #####################################
-sub ShellyMonitor_Read($)
+sub ShellyMonitor_Read
 {
-  my ($hash) = @_;
+  my $hash = shift; 
   if( $init_done ) {
     ShellyMonitor_DoRead($hash);
 #    my $new_state = "Statistics: " . $hash->{".Received"} . " msg received, " . $hash->{".ReceivedBroken"} . " broken, " . $hash->{".Ignored"} . " ignored, " . (0 + (keys %{$hash->{".ReceivedByIp"}})) . " devices";
@@ -785,7 +795,7 @@ sub ShellyMonitor_Read($)
 }
 
 #####################################
-sub ShellyMonitor_Notify($$)
+sub ShellyMonitor_Notify
 {
   my ($hash, $dev_hash) = @_;
   my $ownName = $hash->{NAME}; # own name / hash
@@ -832,7 +842,7 @@ sub ShellyMonitor_Notify($$)
 
 
 #####################################
-sub ShellyMonitor_Ready($)
+sub ShellyMonitor_Ready
 {
   my ($hash) = @_;
 
@@ -846,7 +856,7 @@ sub ShellyMonitor_Ready($)
   return ($InBytes>0);
 }
 
-sub ShellyMonitor_Set(@)
+sub ShellyMonitor_Set
 {
   my ($hash, $name, $sName, $sValue, $devName) = @_;
 
@@ -872,7 +882,7 @@ sub ShellyMonitor_Set(@)
     my $dname = defined $devName ? $devName : $device->{name};
     $device->{name} = $dname;
     my $model = $device->{model};
-    my $mode = $device->{mode};
+    my $mode = $device->{mode} if ($model =~ /(shelly2|shelly2.5|shellyrgbw|shellybulb)/);
     my $r;
     if ($sName eq "autocreate") {
       $r = DoTrigger("global", "UNDEFINED $dname Shelly $ip");
@@ -910,12 +920,12 @@ sub ShellyMonitor_Set(@)
     $created++;
   }
   FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "") if ($created>0);
-  return undef;
+  return;
 }
 
 
 
-sub ShellyMonitor_Attr(@)
+sub ShellyMonitor_Attr
 {
   my ($cmd,$name,$aName,$aVal) = @_;
   # $cmd can be "del" or "set"
@@ -928,10 +938,10 @@ sub ShellyMonitor_Attr(@)
 #  } elsif ($aName eq "autoCreate") { 
 #    $hash->{".autoCreate"} = ($cmd eq "set" && $aVal eq "Shelly") ? $aVal : undef;
   }
-  return undef;
+  return;
 }
 
-sub getDevicesForIp ($$) {
+sub getDevicesForIp {
   my ($hash, $ip) = @_;
   my $ip2devices = $hash->{".ip2device"}->{$ip};
   return unless ($ip2devices);
