@@ -401,33 +401,27 @@ sub ShellyMonitor_DoRead($)
     $hash->{".ReceivedByIp"}->{$sending_ip}++;
 
     my $ip2devicesDirty = 0;
-    my $ip2devices = $hash->{".ip2device"}->{$sending_ip};
-    my @devices = ();
-    if (! defined $ip2devices ) {
+    my @devices = getDevicesForIp($hash, $sending_ip);
+    if (! @devices ) {
       Log3 ($name, 4, "$sending_ip not found in cache");
+      # Search for defined devices by IP:
+      @devices = ();
       my @devNames = devspec2array("TYPE=Shelly:FILTER=DEF=$sending_ip");
       foreach ( @devNames ) { 
+        my $model = AttrVal($_, "model", "generic");
         my %d = ( 
           name       => $_ ,
           isDefined  => 1,
-          model      => AttrVal($_, "model", "generic"), 
+          model      => $model,
           mode       => AttrVal($_, "mode", undef)
         );
         push @devices, \%d;
+        Log3 $name, 2, "Defined real device $_ for $sending_ip as model $model";
       }
-      $ip2devices = \@devices;
+      my $ip2devices = \@devices;
       $hash->{".ip2device"}->{$sending_ip} = $ip2devices;
       $ip2devicesDirty = 1;
     } else {
-      @devices = @{$ip2devices};
-      # Panic line, as FHEM crashed here:
-      map { 
-        if (ref $_ ne "HASH") { 
-          @devices = ();
-          delete $hash->{".ip2device"}->{$sending_ip};
-          Log3 $name, 1, "Panic, it happened: Cache for $sending_ip did contain a none-hash";
-        }
-      } @devices;
       Log3 $name, 4, "$sending_ip: in cache, devices=" . join (' ', map { scalar $_->{name} } @devices) . " (size=" . scalar @devices . ")";
     }
     my $autoCreate = (defined $hash->{".autoCreate"}) ? 1 : 0;
@@ -559,10 +553,11 @@ sub ShellyMonitor_DoRead($)
           delete $hash->{".ip2device"}->{$oldip};
           Log3 $name, 2, "Removing old ip $oldip for device $oname";
         }
+        my $model = AttrVal($oname, "model", "generic");
         my %d = (
           name       => $oname,
           isDefined  => 1,
-          model      => AttrVal($oname, "model", "generic"),
+          model      => $model,
           mode       => AttrVal($oname, "mode", undef)
         );
 	push @devices, \%d;
@@ -583,6 +578,19 @@ sub ShellyMonitor_DoRead($)
           $model = "generic";
         }
         $dname .= '_' . lc($shellyId);
+
+        # Search if a shadow device is already existing with a different IP
+        my @ips = ( keys %{$hash->{".ip2device"}} );
+        foreach my $ip ( @ips ) {
+          my @devices = getDevicesForIp($hash, $ip);
+          foreach my $dev ( @devices ) {
+            if ($dev->{name} eq $dname && $dev->{isDefined}==0) {
+              Log3 $name, 2, "shadow device $dname found on old ip $ip, removing";
+              delete $hash->{".ip2device"}->{$ip};
+            }
+          }
+        }
+
         Log3 $name, 2, "Defined shadow device $dname for $sending_ip as model $model";
         my %d = (
           name       => $dname,
@@ -717,7 +725,7 @@ sub ShellyMonitor_detailFn($$$) {
   my $now = time();
   my $formNo = 1;
   foreach my $ip ( @ips ) {
-    my @devices = @{$hash->{".ip2device"}->{$ip}};
+    my @devices = getDevicesForIp($hash, $ip);
     foreach my $dev ( @devices ) {
       if ($dev->{expires} < $now) {
         Log3 $hash->{NAME}, 1, "Device " . $dev->{name} . " has expired, no messages seen";
@@ -797,7 +805,7 @@ sub ShellyMonitor_Notify($$)
     my @ips = ( keys %{$hash->{".ip2device"}} );
     $ip2devicesDirty = 0;
     foreach my $ip ( @ips ) {
-      my @devices = @{$hash->{".ip2device"}->{$ip}};
+      my @devices = getDevicesForIp($hash, $ip);
       foreach my $dev ( @devices ) {
         next unless ($dev->{name} eq $evDev1);
         $ip2devicesDirty = 1;
@@ -856,10 +864,11 @@ sub ShellyMonitor_Set(@)
   my @ips = grep { $_ =~ qr/^$sValue$/ } ( keys %{$hash->{".ip2device"}} );
   return "Provided IP $sValue did not match any IPs" unless (scalar @ips>=1);
   foreach my $ip ( @ips ) {
-    my $ip2devices = $hash->{".ip2device"}->{$ip};
-    my $device = @{$ip2devices}[0];
+    my @devices = getDevicesForIp($hash, $ip);
+    next unless (@devices);
+    my $device = $devices[0];
     next if ($device->{isDefined});
-    Log3 $name, 1, "AutoCreate called for IP $ip, ip2devices=" . scalar @{$ip2devices};
+    Log3 $name, 1, "AutoCreate called for IP $ip, #devices=" . scalar @devices;
     my $dname = defined $devName ? $devName : $device->{name};
     $device->{name} = $dname;
     my $model = $device->{model};
@@ -922,6 +931,20 @@ sub ShellyMonitor_Attr(@)
   return undef;
 }
 
+sub getDevicesForIp ($$) {
+  my ($hash, $ip) = @_;
+  my $ip2devices = $hash->{".ip2device"}->{$ip};
+  return unless ($ip2devices);
+  my @devices = @{$ip2devices};
+  foreach ( @devices ) {
+    if (ref $_ ne "HASH") { 
+      @devices = ();
+      delete $hash->{".ip2device"}->{$ip};
+      Log3 $hash->{NAME}, 1, "Panic, it happened: Cache for $ip did contain a none-hash";
+    }
+  }
+  return @devices;
+}
 
 1;
 
