@@ -2639,6 +2639,14 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
       </li>
     </ul>
     <br>
+    
+    <ul>
+      <a name="reset"></a>
+      <li><b>reset </b> <br> 
+       Löscht die aus der Drop-Down Liste gewählte Datenquelle. <br>    
+      </li>
+    </ul>
+    <br>
   
   </ul>
   <br>
