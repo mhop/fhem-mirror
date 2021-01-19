@@ -2284,8 +2284,8 @@ sub setPVhistory {
   my $name      = $paref->{name};
   my $t         = $paref->{t};                                                            # aktuelle Unix-Zeit
   my $chour     = $paref->{chour};
-  my $ethishour = $paref->{ethishour};
-  my $calcpv    = $paref->{calcpv};
+  my $ethishour = $paref->{ethishour} // 0;
+  my $calcpv    = $paref->{calcpv}    // 0;
   
   my $type = $hash->{TYPE};  
   my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
@@ -2311,8 +2311,10 @@ sub listPVHistory {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$pvhh->{$day}}) {
-          $ret .= "\n      " if($ret);
-          $ret .= $key." => pvreal:".$pvhh->{$day}{$key}{pvrl}.", pvforecast:".$pvhh->{$day}{$key}{pvfc};
+          my $pvrl = $pvhh->{$day}{$key}{pvrl} // 0;
+          my $pvfc = $pvhh->{$day}{$key}{pvfc} // 0;
+          $ret    .= "\n      " if($ret);
+          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc";
       }
       return $ret;
   };
