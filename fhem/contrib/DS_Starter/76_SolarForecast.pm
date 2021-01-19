@@ -2174,6 +2174,8 @@ sub calcVariance {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
+  
+  calcFromHistory ($paref);
 
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
@@ -2245,6 +2247,34 @@ return;
 }
 
 ################################################################
+#   Berechne Durchschnitte aus Werten der PV History
+################################################################
+sub calcFromHistory {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
+  my $chour = $paref->{chour};
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};  
+  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
+  my $pvhh = $data{$type}{$name}{pvhist};
+  
+  my $maxd = 31;
+  
+  my @k     = sort {$a<=>$b} keys %{$pvhh};
+  my $ile   = $#k;                                                                        # Index letztes Arrayelement
+  my ($idx) = grep {$k[$_] eq "$day"} (0..@k-1);                                          # Index des aktuellen Tages
+  
+  my $below = $idx;                                                                       # Anzahl aller Elemente im Array unter dem aktuellen Tag
+  
+  
+  # Log3 ($name, 1, "$name - PV History Array: Index last element: $ile, Day $day has index $idx. All days: ".join " ",@k); 
+    
+return;
+}
+
+################################################################
 #   PV und PV Forecast in History-Hash speichern zur 
 #   Berechnung des Korrekturfaktors über mehrere Tage
 ################################################################
@@ -2258,10 +2288,11 @@ sub setPVhistory {
   my $calcpv    = $paref->{calcpv};
   
   my $type = $hash->{TYPE};  
-  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag                                                                    
+  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
+  my $pvhh = $data{$type}{$name}{pvhist};  
   
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);    # realer Energieertrag
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);       # prognostizierter Energieertrag
+  $pvhh->{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);    # realer Energieertrag
+  $pvhh->{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);       # prognostizierter Energieertrag
     
 return;
 }
@@ -2274,23 +2305,24 @@ sub listPVHistory {
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $pvhh = $data{$type}{$name}{pvhist};  
   
   my $sub = sub { 
       my $day = shift;
       my $ret;          
-      for my $key (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}{$day}}) {
+      for my $key (sort{$a<=>$b} keys %{$pvhh->{$day}}) {
           $ret .= "\n      " if($ret);
-          $ret .= $key." => pvreal:".$data{$type}{$name}{pvhist}{$day}{$key}{pvrl}.", pvforecast:".$data{$type}{$name}{pvhist}{$day}{$key}{pvfc};
+          $ret .= $key." => pvreal:".$pvhh->{$day}{$key}{pvrl}.", pvforecast:".$pvhh->{$day}{$key}{pvfc};
       }
       return $ret;
   };
         
-  if (!keys %{$data{$type}{$name}{pvhist}}) {
+  if (!keys %{$pvhh}) {
       return qq{PV cache is empty.};
   }
   
   my $sq;
-  for my $idx (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+  for my $idx (sort{$a<=>$b} keys %{$pvhh}) {
       $sq .= $idx." => ".$sub->($idx)."\n";             
   }
       
@@ -2446,18 +2478,16 @@ return;
 <h3>SolarForecast</h3>
 <br>
 
-Das Modul SolarForecast erstellt auf Grundlage der Werte aus Devices vom Typ DWD_OpenData sowie weiteren Input-Devices eine 
+Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellendevices eine 
 Vorhersage für den solaren Ertrag und weitere Informationen als Grundlage für abhängige Steuerungen. <br>
 Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem 
 <a href="https://wiki.fhem.de/wiki/FTUI_Widget_SolarForecast">"SolarForecast Widget"</a> integriert werden. <br><br>
 
 Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) prognostizierten Globalstrahlung am 
 Anlagenstandort. Im zugeordneten DWD_OpenData Device ist die passende Wetterstation mit dem Attribut "forecastStation" 
-festulegen um eine Prognose für diesen Standort zu erhalten. <br>
+festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
 Abhängig von der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.) wird die 
 verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
-Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
-(set &lt;name&gt; pvCorrectionFactor_XX) oder automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto) eingefügt werden.
 
 <ul>
   <a name="SolarForecastdefine"></a>
@@ -2473,8 +2503,23 @@ Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturf
     <br>
     
     Nach der Definition des Devices ist zwingend ein Vorhersage-Device des Typs DWD_OpenData zuzuordnen sowie weitere 
-    anlagenspezifische Angaben mit dem entsprechenden set-Kommando vorzunehmen. Empfohlen wird ebenfalls ein Inverter-Device 
-    des Typs SMAInverter zuzuordnen um eine automatische Vorhersagekorrektur zu ermöglichen (Auto Learning Mode). 
+    anlagenspezifische Angaben mit dem entsprechenden set-Kommando vorzunehmen. <br>
+    Mit nachfolgenden set-Kommandos werden die Quellendevices und Quellenreadings für maßgebliche Informationen 
+    hinterlegt: <br><br>
+
+      <ul>
+         <table>  
+         <colgroup> <col width=35%> <col width=65%> </colgroup>
+            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Strahlungsdaten liefert          </td></tr>
+            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert        </td></tr>
+            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches aktuelle Netzbezugsdaten liefert </td></tr>         
+         </table>
+      </ul>
+      <br>
+      
+    Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
+    (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto) eingefügt 
+    werden.       
  
     <br><br>
   </ul>
