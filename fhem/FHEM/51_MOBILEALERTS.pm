@@ -27,6 +27,7 @@ sub MOBILEALERTS_Initialize($) {
     $hash->{AutoCreate} = {
         "MA_.*" => {
             ATTR => "event-on-change-reading:.* timestamp-on-change-reading:.*",
+            GPLOT => "",
             FILTER => "%NAME"
         }
     };
@@ -678,11 +679,13 @@ sub MOBILEALERTS_Parse_e1 ($$) {
       unpack( "nnnnnnnnnnnn", $message );
     my $lastEventCounter = ReadingsVal( $hash->{NAME}, "eventCounter", undef );
     my $mmRain           = 0;
+    my $mmRainOffset     = 0;
 
     if ( !defined($lastEventCounter) ) {
 
         # First Data
-        $mmRain = $eventCounter * MA_RAIN_FACTOR;
+        $mmRainOffset = $eventCounter * MA_RAIN_FACTOR;
+        $mmRain = 0;
     }
     elsif ( $lastEventCounter > $eventCounter ) {
 
@@ -695,7 +698,7 @@ sub MOBILEALERTS_Parse_e1 ($$) {
     else {
         $mmRain = 0;
     }
-    MOBILEALERTS_CheckRainSensor( $hash, $mmRain );
+    MOBILEALERTS_CheckRainSensor( $hash, $mmRain, $mmRainOffset );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "txCounter",
         MOBILEALERTS_decodeTxCounter($txCounter) );
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "triggered",
@@ -1348,7 +1351,7 @@ sub MOBILEALERTS_CheckRainSensorTimed($) {
     my ($hash) = @_;
     $hash->{".expertMode"} = AttrVal( $hash->{NAME}, "expert", 0 );
     readingsBeginUpdate($hash);
-    MOBILEALERTS_CheckRainSensor( $hash, 0 );
+    MOBILEALERTS_CheckRainSensor( $hash, 0, 0);
     readingsEndUpdate( $hash, 1 );
     InternalTimer(
         time_str2num(
@@ -1359,8 +1362,8 @@ sub MOBILEALERTS_CheckRainSensorTimed($) {
     );
 }
 
-sub MOBILEALERTS_CheckRainSensor($$) {
-    my ( $hash, $mmRain ) = @_;
+sub MOBILEALERTS_CheckRainSensor($$$) {
+    my ( $hash, $mmRain, $mmRainOffset ) = @_;
 
     #Event
     push @{ $hash->{CHANGED} }, "rain" if ( $mmRain > 0 );
@@ -1423,8 +1426,8 @@ sub MOBILEALERTS_CheckRainSensor($$) {
           if ( $mmRain > 0 );
     }
     MOBILEALERTS_readingsBulkUpdate( $hash, 0, "mmRain",
-        $mmRain + ReadingsVal( $hash->{NAME}, "mmRain", "0" ) )
-      if ( $mmRain > 0 );
+        $mmRain + $mmRainOffset + ReadingsVal( $hash->{NAME}, "mmRain", "0" ) )
+      if ( $mmRain + $mmRainOffset > 0 );
 }
 
 sub MOBILEALERTS_ActionDetector($) {

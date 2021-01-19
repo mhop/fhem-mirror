@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  51_MOBILEALERTS: Perl Warnings and Init RainSensor
  - bugfix:  57_Calendar: correct event selection for 
                          limit:when=tomorrow (forum #97810)
  - feature: 36_ShellyModule: new module to interwork with 36_Shelly
