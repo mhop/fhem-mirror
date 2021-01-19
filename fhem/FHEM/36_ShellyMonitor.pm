@@ -597,7 +597,8 @@ sub ShellyMonitor_DoRead
           isDefined  => 0,
           model      => $model,
 	  expires    => time()+$validity,
-          attrs      => $DEVID_ATTRS{$shellyCoIoTModel}
+          attrs      => $DEVID_ATTRS{$shellyCoIoTModel},
+          mcastName  => $shellyCoIoTModel
         );
 	push @devrefs, \%d;
         $hash->{".ip2device"}->{$sending_ip} = [ @devrefs ];
@@ -768,6 +769,9 @@ sub ShellyMonitor_detailFn {
         $haveUnsupported = 1;
       } else {
         $nstate .= " $dev->{mode}" if (defined $dev->{mode});
+      }
+      if ($dev->{model} eq "generic" && defined $dev->{mcastName}) {
+        $nstate .= " (" . $dev->{mcastName} . ")";
       }
       if ($dev->{isDefined}) { 
         $nstate .= "</td><td></td></tr>";
