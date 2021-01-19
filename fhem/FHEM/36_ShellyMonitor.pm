@@ -213,7 +213,9 @@ my %DEVID_MODEL = (
     "SHSW-44"  => "shelly4",
     "SHRGBW2"  => "shellyrgbw",
     "SHBLB-1"  => "shellybulb",
-    "SHBDUO-1" => "shellybulb"
+    "SHBDUO-1" => "shellybulb",
+    "SHWT-1"   => "generic",
+    "SHHT-1"   => "generic"
 );
 
 # Mapping of DeviceId in Multicast to suggested generic name
@@ -228,7 +230,9 @@ my %DEVID_PREFIX = (
     "SHSW-44"  => "shelly_4",
     "SHRGBW2"  => "shelly_rgbw",
     "SHBLB-1"  => "shelly_bulb",
-    "SHBDUO-1" => "shelly_duo"
+    "SHBDUO-1" => "shelly_duo",
+    "SHWT-1"   => "shelly_flood",
+    "SHHT-1"   => "shelly_ht"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
