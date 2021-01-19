@@ -5,7 +5,6 @@
 # FHEM module to commmunicate with general 1-Wire ID-ROMS
 #
 # Prof. Dr. Peter A. Henning
-# Norbert Truchsess
 #
 # $Id$
 #
@@ -35,21 +34,7 @@ use Time::HiRes qw(gettimeofday);
 use strict;
 use warnings;
 
-#add FHEM/lib to @INC if it is not already included. Should rather be in fhem.pl than here though...
-BEGIN {
-  if (!grep(/FHEM\/lib$/,@INC)) {
-    foreach my $inc (grep(/FHEM$/,@INC)) {
-      push @INC,$inc."/lib";
-    };
-  };
-};
-
-use GPUtils qw(:all);
-use ProtoThreads;
-no warnings 'deprecated';
-sub Log3($$$);
-
-my $owx_version="7.01";
+my $owx_version="7.23";
 #-- declare variables
 my %gets = (
   "present"     => ":noArg",
@@ -184,9 +169,7 @@ sub OWID_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWID: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
-  }
+  } 
 
   $modules{OWID}{defptr}{$id} = $hash;
   #--
@@ -326,13 +309,6 @@ sub OWID_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $value = OWX_Verify($master,$name,$hash->{ROM_ID},0);    
-    #-- OWX_ASYNC interface
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-      };
-      return GP_Catch($@) if $@;
-        
     #-- Unknown interface 
     } else {
       return "OWID: Verification not yet implemented for interface $interface";
@@ -385,18 +361,8 @@ sub OWID_GetValues($) {
   #-- hash of the busmaster
   my $master    = $hash->{IODev};
   my $interface = $master->{TYPE};
-  
-  #-- OWX interface
-  if( $interface eq "OWX" ){
-    $value = OWX_Verify($master,$name,$hash->{ROM_ID},0);
-      
-  #-- OWX_ASYNC interface
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_RunToCompletion($hash,OWX_ASYNC_PT_Verify($hash));
-    };
-    return GP_Catch($@) if $@;
-  }
+
+  $value = OWX_Verify($master,$name,$hash->{ROM_ID},0);
 
   #-- process results
   if( $master->{ASYNCHRONOUS} ){
@@ -481,6 +447,7 @@ sub OWID_Undef ($) {
 
  <a name="OWID"></a>
         <h3>OWID</h3>
+        <ul>
         <p>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
             <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
             Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br /></p>
@@ -536,6 +503,6 @@ sub OWID_Undef ($) {
                 interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
-        
+        </ul>
 =end html
 =cut

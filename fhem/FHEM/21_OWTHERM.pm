@@ -33,20 +33,7 @@ use strict;
 use warnings;
 use Time::HiRes qw( gettimeofday );
 
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
-
-no warnings 'deprecated';
-sub Log3($$$);
-sub AttrVal($$$);
-
-my $owx_version="7.2";
+my $owx_version="7.23";
 
 my %gets = (
   "id"          => ":noArg",
@@ -204,7 +191,6 @@ sub OWTHERM_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
-  #-- if coupled, test if ASYNC or not
   } 
 
   $modules{OWTHERM}{defptr}{$id} = $hash;
@@ -300,7 +286,6 @@ sub OWTHERM_Attr(@) {
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
           if ($init_done) {
             OWTHERM_Init($hash);
           }

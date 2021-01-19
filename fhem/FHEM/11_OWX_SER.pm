@@ -59,7 +59,7 @@ sub new($) {
 		#-- OWX device
 		hash => $hash,
 		#-- module version
-	    version => "7.21",
+	    version => "7.23",
 		#-- baud rate serial interface
 		baud => 9600,
 		#-- 16 byte search string

@@ -33,21 +33,7 @@ use strict;
 use warnings;
 use Time::HiRes qw( gettimeofday );
 
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
-
-use ProtoThreads;
-no warnings 'deprecated';
-sub Log3($$$);
-sub AttrVal($$$);
-
-my $owx_version="7.0";
+my $owx_version="7.23";
 my $owg_channel = "";
 
 my %gets = (
@@ -169,8 +155,6 @@ sub OWVAR_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWVAR: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $modules{OWVAR}{defptr}{$id} = $hash;
@@ -241,7 +225,6 @@ sub OWVAR_Attr(@) {
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
           if ($init_done) {
             OWVAR_Init($hash);
           }
@@ -390,12 +373,6 @@ sub OWVAR_Get($@) {
     if( $interface eq "OWX" ){
       #-- not different from getting all values ..
       $ret = OWXVAR_GetValues($hash);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      Log3 $name,1,"OWVAR: Get ASYNC interface not implemented";
-      #eval {
-      #  $ret = OWX_ASYNC_RunToCompletion($hash,OWXVAR_PT_GetValues($hash));
-      #};
-      #$ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSVAR_GetValues($hash);
@@ -449,8 +426,6 @@ sub OWVAR_GetValues($@) {
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
     $ret = OWXVAR_GetValues($hash);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    Log3 $name, 1,"OWVAR: Get ASYNC interface not implemented";
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSVAR_GetValues($hash);
   }else{
@@ -543,8 +518,6 @@ sub OWVAR_Set($@) {
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXVAR_SetValues($hash,$key,$value);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    Log3 $name, 1,"OWVAR: Set ASYNC interface not implemented";
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret = OWFSVAR_SetValues($hash,$key,$value);
@@ -868,8 +841,6 @@ sub OWXVAR_SetValues($$$) {
   return undef;
 }
 
-
-
 1;
 
 =pod 
@@ -879,6 +850,7 @@ sub OWXVAR_SetValues($$$) {
 
 <a name="OWVAR"></a>
         <h3>OWVAR</h3>
+        <ul>
         <p>FHEM module to commmunicate with 1-Wire bus digital potentiometer devices of type DS2890<br />
         <br />This 1-Wire module works with the OWX interface module, but not yet with the OWServer interface module.
           
@@ -944,6 +916,6 @@ sub OWXVAR_SetValues($$$) {
                  </li>
            <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         </ul>
-        
+        </ul>
 =end html
 =cut

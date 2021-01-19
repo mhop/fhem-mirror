@@ -99,7 +99,7 @@ my %sets = (
 );
 
 #-- some globals needed for the 1-Wire module
-$owx_version="7.21";
+$owx_version="7.23";
 
 #-- debugging now verbosity, this is just for backward compatibility
 $owx_debug=0;

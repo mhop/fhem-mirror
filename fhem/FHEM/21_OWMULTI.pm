@@ -5,7 +5,6 @@
 # FHEM module to commmunicate with 1-Wire chip DS2438Z - Smart Battery Monitor
 #
 # Prof. Dr. Peter A. Henning
-# Norbert Truchsess
 #
 # $Id$                                  
 #
@@ -32,18 +31,9 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-#add FHEM/lib to @INC if it's not already included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
 
-sub Log($$);
+my $owx_version="7.23";
 
-my $owx_version="7.21";
 #-- flexible channel name
 my ($owg_channel,$owg_schannel,$owg_sichannel);
 

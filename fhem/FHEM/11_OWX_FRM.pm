@@ -56,7 +56,7 @@ sub new($) {
 	return bless {
 		hash => $hash,
 	    #-- module version
-        version => "7.21"
+        version => "7.23"
 	}, $class;
 }
 

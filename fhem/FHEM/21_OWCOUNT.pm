@@ -5,7 +5,6 @@
 # FHEM module to commmunicate with 1-Wire Counter/RAM DS2423
 #
 # Prof. Dr. Peter A. Henning
-# Norbert Truchsess
 #
 # $Id$
 #
@@ -32,22 +31,10 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
+use Time::HiRes qw( gettimeofday );
 
-#add FHEM/lib to @INC if it's not already included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
+my $owx_version="7.23";
 
-use ProtoThreads;
-no warnings 'deprecated';
-
-sub Log3($$$);
-
-my $owx_version="7.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B");
 my @owg_channel = ("A","B");
@@ -220,8 +207,6 @@ sub OWCOUNT_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWCOUNT: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $modules{OWCOUNT}{defptr}{$id} = $hash;
@@ -345,7 +330,6 @@ sub OWCOUNT_Attr(@) {
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
           if ($init_done) {
             OWCOUNT_Init($hash);
           }
@@ -582,9 +566,9 @@ sub OWCOUNT_FormatValues($) {
           if( $delt > 0.0 ){
             $dt   = -$delf/$delt;
             $dval = int(($vval+($vval-$oldval)*$dt)*10000+0.5)/10000;
-            Log3 $name,5,"OWCOUNT: midnight exploration $name channel ".$owg_channel[$i]." with time delta $delt, dt $dt and dval=$dval";
+            Log3 $name,5,"OWCOUNT: midnight extrapolation $name channel ".$owg_channel[$i]." with time delta $delt, dt $dt and dval=$dval";
           }else{
-            Log3 $name,5,"OWCOUNT: midnight exploration $name channel ".$owg_channel[$i]." fails because of zero time delta. dval=$dval";
+            Log3 $name,5,"OWCOUNT: midnight extrapolation $name channel ".$owg_channel[$i]." fails because of zero time delta. dval=$dval";
           }
           if( $daily == 1 ){
             $dval2 = $dval+$hash->{owg_midnight}->[$i]; 
@@ -896,15 +880,6 @@ sub OWCOUNT_GetPage ($$$@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page,$final);
-    }elsif( $interface eq "OWX_ASYNC" ){      
-      eval {
-        if ($sync) {
-          $ret = OWX_ASYNC_RunToCompletion($hash,OWXCOUNT_PT_GetPage($hash,$page,$final));
-        } else {
-          OWX_ASYNC_Schedule( $hash, OWXCOUNT_PT_GetPage($hash,$page,$final) );
-        }
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_GetPage($hash,$page,$final);
@@ -1310,7 +1285,7 @@ sub OWCOUNT_Set($@) {
   if( defined($ret) && ($ret ne "")  ){
       return "OWCOUNT: set $name $key failed, reason: ".$ret;
   } 
-  #-- Took this out, not possible in asynchronoues mode
+  #-- Took this out, not possible in asynchronous mode
   #OWCOUNT_GetValues($hash);  
   Log3 $name,5, "OWCOUNT: set $name $key $value";
 }
@@ -1342,11 +1317,6 @@ sub OWCOUNT_SetPage ($$$) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXCOUNT_PT_SetPage($hash,$page,$data) );
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSCOUNT_SetPage($hash,$page,$data);
@@ -1841,179 +1811,6 @@ sub OWXCOUNT_SetPage($$$) {
   return undef;
 }
 
-########################################################################################
-#
-# OWXCOUNT_PT_GetPage - Get one memory page + counter from device async
-#
-# Parameter hash = hash of device addressed
-#           page = 0..15
-#           final= 1 if FormatValues is to be called
-#
-########################################################################################
-
-sub OWXCOUNT_PT_GetPage($$$) {
-
-  my ($hash,$page,$final) = @_;
-
-  return PT_THREAD(sub {
-    my ($thread) = @_;
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    PT_BEGIN($thread);
-
-    #=============== wrong value requested ===============================
-    if( ($page<0) || ($page>15) ){
-      die("wrong memory page requested");
-    } 
-    #=============== get memory + counter ===============================
-    #-- issue the match ROM command \x55 and the read memory + counter command
-    #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
-    my $ta2 = ($page*32) >> 8;
-    my $ta1 = ($page*32) & 255;
-    $thread->{'select'}=sprintf("\xA5%c%c",$ta1,$ta2);
-    
-    #-- reading 9 + 3 + 40 data bytes (32 byte memory, 4 byte counter + 4 byte zeroes) and 2 CRC bytes = 54 bytes
-
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 42 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    $thread->{response} = $thread->{pt_execute}->PT_RETVAL();
-
-    #-- reset the bus (needed to stop receiving data ?)
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,undef,undef,undef);
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    if (my $ret = OWXCOUNT_BinValues($hash,"getpage.".$page.($final ? ".final" : ""),0,$owx_dev,$thread->{'select'},0,$thread->{response})) {
-      die $ret;
-    }
-    PT_END;
-  });
-}
-
-########################################################################################
-#
-# OWXCOUNT_PT_SetPage - Set one memory page of device async
-#
-# Parameter hash = hash of device addressed
-#           page = "alarm" or "status"
-#
-########################################################################################
-
-sub OWXCOUNT_PT_SetPage($$$) {
-
-  my ($hash,$page,$data) = @_;
-  
-  return PT_THREAD(sub {
-    my ($thread) = @_;
-
-    my ($res, $response);
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    PT_BEGIN($thread);
-    #=============== wrong page requested ===============================
-    if( ($page<0) || ($page>15) ){
-      PT_EXIT("wrong memory page write attempt");
-    } 
-    #=============== midnight value =====================================
-    if( ($page==14) || ($page==15) ){
-      OWCOUNT_ParseMidnight($hash,$data,$page);
-    }
-    #=============== set memory =========================================
-    #-- issue the match ROM command \x55 and the write scratchpad command
-    #   \x0F TA1 TA2 followed by the data
-    my $ta2 = ($page*32) >> 8;
-    my $ta1 = ($page*32) & 255;
-    #Log 1, "OWXCOUNT: setting page Nr. $ta2 $ta1 $data";
-    $thread->{'select'}=sprintf("\x0F%c%c",$ta1,$ta2).$data;
-
-    #"setpage.1"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 0 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-    #-- issue the match ROM command \x55 and the read scratchpad command
-    #   \xAA, receiving 2 address bytes, 1 status byte and scratchpad content
-    $thread->{'select'} = "\xAA";
-    #-- reading 9 + 3 + up to 32 bytes
-    # TODO: sometimes much less than 28
-    #"setpage.2"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 28 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    $res = $thread->{pt_execute}->PT_RETVAL();
-    if( length($res) < 13 ){
-      PT_EXIT("device $owx_dev not accessible in reading scratchpad"); 
-    } 
-
-    #-- issue the match ROM command \x55 and the copy scratchpad command
-    #   \x5A followed by 3 byte authentication code obtained in previous read
-    $thread->{'select'}="\x5A".substr($res,0,3);
-    #-- first command, next 2 are address, then data
-
-    #"setpage.3"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 6 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    $res = $thread->{pt_execute}->PT_RETVAL();
-    #TODO validate whether testing '0' is appropriate with async interface
-    #-- process results
-    if( $res eq 0 ){
-      PT_EXIT("device $owx_dev error copying scratchpad"); 
-    } 
-    PT_END;
-  });
-}
-
-sub OWXCOUNT_PT_InitializeDevicePage($$$) {
-  my ($hash,$page,$newdata) = @_;
-
-  return PT_THREAD(sub {
-    my ($thread) = @_;
-
-    my $ret;
-
-    PT_BEGIN($thread);
-
-    $thread->{task} = OWXCOUNT_PT_GetPage($hash,$page,0);
-    PT_WAIT_THREAD($thread->{task});
-    $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
-
-    $thread->{olddata} = $hash->{owg_str}->[14];
-
-    $thread->{task} = OWXCOUNT_PT_SetPage($hash,$page,$newdata);
-    PT_WAIT_THREAD($thread->{task});
-    $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
-
-    $thread->{task} = OWXCOUNT_PT_GetPage($hash,$page,0);
-    PT_WAIT_THREAD($thread->{task});
-    $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
-
-    $thread->{task} = OWXCOUNT_PT_SetPage($hash,$page,$thread->{olddata});
-    PT_WAIT_THREAD($thread->{task});
-    $ret = $thread->{task}->PT_RETVAL();
-    if ($ret) {
-      PT_EXIT($ret);
-    }
-    PT_END;
-  });
-}
-
 1;
 
 =pod
@@ -2023,6 +1820,7 @@ sub OWXCOUNT_PT_InitializeDevicePage($$$) {
 
 <a name="OWCOUNT"></a>
         <h3>OWCOUNT</h3>
+        <ul>
         <p>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 or its emulation DS2423emu <br />
         <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
             (prerequisite: Add this module's name to the list of clients in OWServer).
@@ -2165,6 +1963,7 @@ sub OWXCOUNT_PT_InitializeDevicePage($$$) {
                         second</code></a>
                 <br />period for rate calculation </li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        </ul>
         </ul>
         
 =end html

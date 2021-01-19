@@ -1,11 +1,10 @@
 ########################################################################################
 #
-# OWAD.pm  
+# OWAD.pm   
 #
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
 # Prof. Dr. Peter A. Henning
-# Norbert Truchsess
 #
 # $Id$
 #
@@ -32,23 +31,10 @@ package main;
 use vars qw{%attr %defs %modules $readingFnAttributes $init_done};
 use strict;
 use warnings;
-use GPUtils qw(:all);
 use Time::HiRes qw( gettimeofday );
 
-#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
-BEGIN {
-	if (!grep(/FHEM\/lib$/,@INC)) {
-		foreach my $inc (grep(/FHEM$/,@INC)) {
-			push @INC,$inc."/lib";
-		};
-	};
-};
+my $owx_version="7.23";
 
-use ProtoThreads;
-no warnings 'deprecated';
-sub Log3($$$);
-
-my $owx_version="7.01";
 #-- fixed raw channel name, flexible channel name
 my @owg_fixed   = ("A","B","C","D");
 my @owg_channel = ("A","B","C","D");
@@ -68,7 +54,7 @@ my %gets = (
 );
 
 my %sets = (
-  "initialize"  => "",
+  "initialize"  => ":noArg",
   "interval"    => "",
   "AAlarm"      => "",
   "ALow"        => "",
@@ -224,8 +210,6 @@ sub OWAD_Define ($$) {
   AssignIoPort($hash);
   if( !defined($hash->{IODev}) or !defined($hash->{IODev}->{NAME}) ){
     return "OWAD: Warning, no 1-Wire I/O device found for $name.";
-  } else {
-    $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0; #-- false for now
   }
 
   $main::modules{OWAD}{defptr}{$id} = $hash;
@@ -313,7 +297,6 @@ sub OWAD_Attr(@) {
       $key eq "IODev" and do {
         AssignIoPort($hash,$value);
         if( defined($hash->{IODev}) ) {
-          $hash->{ASYNC} = $hash->{IODev}->{TYPE} eq "OWX_ASYNC" ? 1 : 0;
           if ($init_done) {
             OWAD_Init($hash);
           }
@@ -393,6 +376,8 @@ sub OWAD_FormatValues($) {
   #-- TODO $hash->{owg_val}->[..] might be undefined here?
     $vfuncall .= "\$hash->{owg_val}->[$k]=$hash->{owg_val}->[$k];"; 
   }
+  #-- replaced this, insert numerical values directly
+  
   my $alarm;
   my $galarm     = 0;
   my $achange    = 0;
@@ -425,14 +410,17 @@ sub OWAD_FormatValues($) {
     $hash->{tempf}{$owg_fixed[$i]}{function}   = $vfunc;  
         
     #-- replace by proper values (VA -> $hash->{owg_val}->[0] etc.)
-    #   careful: how to prevent {VAL} from being replaced ?
     for( my $k=0;$k<int(@owg_fixed);$k++ ){
+      #--- value to be replaced
       my $sstr = "V$owg_fixed[$k]";
+      #-- protect VAL
       $vfunc =~ s/VAL/WERT/g;
-      $vfunc =~ s/$sstr/\$hash->{owg_val}->[$k]/g;
+      #-- do the substitution
+      $vfunc =~ s/$sstr/\(\$hash->{owg_val}->[$k]\)/g;
+      #-- unprotect VAL
       $vfunc =~ s/WERT/VAL/g;
     }
-      
+    
     #-- determine the measured value from the function
     $vfunc = $vfuncall.$vfunc;
     $vfunc = eval($vfunc);
@@ -559,11 +547,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"reading",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"reading",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"reading",1);
@@ -589,11 +572,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"alarm",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"alarm",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"alarm",1);
@@ -627,11 +605,6 @@ sub OWAD_Get($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_GetPage($hash,"status",1);
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        $ret = OWX_ASYNC_RunToCompletion($hash,OWXAD_PT_GetPage($hash,"status",1));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_GetPage($hash,"status",1);
@@ -723,13 +696,6 @@ sub OWAD_GetValues($) {
     $ret1 = OWXAD_GetPage($hash,"reading",0);
     $ret2 = OWXAD_GetPage($hash,"alarm",0);
     $ret3 = OWXAD_GetPage($hash,"status",1);
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"reading",0));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"alarm",0));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_GetPage($hash,"status",1));
-    };
-    $ret .= GP_Catch($@) if $@;
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_GetPage($hash,"reading",0);
     $ret2 = OWFSAD_GetPage($hash,"alarm",0);
@@ -819,12 +785,6 @@ sub OWAD_InitializeDevice($) {
   if( $interface eq "OWX" ){
     $ret1 = OWXAD_SetPage($hash,"status");
     $ret2 = OWXAD_SetPage($hash,"alarm");
-  }elsif( $interface eq "OWX_ASYNC" ){
-    eval {
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"alarm"));
-    };
-    $ret .= GP_Catch($@) if $@;
   #-- OWFS interface
   }elsif( $interface eq "OWServer" ){
     $ret1 = OWFSAD_SetPage($hash,"status");
@@ -860,12 +820,14 @@ sub OWAD_Set($@) {
   my $key     = $a[1];
   my $value   = $a[2];
   
- #-- for the selector: which values are possible
-  return join(" ", sort keys %sets) if(@a == 2);
-  
-  #-- check syntax
-  return "OWAD: Set needs one parameter when setting this value"
-    if( int(@a)!=3 );
+  my $msg = "";
+  #-- for the selector: which values are possible - but only if not initialization key
+  if(@a != 3){
+    if( $key ne "initialize" ){
+      $msg .= "$_$sets{$_} " foreach (keys%sets);
+      return $msg
+    }
+  }
   
   #-- check argument
   if( !defined($sets{$a[1]}) && !($key =~ m/.*(Alarm|Low|High)/) ){
@@ -940,11 +902,6 @@ sub OWAD_Set($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"status");
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"status");
@@ -991,11 +948,6 @@ sub OWAD_Set($@) {
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXAD_SetPage($hash,"alarm");
-    }elsif( $interface eq "OWX_ASYNC" ){
-      eval {
-        OWX_ASYNC_Schedule( $hash, OWXAD_PT_SetPage($hash,"status"));
-      };
-      $ret = GP_Catch($@) if $@;
     #-- OWFS interface
     }elsif( $interface eq "OWServer" ){
       $ret = OWFSAD_SetPage($hash,"alarm");
@@ -1067,7 +1019,6 @@ sub OWFSAD_GetPage($$$) {
   if( $page eq "reading"){
     #-- get values - or should we rather use the uncached ones ?
     $rel = OWServer_Read($master,"/$owx_add/volt.ALL");
-
     return "no return from OWServer"
       if( !defined($rel) );     
     return "empty return from OWServer"
@@ -1079,6 +1030,7 @@ sub OWFSAD_GetPage($$$) {
       if( int(@ral) != 4);
     for( $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= int($ral[$i]*1000)/1000;
+      #Log 1,"=====> ".$hash->{owg_val}->[$i];
     }
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
@@ -1179,6 +1131,8 @@ sub OWFSAD_GetPage($$$) {
   #-- and now from raw to formatted values
   $hash->{PRESENT}  = 1;
   if( $final==1 ){
+     for( $i=0;$i<int(@owg_fixed);$i++){
+    }
     my $value = OWAD_FormatValues($hash);
     Log 5, $value;
   }
@@ -1314,6 +1268,13 @@ sub OWXAD_BinValues($$$$$$$) {
     for( my $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
+    
+    2021.01.17 05:31:05 1: PERL WARNING: Use of uninitialized value within @owg_resoln in left bitshift (<<) at /opt/fhem/FHEM/21_OWAD.pm line 1270.
+2021.01.17 05:31:05 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1270.
+2021.01.17 05:31:06 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1276.
+2021.01.17 05:31:06 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1277.
+    
+    
   #=============== get the alarm reading ===============================
   } elsif ( $context =~ /^ds2450.getalarm/ ){
     for( my $i=0;$i<int(@owg_fixed);$i++){
@@ -1545,155 +1506,6 @@ sub OWXAD_SetPage($$) {
   return undef;
 }
 
-########################################################################################
-#
-# OWXAD_PT_GetPage - Get one memory page from device
-#
-# Parameter hash = hash of device addressed
-#           page = "reading", "alarm" or "status"
-#           final= 1 if FormatValues is to be called
-#
-########################################################################################
-
-sub OWXAD_PT_GetPage($$$) {
-
-  my ($hash,$page,$final) = @_;
-  
-  return PT_THREAD(sub {
-
-    my ($thread) = @_;
-
-    my ($res, $res2, $res3, @data, $an, $vn);
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    my ($i,$j,$k);
-
-    PT_BEGIN($thread);
-
-    #=============== get the voltage reading ===============================
-    if( $page eq "reading") {
-      #-- issue the match ROM command \x55 and the start conversion command
-
-      $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, "\x3C\x0F\x00\xFF\xFF", 0 );
-      $thread->{ExecuteTime} = gettimeofday() + 0.07; # was 0.02
-      PT_WAIT_THREAD($thread->{pt_execute});
-      die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-
-      PT_YIELD_UNTIL(gettimeofday() >= $thread->{ExecuteTime});
-      delete $thread->{ExecuteTime};
-
-      #-- issue the match ROM command \x55 and the read conversion page command
-      #   \xAA\x00\x00 
-      $thread->{'select'}="\xAA\x00\x00";
-    #=============== get the alarm reading ===============================
-    } elsif ( $page eq "alarm" ) {
-      #-- issue the match ROM command \x55 and the read alarm page command 
-      #   \xAA\x10\x00 
-      $thread->{'select'}="\xAA\x10\x00";
-    #=============== get the status reading ===============================
-    } elsif ( $page eq "status" ) {
-      #-- issue the match ROM command \x55 and the read status memory page command 
-      #   \xAA\x08\x00 r
-      $thread->{'select'}="\xAA\x08\x00";
-    #=============== wrong value requested ===============================
-    } else {
-      die "wrong memory page requested from $owx_dev";
-    }
-    #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
-
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $thread->{'select'}, 10 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    my $response = $thread->{pt_execute}->PT_RETVAL();
-    my $res = OWXAD_BinValues($hash,"ds2450.get".$page.($final ? ".final" : ""),1,$owx_dev,$thread->{'select'},10,$response);
-    if ($res) {
-      die $res;
-    }
-    PT_END;
-  });
-}
-
-########################################################################################
-#
-# OWXAD_PT_SetPage - Set one page of device
-#
-# Parameter hash = hash of device addressed
-#           page = "alarm" or "status"
-#
-########################################################################################
-
-sub OWXAD_PT_SetPage($$) {
-
-  my ($hash,$page) = @_;
-
-  return PT_THREAD(sub {
-
-    my ($thread) = @_;
-    my ($select, $res, $res2, $res3, @data);
-
-    #-- ID of the device, hash of the busmaster
-    my $owx_dev = $hash->{ROM_ID};
-    my $master  = $hash->{IODev};
-
-    my ($i,$j,$k);
-
-    PT_BEGIN($thread);
-
-    #=============== set the alarm values ===============================
-    if ( $page eq "alarm" ) {
-      #-- issue the match ROM command \x55 and the set alarm page command 
-      #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
-      $select="\x55\x10\x00";
-      for( $i=0;$i<int(@owg_fixed);$i++){
-        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vlow}->[$i]*256000/$owg_range[$i]); 
-        $select .= sprintf "%c\xFF\xFF\xFF",int($hash->{owg_vhigh}->[$i]*256000/$owg_range[$i]);
-      }
-
-    #++Use of uninitialized value within @owg_vlow in multiplication  at 
-    #++/usr/share/fhem/FHEM/21_OWAD.pm line 1362.
-    #=============== set the status ===============================
-    } elsif ( $page eq "status" ) {
-      my ($sb1,$sb2)=(0,0);
-      #-- issue the match ROM command \x55 and the set status memory page command 
-      #   \x55\x08\x00 reading 8 data bytes and 2 CRC bytes
-      $select="\x55\x08\x00";
-      for( $i=0;$i<int(@owg_fixed);$i++){
-        #if( $owg_mode[$i] eq "input" ){
-        if( 1 > 0){
-          #-- resolution (TODO: check !)
-          $sb1 = $owg_resoln[$i] & 15;
-          #-- alarm enabled        
-          if( defined($hash->{owg_slow}->[$i]) ){
-            $sb2   =  ( $hash->{owg_slow}->[$i] ne 0  ) ? 4 : 0;
-          }
-          if( defined($hash->{owg_shigh}->[$i]) ){
-            $sb2  += ( $hash->{owg_shigh}->[$i] ne 0 ) ? 8 : 0;
-          }
-          #-- range 
-          $sb2 |= 1 
-            if( $owg_range[$i] > 2560 );
-        } else {
-          $sb1 = 128;
-          $sb2 = 0;
-        }
-        $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
-        $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
-      }
-    #=============== wrong page write attempt  ===============================
-    } else {
-      PT_EXIT("wrong memory page write attempt");
-    }
-    #"setpage"
-    $thread->{pt_execute} = OWX_ASYNC_PT_Execute($master,1,$owx_dev, $select, 0 );
-    PT_WAIT_THREAD($thread->{pt_execute});
-    die $thread->{pt_execute}->PT_CAUSE() if ($thread->{pt_execute}->PT_STATE() == PT_ERROR);
-    PT_END;
-  });
-}
-
 1;
 
 =pod
@@ -1703,6 +1515,7 @@ sub OWXAD_PT_SetPage($$) {
 
 <a name="OWAD"></a>
         <h3>OWAD</h3>
+        <ul>
         <p>FHEM module to commmunicate with 1-Wire A/D converters<br /><br />   
         <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
          (prerequisite: Add this module's name to the list of clients in OWServer).
@@ -1752,8 +1565,14 @@ sub OWXAD_PT_SetPage($$) {
         <a name="OWADset"></a>
         <h4>Set</h4>
         <ul>
-            <li><a name="owad_interval">
-                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+           <li><a name="owad_initialize">
+                 <code>set &lt;name&gt; initialize </code></a><br /> Re-initialize the sensor device (range, resolution etc.). Necessary after power loss.</li>
+           <li><a name="owad_alarm">
+                 <code>set  &lt;name&gt; (A|B|C|D)Alarm (none|low|high|both)</code> Set the device into alarme status if none, the high, low or both voltage limits are reached.</li>
+           <li><a name="owad_alarmP">
+                 <code>set  &lt;name&gt; (A|B|C|D)(Low|High) &lt;voltage value&gt;</code> Set one of the voltage limits for alarm status</li>
+           <li><a name="owad_interval">
+                 <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
                 interval in seconds. The default is 300 seconds, a value of 0 disables the automatic update.</li>
         </ul>
         <br />
@@ -1808,6 +1627,7 @@ sub OWXAD_PT_SetPage($$) {
                         &lt;float&gt;</code></a>
                 <br />measurement value for highalarm. </li>
             <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        </ul>
         </ul>
         
 =end html
