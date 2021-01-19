@@ -32,6 +32,7 @@
 #
 # 19.01.2021 1.2.9
 # improvement: increment 'incoming-count' only if at least one device is affected
+# bugfix     : fix parse loop over MGB instances for the same IODev (MQTT2-IO only)
 # 
 #
 # 19.01.2021 1.2.9
@@ -2788,6 +2789,7 @@ sub Parse($$) {
   my ($cid, $topic, $value) = split("\0", $msg, 3);
   
   my @instances = devspec2array("TYPE=MQTT_GENERIC_BRIDGE");
+  my @ret=();
   foreach my $dev (@instances) {
     my $hash = $defs{$dev};
     # Name mit IODev vegleichen
@@ -2804,15 +2806,18 @@ sub Parse($$) {
     # unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
     # return @ret;
     my $fret = onmessage($hash, $topic, $value);
-    return ("[NEXT]") unless defined $fret;
+    next unless defined $fret;
     if( ref($fret) eq 'ARRAY' ) {
-      my @ret=@{$fret};
-      unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
-      return @ret;
+      push (@ret, @{$fret});
+      #my @ret=@{$fret};
+      #unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
+      #return @ret;
+    } else {
+      Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): internal error:  onmessage returned an unexpected value: ".$fret);  
     }
-    Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse ($iiodt : '$ioname'): internal error:  onmessage returned an unexpected value: ".$fret);
-    return ("[NEXT]");
   }
+  unshift(@ret, "[NEXT]"); # damit weitere Geraetemodule ggf. aufgerufen werden
+  return @ret;
 }
 
 # Routine MQTT-Message Callback
