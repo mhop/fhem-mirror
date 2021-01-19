@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 #
+# 19.01.2021 1.3.0 
+# feature    : supports attrTemplate (thanks to Beta-User)
+#
 # 19.01.2021 1.2.9
 # improvement: increment 'incoming-count' only if at least one device is affected
 # bugfix     : fix parse loop over MGB instances for the same IODev (MQTT2-IO only)
@@ -379,10 +382,11 @@
 
 use strict;
 use warnings;
+use AttrTemplate;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.2.9 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.3.0 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -414,6 +418,7 @@ sub MQTT_GENERIC_BRIDGE_Initialize($) {
   # Consumer
   $hash->{DefFn}    = "MQTT::GENERIC_BRIDGE::Define";
   $hash->{UndefFn}  = "MQTT::GENERIC_BRIDGE::Undefine";
+  $hash->{SetFn}    = "MQTT::GENERIC_BRIDGE::Set";
   $hash->{GetFn}    = "MQTT::GENERIC_BRIDGE::Get";
   $hash->{NotifyFn} = "MQTT::GENERIC_BRIDGE::Notify";
   $hash->{AttrFn}   = "MQTT::GENERIC_BRIDGE::Attr";
@@ -505,6 +510,7 @@ BEGIN {
     CTRL_ATTR_NAME_GLOBAL_TYPE_EXCLUDE
     CTRL_ATTR_NAME_GLOBAL_DEV_EXCLUDE
     CTRL_ATTR_NAME_GLOBAL_PREFIX
+    AttrTemplate_Set
   ))
 
 };
@@ -2054,6 +2060,11 @@ sub Get($$$@) {
     #   last;
     # };
   };
+}
+
+sub Set {
+  my ($hash, @args) = @_;
+  return AttrTemplate_Set($hash,'',@args);
 }
 
 # Routine fuer FHEM Notify
