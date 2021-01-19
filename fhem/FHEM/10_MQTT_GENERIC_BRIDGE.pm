@@ -31,6 +31,10 @@
 # CHANGE LOG
 #
 # 19.01.2021 1.2.9
+# improvement: increment 'incoming-count' only if at least one device is affected
+# 
+#
+# 19.01.2021 1.2.9
 # change     : ParseFn gibt jetzt immer [NEXT] zurueck
 #              Verbessertes Zusammenspiel mit MQTT2-IO
 #
@@ -2817,11 +2821,15 @@ sub onmessage($$$) {
   #CheckInitialization($hash);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] onmessage: $topic => $message");
 
-  $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT}++; 
-  readingsSingleUpdate($hash,"incoming-count",$hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT},1);
-
   my $fMap = searchDeviceForTopic($hash, $topic);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] onmessage: $fMap : ".Dumper($fMap));
+
+  #if (isIODevMQTT($hash) || keys %{$fMap}) {
+  if (keys %{$fMap}) {
+    $hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT}++; 
+    readingsSingleUpdate($hash,"incoming-count",$hash->{+HELPER}->{+HS_PROP_NAME_INCOMING_CNT},1);
+  }
+
   my $updated = 0;
   my @updatedList;
   foreach my $deviceKey (keys %{$fMap}) {
