@@ -29,7 +29,7 @@ my $SHELLY_DEF_SEN = {
 "132" => { "type"=>"S", "desc"=>"output_2"},
 "142" => { "type"=>"S", "desc"=>"output_3"},
 "113" => { "type"=>"T", "desc"=>"deviceTemp", "unit"=>"C"},
-"114" => { "type"=>"T", "desc"=>"deviceTemp", "unit"=>"F"},
+"114" => { "type"=>"T", "desc"=>"deviceTempF", "unit"=>"F"},
 "214" => { "type"=>"E", "desc"=>"energy_0", "unit"=>"Wmin"},
 # Version 2, since FW >= 1.6
 "1101" => { "type"=>"S", "desc"=>"output_0"},
@@ -60,10 +60,10 @@ my $SHELLY_DEF_SEN = {
 # Used by Shelly i3 SHIX3-1:
 "2303" => { "type"=>"EVC", "desc"=>"inputEventCnt_2"},
 "3101" => { "type"=>"T", "desc"=>"extTemp_0", "unit"=>"C"},
-"3102" => { "type"=>"T", "desc"=>"extTemp_0", "unit"=>"F"},
+"3102" => { "type"=>"T", "desc"=>"extTemp_0f", "unit"=>"F"},
 "3103" => { "type"=>"H", "desc"=>"humidity"},
 "3104" => { "type"=>"T", "desc"=>"deviceTemp", "unit"=>"C"},
-"3105" => { "type"=>"T", "desc"=>"deviceTemp", "unit"=>"F"},
+"3105" => { "type"=>"T", "desc"=>"deviceTempF", "unit"=>"F"},
 # Used by Shelly Sense SHSEN-1, Shelly Door Window SHDW-1, Shelly Door Window 2 SHDW-2:
 "3106" => { "type"=>"L", "desc"=>"luminosity", "unit"=>"lux"},
 # Used by Shelly Gas SHGS-1:
@@ -86,9 +86,9 @@ my $SHELLY_DEF_SEN = {
 "3116" => { "type"=>"S", "desc"=>"dayLight"},
 "3117" => { "type"=>"S", "desc"=>"extInput"},
 "3201" => { "type"=>"T", "desc"=>"extTemp_1", "unit"=>"C"},
-"3202" => { "type"=>"T", "desc"=>"extTemp_1", "unit"=>"F"},
+"3202" => { "type"=>"T", "desc"=>"extTemp_1f", "unit"=>"F"},
 "3301" => { "type"=>"T", "desc"=>"extTemp_2", "unit"=>"C"},
-"3302" => { "type"=>"T", "desc"=>"extTemp_2", "unit"=>"F"},
+"3302" => { "type"=>"T", "desc"=>"extTemp_2f", "unit"=>"F"},
 "4101" => { "type"=>"P", "desc"=>"power_0", "unit"=>"W"},
 # Used by Shelly 2 SHSW-21 roller-mode, Shelly 2.5 SHSW-25 roller-mode:
 "4102" => { "type"=>"P", "desc"=>"rollerPower", "unit"=>"W"},
@@ -400,11 +400,11 @@ sub ShellyMonitor_DoRead
     $hash->{".ReceivedByIp"}->{$sending_ip}++;
 
     my $ip2devicesDirty = 0;
-    my @devices = getDevicesForIp($hash, $sending_ip);
-    if (! @devices ) {
+    my @devrefs = getDevicesForIp($hash, $sending_ip);
+    if (! @devrefs ) {
       Log3 ($name, 4, "$sending_ip not found in cache");
       # Search for defined devices by IP:
-      @devices = ();
+      @devrefs = ();
       my @devNames = devspec2array("TYPE=Shelly:FILTER=DEF=$sending_ip");
       foreach ( @devNames ) { 
         my $model = AttrVal($_, "model", "generic");
@@ -414,14 +414,13 @@ sub ShellyMonitor_DoRead
           model      => $model,
           mode       => AttrVal($_, "mode", undef)
         );
-        push @devices, \%d;
+        push @devrefs, \%d;
         Log3 $name, 2, "Defined real device $_ for $sending_ip as model $model";
       }
-      my $ip2devices = \@devices;
-      $hash->{".ip2device"}->{$sending_ip} = $ip2devices;
+      $hash->{".ip2device"}->{$sending_ip} = [ @devrefs ];
       $ip2devicesDirty = 1;
     } else {
-      Log3 $name, 4, "$sending_ip: in cache, devices=" . join (' ', map { scalar $_->{name} } @devices) . " (size=" . scalar @devices . ")";
+      Log3 $name, 4, "$sending_ip: in cache, devices=" . join (' ', map { scalar $_->{name} } @devrefs) . " (size=" . scalar @devrefs . ")";
     }
     my $autoCreate = (defined $hash->{".autoCreate"}) ? 1 : 0;
 
@@ -486,7 +485,7 @@ sub ShellyMonitor_DoRead
       }
     }
 
-    foreach ( @devices ) {
+    foreach ( @devrefs ) {
       $_->{expires} = time()+$validity;
     }
 
@@ -496,9 +495,9 @@ sub ShellyMonitor_DoRead
     # Handle ignoring of devices
     my $ignoreRegexp = $hash->{".ignoreDevices"};
     if ($ignoreRegexp) {
-      @devices = grep { $_->{name} !~ qr/$ignoreRegexp/ } @devices;
+      @devrefs = grep { $_->{name} !~ qr/$ignoreRegexp/ } @devrefs;
       Log3 ($name, 4, "Applied RegExp $ignoreRegexp");
-      if (! @devices || scalar @devices == 0) {
+      if (! @devrefs || scalar @devrefs == 0) {
         Log3 ($name, 4, "Shelly-devices found by IP match ignoreRule");
         $hash->{".Ignored"}++;
         return;
@@ -517,7 +516,7 @@ sub ShellyMonitor_DoRead
       $shellyId = $2; 
     }
     # Iterate over Shellys found by IP and x-check ID
-    foreach ( @devices ) {
+    foreach ( @devrefs ) {
       $_->{expires} = time()+$validity;
       next unless $_->{isDefined};
       my $device = $defs{$_->{name}};
@@ -526,7 +525,8 @@ sub ShellyMonitor_DoRead
          if ($device->{SHELLYID} !~ qr/.*$shellyId$/) {
            Log3 $name, 1, "Device $_ has ID " . $device->{SHELLYID} . " which does not match $shellyId";
            my $dName = $_;
-           @devices = grep { $_->{name} ne $dName } @devices;
+           @devrefs = grep { $_->{name} ne $dName } @devrefs;
+           $hash->{".ip2device"}->{$sending_ip} = [ @devrefs ];
          }
       } else {
         $device->{SHELLYID} = $shellyId;
@@ -537,7 +537,7 @@ sub ShellyMonitor_DoRead
     my $haveAutoCreated = 0;
 
     # Hopefully, all Shellys have an ID with 6-12 Chars...
-    if (scalar @devices==0 && $global_devid=~ /(SH[^#]+)#([A-F0-9]{6,12})#/) {
+    if (scalar @devrefs==0 && $global_devid=~ /(SH[^#]+)#([A-F0-9]{6,12})#/) {
       my $shellyCoIoTModel = $1;
       my $shellyId = $2;
       my @devsByShellyId = devspec2array("TYPE=Shelly:FILTER=SHELLYID=.*".$shellyId);
@@ -559,7 +559,8 @@ sub ShellyMonitor_DoRead
           model      => $model,
           mode       => AttrVal($oname, "mode", undef)
         );
-	push @devices, \%d;
+	push @devrefs, \%d;
+        $hash->{".ip2device"}->{$sending_ip} = [ @devrefs ];
         $ip2devicesDirty = 1;
         Log3 $name, 2, "Changed IP for device '" . $oname . "' to $sending_ip";
 
@@ -581,8 +582,8 @@ sub ShellyMonitor_DoRead
         # Search if a shadow device is already existing with a different IP
         my @ips = ( keys %{$hash->{".ip2device"}} );
         foreach my $ip ( @ips ) {
-          my @devices = getDevicesForIp($hash, $ip);
-          foreach my $dev ( @devices ) {
+          my @devrefs2 = getDevicesForIp($hash, $ip);
+          foreach my $dev ( @devrefs2 ) {
             if ($dev->{name} eq $dname && $dev->{isDefined}==0) {
               Log3 $name, 2, "shadow device $dname found on old ip $ip, removing";
               delete $hash->{".ip2device"}->{$ip};
@@ -598,12 +599,13 @@ sub ShellyMonitor_DoRead
 	  expires    => time()+$validity,
           attrs      => $DEVID_ATTRS{$shellyCoIoTModel}
         );
-	push @devices, \%d;
+	push @devrefs, \%d;
+        $hash->{".ip2device"}->{$sending_ip} = [ @devrefs ];
         $ip2devicesDirty = 1;
       } 
     }
 
-    foreach ( @devices ) {
+    foreach ( @devrefs ) {
       my $device = $defs{$_->{name}};
       next unless ($device);
       if ($_->{isDefined}) {
@@ -634,7 +636,7 @@ sub ShellyMonitor_DoRead
             my $rtype = $1;
             my $rno = $2;
 
-            foreach ( @devices ) {
+            foreach ( @devrefs ) {
 	      # We want to set the mode also for shadow devices
               my $model = $_->{model};
               if ($rtype eq "mode") {
@@ -688,10 +690,11 @@ sub ShellyMonitor_DoRead
             }
           } else {
             # Generic Shelly Device gets any reading in native form
-            foreach ( @devices ) {
+            foreach ( @devrefs ) {
 	      # We want to set the mode also for shadow devices
               my $model = $_->{model};
               my $device = $defs{$_->{name}};
+              $svalue = join (' ', @$svalue) if (ref $svalue eq "ARRAY");
               readingsBulkUpdateIfChanged($device, $rname, $svalue)
                 if (defined $device && (( ! defined $model ) || ($model eq "generic")));
             }
@@ -702,7 +705,7 @@ sub ShellyMonitor_DoRead
         }
       }
     }
-    foreach ( @devices ) {
+    foreach ( @devrefs ) {
       if ($_->{isDefined}) {
         my $device = $defs{$_->{name}};
         if ($rgbdevices{$_->{name}} &&
@@ -735,15 +738,15 @@ sub ShellyMonitor_detailFn {
   my $now = time();
   my $formNo = 1;
   foreach my $ip ( @ips ) {
-    my @devices = getDevicesForIp($hash, $ip);
-    foreach my $dev ( @devices ) {
+    my @devrefs = getDevicesForIp($hash, $ip);
+    foreach my $dev ( @devrefs ) {
       if ($dev->{expires} < $now) {
         Log3 $hash->{NAME}, 1, "Device " . $dev->{name} . " has expired, no messages seen";
-        if (scalar @devices == 1) {
+        if (scalar @devrefs == 1) {
           delete $hash->{".ip2device"}->{$ip};
         } else {
-          @devices = grep { $_->{expires} > $now } @devices;
-          $hash->{".ip2device"}->{$ip} = \ @devices;
+          @devrefs = grep { $_->{expires} > $now } @devrefs;
+          $hash->{".ip2device"}->{$ip} = \ @devrefs;
         }
         next;
       }
@@ -815,8 +818,8 @@ sub ShellyMonitor_Notify
     my @ips = ( keys %{$hash->{".ip2device"}} );
     $ip2devicesDirty = 0;
     foreach my $ip ( @ips ) {
-      my @devices = getDevicesForIp($hash, $ip);
-      foreach my $dev ( @devices ) {
+      my @devrefs = getDevicesForIp($hash, $ip);
+      foreach my $dev ( @devrefs ) {
         next unless ($dev->{name} eq $evDev1);
         $ip2devicesDirty = 1;
         delete $hash->{".ip2device"}->{$ip} if ($evType eq "DELETED");
@@ -874,11 +877,11 @@ sub ShellyMonitor_Set
   my @ips = grep { $_ =~ qr/^$sValue$/ } ( keys %{$hash->{".ip2device"}} );
   return "Provided IP $sValue did not match any IPs" unless (scalar @ips>=1);
   foreach my $ip ( @ips ) {
-    my @devices = getDevicesForIp($hash, $ip);
-    next unless (@devices);
-    my $device = $devices[0];
+    my @devrefs = getDevicesForIp($hash, $ip);
+    next unless (@devrefs);
+    my $device = $devrefs[0];
     next if ($device->{isDefined});
-    Log3 $name, 1, "AutoCreate called for IP $ip, #devices=" . scalar @devices;
+    Log3 $name, 1, "AutoCreate called for IP $ip, #devices=" . scalar @devrefs;
     my $dname = defined $devName ? $devName : $device->{name};
     $device->{name} = $dname;
     my $model = $device->{model};
@@ -945,15 +948,24 @@ sub getDevicesForIp {
   my ($hash, $ip) = @_;
   my $ip2devices = $hash->{".ip2device"}->{$ip};
   return unless ($ip2devices);
-  my @devices = @{$ip2devices};
-  foreach ( @devices ) {
+  my @devrefs = @{$ip2devices};
+  foreach ( @devrefs ) {
     if (ref $_ ne "HASH") { 
-      @devices = ();
       delete $hash->{".ip2device"}->{$ip};
-      Log3 $hash->{NAME}, 1, "Panic, it happened: Cache for $ip did contain a none-hash";
+      @devrefs = ();
+      Log3 $hash->{NAME}, 1, "Panic, it happened: Cache for $ip did contain a none-hash, $_ instead";
     }
   }
-  return @devices;
+  return @devrefs;
+}
+
+sub completecheck {
+  my ($hash) = @_;
+  my @is = ( keys %{$hash->{".ip2device"}} );
+  foreach my $ip ( @is ) {
+    my @devrefs = getDevicesForIp($hash, $ip);
+Log3 $hash->{NAME}, 4, "IP: $ip " . scalar @devrefs . " entries";
+  }
 }
 
 1;
