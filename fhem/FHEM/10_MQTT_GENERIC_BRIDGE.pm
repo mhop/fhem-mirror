@@ -33,7 +33,7 @@
 # 19.01.2021 1.2.9
 # improvement: increment 'incoming-count' only if at least one device is affected
 # bugfix     : fix parse loop over MGB instances for the same IODev (MQTT2-IO only)
-# 
+# change     : check IOType (MQTT, MQTT2x) slightly improved
 #
 # 19.01.2021 1.2.9
 # change     : ParseFn gibt jetzt immer [NEXT] zurueck
@@ -556,7 +556,8 @@ sub isConnected($);
 sub ioDevConnect($);
 sub ioDevDisconnect($);
 sub updateDevCount($);
-sub retrieveIODev($);
+sub retrieveIODevName($);
+sub retrieveIODevType($);
 sub isIODevMQTT2($);
 sub isIODevMQTT2_CLIENT($);
 sub isIODevMQTT($);
@@ -669,21 +670,33 @@ sub refreshUserAttr($) {
 }
 
 # liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
-sub retrieveIODev($) {
+sub retrieveIODevName($) {
   my ($hash) = @_;
+  my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
+  return $iodn;
+}
+
+# liefert TYPE des IODev, wenn definiert (MQTT; MQTT2,..)
+sub retrieveIODevType($) {
+  my ($hash) = @_;
+  
+  return $hash->{+HELPER}->{+IO_DEV_TYPE} if defined $hash->{+HELPER}->{+IO_DEV_TYPE};
+
   my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
   my $iodt = undef;
   if(defined($iodn) and defined($defs{$iodn})) {
     $iodt = $defs{$iodn}{TYPE};
   }
   $hash->{+HELPER}->{+IO_DEV_TYPE} =  $iodt;
-  return ($iodt, $iodn);
+  #return ($iodt, $iodn);
+  return $iodt;
+  #return $hash->{+HELPER}->{+IO_DEV_TYPE};
 }
 
 # prueft, ob IODev MQTT-Instanz ist
 sub isIODevMQTT($) {
   my ($hash) = @_;
-  my ($iodt, $iodn) = retrieveIODev($hash);
+  my $iodt = retrieveIODevType($hash);
   return 0 unless defined $iodt;
   return 0 unless $iodt eq 'MQTT';
   return 1;
@@ -707,14 +720,14 @@ sub checkIODevMQTT2_CLIENT($) {
 # prueft, ob IODev MQTT2-Instanz ist
 sub isIODevMQTT2($) {
   my ($hash) = @_;
-  my ($iodt, $iodn) = retrieveIODev($hash);
+  my $iodt = retrieveIODevType($hash);
   return checkIODevMQTT2($iodt);
 }
 
 # prueft, ob IODev MQTT2_CLIENT-Instanz ist
 sub isIODevMQTT2_CLIENT($) {
   my ($hash) = @_;
-  my ($iodt, $iodn) = retrieveIODev($hash);
+  my $iodt = retrieveIODevType($hash);
   return checkIODevMQTT2_CLIENT($iodt);
 }
 
@@ -823,11 +836,11 @@ sub isConnected($) {
   return 1 if isIODevMQTT2($hash);
   # ich weiß nicht, ob das eine gute Idee ist, zu prüfen, evtl. wird FHEM-Standard-writeBuffef für das Senden nach dem Connect selbst sorgen
   # in diesem Fall koenne wir annehmen, dass immer connected ist und keine eigene Warteschlangen verwenden
-  # my ($iodt, $iodn) = retrieveIODev($hash);
+  # my $iodt = retrieveIODevType($hash);
   # return 0 unless defined $iodt;
   # return 1 if $iodt eq 'MQTT2_SERVER'; # immer 'verbunden'
   # if($iodt eq 'MQTT2_CLIENT') { # Status pruefen
-  #   my $iodn = AttrVal($hash->{NAME}, "IODev", undef);
+  #   my $iodn = retrieveIODevName($hash);
   #   return 1 if (ReadingsVal($iodn, "state", "") eq "opened");
   #   return 0;
   # }
@@ -2449,7 +2462,7 @@ sub doPublish($$$$$$$$) {
     $hash->{message_ids}->{$msgid}++ if defined $msgid;
     return 'empty topic or message';
   } else {
-    my ($iodt, $iodn) = retrieveIODev($hash);
+    my $iodt = retrieveIODevType($hash);
     $iodt = 'undef' unless defined $iodt;
     Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] unknown IODev: ".$iodt);
     return 'unknown IODev';
@@ -2793,9 +2806,10 @@ sub Parse($$) {
   foreach my $dev (@instances) {
     my $hash = $defs{$dev};
     # Name mit IODev vegleichen
-    my ($iiodt, $iiodn) = retrieveIODev($hash);
+    my $iiodn = retrieveIODevName($hash);
     #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE: [$hash->{NAME}] Parse: test IODev: $iiodn vs. $ioname");
     next unless $ioname eq $iiodn;
+    my $iiodt = retrieveIODevType($hash);
     next unless checkIODevMQTT2($iiodt);
     #next unless isIODevMQTT2($hash);
 
