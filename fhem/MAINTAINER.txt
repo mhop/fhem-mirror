@@ -274,6 +274,7 @@ FHEM/51_I2C_TSL2561.pm       jensb                Sonstige Systeme
 FHEM/51_MOBILEALERTS.pm      MarkusF              Sonstige Systeme
 FHEM/51_Netzer.pm            klausw               Sonstige Systeme
 FHEM/51_RPI_GPIO.pm          klausw               Einplatinencomputer
+FHEM/52_I2C_ADS1x1x          Adimarantis          Sonstige Systeme
 FHEM/52_I2C_BME280           klausw               Sonstige Systeme
 FHEM/52_I2C_DS1307           ntruchsess           Sonstige Systeme
 FHEM/52_I2C_EEPROM.pm        klausw               Sonstige Systeme
