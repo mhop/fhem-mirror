@@ -241,6 +241,11 @@ my %DEVID_ATTRS = (
     "SHBDUO-1" => "widgetOverride ct:colorpicker,CT,2700,10,6500"
 );
 
+my %DEVID_TTL_OVERRIDE = (
+    "SHWT-1"   => 90000,
+    "SHHT-1"   => 90000
+);
+
 
 # SHWT-1 = Shelly Flood, should go to generic
 
@@ -489,12 +494,12 @@ sub ShellyMonitor_DoRead
       }
     }
 
-    foreach ( @devrefs ) {
-      $_->{expires} = time()+$validity;
-    }
-
     # Header parsed, processing data...
     my ($devtype, $devid, $devversion) = split (/#/, $global_devid);
+
+    foreach ( @devrefs ) {
+      $_->{expires} = time() + ( $DEVID_TTL_OVERRIDE{$devtype} // $validity );
+    }
 
     # Handle ignoring of devices
     my $ignoreRegexp = $hash->{".ignoreDevices"};
