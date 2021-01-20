@@ -291,7 +291,7 @@ my $kJtokWh     = 0.00027778;                                                   
 my $defmaxvar   = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-
+my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
 
 ################################################################
 #               Init Fn
@@ -993,7 +993,7 @@ sub _transferDWDForecastValues {
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
       
-      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." Wh";               # original Vorhersagedaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
+      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." kJ/m2";            # original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";         
@@ -2260,17 +2260,25 @@ sub calcFromHistory {
   my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
   my $pvhh = $data{$type}{$name}{pvhist};
   
-  my $maxd = 31;
+  $calcmaxd = 30;
   
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
   my ($idx) = grep {$k[$_] eq "$day"} (0..@k-1);                                          # Index des aktuellen Tages
   
-  my $below = $idx;                                                                       # Anzahl aller Elemente im Array unter dem aktuellen Tag
+  if(defined $idx) {
+      my $ei = $idx-1;
+      $ei    = $ei < 0 ? $ile : $ei;
+      my @efa;
+      
+      for my $e (0..$calcmaxd) {
+          last if($e == $calcmaxd || $k[$ei] == $day);
+          push @efa, $k[$ei];
+          $ei--;
+      }
+      # Log3 ($name, 1, "$name - PV History Array -> Index last element: $ile, Day $day has index $idx. Days for calc: ".join " ",@efa); 
+  }
   
-  
-  # Log3 ($name, 1, "$name - PV History Array: Index last element: $ile, Day $day has index $idx. All days: ".join " ",@k); 
-    
 return;
 }
 
