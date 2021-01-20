@@ -114,7 +114,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.2.0"  => "use SMUtils, JSON, implement getter data,html,pvHistory ",
+  "0.2.0"  => "use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -293,13 +293,16 @@ my $definterval = 70;                                                           
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
 
+my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
+
 ################################################################
 #               Init Fn
 ################################################################
 sub Initialize {
   my ($hash) = @_;
 
-  my $fwd = join(",",devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized")); 
+  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized"); 
+  my $cda = join ",", @consdays;
   
   $hash->{DefFn}              = \&Define;
   $hash->{GetFn}              = \&Get;
@@ -331,6 +334,7 @@ sub Initialize {
                                 "layoutType:pv,co,pvco,diff ".
                                 "maxVariancePerDay ".
                                 "maxPV ".
+                                "numHistDays:$cda ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
                                 "showLink:1,0 ".
@@ -782,16 +786,9 @@ sub Attr {
         if($cmd eq "set") {
             $do = ($aVal) ? 1 : 0;
         }
-        $do = 0 if($cmd eq "del");
+        $do  = 0 if($cmd eq "del");
         $val = ($do == 1 ? "disabled" : "initialized");
         readingsSingleUpdate($hash, "state", $val, 1);
-        
-        if($do == 1) {
-            my @allrds = keys%{$defs{$name}{READINGS}};
-            foreach my $key(@allrds) {
-                delete($defs{$name}{READINGS}{$key}) if($key ne "state");
-            }
-        }
     }
     
     if($aName eq "icon") {
@@ -2175,7 +2172,7 @@ sub calcVariance {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   
-  calcFromHistory ($paref);
+  my ($pvavg,$fcavg) = calcFromHistory ($paref);                                        # historische PV / Forecast Vergleichswerte ermitteln
 
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
@@ -2210,10 +2207,10 @@ sub calcVariance {
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h >= $chour);
-      my $fcnum = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
-      next if(!$fcnum);
+      my $fcval = $fcavg // ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      next if(!$fcval);
  
-      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvval = $pvavg // ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
@@ -2225,9 +2222,9 @@ sub calcVariance {
       my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);             # bisher definierter Korrekturfaktor
       $oldfac    = 1 if(1*$oldfac == 0);
       
-      my $factor = sprintf "%.2f", ($pvval / $fcnum);                                             # Faktorberechnung: reale PV / Prognose
+      my $factor = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
       
-      Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcnum");
+      Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
@@ -2253,14 +2250,14 @@ sub calcFromHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
-  my $chour = $paref->{chour};
+  my $chour = $paref->{chour};                                                            # Stunde für die der Durchschnitt bestimmt werden soll
   
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};  
-  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
-  my $pvhh = $data{$type}{$name}{pvhist};
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};  
+  my $day   = strftime "%d", localtime($t);                                               # aktueller Tag
+  my $pvhh  = $data{$type}{$name}{pvhist};
   
-  $calcmaxd = 30;
+  my $calcd = AttrVal($name, "numHistDays", $calcmaxd);
   
   my @k     = sort {$a<=>$b} keys %{$pvhh};
   my $ile   = $#k;                                                                        # Index letztes Arrayelement
@@ -2271,12 +2268,29 @@ sub calcFromHistory {
       $ei    = $ei < 0 ? $ile : $ei;
       my @efa;
       
-      for my $e (0..$calcmaxd) {
-          last if($e == $calcmaxd || $k[$ei] == $day);
-          push @efa, $k[$ei];
+      for my $e (0..$calcd) {
+          last if($e == $calcd || $k[$ei] == $day);
+          unshift @efa, $k[$ei];
           $ei--;
       }
-      # Log3 ($name, 1, "$name - PV History Array -> Index last element: $ile, Day $day has index $idx. Days for calc: ".join " ",@efa); 
+      
+      Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Days ($calcd) for calc: ".join " ",@efa); 
+  
+      my $pvhh         = $data{$type}{$name}{pvhist};
+      my $anzavg       = scalar(@efa);
+      my ($pvrl,$pvfc) = (0,0);
+      
+      for my $dayfa (@efa) {
+          $pvrl += $pvhh->{$dayfa}{$chour}{pvrl};
+          $pvfc += $pvhh->{$dayfa}{$chour}{pvfc};
+      }
+      
+      my $pvavg = $pvrl / $anzavg;
+      my $fcavg = $pvfc / $anzavg;
+      
+      Log3 ($name, 4, "$name - PV History -> average hour ($chour) -> real: $pvavg, forecast: $fcavg");
+      
+      return ($pvavg,$fcavg);
   }
   
 return;
@@ -2784,6 +2798,13 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
        </li>
        <br>
        
+       <a name="hourCount"></a>
+       <li><b>hourCount &lt;4...24&gt; </b><br>
+         Anzahl der Balken/Stunden. <br>
+         (default: 24)
+       </li>
+       <br>
+       
        <a name="headerDetail"></a>
        <li><b>headerDetail &lt;all | co | pv | pvco | statusLink&gt; </b><br>
          Detailiierungsgrad der Kopfzeilen. <br>
@@ -2802,13 +2823,6 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
        </li>
        <br>                                      
        
-       <a name="hourCount"></a>
-       <li><b>hourCount &lt;4...24&gt; </b><br>
-         Anzahl der Balken/Stunden. <br>
-         (default: 24)
-       </li>
-       <br>
-       
        <a name="hourStyle"></a>
        <li><b>hourStyle </b><br>
          Format der Zeitangabe. <br><br>
@@ -2823,6 +2837,18 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
        </ul>       
        </li>
        <br>
+       
+       <a name="htmlStart"></a>
+       <li><b>htmlStart &lt;HTML-String&gt; </b><br>
+         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
+       </li>
+       <br>
+
+       <a name="htmlEnd"></a>
+       <li><b>htmlEnd &lt;HTML-String&gt; </b><br>
+         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
+       </li>
+       <br> 
        
        <a name="interval"></a>
        <li><b>interval &lt;Sekunden&gt; </b><br>
@@ -2846,17 +2872,13 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
        </li>
        <br>
        
-       <a name="htmlStart"></a>
-       <li><b>htmlStart &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der vor dem Grafik-Code ausgeführt wird. 
+       <a name="numHistDays"></a>
+       <li><b>numHistDays </b><br>
+         Anzahl der vergangenen Tage die zur Durchschnittsermittlung von PV Erzeugung und PV Vorhersage aus den historischen 
+         Daten verwendet werden. Diese Werte dienen zur automatischen Vorhersageanpassung sofern verwendet. <br>
+         (default: 30)
        </li>
        <br>
-
-       <a name="htmlEnd"></a>
-       <li><b>htmlEnd &lt;HTML-String&gt; </b><br>
-         Angabe eines beliebigen HTML-Strings der nach dem Grafik-Code ausgeführt wird. 
-       </li>
-       <br> 
    
        <a name="showDiff"></a>
        <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
