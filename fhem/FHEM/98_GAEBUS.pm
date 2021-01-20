@@ -55,6 +55,7 @@
 # 16.01.2020 : A.Goebel : add ignore error messages returned by ebusd
 # 05.02.2020 : A.Goebel : change substitute tilde by slash in attribute names (delimiter)
 # 16.02.2020 : A.Goebel : fix also request broadcast messages periodic call (fix from Tomy) 
+# 20.01.2021 : A.Goebel : fix remove deprecated attribute loglevel
 
 package main;
 
@@ -98,7 +99,7 @@ my $allGetParams           = "";
 my $allGetParamsForWriting = "";
 my $delimiter              = "_";
 
-my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes";
+my $attrsDefault = "do_not_notify:1,0 disable:1,0 dummy:1,0 showtime:1,0 ebusWritesEnabled:0,1 valueFormat:textField-long $readingFnAttributes";
 my %ebusCmd  = ();
 
 #####################################
@@ -1437,7 +1438,7 @@ GAEBUS_valueFormat(@)
     <li><a href="#attrdummy">disable</a></li><br>
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#verbose">verbose</a></li><br>
     <li>ebusWritesEnabled 0,1<br>
         disable (0) or enable (1) that commands can be send to ebus devices<br>
         See also description for Set and Get<br>
