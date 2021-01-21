@@ -114,7 +114,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.2.0"  => "use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
+  "0.3.0"  => "21.12.2021  implement cloud correction ",
+  "0.2.0"  => "20.12.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -292,6 +293,7 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
+my $cloudslope  = 20;                                                            # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
 
@@ -1058,7 +1060,8 @@ sub _transWeatherValues {
           $epoche   = $t + (3600*$num);
       }
 
-      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww", 99);                               # 55_DWD -> 0 .. 98 definiert , 99 ist nicht vorhanden                                                    # führende 0 einfügen wenn nötig
+      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  99);                              # 55_DWD -> 0 .. 98 definiert , 99 ist nicht vorhanden                                                    # führende 0 einfügen wenn nötig
+      my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
       
       my $fhstr = sprintf "%02d", $fh;
       
@@ -1075,6 +1078,7 @@ sub _transWeatherValues {
       
       $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
       $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
+      $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
   }
       
 return;
@@ -2151,22 +2155,28 @@ sub calcPVforecast {
   my $rad  = shift;                                                                     # Nominale Strahlung aus DWD Device
   my $fh   = shift;                                                                     # Stunde des Tages 
   
+  my $hash = $defs{$name};
+  
   my $ma = ReadingsNum ($name, "moduleArea",                              0        );   # Solar Modulfläche (gesamt)
   my $ta = ReadingsNum ($name, "moduleTiltAngle",                         45       );   # Neigungswinkel Solarmodule
   my $me = ReadingsNum ($name, "moduleEfficiency",                        $defpvme );   # Solar Modul Wirkungsgrad (%)
   my $ie = ReadingsNum ($name, "inverterEfficiency",                      $definve );   # Solar Inverter Wirkungsgrad (%)
   my $hc = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
   
+  my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;  # effektive Wolkendecke
+  my $cloudk     = $cloudslope * 0.01;                                                  # Steilheit Faktor effektive Wolkendecke
+  my $ccf        = 1 - ($cloudcover * $cloudk / 100);                                   # Cloud Correction Faktor
+  
   $hc    = 1 if(1*$hc == 0);
   
-  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * 1000);
+  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * $ccf * 1000);
   
   my $kw =  AttrVal ($name, 'Wh/kWh', 'Wh');
   if($kw eq "Wh") {
       $pv = int $pv;
   }
  
-  Log3($name, 5, "$name - calcPVforecast - Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", pvCorrectionFactor: $hc");
+  Log3($name, 5, "$name - calcPVforecast - Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", pvCorrectionFactor: $hc, Cloudfactor: $ccf");
   
 return $pv;
 }
@@ -2618,7 +2628,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
     <ul>
       <a name="inverterEfficiency"></a>
       <li><b>inverterEfficiency &lt;Zahl&gt; </b> <br> 
-      Wirkungsgrad des Wechselrichters (currentInverterDev) in %. <br>
+      Wirkungsgrad des Wechselrichters (currentInverterDev) in % laut Herstellerangabe. <br>
       (default: 98.3)      
       </li>
     </ul>
@@ -2635,7 +2645,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
     <ul>
       <a name="moduleEfficiency"></a>
       <li><b>moduleEfficiency &lt;Zahl&gt; </b> <br> 
-      Wirkungsgrad der Solarmodule in %.  <br>
+      Wirkungsgrad der Solarmodule in % laut Herstellerangabe.  <br>
       (default: 16.52)      
       </li>
     </ul>
