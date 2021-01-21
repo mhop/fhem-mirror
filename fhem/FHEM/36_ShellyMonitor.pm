@@ -217,6 +217,7 @@ my %DEVID_MODEL = (
     "SHBDUO-1" => "shellybulb",
     "SHWT-1"   => "generic",
     "SHHT-1"   => "generic",
+    "SHGS-1"   => "generic",
     "SHBTN-2"  => "generic"
 );
 
@@ -236,6 +237,7 @@ my %DEVID_PREFIX = (
     "SHBDUO-1" => "shelly_duo",
     "SHWT-1"   => "shelly_flood",
     "SHHT-1"   => "shelly_ht",
+    "SHGS-1"   => "shelly_gas",
     "SHBTN-2"  => "shelly_button"
 );
 
@@ -248,11 +250,14 @@ my %DEVID_ATTRS = (
 my %DEVID_TTL_OVERRIDE = (
     "SHWT-1"   => 90000,
     "SHHT-1"   => 90000,
+    "SHGS-1"   => 90000,
     "SHBTN-2"   => 90000
 );
 
-
 # SHWT-1 = Shelly Flood, should go to generic
+# SHHT-1 = Shelly H&T, should go to generic
+# SHGS-1 = Shelly Gas, should go to generic
+# SHBTN-2 = Shelly Button, should go to generic
 
 my %ROLLER_STATUS_MAP = (
     "open" => "moving_up",
