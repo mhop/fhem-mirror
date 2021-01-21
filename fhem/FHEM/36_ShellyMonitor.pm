@@ -242,9 +242,23 @@ my %DEVID_PREFIX = (
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
+
+my $devicon_lametta_pm0 = 'devStateIcon {my $lderr = ReadingsVal($name,"network","-")' .
+   ' !~ /^.*>connected.*/?"10px-kreis-rot":"10px-kreis-gruen"; ' .
+   'my $light = ReadingsVal($name,"relay_0","off"); ' .
+   'my $cons = ReadingsVal($name,"power","unknown");' . 
+   'my $kwh = sprintf("%.2f kWh", ReadingsVal($name,"energy",0)/1000.0);' .
+   'FW_makeImage($lderr)."<a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">' .
+   '".FW_makeImage($light)."</a><div>$cons W / $kwh</div>"}';
+
+my $devicon_lametta_pm = $devicon_lametta_pm0;
+$devicon_lametta_pm =~ s/_0//;
+
 my %DEVID_ATTRS = (
-    "SHDM-2"   => "webCmd pct:on:off widgetOverride pct:slider,0,1,100",
-    "SHBDUO-1" => "widgetOverride ct:colorpicker,CT,2700,10,6500"
+    "SHDM-2"   => [ ( "webCmd pct:on:off", "widgetOverride pct:slider,0,1,100", $devicon_lametta_pm0 ) ],
+    "SHBDUO-1" => [ ( "widgetOverride ct:colorpicker,CT,2700,10,6500", $devicon_lametta_pm0 ) ],
+    "SHCB-1"   => [ ( $devicon_lametta_pm0 ) ],
+    "SHSW-PM"  => [ ( $devicon_lametta_pm ) ],
 );
 
 my %DEVID_TTL_OVERRIDE = (
@@ -926,10 +940,9 @@ sub ShellyMonitor_Set
     return "Creation of device '$dname' failed" unless ($defs{$dname});
 
     my $attrs = $device->{attrs};
-    if (defined $attrs) {
-      my @a = split / /, $attrs;
-      while (my $aname = shift @a) {
-        CommandAttr ( undef, $dname . " $aname " . shift @a );
+    if ($attrs) {
+      foreach (@{$attrs}) {
+        CommandAttr ( undef, $dname . ' ' . $_ );
       }
     }
     if (defined $mode) {
