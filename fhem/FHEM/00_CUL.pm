@@ -960,7 +960,7 @@ CUL_Ready($)
 {
   my ($hash) = @_;
 
-  return DevIo_OpenDev($hash, 1, "CUL_DoInit")
+  return DevIo_OpenDev($hash, 1, "CUL_DoInit", sub(){})
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
