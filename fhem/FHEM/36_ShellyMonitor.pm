@@ -212,10 +212,12 @@ my %DEVID_MODEL = (
     "SHDM-2"   => "shellydimmer",
     "SHSW-44"  => "shelly4",
     "SHRGBW2"  => "shellyrgbw",
+    "SHCB-1"   => "shellybulb",
     "SHBLB-1"  => "shellybulb",
     "SHBDUO-1" => "shellybulb",
     "SHWT-1"   => "generic",
-    "SHHT-1"   => "generic"
+    "SHHT-1"   => "generic",
+    "SHBTN-2"  => "generic"
 );
 
 # Mapping of DeviceId in Multicast to suggested generic name
@@ -230,9 +232,11 @@ my %DEVID_PREFIX = (
     "SHSW-44"  => "shelly_4",
     "SHRGBW2"  => "shelly_rgbw",
     "SHBLB-1"  => "shelly_bulb",
+    "SHCB-1"   => "shelly_duo",
     "SHBDUO-1" => "shelly_duo",
     "SHWT-1"   => "shelly_flood",
-    "SHHT-1"   => "shelly_ht"
+    "SHHT-1"   => "shelly_ht",
+    "SHBTN-2"  => "shelly_button"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
@@ -243,7 +247,8 @@ my %DEVID_ATTRS = (
 
 my %DEVID_TTL_OVERRIDE = (
     "SHWT-1"   => 90000,
-    "SHHT-1"   => 90000
+    "SHHT-1"   => 90000,
+    "SHBTN-2"   => 90000
 );
 
 
@@ -642,7 +647,7 @@ sub ShellyMonitor_DoRead
           my $rname = $defarr->{"desc"};
           #$rname .= "(" . $defarr->{"unit"} . ")" if ($defarr->{"unit"});
 
-          if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*)$/) {
+          if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
             my $rtype = $1;
             my $rno = $2;
 
@@ -692,6 +697,8 @@ sub ShellyMonitor_DoRead
                 readingsBulkUpdateIfChanged($device, "last_dir", "up") if ($svalue eq "open") ;
               } elsif ($rtype eq "mode" && $haveAutoCreated==1) {
 		CommandAttr ( undef, $_->{name} . ' mode ' . $svalue);
+              } elsif ($rtype eq "colorTemp") {
+                readingsBulkUpdateIfChanged($device, "ct", $svalue);
               } elsif ($rtype =~ /L-(red|green|blue|white)/) {
                 $rgb{$1} = $svalue;
                 $rgbdevices{$_->{name}} = 1;
@@ -932,7 +939,7 @@ sub ShellyMonitor_Set
     if ($model =~ /shellydimmer.*/) {
       CommandAttr ( undef, $dname . ' webCmd pct:on:off' );
     }
-    CommandAttr ( undef, $dname . ' interval 600' );
+    CommandAttr ( undef, $dname . ( $model eq 'generic' ? ' interval 0' : ' interval 600' ) );
     $created++;
   }
   FW_directNotify("#FHEMWEB:WEB", "location.reload('true')", "") if ($created>0);
