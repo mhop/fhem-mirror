@@ -500,6 +500,10 @@ sub _setinverterDevice {                 ## no critic "not used"
   if(!$indev || !$defs{$indev}) {
       return qq{The device "$indev" doesn't exist!};
   }
+  
+  if(!$h->{pv} || !$h->{etoday}) {
+      return qq{The syntax of "$opt" isn't right. Please consider the commandref.};
+  }  
 
   readingsSingleUpdate($hash, "currentInverterDev", $arg, 1);
   createNotifyDev     ($hash);
@@ -527,6 +531,10 @@ sub _setmeterDevice {                    ## no critic "not used"
   if(!$medev || !$defs{$medev}) {
       return qq{The device "$medev" doesn't exist!};
   }
+  
+  if(!$h->{gcon}) {
+      return qq{The syntax of "$opt" isn't right. Please consider the commandref.};
+  }  
 
   readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
   createNotifyDev     ($hash);
@@ -2172,8 +2180,6 @@ sub calcVariance {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   
-  my ($pvavg,$fcavg) = calcFromHistory ($paref);                                        # historische PV / Forecast Vergleichswerte ermitteln
-
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
       Log3($name, 4, "$name - automatic Variance calculation is switched off."); 
@@ -2207,10 +2213,10 @@ sub calcVariance {
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h >= $chour);
-      my $fcval = $fcavg // ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
+      my $fcval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
       next if(!$fcval);
  
-      my $pvval = $pvavg // ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+      my $pvval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
       next if(!$pvval);
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
@@ -2219,12 +2225,16 @@ sub calcVariance {
           next;
       }
 
-      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);             # bisher definierter Korrekturfaktor
+      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);                     # bisher definierter Korrekturfaktor
       $oldfac    = 1 if(1*$oldfac == 0);
       
-      my $factor = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
-      
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
+      
+      $paref->{hour}     = $h;
+      my ($pvavg,$fcavg) = calcFromHistory ($paref);                                                      # historische PV / Forecast Vergleichswerte ermitteln
+      $pvval             = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;
+      $fcval             = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;
+      my $factor         = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
       
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
@@ -2250,7 +2260,7 @@ sub calcFromHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
-  my $chour = $paref->{chour};                                                            # Stunde für die der Durchschnitt bestimmt werden soll
+  my $hour  = $paref->{hour};                                                             # Stunde für die der Durchschnitt bestimmt werden soll
   
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};  
@@ -2281,14 +2291,14 @@ sub calcFromHistory {
       my ($pvrl,$pvfc) = (0,0);
       
       for my $dayfa (@efa) {
-          $pvrl += $pvhh->{$dayfa}{$chour}{pvrl};
-          $pvfc += $pvhh->{$dayfa}{$chour}{pvfc};
+          $pvrl += $pvhh->{$dayfa}{$hour}{pvrl};
+          $pvfc += $pvhh->{$dayfa}{$hour}{pvfc};
       }
       
       my $pvavg = $pvrl / $anzavg;
       my $fcavg = $pvfc / $anzavg;
       
-      Log3 ($name, 4, "$name - PV History -> average hour ($chour) -> real: $pvavg, forecast: $fcavg");
+      Log3 ($name, 4, "$name - PV History -> average hour ($hour) -> real: $pvavg, forecast: $fcavg");
       
       return ($pvavg,$fcavg);
   }
