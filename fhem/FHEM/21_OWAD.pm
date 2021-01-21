@@ -1262,18 +1262,11 @@ sub OWXAD_BinValues($$$$$$$) {
     $hash->{ERRSTATE} = 1;
   };
   
-        
   #=============== get the voltage reading ===============================
   if( $context =~ /^ds2450.getreading/ ){
     for( my $i=0;$i<int(@owg_fixed);$i++){
       $hash->{owg_val}->[$i]= (ord($data[2*$i])+256*ord($data[1+2*$i]) )/(1<<$owg_resoln[$i]) * $owg_range[$i]/1000;
     }
-    
-    2021.01.17 05:31:05 1: PERL WARNING: Use of uninitialized value within @owg_resoln in left bitshift (<<) at /opt/fhem/FHEM/21_OWAD.pm line 1270.
-2021.01.17 05:31:05 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1270.
-2021.01.17 05:31:06 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1276.
-2021.01.17 05:31:06 1: PERL WARNING: Use of uninitialized value in multiplication (*) at /opt/fhem/FHEM/21_OWAD.pm line 1277.
-    
     
   #=============== get the alarm reading ===============================
   } elsif ( $context =~ /^ds2450.getalarm/ ){
