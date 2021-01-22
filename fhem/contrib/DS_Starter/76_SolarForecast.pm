@@ -114,7 +114,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.3.0"  => "21.12.2021  implement cloud correction ",
+  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction ",
   "0.2.0"  => "20.12.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
@@ -157,7 +157,7 @@ my %hget = (                                                                # Ha
   pvHistory => { fn => \&_getlistPVHistory, needcred => 0 },
 );
 
-my %htilt = (                                                               # Faktor für Neigungswinkel der Solarmodule
+my %htilt = (                                                               # Faktor für Neigungswinkel der Solarmodule (Südausrichtung)
   "0"  => 1.00,                                                             # https://www.labri.fr/perso/billaud/travaux/Helios/Helios2/resources/de04/Chapter_4_DE.pdf
   "10" => 1.06,
   "20" => 1.15,
@@ -293,8 +293,12 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
+
 my $cloudslope  = 0.55;                                                          # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
+
+my $rainslope   = 0.30;                                                          # Steilheit des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
 
@@ -1067,6 +1071,7 @@ sub _transWeatherValues {
 
       my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  99);                              # 55_DWD -> 0 .. 98 definiert , 99 ist nicht vorhanden                                                    # führende 0 einfügen wenn nötig
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
+      my $r101  = ReadingsNum($fcname, "fc${fd}_${fh}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
       
       my $fhstr = sprintf "%02d", $fh;
       
@@ -1084,6 +1089,7 @@ sub _transWeatherValues {
       $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
       $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
       $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
+      $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
   }
       
 return;
@@ -2176,16 +2182,19 @@ sub calcPVforecast {
   my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;  # effektive Wolkendecke
   my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);               # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
+  my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_RainProb"} // 0;    # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                   # Rain Correction Faktor mit Steilheit
+  
   $hc    = 1 if(1*$hc == 0);
   
-  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * $ccf * 1000);
+  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
   
   my $kw =  AttrVal ($name, 'Wh/kWh', 'Wh');
   if($kw eq "Wh") {
       $pv = int $pv;
   }
  
-  Log3($name, 5, "$name - calcPVforecast - Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", pvCorrectionFactor: $hc, Cloudfactor: $ccf");
+  Log3($name, 5, "$name - calcPVforecast -> Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", Cloudfactor: $ccf, Rainfactor: $rcf, pvCorrectionFactor: $hc");
   
 return $pv;
 }
@@ -2345,8 +2354,10 @@ sub setPVhistory {
   my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
   my $pvhh = $data{$type}{$name}{pvhist};  
   
-  $pvhh->{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);    # realer Energieertrag
-  $pvhh->{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);       # prognostizierter Energieertrag
+  $pvhh->{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);                        # realer Energieertrag
+  $pvhh->{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);                           # prognostizierter Energieertrag
+  
+  Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
     
 return;
 }
