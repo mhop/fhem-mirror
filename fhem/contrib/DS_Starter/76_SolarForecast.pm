@@ -293,7 +293,8 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
-my $cloudslope  = 20;                                                            # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cloudslope  = 0.55;                                                          # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
 
@@ -2173,8 +2174,7 @@ sub calcPVforecast {
   my $hc = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
   
   my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;  # effektive Wolkendecke
-  my $cloudk     = $cloudslope * 0.01;                                                  # Steilheit Faktor effektive Wolkendecke
-  my $ccf        = 1 - ($cloudcover * $cloudk / 100);                                   # Cloud Correction Faktor
+  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);               # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   $hc    = 1 if(1*$hc == 0);
   
