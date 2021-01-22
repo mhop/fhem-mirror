@@ -2317,8 +2317,8 @@ sub calcFromHistory {
           $pvfc += $pvhh->{$dayfa}{$hour}{pvfc} // 0;
       }
       
-      my $pvavg = $pvrl / $anzavg;
-      my $fcavg = $pvfc / $anzavg;
+      my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
+      my $fcavg = sprintf "%.2f", $pvfc / $anzavg;
       
       Log3 ($name, 4, "$name - PV History -> average hour ($hour) -> real: $pvavg, forecast: $fcavg");
       
