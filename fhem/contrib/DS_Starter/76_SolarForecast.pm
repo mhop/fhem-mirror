@@ -293,7 +293,7 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
-my $cloudslope  = 20;                                                            # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung
+my $cloudslope  = 20;                                                            # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
 
@@ -698,6 +698,10 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   my $prop  = $paref->{prop} // return qq{no correction value specified};
   
   readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", $prop, 1);
+  
+  if($prop eq "off") {
+      deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
+  }
 
 return;
 }
@@ -1074,7 +1078,7 @@ sub _transWeatherValues {
       
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh}_wwd", '');
       
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt");
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff");
       
       $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
       $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
@@ -2149,6 +2153,11 @@ sub TimeAdjust {
 # Damit ergibt sich ein Umrechnungsfaktor von: 0,00140019 für kWh / 1,40019 für Wh
 #
 # Bei einem Rad1h-Wert von 500 ergibt dies bei mir also  0,700095 kWh / 700,095 Wh
+#
+# Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist 
+# hier beschrieben: 
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+#
 ##################################################################################################
 sub calcPVforecast {            
   my $name = shift;
@@ -2183,6 +2192,7 @@ return $pv;
 
 ################################################################
 #       Abweichung PVreal / PVforecast berechnen
+#       bei eingeschalteter automat. Korrektur
 ################################################################
 sub calcVariance {               
   my $paref = shift;
@@ -2242,16 +2252,16 @@ sub calcVariance {
       
       $paref->{hour}     = $h;
       my ($pvavg,$fcavg) = calcFromHistory ($paref);                                                      # historische PV / Forecast Vergleichswerte ermitteln
-      $pvval             = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;
-      $fcval             = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;
+      $pvval             = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                                       # Ertrag aktuelle Stunde berücksichtigen
+      $fcval             = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                                       # Vorhersage aktuelle Stunde berücksichtigen
       my $factor         = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
       
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-          Log3($name, 3, "$name - new limited Variance factor: $factor for hour: $h");
+          Log3($name, 3, "$name - new limited Variance factor: $factor (old: $oldfac) for hour: $h");
       }
       else {
-          Log3($name, 3, "$name - new Variance factor: $factor for hour: $h calculated") if($factor != $oldfac);
+          Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
@@ -2271,6 +2281,8 @@ sub calcFromHistory {
   my $hash  = $paref->{hash};
   my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
   my $hour  = $paref->{hour};                                                             # Stunde für die der Durchschnitt bestimmt werden soll
+  
+  $hour     = sprintf("%02d",$hour);
   
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};  
@@ -2299,10 +2311,10 @@ sub calcFromHistory {
       my $pvhh         = $data{$type}{$name}{pvhist};
       my $anzavg       = scalar(@efa);
       my ($pvrl,$pvfc) = (0,0);
-      
+            
       for my $dayfa (@efa) {
-          $pvrl += $pvhh->{$dayfa}{$hour}{pvrl};
-          $pvfc += $pvhh->{$dayfa}{$hour}{pvfc};
+          $pvrl += $pvhh->{$dayfa}{$hour}{pvrl} // 0;
+          $pvfc += $pvhh->{$dayfa}{$hour}{pvfc} // 0;
       }
       
       my $pvavg = $pvrl / $anzavg;
