@@ -218,7 +218,8 @@ my %DEVID_MODEL = (
     "SHWT-1"   => "generic",
     "SHHT-1"   => "generic",
     "SHGS-1"   => "generic",
-    "SHBTN-2"  => "generic"
+    "SHBTN-2"  => "generic",
+    "SHIX3-1"  => "generic"
 );
 
 # Mapping of DeviceId in Multicast to suggested generic name
@@ -238,7 +239,8 @@ my %DEVID_PREFIX = (
     "SHWT-1"   => "shelly_flood",
     "SHHT-1"   => "shelly_ht",
     "SHGS-1"   => "shelly_gas",
-    "SHBTN-2"  => "shelly_button"
+    "SHBTN-2"  => "shelly_button",
+    "SHIX3-1"  => "shelly_i3"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
@@ -325,6 +327,7 @@ sub MCast_Open {
       $err = "Error adding mcast interface";
       $conn->mcast_add('224.0.1.187') or $err = "Cannot open Multicast socket: $^E";
     }
+    $conn->sockopt(IO::Socket::SO_RCVBUF, 65535);
     $err = undef;
     $hash->{".JSON"} = JSON->new->utf8;
     1;
@@ -664,7 +667,6 @@ sub ShellyMonitor_DoRead
 
         if (defined $defarr) {
           my $rname = $defarr->{"desc"};
-          #$rname .= "(" . $defarr->{"unit"} . ")" if ($defarr->{"unit"});
 
           if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
             my $rtype = $1;
@@ -730,7 +732,20 @@ sub ShellyMonitor_DoRead
 	      # We want to set the mode also for shadow devices
               my $model = $_->{model};
               my $device = $defs{$_->{name}};
+              next unless ($device);
               $svalue = join (' ', @$svalue) if (ref $svalue eq "ARRAY");
+              # In case of inputEventCnt_x, we have to determine the old device reading
+              # to check for changes:
+              if ($rname =~ /^inputEventCnt_(\d)$/) {
+                if (ReadingsVal($_->{name}, $rname, "-1") ne $svalue && $svalue>0) {
+                  $_->{inputEventCnt} = {} unless ($_->{inputEventCnt});
+                  $_->{inputEventCnt}->{$1} = 1;
+                }
+              }
+              if ($rname eq "wakeupEvent" && $svalue eq "button") {
+                # inputEventCnt_0 will be always one, so we force an update:
+                $_->{inputEventCnt} = { "0" => "1" };
+              }
               readingsBulkUpdateIfChanged($device, $rname, $svalue)
                 if (defined $device && (( ! defined $model ) || ($model eq "generic")));
             }
@@ -748,6 +763,14 @@ sub ShellyMonitor_DoRead
             defined $rgb{"red"} && defined $rgb{"green"} && defined $rgb{"blue"}) {
           readingsBulkUpdateIfChanged($device, "rgb",
              sprintf("%02X%02X%02X", $rgb{"red"},$rgb{"green"},$rgb{"blue"}));
+        }
+        if ($_->{inputEventCnt}) {
+          foreach my $i ( keys %{$_->{inputEventCnt}}) {
+            my $rname = "inputEvent_$i";
+            # Old news is recent news :-)
+            readingsBulkUpdate ($device, $rname, ReadingsVal($device->{NAME}, $rname, undef));
+          }
+          delete $_->{inputEventCnt};
         }
         readingsEndUpdate($device, 1) if ($device);
       }
