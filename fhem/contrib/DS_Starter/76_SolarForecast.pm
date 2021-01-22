@@ -2372,6 +2372,8 @@ sub listPVHistory {
   my $type = $hash->{TYPE};
   my $pvhh = $data{$type}{$name}{pvhist};  
   
+  Log3 ($name, 5, "$name - PV History content: ".Dumper $pvhh);
+  
   my $sub = sub { 
       my $day = shift;
       my $ret;          
