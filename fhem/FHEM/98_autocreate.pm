@@ -252,10 +252,11 @@ autocreate_Notify($$)
       $attr{$name}{room} = $room if($room);
 
       $nrcreated = 0 if($temporary); # do not save
-      next if($modules{$hash->{TYPE}}{noAutocreatedFilelog} || $temporary);
+      next if($temporary);
 
       ####################
       my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
+      $fl = undef if($modules{$hash->{TYPE}}{noAutocreatedFilelog});
       my $flname = "FileLog_$name";
       delete($defs{$flname}) if($fl); # If we are re-creating it with createlog.
       my ($gplot, $filter, $devattr) = ("", $name, "");

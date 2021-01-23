@@ -1760,7 +1760,7 @@ FileLog_regexpFn($$)
         Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
         "devspec:readings:maxInterval" Tripel. readings kann ein regexp sein.
         Falls nach maxInterval (Sekunden) kein passendes Event eingetroffen ist,
-        der letzte Wert wird zum Logfile hinzugefuegt.
+        wird der letzte Wert zum Logfile hinzugefuegt.
         </li><br>
 
     <a name="archivedir"></a>
