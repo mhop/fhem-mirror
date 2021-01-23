@@ -2657,12 +2657,15 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
       <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etoday=&lt;Reading Energieerzeugung aktueller Tag&gt;:&lt;Einheit&gt;  </b> <br> 
       Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. 
       Es ist anzugeben, welche Readings die aktuelle PV-Leistung und die erzeugte Energie des aktuellen Tages liefern sowie deren Einheit (W,kW,Wh,kWh).
+      <br>
+      Das Reading im Schlüssel etoday muß die tägliche Erzeugung beginnend mit 0 um 00:00 Uhr aufsteigend bis zum maximalen
+      täglichen Ertrag am Ende des Tages enthalten.
       <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etoday=etoday:kWh <br>
-        # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Energie im 
+        # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Erzeugung im 
           Reading "etoday" (kWh)
       </ul>
       </li>
