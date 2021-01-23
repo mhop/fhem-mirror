@@ -38,6 +38,7 @@ eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # 
 
 use FHEM::SynoModules::SMUtils qw( evaljson  
                                    moduleVersion
+                                   trim
                                  );                       # Hilfsroutinen Modul
 
 use Data::Dumper;                                 
@@ -293,6 +294,7 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
+my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 
 my $cloudslope  = 0.55;                                                          # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
@@ -939,8 +941,12 @@ sub centralTask {
           daref => \@da
       };
       
+      Log3 ($name, 5, "$name - ################################################################");
+      Log3 ($name, 5, "$name - ###                New data collection cycle                 ###");
+      Log3 ($name, 5, "$name - ################################################################");
+      
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen 
-      _transWeatherValues        ($params);                                                        # Wetterwerte übertragen 
+      _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen 
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
       
@@ -988,6 +994,11 @@ sub _transferDWDForecastValues {
   
   my ($time_str,$epoche);
   
+  my @aneeded = checkdwdattr ($fcname);
+  if (@aneeded) {
+      Log3($name, 2, qq{$name - ERROR - the attribute "forecastProperties" of device "$fcname" needs to contain: }.join ",",@aneeded);
+  }
+  
   # deleteReadingspec ($hash, "NextHour.*");
   
   for my $num (0..47) {                      
@@ -1033,7 +1044,7 @@ return;
 ################################################################
 #    Wetter Werte aus dem angebenen Wetterdevice extrahieren
 ################################################################
-sub _transWeatherValues {               
+sub _transferWeatherValues {               
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1090,7 +1101,7 @@ sub _transWeatherValues {
       
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh}_wwd", '');
       
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff");
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
       $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
       $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
@@ -2148,6 +2159,25 @@ sub TimeAdjust {
   else {
       return (sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00"));
   }
+}
+
+################################################################
+#      benötigte Attribute im DWD Device checken
+################################################################
+sub checkdwdattr {
+  my $dwddev = shift;
+  
+  my @fcprop = map { trim($_) } split ",", AttrVal($dwddev, "forecastProperties", "pattern");
+  
+  # my @trimed = map { trim($_) } @fcprop;
+  
+  my @aneeded;
+  for my $am (@dwdattrmust) {
+      next if($am ~~ @fcprop);
+      push @aneeded, $am;
+  }
+  
+return @aneeded;
 }
 
 ##################################################################################################
