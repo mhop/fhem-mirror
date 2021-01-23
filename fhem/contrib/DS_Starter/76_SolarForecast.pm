@@ -114,7 +114,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction ",
+  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction, add reset pvHistory ",
   "0.2.0"  => "20.12.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
@@ -446,7 +446,7 @@ sub Set {
              "moduleEfficiency ".
              "moduleTiltAngle:$tilt ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev,pvHistory ".
              $cf
              ;
             
@@ -576,7 +576,13 @@ sub _setreset {                          ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no reading to reset specified};
+  my $prop  = $paref->{prop} // return qq{no source specified for reset};
+  
+  if($prop eq "pvHistory") {
+      my $type = $hash->{TYPE};
+      delete $data{$type}{$name}{pvhist};
+      return;
+  }
 
   readingsDelete($hash, $prop);
   
@@ -836,8 +842,8 @@ sub Notify {
   # Dadurch kann die Menge der Events verringert werden. In sub DbRep_Define angeben. 
   my $myHash   = shift;
   my $dev_hash = shift;
-  my $myName   = $myHash->{NAME};                                                                  # Name des eigenen Devices
-  my $devName  = $dev_hash->{NAME};                                                                # Device welches Events erzeugt hat
+  my $myName   = $myHash->{NAME};                                                         # Name des eigenen Devices
+  my $devName  = $dev_hash->{NAME};                                                       # Device welches Events erzeugt hat
  
   return if(IsDisabled($myName) || !$myHash->{NOTIFYDEV}); 
   
@@ -2345,17 +2351,16 @@ sub setPVhistory {
   my $paref     = shift;
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
-  my $t         = $paref->{t};                                                            # aktuelle Unix-Zeit
+  my $t         = $paref->{t};                                                                  # aktuelle Unix-Zeit
   my $chour     = $paref->{chour};
   my $ethishour = $paref->{ethishour} // 0;
   my $calcpv    = $paref->{calcpv}    // 0;
   
   my $type = $hash->{TYPE};  
-  my $day  = strftime "%d", localtime($t);                                                # aktueller Tag
-  my $pvhh = $data{$type}{$name}{pvhist};  
+  my $day  = strftime "%d", localtime($t);                                                      # aktueller Tag 
   
-  $pvhh->{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);                        # realer Energieertrag
-  $pvhh->{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);                           # prognostizierter Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);          # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);             # prognostizierter Energieertrag
   
   Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
     
@@ -2607,7 +2612,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
          <table>  
          <colgroup> <col width=35%> <col width=65%> </colgroup>
             <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R600,ww,SunUp,SunRise,SunSet                                                   </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R101,ww,SunUp,SunRise,SunSet                                                   </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>         
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
             <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte forecastStation muß Strahlungswerte (Rad1h Readings) liefern. </td></tr>
