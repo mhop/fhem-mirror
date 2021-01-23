@@ -24,7 +24,7 @@ prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devic
 filter:TYPE=MQTT_GENERIC_BRIDGE
 desc:This template is proposal to fullfill requirements for the rest of the s some basic configuration on the MQTT_GENERIC_BRIDGE side itself, especially:<br>- different topic structures for sending readings values and receiving commands and/or reading values; <br>- Variable $name must be part of the base topic structures.<br>Note: All outgoing messages will be sent without retain flag; change this to 1, if you need values stored on your MQTT server (e.g. if your clients are not always connected).
 order:000001
-attr DEVICE globalDefaults sub:base={"DEVICE/set"} pub:base={"DEVICE"} pub:qos=0 sub:qos=2 retain=0
+attr DEVICE globalDefaults sub:base={"DEVICE/set"} pub:base={"DEVICE"}
 farewell:Now you can start to configure your devices to send and receive messages over MQTT!
 
 
