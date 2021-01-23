@@ -11,7 +11,8 @@ zw_nl(fhemFn)
   zw_visible = !zw_visible;
   var txt = (zw_visible ? 'Hide' : 'Show');
 
-  var width=960,height=480;
+  var width=$("#content").width()-20, 
+      height=$("#content").height()-20;
   $('#ZWDongleNr a#zw_snm').html(txt+' neighbor map');
 
   if(!zw_visible) {
@@ -51,8 +52,7 @@ zw_nl(fhemFn)
       el.x = el.pos[0]; el.y = el.pos[1]; 
       cnt++;
     }
-    if(height < cnt*35)
-      height = cnt*35;
+
     zw_draw(fnRet, width, height);
     $('#ZWDongleNr a#zw_al').click(function(){ zw_al(fnRet, width, height); });
 
@@ -96,7 +96,7 @@ zw_draw(fnRet, width, height)
   for(var o in h) {
     if(h[o].txt && h[o].neighbors)
       for(var i1=0; i1<h[o].neighbors.length; i1++)
-        svg += zw_drawline(ld, h, o, i1);
+        svg += zw_drawline(fnRet, ld, h, o, i1);
   }
   for(var o in h)
     if(h[o].txt)
@@ -179,16 +179,18 @@ zw_calcPos(o, n)
 }
 
 function
-zw_drawline(ld, h, o, i1)
+zw_drawline(fnRet, ld, h, o, i1)
 {
   var n = h[o].neighbors[i1];
   var ns = (h[o].neighborstyles ? h[o].neighborstyles[i1] : "")
   if(!h[o] || !h[n])
     return "";
   var bidi = false;
-  for(var i1=0; i1<h[n].neighbors.length; i1++)
-    if(h[n].neighbors[i1] == o)
-      bidi = true;
+  if(!fnRet.skipArrow) {
+    for(var i1=0; i1<h[n].neighbors.length; i1++)
+      if(h[n].neighbors[i1] == o)
+        bidi = true;
+  }
 
   if(n < o) {
     var t = n; n = o; o = t;
@@ -204,7 +206,7 @@ zw_drawline(ld, h, o, i1)
   return '<line class="zwLine col_link '+ns+'" data-name="'+cl+
                '" x1="'+fr.x+'" y1="'+fr.y+
                '" x2="'+to.x+'" y2="'+to.y+'"'+
-                 ' marker-end="url(#endarrow)"'+
+                 (!fnRet.skipArrow ? ' marker-end="url(#endarrow)"':'')+
                  (bidi?' marker-start="url(#startarrow)"':'')+
                '/>';
 }

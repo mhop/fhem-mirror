@@ -30,9 +30,16 @@ weblink_Define($$)
 {
   my ($hash, $def) = @_;
   my ($name, $type, $wltype, $link) = split("[ \t]+", $def, 4);
-  my %thash = ( link=>1, image=>1, iframe=>1, htmlCode=>1, 
-                cmdList=>1,
-                fileplot=>1, dbplot=>1);
+  my %thash = ( 
+    associatedWith=>1,
+    cmdList=>1,
+    dbplot=>1,
+    fileplot=>1,
+    htmlCode=>1, 
+    iframe=>1,
+    image=>1,
+    link=>1,
+  );
   
   if(!$link || !$thash{$wltype}) {
     return "Usage: define <name> weblink [" .
@@ -131,9 +138,95 @@ weblink_FwFn($$$$)
     }
     $ret .= "</table></td></tr>";
     $ret .= "</table><br>";
+  
+  } elsif($wltype eq "associatedWith") {
+    my $js = "$FW_ME/pgm2/zwave_neighborlist.js";
+    return
+    "<div id='ZWDongleNr'><a id='zw_snm' href='#'>Show neighbor map</a></div>".
+    "<div id='ZWDongleNrSVG'></div>".
+    "<script type='text/javascript' src='$js'></script>".
+    '<script type="text/javascript">'.<<"JSEND"
+      \$(document).ready(function() {
+        \$("div#ZWDongleNr a#zw_snm")
+          .click(function(e){
+            e.preventDefault();
+            zw_nl('webdev_AWData("$d")');
+          });
+      });
+    </script>
+JSEND
   }
 
   return $ret;
+}
+
+sub
+webdev_AWData($)
+{
+  my ($me) = @_;
+
+  my (%h, @ds);
+  my ($fo, $foCount, $level) = ("", 0, 0);
+  my @l = split(" ", $defs{$me}{LINK});
+
+  @ds = devspec2array($l[0]);
+  for(;;) {
+    $level++;
+    my %new;
+    foreach my $d (@ds) {
+      next if($h{$d} || !$defs{$d} || $defs{$d}{TEMPORARY});
+      my @paw = getPawList($d);
+      map { $new{$_}=1 if(!$h{$_}) } @paw;
+      my $a = AttrVal($d,"alias","");
+      my $r = AttrVal($d,"room","");
+      $h{$d}{title} = 
+          ($a ? "Alias:$a ":"").
+          ($r ? "room:$r ":"").
+          ("type:".$defs{$d}{TYPE});
+      $h{$d}{neighbors} = \@paw;
+      $h{$d}{class} = ($level == 1 ? "zwDongle" : "zwBox");
+      $h{$d}{txt} = $d;
+      $h{$d}{neighbors} = \@paw;
+
+      $fo = $d if(!$fo);
+      if($level == 1 && $foCount < int(@paw)) {
+        $foCount = int(@paw);
+        $fo = $d;
+      }
+    }
+    last if($l[1] && $l[1] <= $level);
+    @ds = keys %new;
+    last if(!@ds);
+  }
+
+  my @ret;
+  my @dp = split(" ", AttrVal($me, "htmlattr", ""));
+  my %dp = @dp;
+  for my $k (keys %h) {
+    my $n = $h{$k}{neighbors};
+    push @ret, '"'.$k.'":{'.
+        '"class":"'.$h{$k}{class}.' col_link col_oddrow",'.
+        '"txt":"'.$h{$k}{txt}.'",'.
+        '"title":"'.$h{$k}{title}.'",'.
+        '"pos":['.($dp{$k} ? $dp{$k} : '').'],'.
+        '"neighbors":['. (@{$n} ? ('"'.join('","',@{$n}).'"'):'').']}';
+  }
+
+  my $r = '{"firstObj":"'.$fo.'",'.
+           '"el":{'.join(",",@ret).'},'.
+           '"skipArrow":true,'.
+           '"saveFn":"{webdev_AWaddPos(\''.$me.'\',\'{1}\',\'{2}\')}" }';
+  return $r;
+}
+
+sub
+webdev_AWaddPos($$$)
+{
+  my ($me, $d, $pos) = @_;
+  my @dp = split(" ", AttrVal($me, "htmlattr", ""));
+  my %dp = @dp;
+  $dp{$d} = $pos;
+  CommandAttr(undef,"$me htmlattr ".join(" ",map {"$_ $dp{$_}"} sort keys %dp));
 }
 
 1;
@@ -150,7 +243,8 @@ weblink_FwFn($$$$)
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|image|iframe|htmlCode|cmdList]
+    <code>define &lt;name&gt; weblink
+          [link|image|iframe|htmlCode|cmdList|associatedWidth]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder device used with FHEMWEB to be able to add user
@@ -167,14 +261,21 @@ weblink_FwFn($$$$)
              pair:Pair:set+cul2+hmPairForSec+60
              restart:Restart:shutdown+restart
              update:UpdateCheck:update+check
+      define aw weblink associatedWith rgr_Residents 3
       </code>
     </ul>
     <br>
 
     Notes:
     <ul>
-      <li>For cmdList &lt;argument&gt; consists of a list of space
-          separated icon:label:cmd triples.</li>
+      <li>For cmdList &lt;argument&gt; consists of a list of space separated
+      icon:label:cmd triples.</li>
+
+      <li>the associatedWidth mode takes a devspec and an optional depth as
+      arguments, and follows the devices along the "probably associated with"
+      links seen on the detail page for depth iterations. The so collected data
+      can be displayed as an SVG graph.</li>
+
     </ul>
   </ul>
 
