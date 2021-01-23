@@ -724,7 +724,7 @@ MQTT2_DEVICE_nlData($)
   #my $pref = "https://koenkk.github.io/zigbee2mqtt/images/devices/";
   my $pref = "https://www.zigbee2mqtt.io/images/devices/";
 
-  # Needed for the image links
+  # Needed for the image links {
   my $dv = ReadingsVal($d, ".devices", ReadingsVal($d, "devices", ""));
   $dv =~ s@ieeeAddr":"([^"]+)"[^}]+model":"([^"]+)"@
             my $ieeeAddr = $1;
