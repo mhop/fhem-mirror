@@ -730,7 +730,7 @@ sub _setwriteHistory {                   ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  my $ret = writeHistoryToFile ($hash);
+  my $ret = periodicWriteHistFile ($hash);
 
 return $ret;
 }
