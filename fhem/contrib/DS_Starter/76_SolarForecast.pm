@@ -115,7 +115,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction, add reset pvHistory ",
+  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
   "0.2.0"  => "20.12.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
@@ -149,6 +149,7 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
   reset                   => { fn => \&_setreset                  },
   moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
+  writeHistory            => { fn => \&_setwriteHistory           },
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
@@ -295,6 +296,7 @@ my $definterval = 70;                                                           
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
+my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
 my $cloudslope  = 0.55;                                                          # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
@@ -407,7 +409,8 @@ sub Define {
   
   readingsSingleUpdate($hash, "state", "initialized", 1); 
 
-  centralTask ($hash);                                                             # Einstieg in Abfrage  
+  centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
+  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteHistFile", $hash, 0);   # Einstieg periodisches Schreiben historische Daten
   
 return;
 }
@@ -449,6 +452,7 @@ sub Set {
              "moduleTiltAngle:$tilt ".
              "pvCorrectionFactor_Auto:on,off ".
              "reset:currentForecastDev,currentInverterDev,currentMeterDev,pvHistory ".
+             "writeHistory:noArg ".
              $cf
              ;
             
@@ -719,6 +723,18 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
 return;
 }
 
+################################################################
+#                      Setter writeHistory
+################################################################
+sub _setwriteHistory {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+
+  my $ret = writeHistoryToFile ($hash);
+
+return $ret;
+}
+
 ###############################################################
 #                  SolarForecast Get
 ###############################################################
@@ -864,18 +880,7 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  if($data{$type}{$name}{pvhist}) {                                                       # Cache File für PV History schreiben
-      my @pvh;
-      
-      my $json  = encode_json ($data{$type}{$name}{pvhist});
-      push @pvh, $json;
-      
-      my $file  = $pvhcache.$name;
-      my $error = FileWrite($file, @pvh);
-      if ($error) {
-          Log3 ($name, 2, qq{$name - ERROR writing cache file "$file": $error}); 
-      }
-  }  
+  writeHistoryToFile ($hash);                                # Cache File für PV History schreiben
   
 return; 
 }
@@ -975,6 +980,55 @@ sub controlParams {
   my $interval = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
 
 return $interval;
+}
+
+################################################################
+#        Timer für historische Daten schreiben
+################################################################
+sub periodicWriteHistFile {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteHistFile");
+  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteHistFile", $hash, 0);
+  
+  return if(IsDisabled($name));
+  
+  writeHistoryToFile ($hash);         # Cache File für PV History schreiben
+  
+return;
+}
+
+################################################################
+#       historische Daten in File wegschreiben
+################################################################
+sub writeHistoryToFile {  
+  my $hash = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if($data{$type}{$name}{pvhist}) {
+      my @pvh;
+      
+      my $json  = encode_json ($data{$type}{$name}{pvhist});
+      push @pvh, $json;
+      
+      my $file  = $pvhcache.$name;
+      my $error = FileWrite($file, @pvh);
+      
+      if ($error) {
+          my $err = qq{ERROR writing cache file "$file": $error};
+          Log3 ($name, 2, "$name - $err");
+          return $err;          
+      }
+      else {
+          my $lw = gettimeofday(); 
+          $hash->{HISTFILE} = "last write time: ".FmtTime($lw);
+      }
+  }  
+  
+return; 
 }
 
 ################################################################
@@ -2747,6 +2801,15 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
       <a name="reset"></a>
       <li><b>reset </b> <br> 
        Löscht die aus der Drop-Down Liste gewählte Datenquelle. <br>    
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="writeHistory"></a>
+      <li><b>writeHistory </b> <br> 
+       Die vom Device gesammelten historischen PV Daten werden in eine File geschrieben. Dieser Vorgang wird per default 
+       regelmäßig im Hintergrund ausgeführt. Im Internal "HISTFILE" wird der Zeitpunkt der letzten Speicherung angezeigt. <br>    
       </li>
     </ul>
     <br>
