@@ -996,7 +996,7 @@ sub _transferDWDForecastValues {
   
   my @aneeded = checkdwdattr ($fcname);
   if (@aneeded) {
-      Log3($name, 2, qq{$name - ERROR - the attribute "forecastProperties" of device "$fcname" needs to contain: }.join ",",@aneeded);
+      Log3($name, 2, qq{$name - ERROR - the attribute "forecastProperties" of device "$fcname" must contain: }.join ",",@aneeded);
   }
   
   # deleteReadingspec ($hash, "NextHour.*");
@@ -2168,8 +2168,6 @@ sub checkdwdattr {
   my $dwddev = shift;
   
   my @fcprop = map { trim($_) } split ",", AttrVal($dwddev, "forecastProperties", "pattern");
-  
-  # my @trimed = map { trim($_) } @fcprop;
   
   my @aneeded;
   for my $am (@dwdattrmust) {
