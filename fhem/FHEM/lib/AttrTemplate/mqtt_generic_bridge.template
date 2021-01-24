@@ -147,7 +147,7 @@ option:{SENDNOREADINGS}
 deleteattr TARGETDEV MQTTPREFIXPublish 
 
 option:{ SENDBASICREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
-attr TARGETDEV MQTTPREFIXPublish state|pct|motor:topic={"$base/$device/$name"} motor:expression={$value=~m,([^:]+)?,?$1:undef}
+attr TARGETDEV MQTTPREFIXPublish state:topic={"$base/$device"} pct|motor:topic={"$base/$device/$name"} motor:expression={$value=~m,([^:]+)?,?$1:undef}
 
 option:{ SENDALLREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
 attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
