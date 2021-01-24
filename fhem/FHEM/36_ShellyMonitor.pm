@@ -668,7 +668,7 @@ sub ShellyMonitor_DoRead
         if (defined $defarr) {
           my $rname = $defarr->{"desc"};
 
-          if ($rname =~ /^(power|output|energy|brightness)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
+          if ($rname =~ /^(power|output|energy|brightness|extTemp)_(.).*/ || $rname =~ /^(roller.*|mode|L-.*|colorTemp)$/) {
             my $rtype = $1;
             my $rno = $2;
 
@@ -720,6 +720,8 @@ sub ShellyMonitor_DoRead
 		CommandAttr ( undef, $_->{name} . ' mode ' . $svalue);
               } elsif ($rtype eq "colorTemp") {
                 readingsBulkUpdateIfChanged($device, "ct", $svalue);
+              } elsif ($rtype eq "extTemp") {
+                readingsBulkUpdateIfChanged($device, $rname, $svalue);
               } elsif ($rtype =~ /L-(red|green|blue|white)/) {
                 $rgb{$1} = $svalue;
                 $rgbdevices{$_->{name}} = 1;
@@ -834,7 +836,7 @@ sub ShellyMonitor_detailFn {
       if ($dev->{isDefined}) { 
         $nstate .= "</td><td></td></tr>";
       } else {
-        $nstate .= "</td><td><input type=\"submit\" value=\"Create\" onClick=\"return checkInput($formNo);\"></td></tr></form>";
+        $nstate .= "</td><td><input type=\"submit\" value=\"Define\" onClick=\"return checkInput($formNo);\"></td></tr></form>";
         $formNo++;
       }
 #	($dev->{isDefined} ? "" : "<a href=\"$FW_ME?cmd=set $deviceName autocreate $ip".$FW_CSRF."\">Create</a>" ) .
