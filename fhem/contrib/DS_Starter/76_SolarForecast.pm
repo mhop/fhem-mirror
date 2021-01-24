@@ -1445,9 +1445,10 @@ sub forecastGraphic {                                                           
   
   my $pv0    = ReadingsNum ($name, "ThisHour_PVforecast", undef);
   my $ma     = ReadingsNum ($name, "moduleArea",              0);                          # Solar Modulfläche (qm)
-  my $moddir = ReadingsVal ($name, "moduleDirection", "");                                 # aktuelles Inverter Device
+  my $moddir = ReadingsVal ($name, "moduleDirection",        "");                          # aktuelles Inverter Device
+  my $ta     = ReadingsNum ($name, "moduleTiltAngle",     undef);                          # Neigungswinkel Solarmodule
   
-  if(!$fcdev || !$ma || !defined $pv0 || !$moddir) {
+  if(!$fcdev || !$ma || !defined $pv0 || !$moddir || !defined $ta) {
       $height = AttrNum($name, 'beamHeight', 200);   
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
@@ -1464,6 +1465,9 @@ sub forecastGraphic {                                                           
       }
       elsif(!$moddir) {
           $ret .= qq{Please specify the module Direction with "set $name moduleDirection"};   
+      }
+      elsif(!defined $ta) {
+          $ret .= qq{Please specify the module tilt angle with "set $name moduleTiltAngle"};   
       }
       elsif(!defined $pv0) {
           $ret .= qq{Awaiting data from selected Solar Forecast device ...};   
