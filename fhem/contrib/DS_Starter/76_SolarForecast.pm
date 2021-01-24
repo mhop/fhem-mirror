@@ -959,8 +959,8 @@ sub centralTask {
           createReadingsFromArray ($hash, \@da, 1);
       }
       
-      sumNextHours ($hash, $chour, \@da);                                                          # Zusammenfassung nächste 4 Stunden erstellen
-      calcVariance ($params);                                                                      # Autokorrektur berechnen
+      collectSummaries ($hash, $chour, \@da);                                                      # Zusammenfassung nächste 4 Stunden u.a. erstellen
+      calcVariance     ($params);                                                                  # Autokorrektur berechnen
       
       readingsSingleUpdate($hash, "state", "updated", 1);                                          # Abschluß state 
   }
@@ -1024,7 +1024,7 @@ sub writeHistoryToFile {
       }
       else {
           my $lw = gettimeofday(); 
-          $hash->{HISTFILE} = "last write time: ".FmtTime($lw);
+          $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file";
       }
   }  
   
@@ -2488,7 +2488,7 @@ return $sq;
 ################################################################
 #               Zusammenfassungen erstellen
 ################################################################
-sub sumNextHours {            
+sub collectSummaries {            
   my $hash  = shift;
   my $chour = shift;                          # aktuelle Stunde
   my $daref = shift;
@@ -2498,6 +2498,7 @@ sub sumNextHours {
   my $next4HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $restOfDaySum  = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $tomorrowSum   = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   
   my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
   my $thforecast       = ReadingsNum ($name, "ThisHour_PVforecast", 0);
@@ -2505,14 +2506,16 @@ sub sumNextHours {
   $restOfDaySum->{PV}  = $thforecast;
   
   for my $h (1..47) {
-      $next4HoursSum->{PV} += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= 3);
-      $restOfDaySum->{PV}  += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= $rdh);
-      $tomorrowSum->{PV}   += ReadingsNum ($name, "NextHour".(sprintf "%02d", $h)."_PVforecast", 0) if($h >  $rdh);
+      $next4HoursSum->{PV} += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h <= 3);
+      $restOfDaySum->{PV}  += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h <= $rdh);
+      $tomorrowSum->{PV}   += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h >  $rdh);
+      $todaySum->{PV}      += ReadingsNum ($name, "Today_Hour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= 23);
   }
   
   push @$daref, "Next04Hours_PV:". (int $next4HoursSum->{PV})." Wh";
   push @$daref, "RestOfDay_PV:".   (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PV:".    (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PV:".       (int $todaySum->{PV}).     " Wh";
 
   createReadingsFromArray ($hash, $daref, 1);
   
@@ -2808,8 +2811,9 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
     <ul>
       <a name="writeHistory"></a>
       <li><b>writeHistory </b> <br> 
-       Die vom Device gesammelten historischen PV Daten werden in eine File geschrieben. Dieser Vorgang wird per default 
-       regelmäßig im Hintergrund ausgeführt. Im Internal "HISTFILE" wird der Zeitpunkt der letzten Speicherung angezeigt. <br>    
+       Die vom Device gesammelten historischen PV Daten werden in ein File geschrieben. Dieser Vorgang wird per default 
+       regelmäßig im Hintergrund ausgeführt. Im Internal "HISTFILE" wird der Filename und der Zeitpunkt der letzten 
+       Speicherung dokumentiert. <br>    
       </li>
     </ul>
     <br>
