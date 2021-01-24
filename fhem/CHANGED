@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  70_BRAVIA: fix volume info from headphone
+ - change:  70_BRAVIA: new package FHEM::BRAVIA, PBP changes
  - feature: 52_I2C_ADS1x1x: New module for TI AD Converters
  - bugfix:  51_MOBILEALERTS: Perl Warnings and Init RainSensor
  - bugfix:  57_Calendar: correct event selection for 
