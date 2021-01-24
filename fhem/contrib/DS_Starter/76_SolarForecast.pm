@@ -115,8 +115,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.3.0"  => "21.12.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
-  "0.2.0"  => "20.12.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
+  "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to calcPVforecast, add reset pvCorrection ",
+  "0.3.0"  => "21.01.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
+  "0.2.0"  => "20.01.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -149,6 +150,7 @@ my %hset = (                                                                # Ha
   pvCorrectionFactor_Auto => { fn => \&_setpvCorrectionFactorAuto },
   reset                   => { fn => \&_setreset                  },
   moduleTiltAngle         => { fn => \&_setmoduleTiltAngle        },
+  moduleDirection         => { fn => \&_setmoduleDirection        },
   writeHistory            => { fn => \&_setwriteHistory           },
 );
 
@@ -159,18 +161,18 @@ my %hget = (                                                                # Ha
   pvHistory => { fn => \&_getlistPVHistory, needcred => 0 },
 );
 
-my %htilt = (                                                               # Faktor für Neigungswinkel der Solarmodule (Südausrichtung)
-  "0"  => 1.00,                                                             # https://www.labri.fr/perso/billaud/travaux/Helios/Helios2/resources/de04/Chapter_4_DE.pdf
-  "10" => 1.06,
-  "20" => 1.15,
-  "30" => 1.35,
-  "40" => 1.43,
-  "45" => 1.44,
-  "50" => 1.47,
-  "60" => 1.50,
-  "70" => 1.44,
-  "80" => 1.35,
-  "90" => 1.26
+my %hff = (                                                                                           # Flächenfaktoren 
+  "0"  => { N => 100, NE => 100, E => 100, SE => 100, S => 100, SW => 100, W => 100, NW => 100 },     # http://www.ing-büro-junge.de/html/photovoltaik.html
+  "10" => { N => 90,  NE => 93,  E => 100, SE => 105, S => 107, SW => 105, W => 100, NW => 93  },
+  "20" => { N => 80,  NE => 84,  E => 97,  SE => 109, S => 114, SW => 109, W => 97,  NW => 84  },
+  "30" => { N => 69,  NE => 76,  E => 94,  SE => 110, S => 116, SW => 110, W => 94,  NW => 76  },
+  "40" => { N => 59,  NE => 68,  E => 90,  SE => 109, S => 117, SW => 109, W => 90,  NW => 68  },
+  "45" => { N => 55,  NE => 65,  E => 87,  SE => 108, S => 115, SW => 108, W => 87,  NW => 65  },
+  "50" => { N => 49,  NE => 62,  E => 85,  SE => 107, S => 113, SW => 107, W => 85,  NW => 62  },
+  "60" => { N => 42,  NE => 55,  E => 80,  SE => 102, S => 111, SW => 102, W => 80,  NW => 55  },
+  "70" => { N => 37,  NE => 50,  E => 74,  SE => 95,  S => 104, SW => 95,  W => 74,  NW => 50  },
+  "80" => { N => 35,  NE => 46,  E => 67,  SE => 86,  S => 95,  SW => 86,  W => 67,  NW => 46  },
+  "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
 );
 
 my %weather_ids = (
@@ -440,7 +442,7 @@ sub Set {
   }
   $cf = join " ", @cfs if(@cfs);
   
-  my $tilt = join ",", sort keys %htilt;
+  my $tilt = join ",", sort keys %hff;
 
   $setlist = "Unknown argument $opt, choose one of ".
              "currentForecastDev:$fcd ".
@@ -450,8 +452,9 @@ sub Set {
              "moduleArea ".
              "moduleEfficiency ".
              "moduleTiltAngle:$tilt ".
+             "moduleDirection:N,NE,E,SE,S,SW,W,NW ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev,pvHistory ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev,pvCorrection,pvHistory ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -589,6 +592,11 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{pvhist};
       return;
   }
+  
+  if($prop eq "pvCorrection") {
+      deleteReadingspec   ($hash, "pvCorrectionFactor_.*");
+      return;
+  }
 
   readingsDelete($hash, $prop);
   
@@ -640,6 +648,24 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   }
 
   readingsSingleUpdate($hash, "moduleTiltAngle", $prop, 1);
+
+return;
+}
+
+################################################################
+#                 Setter moduleDirection
+################################################################
+sub _setmoduleDirection {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no module direction was provided};
+
+  if($prop !~ /N|NE|E|SE|S|SW|W|NW/x) {
+      return qq{No valid value for module direction: $prop};
+  }
+
+  readingsSingleUpdate($hash, "moduleDirection", $prop, 1);
 
 return;
 }
@@ -1411,16 +1437,17 @@ sub forecastGraphic {                                                           
   $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
-  my $fcdev  = ReadingsVal($name, "currentForecastDev", "");                               # aktuelles Forecast Device  
-  my $indev  = ReadingsVal($name, "currentInverterDev", "");                               # aktuelles Inverter Device
+  my $fcdev  = ReadingsVal ($name, "currentForecastDev", "");                              # aktuelles Forecast Device  
+  my $indev  = ReadingsVal ($name, "currentInverterDev", "");                              # aktuelles Inverter Device
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";  
   my $cclv   = "L05";
   
-  my $pv0   = ReadingsNum ($name, "ThisHour_PVforecast", undef);
-  my $ma    = ReadingsNum ($name, "moduleArea",              0);                           # Solar Modulfläche (qm)
+  my $pv0    = ReadingsNum ($name, "ThisHour_PVforecast", undef);
+  my $ma     = ReadingsNum ($name, "moduleArea",              0);                          # Solar Modulfläche (qm)
+  my $moddir = ReadingsVal ($name, "moduleDirection", "");                                 # aktuelles Inverter Device
   
-  if(!$fcdev || !$ma || !defined $pv0) {
+  if(!$fcdev || !$ma || !defined $pv0 || !$moddir) {
       $height = AttrNum($name, 'beamHeight', 200);   
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
@@ -1434,6 +1461,9 @@ sub forecastGraphic {                                                           
       }
       elsif(!$ma) {
           $ret .= qq{Please specify the total module area with "set $name moduleArea"};   
+      }
+      elsif(!$moddir) {
+          $ret .= qq{Please specify the module Direction with "set $name moduleDirection"};   
       }
       elsif(!defined $pv0) {
           $ret .= qq{Awaiting data from selected Solar Forecast device ...};   
@@ -2253,41 +2283,52 @@ return @aneeded;
 # hier beschrieben: 
 # https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 #
+# !!! PV Berechnungsgrundlagen !!!
+# https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
+# http://www.ing-büro-junge.de/html/photovoltaik.html
+# -> es wird die Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html
+# verwendet
+# 
 ##################################################################################################
 sub calcPVforecast {            
   my $name = shift;
-  my $rad  = shift;                                                                     # Nominale Strahlung aus DWD Device
-  my $fh   = shift;                                                                     # Stunde des Tages 
+  my $rad  = shift;                                                                         # Nominale Strahlung aus DWD Device
+  my $fh   = shift;                                                                         # Stunde des Tages 
   
   my $hash = $defs{$name};
   
-  my $ma = ReadingsNum ($name, "moduleArea",                              0        );   # Solar Modulfläche (gesamt)
-  my $ta = ReadingsNum ($name, "moduleTiltAngle",                         45       );   # Neigungswinkel Solarmodule
-  my $me = ReadingsNum ($name, "moduleEfficiency",                        $defpvme );   # Solar Modul Wirkungsgrad (%)
-  my $ie = ReadingsNum ($name, "inverterEfficiency",                      $definve );   # Solar Inverter Wirkungsgrad (%)
-  my $hc = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
+  my $ma     = ReadingsNum ($name, "moduleArea",                              0        );   # Solar Modulfläche (gesamt)
+  my $ta     = ReadingsNum ($name, "moduleTiltAngle",                         45       );   # Neigungswinkel Solarmodule
+  my $moddir = ReadingsVal ($name, "moduleDirection",                         "S"      );   # Ausrichtung der Solarmodule
+  my $me     = ReadingsNum ($name, "moduleEfficiency",                        $defpvme );   # Solar Modul Wirkungsgrad (%)
+  my $ie     = ReadingsNum ($name, "inverterEfficiency",                      $definve );   # Solar Inverter Wirkungsgrad (%)
+  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
   
-  my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;  # effektive Wolkendecke
-  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);               # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;      # effektive Wolkendecke
+  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);                   # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_RainProb"} // 0;    # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                   # Rain Correction Faktor mit Steilheit
+  my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_RainProb"} // 0;        # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                       # Rain Correction Faktor mit Steilheit
+  
+  my $af         = $hff{$ta}{$moddir} / 100;                                                # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
   
   $hc    = 1 if(1*$hc == 0);
   
-  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $htilt{"$ta"} * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
+  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $af * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
   
   my $kw =  AttrVal ($name, 'Wh/kWh', 'Wh');
   if($kw eq "Wh") {
       $pv = int $pv;
   }
   
-  my $lh = {                                                                            # Log-Hash zur Ausgabe
-      "moduleTiltAngle factor"  => $htilt{"$ta"},
+  my $lh = {                                                                                # Log-Hash zur Ausgabe
+      "moduleDirection"         => $moddir,
+      "moduleArea"              => $ma,
+      "moduleTiltAngle"         => $ta,
+      "Area factor"             => $af,
       "Cloudfactor"             => $ccf,
       "Rainfactor"              => $rcf,
       "pvCorrectionFactor"      => $hc,
-      "moduleArea"              => $ma,
       "moduleEfficiency"        => $me/100,
       "inverterEfficiency"      => $ie/100,
       "Radiation"               => $rad,
@@ -2476,7 +2517,7 @@ sub listPVHistory {
   my $type = $hash->{TYPE};
   my $pvhh = $data{$type}{$name}{pvhist};  
   
-  Log3 ($name, 5, "$name - PV History content: ".Dumper $pvhh);
+  # Log3 ($name, 5, "$name - PV History content: ".Dumper $pvhh);
   
   my $sub = sub { 
       my $day = shift;
@@ -2773,6 +2814,28 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
       <a name="moduleArea"></a>
       <li><b>moduleArea &lt;Zahl&gt; </b> <br> 
       Gesamte installierte Solarmodulfläche in qm.       
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="moduleDirection"></a>
+      <li><b>moduleDirection </b> <br> 
+      Ausrichtung der Solarmodule. <br><br>
+
+      <ul>
+         <table>  
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>N</b>  </td><td>Nordausrichtung            </td></tr>
+            <tr><td> <b>NE</b> </td><td>Nord-Ost Ausrichtung       </td></tr>
+            <tr><td> <b>E</b>  </td><td>Ostausrichtung             </td></tr>         
+            <tr><td> <b>SE</b> </td><td>Süd-Ost Ausrichtung        </td></tr>
+            <tr><td> <b>S</b>  </td><td>Südausrichtung             </td></tr>
+            <tr><td> <b>SW</b> </td><td>Süd-West Ausrichtung       </td></tr>
+            <tr><td> <b>W</b>  </td><td>Westausrichtung            </td></tr>
+            <tr><td> <b>NW</b> </td><td>Nord-West Ausrichtung      </td></tr>
+         </table>
+      </ul>       
       </li>
     </ul>
     <br>
