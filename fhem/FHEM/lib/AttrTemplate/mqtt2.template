@@ -104,6 +104,18 @@ deleteattr TYPE=MQTT2_\DEVICE:FILTER=model=MQTT2_CLIENT_general_bridge readingLi
 #option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal('IODEVNAME','ignoreRegexp','not_set');;return 0}
 #attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
+###########################################
+# mosquitto state, see https://forum.fhem.de/index.php/topic,117988.msg1124272.html#msg1124272
+name:MQTT2_mosquitto_SYS
+prereq:{my @devices=devspec2array("TYPE=MQTT2_CLIENT");;return 1 if $devices[0];;return 0}
+filter:TYPE=MQTT2_DEVICE
+desc:Shows health info about mosquitto. Needs additional subscriptions on MQTT2_CLIENT side, see https://forum.fhem.de/index.php/topic,117988.msg1124272.html#msg1124272 for details.
+order:000002
+attr DEVICE readingList\
+  .*SYS/broker/.+:.* { $TOPIC=~m,SYS/broker/(.*),;; my %h;; $h{$1}=$EVENT;; \%h }
+attr DEVICE model MQTT2_mosquitto_SYS
+setreading DEVICE attrTemplateVersion 20210121
+
 
 ###########################################
 # zigbee2mqtt

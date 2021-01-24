@@ -24,9 +24,16 @@ prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devic
 filter:TYPE=MQTT_GENERIC_BRIDGE
 desc:This template is proposal to fullfill requirements for the rest of the s some basic configuration on the MQTT_GENERIC_BRIDGE side itself, especially:<br>- different topic structures for sending readings values and receiving commands and/or reading values; <br>- Variable $name must be part of the base topic structures.<br>Note: All outgoing messages will be sent without retain flag; change this to 1, if you need values stored on your MQTT server (e.g. if your clients are not always connected).
 order:000001
+par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
+par:RADIO_SETCLIENTODERMGB_M2D;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE MQTT2_DEVICE" (recommended);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,"TYPE","MQTT") eq "MQTT"; AttrVal($io,"clientOrder",undef) }
+par:RADIO_SETCLIENTODERM2D_MGB;Set clientOrder on IODev to "MQTT2_DEVICE MQTT_GENERIC_BRIDGE" (default, may cause unintended autocreates);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,"TYPE","MQTT") eq "MQTT"; AttrVal($io,"clientOrder",undef) }
+par:RADIO_DONTSETCLIENTODER;Leave clientOrder on IODev (default is "MQTT2_DEVICE MQTT_GENERIC_BRIDGE", may cause unintended autocreates);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,"TYPE","MQTT") eq "MQTT"; AttrVal($io,"clientOrder",undef) }
 attr DEVICE globalDefaults sub:base={"DEVICE/set"} pub:base={"DEVICE"}
+option:{ RADIO_SETCLIENTODERMGB_M2D }
+attr IODEVNAME clientOrder MQTT_GENERIC_BRIDGE MQTT2_\DEVICE
+option:{ RADIO_SETCLIENTODERM2D_MGB }
+attr IODEVNAME clientOrder MQTT2_\DEVICE MQTT_GENERIC_BRIDGE
 farewell:Now you can start to configure your devices to send and receive messages over MQTT!
-
 
 ##########
 ## subordintated devices section
@@ -103,5 +110,45 @@ attr TARGETDEV MQTTPREFIXAlias pub:measured-temp=temperature
 attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
 
 option:{ SENDALLREADINGS && "TRGETDEVTYPE" eq "MAX" }
+attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
+
+############
+name:mgb_shutter
+prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
+filter:TYPE=MQTT_GENERIC_BRIDGE
+desc:This template is starting point to configure shutter devices in MQTT_GENERIC_BRIDGE usage context.<br>NOTE: Early testing version, see https://forum.fhem.de/index.php/topic,117423.0.html for details.<br>Might still need some changes!
+order:C_10000
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:TRGETDEVTYPE;TYPE of target device;{ InternalVal("TARGETDEV",'TYPE',undef) }
+par:RADIO_SENDNOREADINGS;Do not send any readings from device to MQTT server;{ undef }
+par:RADIO_SENDBASICREADINGS;Send only basic readings (pct, motor (if available) and state) to MQTT server;{ undef }
+par:RADIO_SENDALLREADINGS;Send all Readings from device to MQTT server (not recommended);{ undef }
+par:MQTTPREFIX;prefix used in MGB;{ InternalVal("DEVICE",'prefix',undef) } 
+
+option:global
+set DEVICE attrTemplate mgb_shutter_with_params \TARGETDEV=TARGETDEV \TRGETDEVTYPE=TRGETDEVTYPE SENDNOREADINGS=RADIO_SENDNOREADINGS SENDBASICREADINGS=RADIO_SENDBASICREADINGS SENDALLREADINGS=RADIO_SENDALLREADINGS \MQTTPREFIX=MQTTPREFIX
+
+
+name:mgb_shutter_with_params
+order:C_10000w
+prereq:{my @devices=devspec2array("TYPE=MQTT_GENERIC_BRIDGE");return 1 if $devices[0];return 0}
+filter:NAME=mgbTesting
+par:TARGETDEV;Pls enter name of the device you want to put under MQTT_GENERIC_BRIDGE controll;{ undef }
+par:SENDNOREADINGS;Do not send any readings from device to MQTT server;{ 0 }
+par:RADIO_SENDBASICREADINGS;Send only basic readings (pct, motor (if available) and state) to MQTT server;{ undef }
+par:SENDALLREADINGS;Send all Readings from device to MQTT server (not recommended);{ 0 }
+par:MQTTPREFIX;prefix used in MGB;{ InternalVal("DEVICE",'prefix',undef) } 
+par:TRGETDEVTYPE;TYPE of target device;{ InternalVal("TARGETDEV",'TYPE',undef) }
+
+option:{ "TRGETDEVTYPE" eq "CUL_HM" }
+attr TARGETDEV MQTTPREFIXSubscribe state:stopic={"$base/$device"} pct:stopic={"$base/$device/$name"}
+
+option:{SENDNOREADINGS}
+deleteattr TARGETDEV MQTTPREFIXPublish 
+
+option:{ SENDBASICREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
+attr TARGETDEV MQTTPREFIXPublish state|pct|motor:topic={"$base/$device/$name"} motor:expression={$value=~m,([^:]+)?,?$1:undef}
+
+option:{ SENDALLREADINGS && "TRGETDEVTYPE" eq "CUL_HM" }
 attr TARGETDEV MQTTPREFIXPublish *:topic={"$base/$device/$name"}
 
