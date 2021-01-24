@@ -21,7 +21,6 @@ MQTT2_SERVER_Initialize($)
 {
   my ($hash) = @_;
 
-  MQTT2_SERVER_resetClients($hash);
   $hash->{ReadFn}  = "MQTT2_SERVER_Read";
   $hash->{DefFn}   = "MQTT2_SERVER_Define";
   $hash->{AttrFn}  = "MQTT2_SERVER_Attr";
@@ -55,6 +54,7 @@ MQTT2_SERVER_resetClients($)
 {
   my ($hash) = @_;
 
+  $hash->{ClientsKeepOrder} = 1;
   $hash->{Clients} = ":MQTT2_DEVICE:MQTT_GENERIC_BRIDGE:";
   $hash->{MatchList}= {
     "1:MQTT2_DEVICE"  => "^.",
@@ -72,6 +72,7 @@ MQTT2_SERVER_Define($$)
   return "Usage: define <name> MQTT2_SERVER [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/);
 
+  MQTT2_SERVER_resetClients($hash);
   MQTT2_SERVER_Undef($hash, undef) if($hash->{OLDDEF}); # modify
   my $ret = TcpServer_Open($hash, $port, $global);
 
@@ -161,13 +162,13 @@ MQTT2_SERVER_Attr(@)
   if($attrName eq "clientOrder") {
     if($type eq "set") {
       my @p = split(" ", $param[0]);
-      $modules{MQTT2_SERVER}{Clients} = ":".join(":",@p).":";
+      $hash->{Clients} = ":".join(":",@p).":";
       my $cnt = 1;
       my %h = map { ($cnt++.":$_", "^.") } @p;
-      $modules{MQTT2_SERVER}{MatchList} = \%h;
-      delete($modules{MQTT2_SERVER}{".clientArray"}); # Force a recompute
+      $hash->{MatchList} = \%h;
+      delete($hash->{".clientArray"}); # Force a recompute
     } else {
-      MQTT2_SERVER_resetClients($modules{MQTT2_SERVER});
+      MQTT2_SERVER_resetClients($hash);
     }
   }
 

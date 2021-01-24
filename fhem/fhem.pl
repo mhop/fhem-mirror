@@ -4003,7 +4003,7 @@ Dispatch($$;$$)
 
   foreach my $m (@{$clientArray}) {
     # Module is not loaded or the message is not for this module
-    next if(!$modules{$m} || $dmsg !~ m/$modules{$m}{Match}/s);
+    next if(!$dmsg !~ m/$modules{$m}{Match}/s);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
       ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
@@ -4038,10 +4038,20 @@ Dispatch($$;$$)
             $mname = $newm if($newm ne "UNDEFINED");
             if($modules{$mname} && $modules{$mname}{ParseFn}) {
               no strict "refs"; $readingsUpdateDelayTrigger = 1;
-              @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
+              my @tfound = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
               use strict "refs"; $readingsUpdateDelayTrigger = 0;
               $parserMod = $mname;
-              last if(defined($found[0]));
+
+              if(int(@tfound) && defined($tfound[0])) {
+                if($tfound[0] && $tfound[0] eq "[NEXT]") {
+                  shift(@tfound);
+                  push @found, @tfound;
+                } else {
+                  push @found, @tfound;
+                  last;
+                }
+              }
+
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
             }
@@ -5066,14 +5076,20 @@ computeClientArray($$)
 {
   my ($hash, $module) = @_;
   my @a = ();
+
   my @mRe = split(":", $hash->{Clients} ? $hash->{Clients}:$module->{Clients});
 
-  foreach my $m (sort { $modules{$a}{ORDER}.$a cmp $modules{$b}{ORDER}.$b }
-                  grep { defined($modules{$_}{ORDER}) } keys %modules) {
-    foreach my $re (@mRe) {
-      if($m =~ m/^$re$/) {
-        push @a, $m if($modules{$m}{Match});
-        last;
+  if($hash->{ClientsKeepOrder}) {
+    @a = grep { $modules{$_} && $modules{$_}{Match} } @mRe;
+
+  } else {
+    foreach my $m (sort { $modules{$a}{ORDER}.$a cmp $modules{$b}{ORDER}.$b }
+                    grep { defined($modules{$_}{ORDER}) } keys %modules) {
+      foreach my $re (@mRe) {
+        if($m =~ m/^$re$/) {
+          push @a, $m if($modules{$m}{Match});
+          last;
+        }
       }
     }
   }
