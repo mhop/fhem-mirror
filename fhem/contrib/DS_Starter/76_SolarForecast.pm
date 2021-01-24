@@ -2281,8 +2281,25 @@ sub calcPVforecast {
   if($kw eq "Wh") {
       $pv = int $pv;
   }
- 
-  Log3($name, 5, "$name - calcPVforecast -> Hour: ".sprintf("%02d",$fh)." ,moduleTiltAngle factor: ".$htilt{"$ta"}.", Cloudfactor: $ccf, Rainfactor: $rcf, pvCorrectionFactor: $hc");
+  
+  my $lh = {                                                                            # Log-Hash zur Ausgabe
+      "moduleTiltAngle factor"  => $htilt{"$ta"},
+      "Cloudfactor"             => $ccf,
+      "Rainfactor"              => $rcf,
+      "pvCorrectionFactor"      => $hc,
+      "moduleArea"              => $ma,
+      "moduleEfficiency"        => $me/100,
+      "inverterEfficiency"      => $ie/100,
+      "Radiation"               => $rad,
+      "Factor kJ to kWh"        => $kJtokWh
+  };
+  
+  my $sq;
+  for my $idx (sort keys %{$lh}) {
+      $sq .= $idx." => ".$lh->{$idx}."\n";             
+  }
+
+  Log3($name, 5, "$name - PV forecast calc factors for hour ".sprintf("%02d",$fh)." ->\n$sq");
   
 return $pv;
 }
