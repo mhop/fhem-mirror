@@ -4002,8 +4002,8 @@ Dispatch($$;$$)
   $clientArray = computeClientArray($hash, $module) if(!$clientArray);
 
   foreach my $m (@{$clientArray}) {
-    # Module is not loaded or the message is not for this module
-    next if(!$dmsg !~ m/$modules{$m}{Match}/s);
+    # The message is not for this module
+    next if($dmsg !~ m/$modules{$m}{Match}/s);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
       ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
