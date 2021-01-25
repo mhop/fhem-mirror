@@ -339,7 +339,7 @@ MQTT2_CLIENT_Attr(@)
       $hash->{MatchList} = \%h;
       delete($hash->{".clientArray"}); # Force a recompute
     } else {
-      MQTT2_CLIENT_resetClients($hash});
+      MQTT2_CLIENT_resetClients($hash);
     }
   }
 
