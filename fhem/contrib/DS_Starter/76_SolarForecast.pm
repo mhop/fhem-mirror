@@ -41,7 +41,8 @@ use FHEM::SynoModules::SMUtils qw( evaljson
                                    trim
                                  );                       # Hilfsroutinen Modul
 
-use Data::Dumper;                                 
+use Data::Dumper; 
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
                                  
 # Run before module compilation
 BEGIN {
@@ -115,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
   "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to calcPVforecast, add reset pvCorrection ",
   "0.3.0"  => "21.01.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
   "0.2.0"  => "20.01.2021  use SMUtils, JSON, implement getter data,html,pvHistory, correct the 'disable' problem ",
@@ -128,6 +130,7 @@ my %hset = (                                                                # Ha
   moduleArea              => { fn => \&_setmoduleArea             },
   moduleEfficiency        => { fn => \&_setmoduleEfficiency       },
   inverterEfficiency      => { fn => \&_setinverterEfficiency     },
+  inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
@@ -155,10 +158,11 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data      => { fn => \&_getdata,          needcred => 0 },
-  html      => { fn => \&_gethtml,          needcred => 0 },
-  ftui      => { fn => \&_getftui,          needcred => 0 },
-  pvHistory => { fn => \&_getlistPVHistory, needcred => 0 },
+  data         => { fn => \&_getdata,          needcred => 0 },
+  html         => { fn => \&_gethtml,          needcred => 0 },
+  ftui         => { fn => \&_getftui,          needcred => 0 },
+  pvHistory    => { fn => \&_getlistPVHistory, needcred => 0 },
+  stringConfig => { fn => \&_getstringConfig,  needcred => 0 },
 );
 
 my %hff = (                                                                                           # Flächenfaktoren 
@@ -429,7 +433,7 @@ sub Set {
   my $prop  = shift @a;
   my $prop1 = shift @a;
   
-  my ($setlist,@fcdevs,@indevs,@medevs,@cfs);
+  my ($setlist,@fcdevs,@cfs);
   my ($fcd,$ind,$med,$cf) = ("","","","");
     
   return if(IsDisabled($name));
@@ -441,20 +445,19 @@ sub Set {
       push @cfs, "pvCorrectionFactor_".sprintf("%02d",$h); 
   }
   $cf = join " ", @cfs if(@cfs);
-  
-  my $tilt = join ",", sort keys %hff;
 
   $setlist = "Unknown argument $opt, choose one of ".
              "currentForecastDev:$fcd ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
              "inverterEfficiency ".
+             "inverterStrings ".
              "moduleArea ".
              "moduleEfficiency ".
-             "moduleTiltAngle:$tilt ".
-             "moduleDirection:N,NE,E,SE,S,SW,W,NW ".
+             "moduleTiltAngle ".
+             "moduleDirection ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev,pvCorrection,pvHistory ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev,inverterStrings,pvCorrection,pvHistory ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -528,6 +531,20 @@ return;
 }
 
 ################################################################
+#                      Setter inverterStrings
+################################################################
+sub _setinverterStrings {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no inverter strings specified};
+
+  readingsSingleUpdate($hash, "inverterStrings", $prop, 1);
+  
+return qq{REMINDER - After setting or changing "inverterStrings" please check / set all module parameter (e.g. moduleTiltAngle) again !};
+}
+
+################################################################
 #                      Setter currentMeterDev
 ################################################################
 sub _setmeterDevice {                    ## no critic "not used"
@@ -565,51 +582,26 @@ sub _setmoduleArea {                     ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no PV module area specified};
-
-  if($prop !~ /[0-9,.]/x) {
-      return qq{The module area must be specified by numbers and optionally with decimal places};
+  my $arg   = $paref->{arg} // return qq{no PV module area specified};
+  
+  $arg =~ s/,/./xg;
+  
+  my ($a,$h) = parseParams ($arg); 
+  
+  if(!keys %$h) {
+      return qq{The provided PV module area has wrong format};
   }
   
-  $prop =~ s/,/./x;
-
-  readingsSingleUpdate($hash, "moduleArea", $prop." qm", 1);
-
-return;
-}
-
-################################################################
-#                      Setter reset
-################################################################
-sub _setreset {                          ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no source specified for reset};
-  
-  if($prop eq "pvHistory") {
-      my $type = $hash->{TYPE};
-      delete $data{$type}{$name}{pvhist};
-      return;
+  while (my ($key, $value) = each %$h) {
+      if($value !~ /[0-9.]/x) {
+          return qq{The module area of "$key" must be specified by numbers and optionally with decimal places};
+      }     
   }
   
-  if($prop eq "pvCorrection") {
-      deleteReadingspec   ($hash, "pvCorrectionFactor_.*");
-      return;
-  }
-
-  readingsDelete($hash, $prop);
+  readingsSingleUpdate($hash, "moduleArea", $arg, 1);
   
-  if($prop eq "currentMeterDev") {
-      readingsDelete($hash, "Current_GridConsumption");
-  }
-  
-  if($prop eq "currentInverterDev") {
-      readingsDelete    ($hash, "Current_PV");
-      deleteReadingspec ($hash, ".*_PVreal" );
-  }
-  
-  createNotifyDev ($hash);
+  my $ret = createStringConfig ($hash);
+  return $ret if($ret);
 
 return;
 }
@@ -621,15 +613,26 @@ sub _setmoduleEfficiency {               ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no PV module efficiency specified};
-
-  if($prop !~ /[0-9,.]/x) {
-      return qq{The module efficiency must be specified by numbers and optionally with decimal places};
+  my $arg   = $paref->{arg} // return qq{no PV module efficiency specified};
+  
+  my ($a,$h) = parseParams ($arg); 
+  
+  if(!keys %$h) {
+      return qq{The provided PV module efficiency has wrong format};
   }
   
-  $prop =~ s/,/./x;
+  $arg =~ s/,/./xg;
+  
+  while (my ($key, $value) = each %$h) {
+      if($value !~ /[0-9.]/x) {
+          return qq{The module efficiency of "$key" must be specified by numbers and optionally with decimal places};
+      }     
+  }
 
-  readingsSingleUpdate($hash, "moduleEfficiency", $prop, 1);
+  readingsSingleUpdate($hash, "moduleEfficiency", $arg, 1);
+  
+  my $ret = createStringConfig ($hash);
+  return $ret if($ret);
 
 return;
 }
@@ -641,13 +644,26 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no tilt angle was provided};
+  my $arg   = $paref->{arg} // return qq{no tilt angle was provided};
+  
+  my $tilt  = join "|", sort keys %hff;
 
-  if($prop !~ /[0-9]/x) {
-      return qq{The tilt angle must be specified by numbers};
+  my ($a,$h) = parseParams ($arg); 
+  
+  if(!keys %$h) {
+      return qq{The provided tilt angle has wrong format};
   }
 
-  readingsSingleUpdate($hash, "moduleTiltAngle", $prop, 1);
+  while (my ($key, $value) = each %$h) {
+      if($value !~ /^($tilt)$/x) {
+          return qq{The tilt angle of "$key" is wrong};
+      }     
+  }
+    
+  readingsSingleUpdate($hash, "moduleTiltAngle", $arg, 1);
+    
+  my $ret = createStringConfig ($hash);
+  return $ret if($ret);  
 
 return;
 }
@@ -659,13 +675,26 @@ sub _setmoduleDirection {                ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no module direction was provided};
+  my $arg   = $paref->{arg} // return qq{no module direction was provided};
 
-  if($prop !~ /N|NE|E|SE|S|SW|W|NW/x) {
-      return qq{No valid value for module direction: $prop};
+  my $dirs  = "N|NE|E|SE|S|SW|W|NW";                                          # mögliche Richtungsangaben
+  
+  my ($a,$h) = parseParams ($arg); 
+  
+  if(!keys %$h) {
+      return qq{The provided module direction has wrong format};
+  }
+  
+  while (my ($key, $value) = each %$h) {
+      if($value !~ /^($dirs)$/x) {
+          return qq{The module direction of "$key" is wrong: $value};
+      }     
   }
 
-  readingsSingleUpdate($hash, "moduleDirection", $prop, 1);
+  readingsSingleUpdate($hash, "moduleDirection", $arg, 1);
+  
+  my $ret = createStringConfig ($hash);
+  return $ret if($ret);
 
 return;
 }
@@ -750,6 +779,42 @@ return;
 }
 
 ################################################################
+#                      Setter reset
+################################################################
+sub _setreset {                          ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no source specified for reset};
+  
+  if($prop eq "pvHistory") {
+      my $type = $hash->{TYPE};
+      delete $data{$type}{$name}{pvhist};
+      return;
+  }
+  
+  if($prop eq "pvCorrection") {
+      deleteReadingspec   ($hash, "pvCorrectionFactor_.*");
+      return;
+  }
+
+  readingsDelete($hash, $prop);
+  
+  if($prop eq "currentMeterDev") {
+      readingsDelete($hash, "Current_GridConsumption");
+  }
+  
+  if($prop eq "currentInverterDev") {
+      readingsDelete    ($hash, "Current_PV");
+      deleteReadingspec ($hash, ".*_PVreal" );
+  }
+  
+  createNotifyDev ($hash);
+
+return;
+}
+
+################################################################
 #                      Setter writeHistory
 ################################################################
 sub _setwriteHistory {                   ## no critic "not used"
@@ -774,7 +839,8 @@ sub Get {
   my $getlist = "Unknown argument $opt, choose one of ".
                 "data:noArg ".
                 "html:noArg ".
-                "pvHistory:noArg "
+                "pvHistory:noArg ".
+                "stringConfig:noArg "
                 ;
                 
   return if(IsDisabled($name));
@@ -837,6 +903,18 @@ sub _getlistPVHistory {
   my $hash  = $paref->{hash};
  
   my $ret = listPVHistory ($hash);
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter stringConfig
+###############################################################
+sub _getstringConfig {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+ 
+  my $ret = checkStringConfig ($hash);
                     
 return $ret;
 }
@@ -941,6 +1019,7 @@ return;
 sub centralTask {
   my $hash = shift;
   my $name = $hash->{NAME};                                                                        # Name des eigenen Devices 
+  my $type = $hash->{TYPE};  
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
 
@@ -958,7 +1037,16 @@ sub centralTask {
       
       return if(IsDisabled($name));
       
-      readingsSingleUpdate($hash, "state", "running", 1); 
+      readingsSingleUpdate($hash, "state", "running", 1);
+
+      my $stch = $data{$type}{$name}{strings};                                                     # String Config Hash
+      if (!keys %{$stch}) {
+          my $ret = createStringConfig ($hash);                                                    # die String Konfiguration erstellen
+          if ($ret) {
+              readingsSingleUpdate($hash, "state", $ret, 1);
+              return;
+          }
+      }      
       
       my @da;
       my $t     = time;                                                                            # aktuelle Unix-Zeit 
@@ -994,6 +1082,90 @@ sub centralTask {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
   }
   
+return;
+}
+
+################################################################
+#       Erstellen der Stringkonfiguration
+#       Stringhash: $data{$type}{$name}{strings}
+################################################################
+sub createStringConfig {                 ## no critic "not used"
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  delete $data{$type}{$name}{strings};                                                            # Stringhash zurücksetzen
+  
+  my @istrings = split ",", ReadingsVal ($name, "inverterStrings", "");                           # Stringbezeichner
+  
+  if(!@istrings) {
+      return qq{Define all used strings with command "set $name inverterStrings" first.};
+  }
+  
+  my $tilt     = ReadingsVal ($name, "moduleTiltAngle", "");                                      # Modul Neigungswinkel für jeden Stringbezeichner
+  my ($at,$ht) = parseParams ($tilt);
+ 
+  while (my ($key, $value) = each %$ht) {
+      if ($key ~~ @istrings) {
+          $data{$type}{$name}{strings}{"$key"}{tilt} = $value;
+      }
+      else {
+          return qq{Check "moduleTiltAngle" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+      }
+  }
+  
+  my $area     = ReadingsVal ($name, "moduleArea", "");                                          # Modul Fläche für jeden Stringbezeichner
+  my ($aa,$ha) = parseParams ($area);
+ 
+  while (my ($key, $value) = each %$ha) {
+      if ($key ~~ @istrings) {
+          $data{$type}{$name}{strings}{"$key"}{area} = $value;
+      }
+      else {
+          return qq{Check "moduleArea" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+      }
+  }  
+  
+  my $effi     = ReadingsVal ($name, "moduleEfficiency", "");                                    # Modul Effizienz für jeden Stringbezeichner
+  my ($ae,$he) = parseParams ($effi);
+ 
+  while (my ($key, $value) = each %$he) {
+      if ($key ~~ @istrings) {
+          $data{$type}{$name}{strings}{"$key"}{effi} = $value;
+      }
+      else {
+          return qq{Check "moduleEfficiency" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+      }
+  }
+  
+  my $dir      = ReadingsVal ($name, "moduleDirection", "");                                    # Modul Ausrichtung für jeden Stringbezeichner
+  my ($ad,$hd) = parseParams ($dir);
+ 
+  while (my ($key, $value) = each %$hd) {
+      if ($key ~~ @istrings) {
+          $data{$type}{$name}{strings}{"$key"}{dir} = $value;
+      }
+      else {
+          return qq{Check "moduleDirection" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+      }
+  }  
+  
+  if(!keys %{$data{$type}{$name}{strings}}) {
+      return qq{The string configuration is empty.\nPlease check the settings of inverterStrings, moduleArea, moduleDirection, moduleTiltAngle, moduleEfficiency};
+  }
+  
+  my @sca = keys %{$data{$type}{$name}{strings}};                                                # Gegencheck ob nicht mehr Strings in inverterStrings enthalten sind als eigentlich verwendet
+  my @tom;
+  for my $sn (@istrings) {
+      next if ($sn ~~ @sca);
+      push @tom, $sn;      
+  }
+  if(@tom) {
+      return qq{Some Strings are not used. Please delete this string names from "inverterStrings" :}.join ",",@tom;
+  }
+  
+  # Log3 ($name, 2, "$name - string config: ".Dumper $data{$type}{$name}{strings});
+   
 return;
 }
 
@@ -1106,7 +1278,7 @@ sub _transferDWDForecastValues {
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
       
-      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_PVforecast"} = $v." kJ/m2";            # original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
+      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";         
@@ -1344,43 +1516,6 @@ sub pageRefresh {
 return;
 }
 
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-
-  my $v                    = (sortTopicNum("desc",keys %vNotesIntern))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
-  
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-      # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SolarForecast.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/g;
-      } 
-      else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SolarForecast.pm 21735 2020-04-20 20:53:24Z DS_Starter $ im Kopf komplett! vorhanden )
-      
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
-      }
-  } 
-  else {                                                                                                                # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
-  }
-  
-return;
-}
-
 ################################################################
 #    Grafik als HTML zurück liefern    (z.B. für Widget)
 ################################################################
@@ -1440,34 +1575,43 @@ sub forecastGraphic {                                                           
   my $fcdev  = ReadingsVal ($name, "currentForecastDev", "");                              # aktuelles Forecast Device  
   my $indev  = ReadingsVal ($name, "currentInverterDev", "");                              # aktuelles Inverter Device
   my ($a,$h) = parseParams ($indev);
-  $indev     = $a->[0] // "";  
-  my $cclv   = "L05";
+  $indev     = $a->[0] // "";
   
   my $pv0    = ReadingsNum ($name, "ThisHour_PVforecast", undef);
-  my $ma     = ReadingsNum ($name, "moduleArea",              0);                          # Solar Modulfläche (qm)
-  my $moddir = ReadingsVal ($name, "moduleDirection",        "");                          # aktuelles Inverter Device
-  my $ta     = ReadingsNum ($name, "moduleTiltAngle",     undef);                          # Neigungswinkel Solarmodule
   
-  if(!$fcdev || !$ma || !defined $pv0 || !$moddir || !defined $ta) {
-      $height = AttrNum($name, 'beamHeight', 200);   
-      $ret   .= "<table class='roomoverview'>";
-      $ret   .= "<tr style='height:".$height."px'>";
-      $ret   .= "<td>";
+  my $is     = ReadingsVal ($name, "inverterStrings",     undef);                          # String Konfig
+  my $ma     = ReadingsVal ($name, "moduleArea",          undef);                          # Modulfläche Konfig
+  my $dir    = ReadingsVal ($name, "moduleDirection",     undef);                          # Modulausrichtung Konfig
+  my $ta     = ReadingsVal ($name, "moduleTiltAngle",     undef);                          # Modul Neigungswinkel Konfig
+  my $eff    = ReadingsVal ($name, "moduleEfficiency",    undef);                          # Modul Effizienz Konfig
+  
+  if(!$is || !$fcdev || !$ma || !defined $pv0 || !$dir || !$ta || !$eff) {
+      my $link = qq{<a href="/fhem?detail=$name">$name</a>};  
+      $height  = AttrNum($name, 'beamHeight', 200);   
+      $ret    .= "<table class='roomoverview'>";
+      $ret    .= "<tr style='height:".$height."px'>";
+      $ret    .= "<td>";
       
       if(!$fcdev) {
-          $ret .= qq{Please select a Solar Forecast device of Type "DWD_OpenData" with "set $name currentForecastDev"};
+          $ret .= qq{Please select a Solar Forecast device with "set $link currentForecastDev"};
       }
       elsif(!$indev) {
-          $ret .= qq{Please select an Inverter device with "set $name currentInverterDev"};   
+          $ret .= qq{Please select an Inverter device with "set $link currentInverterDev"};   
+      }
+      elsif(!$is) {
+          $ret .= qq{Please define all of your used string names with "set $link inverterStrings".};
       }
       elsif(!$ma) {
-          $ret .= qq{Please specify the total module area with "set $name moduleArea"};   
+          $ret .= qq{Please specify the total module area with "set $link moduleArea"};   
       }
-      elsif(!$moddir) {
-          $ret .= qq{Please specify the module Direction with "set $name moduleDirection"};   
+      elsif(!$eff) {
+          $ret .= qq{Please specify the module efficiency with "set $link moduleEfficiency"};   
       }
-      elsif(!defined $ta) {
-          $ret .= qq{Please specify the module tilt angle with "set $name moduleTiltAngle"};   
+      elsif(!$dir) {
+          $ret .= qq{Please specify the module direction with "set $link moduleDirection"};   
+      }
+      elsif(!$ta) {
+          $ret .= qq{Please specify the module tilt angle with "set $link moduleTiltAngle"};   
       }
       elsif(!defined $pv0) {
           $ret .= qq{Awaiting data from selected Solar Forecast device ...};   
@@ -1479,6 +1623,7 @@ sub forecastGraphic {                                                           
       return $ret;
   }
 
+  my $cclv                    = "L05";
   @pgCDev                     = split(',',AttrVal($name,"consumerList",""));            # definierte Verbraucher ermitteln
   my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
 
@@ -2296,57 +2441,69 @@ return @aneeded;
 ##################################################################################################
 sub calcPVforecast {            
   my $name = shift;
-  my $rad  = shift;                                                                         # Nominale Strahlung aus DWD Device
-  my $fh   = shift;                                                                         # Stunde des Tages 
+  my $rad  = shift;                                                                             # Nominale Strahlung aus DWD Device
+  my $fh   = shift;                                                                             # Stunde des Tages 
   
   my $hash = $defs{$name};
+  my $type = $hash->{TYPE};
+  my $stch = $data{$type}{$name}{strings};                                                      # String Configuration Hash
   
-  my $ma     = ReadingsNum ($name, "moduleArea",                              0        );   # Solar Modulfläche (gesamt)
-  my $ta     = ReadingsNum ($name, "moduleTiltAngle",                         45       );   # Neigungswinkel Solarmodule
-  my $moddir = ReadingsVal ($name, "moduleDirection",                         "S"      );   # Ausrichtung der Solarmodule
-  my $me     = ReadingsNum ($name, "moduleEfficiency",                        $defpvme );   # Solar Modul Wirkungsgrad (%)
-  my $ie     = ReadingsNum ($name, "inverterEfficiency",                      $definve );   # Solar Inverter Wirkungsgrad (%)
-  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );   # Korrekturfaktor für die Stunde des Tages
+  my @strings = sort keys %{$stch};
   
-  my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;      # effektive Wolkendecke
-  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);                   # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_CloudCover"} // 0;          # effektive Wolkendecke
+  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);                       # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_RainProb"} // 0;        # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                       # Rain Correction Faktor mit Steilheit
-  
-  my $af         = $hff{$ta}{$moddir} / 100;                                                # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
-  
-  $hc    = 1 if(1*$hc == 0);
-  
-  my $pv = sprintf "%.1f", ($rad * $kJtokWh * $ma * $af * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
-  
-  my $kw =  AttrVal ($name, 'Wh/kWh', 'Wh');
-  if($kw eq "Wh") {
-      $pv = int $pv;
-  }
-  
-  my $lh = {                                                                                # Log-Hash zur Ausgabe
-      "moduleDirection"         => $moddir,
-      "moduleArea"              => $ma,
-      "moduleTiltAngle"         => $ta,
-      "Area factor"             => $af,
-      "Cloudfactor"             => $ccf,
-      "Rainfactor"              => $rcf,
-      "pvCorrectionFactor"      => $hc,
-      "moduleEfficiency"        => $me/100,
-      "inverterEfficiency"      => $ie/100,
-      "Radiation"               => $rad,
-      "Factor kJ to kWh"        => $kJtokWh
-  };
-  
-  my $sq;
-  for my $idx (sort keys %{$lh}) {
-      $sq .= $idx." => ".$lh->{$idx}."\n";             
-  }
+  my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$fh)."_RainProb"} // 0;            # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                           # Rain Correction Faktor mit Steilheit
 
-  Log3($name, 5, "$name - PV forecast calc factors for hour ".sprintf("%02d",$fh)." ->\n$sq");
+  my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
+  my $ie     = ReadingsNum ($name, "inverterEfficiency",                      $definve );       # Solar Inverter Wirkungsgrad (%)
+  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );       # Korrekturfaktor für die Stunde des Tages
   
-return $pv;
+  my $pvsum  = 0;  
+  
+  for my $st (@strings) {                                                                       # für jeden String der Config ..
+      my $ma     = $stch->{"$st"}{area};                                                        # Solar Modulfläche String
+      my $ta     = $stch->{"$st"}{tilt};                                                        # Neigungswinkel Solarmodule
+      my $moddir = $stch->{"$st"}{dir};                                                         # Ausrichtung der Solarmodule
+      my $me     = $stch->{"$st"}{effi};                                                        # Solar Modul Wirkungsgrad (%)
+      
+      my $af     = $hff{$ta}{$moddir} / 100;                                                    # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
+      $hc        = 1 if(1*$hc == 0);
+      my $pv     = sprintf "%.1f", ($rad * $kJtokWh * $ma * $af * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
+  
+      my $lh = {                                                                                # Log-Hash zur Ausgabe
+          "moduleDirection"         => $moddir,
+          "moduleArea"              => $ma,
+          "moduleTiltAngle"         => $ta,
+          "Area factor"             => $af,
+          "Cloudfactor"             => $ccf,
+          "Rainfactor"              => $rcf,
+          "pvCorrectionFactor"      => $hc,
+          "moduleEfficiency"        => $me/100,
+          "inverterEfficiency"      => $ie/100,
+          "Radiation"               => $rad,
+          "Factor kJ to kWh"        => $kJtokWh,
+          "PV generation (Wh)"      => $pv
+      };  
+      
+      my $sq;
+      for my $idx (sort keys %{$lh}) {
+          $sq .= $idx." => ".$lh->{$idx}."\n";             
+      }
+
+      Log3($name, 5, "$name - PV forecast calc for hour ".sprintf("%02d",$fh)." string: $st ->\n$sq");
+      
+      $pvsum += $pv;
+  }
+  
+  if($kw eq "Wh") {
+      $pvsum = int $pvsum;
+  }
+  
+  Log3($name, 5, "$name - PV forecast calc for hour ".sprintf("%02d",$fh)." summary: $pvsum");
+ 
+return $pvsum;
 }
 
 ################################################################
@@ -2387,7 +2544,7 @@ sub calcVariance {
       readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on", 0);
   }
 
-  my $maxvar = AttrVal($name, "maxVariancePerDay", $defmaxvar);                         # max. Korrekturvarianz
+  my $maxvar = AttrVal($name, "maxVariancePerDay", $defmaxvar);                                           # max. Korrekturvarianz
 
   my @da;
   for my $h (1..23) {
@@ -2400,7 +2557,7 @@ sub calcVariance {
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
       if($cdone eq "done") {
-          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h));
+          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h). "already calculated");
           next;
       }
 
@@ -2467,7 +2624,7 @@ sub calcFromHistory {
       
       Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Days ($calcd) for calc: ".join " ",@efa); 
   
-      my $pvhh         = $data{$type}{$name}{pvhist};
+      # my $pvhh         = $data{$type}{$name}{pvhist};
       my $anzavg       = scalar(@efa);
       my ($pvrl,$pvfc) = (0,0);
             
@@ -2545,6 +2702,49 @@ sub listPVHistory {
   }
       
 return $sq;
+}
+
+################################################################
+#        liefert aktuelle Stringkonfiguration
+#        inkl. Vollständigkeitscheck
+################################################################
+sub checkStringConfig {                 
+  my $hash = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  my $stch = $data{$type}{$name}{strings};
+  
+  my $sub = sub { 
+      my $string = shift;
+      my $ret;          
+      for my $key (sort keys %{$stch->{"$string"}}) {
+          $ret    .= ", " if($ret);
+          $ret    .= $key.": ".$stch->{"$string"}{$key};
+      }
+      return $ret;
+  };
+        
+  if (!keys %{$stch}) {
+      return qq{String configuration is empty.};
+  }
+  
+  my $sc;
+  my $cf = 0;
+  for my $sn (sort keys %{$stch}) {
+      my $sp = $sn." => ".$sub->($sn)."\n";
+      $cf    = 1 if($sp !~ /area.*?dir.*?effi.*?tilt/x);             # Test Vollständigkeit: z.B. Ostlage => area: 31.04, dir: E, effi: 16.52, tilt: 30
+      $sc   .= $sp;
+  }
+  
+  if($cf) {                             
+      $sc .= "\n\nOh no &#128577, your string configuration is inconsistent.\nPlease check the settings of moduleArea, moduleDirection, moduleEfficiency, moduleTiltAngle !";
+  }
+  else {
+      $sc .= "\n\nCongratulations &#128522, your string configuration checked without found errors !";
+  }
+      
+return $sc;
 }
 
 ################################################################
@@ -2702,13 +2902,15 @@ return;
 Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellendevices eine 
 Vorhersage für den solaren Ertrag und weitere Informationen als Grundlage für abhängige Steuerungen. <br>
 Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem 
-<a href="https://wiki.fhem.de/wiki/FTUI_Widget_SolarForecast">"SolarForecast Widget"</a> integriert werden. <br><br>
+<a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SolarForecast Widget"</a> integriert werden. <br><br>
 
 Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) prognostizierten Globalstrahlung am 
 Anlagenstandort. Im zugeordneten DWD_OpenData Device ist die passende Wetterstation mit dem Attribut "forecastStation" 
 festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
 Abhängig von der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.) wird die 
-verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
+verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. <br>
+Ein SolarForecast Device unterstützt einen Wechselrichter mit beliebig vielen angeschlossenen Strings. Weiteren Wechselrichtern
+werden weitere SolarForecast Devices zugeordnet.
 
 <ul>
   <a name="SolarForecastdefine"></a>
@@ -2815,17 +3017,39 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
     <br>
     
     <ul>
+      <a name="inverterStrings"></a>
+      <li><b>inverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br> 
+      Bezeichnungen der am Wechselrichter aktiven Strings. Diese Bezeichnungen werden als Schlüssel in den weiteren 
+      Settings verwendet. <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; inverterStrings Ostdach,Südgarage,S3 <br>
+      </ul>    
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
       <a name="moduleArea"></a>
-      <li><b>moduleArea &lt;Zahl&gt; </b> <br> 
-      Gesamte installierte Solarmodulfläche in qm.       
+      <li><b>moduleArea &lt;Stringname1&gt;=&lt;Fläche&gt; [&lt;Stringname2&gt;=&lt;Fläche&gt; &lt;Stringname3&gt;=&lt;Fläche&gt; ...] </b> <br> 
+      Gesamte an dem String "StringnameX" installierte Solarmodulfläche in qm. Der Stringname ist ein Schlüsselwert des 
+      Readings <b>inverterStrings</b>. <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleArea Ostdach=31.04 Südgarage=20 S3=32.05 <br>
+      </ul>      
       </li>
     </ul>
     <br>
     
     <ul>
       <a name="moduleDirection"></a>
-      <li><b>moduleDirection </b> <br> 
-      Ausrichtung der Solarmodule. <br><br>
+      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br> 
+      Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des 
+      Readings <b>inverterStrings</b>. <br>
+      Die Richtungsangabe &lt;dir&gt; kann eine der folgenden Werte sein: <br><br>
 
       <ul>
          <table>  
@@ -2839,6 +3063,12 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
             <tr><td> <b>W</b>  </td><td>Westausrichtung            </td></tr>
             <tr><td> <b>NW</b> </td><td>Nord-West Ausrichtung      </td></tr>
          </table>
+      </ul> 
+      <br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleDirection Ostdach=E Südgarage=S S3=NW <br>
       </ul>       
       </li>
     </ul>
@@ -2846,18 +3076,28 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt.
     
     <ul>
       <a name="moduleEfficiency"></a>
-      <li><b>moduleEfficiency &lt;Zahl&gt; </b> <br> 
-      Wirkungsgrad der Solarmodule in % laut Herstellerangabe.  <br>
-      (default: 16.52)      
+      <li><b>moduleEfficiency &lt;Stringname1&gt;=&lt;Eff&gt; [&lt;Stringname2&gt;=&lt;Eff&gt; &lt;Stringname3&gt;=&lt;Eff&gt; ...] </b> <br> 
+      Wirkungsgrad der Solarmodule im String "StringnameX" laut Herstellerangabe in %. Der Stringname ist ein Schlüsselwert des 
+      Readings <b>inverterStrings</b>. <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleEfficiency Ostdach=16.52 Südgarage=16.52 S3=16.52 <br>
+      </ul>      
       </li>
     </ul>
     <br>
     
     <ul>
       <a name="moduleTiltAngle"></a>
-      <li><b>moduleTiltAngle </b> <br> 
-      Neigungswinkel der Solarmodule (0 = waagerecht, 90 = senkrecht). <br>
-      (default: 45)      
+      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br> 
+      Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
+      Mögliche Neigungswinkel sind: 0,10,20,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; moduleTiltAngle Ostdach=40 Südgarage=60 S3=30 <br>
+      </ul>
       </li>
     </ul>
     <br>
