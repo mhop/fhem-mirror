@@ -70,9 +70,14 @@
 # 2017-01-16 - added:   attributes ga_showQR, ga_strictCheck
 #              removed: FW_summaryFn (not really useful)
 #
+# 2020-03-31 - changed: remove prototyping and undef results
+#
+# 2021-01-26 - changed: rework code to use own package
+#
 =cut
 
-package main;
+package FHEM::GoogleAuth;    ## no critic
+
 use strict;
 use warnings;
 
@@ -81,15 +86,37 @@ use Authen::OATH;
 use URI::Escape;
 use Crypt::URandom qw( urandom );
 
+use GPUtils qw(GP_Import GP_Export);
 
-sub GoogleAuth_Initialize {
+## Import der FHEM Funktionen
+
+BEGIN {
+    # Import from main context
+    GP_Import(
+        qw( AttrVal
+            Debug
+            Log3
+            defs
+            readingFnAttributes
+            readingsSingleUpdate
+            setKeyValue
+            getKeyValue )
+    );
+    
+    #-- Export to main context with different name
+    GP_Export(
+        qw( Initialize )
+    );
+}
+
+sub Initialize {
   my ($hash) = @_;
 
-  $hash->{DefFn}        = "GoogleAuth_Define";
-  $hash->{DeleteFn}	    = "GoogleAuth_Delete";
-  $hash->{SetFn}        = "GoogleAuth_Set";
-  $hash->{GetFn}        = "GoogleAuth_Get";
-  $hash->{FW_detailFn}  = "GoogleAuth_Detail";
+  $hash->{DefFn}        = \&Define;
+  $hash->{DeleteFn}	    = \&Delete;
+  $hash->{SetFn}        = \&Set;
+  $hash->{GetFn}        = \&Get;
+  $hash->{FW_detailFn}  = \&Detail;
 
   $hash->{AttrList} = "ga_labelName ".
                       "ga_qrSize:100x100,200x200,300x300,400x400 ".
@@ -98,7 +125,7 @@ sub GoogleAuth_Initialize {
                       "$readingFnAttributes";
 }
 
-sub GoogleAuth_Define {
+sub Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   my @a = split("[ \t][ \t]*", $def);
@@ -109,12 +136,12 @@ sub GoogleAuth_Define {
   return;
 }
 
-sub GoogleAuth_Delete {
+sub Delete {
   my ($hash,$name) = @_;
   setKeyValue("googleAuth$name",undef);
 }
 
-sub GoogleAuth_Set {
+sub Set {
   my ($hash, $name, $cmd, @args) = @_;
   my $usage = "Unknown argument, choose one of new:noArg revoke:noArg";
 
@@ -136,7 +163,7 @@ sub GoogleAuth_Set {
   return;
 }
 
-sub GoogleAuth_Get {
+sub Get {
   my ($hash, $name, $cmd, $given_token) = @_;
   my $usage = "Unknown argument, choose one of check";
 
@@ -167,7 +194,7 @@ sub GoogleAuth_Get {
   return $usage;
 }
 
-sub GoogleAuth_Detail {
+sub Detail {
   my ($FW_wname, $name, $room, $pageHash) = @_;
   my $qr_url = _ga_make_url($name);
   my $secret_base32 = getKeyValue("googleAuth$name"); # read from fhem keystore
@@ -209,9 +236,12 @@ sub _ga_make_token_6 {
   return $token;
 }
 
+package main;
+
 sub gAuth {
   my($name,$token) = @_;
-  return CommandGet(undef,"$name check $token");
+  my $myHash = $defs{$name};
+  return FHEM::GoogleAuth::Get($myHash,$name,'check',$token);
 }
 
 1;
