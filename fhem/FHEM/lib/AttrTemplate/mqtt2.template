@@ -2284,7 +2284,7 @@ par:DEVNAME;Shelly1 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,
 par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
 par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:NEWUSERREADINGS;NEWUSERREADINGS as set if emeter_0_energy_total is included, otherwise it will be added;{ my $tobeadded = 'emeter_0_energy_total:emeter_0_energy:.* monotonic {ReadingsNum("$name","emeter_0_energy",0)}, emeter_1_energy_total:emeter_1_energy:.* monotonic {ReadingsNum("$name","emeter_1_energy",0)}, emeter_2_energy_total:emeter_2_energy:.* monotonic {ReadingsNum("$name","emeter_2_energy",0)}'; my $old =  AttrVal("DEVICE","userReadings",undef); !defined $old ? $tobeadded : $old =~ m,emeter_0_energy_total:emeter_0_energy.*, ? $old : $old." $tobeadded"  }
-set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=0 \RADIO_DONOTSETUSERREADING=0
+set DEVICE attrTemplate shelly1_w_energy_measuring \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; my $light = ReadingsVal($name,"state","off"); my $cons1 = ReadingsVal($name,"emeter_0_power","unknown"); my $cons2 = ReadingsVal($name,"emeter_1_power","unknown"); my $cons3 = ReadingsVal($name,"emeter_2_power","unknown"); my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown"); my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown"); my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown"); my $total_sum = $total1+$total2+$total3; "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a><div>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh<br>3 Phases total: $total_sum kWh</div>"}
 attr DEVICE stateFormat { my $light = ReadingsVal($name,"state","off"); my $cons1 = ReadingsVal($name,"emeter_0_power","unknown"); my $cons2 = ReadingsVal($name,"emeter_1_power","unknown"); my $cons3 = ReadingsVal($name,"emeter_2_power","unknown"); my $total1 = ReadingsVal($name,"emeter_0_kWh","unknown"); my $total2 = ReadingsVal($name,"emeter_1_kWh","unknown"); my $total3 = ReadingsVal($name,"emeter_2_kWh","unknown"); return qq(Relay: $light,<br>P1: $cons1 W / Total P1: $total1 kWh<br>P2: $cons2 W / Total P2: $total2 kWh<br>P3: $cons3 W / Total P3: $total3 kWh) }
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
@@ -2324,7 +2324,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shelly3em
-setreading DEVICE attrTemplateVersion 20200831
+setreading DEVICE attrTemplateVersion 20210126
 option:{ RADIO_SETUSERREADING }
 attr DEVICE userReadings NEWUSERREADINGS
 
@@ -2399,7 +2399,11 @@ attr DEVICE readingList \
   shellies/DEVNAME/roller/0/power:.* roller_0_power\
   shellies/DEVNAME/roller/0/energy:.* roller_0_energy\
   shellies/DEVNAME/temperature_f:.* temperature_f
-attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen"; my $con = ReadingsVal($name,"state","unknown"); $con = 100 - $con if $con =~ /\d+/; my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown'; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>"; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
+attr DEVICE devStateIcon .*/open:fts_shutter_up@red .*/close:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 0/stop:fts_shutter_100 100/stop:fts_shutter_10 9\d/stop:fts_shutter_10 8\d/stop:fts_shutter_20 7\d/stop:fts_shutter_30 6\d/stop:fts_shutter_40 5\d/stop:fts_shutter_50 4\d/stop:fts_shutter_60 3\d/stop:fts_shutter_70 2\d/stop:fts_shutter_80 1\d/stop:fts_shutter_90 0\d/stop:fts_shutter_100 set_.*:fts_shutter_updown
+attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+online\
+</a>\
+state/current
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
@@ -2408,7 +2412,7 @@ attr DEVICE eventMap open:opens close:closes
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shelly25_roller_invert_0
-setreading DEVICE attrTemplateVersion 20201206
+setreading DEVICE attrTemplateVersion 20210126
 
 name:shelly25_roller_invert_1
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
@@ -2444,7 +2448,11 @@ attr DEVICE readingList \
   shellies/DEVNAME/roller/0/power:.* roller_0_power\
   shellies/DEVNAME/roller/0/energy:.* roller_0_energy\
   shellies/DEVNAME/temperature_f:.* temperature_f
-attr DEVICE devStateIcon { my $amp = ReadingsVal($name,"online","false") eq "false" ? "rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "gelb" : "gruen"; my $con = ReadingsVal($name,"state","unknown"); my $pic = $con eq "opening" ? 'fts_shutter_up@red' : $con eq "closing" ? 'fts_shutter_down@red' : $con eq "100" ? 'fts_shutter_100' : $con =~ /(\d)\d/ ? 'fts_shutter_'.$1.'0' : $con =~ /\b\d\b/ ? 'fts_shutter_10' : 'fts_shutter_updown'; my $show = "$amp" eq "gelb" ? "<a href=\"/fhem?cmd.dummy=set $name x_update&XHR=1\">".FW_makeImage("10px-kreis-".$amp)."</a>" : "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage("10px-kreis-".$amp)."</a>"; "<div> $show <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\"></a>".FW_makeImage($pic)." </div>"}
+attr DEVICE devStateIcon .*/open:fts_shutter_up@red .*/close:fts_shutter_down@red true:10px-kreis-gruen false:10px-kreis-rot 0/stop:fts_shutter_100 100/stop:fts_shutter_10 9\d/stop:fts_shutter_10 8\d/stop:fts_shutter_20 7\d/stop:fts_shutter_30 6\d/stop:fts_shutter_40 5\d/stop:fts_shutter_50 4\d/stop:fts_shutter_60 3\d/stop:fts_shutter_70 2\d/stop:fts_shutter_80 1\d/stop:fts_shutter_90 0\d/stop:fts_shutter_100 set_.*:fts_shutter_updown
+attr DEVICE stateFormat <a href="http://ip" target="_blank">\
+online\
+</a>\
+state/current
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
 attr DEVICE webCmd :open:close:half:stop:pct
 deletereading -q DEVICE (?!associatedWith).*
@@ -2453,7 +2461,7 @@ attr DEVICE eventMap open:opens close:closes
 set DEVICE x_mqttcom announce
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model shelly25_roller_invert_1
-setreading DEVICE attrTemplateVersion 20201206
+setreading DEVICE attrTemplateVersion 20210126
 
 # shelly2 using original firmware.
 # NOTE: a second device will be created for the second channel
@@ -2479,8 +2487,10 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shelly2.5 using original firmware. <br>NOTE: a second device will be created for the second channel
 order:A_11a1
 par:DEVNAME;Shelly2 name in the topic;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]*)/, ? $1 : undef }
+par:RADIO_SETUSERREADING;Set userreading for total energy consumption;{ undef }
+par:RADIO_DONOTSETUSERREADING;Do not set userreading for total energy consumption;{ undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
-set DEVICE attrTemplate shelly1_w_energy_measuring \CALLSPEECHRECOGN=0
+set DEVICE attrTemplate shelly1_w_energy_measuring \CALLSPEECHRECOGN=0 \RADIO_SETUSERREADING=RADIO_SETUSERREADING \RADIO_DONOTSETUSERREADING=RADIO_DONOTSETUSERREADING
 set DEVICE attrTemplate set_associatedWith \CHANNELS=2 \MAKECOPIES=1
 attr DEVICE_CH2 readingList shellies/DEVNAME/relay/1:.* state\
   shellies/DEVNAME/relay/1:.* relay1\
@@ -2502,7 +2512,7 @@ attr DEVICE_CH2 setList \
   on:noArg shellies/DEVNAME/relay/1/command on
 attr DEVICE_CH2 devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "false"?"10px-kreis-rot" : ReadingsVal($name,"new_fw","false") eq "true" ? "10px-kreis-gelb" : "10px-kreis-gruen"; my $light = ReadingsVal($name,"state","off"); my $cons = ReadingsVal($name,"relay_1_power","unknown"); my $temp = ReadingsVal($name,"temperature","-100");"<div><a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($light)."</a> Aktuell: $cons W / Temp.: $temp °C<b></b>"}
 attr DEVICE,DEVICE_CH2 model shelly25_split
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20200831
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210126
 option:{ CALLSPEECHRECOGN }  
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_switch
 
