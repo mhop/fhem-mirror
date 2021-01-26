@@ -2697,7 +2697,7 @@ sub listPVHistory {
   }
   
   my $sq;
-  for my $idx (sort{$a<=>$b} keys %{$pvhh}) {
+  for my $idx (reverse sort{$a<=>$b} keys %{$pvhh}) {
       $sq .= $idx." => ".$sub->($idx)."\n";             
   }
       
