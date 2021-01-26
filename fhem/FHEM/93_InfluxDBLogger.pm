@@ -192,7 +192,7 @@ sub InfluxDBLogger_BuildDataDynamic($$$$$)
     return ($measurementAndTagSet,$field_set);
 }
 
-sub InfluxDBLogger_GetMeasurement($$$)
+sub InfluxDBLogger_GetMeasurement($$$$$)
 {
     my ($hash, $dev_hash, $device, $reading, $value) = @_;
     my $name = $hash->{NAME};
@@ -211,7 +211,7 @@ sub InfluxDBLogger_GetMeasurement($$$)
     return $measurement;
 }
 
-sub InfluxDBLogger_GetTagSet($$$)
+sub InfluxDBLogger_GetTagSet($$$$$)
 {
     my ($hash, $dev_hash, $device, $reading, $value) = @_;
     my $name = $hash->{NAME};
@@ -230,7 +230,7 @@ sub InfluxDBLogger_GetTagSet($$$)
     return $tags_set;
 }
 
-sub InfluxDBLogger_GetFieldSet($$$)
+sub InfluxDBLogger_GetFieldSet($$$$$)
 {
     my ($hash, $dev_hash, $device, $reading, $value) = @_;
     my $name = $hash->{NAME};
@@ -376,7 +376,7 @@ sub InfluxDBLogger_DroppedIncompatibleValues($$@)
     readingsEndUpdate($hash, 1);
 }
 
-sub InfluxDBLogger_Set($$@)
+sub InfluxDBLogger_Set($$$@)
 {
     my ( $hash, $name, $cmd, @args ) = @_;
     Log3 $name, 5, "InfluxDBLogger: [$name] set $cmd";
@@ -400,7 +400,7 @@ sub InfluxDBLogger_Set($$@)
     }
 }
 
-sub InfluxDBLogger_ResetStatistics($)
+sub InfluxDBLogger_ResetStatistics($$)
 {
     my ( $hash, $name ) = @_;
     readingsBeginUpdate($hash);
@@ -421,7 +421,7 @@ sub InfluxDBLogger_IsBasicAuth($)
     return AttrVal($name, "security", "") eq "basic_auth";
 }
 
-sub InfluxDBLogger_GetPassword()
+sub InfluxDBLogger_GetPassword($$)
 {
     my $hash = shift;
     my $name = shift;
@@ -436,7 +436,7 @@ sub InfluxDBLogger_GetPassword()
     }
 }
 
-sub InfluxDBLogger_StoreSecret {
+sub InfluxDBLogger_StoreSecret($$$$) {
     my $hash     = shift;
     my $name     = shift;
     my $ref      = shift;
@@ -467,7 +467,7 @@ sub InfluxDBLogger_StoreSecret {
     return "$ref successfully saved";
 }
 
-sub InfluxDBLogger_ReadSecret {
+sub InfluxDBLogger_ReadSecret($$$) {
     my $hash = shift;
     my $name = shift;
     my $ref  = shift;
