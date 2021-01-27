@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
   "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
   "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to calcPVforecast, add reset pvCorrection ",
   "0.3.0"  => "21.01.2021  add cloud correction, add rain correction, add reset pvHistory, setter writeHistory ",
@@ -127,9 +128,7 @@ my %vNotesIntern = (
 
 my %hset = (                                                                # Hash der Set-Funktion
   currentForecastDev      => { fn => \&_setcurrentForecastDev     },
-  moduleArea              => { fn => \&_setmoduleArea             },
-  moduleEfficiency        => { fn => \&_setmoduleEfficiency       },
-  inverterEfficiency      => { fn => \&_setinverterEfficiency     },
+  modulePeakString        => { fn => \&_setmodulePeakString       },
   inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
@@ -450,10 +449,8 @@ sub Set {
              "currentForecastDev:$fcd ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
-             "inverterEfficiency ".
              "inverterStrings ".
-             "moduleArea ".
-             "moduleEfficiency ".
+             "modulePeakString ".
              "moduleTiltAngle ".
              "moduleDirection ".
              "pvCorrectionFactor_Auto:on,off ".
@@ -576,60 +573,29 @@ return;
 }
 
 ################################################################
-#                      Setter moduleArea
+#                      Setter modulePeakString
 ################################################################
-sub _setmoduleArea {                     ## no critic "not used"
+sub _setmodulePeakString {               ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no PV module area specified};
+  my $arg   = $paref->{arg} // return qq{no PV module peak specified};
   
   $arg =~ s/,/./xg;
   
   my ($a,$h) = parseParams ($arg); 
   
   if(!keys %$h) {
-      return qq{The provided PV module area has wrong format};
+      return qq{The provided PV module peak has wrong format};
   }
   
   while (my ($key, $value) = each %$h) {
       if($value !~ /[0-9.]/x) {
-          return qq{The module area of "$key" must be specified by numbers and optionally with decimal places};
+          return qq{The module peak of "$key" must be specified by numbers and optionally with decimal places};
       }     
   }
   
-  readingsSingleUpdate($hash, "moduleArea", $arg, 1);
-  
-  my $ret = createStringConfig ($hash);
-  return $ret if($ret);
-
-return;
-}
-
-################################################################
-#                      Setter moduleEfficiency
-################################################################
-sub _setmoduleEfficiency {               ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $arg   = $paref->{arg} // return qq{no PV module efficiency specified};
-  
-  my ($a,$h) = parseParams ($arg); 
-  
-  if(!keys %$h) {
-      return qq{The provided PV module efficiency has wrong format};
-  }
-  
-  $arg =~ s/,/./xg;
-  
-  while (my ($key, $value) = each %$h) {
-      if($value !~ /[0-9.]/x) {
-          return qq{The module efficiency of "$key" must be specified by numbers and optionally with decimal places};
-      }     
-  }
-
-  readingsSingleUpdate($hash, "moduleEfficiency", $arg, 1);
+  readingsSingleUpdate($hash, "modulePeakString", $arg, 1);
   
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
@@ -695,26 +661,6 @@ sub _setmoduleDirection {                ## no critic "not used"
   
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
-
-return;
-}
-
-################################################################
-#                      Setter inverterEfficiency
-################################################################
-sub _setinverterEfficiency {             ## no critic "not used"
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no inverter efficiency specified};
-
-  if($prop !~ /[0-9,.]/x) {
-      return qq{The inverter efficiency must be specified by numbers and optionally with decimal places};
-  }
-  
-  $prop =~ s/,/./x;
-
-  readingsSingleUpdate($hash, "inverterEfficiency", $prop, 1);
 
 return;
 }
@@ -1114,27 +1060,15 @@ sub createStringConfig {                 ## no critic "not used"
       }
   }
   
-  my $area     = ReadingsVal ($name, "moduleArea", "");                                          # Modul Fläche für jeden Stringbezeichner
-  my ($aa,$ha) = parseParams ($area);
+  my $peak     = ReadingsVal ($name, "modulePeakString", "");                                    # kWp für jeden Stringbezeichner
+  my ($aa,$ha) = parseParams ($peak);
  
   while (my ($key, $value) = each %$ha) {
       if ($key ~~ @istrings) {
-          $data{$type}{$name}{strings}{"$key"}{area} = $value;
+          $data{$type}{$name}{strings}{"$key"}{peak} = $value;
       }
       else {
-          return qq{Check "moduleArea" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
-      }
-  }  
-  
-  my $effi     = ReadingsVal ($name, "moduleEfficiency", "");                                    # Modul Effizienz für jeden Stringbezeichner
-  my ($ae,$he) = parseParams ($effi);
- 
-  while (my ($key, $value) = each %$he) {
-      if ($key ~~ @istrings) {
-          $data{$type}{$name}{strings}{"$key"}{effi} = $value;
-      }
-      else {
-          return qq{Check "moduleEfficiency" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
+          return qq{Check "modulePeakString" -> the stringname "$key" is not defined as valid string in reading "inverterStrings"};
       }
   }
   
@@ -1151,7 +1085,7 @@ sub createStringConfig {                 ## no critic "not used"
   }  
   
   if(!keys %{$data{$type}{$name}{strings}}) {
-      return qq{The string configuration is empty.\nPlease check the settings of inverterStrings, moduleArea, moduleDirection, moduleTiltAngle, moduleEfficiency};
+      return qq{The string configuration is empty.\nPlease check the settings of inverterStrings, modulePeakString, moduleDirection, moduleTiltAngle};
   }
   
   my @sca = keys %{$data{$type}{$name}{strings}};                                                # Gegencheck ob nicht mehr Strings in inverterStrings enthalten sind als eigentlich verwendet
@@ -1580,12 +1514,11 @@ sub forecastGraphic {                                                           
   my $pv0    = ReadingsNum ($name, "ThisHour_PVforecast", undef);
   
   my $is     = ReadingsVal ($name, "inverterStrings",     undef);                          # String Konfig
-  my $ma     = ReadingsVal ($name, "moduleArea",          undef);                          # Modulfläche Konfig
+  my $peak   = ReadingsVal ($name, "modulePeakString",    undef);                          # String Peak
   my $dir    = ReadingsVal ($name, "moduleDirection",     undef);                          # Modulausrichtung Konfig
   my $ta     = ReadingsVal ($name, "moduleTiltAngle",     undef);                          # Modul Neigungswinkel Konfig
-  my $eff    = ReadingsVal ($name, "moduleEfficiency",    undef);                          # Modul Effizienz Konfig
   
-  if(!$is || !$fcdev || !$ma || !defined $pv0 || !$dir || !$ta || !$eff) {
+  if(!$is || !$fcdev || !$indev || !$peak || !defined $pv0 || !$dir || !$ta) {
       my $link = qq{<a href="/fhem?detail=$name">$name</a>};  
       $height  = AttrNum($name, 'beamHeight', 200);   
       $ret    .= "<table class='roomoverview'>";
@@ -1601,11 +1534,8 @@ sub forecastGraphic {                                                           
       elsif(!$is) {
           $ret .= qq{Please define all of your used string names with "set $link inverterStrings".};
       }
-      elsif(!$ma) {
-          $ret .= qq{Please specify the total module area with "set $link moduleArea"};   
-      }
-      elsif(!$eff) {
-          $ret .= qq{Please specify the module efficiency with "set $link moduleEfficiency"};   
+      elsif(!$peak) {
+          $ret .= qq{Please specify the total module peak with "set $link modulePeakString"};   
       }
       elsif(!$dir) {
           $ret .= qq{Please specify the module direction with "set $link moduleDirection"};   
@@ -2413,20 +2343,28 @@ return @aneeded;
 
 ##################################################################################################
 #            PV Forecast Rad1h in kWh / Wh
-# Für die Umrechnung in einen kWh/Wh-Wert benötigt man einen entsprechenden Faktorwert:
+# Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
 #
 #    * Faktor für Umwandlung kJ in kWh:   0.00027778
 #    * Eigene Modulfläche in qm z.B.:     31,04
 #    * Wirkungsgrad der Module in % z.B.: 16,52
 #    * Wirkungsgrad WR in % z.B.:         98,3
-#    * Korrekturwerte wegen Ausrichtung/Verschattung: 83% wegen Ost/West und Schatten (Iteration)
+#    * Korrekturwerte wegen Ausrichtung/Verschattung etc.
 #
 # Die Formel wäre dann: 
-# Ertrag in kWh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100%
+# Ertrag in Wh = Rad1h * 0.00027778 * 31,04 qm * 16,52% * 98,3% * 100% * 1000
 #
-# Damit ergibt sich ein Umrechnungsfaktor von: 0,00140019 für kWh / 1,40019 für Wh
+# Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
 #
-# Bei einem Rad1h-Wert von 500 ergibt dies bei mir also  0,700095 kWh / 700,095 Wh
+#    * Globalstrahlung:                G =  kJ / m2
+#    * Korrektur mit Flächenfaktor f:  Gk = G * f
+#    * Globalstrahlung (STC):          1 kW/m2
+#    * Peak Leistung String (kWp):     Pnenn = x kW
+#    * Performance Ratio:              PR (typisch 0,85 bis 0,9)
+#    * weitere Korrekturwerte für Regen, Wolken etc.: Korr
+#
+#    pv (kWh) = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr
+#    pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
 #
 # Die Abhängigkeit der Strahlungsleistung der Sonnenenergie nach Wetterlage und Jahreszeit ist 
 # hier beschrieben: 
@@ -2435,8 +2373,6 @@ return @aneeded;
 # !!! PV Berechnungsgrundlagen !!!
 # https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/ertrag
 # http://www.ing-büro-junge.de/html/photovoltaik.html
-# -> es wird die Berechnung nach Formel 1 aus http://www.ing-büro-junge.de/html/photovoltaik.html
-# verwendet
 # 
 ##################################################################################################
 sub calcPVforecast {            
@@ -2447,6 +2383,7 @@ sub calcPVforecast {
   my $hash = $defs{$name};
   my $type = $hash->{TYPE};
   my $stch = $data{$type}{$name}{strings};                                                      # String Configuration Hash
+  my $pr   = 1.0;                                                                               # Performance Ratio (PR)
   
   my @strings = sort keys %{$stch};
   
@@ -2457,31 +2394,29 @@ sub calcPVforecast {
   my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                           # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
-  my $ie     = ReadingsNum ($name, "inverterEfficiency",                      $definve );       # Solar Inverter Wirkungsgrad (%)
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );       # Korrekturfaktor für die Stunde des Tages
   
   my $pvsum  = 0;  
   
   for my $st (@strings) {                                                                       # für jeden String der Config ..
-      my $ma     = $stch->{"$st"}{area};                                                        # Solar Modulfläche String
+      my $peak   = $stch->{"$st"}{peak};                                                        # String Peak (kWp)
       my $ta     = $stch->{"$st"}{tilt};                                                        # Neigungswinkel Solarmodule
       my $moddir = $stch->{"$st"}{dir};                                                         # Ausrichtung der Solarmodule
-      my $me     = $stch->{"$st"}{effi};                                                        # Solar Modul Wirkungsgrad (%)
       
       my $af     = $hff{$ta}{$moddir} / 100;                                                    # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
       $hc        = 1 if(1*$hc == 0);
-      my $pv     = sprintf "%.1f", ($rad * $kJtokWh * $ma * $af * $me/100 * $ie/100 * $hc * $ccf * $rcf * 1000);
+      
+      # pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
+      my $pv   = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf * 1000);
   
       my $lh = {                                                                                # Log-Hash zur Ausgabe
           "moduleDirection"         => $moddir,
-          "moduleArea"              => $ma,
+          "modulePeakString"        => $peak,
           "moduleTiltAngle"         => $ta,
           "Area factor"             => $af,
           "Cloudfactor"             => $ccf,
           "Rainfactor"              => $rcf,
           "pvCorrectionFactor"      => $hc,
-          "moduleEfficiency"        => $me/100,
-          "inverterEfficiency"      => $ie/100,
           "Radiation"               => $rad,
           "Factor kJ to kWh"        => $kJtokWh,
           "PV generation (Wh)"      => $pv
@@ -2557,7 +2492,7 @@ sub calcVariance {
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
       if($cdone eq "done") {
-          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h). "already calculated");
+          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h). " already calculated");
           next;
       }
 
@@ -2733,12 +2668,12 @@ sub checkStringConfig {
   my $cf = 0;
   for my $sn (sort keys %{$stch}) {
       my $sp = $sn." => ".$sub->($sn)."\n";
-      $cf    = 1 if($sp !~ /area.*?dir.*?effi.*?tilt/x);             # Test Vollständigkeit: z.B. Ostlage => area: 31.04, dir: E, effi: 16.52, tilt: 30
+      $cf    = 1 if($sp !~ /dir.*?peak.*?tilt/x);             # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
       $sc   .= $sp;
   }
   
   if($cf) {                             
-      $sc .= "\n\nOh no &#128577, your string configuration is inconsistent.\nPlease check the settings of moduleArea, moduleDirection, moduleEfficiency, moduleTiltAngle !";
+      $sc .= "\n\nOh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !";
   }
   else {
       $sc .= "\n\nCongratulations &#128522, your string configuration checked without found errors !";
@@ -3006,15 +2941,6 @@ werden weitere SolarForecast Devices zugeordnet.
       </li>
     </ul>
     <br>
-  
-    <ul>
-      <a name="inverterEfficiency"></a>
-      <li><b>inverterEfficiency &lt;Zahl&gt; </b> <br> 
-      Wirkungsgrad des Wechselrichters (currentInverterDev) in % laut Herstellerangabe. <br>
-      (default: 98.3)      
-      </li>
-    </ul>
-    <br>
     
     <ul>
       <a name="inverterStrings"></a>
@@ -3031,14 +2957,14 @@ werden weitere SolarForecast Devices zugeordnet.
     <br>
     
     <ul>
-      <a name="moduleArea"></a>
-      <li><b>moduleArea &lt;Stringname1&gt;=&lt;Fläche&gt; [&lt;Stringname2&gt;=&lt;Fläche&gt; &lt;Stringname3&gt;=&lt;Fläche&gt; ...] </b> <br> 
-      Gesamte an dem String "StringnameX" installierte Solarmodulfläche in qm. Der Stringname ist ein Schlüsselwert des 
+      <a name="modulePeakString"></a>
+      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br> 
+      Die Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleArea Ostdach=31.04 Südgarage=20 S3=32.05 <br>
+        set &lt;name&gt; modulePeakString Ostdach=5.1 Südgarage=2.0 S3=7.2 <br>
       </ul>      
       </li>
     </ul>
@@ -3070,20 +2996,6 @@ werden weitere SolarForecast Devices zugeordnet.
         <b>Beispiel: </b> <br>
         set &lt;name&gt; moduleDirection Ostdach=E Südgarage=S S3=NW <br>
       </ul>       
-      </li>
-    </ul>
-    <br>
-    
-    <ul>
-      <a name="moduleEfficiency"></a>
-      <li><b>moduleEfficiency &lt;Stringname1&gt;=&lt;Eff&gt; [&lt;Stringname2&gt;=&lt;Eff&gt; &lt;Stringname3&gt;=&lt;Eff&gt; ...] </b> <br> 
-      Wirkungsgrad der Solarmodule im String "StringnameX" laut Herstellerangabe in %. Der Stringname ist ein Schlüsselwert des 
-      Readings <b>inverterStrings</b>. <br><br>
-      
-      <ul>
-        <b>Beispiel: </b> <br>
-        set &lt;name&gt; moduleEfficiency Ostdach=16.52 Südgarage=16.52 S3=16.52 <br>
-      </ul>      
       </li>
     </ul>
     <br>
