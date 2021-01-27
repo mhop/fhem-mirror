@@ -201,6 +201,8 @@ sub testStep19 {
     fhem ('attr Master nonPrioritizedGet 0');
     fhem ('attr Master dev-timing-timeout 0.5');
     fhem ('attr Master verbose 5');
+    fhem ('attr Slave verbose 5');
+    fhem ('attr Relay verbose 5');
     fhem ('get Master TempWasserEin');
     return 0.1;
 }
@@ -209,12 +211,12 @@ sub testStep20 {
     LogStep "check result after prio get";
     is(FhemTestUtils_gotLog('device opened'), 1, "device opened");
     is(FhemTestUtils_gotLog('Master: Timeout in Readanswer'), 1, "readanswer called but slave cannot answer while sitting in readanswer");
-    return;
+    return 0.1;
 }
 
 sub testStep21 {
     LogStep "check result after prio get";
-    is(FhemTestUtils_gotLog('Master: read buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
+    is(FhemTestUtils_gotLog('Master: read.* buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
     return;
 }
 

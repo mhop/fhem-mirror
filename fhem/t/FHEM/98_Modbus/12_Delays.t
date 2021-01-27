@@ -42,7 +42,7 @@ SetTestOptions(
         Time1Name     => 'Sending',
         Time1Regex    => qr{MS:\sSimulate\ssending},
         Time2Name     => 'Reception',
-        Time2Regex    => qr{ParseFrameStart\s\(RTU\)\sextracted\sid},
+        Time2Regex    => qr{ParseFrameStart\s\(RTU.*\)\sextracted\sid},
     }                                
 );                             
 

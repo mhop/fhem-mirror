@@ -115,7 +115,7 @@ sub testStep10 {    # check combined read of holding registers and coils
     fhem ('attr Master verbose 3');
     fhem ('attr Slave verbose 3');
     fhem ('set Master reread');
-    return 0.1;
+    return 0.15;
 }
 
 sub testStep11 {    # check results coming from slave and write coils to slave
@@ -214,7 +214,7 @@ sub testStep20 {
 
 sub testStep21 {
     LogStep "check result after prio get";
-    is(FhemTestUtils_gotLog('Master: read buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
+    is(FhemTestUtils_gotLog('Master: read.* buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
     return;
 }
 
