@@ -213,7 +213,6 @@ sub Detail {
   return $ret;
 }
 
-
 # helper functions
 sub _ga_make_url {
   my ($name)        = @_;
@@ -239,9 +238,23 @@ sub _ga_make_token_6 {
 package main;
 
 sub gAuth {
-  my($name,$token) = @_;
+  my($name,$token,$aDev) = @_;
+  return "missing name!"   unless $name;
+  return "missing $token!" unless $token;
+  $aDev //= '';
   my $myHash = $defs{$name};
-  return FHEM::GoogleAuth::Get($myHash,$name,'check',$token);
+  if (exists $myHash->{helper}{$token} 
+  && $myHash->{helper}{$token} - gettimeofday() > 0 
+  && defined($aDev) 
+  && exists $defs{$aDev} 
+  && $defs{$aDev}{TYPE} eq 'allowed') {
+    return 1;
+  } else {
+    delete $myHash->{helper}{$token} if defined($myHash->{helper}{$token});
+    my $result = FHEM::GoogleAuth::Get($myHash,$name,'check',$token);
+    if ($result == 1) {$myHash->{helper}{$token} = gettimeofday()+DAYSECONDS};
+    return $result;
+  }
 }
 
 1;
