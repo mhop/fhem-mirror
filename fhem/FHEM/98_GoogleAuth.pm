@@ -331,17 +331,11 @@ sub gAuth {
     <br/>
     Check the validity of a given token; return value is 1 for a valid token, otherwise -1.<br/>
     <ul>
-    <li>Token always consists of six numerical digits and will change every 30 seconds.</li>
-    <li>Token is valid if it matches one of three tokens calculated by FHEM<br/>
-    using three timestamps: -30 seconds, now and +30 seconds.<br/>
-    This behavior can be changed by attribute ga_strictCheck.</li>
+      <li>Token always consists of six numerical digits and will change every 30 seconds.</li>
+      <li>Token is valid if it matches one of three tokens calculated by FHEM<br/>
+      using three timestamps: -30 seconds, now and +30 seconds.<br/>
+      This behavior can be changed by attribute ga_strictCheck.</li>
     </ul>
-    <br/>
-    </li>
-    <li><code>gAuth(&lt;name&gt;,&lt;token&gt;)</code><br/>
-    <br/>
-    For easy use in your own functions you can call function gAuth(),<br/>
-    which will return same result codes as the "get" command.
     </li>
   </ul>
   <br/>
@@ -368,6 +362,28 @@ sub gAuth {
   <ul>
     <li><b>lastResult</b> - contains result from last token check</li>
     <li><b>state</b> - "active" if a key is set, otherwise "defined"</li>
+  </ul>
+  <br/>
+  <br/>
+
+  <b>Integration with gAuth()</b><br/><br/>
+  <ul>
+    <li><code>gAuth(&lt;name&gt;,&lt;token&gt;)</code><br/>
+    <br/>
+    For easy use in your own scenarios you can call function gAuth(),<br/>
+    which will return same result codes as the "get" command.
+    </li>
+    <br/>
+    <li>Usage of gAuth() for login to FHEM<br/>
+      <br/>
+      A device of TYPE=allowed can be used to secure login to FHEM via basicAuth.<br/>
+      <code>attr &lt;deviceName&gt; basicAuth { "$user" eq "xxx" &amp;&amp; gAuth("GoogleAuth","$password","&lt;deviceName&gt;") == 1 }</code><br/>
+      <br/>
+      In both cases &lt;deviceName&gt; has to be the name of the allowed-TYPE device.<br/>
+      The authenticated login will be cached for this device for a maximum period of 86400 seconds.<br/>
+      Do not use basicAuthExpiry in this scenario!<br/>
+      The cache will be lost after FHEM restart or after any invalid token checked by the named allowed-TYPE device.<br/>
+    </li>
   </ul>
   <br/>
   <br/>
