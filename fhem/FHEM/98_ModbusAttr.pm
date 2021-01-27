@@ -370,7 +370,7 @@ sub Initialize {
     <ul>
         are created based on the attributes defining the data objects.<br>
         Every object for which an attribute like <code>obj-xy-set</code> is set to 1 will create a valid set option.<br>
-        Additionally the attribute <code>enableControlSet</code> enables the set options <code>interval</code>, <code>stop</code>, <code>start</code>, <code>reread</code> as well as <code>scanModbusObjects</code>, <code>scanStop</code> and <code>scanModbusIds</code> (for devices connected with RTU / ASCII over a serial line).<br>
+        Additionally the attribute <code>enableControlSet</code> enables the set options <code>interval</code>, <code>stop</code>, <code>start</code>, <code>reread</code> as well as <code>scanModbusObjects</code>, <code>scanStop</code> and <code>scanModbusId</code> (for devices connected with RTU / ASCII over a serial line).<br>
         Starting with Version 4 of the Modbus module enableControlSet defaults to 1.<br>
         <ul>
             <li><code>interval &lt;Interval&gt;</code></li>
@@ -390,7 +390,7 @@ sub Initialize {
                 <code>scan-h100 hex=0021, string=.!, s=8448, s>=33, S=8448, S>=33</code><br>
                 the representation of the result as hex is 0021 and
                 the ASCII representation is .!. s, s>, S and S> are different representations with their Perl pack-code.
-            <li><code>scanModbusIds &lt;startId&gt; - &lt;endId&gt; &lt;knownObj&gt;</code></li>
+            <li><code>scanModbusId &lt;startId&gt; - &lt;endId&gt; &lt;knownObj&gt;</code></li>
                 scans for Modbus Ids on an RS485 Bus. The following set command for example starts a scan:<br>
                 <code>set Device scanModbusId 1-7 h770</code><br>
                 since many modbus devices don't reply at all if an object is requested that does not exist, scanModbusId 
