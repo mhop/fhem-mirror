@@ -4512,7 +4512,7 @@ sub ring
   $size=100 if (!defined $size);
   my $prop=($value-$min)/($max-$min);
   my ($x1,$y1,$x2,$y2);
-  ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
+  ($x1,$y1,$x2,$y2)=($prop*100,-20,0,(1-$prop)*100);
   my $val1=int($prop*100)+20;
   my $y=125-$val1;
   my $currColor;
@@ -4611,7 +4611,7 @@ sub ring2
   $size=100 if (!defined $size);
   
   my $prop=($value-$min)/($max-$min);
-  my ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
+  my ($x1,$y1,$x2,$y2)=($prop*100,-20,0,(1-$prop)*100);
   my $val1=int($prop*100)+20;
   my $y=125-$val1;
   my $currColor;
@@ -4642,7 +4642,7 @@ sub ring2
   $min2=$value2 if ($value2<$min2);
   my $prop2=($value2-$min2)/($max2-$min2);
   my ($x12,$y12,$x22,$y22);
-  ($x12,$y12,$x22,$y22)=($prop2*100,0,0,(1-$prop2)*100);
+  ($x12,$y12,$x22,$y22)=($prop2*100,-20,0,(1-$prop2)*100);
   my $val12=int($prop2*100)+20;
   $y2=125-$val12;
   my $currColor2;
@@ -4846,7 +4846,7 @@ sub cylinder
    ($y,$val1,$null)=y_h($value,$min,$max,$height);
     $out.= sprintf('<rect x="15" y="%d" width="%d" height="%d" rx="20" ry="2" fill="url(#grad1_%s)"/>',$y,$width,$val1,$color);
     #$out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="rgb(137, 137, 137)" stroke-width="0.5"/>',$y,$width);
-    $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="%s" stroke-width="0.5"/>',$y,$width,hsl_color($color,15));
+    $out.= sprintf('<rect x="15" y="%d" width="%d" height="4" rx="20" ry="2" fill="none" stroke="%s" stroke-width="0.5"/>',$y,$width,hsl_color($color,0));
 
     if (defined $text and $text ne "") {
       $out.= sprintf('<text x="60" y="%d" style="fill:%s; font-size:12px">%s</text>',$yBegin+$i*10,hsl_color($color),$text.":");
