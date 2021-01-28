@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2021.01.28 v0.2.7
+# - BUG:     Routinen werden nicht mehr angezeigt
+#
 # 2021.01.18 v0.2.6
 # - BUG:     item_shopping_delete,item_shopping_add,item_task_delete,item_task.add
 # - FEATURE: Unterstützung A23FPV4BT7FH68 Yamaha YAS-209 Soundbar
@@ -444,7 +447,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.6";
+my $ModulVersion     = "0.2.7";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -1655,7 +1658,7 @@ sub echodevice_SendCommand($$$) {
 	}
 	
 	elsif ($type eq "getbehavior") {
-        $SendUrl   .= "/api/behaviors/automations?limit=100";
+        $SendUrl   .= "/api/behaviors/v2/automations?limit=100";
 	}	
 	
 	elsif ($type eq "getdevicesettings") {
