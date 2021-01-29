@@ -41,17 +41,12 @@
 # !!!!! - Innerhalb einer Shutterschleife kein CommandAttr verwenden. Bring Fehler!!! Kommen Raumnamen in die Shutterliste !!!!!!
 #
 
-package main;
-
-use Meta;
-
-
-
 package FHEM::AutoShuttersControl;
 
 use strict;
 use warnings;
 use utf8;
+use FHEM::Meta;
 
 use FHEM::Automation::ShuttersControl;
 use GPUtils qw(GP_Import GP_Export);
@@ -105,6 +100,7 @@ sub Initialize {
       . 'ASC_expert:1 '
       . 'ASC_blockAscDrivesAfterManual:0,1 '
       . 'ASC_debug:1 '
+      . 'ASC_advDate:DeadSunday,FirstAdvent '
       . $readingFnAttributes;
     $hash->{NotifyOrderPrefix} = '51-';    # Order Nummer für NotifyFn
     $hash->{FW_detailFn} =
@@ -315,6 +311,9 @@ sub Initialize {
             <a name="ASC_freezeTemp"></a>
             <li><strong>ASC_freezeTemp</strong> - Temperature threshold for the freeze protection. The freeze protection
                 prevents the shutter to be operated by <abbr>ASC</abbr>. Last operating order will be kept.
+            </li>
+            <a name="ASC_advDate"></a>
+            <li><strong>ASC_advDate</strong> - Advent Season, selected FirstAdvent or DeadSunday.
             </li>
             <a name="ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS]</strong> - Contains
@@ -890,6 +889,8 @@ sub Initialize {
             <li><strong>ASC_expert</strong> - ist der Wert 1, so werden erweiterte Informationen bez&uuml;glich des NotifyDevs unter set und get angezeigt</li>
             <a name="ASC_freezeTemp"></a>
             <li><strong>ASC_freezeTemp</strong> - Temperatur, ab welcher der Frostschutz greifen soll und der Rollladen nicht mehr f&auml;hrt. Der letzte Fahrbefehl wird gespeichert.</li>
+            <a name="ASC_advDate"></a>
+            <li><strong>ASC_advDate</strong> - Adventszeit, Auswahl ab wann die Adventszeit beginnen soll.</li>
             <a name="ASC_rainSensor"></a>
             <li><strong>ASC_rainSensor - DEVICENAME[:READINGNAME] MAXTRIGGER[:HYSTERESE] [CLOSEDPOS:[WAITINGTIME]]</strong> - der Inhalt ist eine Kombination aus Devicename, Readingname, Wert ab dem getriggert werden soll, Hysterese Wert ab dem der Status Regenschutz aufgehoben werden soll und der "wegen Regen geschlossen Position", sowie der Wartezeit bis dann tats&auml;chlich die aktion ausgeführt wird.</li>
             <a name="ASC_residentsDev"></a>
@@ -1264,7 +1265,7 @@ sub Initialize {
   ],
   "release_status": "testing",
   "license": "GPL_2",
-  "version": "v0.10.10",
+  "version": "v0.10.11",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

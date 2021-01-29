@@ -120,7 +120,7 @@ sub _getPosition {
     }
     else {
         ( $position, $posAssignment ) =
-          FHEM::Automation::ShuttersControl::GetAttrValues(
+          FHEM::Automation::ShuttersControl::Helper::GetAttrValues(
             $self->{shuttersDev},
             $attr,
             $FHEM::Automation::ShuttersControl::userAttrList{$userAttrList}
@@ -243,7 +243,7 @@ sub getSlatPosCmd {
     $self->{ $self->{shuttersDev} }->{ASC_SlatPosCmd_SlatDevice}->{LASTGETTIME}
       = int( gettimeofday() );
     my ( $slatPosCmd, $slatDevice ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_SlatPosCmd_SlatDevice', 'none:none' );
 
     ## Erwartetes Ergebnis
@@ -306,7 +306,7 @@ sub getPrivacyUpTime {
     $self->{ $self->{shuttersDev} }->{ASC_PrivacyUpValue_beforeDayOpen}
       ->{LASTGETTIME} = int( gettimeofday() );
     my ( $upTime, $upBrightnessVal ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_PrivacyUpValue_beforeDayOpen', '-1:-1' );
 
     ## Erwartetes Ergebnis
@@ -385,7 +385,7 @@ sub getPrivacyDownTime {
     $self->{ $self->{shuttersDev} }->{ASC_PrivacyDownValue_beforeNightClose}
       ->{LASTGETTIME} = int( gettimeofday() );
     my ( $downTime, $downBrightnessVal ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_PrivacyDownValue_beforeNightClose', '-1:-1' );
 
     ## Erwartetes Ergebnis
@@ -605,7 +605,7 @@ sub _getTempSensor {
     $self->{ $self->{shuttersDev} }->{ASC_TempSensor}->{LASTGETTIME} =
       int( gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_TempSensor', 'none' );
 
     ### erwartetes Ergebnis
@@ -665,7 +665,7 @@ sub _getIdleDetectionReading {
     $self->{ $self->{shuttersDev} }->{ASC_Shutter_IdleDetection}->{LASTGETTIME}
       = int( gettimeofday() );
     my ( $reading, $value ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_Shutter_IdleDetection', 'none' );
 
     ### erwartetes Ergebnis
@@ -729,7 +729,7 @@ sub _getBrightnessSensor {
     $self->{ $self->{shuttersDev} }->{ASC_BrightnessSensor}->{LASTGETTIME} =
       int( gettimeofday() );
     my ( $device, $reading, $max, $min ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_BrightnessSensor', 'none' );
 
     ### erwartetes Ergebnis
@@ -815,7 +815,7 @@ sub getShadingAzimuthRight {
     $self->{ $self->{shuttersDev} }->{ASC_Shading_InOutAzimuth}->{LASTGETTIME}
       = int( gettimeofday() );
     my ( $left, $right ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_Shading_InOutAzimuth', '95:265' );
 
     ### erwartetes Ergebnis
@@ -874,7 +874,7 @@ sub getShadingMinElevation {
     $self->{ $self->{shuttersDev} }->{ASC_Shading_MinMax_Elevation}
       ->{LASTGETTIME} = int( gettimeofday() );
     my ( $min, $max ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_Shading_MinMax_Elevation', '25.0:100.0' );
 
     ### erwartetes Ergebnis
@@ -944,7 +944,7 @@ sub getShadingStateChangeSunny {
     $self->{ $self->{shuttersDev} }->{ASC_Shading_StateChange_SunnyCloudy}
       ->{LASTGETTIME} = int( gettimeofday() );
     my ( $sunny, $cloudy, $maxBrightnessAverageArrayObjects ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_Shading_StateChange_SunnyCloudy',
         '35000:20000' );
 
@@ -1048,7 +1048,7 @@ sub getExternalTriggerDevice {
       int( gettimeofday() );
     my ( $device, $reading, $valueActive, $valueInactive, $posActive,
         $posInactive, $valueActive2, $posActive2 )
-      = FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      = FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_ExternalTrigger', 'none' );
 
     ### erwartetes Ergebnis
@@ -1545,7 +1545,7 @@ sub getWindMax {
     $self->{ $self->{shuttersDev} }->{ASC_WindParameters}->{LASTGETTIME} =
       int( gettimeofday() );
     my ( $max, $hyst, $pos ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_WindParameters', '50:20' );
 
     ## Erwartetes Ergebnis

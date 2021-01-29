@@ -94,7 +94,7 @@ sub _getWinDev {
     $self->{ $self->{shuttersDev} }->{ASC_WindowRec}->{LASTGETTIME} =
       int( gettimeofday() );
     my ( $device, $reading ) =
-      FHEM::Automation::ShuttersControl::GetAttrValues( $self->{shuttersDev},
+      FHEM::Automation::ShuttersControl::Helper::GetAttrValues( $self->{shuttersDev},
         'ASC_WindowRec', 'none' );
 
     ### erwartetes Ergebnis

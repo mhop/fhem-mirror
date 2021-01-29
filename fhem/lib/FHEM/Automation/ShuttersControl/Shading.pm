@@ -286,6 +286,8 @@ sub ShadingProcessing {
               ->getShadingWaitingPeriod / 2
             )
         || $FHEM::Automation::ShuttersControl::shutters->getShadingMode eq 'off'
+        || $FHEM::Automation::ShuttersControl::ascDev
+              ->getAutoShuttersControlShading eq 'off'
       );
 
     Log3( $name, 4,

@@ -786,6 +786,8 @@ sub EventProcessingRoommate {
         }
         elsif (
             ( $event eq 'gotosleep' || $event eq 'asleep' )
+            && $FHEM::Automation::ShuttersControl::shutters->getModeDown ne
+                'absent'
             && ( $FHEM::Automation::ShuttersControl::ascDev
                 ->getAutoShuttersControlEvening eq 'on'
                 || $FHEM::Automation::ShuttersControl::shutters->getDown eq
@@ -938,8 +940,8 @@ sub EventProcessingResidents {
                 'on'
                 && $FHEM::Automation::ShuttersControl::shutters
                 ->getSelfDefenseMode ne 'off'
-                || (   $getModeDown eq 'absent'
-                    || $getModeDown eq 'always' )
+                || $getModeDown eq 'absent'
+#                     || $getModeDown eq 'always' )       Wird zu Testzwecken auskommentiert, siehe #90 Github
                 || ( $FHEM::Automation::ShuttersControl::shutters
                     ->getShadingMode eq 'absent'
                     && $FHEM::Automation::ShuttersControl::shutters
@@ -1013,7 +1015,7 @@ sub EventProcessingResidents {
                         $FHEM::Automation::ShuttersControl::shutters
                           ->getLastPos );
                 }
-                elsif (( $getModeDown eq 'absent' || $getModeDown eq 'always' )
+                elsif ( $getModeDown eq 'absent'        # || $getModeDown eq 'always' )   Wird zu Testzwecken auskommentiert, siehe #90 Github
                     && !$FHEM::Automation::ShuttersControl::shutters->getIsDay
                     && IsAfterShuttersTimeBlocking($shuttersDev)
                     && $FHEM::Automation::ShuttersControl::shutters
@@ -2256,8 +2258,12 @@ sub EventProcessingPartyMode {
                     $shuttersDev,
                     (
                         CheckIfShuttersWindowRecOpen($shuttersDev) == 0
-                        ? $FHEM::Automation::ShuttersControl::shutters
-                          ->getClosedPos
+                        ? ($FHEM::Automation::ShuttersControl::shutters
+                              ->getSleepPos > 0
+                            ? $FHEM::Automation::ShuttersControl::shutters
+                                ->getSleepPos
+                            : $FHEM::Automation::ShuttersControl::shutters
+                                ->getClosedPos)
                         : $FHEM::Automation::ShuttersControl::shutters
                           ->getVentilatePos
                     )
