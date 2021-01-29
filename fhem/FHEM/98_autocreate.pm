@@ -113,8 +113,10 @@ autocreate_Notify($$)
 
   my $me = $ntfy->{NAME};
   my $max = int(@{$dev->{CHANGED}});
+  my $calledByCreatelog;
   my $ret = "";
   my $nrcreated;
+  $calledByCreatelog = ($dev && $me eq $dev->{NAME});
 
   for (my $i = 0; $i < $max; $i++) {
 
@@ -256,7 +258,8 @@ autocreate_Notify($$)
 
       ####################
       my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
-      $fl = undef if($modules{$hash->{TYPE}}{noAutocreatedFilelog});
+      $fl = undef if($modules{$hash->{TYPE}}{noAutocreatedFilelog} &&
+                     !$calledByCreatelog);
       my $flname = "FileLog_$name";
       delete($defs{$flname}) if($fl); # If we are re-creating it with createlog.
       my ($gplot, $filter, $devattr) = ("", $name, "");
