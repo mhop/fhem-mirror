@@ -1,4 +1,4 @@
-REV 23629
+REV 23633
 DIR unused
 UPD 2021-01-25_07:45:14 356912 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -209,7 +209,7 @@ UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
-UPD 2021-01-19_07:45:02 248608 FHEM/37_echodevice.pm
+UPD 2021-01-29_07:45:08 248683 FHEM/37_echodevice.pm
 UPD 2019-10-05_07:45:03 22167 FHEM/37_fakeRoku.pm
 UPD 2019-04-14_07:45:03 79219 FHEM/37_harmony.pm
 UPD 2020-04-17_07:45:02 152805 FHEM/37_plex.pm
@@ -469,7 +469,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2020-05-16_07:45:03 47798 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2021-01-04_07:45:02 312437 FHEM/98_DOIF.pm
+UPD 2021-01-29_07:45:08 312442 FHEM/98_DOIF.pm
 UPD 2020-08-16_07:45:02 114179 FHEM/98_DOIFtools.pm
 UPD 2020-05-24_07:45:03 37472 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
@@ -640,7 +640,7 @@ UPD 2021-01-09_07:45:04 70537 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
 UPD 2021-01-27_07:45:03 302668 FHEM/lib/AttrTemplate/mqtt2.template
-UPD 2021-01-28_07:45:03 11816 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
+UPD 2021-01-29_07:45:08 13303 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
@@ -735,8 +735,8 @@ UPD 2021-01-28_07:45:07 4419568 docs/commandref.html
 UPD 2021-01-24_07:45:10 2720025 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-01-28_07:45:11 235053 docs/commandref_modular.html
-UPD 2021-01-28_07:45:12 245826 docs/commandref_modular_DE.html
+UPD 2021-01-29_07:45:16 235053 docs/commandref_modular.html
+UPD 2021-01-29_07:45:17 245826 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
