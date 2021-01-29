@@ -73,12 +73,6 @@ FileLog_Initialize($)
   InternalTimer(time()+0.1, sub() {      # Forum #39792
     map { HandleArchiving($defs{$_},1) } devspec2array("TYPE=FileLog");
     FileLog_dailySwitch($hash);          # Forum #42415
-    map {
-      FileLog_initEMI($defs{$_}, "filelog-event-min-interval", undef,1);
-      FileLog_initEMI($defs{$_}, "addLog", undef, 1);
-      my $mi = $defs{$_}{addLogMinInterval};
-      InternalTimer(time()+$mi, "FileLog_addLog", $defs{$_}, 0) if($mi);
-    } devspec2array("TYPE=FileLog");
   }, $hash, 0);
 }
 
@@ -201,7 +195,14 @@ FileLog_Define($@)
   $hash->{logfile} = $a[2];
   $hash->{currentlogfile} = $f;
   $hash->{STATE} = "active";
-  InternalTimer(0, sub(){  notifyRegexpChanged($hash, $a[3]); }, $hash);
+
+  InternalTimer(0, sub(){ 
+    notifyRegexpChanged($hash, $a[3]); 
+    FileLog_initEMI($hash, "filelog-event-min-interval", undef,1);
+    FileLog_initEMI($hash, "addLog", undef, 1);
+    my $mi = $hash->{addLogMinInterval};
+    InternalTimer(time()+$mi, "FileLog_addLog", $hash, 0) if($mi);
+  }, $hash);
 
   return undef;
 }
