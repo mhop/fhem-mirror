@@ -68,7 +68,8 @@ sub HMinfo_Initialize($$) {####################################################
                        ."verbCULHM:multiple,none,allSet,allGet,allSetVerb,allGetVerb "
                        .$readingFnAttributes;
   $hash->{NOTIFYDEV} = "global";
-  InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
+  $modules{HMinfo}{helper}{initDone} = 0;
+  HMinfo_init();
 }
 sub HMinfo_Define($$){#########################################################
   my ($hash, $def) = @_;
@@ -96,6 +97,8 @@ sub HMinfo_Define($$){#########################################################
                             .",cover:closed"
                             ;
   $hash->{nb}{cnt} = 0;
+  $modules{HMinfo}{helper}{initDone} = 0;
+  HMinfo_init();
   return;
 }
 sub HMinfo_Undef($$){##########################################################
@@ -251,6 +254,7 @@ sub HMinfo_Notify(@){##########################################################
     HMinfo_archConfig($hash,$name,"","") if(AttrVal($name,"autoArchive",undef));
   }
   if (grep /INITIALIZED/,@{$events}){
+    $modules{HMinfo}{helper}{initDone} = 0;
     HMinfo_init();
   }
   return undef;
@@ -258,10 +262,11 @@ sub HMinfo_Notify(@){##########################################################
 sub HMinfo_init(){#############################################################
   RemoveInternalTimer("HMinfo_init");# just to be secure...
   if ($init_done){
-    if (!defined $modules{HMinfo}{helper}{initDone} || !$modules{HMinfo}{helper}{initDone}){ # && !$modules{HMinfo}{helper}{initDone}){
+    if (!$modules{HMinfo}{helper}{initDone}){ # && !$modules{HMinfo}{helper}{initDone}){
       my ($hm) = devspec2array("TYPE=HMinfo");
       if (substr(AttrVal($hm, "autoLoadArchive", 0),0,1) ne 0){
         HMinfo_SetFn($defs{$hm},$hm,"loadConfig");
+        InternalTimer(gettimeofday()+5,"HMinfo_init", "HMinfo_init", 0);
       }
       else{
         $modules{HMinfo}{helper}{initDone} = 1;
