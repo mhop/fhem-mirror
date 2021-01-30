@@ -771,7 +771,7 @@ sub _CreateForecastRef($) {
             lat  => $self->{lat},
             long => $self->{long},
             apiMaintainer =>
-'Leon Gaultier (<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>)',
+'Marko Oldenburg (<a href=https://forum.fhem.de/index.php?action=profile;u=13684>CoolTux</a>)',
             apiVersion    => version->parse(DarkSkyAPI->VERSION())->normal,
         }
     );
