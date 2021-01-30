@@ -416,8 +416,12 @@ my %fbhttp_readings = (
    summeractive    => '"summeractive:".($val ? "yes":"no")',
    holidayactive   => '"holidayactive:".($val ? "yes":"no")',
    lastpressedtimestamp => '"lastpressedtimestamp:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
-   lastpressedtimestamp_kurz => '"lastpressedtimestamp_kurz:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
-   lastpressedtimestamp_lang => '"lastpressedtimestamp_lang:".($val=~m/^\d{10}$/ ? FmtDateTime($val) : "N/A")',
+   lastpressedtimestamp_kurz => '"lastpressedtimestamp_kurz:$val"',
+   lastpressedtimestamp_lang => '"lastpressedtimestamp_lang:$val"',
+   lastpressedtimestamp_Oben_rechts =>'"lastpressedtimestamp_oben_rechts:$val"',
+   lastpressedtimestamp_Unten_rechts=>'"lastpressedtimestamp_unten_rechts:$val"',
+   lastpressedtimestamp_Oben_links =>'"lastpressedtimestamp_oben_links:$val"',
+   lastpressedtimestamp_Unten_links=>'"lastpressedtimestamp_unten_links:$val"',
    hue             => '"hue:$val"',
    current_mode    => '"current_mode:$val"',
    saturation      => '"saturation:$val"',
@@ -438,24 +442,23 @@ FBDECT_ParseHttp($$$)
   my $omsg;
 
   $omsg = $msg;
-  $omsg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2,ge; # Quick & Dirty: Tags
+  $omsg =~ s,<([^/>]+?)>([^<]+?)<,$h{$1}=$2 if(!$h{$1}),ge; # Quick & Dirty:Tags
   $omsg = $msg;
-  $omsg =~ s, ([a-z_]+?)="([^"]*)",$h{$1}=$2,ge; # Quick & Dirty: Attributes
+  $omsg =~ s, ([a-z_]+?)="([^"]*)",$h{$1}=$2 if(!$h{$1}),ge; # Attributes
 
-  if($h{lastpressedtimestamp}) { # Dect400/#94700
-    sub dp($$$);
-    sub 
-    dp($$$)
-    {
-      my ($ln, $txt,$hptr) = (@_);
+  if($h{lastpressedtimestamp}) { # Dect400/#94700, 440/#118303
+    sub dp {
+      my ($txt,$h,$ln) = (@_);
       $txt =~ s#<([^/\s>]+?)[^/]*?>(.*?)</\g1>#
         my ($n,$c) = ($1,$2);
-        $ln = $1 if($n eq "name" && $c =~ m/.*(kurz|lang)$/);
-        $hptr->{"${n}_$ln"} = $c if($n eq "lastpressedtimestamp" && $ln);
-        dp($ln, $c, $hptr) if($c && $c =~ m/^<.*>$/);
+        $ln = makeReadingName($1) if($n eq "name" && $c =~ m/: (.*)$/);
+        if($n eq "lastpressedtimestamp" && $ln) {
+          $h->{"${n}_$ln"} = ($c =~ m/^\d{10}$/ ? FmtDateTime($c) : "N/A");
+        }
+        dp($c, $h) if($c && $c =~ m/^<.*>$/);
       #gex;
     }
-    dp("", $msg, \%h);
+    dp($msg, \%h);
   }
 
   my $ain = $h{identifier};
