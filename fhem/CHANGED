@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  93_DbRep: fix commandref
  - bugfix:  74_AutoShuttersControl: fix many bugs reported by users
  - bugfix:  70_BRAVIA: fix volume info from headphone
  - change:  70_BRAVIA: new package FHEM::BRAVIA, PBP changes

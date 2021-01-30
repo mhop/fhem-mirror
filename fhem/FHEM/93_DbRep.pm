@@ -57,6 +57,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.42.4"  => "30.01.2021  fix commandref ",
   "8.42.3"  => "03.01.2021  set fastStart as default for TYPE Client ",
   "8.42.2"  => "03.01.2021  sumValue - create 0 instaed of '-' if value of DS is 0, Forum:#index.php/topic,53584.msg1116910.html#msg1116910 ",
   "8.42.1"  => "22.11.2020  fix delete \$hash->{HELPER}{REDUCELOG} Forum:#116057 ",
@@ -13474,9 +13475,9 @@ return;
                                    <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-                                      <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
+                                      <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective aggregation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an aggregation period </td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an aggregation period </td></tr>
                                    </table>
                                    </ul>
                                    <br>
