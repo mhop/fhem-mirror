@@ -4512,9 +4512,8 @@ sub ring
   $size=100 if (!defined $size);
   my $prop=($value-$min)/($max-$min);
   my ($x1,$y1,$x2,$y2);
-  ($x1,$y1,$x2,$y2)=($prop*100,-20,0,(1-$prop)*100);
+  ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
   my $val1=int($prop*100)+20;
-  my $y=125-$val1;
   my $currColor;
   if (defined $func) {
     if (defined($model)) {
@@ -4611,9 +4610,8 @@ sub ring2
   $size=100 if (!defined $size);
   
   my $prop=($value-$min)/($max-$min);
-  my ($x1,$y1,$x2,$y2)=($prop*100,-20,0,(1-$prop)*100);
+  my ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
   my $val1=int($prop*100)+20;
-  my $y=125-$val1;
   my $currColor;
   if (defined $func) {
     $currColor=&{$func}($value);
@@ -4642,12 +4640,11 @@ sub ring2
   $min2=$value2 if ($value2<$min2);
   my $prop2=($value2-$min2)/($max2-$min2);
   my ($x12,$y12,$x22,$y22);
-  ($x12,$y12,$x22,$y22)=($prop2*100,-20,0,(1-$prop2)*100);
+  ($x12,$y12,$x22,$y22)=($prop2*100,0,0,(1-$prop2)*100);
   my $val12=int($prop2*100)+20;
-  $y2=125-$val12;
   my $currColor2;
   if (defined $func2) {
-    $currColor2=&{$func2}($value2);
+   $currColor2=&{$func2}($value2);
   } else {
     if ($minColor2 < $maxColor2) {
       $currColor2=$prop2*($maxColor2-$minColor2)+$minColor2;
@@ -4690,21 +4687,14 @@ sub ring2
   $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="3">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, 23.5, 0, int($prop2*280));
   $out.='</g>';
-    $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
+  $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
   $out.=describeArc(40, 30, 25.2, 0, 1.5);
   $out.='</g>';
 
   $out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
   $out.=describeArc(40, 30, 25.2, 279, 280.5);
   $out.='</g>';
-  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor));
-  #$out.=describeArc(40, 30, 27, 273, 280);
-  #$out.='</g>';
-
-  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="3">',color($maxColor2));
-  #$out.=describeArc(40, 30, 23.5, 273, 280);
-  #$out.='</g>';
-    
+   
   $out.= sprintf('<text text-anchor="middle" x="40" y="30" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor,$ln),sprintf($format,$val));
   $out.= sprintf('<text text-anchor="middle" x="40" y="17" style="fill:%s;font-size:8px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
   
