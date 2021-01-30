@@ -3437,6 +3437,11 @@ sub AddToSendQueue {
             also been set. Every time the update function is called, it checks if since this get has been read the last time, the defined delay has elapsed. If not, then it is skipped this time.<br>
             PollDelay can be specified as seconds or as x[0-9]+ which means a multiple of the interval in the define command.
         <br>
+        <li><b>(get|set)[0-9]*FollowGet</b></li>
+            allows to chain a get command after another set or get command. <br>
+            If for example you want to set a new required temerature with a set 'TargetTemp' command and this set command changes the temperature with a series 
+            of HTTP requests in your heating system, then you can automaticaly do a get 'TargetTemp' to read out the new value from your heating.<br>
+            The value of this attribute must match a defined get command name.
         
         <li><b>(get|set)[0-9]*TextArg</b></li>
             For a get command this defines that the command accepts a text value after the option name. 
