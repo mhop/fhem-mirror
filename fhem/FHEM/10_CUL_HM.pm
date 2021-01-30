@@ -4439,7 +4439,7 @@ sub CUL_HM_SetList($$) {#+++++++++++++++++ get command basic list+++++++++++++++
     push @cond,"slider,0,1,255" if (!scalar @cond);
     $hash->{helper}{cmds}{lst}{condition} = join(",",sort grep /./,@cond);
 
-    $hash->{helper}{cmds}{lst}{peer} = join",",sort CUL_HM_getPeers($name,"Names");
+    $hash->{helper}{cmds}{lst}{peer} = join",",sort (CUL_HM_getPeers($name,"Names"));
     if (grep /^press:/,@arr1){
       if ($roleV){
         push @arr1,"pressS:[(-peer-|{all})]";
@@ -8170,7 +8170,7 @@ sub CUL_HM_ID2PeerList ($$$) { # {CUL_HM_ID2PeerList ("lvFrei","12345678",1)}
     if ($st eq "virtual"){
       #if any of the peers is an SD we are team master
       my ($tMstr,$tcSim,$thSim) = (0,0,0);
-      foreach (CUL_HM_getPeers($name,"Names" )){
+      foreach (CUL_HM_getPeers($name,"NamesExt" )){
         if(AttrVal($_,"subType","") eq "smokeDetector"){#have smoke detector
           $tMstr = AttrVal($_,"model","") eq "HM-SEC-SD-2"? 2:1;#differentiate SD and SD2
         }
@@ -9242,7 +9242,9 @@ sub CUL_HM_getPeers($$)   { #return peering information - status and lists
    elsif ($type eq "Names"         ){return map{$hashH->{peerIDsH}{$_}} grep!/00000000/         ,keys%{$hashH->{peerIDsH}};}#all peer names
    elsif ($type eq "IDsExt"        ){return                             grep!/(00000000|$devId)/,keys%{$hashH->{peerIDsH}};}#only external peers
    elsif ($type eq "IDsSelf"       ){return                             grep /$devId/           ,keys%{$hashH->{peerIDsH}};}#only own peers
-   elsif ($type eq "NamesExt"      ){return map{$hashH->{peerIDsH}{$_}} grep!/(00000000|$devId)/,keys%{$hashH->{peerIDsH}};}#all external names
+   elsif ($type eq "NamesExt"      ){return grep/./,map{(my $foo = $hashH->{peerIDsH}{$_}) =~ s/_chn-..$//;
+                                                         defined($defs{$foo})?$foo:""}
+                                                                        grep!/(00000000|$devId)/,keys%{$hashH->{peerIDsH}};}#all external names
    elsif ($type eq "NamesSelf"     ){return map{$hashH->{peerIDsH}{$_}} grep /$devId/           ,keys%{$hashH->{peerIDsH}};}#all own names
    elsif ($type eq "IDsRaw"        ){return                                                      keys%{$hashH->{peerIDsH}};}
    elsif ($type eq "Status"        ){
@@ -9271,7 +9273,7 @@ sub CUL_HM_getPeers($$)   { #return peering information - status and lists
    elsif ($type =~ m/^ID:(.{8})$/  ){return $hashH->{peerIDsH}{$1} if (defined $hashH->{peerIDsH}{$1});}
    elsif ($type =~ m/^ID:(.{6})$/  ){return                             grep /$1../             ,keys%{$hashH->{peerIDsH}};}#peers for a device
    elsif ($type =~ m/^Name:(.{6})$/){return map{$hashH->{peerIDsH}{$_}} grep /$1../             ,keys%{$hashH->{peerIDsH}};}#peers for a device
-   return ();
+     ();
 }
 sub CUL_HM_getChnPeers($){ #which peertype am I
   my ($name) = @_;
