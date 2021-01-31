@@ -44,6 +44,7 @@
 package main;
 use strict;
 use warnings;
+use FHEM::Meta;
 
 ###START###### Initialize module ##############################################################################START####
 sub ElectricityCalculator_Initialize($)
@@ -73,6 +74,7 @@ sub ElectricityCalculator_Initialize($)
 								  "Currency:&#8364;,&#163;,&#36; " .
 								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -129,6 +131,19 @@ sub ElectricityCalculator_Define($$$)
 		
 	### Writing log entry
 	Log3 $name, 5, $name. " : ElectricityCalculator - Starting to define module";
+
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "ElectricityCalculator_MidnightTimer", $hash, 0);
+
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - time              : " . time();
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - year              : " . $year;
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - mon               : " . $mon;
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - day               : " . $mday;
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $name, 5, $name. " : ElectricityCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
 
 	return undef;
 }
@@ -398,6 +413,125 @@ sub ElectricityCalculator_Set($@)
 }
 ####END####### Manipulate reading after "set" command by fhem ##################################################END#####
 
+###START###### Midnight Routine ###############################################################################START####
+sub ElectricityCalculator_MidnightTimer($)
+{
+	### Define variables
+	my ($ElectricityCalcDev)									= @_;
+	my $ElectricityCalcName 									= $ElectricityCalcDev->{NAME};
+ 	my $RegEx													= $ElectricityCalcDev->{REGEXP};
+	my ($ElectricityCountName, $ElectricityCountReadingRegEx)	= split(":", $RegEx, 2);
+	my $ElectricityCountDev							  			= $defs{$ElectricityCountName};
+	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]//g;
+
+	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
+	my @ElectricityCountReadingNameListFiltered;
+
+	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
+		if ($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) {
+			push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
+		}
+	}
+
+
+	### Create Log entries for debugging purpose
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer__________________________________________________________";
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                            : MidnightTimer initiated";
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - RegEx                    : " . $RegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountName     : " . $ElectricityCountName;
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountReadList : " . Dumper(@ElectricityCountReadingNameListFiltered);
+	
+
+	### Remove internal timer for ElectricityCalculator_MidnightTimer
+	RemoveInternalTimer($ElectricityCalcDev, "ElectricityCalculator_MidnightTimer");
+
+	### Create Log entries for debugging purpose
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
+	
+	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListFiltered) {
+
+		# ### Restore Destination of readings
+		my $ElectricityCalcReadingPrefix                = $ElectricityCountName . "_" . $ElectricityCountReadingName;
+		my $ElectricityCalcReadingDestinationDeviceName	= ReadingsVal($ElectricityCalcName, ".ReadingDestinationDeviceName"                           , "error");
+		my $ElectricityCounterReadingValue 				= ReadingsVal($ElectricityCountName, $ElectricityCountReadingName                                   , "error");
+		my $LastUpdateTimestampUnix                 	= ReadingsVal($ElectricityCalcName, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+	
+		### Calculate time difference since last update
+		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
+
+		### Create Log entries for debugging purpose
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ___________Looping________________";
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ReadingPrefix     : " . $ElectricityCalcReadingPrefix;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - DeviceName        : " . $ElectricityCalcReadingDestinationDeviceName;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp now     : " . time();
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+
+
+		### If the Readings for midnight settings have been provided
+		if (($ElectricityCalcReadingPrefix ne "error") && ($ElectricityCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
+
+			### Create Log entries for debugging purpose
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ReadingPrefix     : " . $ElectricityCalcReadingPrefix;
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - DeviceName        : " . $ElectricityCalcReadingDestinationDeviceName;
+			
+			### If there was no update in the last 24h
+			if ( $DeltaTimeSinceLastUpdate >= 86400) {
+				### Create Log entries for debugging purpose
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Last Update       : No Update in the last 24h!";
+
+			}
+			else {
+				### Create Log entries for debugging purpose
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
+			}
+			
+			#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCalcRDD      : \n" . Dumper($ElectricityCalcReadingDestinationDevice);
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCounter: " . $ElectricityCounterReadingValue;
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "."  . 	$ElectricityCalcReadingPrefix . "_PowerDaySum",     	"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDayCount   : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "."  . 	$ElectricityCalcReadingPrefix . "_PowerDayCount",     	"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDayCurrent : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_PowerCurrent",     	"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDayAver    : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_PowerDayAver",     	"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDayMax     : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_PowerDayMax",    		"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDayMin     : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_PowerDayMin",     	"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre ConsumDay     : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_EnergyDay",     		"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre ConsumDayLast : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_EnergyDayLast",		"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre ConsumCstDay  : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_EnergyCostDay",		"error");
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre ConsumCstDayL : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, 		$ElectricityCalcReadingPrefix . "_EnergyCostDayLast",	"error");
+
+
+			if ($ElectricityCounterReadingValue ne "error") {
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Counter   : " . $ElectricityCounterReadingValue;
+				readingsSingleUpdate($ElectricityCountDev, $ElectricityCountReadingName, $ElectricityCounterReadingValue, 1);
+			}
+			else {
+		
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Counter   : Error!";
+			}
+		}
+		### If the Readings for midnight settings have not been provided
+		else {
+			### Warning Log entry
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ERROR - There have no information stored about previous readings. Make sure the counter has been delivering at least 2 values to the Calculator device before next midnight!";
+		}
+	}
+
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "ElectricityCalculator_MidnightTimer", $ElectricityCalcDev, 0);
+	
+	### For debugging purpose only
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer _______Looping finished___________";
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - time              : " . time();
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+}
+####END####### Midnight Routine ################################################################################END#####
+
+
 ###START###### Calculate Electricity meter values on changed events ###################################################START####
 sub ElectricityCalculator_Notify($$)
 {
@@ -603,9 +737,13 @@ sub ElectricityCalculator_Notify($$)
 			next;
 		}
 		
+		### Save Destination of readings into hidden readings
+		readingsSingleUpdate($ElectricityCalcDev, ".ReadingDestinationDeviceName",	$ElectricityCalcReadingDestinationDeviceName,	0);
+		
 		### Restore previous Counter and if not available define it with "undef"
-		my $ElectricityCountReadingTimestampPrevious = ReadingsTimestamp($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
-		my $ElectricityCountReadingValuePrevious     =       ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
+		my $ElectricityCountReadingTimestampPrevious =    ReadingsTimestamp($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
+		my $ElectricityCountReadingValuePrevious     =          ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_PrevRead", undef);
+		my $ElectricityCountReadingLastChangeDelta   = time() - ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValuePrevious             : " . $ElectricityCountReadingValuePrevious;
@@ -696,11 +834,15 @@ sub ElectricityCalculator_Notify($$)
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Current Reading Value                            : " . $ElectricityCountReadingValueCurrent;
 		
 		####### Check whether Initial readings needs to be written
-		### Check whether the current value is the first one after change of day = First one after midnight
-		if ($ElectricityCountReadingTimestampCurrentHour < $ElectricityCountReadingTimestampPreviousHour)
+		### Check whether the current value is the first one after change of day = First one after midnight or if last update is older than 1 day
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimeCurHour             : " . $ElectricityCountReadingTimestampCurrentHour;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimePrevHour            : " . $ElectricityCountReadingTimestampPreviousHour;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimeRelDelta            : " . $ElectricityCountReadingLastChangeDelta;
+
+		if (($ElectricityCountReadingTimestampCurrentHour < $ElectricityCountReadingTimestampPreviousHour) || ($ElectricityCountReadingLastChangeDelta > 86400))
 		{
 			### Create Log entries for debugging
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - First reading of day detected";
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - First reading of day detected OR last reading is older than 24h!";
 
 			### Calculate Electricity energy of previous day € = (Wprevious[kWh] - WcurrentDay[kWh]) 
 			my $ElectricityCalcEnergyDayLast      = ($ElectricityCountReadingValuePrevious - ReadingsVal($ElectricityCalcReadingDestinationDeviceName, $ElectricityCalcReadingPrefix . "_CounterDay1st", "0"));
@@ -790,6 +932,12 @@ sub ElectricityCalculator_Notify($$)
 			### Calculate DW (electric Energy difference) of previous and current value / [kWh]
 			my $ElectricityCountReadingValueDelta = sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)) - sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious));
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValueDelta                : " . $ElectricityCountReadingValueDelta;
+
+			### If the value has been changed since the last one
+			if ($ElectricityCountReadingValueDelta > 0) {
+				### Save current Timestamp as UNIX epoch into hash if the 
+				readingsSingleUpdate($ElectricityCalcDev, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", $ElectricityCountReadingTimestampCurrentRelative, 0);
+			}
 
 			### Calculate Current Power P = DW/Dt[kWh/s] * 3600[s/h] * 1000 [1/k] / SiPrefixPowerFactor
 			my $ElectricityCalcPowerCurrent    = ($ElectricityCountReadingValueDelta / $ElectricityCountReadingTimestampDelta) * 3600 * 1000 / $ElectricityCalcDev->{system}{SiPrefixPowerFactor};
@@ -977,581 +1125,104 @@ sub ElectricityCalculator_Notify($$)
 <a name="ElectricityCalculator"></a>
 <h3>ElectricityCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>
-			It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic electricity meter.<BR>
-			<BR>
-			As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			The ElectricityCalculator module provides several current, historical, statistical values around with respect to one or more electricity meter and creates respective readings.<BR>
-			<BR>
-			To avoid waiting for max. 12 months to have realistic values, the readings <BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> and<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
-			must be corrected with real values by using the <code>setreading</code> - command.<BR>
-			These real values may be found on the last electricity bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
-			<BR>
-			Intervalls smaller than 10s will be discarded to avoid peaks due to fhem blockages (e.g. DbLog - reducelog).
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table><tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr></table>
-
-<table><tr><td><ul><code>define &lt;name&gt; ElectricityCalculator &lt;regex&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>The name of the calculation device. (E.g.: "myElectricityCalculator")</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>A valid regular expression (also known as regex or regexp) of the event where the counter can be found</td></tr>
-	</table>
-</ul></ul>
-
-<table><tr><td><ul>Example: <code>define myElectricityCalculator ElectricityCalculator myElectricityCounter:countersA.*</code></ul></td></tr></table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				The set - function sets individual values for example to correct values after power loss etc.<BR>
-				The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>
-				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
-				The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				The get - function just returns the individual value of the reading.<BR>
-				The get - function works only for readings which have been stored in the CalculatorDevice.<BR>
-				The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR>
-	</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the ElectricityCalculator specific attributes with default values.<BR>
-				In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	A valid float number for basic annual fee in the chosen currency for the electricity supply to the home.<BR>
-																			The value is provided by your local electricity supplier and is shown on your electricity bill.<BR>
-																			For UK and US users it may known under "standing charge". Please make sure it is based on one year!<BR>
-																			The default value is 0.00<BR>
-			</td></tr>
+				The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>
+				It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic electricity meter.<BR>
+				<BR>
+				As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				The ElectricityCalculator module provides several current, historical, statistical values around with respect to one or more electricity meter and creates respective readings.<BR>
+				<BR>
+				To avoid waiting for max. 12 months to have realistic values, the readings <BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> and<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
+				must be corrected with real values by using the <code>setreading</code> - command.<BR>
+				These real values may be found on the last electricity bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
+				<BR>
+				Intervalls smaller than 10s will be discarded to avoid peaks due to fhem blockages (e.g. DbLog - reducelog).
+				<BR>
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	  
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>
-																The default value is &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; ElectricityCalculator &lt;regex&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>The name of the calculation device. (E.g.: "myElectricityCalculator")</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : </td><td>A valid regular expression (also known as regex or regexp) of the event where the counter can be found</ul></ul></td></tr>
+		<tr><td><ul>Example: <code>define myElectricityCalculator ElectricityCalculator myElectricityCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>			Disables the current module. The module will not react on any events described in the regular expression.<BR>
-																		The default value is 0 = enabled.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorSet"></a><b>Set</b></td></tr>
+		<tr><td><ul>The set - function sets individual values for example to correct values after power loss etc.<BR>The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityCounterOffset</code> : </li></td><td>	A valid float number of the electric Energy difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the electric energy and the calculated electric energy of the counting device.<BR>
-																		The value for this offset will be calculated as follows W<sub>Offset</sub> = W<sub>Mechanical</sub> - W<sub>Module</sub><BR>
-																		The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorGet"></a><b>Get</b></td></tr>
+		<tr><td><ul>The get - function just returns the individual value of the reading.<BR>The get - function works only for readings which have been stored in the CalculatorDevice.<BR>The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR></ul></td></tr>
 	</table>
-</ul></ul>
+	<BR>
 
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityKwhPerCounts</code> : </li></td><td>	A valid float number of electric energy in kWh per counting ticks.<BR>
-																		The value is given by the mechanical trigger of the mechanical electricity meter. E.g. ElectricityKwhPerCounts = 0.001 means each count is a thousandth of one kWh (=Wh).<BR>
-																		Some electronic counter (E.g. HomeMatic HM-ES-TX-WM) providing the counted electric energy as Wh. Therfore  this attribute must be 0.001 in order to transform it correctly to kWh.<BR>
-																		The default value is 1 (= the counter is already providing kWh)<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the ElectricityCalculator specific attributes with default values.<BR>In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityPricePerKWh</code> : </li></td><td>	A valid float number for electric energy price in the chosen currency per kWh.<BR>
-																		The value is provided by your local electricity supplier and is shown on your electricity bill.<BR>
-																		The default value is 0.2567<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"       ></a><li><b><u><code>BasicPricePerAnnum       </code></u></b> :  A valid float number for basic annual fee in the chosen currency for the electricity supply to the home.<BR>																			The value is provided by your local electricity supplier and is shown on your electricity bill.<BR>																			For UK and US users it may known under "standing charge". Please make sure it is based on one year!<BR>The default value is 0.00       <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"                 ></a><li><b><u><code>Currency                 </code></u></b> :  One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>																The default value is &#8364;                                                                                                                                                                                                                                                                                                                                       <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"                  ></a><li><b><u><code>disable                  </code></u></b> :  Disables the current module. The module will not react on any events described in the regular expression.<BR>																		The default value is 0 = enabled.                                                                                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ElectricityCounterOffset" ></a><li><b><u><code>ElectricityCounterOffset </code></u></b> :  A valid float number of the electric Energy difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the electric energy and the calculated electric energy of the counting device.<BR>The value for this offset will be calculated as follows W<sub>Offset</sub> = W<sub>Mechanical</sub> - W<sub>Module</sub><BR>The default value is 0.00                                                                                                       <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ElectricityKwhPerCounts"  ></a><li><b><u><code>ElectricityKwhPerCounts  </code></u></b> :  A valid float number of electric energy in kWh per counting ticks.<BR>The value is given by the mechanical trigger of the mechanical electricity meter. E.g. ElectricityKwhPerCounts = 0.001 means each count is a thousandth of one kWh (=Wh).<BR>Some electronic counter (E.g. HomeMatic HM-ES-TX-WM) providing the counted electric energy as Wh. Therfore  this attribute must be 0.001 in order to transform it correctly to kWh.<BR>The default value is 1 (= the counter is already providing kWh)  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ElectricityPricePerKWh"   ></a><li><b><u><code>ElectricityPricePerKWh   </code></u></b> :  A valid float number for electric energy price in the chosen currency per kWh.<BR>The value is provided by your local electricity supplier and is shown on your electricity bill.<BR>The default value is 0.2567                                                                                                                                                                                                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"           ></a><li><b><u><code>MonthlyPayment           </code></u></b> :  A valid float number for monthly advance payments in the chosen currency towards the electricity supplier.<BR>The default value is 0.00                                                                                                                                                                                                                                                                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading"     ></a><li><b><u><code>MonthOfAnnualReading     </code></u></b> :  A valid integer number for the month when the mechanical electricity meter reading is performed every year.<BR>The default value is 5 (May)                                                                                                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"       ></a><li><b><u><code>ReadingDestination       </code></u></b> :  One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>The CalculatorDevice is the device which has been created with this module.<BR>The CounterDevice is the Device which is reading the mechanical Electricity-meter.<BR>The default value is CalculatorDevice - Therefore the readings will be written into this device.                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="SiPrefixPower"            ></a><li><b><u><code>SiPrefixPower            </code></u></b> :  One value of the pre-defined list: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>It defines which SI-prefix for the power value shall be used. The power value will be divided accordingly by multiples of 1000.<BR>The default value is W (Watt).                                                                                                                                                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DecimalPlace"             ></a><li><b><u><code>DecimalPlace             </code></u></b> :  One value of the pre-defined list 3 to 7.<BR>It defines to which accuracy in decimal places all results shall be calculated.<BR>The default value is 3 = 0.001.                                                                                                                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>	A valid float number for monthly advance payments in the chosen currency towards the electricity supplier.<BR>
-																		The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
+		<tr><td><ul>As soon the device has been able to read at least 2 times the counter, it automatically will create a set of readings:<BR>The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above. <BR> This will not appear if CalculatorDevice has been chosen.<BR>The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression where the counting ticks are coming from.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	A valid integer number for the month when the mechanical electricity meter reading is performed every year.<BR>
-																			The default value is 5 (May)<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent      </code></li></td><td>: Current indicated total electric energy consumption as shown on mechanical electricity meter. Correct Offset-attribute if not identical.                                                                                                                                                                                                                                                                                                                                                           <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st       </code></li></td><td>: The first meter reading after midnight.                                                                                                                                                                                                                                                                                                                                                                                                                                                            <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast      </code></li></td><td>: The last meter reading of the previous day.                                                                                                                                                                                                                                                                                                                                                                                                                                                        <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st     </code></li></td><td>: The first meter reading after midnight of the first day of the month.                                                                                                                                                                                                                                                                                                                                                                                                                              <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast    </code></li></td><td>: The last meter reading of the previous month.                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st     </code></li></td><td>: The first meter reading after midnight of the first day of the month where the mechanical meter is read by the electricity supplier.                                                                                                                                                                                                                                                                                                                                                               <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast    </code></li></td><td>: The last meter reading of the previous meter reading year.                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st      </code></li></td><td>: The first meter reading after midnight of the first day of the year.                                                                                                                                                                                                                                                                                                                                                                                                                               <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast     </code></li></td><td>: The last meter reading of the previous year.                                                                                                                                                                                                                                                                                                                                                                                                                                                       <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast   </code></li></td><td>: Energy costs of the last day.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast </code></li></td><td>: Energy costs in the chosen currency of the last electricity meter period.                                                                                                                                                                                                                                                                                                                                                                                                                          <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast </code></li></td><td>: Energy costs in the chosen currency of the last month.                                                                                                                                                                                                                                                                                                                                                                                                                                             <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast  </code></li></td><td>: Energy costs of the last calendar year.                                                                                                                                                                                                                                                                                                                                                                                                                                                            <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDay       </code></li></td><td>: Energy consumption in kWh since the beginning of the current day (midnight).                                                                                                                                                                                                                                                                                                                                                                                                                       <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter     </code></li></td><td>: Energy costs in the chosen currency since the beginning of the month of where the last electricity meter reading has been performed by the electricity supplier.                                                                                                                                                                                                                                                                                                                                   <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth     </code></li></td><td>: Energy costs in the chosen currency since the beginning of the current month.                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear      </code></li></td><td>: Energy costs in the chosen currency since the beginning of the current year.                                                                                                                                                                                                                                                                                                                                                                                                                       <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay           </code></li></td><td>: Energy consumption in kWh since the beginning of the current day (midnight).                                                                                                                                                                                                                                                                                                                                                                                                                       <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast       </code></li></td><td>: Total Energy consumption in kWh of the last day.                                                                                                                                                                                                                                                                                                                                                                                                                                                   <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter         </code></li></td><td>: Energy consumption in kWh since the beginning of the month of where the last electricity-meter reading has been performed by the Electricity supplier.                                                                                                                                                                                                                                                                                                                                             <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast     </code></li></td><td>: Total Energy consumption in kWh of the last electricity-meter reading period.                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth         </code></li></td><td>: Energy consumption in kWh since the beginning of the current month (midnight of the first).                                                                                                                                                                                                                                                                                                                                                                                                        <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast     </code></li></td><td>: Total Energy consumption in kWh of the last month.                                                                                                                                                                                                                                                                                                                                                                                                                                                 <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energy consumption in kWh since the beginning of the current year (midnight of the first).                                                                                                                                                                                                                                                                                                                                                                                                         <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Total Energy consumption in kWh of the last calendar year.                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Financial Reserve based on the advanced payments done on the first of every month towards the Electricity supplier. With negative values, an additional payment is to be expected.                                                                                                                                                                                                                                                                                                                 <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Number of month since last meter reading. The month when the reading occured is the first month = 1.                                                                                                                                                                                                                                                                                                                                                                                               <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Current electric Power. (Average Power between current and previous measurement.)                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Average electric Power since midnight.                                                                                                                                                                                                                                                                                                                                                                                                                                                             <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax         </code></li></td><td>: Maximum Power peak since midnight.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <BR>    </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin         </code></li></td><td>: Minimum Power peak since midnight.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 <BR>    </ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>
-																			The CalculatorDevice is the device which has been created with this module.<BR>
-																			The CounterDevice    is the Device which is reading the mechanical Electricity-meter.<BR>
-																			The default value is CalculatorDevice - Therefore the readings will be written into this device.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        One value of the pre-defined list: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
-																			It defines which SI-prefix for the power value shall be used. The power value will be divided accordingly by multiples of 1000.
-																			The default value is W (Watt).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>DecimalPlace</code> : </li></td><td>	        One value of the pre-defined list 3 to 7.<BR>
-																			It defines to which accuracy in decimal places all results shall be calculated.
-																			The default value is 3 = 0.001.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			As soon the device has been able to read at least 2 times the counter, it automatically will create a set of readings:<BR>
-			The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above. <BR> This will not appear if CalculatorDevice has been chosen.<BR>
-			The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression where the counting ticks are coming from.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent</code> : </li></td><td>Current indicated total electric energy consumption as shown on mechanical electricity meter. Correct Offset-attribute if not identical.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code> : </li></td><td>The first meter reading after midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast</code> : </li></td><td>The last meter reading of the previous day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code> : </li></td><td>The first meter reading after midnight of the first day of the month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast</code> : </li></td><td>The last meter reading of the previous month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code> : </li></td><td>The first meter reading after midnight of the first day of the month where the mechanical meter is read by the electricity supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast</code> : </li></td><td>The last meter reading of the previous meter reading year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> : </li></td><td>The first meter reading after midnight of the first day of the year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>The last meter reading of the previous year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast</code> : </li></td><td>Energy costs of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast</code> : </li></td><td>Energy costs in the chosen currency of the last electricity meter period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast</code> : </li></td><td>Energy costs in the chosen currency of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast</code> : </li></td><td>Energy costs of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDay</code> : </li></td><td>Energy consumption in kWh since the beginning of the current day (midnight).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the month of where the last electricity meter reading has been performed by the electricity supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the current month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the current year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay</code> : </li></td><td>Energy consumption in kWh since the beginning of the current day (midnight).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast</code> : </li></td><td>Total Energy consumption in kWh of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energy consumption in kWh since the beginning of the month of where the last electricity-meter reading has been performed by the Electricity supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast</code> : </li></td><td>Total Energy consumption in kWh of the last electricity-meter reading period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth</code> : </li></td><td>Energy consumption in kWh since the beginning of the current month (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast</code> : </li></td><td>Total Energy consumption in kWh of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energy consumption in kWh since the beginning of the current year (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast</code> : </li></td><td>Total Energy consumption in kWh of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Financial Reserve based on the advanced payments done on the first of every month towards the Electricity supplier. With negative values, an additional payment is to be expected.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Number of month since last meter reading. The month when the reading occured is the first month = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Current electric Power. (Average Power between current and previous measurement.)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver</code> : </li></td><td>Average electric Power since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximum Power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimum Power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
 </ul>
 
 =end html
@@ -1561,583 +1232,159 @@ sub ElectricityCalculator_Notify($$)
 <a name="ElectricityCalculator"></a>
 <h3>ElectricityCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>
-			Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>
-			<BR>
-			Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			Das ElectricityCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Elektrizit&auml;tsz&auml;hlern und erstellt die entsprechenden Readings.<BR>
-			<BR>
-			Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> und<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
-			entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.<BR>
-			Diese Werte findet man unter Umst&auml;nden auf der letzten Abrechnung des Elektrizit&auml;tsversorgers. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
-			<BR>
-			<BR>
-			Intervalle kleienr als 10s werden ignoriert um Spitzen zu verhindern die von Blockaden des fhem Systems hervorgerufen werden (z.B. DbLog - reducelog).
-		</td>
-	</tr>
-</table>
-  
-<table>
-<tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr>
-</table>
-
-<table><tr><td><ul><code>define &lt;name&gt; ElectricityCalculator &lt;regex&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>Der Name dieses Berechnungs-Device. Empfehlung: "myElectricityCalculator".</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann</td></tr>
-	</table>
-</ul></ul>
-
-<table><tr><td><ul>Beispiel: <code>define myElectricityCalculator ElectricityCalculator myElectricityCounter:countersA.*</code></ul></td></tr></table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
-				Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
-				Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
-				Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR>
-
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>
-				Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Elektrizit&auml;ts-Versorgung zum Endverbraucher.<BR>
-																			Dieser Wert stammt vom Elektrizit&auml;tsversorger und steht auf der Abrechnung.<BR>
-																			Der Standard Wert ist 0.00<BR>
-			</td></tr>
+				Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>
+				Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>
+				<BR>
+				Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				Das ElectricityCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Elektrizit&auml;tsz&auml;hlern und erstellt die entsprechenden Readings.<BR>
+				<BR>
+				Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> und<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
+				entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.<BR>
+				Diese Werte findet man unter Umst&auml;nden auf der letzten Abrechnung des Elektrizit&auml;tsversorgers. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
+				<BR>
+				<BR>
+				Intervalle kleienr als 10s werden ignoriert um Spitzen zu verhindern die von Blockaden des fhem Systems hervorgerufen werden (z.B. DbLog - reducelog).
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>
-																Der Standard Wert ist &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; ElectricityCalculator &lt;regex&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>Der Name dieses Berechnungs-Device. Empfehlung: "myElectricityCalculator".                                          </ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : </td><td>Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann. </ul></ul></td></tr>
+		<tr><td><ul>Beispiel: <code>define myElectricityCalculator ElectricityCalculator myElectricityCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>	Deaktiviert das device. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>
-																Der Standard Wert ist 0 = aktiviert.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorSet"></a><b>Set</b></td></tr>
+		<tr><td><ul>Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR></ul></td></tr>
 	</table>
-</ul></ul>
+	<BR>
 
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityCounterOffset</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Elektrizit&auml;tsz&auml;hlern und dem angezeigten Wert im Reading dieses Device.<BR>
-																				Der Offset-Wert wird wie folgt ermittelt: W<sub>Offset</sub> = W<sub>Mechanisch</sub> - W<sub>Module</sub><BR>
-																				Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorGet"></a><b>Get</b></td></tr>
+		<tr><td><ul>Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityKwhPerCounts</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Menge kWh pro Z&auml;hlimpulsen.<BR>
-																				Der Wert ist durch das mechanische Z&auml;hlwerk des Elektrizit&auml;tsz&auml;hlern vorgegeben. ElectricityKwhPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel einer kWh ist (=Wh).<BR>
-																				Einige elektronische Zähler (Bsp.: HomeMatic HM-ES-TX-WM) stellen die gezählte Menge an elektrischer Energie als Wh bereit.<BR>
-																				Aus diesem Grund muss dieses Attribut auf 0.001 gesetzt werden um eine korrekte Transformation in kWh zu erm&ouml;glichen.<BR>
-																				Der Standard-Wert ist 1<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ElectricityPricePerKWh</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Preis pro kWh.<BR>
-																				Dieser Wert stammt vom Elektrizit&auml;tsversorger und steht auf der Abrechnung.<BR>
-																				Der Standard-Wert ist 0.2567<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"  ></a><li><b><u><code>BasicPricePerAnnum       </code></u></b> : Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Elektrizit&auml;ts-Versorgung zum Endverbraucher.<BR>Dieser Wert stammt vom Elektrizit&auml;tsversorger und steht auf der Abrechnung.<BR>Der Standard Wert ist 0.00.                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"            ></a><li><b><u><code>Currency                 </code></u></b> : Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>Der Standard Wert ist &#8364;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"             ></a><li><b><u><code>disable                  </code></u></b> : Deaktiviert das device. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>Der Standard Wert ist 0 = aktiviert.                                                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCounterOffset"  ></a><li><b><u><code>ElectricityCounterOffset </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Elektrizit&auml;tsz&auml;hlern und dem angezeigten Wert im Reading dieses Device.<BR>Der Offset-Wert wird wie folgt ermittelt: W<sub>Offset</sub> = W<sub>Mechanisch</sub> - W<sub>Module</sub><BR>Der Standard-Wert ist 0.00.                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCubicPerCounts" ></a><li><b><u><code>ElectricityKwhPerCounts  </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Menge kWh pro Z&auml;hlimpulsen.<BR>Der Wert ist durch das mechanische Z&auml;hlwerk des Elektrizit&auml;tsz&auml;hlern vorgegeben. ElectricityKwhPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel einer kWh ist (=Wh).<BR>Einige elektronische Z&auml;hler (Bsp.: HomeMatic HM-ES-TX-WM) stellen die gezählte Menge an elektrischer Energie als Wh bereit.<BR>Aus diesem Grund muss dieses Attribut auf 0.001 gesetzt werden um eine korrekte Transformation in kWh zu erm&ouml;glichen.<BR>Der Standard-Wert ist 1. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterPricePerCubic"  ></a><li><b><u><code>ElectricityPricePerKWh   </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Preis pro kWh.<BR>Dieser Wert stammt vom Elektrizit&auml;tsversorger und steht auf der Abrechnung.<BR>Der Standard-Wert ist 0.2567.                                                                                                                                                                                                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"      ></a><li><b><u><code>MonthlyPayment           </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Elektrizit&auml;tsversorger.<BR>Der Standard-Wert ist 0.00.                                                                                                                                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading"></a><li><b><u><code>MonthOfAnnualReading     </code></u></b> : Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Elektrizit&auml;tsz&auml;hler jedes Jahr durch den Elektrizit&auml;tsversorger abgelesen wird.<BR>Der Standard-Wert ist 5 (Mai)                                                                                                                                                                                                                                                                                                                                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"  ></a><li><b><u><code>ReadingDestination       </code></u></b> : Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>Das CounterDevice    ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>Der Standard-Wert ist CalculatorDevice.                                                                                                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WFRUnit"             ></a><li><b><u><code>SiPrefixPower            </code></u></b> : Ein Wert der vorgegebenen Auswahlliste: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>Es definiert welcher SI-Prefix verwendet werden soll und teilt die Leistung entsprechend durch ein Vielfaches von 1000.<BR>Der Standard-Wert ist W (Watt).                                                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DecimalPlace"        ></a><li><b><u><code>DecimalPlace             </code></u></b> : Ein Wert der vorgegebenen Auswahlliste von 3 bis 7.<BR>Es definiert die Genauigkeit in Nachkommastellen mit welcher die Ergebnisse berechnet werden.Der Standard-Wert ist 3 = 0,001.                                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Elektrizit&auml;tsversorger.<BR>
-																		Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
+		<tr><td><ul>Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Elektrizit&auml;tsz&auml;hler jedes Jahr durch den Elektrizit&auml;tsversorger abgelesen wird.<BR>
-																			Der Standard-Wert ist 5 (Mai)<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent      </code></li></td><td>: Aktueller Z&auml;hlerstand am mechanischen Z&auml;hler. Bei Unterschied muss das Offset-Attribut entspechend korrigiert werden.                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>                    
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st       </code></li></td><td>: Der erste Z&auml;hlerstand des laufenden Tages seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast      </code></li></td><td>: Der letzte Z&auml;hlerstand des vorherigen Tages.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st     </code></li></td><td>: Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages der laufenden Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast    </code></li></td><td>: Der letzte Z&auml;hlerstand seit Mitternacht des ersten Tages der vorherigen Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st     </code></li></td><td>: Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast    </code></li></td><td>: Der letzte Z&auml;hlerstand des vorherigen Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st      </code></li></td><td>: Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Jahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast     </code></li></td><td>: Der letzte Z&auml;hlerstand des letzten Jahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast   </code></li></td><td>: Elektrische Energiekosten des letzten Tages.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast </code></li></td><td>: Elektrische Energiekosten der letzten Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast </code></li></td><td>: Elektrische Energiekosten des letzten Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast  </code></li></td><td>: Elektrische Energiekosten des letzten Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDay       </code></li></td><td>: Energiekosten in gew&auml;hlter W&auml;hrung seit Mitternacht des laufenden Tages.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter     </code></li></td><td>: Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn der laufenden Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth     </code></li></td><td>: Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear      </code></li></td><td>: Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay           </code></li></td><td>: Energieverbrauch seit Beginn der aktuellen Tages (Mitternacht).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast       </code></li></td><td>: Energieverbrauch in kWh des vorherigen Tages.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter         </code></li></td><td>: Energieverbrauch seit Beginn der aktuellen Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast     </code></li></td><td>: Energieverbrauch in kWh der vorherigen Ableseperiode.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth         </code></li></td><td>: Energieverbrauch seit Beginn des aktuellen Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast     </code></li></td><td>: Energieverbrauch in kWh des vorherigen Monats.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energieverbrauch seit Beginn des aktuellen Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Energieverbrauch in kWh des vorherigen Kalenderjahres.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Elektrizit&auml;tsversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Aktuelle elektrische Leistung. (Mittelwert zwischen aktueller und letzter Messung)<BR>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Mittlere elektrische Leistung seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax         </code></li></td><td>: Maximale elektrische Leistungsaufnahme seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin         </code></li></td><td>: Minimale elektrische Leistungsaufnahme seit Mitternacht.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>
-																			Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>
-																			Das CounterDevice    ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>
-																			Der Standard-Wert ist CalculatorDevice.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>SiPrefixPower</code> : </li></td><td>	        Ein Wert der vorgegebenen Auswahlliste: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>
-																			Es definiert welcher SI-Prefix verwendet werden soll und teilt die Leistung entsprechend durch ein Vielfaches von 1000.
-																			Der Standard-Wert ist W (Watt).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>DecimalPlace</code> : </li></td><td>	        Ein Wert der vorgegebenen Auswahlliste von 3 bis 7.<BR>
-																			Es definiert die Genauigkeit in Nachkommastellen mit welcher die Ergebnisse berechnet werden.
-																			Der Standard-Wert ist 3 = 0,001.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>
-			Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>
-			Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent</code> : </li></td><td>Aktueller Z&auml;hlerstand am mechanischen Z&auml;hler. Bei Unterschied muss das Offset-Attribut entspechend korrigiert werden.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code> : </li></td><td>Der erste Z&auml;hlerstand des laufenden Tages seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des vorherigen Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages der laufenden Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast</code> : </li></td><td>Der letzte Z&auml;hlerstand seit Mitternacht des ersten Tages der vorherigen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des vorherigen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des letzten Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast</code> : </li></td><td>Elektrische Energiekosten des letzten Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast</code> : </li></td><td>Elektrische Energiekosten der letzten Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast</code> : </li></td><td>Elektrische Energiekosten des letzten Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast</code> : </li></td><td>Elektrische Energiekosten des letzten Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDay</code> : </li></td><td>Energiekosten in gew&auml;hlter W&auml;hrung seit Mitternacht des laufenden Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn der laufenden Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth</code> : </li></td><td>Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energiekosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay</code> : </li></td><td>Energieverbrauch seit Beginn der aktuellen Tages (Mitternacht).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast</code> : </li></td><td>Energieverbrauch in kWh des vorherigen Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energieverbrauch seit Beginn der aktuellen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast</code> : </li></td><td>Energieverbrauch in kWh der vorherigen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth</code> : </li></td><td>Energieverbrauch seit Beginn des aktuellen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast</code> : </li></td><td>Energieverbrauch in kWh des vorherigen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energieverbrauch seit Beginn des aktuellen Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast</code> : </li></td><td>Energieverbrauch in kWh des vorherigen Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Elektrizit&auml;tsversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Aktuelle elektrische Leistung. (Mittelwert zwischen aktueller und letzter Messung)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver</code> : </li></td><td>Mittlere elektrische Leistung seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximale elektrische Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimale elektrische Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 73_ElectricityCalculator.pm
+{
+  "abstract": "Calculates the electrical energy consumption and costs.",
+  "description": "The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>Tt is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic electricity meter.<BR>As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>The ElectricityCalculator module provides several current, historical, statistical values around with respect to one or more electricity meter and creates respective readings.<BR>",
+  "x_lang": {
+    "de": {
+      "abstract": "Berechnet den Energieverbrauch und verbundene Kosten",
+      "description": "Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>Das ElectricityCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Elektrizit&auml;tsz&auml;hlern und erstellt die entsprechenden Readings.<BR>"
+    }
+  },
+  "author": [
+    "I am the maintainer matthias.deeke@deeke.eu"
+  ],
+  "x_fhem_maintainer": [
+    "Sailor"
+  ],
+  "keywords": [
+    "electricity",
+	"current",
+    "calculation",
+    "consumption",
+    "cost",
+    "counter"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_support_community": {
+      "rss": "https://forum.fhem.de/index.php/topic,57106.msg",
+      "web": "https://forum.fhem.de/index.php/topic,57106.msg",
+      "subCommunity" : {
+          "rss" : "https://forum.fhem.de/index.php/topic,57106.msg",
+          "title" : "This sub-board will be first contact point",
+          "web" : "https://forum.fhem.de/index.php/topic,57106.msg"
+       }
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
 
 =cut
