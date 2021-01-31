@@ -46,6 +46,7 @@ use strict;
 use warnings;
 my %GasCalculator_gets;
 my %GasCalculator_sets;
+use FHEM::Meta;
 
 ###START###### Initialize module ##############################################################################START####
 sub GasCalculator_Initialize($)
@@ -77,6 +78,7 @@ sub GasCalculator_Initialize($)
 								  "Currency:&#8364;,&#163;,&#36; " .
 								  "DecimalPlace:3,4,5,6,7 " .
 								   $readingFnAttributes;
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -134,6 +136,19 @@ sub GasCalculator_Define($$$)
 
 	### Writing log entry
 	Log3 $name, 5, $name. " : GasCalculator - Starting to define module";
+
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "GasCalculator_MidnightTimer", $hash, 0);
+
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - time              : " . time();
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - year              : " . $year;
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - mon               : " . $mon;
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - day               : " . $mday;
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $name, 5, $name. " : GasCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
 
 	return undef;
 }
@@ -337,6 +352,125 @@ sub GasCalculator_Set($@)
 	return($ReturnMessage);
 }
 ####END####### Manipulate reading after "set" command by fhem ##################################################END#####
+
+###START###### Midnight Routine ###############################################################################START####
+sub GasCalculator_MidnightTimer($)
+{
+	### Define variables
+	my ($GasCalcDev)						  = @_;
+	my $GasCalcName 						  = $GasCalcDev->{NAME};
+ 	my $RegEx								  = $GasCalcDev->{REGEXP};
+	my ($GasCountName, $GasCountReadingRegEx) = split(":", $RegEx, 2);
+	my $GasCountDev							  = $defs{$GasCountName};
+	$GasCountReadingRegEx					  =~ s/[\.\*]//g;
+
+	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
+	my @GasCountReadingNameListFiltered;
+
+	foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
+		if ($GasCountReadingName =~ m[$GasCountReadingRegEx]) {
+			push(@GasCountReadingNameListFiltered, $GasCountReadingName);
+		}
+	}
+
+
+	### Create Log entries for debugging purpose
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer__________________________________________________________";
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer                     : MidnightTimer initiated";
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - RegEx             : " . $RegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountName      : " . $GasCountName;
+	#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadList: " . Dumper(@GasCountReadingNameListFiltered);
+	
+
+	### Remove internal timer for GasCalculator_MidnightTimer
+	RemoveInternalTimer($GasCalcDev, "GasCalculator_MidnightTimer");
+
+	### Create Log entries for debugging purpose
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
+	
+	foreach my $GasCountReadingName (@GasCountReadingNameListFiltered) {
+
+		# ### Restore Destination of readings
+		my $GasCalcReadingPrefix                = $GasCountName . "_" . $GasCountReadingName;
+		my $GasCalcReadingDestinationDeviceName	= ReadingsVal($GasCalcName, ".ReadingDestinationDeviceName"                           , "error");
+		my $GasCounterReadingValue 				= ReadingsVal($GasCountName, $GasCountReadingName                                   , "error");
+		my $LastUpdateTimestampUnix             = ReadingsVal($GasCalcName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+	
+		### Calculate time difference since last update
+		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
+
+		### Create Log entries for debugging purpose
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ___________Looping________________";
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - ReadingPrefix     : " . $GasCalcReadingPrefix;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - DeviceName        : " . $GasCalcReadingDestinationDeviceName;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp now     : " . time();
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+
+
+		### If the Readings for midnight settings have been provided
+		if (($GasCalcReadingPrefix ne "error") && ($GasCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
+
+			### Create Log entries for debugging purpose
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - ReadingPrefix     : " . $GasCalcReadingPrefix;
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - DeviceName        : " . $GasCalcReadingDestinationDeviceName;
+			
+			### If there was no update in the last 24h
+			if ( $DeltaTimeSinceLastUpdate >= 86400) {
+				### Create Log entries for debugging purpose
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : No Update in the last 24h!";
+
+			}
+			else {
+				### Create Log entries for debugging purpose
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
+			}
+			
+			#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCalcRDD      : \n" . Dumper($GasCalcReadingDestinationDevice);
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCounter        : " . $GasCounterReadingValue;
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($GasCalcReadingDestinationDeviceName, "."  . 	$GasCalcReadingPrefix . "_PowerDaySum",     	"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDayCount   : " . ReadingsVal($GasCalcReadingDestinationDeviceName, "."  . 	$GasCalcReadingPrefix . "_PowerDayCount",     	"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDayCurrent : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_PowerCurrent",     	"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDayAver    : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_PowerDayAver",     	"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDayMax     : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_PowerDayMax",    		"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDayMin     : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_PowerDayMin",     	"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre ConsumDay     : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_EnergyDay",     		"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre ConsumDayLast : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_EnergyDayLast",		"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre ConsumCstDay  : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_EnergyCostDay",		"error");
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre ConsumCstDayL : " . ReadingsVal($GasCalcReadingDestinationDeviceName, 		$GasCalcReadingPrefix . "_EnergyCostDayLast",	"error");
+
+
+			if ($GasCounterReadingValue ne "error") {
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Counter   : " . $GasCounterReadingValue;
+				readingsSingleUpdate($GasCountDev, $GasCountReadingName, $GasCounterReadingValue, 1);
+			}
+			else {
+		
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Counter   : Error!";
+			}
+		}
+		### If the Readings for midnight settings have not been provided
+		else {
+			### Warning Log entry
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - ERROR - There have no information stored about previous readings. Make sure the counter has been delivering at least 2 values to the Calculator device before next midnight!";
+		}
+	}
+
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "GasCalculator_MidnightTimer", $GasCalcDev, 0);
+	
+	### For debugging purpose only
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer _______Looping finished___________";
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - time              : " . time();
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+}
+####END####### Midnight Routine ################################################################################END#####
+
 
 ###START###### Calculate gas meter values on changed events ###################################################START####
 sub GasCalculator_Notify($$)
@@ -564,10 +698,14 @@ sub GasCalculator_Notify($$)
 			### Skipping event
 			next;
 		}
+	
+		### Save Destination of readings into hidden readings
+		readingsSingleUpdate($GasCalcDev, ".ReadingDestinationDeviceName",	$GasCalcReadingDestinationDeviceName,	0);
 		
 		### Restore previous Counter and if not available define it with "undef"
-		my $GasCountReadingTimestampPrevious = ReadingsTimestamp($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
-		my $GasCountReadingValuePrevious     =       ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
+		my $GasCountReadingTimestampPrevious =    ReadingsTimestamp($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
+		my $GasCountReadingValuePrevious     =          ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_PrevRead", undef);
+		my $GasCountReadingLastChangeDelta   = time() - ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValuePrevious             : " . $GasCountReadingValuePrevious;
@@ -587,6 +725,21 @@ sub GasCalculator_Notify($$)
 		{
 			### Write current Volume as previous Voulume for future use in the GasCalc-Device
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix. "_PrevRead", sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+
+			### Save current Gas Consumption as first reading of day = first after midnight and reset min, max value, value counter and value sum
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterDay1st",        sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterDayLast",       sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterMonth1st",      sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterMonthLast",     sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterMeter1st",      sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterMeterLast",     sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterYear1st",       sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_CounterYearLast",      sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_WFRDaySum",            0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_WFRDayCount",          0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_WFRDayMin",            0, 1);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_WFRDayMax",            0, 1);
+			readingsSingleUpdate( $GasCalcDev,                      "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value NOT found. Skipping Loop";
@@ -659,10 +812,14 @@ sub GasCalculator_Notify($$)
 
 		####### Check whether Initial readings needs to be written
 		### Check whether the current value is the first one after change of day = First one after midnight
-		if ($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour)
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimeCurHour  : " . $GasCountReadingTimestampCurrentHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimePrevHour : " . $GasCountReadingTimestampPreviousHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimeRelDelta : " . $GasCountReadingLastChangeDelta;
+
+		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > 86400))
 		{
-			### Create Log entries for debugging
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected";
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected OR last reading is older than 24h!";
 
 			### Calculate gas energy of previous day € = (Vprevious[cubic] - V1stDay[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic] 
 			my $GasCalcEnergyDayLast      = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
@@ -740,7 +897,7 @@ sub GasCalculator_Notify($$)
 			}
 		}
 		
-		###### Do calculations
+		###### 	Do calculations
 		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
 		my $GasCountReadingTimestampDelta = $GasCountReadingTimestampCurrentRelative - $GasCountReadingTimestampPreviousRelative;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingTimestampDelta            : " . $GasCountReadingTimestampDelta . " s";
@@ -751,6 +908,12 @@ sub GasCalculator_Notify($$)
 			### Calculate DV (Volume difference) of previous and current value / [cubic]
 			my $GasCountReadingValueDelta = sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent )) - sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValuePrevious));
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValueDelta                : " . $GasCountReadingValueDelta . " " . $attr{$GasCalcName}{Volume};
+
+			### If the value has been changed since the last one
+			if ($GasCountReadingValueDelta > 0) {
+				### Save current Timestamp as UNIX epoch into hash if the 
+				readingsSingleUpdate($GasCalcDev, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", $GasCountReadingTimestampCurrentRelative, 0);
+			}
 
 			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h] / SiPrefixPowerFactor
 			my $GasCalcPowerCurrent    = ($GasCountReadingValueDelta / $GasCountReadingTimestampDelta) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue} * 3600 / $GasCalcDev->{system}{SiPrefixPowerFactor};
@@ -937,571 +1100,97 @@ sub GasCalculator_Notify($$)
 <a name="GasCalculator"></a>
 <h3>GasCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			The GasCalculator Module calculates the gas consumption and costs of one ore more gas counters.<BR>
-			It is not a counter module itself but requires a regular expression (regex or regexp) in order to know where retrieve the counting ticks of one or more mechanical gas counter.<BR>
-			<BR>
-			As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			The GasCalculator module provides several current, historical, statistical predictable values around with respect to one or more gas-counter and creates respective readings.<BR>
-			<BR>
-			To avoid waiting for max. 12 months to have realistic values, the readings <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> and <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> must be corrected with real values by using the <code>setreading</code> - command.
-			These real values may be found on the last gas bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table><tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr></table>
-
-<table><tr><td><ul><code>define &lt;name&gt; GasCalculator &lt;regex&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>The name of the calculation device. Recommendation: "myGasCalculator".</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>A valid regular expression (also known as regex or regexp) of the event where the counter can be found</td></tr>
-	</table>
-</ul></ul>
-
-<table><tr><td><ul>Example: <code>define myGasCalculator GasCalculator myGasCounter:countersA.*</code></ul></td></tr></table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				The set - function sets individual values for example to correct values after power loss etc.<BR>
-				The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>
-				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
-				The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				The get - function just returns the individual value of the reading.<BR>
-				The get - function works only for readings which have been stored in the CalculatorDevice.<BR>
-				The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the GasCalculator specific attributes with default values.<BR>
-				In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	A valid float number for basic annual fee in the chosen currency for the gas supply to the home.<BR>
-																			The value is provided by your local gas provider is shown on your gas bill.<BR>
-																			For UK users it may known under "Standing Charge". Please make sure it is based on one year<BR>
-																			The default value is 0.00<BR>
-			</td></tr>
+				The GasCalculator Module calculates the gas consumption and costs of one ore more gas counters.<BR>
+				It is not a counter module itself but requires a regular expression (regex or regexp) in order to know where retrieve the counting ticks of one or more mechanical gas counter.<BR>
+				<BR>
+				As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				The GasCalculator module provides several current, historical, statistical predictable values around with respect to one or more gas-counter and creates respective readings.<BR>
+				<BR>
+				To avoid waiting for max. 12 months to have realistic values, the readings <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> and <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> must be corrected with real values by using the <code>setreading</code> - command.
+				These real values may be found on the last gas bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
+				<BR>
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>
-																The default value is &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; GasCalculator &lt;regex&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>The name of the calculation device. Recommendation: "myGasCalculator".</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : </td><td>A valid regular expression (also known as regex or regexp) of the event where the counter can be found.</ul></ul></td></tr>
+		<tr><td><ul>Example: <code>define myGasCalculator GasCalculator myGasCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>			Disables the current module. The module will not react on any events described in the regular expression.<BR>
-																		The default value is 0 = enabled.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
+		<tr><td><ul>The set - function sets individual values for example to correct values after power loss etc.<BR>The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR></ul></td></tr>
 	</table>
-</ul></ul>
+	<BR>
 
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasCounterOffset</code> : </li></td><td>	A valid float number of the volume difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the gas volume and the calculated volume of this device.<BR>
-																		The value for this offset will be calculated as follows V<sub>Offset</sub> = V<sub>Mechanical</sub> - V<sub>Module</sub><BR>
-																		The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
+		<tr><td><ul>The get - function just returns the individual value of the reading.<BR>The get - function works only for readings which have been stored in the CalculatorDevice.<BR>The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasCubicPerCounts</code> : </li></td><td>	A valid float number of the ammount of volume per ticks.<BR>
-																		The value is given by the mechanical trigger of the mechanical gas meter. E.g. GasCubicPerCounts = 0.01 means each count is a hundredth of the volume basis unit.<BR>
-																		The default value is 0.01<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the GasCalculator specific attributes with default values.<BR>In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasNominalHeatingValue</code> : </li></td><td>	A valid float number for the gas heating value in [kWh/ chosen Volume].<BR>
-																				The value is provided by your local gas provider is shown on your gas bill.<BR>
-																				The default value is 10.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"     ></a><li><b><u><code>BasicPricePerAnnum     </code></u></b> : A valid float number for basic annual fee in the chosen currency for the gas supply to the home.<BR>The value is provided by your local gas provider is shown on your gas bill.<BR>For UK users it may known under "Standing Charge". Please make sure it is based on one year<BR>The default value is 0.00																				<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"               ></a><li><b><u><code>Currency               </code></u></b> : One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>The default value is &#8364;																				                                                                                                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"                ></a><li><b><u><code>disable                </code></u></b> : Disables the current module. The module will not react on any events described in the regular expression.<BR>The default value is 0 = enabled.																				                                                                                                                                                            <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasCounterOffset"       ></a><li><b><u><code>GasCounterOffset       </code></u></b> : A valid float number of the volume difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the gas volume and the calculated volume of this device.<BR>The value for this offset will be calculated as follows V<sub>Offset</sub> = V<sub>Mechanical</sub> - V<sub>Module</sub><BR>The default value is 0.00                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasCubicPerCounts"      ></a><li><b><u><code>GasCubicPerCounts      </code></u></b> : A valid float number of the ammount of volume per ticks.<BR>The value is given by the mechanical trigger of the mechanical gas meter. E.g. GasCubicPerCounts = 0.01 means each count is a hundredth of the volume basis unit.<BR>The default value is 0.01                                                                                                                               <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasNominalHeatingValue" ></a><li><b><u><code>GasNominalHeatingValue </code></u></b> : A valid float number for the gas heating value in [kWh/ chosen Volume].<BR>	The value is provided by your local gas provider is shown on your gas bill.<BR>	The default value is 10.00                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GaszValue"              ></a><li><b><u><code>GaszValue              </code></u></b> : A valid float number for the gas condition based on the local installation of the mechanical gas meter in relation of the gas providers main supply station.<BR>The value is provided by your local gas provider is shown on your gas bill.<BR>The default value is 1.00                                                                                                                 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasPricePerKWh"         ></a><li><b><u><code>GasPricePerKWh         </code></u></b> : A valid float number for gas price in the chosen currency per kWh for the gas.<BR>The value is provided by your local gas provider is shown on your gas bill.<BR>The default value is 0.0654                                                                                                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"         ></a><li><b><u><code>MonthlyPayment         </code></u></b> : A valid float number for monthly advance payments in the chosen currency towards the gas supplier.<BR>The default value is 0.00                                                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading"   ></a><li><b><u><code>MonthOfAnnualReading   </code></u></b> : A valid integer number for the month when the mechanical gas meter reading is performed every year.<BR>The default value is 5 (May)                                                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"     ></a><li><b><u><code>ReadingDestination     </code></u></b> : One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>The CalculatorDevice is the device which has been created with this module.<BR>The CounterDevice    is the Device which is reading the mechanical gas-meter.<BR>The default value is CalculatorDevice - Therefore the readings will be written into this device.        <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Volume"                 ></a><li><b><u><code>Volume                 </code></u></b> : One of the pre-defined list of volume symbols [m&#179;,ft&#179;].<BR>The default value is m&#179;                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GaszValue</code> : </li></td><td>	A valid float number for the gas condition based on the local installation of the mechanical gas meter in relation of the gas providers main supply station.<BR>
-																The value is provided by your local gas provider is shown on your gas bill.<BR>
-																The default value is 1.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorReadings"></a><b>Readings</b></td></tr>
+		<tr><td><ul>As soon the device has been able to read at least 2 times the counter, it automatically will create a set readings:<BR>The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above. This will not appear if CalculatorDevice has been chosen.<BR>The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasPricePerKWh</code> : </li></td><td>	A valid float number for gas price in the chosen currency per kWh for the gas.<BR>
-																		The value is provided by your local gas provider is shown on your gas bill.<BR>
-																		The default value is 0.0654<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast   </code></li></td><td>: Energy costs of the last day.                                                                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter     </code></li></td><td>: Energy costs in the chosen currency since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast </code></li></td><td>: Energy costs in the chosen currency of the last gas-meter period.                                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth     </code></li></td><td>: Energy costs in the chosen currency since the beginning of the current month.                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast </code></li></td><td>: Energy costs in the chosen currency of the last month.                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear      </code></li></td><td>: Energy costs in the chosen currency since the beginning of the current year.                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast  </code></li></td><td>: Energy costs of the last calendar year.                                                                                                                                                                                                                                                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay           </code></li></td><td>: Energy consumption in kWh since the beginning of the current day (midnight).                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast       </code></li></td><td>: Total Energy consumption in kWh of the last day.                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter         </code></li></td><td>: Energy consumption in kWh since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast     </code></li></td><td>: Total Energy consumption in kWh of the last gas-meter reading period.                                                                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth         </code></li></td><td>: Energy consumption in kWh since the beginning of the current month (midnight of the first).                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast     </code></li></td><td>: Total Energy consumption in kWh of the last month.                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energy consumption in kWh since the beginning of the current year (midnight of the first).                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Total Energy consumption in kWh of the last calendar year.                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Financial Reserver based on the advanced payments done on the first of every month towards the gas supplier. With negative values, an additional payment is to be excpected.                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Number of month since last meter reading. The month when the reading occured is the first month = 1.                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter               </code></li></td><td>: Current indicated total volume consumption on mechanical gas meter. Correct Offset-attribute if not identical.                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Current heating Power. (Average between current and previous measurement.)                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Average heating Power since midnight.                                                                                                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax         </code></li></td><td>: Maximum power peak since midnight.                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin         </code></li></td><td>: Minimum power peak since midnight.                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay           </code></li></td><td>: First volume reading of the current day.                                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay          </code></li></td><td>: Volume reading of the previous day.                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth         </code></li></td><td>: First volume reading of the current month.                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth        </code></li></td><td>: Volume reading of the previous month.                                                                                                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear          </code></li></td><td>: First volume reading of the current year.                                                                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear         </code></li></td><td>: Volume reading of the previous year.                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter         </code></li></td><td>: First volume reading of the first day of the month of the current meter reading period.                                                                                                                                                                                                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter        </code></li></td><td>: Volume reading of the first day of the month of the last meter reading period.                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>	A valid float number for monthly advance payments in the chosen currency towards the gas supplier.<BR>
-																		The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	A valid integer number for the month when the mechanical gas meter reading is performed every year.<BR>
-																			The default value is 5 (May)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>
-																			The CalculatorDevice is the device which has been created with this module.<BR>
-																			The CounterDevice    is the Device which is reading the mechanical gas-meter.<BR>
-																			The default value is CalculatorDevice - Therefore the readings will be written into this device.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Volume</code> : </li></td><td>	One of the pre-defined list of volume symbols [m&#179;,ft&#179;].<BR>
-																The default value is m&#179;<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			As soon the device has been able to read at least 2 times the counter, it automatically will create a set readings:<BR>
-			The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above. This will not appear if CalculatorDevice has been chosen.<BR>
-			The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostDayLast</code> : </li></td><td>Energy costs of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>	Energy costs in the chosen currency since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast</code> : </li></td><td>	Energy costs in the chosen currency of the last gas-meter period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the current month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast</code> : </li></td><td>Energy costs in the chosen currency of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energy costs in the chosen currency since the beginning of the current year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast</code> : </li></td><td>Energy costs of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay</code> : </li></td><td>Energy consumption in kWh since the beginning of the current day (midnight).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast</code> : </li></td><td>Total Energy consumption in kWh of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energy consumption in kWh since the beginning of the month of where the last gas-meter reading has been performed by the gas supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast</code> : </li></td><td>Total Energy consumption in kWh of the last gas-meter reading period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth</code> : </li></td><td>Energy consumption in kWh since the beginning of the current month (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast</code> : </li></td><td>Total Energy consumption in kWh of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energy consumption in kWh since the beginning of the current year (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast</code> : </li></td><td>Total Energy consumption in kWh of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Financial Reserver based on the advanced payments done on the first of every month towards the gas supplier. With negative values, an additional payment is to be excpected.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Number of month since last meter reading. The month when the reading occured is the first month = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter</code> : </li></td><td>Current indicated total volume consumption on mechanical gas meter. Correct Offset-attribute if not identical.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Current heating Power. (Average between current and previous measurement.)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver</code> : </li></td><td>Average heating Power since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximum power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimum power peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code> : </li></td><td>First volume reading of the current day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay</code> : </li></td><td>Volume reading of the previous day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code> : </li></td><td>First volume reading of the current month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth</code> : </li></td><td>Volume reading of the previous month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> : </li></td><td>First volume reading of the current year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear</code> : </li></td><td>Volume reading of the previous year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> : </li></td><td>First volume reading of the first day of the month of the current meter reading period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter</code> : </li></td><td>Volume reading of the first day of the month of the last meter reading period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
 </ul>
 
 =end html
@@ -1511,575 +1200,151 @@ sub GasCalculator_Notify($$)
 <a name="GasCalculator"></a>
 <h3>GasCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			Das GasCalculator Modul berechnet den Gas - Verbrauch und den verbundenen Kosten von einem oder mehreren Gas-Z&auml;hlern.<BR>
-			Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hl-Impulse von einem oder mehreren Gasz&auml;hlern zu finden.<BR>
-			<BR>
-			Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			Das GasCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Gas-Z&auml;hlern und erstellt die entsprechenden Readings.<BR>
-			<BR>
-			Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> und <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.
-			Diese Werte findet man unter Umst&auml;nden auf der letzten Gas-Rechnung. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table>
-<tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr>
-</table>
-
-<table><tr><td><ul><code>define &lt;name&gt; GasCalculator &lt;regex&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>Der Name dieses Berechnungs-Device. Empfehlung: "myGasCalculator".</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann</td></tr>
-	</table>
-</ul></ul>
-
-<table><tr><td><ul>Beispiel: <code>define myGasCalculator GasCalculator myGasCounter:countersA.*</code></ul></td></tr></table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
-				Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
-				Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
-				Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>
-				Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Gas-Versorgung zum End-Verbraucher.<BR>
-																			Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>
-																			Der Standard Wert ist 0.00<BR>
-			</td></tr>
+				Das GasCalculator Modul berechnet den Gas - Verbrauch und den verbundenen Kosten von einem oder mehreren Gas-Z&auml;hlern.<BR>
+				Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hl-Impulse von einem oder mehreren Gasz&auml;hlern zu finden.<BR>
+				<BR>
+				Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				Das GasCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Gas-Z&auml;hlern und erstellt die entsprechenden Readings.<BR>
+				<BR>
+				Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code>, <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> und <code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.
+				Diese Werte findet man unter Umst&auml;nden auf der letzten Gas-Rechnung. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
+				<BR>
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>
-																Der Standard Wert ist &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; GasCalculator &lt;regex&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>Der Name dieses Berechnungs-Device. Empfehlung: "myGasCalculator".</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : </td><td>Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann</ul></ul></td></tr>
+		<tr><td><ul>Beispiel: <code>define myGasCalculator GasCalculator myGasCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>			Deaktiviert das devive. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>
-																		Der Standard Wert ist 0 = ativiert.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorSet"></a><b>Set</b></td></tr>
+		<tr><td><ul>Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasCounterOffset</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Volumen Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Gasz&auml;hler und dem angezeigten Wert im Reading dieses Device.<BR>
-																		Der Offset-Wert wird wie folgt ermittelt: V<sub>Offset</sub> = V<sub>Mechanisch</sub> - V<sub>Module</sub><BR>
-																		Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
+		<tr><td><ul>Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasCubicPerCounts</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Menge an Z&auml;hlimpulsen pro gew&auml;hlter Volumen-Grundeinheit.<BR>
-																		Der Wert ist durch das mechanische Z&auml;hlwerk des Gasz&auml;hlers vorgegeben. GasCubicPerCounts = 0.01 bedeutet, dass jeder Z&auml;hlimpuls ein hunderstel der gew&auml;hlten Volumengrundeinheit.<BR>
-																		Der Standard-Wert ist 0.01<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorAttr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasNominalHeatingValue</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Heizwert des gelieferten Gases in [kWh/ gew&auml;hlter Volumeneinheit].<BR>
-																				Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>
-																				Der Standard-Wert ist 10.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"     ></a><li><b><u><code>BasicPricePerAnnum     </code></u></b> : Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Gas-Versorgung zum End-Verbraucher.<BR>Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>der Standard Wert ist 0.00                                                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"               ></a><li><b><u><code>Currency               </code></u></b> : Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>Der Standard Wert ist &#8364;<BR>                                                                                                                                                                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"                ></a><li><b><u><code>disable                </code></u></b> : Deaktiviert das devive. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>Der Standard Wert ist 0 = ativiert.<BR>                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasCounterOffset"       ></a><li><b><u><code>GasCounterOffset       </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Volumen Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Gasz&auml;hler und dem angezeigten Wert im Reading dieses Device.<BR>Der Offset-Wert wird wie folgt ermittelt: V<sub>Offset</sub> = V<sub>Mechanisch</sub> - V<sub>Module</sub><BR>Der Standard-Wert ist 0.00   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasCubicPerCounts"      ></a><li><b><u><code>GasCubicPerCounts      </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Menge an Z&auml;hlimpulsen pro gew&auml;hlter Volumen-Grundeinheit.<BR>Der Wert ist durch das mechanische Z&auml;hlwerk des Gasz&auml;hlers vorgegeben. GasCubicPerCounts = 0.01 bedeutet, dass jeder Z&auml;hlimpuls ein hunderstel der gew&auml;hlten Volumengrundeinheit.<BR>Der Standard-Wert ist 0.01                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasNominalHeatingValue" ></a><li><b><u><code>GasNominalHeatingValue </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Heizwert des gelieferten Gases in [kWh/ gew&auml;hlter Volumeneinheit].<BR>Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>Der Standard-Wert ist 10.00<BR>                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GaszValue"              ></a><li><b><u><code>GaszValue              </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Zustandszahl des Gases basierend auf der Relation based on the local installation of the mechganical gas meter in relation of the gas providers main supply station.<BR>Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>Der Standard-Wert ist 1.00<BR>                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="GasPricePerKWh"         ></a><li><b><u><code>GasPricePerKWh         </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Gas Preis in der gew&auml;hlten W&auml;hrung pro kWh.<BR>Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>Der Standard-Wert ist 0.0654<BR>                                                                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"         ></a><li><b><u><code>MonthlyPayment         </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Gas-Lieferanten.<BR>Der Standard-Wert ist 0.00<BR>                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading"   ></a><li><b><u><code>MonthOfAnnualReading   </code></u></b> : Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Gas-Z&auml;hler jedes Jahr durch den Gas-Lieferanten abgelesen wird.<BR>Der Standard-Wert ist 5 (Mai)<BR>                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"     ></a><li><b><u><code>ReadingDestination     </code></u></b> : Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>Das CounterDevice    ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>Der Standard-Wert ist CalculatorDevice.<BR>                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Volume"                 ></a><li><b><u><code>Volume                 </code></u></b> : Eine der vordefinierten Volumensymbole f&uuml;r die Volumeneinheit [m&#179;,ft&#179;].<BR>der Standard-Wert ist m&#179;<BR>                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GaszValue</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Zustandszahl des Gases basierend auf der Relation based on the local installation of the mechganical gas meter in relation of the gas providers main supply station.<BR>
-																Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>
-																Der Standard-Wert ist 1.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="GasCalculatorReadings"></a><b>Readings</b></td></tr>
+		<tr><td><ul>Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>GasPricePerKWh</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Gas Preis in der gew&auml;hlten W&auml;hrung pro kWh.<BR>
-																		Dieser Wert stammt vom Gas-Zulieferer und steht auf der Gas-Rechnung.<BR>
-																		Der Standard-Wert ist 0.0654<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastDay   </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Tages.                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter     </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung der letzten Z&auml;hlperiode des Gas-Versorgers.                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth     </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Monats.                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Monats.                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear      </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Jahres.                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast  </code></li></td><td>: Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Jahres.                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay           </code></li></td><td>: Energieverbrauch in kWh seit Mitternacht.                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast       </code></li></td><td>: Gesamter Energieverbrauch des letzten Tages (Gestern).                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter         </code></li></td><td>: Energieverbrauch in kWh seit Anfang seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast     </code></li></td><td>: Gesamter Energieverbrauch der letzten Z&auml;hlerperiode des Gas-Versorgers.                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth         </code></li></td><td>: Energieverbrauch in kWh seit Anfang seit Anfang des Monats (Mitternacht des 01.).                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast     </code></li></td><td>: Gesamter Energieverbrauch im letzten Monat.                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear          </code></li></td><td>: Energieverbrauch in kWh seit Anfang seit Anfang des Jahres (Mitternacht des 01. Januar).                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast      </code></li></td><td>: Gesamter Energieverbrauch in kWh des letzten Kalender-Jahres.                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve      </code></li></td><td>: Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Gas-Versorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen. <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading   </code></li></td><td>: Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter               </code></li></td><td>: Z&auml;hlerstand am Gasz&auml;hler. Bei Differenzen muss das Offset-Attribut korrigiert werden.                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent        </code></li></td><td>: Aktuelle Heizleistung. (Mittelwert zwischen aktueller und letzter Messung)                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver        </code></li></td><td>: Mittlere Heitzleistung seit Mitternacht.                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax         </code></li></td><td>: Maximale Leistungsaufnahme seit Mitternacht.                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin         </code></li></td><td>: Minimale Leistungsaufnahme seit Mitternacht.                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay           </code></li></td><td>: Erster Volumenmesswert des Tages (Mitternacht).                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay          </code></li></td><td>: Verbrauchtes Volumen des vorherigen Tages.                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth         </code></li></td><td>: Erster Volumenmesswert des Monats (Mitternacht des 01.).                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth        </code></li></td><td>: Verbrauchtes Volumen des vorherigen Monats.                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear          </code></li></td><td>: Erster Volumenmesswert des Jahres (Mitternacht des 01. Januar).                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear         </code></li></td><td>: Verbrauchtes Volumen des vorherigen Jahres.                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter         </code></li></td><td>: Erster Volumenmesswert des Zeitraums seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter        </code></li></td><td>: Verbrauchtes Volumen des vorherigen Abrechnungszeitraums.                                                                                                                <BR>     </ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Gas-Lieferanten.<BR>
-																		Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Gas-Z&auml;hler jedes Jahr durch den Gas-Lieferanten abgelesen wird.<BR>
-																			Der Standard-Wert ist 5 (Mai)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>
-																			Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>
-																			Das CounterDevice    ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>
-																			Der Standard-Wert ist CalculatorDevice.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Volume</code> : </li></td><td>	Eine der vordefinierten Volumensymbole f&uuml;r die Volumeneinheit [m&#179;,ft&#179;].<BR>
-																Der Standard-Wert ist m&#179;<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="GasCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>
-			Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>
-			Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostLastDay</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeter</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMeterLast</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung der letzten Z&auml;hlperiode des Gas-Versorgers.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonth</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostMonthLast</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYear</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung seit Anfang des Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyCostYearLast</code> : </li></td><td>Energiekosten in der gew&auml;hlten W&auml;hrung des letzten Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDay</code> : </li></td><td>Energieverbrauch in kWh seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyDayLast</code> : </li></td><td>Gesamter Energieverbrauch des letzten Tages (Gestern).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeter</code> : </li></td><td>Energieverbrauch in kWh seit Anfang seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMeterLast</code> : </li></td><td>Gesamter Energieverbrauch der letzten Z&auml;hlerperiode des Gas-Versorgers.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonth</code> : </li></td><td>Energieverbrauch in kWh seit Anfang seit Anfang des Monats (Mitternacht des 01.).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyMonthLast</code> : </li></td><td>Gesamter Energieverbrauch im letzten Monat.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYear</code> : </li></td><td>Energieverbrauch in kWh seit Anfang seit Anfang des Jahres (Mitternacht des 01. Januar).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_EnergyYearLast</code> : </li></td><td>Gesamter Energieverbrauch in kWh des letzten Kalender-Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Gas-Versorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Meter</code> : </li></td><td>Z&auml;hlerstand am Gasz&auml;hler. Bei Differenzen muss das Offset-Attribut korrigiert werden.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerCurrent</code> : </li></td><td>Aktuelle Heizleistung. (Mittelwert zwischen aktueller und letzter Messung)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayAver</code> : </li></td><td>Mittlere Heitzleistung seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMax</code> : </li></td><td>Maximale Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_PowerDayMin</code> : </li></td><td>Minimale Leistungsaufnahme seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stDay</code> : </li></td><td>Erster Volumenmesswert des Tages (Mitternacht).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastDay</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMonth</code> : </li></td><td>Erster Volumenmesswert des Monats (Mitternacht des 01.).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMonth</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stYear</code> : </li></td><td>Erster Volumenmesswert des Jahres (Mitternacht des 01. Januar).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter</code> : </li></td><td>Erster Volumenmesswert des Zeitraums seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter</code> : </li></td><td>Verbrauchtes Volumen des vorherigen Abrechnungszeitraums.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
 </ul>
-
 =end html_DE
+
+=for :application/json;q=META.json 73_GasCalculator.pm
+{
+  "abstract": "Calculates the gas energy consumption and costs.",
+  "description": "The GasCalculator Module calculates the gas consumption and costs of one ore more gas counters.<BR>It is not a counter module itself but requires a regular expression (regex or regexp) in order to know where retrieve the counting ticks of one or more mechanical gas counter.<BR>As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>The GasCalculator module provides several current, historical, statistical predictable values around with respect to one or more gas-counter and creates respective readings.<BR>",
+  "x_lang": {
+    "de": {
+      "abstract": "Berechnet den Gas-Energieverbrauch und verbundene Kosten",
+      "description": "Das GasCalculator Modul berechnet den Gas - Verbrauch und den verbundenen Kosten von einem oder mehreren Gas-Z&auml;hlern.<BR>Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hl-Impulse von einem oder mehreren Gasz&auml;hlern zu finden.<BR>Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>Das GasCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Gas-Z&auml;hlern und erstellt die entsprechenden Readings.<BR>"
+    }
+  },
+  "author": [
+    "I am the maintainer matthias.deeke@deeke.eu"
+  ],
+  "x_fhem_maintainer": [
+    "Sailor"
+  ],
+  "keywords": [
+    "gas",
+	"energy",
+    "calculation",
+    "consumption",
+    "cost",
+    "counter"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_support_community": {
+      "rss": "https://forum.fhem.de/index.php/topic,47909.msg",
+      "web": "https://forum.fhem.de/index.php/topic,47909.msg",
+      "subCommunity" : {
+          "rss" : "https://forum.fhem.de/index.php/topic,47909.msg",
+          "title" : "This sub-board will be first contact point",
+          "web" : "https://forum.fhem.de/index.php/topic,47909.msg"
+       }
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
 
 =cut
