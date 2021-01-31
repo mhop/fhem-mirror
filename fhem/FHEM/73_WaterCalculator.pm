@@ -28,10 +28,13 @@
 #     You should have received a copy of the GNU General Public License
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-#     fhem.cfg: define <devicename> WaterCalculator <regexp>
+#     Definiton: define <devicename> WaterCalculator <regexp>
 #
-#     Example 1:
+#     Example: Only one Reading "CounterA" of the counter module
 #     define myWaterCalculator WaterCalculator myWaterCounter:CounterA.*
+#
+#     Example: All Readings of the counter module starting with "Counter" = "CounterA", "CounterB", "CounterC" etc.
+#     define myWaterCalculator WaterCalculator myWaterCounter:Counter.*
 #
 ########################################################################################################################
 
@@ -39,12 +42,17 @@
 # List of open Problems / Issues:
 #
 #   - EXPERIMENTAL VERSION ONLY!
+#	_Define: Start Time
+#   _Undefine Timer
+#   _notify: helper zwischenspeichern
+#   _MidnightTimer
 #
 ########################################################################################################################
 
 package main;
 use strict;
 use warnings;
+use FHEM::Meta;
 
 ###START###### Initialize module ##############################################################################START####
 sub WaterCalculator_Initialize($)
@@ -74,6 +82,7 @@ sub WaterCalculator_Initialize($)
 								  "Currency:&#8364;,&#163;,&#36; " .
 								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -131,6 +140,19 @@ sub WaterCalculator_Define($$$)
 	### Writing log entry
 	Log3 $name, 5, $name. " : WaterCalculator - Starting to define module";
 
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $hash, 0);
+
+	### For debugging purpose only
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - time              : " . time();
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - year              : " . $year;
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - mon               : " . $mon;
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - day               : " . $mday;
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $name, 5, $name. " : WaterCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+
 	return undef;
 }
 ####END####### Activate module after module has been used via fhem command "define" ############################END#####
@@ -141,7 +163,11 @@ sub WaterCalculator_Undefine($$)
 {
 	my ($hash, $def)  = @_;
 	my $name = $hash->{NAME};	
-
+	
+	### Stop internal timer
+	RemoveInternalTimer($hash);
+	
+	### Write log information
 	Log3 $name, 3, $name. " WaterCalculator- The Water calculator has been undefined. Values corresponding to water meter will no longer calculated";
 	
 	return undef;
@@ -333,11 +359,11 @@ sub WaterCalculator_Set($@)
 
 	
 	if(defined($hash->{READINGS})) {
-		push(@cList, "SyncCounter"); 
+		push(@cList, "SyncCounter");
 		push(@cList, keys(%{$hash->{READINGS}}));
 	}
 	else {
-		push(@cList, "SyncCounter"); 
+		push(@cList, "SyncCounter");
 	}
 
 	### Create Log entries for debugging
@@ -365,9 +391,6 @@ sub WaterCalculator_Set($@)
 		### Calculate new Offset
 		my $CounterOffsetNew = $value - $CounterValueCurrent;
 
-		### Calculate Ceck
-#		my $CounterValueNew = $CounterValueCurrent + $CounterOffsetNew;
-		
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - Search Result               : " . Dumper(@SearchResult);
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Given  : " . $value;
@@ -375,13 +398,16 @@ sub WaterCalculator_Set($@)
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetCurrent Result : " . $CounterOffsetCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueCurrent  Result : " . $CounterValueCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetNew     Result : " . $CounterOffsetNew;
-#		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Check  : " . $CounterValueNew;
 
 		### Set new Offset in Attributes
 		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
 		$ReturnMessage = $WaterCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
+	}
+	elsif ($reading eq "TriggerCalc")
+	{
+		WaterCalculator_MidnightTimer($hash)
 	}
 	elsif ($reading ne "?")
 	{
@@ -398,6 +424,125 @@ sub WaterCalculator_Set($@)
 	return($ReturnMessage);
 }
 ####END####### Manipulate reading after "set" command by fhem ##################################################END#####
+
+###START###### Midnight Routine ###############################################################################START####
+sub WaterCalculator_MidnightTimer($)
+{
+	### Define variables
+	my ($WaterCalcDev)							  = @_;
+	my $WaterCalcName 							  = $WaterCalcDev->{NAME};
+ 	my $RegEx									  = $WaterCalcDev->{REGEXP};
+	my ($WaterCountName, $WaterCountReadingRegEx) = split(":", $RegEx, 2);
+	my $WaterCountDev							  = $defs{$WaterCountName};
+	$WaterCountReadingRegEx						  =~ s/[\.\*]//g;
+
+	my @WaterCountReadingNameListComplete = keys(%{$WaterCountDev->{READINGS}});
+	my @WaterCountReadingNameListFiltered;
+
+	foreach my $WaterCountReadingName (@WaterCountReadingNameListComplete) {
+		if ($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) {
+			push(@WaterCountReadingNameListFiltered, $WaterCountReadingName);
+		}
+	}
+
+
+	### Create Log entries for debugging purpose
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer__________________________________________________________";
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : MidnightTimer initiated";
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - RegEx             : " . $RegEx;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountName    : " . $WaterCountName;
+	#Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountReadList: " . Dumper(@WaterCountReadingNameListFiltered);
+	
+
+	### Remove internal timer for WaterCalculator_MidnightTimer
+	RemoveInternalTimer($WaterCalcDev, "WaterCalculator_MidnightTimer");
+
+	### Create Log entries for debugging purpose
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
+	
+	foreach my $WaterCountReadingName (@WaterCountReadingNameListFiltered) {
+
+		# ### Restore Destination of readings
+		my $WaterCalcReadingPrefix                  = $WaterCountName . "_" . $WaterCountReadingName;
+		my $WaterCalcReadingDestinationDeviceName	= ReadingsVal($WaterCalcName, ".ReadingDestinationDeviceName"                           , "error");
+		my $WaterCounterReadingValue 				= ReadingsVal($WaterCountName, $WaterCountReadingName                                   , "error");
+		my $LastUpdateTimestampUnix                 = ReadingsVal($WaterCalcName, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+	
+		### Calculate time difference since last update
+		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
+
+		### Create Log entries for debugging purpose
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer ___________Looping________________";
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - ReadingPrefix     : " . $WaterCalcReadingPrefix;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - DeviceName        : " . $WaterCalcReadingDestinationDeviceName;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp now     : " . time();
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+
+
+		### If the Readings for midnight settings have been provided
+		if (($WaterCalcReadingPrefix ne "error") && ($WaterCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
+
+			### Create Log entries for debugging purpose
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - ReadingPrefix     : " . $WaterCalcReadingPrefix;
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - DeviceName        : " . $WaterCalcReadingDestinationDeviceName;
+			
+			### If there was no update in the last 24h
+			if ( $DeltaTimeSinceLastUpdate >= 86400) {
+				### Create Log entries for debugging purpose
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : No Update in the last 24h!";
+
+			}
+			else {
+				### Create Log entries for debugging purpose
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
+			}
+			
+			#Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCalcRDD      : \n" . Dumper($WaterCalcReadingDestinationDevice);
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCounter      : " . $WaterCounterReadingValue;
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, "."  . 	$WaterCalcReadingPrefix . "_WFRDaySum",     			"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDayCount   : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, "."  . 	$WaterCalcReadingPrefix . "_WFRDayCount",     			"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDayCurrent : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_WFRCurrent",     			"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDayAver    : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_WFRDayAver",     			"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDayMax     : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_WFRDayMax",    				"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDayMin     : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_WFRDayMin",     			"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumDay     : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionDay",     		"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumDayLast : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionDayLast",		"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDay  : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDay",		"error");
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDayL : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDayLast",	"error");
+
+
+			if ($WaterCounterReadingValue ne "error") {
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Counter   : " . $WaterCounterReadingValue;
+				readingsSingleUpdate($WaterCountDev, $WaterCountReadingName, $WaterCounterReadingValue, 1);
+			}
+			else {
+		
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Counter   : Error!";
+			}
+		}
+		### If the Readings for midnight settings have not been provided
+		else {
+			### Warning Log entry
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - ERROR - There have no information stored about previous readings. Make sure the counter has been delivering at least 2 values to the Calculator device before next midnight!";
+		}
+	}
+
+	### Start timer for execution around midnight
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+	my $EpochNextMidnight = timelocal(1, 0, 0, $mday, $mon, $year+1900) + 86400;
+	InternalTimer($EpochNextMidnight, "WaterCalculator_MidnightTimer", $WaterCalcDev, 0);
+	
+	### For debugging purpose only
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer _______Looping finished___________";
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - time              : " . time();
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
+}
+####END####### Midnight Routine ################################################################################END#####
+
 
 ###START###### Calculate water meter values on changed events ###################################################START####
 sub WaterCalculator_Notify($$)
@@ -513,7 +658,7 @@ sub WaterCalculator_Notify($$)
 	if(!defined($attr{$WaterCalcName}{DecimalPlace}))
 	{
 		### Set attribute with standard value since it is not available
-		$attr{$WaterCalcName}{DecimalPlace}         = 3;
+		$attr{$WaterCalcName}{DecimalPlace}      = 3;
 		$WaterCalcDev->{system}{DecimalPlace} = "%.3f";
 		
 		### Writing log entry
@@ -559,7 +704,7 @@ sub WaterCalculator_Notify($$)
 		   $WaterCountReadingValueCurrent      = $1 * $attr{$WaterCalcName}{WaterCubicPerCounts} + $attr{$WaterCalcName}{WaterCounterOffset};
 		my $WaterCountReadingTimestampCurrent  = ReadingsTimestamp($WaterCountName,$WaterCountReadingName,0);		
 
-		
+				
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator Begin_______________________________________________________________________________________________________________________________";
 		
@@ -600,10 +745,14 @@ sub WaterCalculator_Notify($$)
 			### Skipping event
 			next;
 		}
-		
+
+		### Save Destination of readings into hidden readings
+		readingsSingleUpdate($WaterCalcDev, ".ReadingDestinationDeviceName",	$WaterCalcReadingDestinationDeviceName,	0);
+
 		### Restore previous Counter and if not available define it with "undef"
-		my $WaterCountReadingTimestampPrevious = ReadingsTimestamp($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_PrevRead", undef);
-		my $WaterCountReadingValuePrevious     =       ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_PrevRead", undef);
+		my $WaterCountReadingTimestampPrevious =    ReadingsTimestamp($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_PrevRead", undef);
+		my $WaterCountReadingValuePrevious     =          ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_PrevRead", undef);
+		my $WaterCountReadingLastChangeDelta   = time() - ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValuePrevious             : " . $WaterCountReadingValuePrevious;
@@ -622,11 +771,24 @@ sub WaterCalculator_Notify($$)
 		else
 		{
 			### Write current water Consumption as previous Value for future use in the WaterCalc-Device
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_PrevRead",             sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDay1st",        sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDayLast",       sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterMonth1st",      sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterMonthLast",     sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterMeter1st",      sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterMeterLast",     sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterYear1st",       sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterYearLast",      sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDaySum",            0, 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDayCount",          0, 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_WFRDayMin",            0, 1);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_WFRDayMax",            0, 1);
+			readingsSingleUpdate( $WaterCalcDev,                      "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
 
 			### Create Log entries for debugging
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous value NOT found. Skipping Loop";
-			
+###		
 			### Jump out of loop since there is nothing to do anymore than to wait for the next value
 			next;
 		}
@@ -635,6 +797,9 @@ sub WaterCalculator_Notify($$)
 		### Find out whether the reading for the daily start value has not been written yet 
 		if(!defined(ReadingsVal($WaterCalcReadingDestinationDeviceName,  $WaterCalcReadingPrefix . "_CounterDay1st", undef)))
 		{
+			### Create Log entries for debugging
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _CounterDay1st value NOT found!";			
+			
 			### Save current water Consumption as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDay1st",  $WaterCountReadingValueCurrent,  1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDayLast", $WaterCountReadingValuePrevious, 1);
@@ -692,13 +857,17 @@ sub WaterCalculator_Notify($$)
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Reading Value                            : " . $WaterCountReadingTimestampCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous Reading Value                           : " . $WaterCountReadingValuePrevious;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Reading Value                            : " . $WaterCountReadingValueCurrent;
-		
+###		
 		####### Check whether Initial readings needs to be written
-		### Check whether the current value is the first one after change of day = First one after midnight
-		if ($WaterCountReadingTimestampCurrentHour < $WaterCountReadingTimestampPreviousHour)
+		### Check whether the current value is the first one after change of day = First one after midnight or if last update is older than 1 day
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeCurHour                        : " . $WaterCountReadingTimestampCurrentHour;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimePrevHour                       : " . $WaterCountReadingTimestampPreviousHour;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeRelDelta                       : " . $WaterCountReadingLastChangeDelta;
+
+		if (($WaterCountReadingTimestampCurrentHour < $WaterCountReadingTimestampPreviousHour) || ($WaterCountReadingLastChangeDelta > 86400))
 		{
 			### Create Log entries for debugging
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - First reading of day detected";
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - First reading of day detected OR last reading is older than 24h!";
 
 			### Calculate Water Consumption of previous day ? = (Wprevious[qm] - WcurrentDay[qm]) 
 			my $WaterCalcConsumptionDayLast      = ($WaterCountReadingValuePrevious - ReadingsVal($WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_CounterDay1st", "0"));
@@ -716,8 +885,7 @@ sub WaterCalculator_Notify($$)
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,  "." . $WaterCalcReadingPrefix . "_WFRDayCount",              0                                                   , 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_WFRDayMin",               (sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent            ))), 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,        $WaterCalcReadingPrefix . "_WFRDayMax",                0                                                   , 1);
-			
-			
+		
 			### Check whether the current value is the first one after change of month
 			if ($WaterCountReadingTimestampCurrentMday < $WaterCountReadingTimestampPreviousMday)
 			{
@@ -780,14 +948,20 @@ sub WaterCalculator_Notify($$)
 		###### Do calculations
 		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
 		my $WaterCountReadingTimestampDelta = $WaterCountReadingTimestampCurrentRelative - $WaterCountReadingTimestampPreviousRelative;
-		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingTimestampDelta            : " . $WaterCountReadingTimestampDelta . " s";
-
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingTimestampDelta                  : " . $WaterCountReadingTimestampDelta . " s";
+###
 		### Continue with calculations only if time difference is larger than 10 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
 		if ($WaterCountReadingTimestampDelta > 10)
 		{
 			### Calculate water consumption (water consumption difference) of previous and current value / [qm]
 			my $WaterCountReadingValueDelta = sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent )) - sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious));
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValueDelta                : " . $WaterCountReadingValueDelta;
+			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValueDelta                      : " . $WaterCountReadingValueDelta;
+###
+			### If the value has been changed since the last one
+			if ($WaterCountReadingValueDelta > 0) {
+				### Save current Timestamp as UNIX epoch into hash if the 
+				readingsSingleUpdate($WaterCalcDev, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", $WaterCountReadingTimestampCurrentRelative, 0);
+			}
 
 			### Calculate Current water flow rate WFR = DV/Dt[qm/s] * 60[s/min] * 1000 [qm --> l] * WFRUnitFactor
 			my $WaterCalcWFRCurrent    = ($WaterCountReadingValueDelta / $WaterCountReadingTimestampDelta) * 60 * 1000 * $WaterCalcDev->{system}{WFRUnitFactor};
@@ -841,17 +1015,17 @@ sub WaterCalculator_Notify($$)
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Basic price per annum                   : " . $attr{$WaterCalcName}{BasicPricePerAnnum}         . " " . $attr{$WaterCalcName}{Currency};
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionCostMeter           : " . sprintf('%.2f', ($WaterCalcConsumptionCostMeter)) . " " . $attr{$WaterCalcName}{Currency};
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReserves                       : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcReserves))             . " " . $attr{$WaterCalcName}{Currency};
-
+								 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______Times__________________________________________";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcMeterYearMonth                 : " . $WaterCalcMeterYearMonth;
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Month                           : " . $WaterCountReadingTimestampCurrentMon;
-
+								 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______Consumption_________________________________________";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionDay                 : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionDay))       . " qm";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMonth               : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMonth))     . " qm";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionYear                : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionYear))      . " qm";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcConsumptionMeter               : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcConsumptionMeter))     . " qm";
-
+								 
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - _______flow___________________________________________";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRCurrent                     : " . sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcWFRCurrent))    . " l_min";
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcWFRDayMin                      : " . ReadingsVal( $WaterCalcReadingDestinationDeviceName, $WaterCalcReadingPrefix . "_WFRDayMin", 0) . " l_min";
@@ -975,515 +1149,108 @@ sub WaterCalculator_Notify($$)
 <a name="WaterCalculator"></a>
 <h3>WaterCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			The WaterCalculator Module calculates the water consumption and costs of one or more water meters.<BR>
-			It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic water meter.<BR>
-			<BR>
-			<BR>
-			<FONT COLOR="#FF0000">The function of the sub-counter for garden water has not been implemented yet. Therefore the sewage water cost needs to be taken into account.</FONT>
-			<BR>
-			As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			The WaterCalculator module provides several current, historical, statistical values around with respect to one or more water meter and creates respective readings.<BR>
-			<BR>
-			To avoid waiting for max. 12 months to have realistic values, the readings <BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> and<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
-			must be corrected with real values by using the <code>setreading</code> - command.<BR>
-			These real values may be found on the last water bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
-			<BR>
-			Intervalls smaller than 10s will be discarded to avoid peaks due to fhem blockages (e.g. DbLog - reducelog).
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table><tr><td><a name="WaterCalculatorDefine"></a><b>Define</b></td></tr></table>
-<table><tr><td><ul><code>define &lt;name&gt; WaterCalculator &lt;regex&gt;</code></ul></td></tr></table>
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>The name of the calculation device. (E.g.: "myWaterCalculator")</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>A valid regular expression (also known as regex or regexp) of the event where the counter can be found</td></tr>
-	</table>
-</ul></ul>
-<table><tr><td><ul>Example: <code>define myWaterCalculator WaterCalculator myWaterCounter:countersA.*</code></ul></td></tr></table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				The set - function sets individual values for example to correct values after power loss etc.<BR>
-				The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>
-				The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>
-				The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR>
-		</ul>
-	</td></tr>
-</table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				The get - function just returns the individual value of the reading.<BR>
-				The get - function works only for readings which have been stored in the CalculatorDevice.<BR>
-				The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR>
-	</ul>
-	</td></tr>
-</table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the WaterCalculator specific attributes with default values.<BR>
-				In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR>
-		</ul>
-	</td></tr>
-</table>
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	A valid float number for basic annual fee in the chosen currency for the water supply to the home.<BR>
-																			The value is provided by your local water supplier and is shown on your water bill.<BR>
-																			For UK and US users it may known under "standing charge". Please make sure it is based on one year!<BR>
-																			The default value is 0.00<BR>
-			</td></tr>
+				The WaterCalculator Module calculates the water consumption and costs of one or more water meters.<BR>
+				It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic water meter.<BR>
+				<BR>
+				<BR>
+				<FONT COLOR="#FF0000">The function of the sub-counter for garden water has not been implemented yet. Therefore the sewage water cost needs to be taken into account.
+				<BR>
+				As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				The WaterCalculator module provides several current, historical, statistical values around with respect to one or more water meter and creates respective readings.<BR>
+				<BR>
+				To avoid waiting for max. 12 months to have realistic values, the readings <BR>
+				<BR>
+				<ul>
+					<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
+					<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
+					<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> and<BR>
+					<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
+				</ul>
+				<BR>
+				must be corrected with real values by using the <code>setreading</code> - command.<BR>
+				These real values may be found on the last water bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>
+				Intervalls smaller than 10s will be discarded to avoid peaks due to fhem blockages (e.g. DbLog - reducelog).
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>
-																The default value is &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="WaterCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; WaterCalculator &lt;regex&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : The name of the calculation device. (E.g.: "myWaterCalculator")</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : A valid regular expression (also known as regex or regexp) of the event where the counter can be found</ul></ul></td></tr>
+		<tr><td><ul>Example:<code>define myWaterCalculator WaterCalculator myWaterCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>			Disables the current module. The module will not react on any events described in the regular expression.<BR>
-																		The default value is 0 = enabled.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><b>Set</b></td></tr>
+		<tr><td><ul>The set - function sets individual values for example to correct values after power loss etc.<BR>The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterCounterOffset</code> : </li></td><td>	A valid float number of the water Consumption difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the water consumption and the calculated water consumption of the counting device.<BR>
-																		The value for this offset will be calculated as follows W<sub>Offset</sub> = W<sub>Mechanical</sub> - W<sub>Module</sub><BR>
-																		The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td></a><b>Get</b></td></tr>
+		<tr><td><ul>The get - function just returns the individual value of the reading.<BR>The get - function works only for readings which have been stored in the CalculatorDevice.<BR>The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterCubicPerCounts</code> : </li></td><td>	A valid float number of water consumption in qm per counting ticks.<BR>
-																		The value is given by the mechanical trigger of the mechanical water meter. E.g. WaterCubicPerCounts = 0.001 means each count is a thousandth of one qm (=liter).<BR>
-																		The default value is 1 (= the counter is already providing qm)<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><b>Attributes</b></td></tr>
+		<tr><td><ul>If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the WaterCalculator specific attributes with default values.<BR>In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<table>		
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"  ></a><li><b><u><code>BasicPricePerAnnum                     </code></u></b> : A valid float number for basic annual fee in the chosen currency for the water supply to the home.<BR>The value is provided by your local water supplier and is shown on your water bill.<BR>For UK and US users it may known under "standing charge". Please make sure it is based on one year!<BR>The default value is 0.00                                                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"            ></a><li><b><u><code>Currency                               </code></u></b> : One of the pre-defined list of currency symbols [&#8364;,&#163;,&#36;].<BR>The default value is &#8364;                                                                                                                                                                                                                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"             ></a><li><b><u><code>disable                                </code></u></b> : Disables the current module. The module will not react on any events described in the regular expression.<BR>The default value is 0 = enabled.                                                                                                                                                                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCounterOffset"  ></a><li><b><u><code>WaterCounterOffset                     </code></u></b> : A valid float number of the water Consumption difference = offset (not the difference of the counter ticks!) between the value shown on the mechanic meter for the water consumption and the calculated water consumption of the counting device.<BR>The value for this offset will be calculated as follows W<sub>Offset</sub> = W<sub>Mechanical</sub> - W<sub>Module</sub><BR>The default value is 0.00 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCubicPerCounts" ></a><li><b><u><code>WaterCubicPerCounts                    </code></u></b> : A valid float number of water consumption in qm per counting ticks.<BR>The value is given by the mechanical trigger of the mechanical water meter. E.g. WaterCubicPerCounts = 0.001 means each count is a thousandth of one qm (=liter).<BR>The default value is 1 (= the counter is already providing qm)                                                                                                 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterPricePerCubic"  ></a><li><b><u><code>WaterPricePerCubic                     </code></u></b> : A valid float number for water Consumption price in the chosen currency per qm.<BR><FONT COLOR="#FF0000">The sewage water cost needs to be taken into account.</FONT>The value is provided by your local water supplier and is shown on your water bill.<BR>The default value is 2.00                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"      ></a><li><b><u><code>MonthlyPayment                         </code></u></b> : A valid float number for monthly advance payments in the chosen currency towards the water supplier.<BR>The default value is 0.00                                                                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading"></a><li><b><u><code>MonthOfAnnualReading                   </code></u></b> : A valid integer number for the month when the mechanical water meter reading is performed every year.<BR>The default value is 5 (May)                                                                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"  ></a><li><b><u><code>ReadingDestination                     </code></u></b> : One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>The CalculatorDevice is the device which has been created with this module.<BR>The CounterDevice is the Device which is reading the mechanical Water-meter.<BR>The default value is CalculatorDevice - Therefore the readings will be written into this device.                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WFRUnit"             ></a><li><b><u><code>WFRUnit                                </code></u></b> : One value of the pre-defined list: l/min (liter/minute), m&sup3;/min (cubicmeter/minute), m&sup3;/h (cubicmeter/hour).<BR>It defines which unit shall be used and devides the water flow rate accordingly.<BR>The default value is l/min (liter/minute).                                                                                                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DecimalPlace"        ></a><li><b><u><code>DecimalPlace                           </code></u></b> : A valid integer number for the number of decimal places taken into account.<BR>The default value is 3.                                                                                                                                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
+	</table>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterPricePerCubic</code> : </li></td><td>	A valid float number for water Consumption price in the chosen currency per qm.<BR>
-																			<FONT COLOR="#FF0000">The sewage water cost needs to be taken into account.</FONT>
-																			The value is provided by your local water supplier and is shown on your water bill.<BR>
-																			The default value is 2.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><b>Readings</b></td></tr>
+		<tr><td><ul>As soon the device has been able to read at least 2 times the counter, it automatically will create a set of readings:<BR>The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above.<BR>This will not appear if CalculatorDevice has been chosen.<BR>The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression where the counting ticks are coming from.                                  </ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>		A valid float number for monthly advance payments in the chosen currency towards the water supplier.<BR>
-																			The default value is 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent           </code></li></td><td>: Current indicated total water consumption as shown on mechanical water meter. Correct Offset-attribute if not identical.                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st            </code></li></td><td>: The first meter reading after midnight.                                                                                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast           </code></li></td><td>: The last meter reading of the previous day.                                                                                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st          </code></li></td><td>: The first meter reading after midnight of the first day of the month.                                                                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast         </code></li></td><td>: The last meter reading of the previous month.                                                                                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st          </code></li></td><td>: The first meter reading after midnight of the first day of the month where the mechanical meter is read by the Water supplier.                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast         </code></li></td><td>: The last meter reading of the previous meter reading year.                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st           </code></li></td><td>: The first meter reading after midnight of the first day of the year.                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast          </code></li></td><td>: The last meter reading of the previous year.                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDayLast   </code></li></td><td>: Consumption costs of the last day.                                                                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeterLast </code></li></td><td>: Consumption costs in the chosen currency of the last water meter period.                                                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonthLast </code></li></td><td>: Consumption costs in the chosen currency of the last month.                                                                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYearLast  </code></li></td><td>: Consumption costs of the last calendar year.                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDay       </code></li></td><td>: Consumption costs in the chosen currency since the beginning of the current day.                                                                                                                                                                                                                                                                                                                      <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeter     </code></li></td><td>: Consumption costs in the chosen currency since the beginning of the month of where the last water meter reading has been performed by the Water supplier.                                                                                                                                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonth     </code></li></td><td>: Consumption costs in the chosen currency since the beginning of the current month.                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYear      </code></li></td><td>: Consumption costs in the chosen currency since the beginning of the current year.                                                                                                                                                                                                                                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDay           </code></li></td><td>: Consumption in qm since the beginning of the current day (midnight).                                                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDayLast       </code></li></td><td>: Total Consumption in qm of the last day.                                                                                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeter         </code></li></td><td>: Consumption in qm since the beginning of the month of where the last Water-meter reading has been performed by the Water supplier.                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeterLast     </code></li></td><td>: Total Consumption in qm of the last Water-meter reading period.                                                                                                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonth         </code></li></td><td>: Consumption in qm since the beginning of the current month (midnight of the first).                                                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonthLast     </code></li></td><td>: Total Consumption in qm of the last month.                                                                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYear          </code></li></td><td>: Consumption in qm since the beginning of the current year (midnight of the first).                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYearLast      </code></li></td><td>: Total Consumption in qm of the last calendar year.                                                                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve           </code></li></td><td>: Financial Reserve based on the advanced payments done on the first of every month towards the water supplier. With negative values, an additional payment is to be expected.                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading        </code></li></td><td>: Number of month since last meter reading. The month when the reading occured is the first month = 1.                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRCurrent               </code></li></td><td>: Current water flow rate. (water flow rate based on current and previous measurement.)                                                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayAver               </code></li></td><td>: Average water flow rate since midnight.                                                                                                                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMax                </code></li></td><td>: Maximum water flow rate peak since midnight.                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMin                </code></li></td><td>: Minimum water flow rate peak since midnight.                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	A valid integer number for the month when the mechanical water meter reading is performed every year.<BR>
-																			The default value is 5 (May)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	One of the pre-defined list for the destination of the calculated readings: [CalculatorDevice,CounterDevice].<BR>
-																			The CalculatorDevice is the device which has been created with this module.<BR>
-																			The CounterDevice    is the Device which is reading the mechanical Water-meter.<BR>
-																			The default value is CalculatorDevice - Therefore the readings will be written into this device.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WFRUnit</code> : </li></td><td>	        One value of the pre-defined list: l/min (liter/minute), m&sup3;/min (cubicmeter/minute), m&sup3;/h (cubicmeter/hour).<BR>
-																		It defines which unit shall be used and devides the water flow rate accordingly.<BR>
-																		The default value is l/min (liter/minute).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			As soon the device has been able to read at least 2 times the counter, it automatically will create a set of readings:<BR>
-			The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above. <BR> This will not appear if CalculatorDevice has been chosen.<BR>
-			The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression where the counting ticks are coming from.<BR>
-		</ul>
-	</td></tr>
-</table>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent</code> : </li></td><td>Current indicated total water consumption as shown on mechanical water meter. Correct Offset-attribute if not identical.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code> : </li></td><td>The first meter reading after midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast</code> : </li></td><td>The last meter reading of the previous day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code> : </li></td><td>The first meter reading after midnight of the first day of the month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast</code> : </li></td><td>The last meter reading of the previous month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code> : </li></td><td>The first meter reading after midnight of the first day of the month where the mechanical meter is read by the Water supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast</code> : </li></td><td>The last meter reading of the previous meter reading year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> : </li></td><td>The first meter reading after midnight of the first day of the year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>The last meter reading of the previous year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDayLast</code> : </li></td><td>Consumption costs of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeterLast</code> : </li></td><td>Consumption costs in the chosen currency of the last water meter period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonthLast</code> : </li></td><td>Consumption costs in the chosen currency of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYearLast</code> : </li></td><td>Consumption costs of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDay</code> : </li></td><td>Consumption costs in the chosen currency since the beginning of the current day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeter</code> : </li></td><td>Consumption costs in the chosen currency since the beginning of the month of where the last water meter reading has been performed by the Water supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonth</code> : </li></td><td>Consumption costs in the chosen currency since the beginning of the current month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYear</code> : </li></td><td>Consumption costs in the chosen currency since the beginning of the current year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDay</code> : </li></td><td>Consumption in qm since the beginning of the current day (midnight).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDayLast</code> : </li></td><td>Total Consumption in qm of the last day.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeter</code> : </li></td><td>Consumption in qm since the beginning of the month of where the last Water-meter reading has been performed by the Water supplier.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeterLast</code> : </li></td><td>Total Consumption in qm of the last Water-meter reading period.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonth</code> : </li></td><td>Consumption in qm since the beginning of the current month (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonthLast</code> : </li></td><td>Total Consumption in qm of the last month.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYear</code> : </li></td><td>Consumption in qm since the beginning of the current year (midnight of the first).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYearLast</code> : </li></td><td>Total Consumption in qm of the last calendar year.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Financial Reserve based on the advanced payments done on the first of every month towards the water supplier. With negative values, an additional payment is to be expected.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Number of month since last meter reading. The month when the reading occured is the first month = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRCurrent</code> : </li></td><td>Current water flow rate. (water flow rate based on current and previous measurement.)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayAver</code> : </li></td><td>Average water flow rate since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMax</code> : </li></td><td>Maximum water flow rate peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMin</code> : </li></td><td>Minimum water flow rate peak since midnight.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
 </ul>
 =end html
 
@@ -1492,516 +1259,160 @@ sub WaterCalculator_Notify($$)
 <a name="WaterCalculator"></a>
 <h3>WaterCalculator</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			Das WaterCalculator Modul berechnet den Verbrauch an Wasser und die verbundenen Kosten von einem oder mehreren Wasserz&auml;hlern.<BR>
-			<BR>
-			<FONT COLOR="#FF0000">Die Funktion des sogenannten Unterwasserz&auml;hlers ist noch nicht implementiert. Daher müssen bei den Wasserkosten die Abwasserkosten mit einbezogen werden.</FONT>
-			<BR>
-			Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Wasserz&auml;hlern zu finden.<BR>
-			<BR>
-			Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
-			<BR>
-			Das WaterCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Wasserz&auml;hlern und erstellt die entsprechenden Readings.<BR>
-			<BR>
-			Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> und<BR>
-			<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
-			entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.<BR>
-			Diese Werte findet man unter Umst&auml;nden auf der letzten Abrechnung des Wasserversorgers. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
-			<BR>
-			<BR>
-			Intervalle kleienr als 10s werden ignoriert um Spitzen zu verhindern die von Blockaden des fhem Systems hervorgerufen werden (z.B. DbLog - reducelog).
-		</td>
-	</tr>
-</table>
-  
-<table>
-<tr><td><a name="WaterCalculatorDefine"></a><b>Define</b></td></tr>
-</table>
-<table><tr><td><ul><code>define &lt;name&gt; WaterCalculator &lt;regex&gt;</code></ul></td></tr></table>
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>Der Name dieses Berechnungs-Device. Empfehlung: "myWaterCalculator".</td></tr>
-		<tr><td><code>&lt;regex&gt;</code> : </td><td>Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann</td></tr>
-	</table>
-</ul></ul>
-<table><tr><td><ul>Beispiel: <code>define myWaterCalculator WaterCalculator myWaterCounter:countersA.*</code></ul></td></tr></table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorSet"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>
-				Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>
-				Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR>
-		</ul>
-	</td></tr>
-</table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorGet"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>
-				Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>
-				Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR>
-		</ul>
-	</td></tr>
-</table>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorAttr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>
-				Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR>
-		</ul>
-	</td></tr>
-</table>
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>BasicPricePerAnnum</code> : </li></td><td>	Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Wasser-Versorgung zum Endverbraucher.<BR>
-																			Dieser Wert stammt vom Wasserversorger und steht auf der Abrechnung.<BR>
-																			Der Standard Wert ist 0.00<BR>
-			</td></tr>
+				Das WaterCalculator Modul berechnet den Verbrauch an Wasser und die verbundenen Kosten von einem oder mehreren Wasserz&auml;hlern.<BR>
+				<BR>
+				<FONT COLOR="#FF0000">Die Funktion des sogenannten Unterwasserz&auml;hlers ist noch nicht implementiert. Daher m&uuml;ssen bei den Wasserkosten die Abwasserkosten mit einbezogen werden.</FONT>
+				<BR>
+				Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Wasserz&auml;hlern zu finden.<BR>
+				<BR>
+				Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
+				<BR>
+				Das WaterCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Wasserz&auml;hlern und erstellt die entsprechenden Readings.<BR>
+				<BR>
+				Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> und<BR>
+				<code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>
+				entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.<BR>
+				Diese Werte findet man unter Umst&auml;nden auf der letzten Abrechnung des Wasserversorgers. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR>
+				<BR>
+				<BR>
+				Intervalle kleiner als 10s werden ignoriert um Spitzen zu verhindern die von Blockaden des fhem Systems hervorgerufen werden (z.B. DbLog - reducelog).
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	  
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>Currency</code> : </li></td><td>	Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>
-																Der Standard Wert ist &#8364;<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="WaterCalculatorDefine"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; WaterCalculator &lt;regex&gt;</code></ul></td></tr><
+		<tr><td><ul><ul><code>&lt;name&gt;</code>  : Der Name dieses Berechnungs-Device. Empfehlung: "myWaterCalculator".</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;regex&gt;</code> : Eine g&uuml;ltige Regular Expression (regex or regexp) von dem Event wo der Z&auml;hlerstand gefunden werden kann</ul></ul></td></tr>
+		<tr><td><ul>Beispiel: <code>define myWaterCalculator WaterCalculator myWaterCounter:countersA.*</code></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>	Deaktiviert das device. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>
-																Der Standard Wert ist 0 = aktiviert.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td></a><b>Set</b></td></tr>
+		<tr><td><ul>Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterCounterOffset</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Wasserz&auml;hlern und dem angezeigten Wert im Reading dieses Device.<BR>
-																				Der Offset-Wert wird wie folgt ermittelt: W<sub>Offset</sub> = W<sub>Mechanisch</sub> - W<sub>Module</sub><BR>
-																				Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td></a><b>Get</b></td></tr>
+		<tr><td><ul>Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterCubicPerCounts</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die Menge Kubik pro Z&auml;hlimpulsen.<BR>
-																				Der Wert ist durch das mechanische Z&auml;hlwerk des Wasserz&auml;hlern vorgegeben. WaterCubicPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel eines Kubik ist (=Liter).<BR>
-																				Der Standard-Wert ist 1<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><b>Attributes</b></td></tr>
+		<tr><td><ul>Sollten die unten ausfeg&auuml;hrten Attribute bei der Definition eines entsprechenden Ger&auml;tes nicht gesetzt sein, so werden sie vom Modul mit Standard Werten automatisch gesetzt<BR>Zus&auml;tzlich k&ouml;nnen die globalen Attribute wie <a href="#room">room</a> verwendet werden.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WaterPricePerCubic</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r den Preis pro Kubik Wasser.<BR>
-																				<FONT COLOR="#FF0000">Hierbei müssen die Abwasserkosten mit einbezogen werden.</FONT>
-																				Dieser Wert stammt vom Wasserversorger und steht auf der Abrechnung.<BR>
-																				Der Standard-Wert ist 2.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><a name="BasicPricePerAnnum"   ></a><li><b><u><code>BasicPricePerAnnum   </code></u></b> : Eine g&uuml;ltige float Zahl f&uuml;r die j&auml;hrliche Grundgeb&uuml;hr in der gew&auml;hlten W&auml;hrung f&uuml;r die Wasser-Versorgung zum Endverbraucher.<BR>Dieser Wert stammt vom Wasserversorger und steht auf der Abrechnung.<BR>Der Standard Wert ist 0.00                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="Currency"             ></a><li><b><u><code>Currency             </code></u></b> : Eines der vordefinerten W&auml;hrungssymbole: [&#8364;,&#163;,&#36;].<BR>Der Standard Wert ist &#8364;                                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"              ></a><li><b><u><code>disable              </code></u></b> : Deaktiviert das device. Das Modul wird nicht mehr auf die Events reagieren die durch die Regular Expression definiert wurde.<BR>Der Standard Wert ist 0 = aktiviert.                                                                                                                                                                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCounterOffset"   ></a><li><b><u><code>WaterCounterOffset   </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Unterschied = Offset (Nicht der Unterschied zwischen Z&auml;hlimpulsen) zwischen dem am mechanischen Wasserz&auml;hlern und dem angezeigten Wert im Reading dieses Device.<BR>	Der Offset-Wert wird wie folgt ermittelt: W<sub>Offset</sub> = W<sub>Mechanisch</sub> - W<sub>Module</sub><BR>Der Standard-Wert ist 0.00 <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterCubicPerCounts"  ></a><li><b><u><code>WaterCubicPerCounts  </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die Menge Kubik pro Z&auml;hlimpulsen.<BR>	Der Wert ist durch das mechanische Z&auml;hlwerk des Wasserz&auml;hlern vorgegeben. WaterCubicPerCounts = 0.001 bedeutet, dass jeder Z&auml;hlimpuls ein Tausendstel eines Kubik ist (=Liter).<BR>	Der Standard-Wert ist 1                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WaterPricePerCubic"   ></a><li><b><u><code>WaterPricePerCubic   </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r den Preis pro Kubik Wasser.<BR>	<FONT COLOR="#FF0000">Hierbei m&uuml;ssen die Abwasserkosten mit einbezogen werden.</FONT>	Dieser Wert stammt vom Wasserversorger und steht auf der Abrechnung.<BR>	Der Standard-Wert ist 2.00                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthlyPayment"       ></a><li><b><u><code>MonthlyPayment       </code></u></b> : Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Wasserversorger.<BR>		Der Standard-Wert ist 0.00                                                                                                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="MonthOfAnnualReading" ></a><li><b><u><code>MonthOfAnnualReading </code></u></b> : Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Wasserz&auml;hler jedes Jahr durch den Wasserversorger abgelesen wird.<BR>Der Standard-Wert ist 5 (Mai)                                                                                                                                                                                       <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadingDestination"   ></a><li><b><u><code>ReadingDestination   </code></u></b> : Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>Das CounterDevice ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>Der Standard-Wert ist CalculatorDevice.                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="WFRUnit"              ></a><li><b><u><code>WFRUnit              </code></u></b> : Ein Wert der vorgegebenen Auswahlliste: l/min (Liter/Minute), m&sup3;/min (Kubikmeter/Minute), m&sup3;/h (Kubikmeter/Stunde).<BR>Es definiert welcher Einheit verwendet werden soll und teilt den Wasserdurchsatz entsprechend.<BR>Der Standard-Wert ist l/min (Liter/Minute).                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DecimalPlace"         ></a><li><b><u><code>DecimalPlace         </code></u></b> : Eine g&uuml;ltige Ganz-Zahl f&uuml;r den die Anzahl der zu verwendenden Nachkommastellen.<BR>		Der Standard-Wert is 3.                                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
+
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthlyPayment</code> : </li></td><td>	Eine g&uuml;ltige float-Zahl f&uuml;r die monatlichen Abschlagszahlungen in der gew&auml;hlten W&auml;hrung an den Wasserversorger.<BR>
-																		Der Standard-Wert ist 0.00<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><b>Readings</b></td></tr>
+		<tr><td><ul>Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>MonthOfAnnualReading</code> : </li></td><td>	Eine g&uuml;ltige Ganz-Zahl f&uuml;r den Monat wenn der mechanische Wasserz&auml;hler jedes Jahr durch den Wasserversorger abgelesen wird.<BR>
-																			Der Standard-Wert ist 5 (Mai)<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent           </code></li></td><td> : Aktueller Z&auml;hlerstand am mechanischen Z&auml;hler. Bei Unterschied muss das Offset-Attribut entspechend korrigiert werden.                                                                                                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st            </code></li></td><td> : Der erste Z&auml;hlerstand des laufenden Tages seit Mitternacht.                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast           </code></li></td><td> : Der letzte Z&auml;hlerstand des vorherigen Tages.                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st          </code></li></td><td> : Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages der laufenden Ableseperiode.                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast         </code></li></td><td> : Der letzte Z&auml;hlerstand seit Mitternacht des ersten Tages der vorherigen Ableseperiode.                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st          </code></li></td><td> : Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Monats.                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast         </code></li></td><td> : Der letzte Z&auml;hlerstand des vorherigen Monats.                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st           </code></li></td><td> : Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Jahres.                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast          </code></li></td><td> : Der letzte Z&auml;hlerstand des letzten Jahres.                                                                                                                                                                                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDayLast   </code></li></td><td> : Wasserkosten des letzten Tages.                                                                                                                                                                                                                                                                                                             <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeterLast </code></li></td><td> : Wasserkosten der letzten Ableseperiode.                                                                                                                                                                                                                                                                                                     <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonthLast </code></li></td><td> : Wasserkosten des letzten Monats.                                                                                                                                                                                                                                                                                                            <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYearLast  </code></li></td><td> : Wasserkosten des letzten Kalenderjahres.                                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDay       </code></li></td><td> : Wasserkosten in gew&auml;hlter W&auml;hrung seit Mitternacht des laufenden Tages.                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeter     </code></li></td><td> : Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn der laufenden Ableseperiode.                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonth     </code></li></td><td> : Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Monats.                                                                                                                                                                                                                                                               <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYear      </code></li></td><td> : Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Kalenderjahres.                                                                                                                                                                                                                                                       <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDay           </code></li></td><td> : Wasserverbrauch seit Beginn der aktuellen Tages (Mitternacht).                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDayLast       </code></li></td><td> : Wasserverbrauch in qm des vorherigen Tages.                                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeter         </code></li></td><td> : Wasserverbrauch seit Beginn der aktuellen Ableseperiode.                                                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeterLast     </code></li></td><td> : Wasserverbrauch in qm der vorherigen Ableseperiode.                                                                                                                                                                                                                                                                                         <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonth         </code></li></td><td> : Wasserverbrauch seit Beginn des aktuellen Monats.                                                                                                                                                                                                                                                                                           <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonthLast     </code></li></td><td> : Wasserverbrauch in qm des vorherigen Monats.                                                                                                                                                                                                                                                                                                <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYear          </code></li></td><td> : Wasserverbrauch seit Beginn des aktuellen Kalenderjahres.                                                                                                                                                                                                                                                                                   <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYearLast      </code></li></td><td> : Wasserverbrauch in qm des vorherigen Kalenderjahres.                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve           </code></li></td><td> : Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Wasserversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading        </code></li></td><td> : Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRCurrent               </code></li></td><td> : Aktueller Wasserdurchsatz. (Wasserdurchsatz basierend auf aktueller und letzter Messung)                                                                                                                                                                                                                                                    <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayAver               </code></li></td><td> : Mittlerer Wasserdurchsatz seit Mitternacht.                                                                                                                                                                                                                                                                                                 <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMax                </code></li></td><td> : Maximale Wasserdurchsatz seit Mitternacht.                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
+		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMin                </code></li></td><td> : Minimale Wasserdurchsatz seit Mitternacht.                                                                                                                                                                                                                                                                                                  <BR>     </ul></ul></td></tr>
 	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadingDestination</code> : </li></td><td>	Eines der vordefinerten Device als Ziel der errechneten Readings: [CalculatorDevice,CounterDevice].<BR>
-																			Das CalculatorDevice ist das mit diesem Modul erstellte Device.<BR>
-																			Das CounterDevice ist das Device von welchem der mechanische Z&auml;hler ausgelesen wird.<BR>
-																			Der Standard-Wert ist CalculatorDevice.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>WFRUnit</code> : </li></td><td>	        	Ein Wert der vorgegebenen Auswahlliste: l/min (Liter/Minute), m&sup3;/min (Kubikmeter/Minute), m&sup3;/h (Kubikmeter/Stunde).<BR>
-																			Es definiert welcher Einheit verwendet werden soll und teilt den Wasserdurchsatz entsprechend.<BR>
-																			Der Standard-Wert ist l/min (Liter/Minute).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<BR>
-<table>
-	<tr><td><a name="WaterCalculatorReadings"></a><b>Readings</b></td></tr>
-	<tr><td>
-		<ul>
-			Sobald das Device in der Lage war mindestens 2 Werte des Z&auml;hlers einzulesen, werden automatisch die entsprechenden Readings erzeugt:<BR>
-			Der Platzhalter <code>&lt;DestinationDevice&gt;</code> steht f&uuml;r das Device, welches man in dem Attribut <code>ReadingDestination</code> oben festgelegt hat. Dieser Platzhalter bleibt leer, sobald man dort CalculatorDevice ausgew&auml;hlt hat.<BR>
-			Der Platzhalter <code>&lt;SourceCounterReading&gt;</code> steht f&uuml;r das Reading welches mit der Regular Expression definiert wurde.<BR>
-		</ul>
-	</td></tr>
-</table>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterCurrent</code> : </li></td><td>Aktueller Z&auml;hlerstand am mechanischen Z&auml;hler. Bei Unterschied muss das Offset-Attribut entspechend korrigiert werden.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code> : </li></td><td>Der erste Z&auml;hlerstand des laufenden Tages seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDayLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des vorherigen Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages der laufenden Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeterLast</code> : </li></td><td>Der letzte Z&auml;hlerstand seit Mitternacht des ersten Tages der vorherigen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonthLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des vorherigen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> : </li></td><td>Der erste Z&auml;hlerstand seit Mitternacht des ersten Tages des laufenden Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYearLast</code> : </li></td><td>Der letzte Z&auml;hlerstand des letzten Jahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDayLast</code> : </li></td><td>Wasserkosten des letzten Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeterLast</code> : </li></td><td>Wasserkosten der letzten Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonthLast</code> : </li></td><td>Wasserkosten des letzten Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYearLast</code> : </li></td><td>Wasserkosten des letzten Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostDay</code> : </li></td><td>Wasserkosten in gew&auml;hlter W&auml;hrung seit Mitternacht des laufenden Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMeter</code> : </li></td><td>Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn der laufenden Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostMonth</code> : </li></td><td>Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionCostYear</code> : </li></td><td>Wasserkosten in gew&auml;hlter W&auml;hrung seit Beginn des laufenden Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDay</code> : </li></td><td>Wasserverbrauch seit Beginn der aktuellen Tages (Mitternacht).<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionDayLast</code> : </li></td><td>Wasserverbrauch in qm des vorherigen Tages.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeter</code> : </li></td><td>Wasserverbrauch seit Beginn der aktuellen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMeterLast</code> : </li></td><td>Wasserverbrauch in qm der vorherigen Ableseperiode.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonth</code> : </li></td><td>Wasserverbrauch seit Beginn des aktuellen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionMonthLast</code> : </li></td><td>Wasserverbrauch in qm des vorherigen Monats.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYear</code> : </li></td><td>Wasserverbrauch seit Beginn des aktuellen Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_ConsumptionYearLast</code> : </li></td><td>Wasserverbrauch in qm des vorherigen Kalenderjahres.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_FinanceReserve</code> : </li></td><td>Finanzielle Reserve basierend auf den Abschlagszahlungen die jeden Monat an den Wasserversorger gezahlt werden. Bei negativen Werten ist von einer Nachzahlung auszugehen.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_MonthMeterReading</code> : </li></td><td>Anzahl der Monate seit der letzten Zählerablesung. Der Monat der Zählerablesung ist der erste Monat = 1.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRCurrent</code> : </li></td><td>Aktueller Wasserdurchsatz. (Wasserdurchsatz basierend auf aktueller und letzter Messung)<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayAver</code> : </li></td><td>Mittlerer Wasserdurchsatz seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMax</code> : </li></td><td>Maximale Wasserdurchsatz seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-<ul><ul>
-	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMin</code> : </li></td><td>Minimale Wasserdurchsatz seit Mitternacht.<BR>
-			</td></tr>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 73_WaterCalculator.pm
+{
+  "abstract": "Calculates the water consumption and costs",
+  "description": "The WaterCalculator Module calculates the water consumption and costs of one or more water meters.<BR>It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic water meter.<BR><BR><BR>The function of the sub-counter for garden water has not been implemented yet. Therefore the sewage water cost needs to be taken into account.<><BR>As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR><BR>The WaterCalculator module provides several current, historical, statistical values around with respect to one or more water meter and creates respective readings.<BR><BR>To avoid waiting for max. 12 months to have realistic values, the readings <BR><BR><ul><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> and<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR></ul><BR>must be corrected with real values by using the <code>setreading</code> - command.<BR>These real values may be found on the last water bill. Otherwise it will take 24h for the daily, 30days for the monthly and up to 12 month for the yearly values to become realistic.<BR>Intervalls smaller than 10s will be discarded to avoid peaks due to fhem blockages (e.g. DbLog - reducelog).",
+  "x_lang": {
+    "de": {
+      "abstract": "Berechnet den Wasserverbrauch und verbundene Kosten",
+      "description": "Das WaterCalculator Modul berechnet den Verbrauch an Wasser und die verbundenen Kosten von einem oder mehreren Wasserz&auml;hlern.<BR><BR>Die Funktion des sogenannten Unterwasserz&auml;hlers ist noch nicht implementiert. Daher m&uuml;ssen bei den Wasserkosten die Abwasserkosten mit einbezogen werden.<BR>Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Wasserz&auml;hlern zu finden.<BR><BR>Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR><BR>Das WaterCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Wasserz&auml;hlern und erstellt die entsprechenden Readings.<BR><BR>Um zu verhindern, dass man bis zu 12 Monate warten muss, bis alle Werte der Realit&auml;t entsprechen, m&uuml;ssen die Readings<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterDay1st</code>,<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMonth1st</code>,<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterYear1st</code> und<BR><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_CounterMeter1st</code><BR>entsprechend mit dem <code>setreading</code> - Befehl korrigiert werden.<BR>Diese Werte findet man unter Umst&auml;nden auf der letzten Abrechnung des Wasserversorgers. Andernfalls dauert es bis zu 24h f&uuml;r die t&auml;glichen, 30 Tage f&uuml;r die monatlichen und bis zu 12 Monate f&uuml;r die j&auml;hrlichen Werte bis diese der Realit&auml;t entsprechen.<BR><BR><BR>Intervalle kleienr als 10s werden ignoriert um Spitzen zu verhindern die von Blockaden des fhem Systems hervorgerufen werden (z.B. DbLog - reducelog)."
+    }
+  },
+  "author": [
+    "I am the maintainer matthias.deeke@deeke.eu"
+  ],
+  "x_fhem_maintainer": [
+    "Sailor"
+  ],
+  "keywords": [
+    "Water",
+    "Caluclation",
+    "consumption",
+    "cost",
+    "counter"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_support_community": {
+      "rss": "https://forum.fhem.de/index.php/topic,58579.msg",
+      "web": "https://forum.fhem.de/index.php/topic,58579.msg",
+      "subCommunity" : {
+          "rss" : "https://forum.fhem.de/index.php/topic,58579.msg",
+          "title" : "This sub-board will be first contact point",
+          "web" : "https://forum.fhem.de/index.php/topic,58579.msg"
+       }
+    }
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
 =cut
