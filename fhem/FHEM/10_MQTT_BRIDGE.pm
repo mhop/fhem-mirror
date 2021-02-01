@@ -215,16 +215,19 @@ sub onmessage($$$) {
   }
 }
 1;
-
+__END__
 =pod
 =item [device]
-=item summary MQTT_BRIDGE acts as a bridge in between an fhem-device and mqtt-topics
+=item summary MQTT_BRIDGE is outdated, consider using MQTT_GENERIC_BRIDGE instead!
 =begin html
 
 <a name="MQTT_BRIDGE"></a>
 <h3>MQTT_BRIDGE</h3>
 <ul>
-  <p>acts as a bridge in between an fhem-device and <a href="http://mqtt.org/">mqtt</a>-topics.</p>
+  <p>acts as a bridge in between a single fhem-device and <a href="http://mqtt.org/">mqtt</a>-topics.</p>
+  <p><b>As newer module <a href="#MQTT_GENERIC_BRIDGE">MQTT_GENERIC_BRIDGE</a> offers options to bridge multiple fhem-device to <a href="http://mqtt.org/">mqtt</a>-topics, 
+  it's highly recommended to use the generic variant!</b><br>
+  Additionally, MQTT_GENERIC_BRIDGE is also compatible with MQTT2_.*-TYPE of interfaces and thus requires less prerequisites on the Perl side!</p>
   <p>requires a <a href="#MQTT">MQTT</a>-device as IODev<br/>
      Note: this module is based on <a href="https://metacpan.org/pod/distribution/Net-MQTT/lib/Net/MQTT.pod">Net::MQTT</a> which needs to be installed from CPAN first.</p>
   <a name="MQTT_BRIDGEdefine"></a>
