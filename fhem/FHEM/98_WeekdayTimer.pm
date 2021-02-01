@@ -687,7 +687,7 @@ E:  while (@$a > 0) {
       
       return if !$wp_profile;
       my $wp_sunaswe = $wprof[2]//0;
-      my $wp_profile_data = CommandGet(undef,$wp_name . " profile_data ". $wp_profile);
+      my $wp_profile_data = CommandGet(undef,"$wp_name profile_data $wp_profile 0");
       if ($wp_profile_data =~ m{(profile.*not.found|usage..profile_data..name)}xms ) {
         Log3( $hash, 3, "[$name] weekprofile $wp_name: no profile named \"$wp_profile\" available" );
         return;
