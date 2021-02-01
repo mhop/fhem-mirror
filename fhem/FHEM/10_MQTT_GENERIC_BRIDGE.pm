@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 #
+# 01.02.2021 1.3.2
+# buxfix     : Rückname Änderung "retain bei MQTT2 ohne Funktion" wg. Irrtum
+#
 # 31.01.2021 1.3.1
 # cleanup    : Bereinigung der Konstruktionen wie my $... if / unless ...
 #              (patch von Beta-User)
@@ -394,7 +397,7 @@ use AttrTemplate;
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.3.1 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.3.2 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -2466,7 +2469,7 @@ sub doPublish($$$$$$$$) {
   if (isIODevMQTT2($hash)){ #if ($hash->{+HELPER}->{+IO_DEV_TYPE} eq 'MQTT2_SERVER') {
     # TODO: publish MQTT2
     # TODO qos / retain ? 
-    $topic ='-r $topic' if $retain;
+    $topic.=':r' if $retain;
     IOWrite($hash, "publish", $topic.' '.$message);
     readingsSingleUpdate($hash,"transmission-state","outgoing publish sent",1);
     $hash->{+HELPER}->{+HS_PROP_NAME_OUTGOING_CNT}++;
