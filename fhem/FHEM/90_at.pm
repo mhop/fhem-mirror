@@ -185,8 +185,11 @@ at_Exec($)
   return if($hash->{DELETED});           # Just deleted
   my $name = $hash->{NAME};
 
-  my $skip = AttrVal($name, "skip_next", undef);
-  delete $attr{$name}{skip_next} if($skip);
+  my $skip = AttrVal($name, "skip_next", ReadingsVal($name, "skip_next", 0));
+  if($skip) {
+    delete $attr{$name}{skip_next};
+    readingsDelete($hash,"skip_next");
+  }
   $hash->{TEMPORARY} = 1 if($hash->{VOLATILE}); # 68680
   delete $hash->{VOLATILE};
 
@@ -248,7 +251,7 @@ at_Set($@)
 {
   my ($hash, @a) = @_;
 
-  my %sets = (modifyTimeSpec=>1, inactive=>0, active=>0, execNow=>0);
+  my %sets =(modifyTimeSpec=>1,inactive=>0,active=>0,execNow=>0,"skip_next"=>0);
   my $cmd = join(" ", sort keys %sets);
   $cmd =~ s/modifyTimeSpec/modifyTimeSpec:time/ if($at_detailFnCalled);
   $at_detailFnCalled = 0;
@@ -281,6 +284,10 @@ at_Set($@)
     my $name = $hash->{NAME};
     my $ret = AnalyzeCommandChain(undef, SemicolonEscape($hash->{COMMAND}));
     Log3 $name, 3, "$name: $ret" if($ret);
+
+  } elsif($a[1] eq "skip_next") {
+    setReadingsVal($hash, $a[1], 1, TimeNow());
+    return undef;
 
   }
 
@@ -556,6 +563,11 @@ at_ultimo(;$$$)
     <li>execNow<br>
         Execute the command associated with the at. The execution of a relative
         at is not affected by this command.</li>
+    <li>skip_next<br>
+        skip the next execution. Just like the attribute with the same name,
+        but better suited for webCmd.
+        </li>
+
   </ul><br>
 
 
@@ -760,6 +772,10 @@ at_ultimo(;$$$)
     <li>execNow<br>
         F&uuml;hrt das mit dem at spezifizierte Befehl aus. Beeinflu&szlig;t
         nicht die Ausf&uuml;hrungszeiten relativer Spezifikationen.
+        </li>
+    <li>skip_next<br>
+        genau wie der gleichnamige Attribut, verhindert die n&auml;chste
+        Ausf&uuml;hrung. Als set Befehl, eignet sich besser f&uuml;r webCmd.
         </li>
   </ul><br>
 
