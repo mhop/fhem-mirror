@@ -44,6 +44,7 @@
 package main;
 use strict;
 use warnings;
+use Time::Local;
 use FHEM::Meta;
 
 ###START###### Initialize module ##############################################################################START####
