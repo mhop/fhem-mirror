@@ -46,6 +46,7 @@ use strict;
 use warnings;
 my %GasCalculator_gets;
 my %GasCalculator_sets;
+use Time::Local;
 use FHEM::Meta;
 
 ###START###### Initialize module ##############################################################################START####
