@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_ElectricityCalculator: Use Time::Local added for compatibility
+ - bugfix:  73_WaterCalculator:  Use Time::Local added for compatibility
+ - bugfix:  73_GasCalculator:  Use Time::Local added for compatibility
  - feature: 73_ElectricityCalculator: Midnight Timer implemented
  - feature: 73_WaterCalculator: Midnight Timer implemented
  - feature: 73_GasCalculator: Midnight Timer implemented
