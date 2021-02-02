@@ -16,6 +16,7 @@ I2C_SH.*
 I2C_TSL.*
 I2C_SUSV
 I2C_LM.*
+I2C_AD.*
 );
 
 my $gpioprg = "/usr/local/bin/gpio";		#WiringPi GPIO utility
