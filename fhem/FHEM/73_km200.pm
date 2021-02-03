@@ -50,6 +50,7 @@ package main;
 use strict;
 use warnings;
 use Blocking;
+use FHEM::Meta;
 use Time::HiRes qw(gettimeofday sleep usleep);
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use base qw( Exporter );
@@ -88,6 +89,7 @@ sub km200_Initialize($)
 							   "DoNotPoll " .
 							   "ReadBackDelay " .
 						       $readingFnAttributes;
+	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
 
@@ -333,7 +335,7 @@ sub km200_DbLog_splitFn($$)
 	### Log entries for debugging
 	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of event             : " . $event;
 	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[0]       : " . $argument[0];
-	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[1]       : " . $argument[1];
+#	Log3 $name, 5, $name. " : km200_DbLog_splitFn - Content of argument[1]       : " . $argument[1];
 
 	### If the service to be changed is identical to the one where the unit received from
 	if ($argument[0] = $hash->{temp}{ServiceDbLogSplitHash}{id})
@@ -1070,6 +1072,9 @@ sub km200_PostSingleService($)
 			### Delete the name of hash, "{" and "}" out of json String. No idea why but result of Try-and-Error method
 			$JsonContent =~ s/{"switchPoints"://;
 			$JsonContent =~ s/]}/]/g;
+
+			### Log file entry for debugging
+			Log3 $name, 5, $name. "km200_Set - JsonContent                              : " . $JsonContent;
 
 			### Encrypt 
 			$hash->{temp}{jsoncontent} = $JsonContent;
@@ -2950,356 +2955,201 @@ sub km200_ParseHttpResponseDyn($)
 =item summary    Connects fhem to Buderus KM300, KM200, KM100, KM50
 =item summary_DE Verbindet fhem mit Buderus KM300, KM200, KM100, KM50
 
-
 =begin html
 
 <a name="km200"></a>
 <h3>KM200</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			The Buderus <a href="https://www.buderus.de/de/produkte/catalogue/alle-produkte/7719_Gateway-Logamatic-web-KM200-KM100-KM50">KM200, KM100  or KM50 (hereafter described as KMxxx)</a> is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>
-			It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbrauch
-			er/EasyControl-4848514.html"> EasyControl</a>.<BR>
-			Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>
-			The km200 fhem-module enables read/write access to these parameters.<BR>
-			<BR>
-			In order to use the KMxxx with fhem, you must define the private password with the Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> first.<BR>
-			<BR>
-			<b><u>Remark:</u></b><BR>
-			Despite the instruction of the Buderus KMxxx Installation guide, the ports 5222 and 5223 should not be opened and allow access to the KMxxx module from outside.<BR>
-			You should configure (or leave) your internet router with the respective settings.<BR>
-			If you want to read or change settings on the heating system, you should access the central heating control system via your fhem system only.<BR>
-			<BR>
-			As soon the module has been defined within the fhem.cfg, the module is trying to obtain all known/possible services. <BR>
-			After this initial contact, the module differs between a set of continuous (dynamically) changing values (e.g.: temperatures) and not changing static values (e.g.: Firmware version).<BR>
-			This two different set of values can be bound to an individual polling interval. Refer to <a href="#KM200Attr">Attributes</a><BR> 
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table>
-<tr><td><a name="KM200define"></a><b>Define</b></td></tr>
-</table>
-
-<table><tr><td><ul><code>define &lt;name&gt; km200 &lt;IPv4-address&gt; &lt;GatewayPassword&gt; &lt;PrivatePassword&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>The name of the device. Recommendation: "myKm200".</td></tr>
-		<tr><td><code>&lt;IPv4-address&gt;</code> : </td><td>A valid IPv4 address of the KMxxx. You might look into your router which DHCP address has been given to the KMxxx.</td></tr>
-		<tr><td><code>&lt;GatewayPassword&gt;</code> : </td><td>The gateway password which is provided on the type sign of the KMxxx.</td></tr>
-		<tr><td><code>&lt;PrivatePassword&gt;</code> : </td><td>The private password which has been defined by the user via <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a>.</td></tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Set"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				The set function is able to change a value of a service which has the "writeable" - tag within the KMxxx service structure.<BR>
-				Most of those values have an additional list of allowed values which are the only ones to be set.<BR>
-				Other floatable type values can be changed only within their range of minimum and maximum value.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<table><tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;service&gt;</code> : </td><td>The name of the service which value shall be set. E.g.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR></td></tr>
-		<tr><td><code>&lt;value&gt;</code> : </td><td>A valid value for this service.<BR></td></tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Get"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				The get function is able to obtain a value of a service within the KMxxx service structure.<BR>
-				The additional list of allowed values or their range of minimum and maximum value will not be handed back.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;service&gt;</code> : </td><td>The name of the service which value shall be obtained. E.g.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
-														&nbsp;&nbsp;It returns only the value but not the unit or the range or list of allowed values possible.<BR>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;option&gt;</code> : </td><td>The optional Argument for the result of the get-command e.g.:  "<code>json</code>"<BR>
-														 &nbsp;&nbsp;The following options are available:<BR>
-														 &nbsp;&nbsp;json - Returns the raw json-answer from the KMxxx as string.
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Attr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				The following user attributes can be used with the km200 module in addition to the global ones e.g. <a href="#room">room</a>.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>IntervalDynVal</code> : </li></td><td>A valid polling interval for the dynamically changing values of the KMxxx. The value must be >=20s to allow the km200 module to perform a full polling procedure. <BR>
-																	The default value is 300s.<BR>
-			</td></tr>
+				The Buderus <a href="https://www.buderus.de/de/produkte/catalogue/alle-produkte/7719_Gateway-Logamatic-web-KM200-KM100-KM50">KM200, KM100  or KM50 (hereafter described as KMxxx)</a> is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>
+				It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbrauch
+				er/EasyControl-4848514.html"> EasyControl</a>.<BR>
+				Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>
+				The km200 fhem-module enables read/write access to these parameters.<BR>
+				<BR>
+				In order to use the KMxxx with fhem, you must define the private password with the Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> first.<BR>
+				<BR>
+				<b><u>Remark:</u></b><BR>
+				Despite the instruction of the Buderus KMxxx Installation guide, the ports 5222 and 5223 should not be opened and allow access to the KMxxx module from outside.<BR>
+				You should configure (or leave) your internet router with the respective settings.<BR>
+				If you want to read or change settings on the heating system, you should access the central heating control system via your fhem system only.<BR>
+				<BR>
+				As soon the module has been defined within the fhem.cfg, the module is trying to obtain all known/possible services. <BR>
+				After this initial contact, the module differs between a set of continuous (dynamically) changing values (e.g.: temperatures) and not changing static values (e.g.: Firmware version).<BR>
+				This two different set of values can be bound to an individual polling interval. Refer to <a href="#KM200Attr">Attributes</a><BR> 
+				<BR>
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>  
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>PollingTimeout</code> : </li></td><td>A valid time in order to allow the module to wait for a response of the KMxxx. Usually this value does not need to be changed but might in case of slow network or slow response.<BR>
-																	The default and minimum value is 5s.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200define"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; km200 &lt;IPv4-address&gt; &lt;GatewayPassword&gt; &lt;PrivatePassword&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>The name of the device. Recommendation: "myKm200".</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;IPv4-address&gt;</code> : </td><td>A valid IPv4 address of the KMxxx. You might look into your router which DHCP address has been given to the KMxxx.</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;GatewayPassword&gt;</code> : </td><td>The gateway password which is provided on the type sign of the KMxxx.</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;PrivatePassword&gt;</code> : </td><td>The private password which has been defined by the user via <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a>.</ul></ul></td></tr>
 	</table>
-</ul></ul>
+	<BR>
 
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>DoNotPoll</code> : </li></td><td>A list of services separated by blanks which shall not be downloaded due to repeatable crashes or irrelevant values.<BR>
-																The list can be filled with the name of the top - hierarchy service, which means everything below that service will also be ignored.<BR>
-																The default value (empty) therefore nothing will be ignored.<BR>
-			</td></tr>			
-			</td>
-		</tr>
+		<tr><td><a name="KM200Set"></a><b>Set</b></td></tr>
+		<tr><td><ul>The set function is able to change a value of a service which has the "writeable" - tag within the KMxxx service structure.<BR>Most of those values have an additional list of allowed values which are the only ones to be set.<BR>Other floatable type values can be changed only within their range of minimum and maximum value.<BR></ul></td></tr>
+		<tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;service&gt;</code> : </td><td>The name of the service which value shall be set. E.g.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR></ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;value&gt;</code> : </td><td>A valid value for this service.<BR></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadBackDelay</code> : </li></td><td>A valid time in milliseconds [ms] for the delay between writing and re-reading of values after using the "set" - command. The value must be >=0ms.<BR>
-																   The default value is 100 = 100ms = 0,1s.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200Get"></a><b>Get</b></td></tr>
+		<tr><td><ul>          The get function is able to obtain a value of a service within the KMxxx service structure.<BR>The additional list of allowed values or their range of minimum and maximum value will not be handed back.<BR></ul></td></tr>
+		<tr><td><ul>    <code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;service&gt;</code> : </td><td>The name of the service which value shall be obtained. E.g.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR>&nbsp;&nbsp;It returns only the value but not the unit or the range or list of allowed values possible.<BR></ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;option&gt;</code> : </td><td>The optional Argument for the result of the get-command e.g.:  "<code>json</code>"<BR>&nbsp;&nbsp;The following options are available:<BR>&nbsp;&nbsp;json - Returns the raw json-answer from the KMxxx as string.<BR></ul></ul></td></tr>
 	</table>
-</ul></ul>
+	<BR>
 
-<ul><ul>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>Stops the device from further pollings and deletes the existing readings.<BR>
-															   The default value is 0 = activated<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200Attr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>The following user attributes can be used with the km200 module in addition to the global ones e.g. <a href="#room">room</a>.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
+	<table>
+		<tr><td><ul><ul><a name="IntervalDynVal" ></a><li><b><u><code>IntervalDynVal </code></u></b> : A valid polling interval for the dynamically changing values of the KMxxx. The value must be >=20s to allow the km200 module to perform a full polling procedure. <BR>The default value is 300s.                                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="PollingTimeout" ></a><li><b><u><code>PollingTimeout </code></u></b> : A valid time in order to allow the module to wait for a response of the KMxxx. Usually this value does not need to be changed but might in case of slow network or slow response.<BR>The default and minimum value is 5s.                                                                                                    <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DoNotPoll"      ></a><li><b><u><code>DoNotPoll      </code></u></b> : A list of services separated by blanks which shall not be downloaded due to repeatable crashes or irrelevant values.<BR>The list can be filled with the name of the top - hierarchy service, which means everything below that service will also be ignored.<BR>The default value (empty) therefore nothing will be ignored. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadBackDelay"  ></a><li><b><u><code>ReadBackDelay  </code></u></b> : A valid time in milliseconds [ms] for the delay between writing and re-reading of values after using the "set" - command. The value must be >=0ms.<BR>The default value is 100 = 100ms = 0,1s.                                                                                                                               <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"        ></a><li><b><u><code>disable        </code></u></b> : Stops the device from further pollings and deletes the existing readings.<BR>The default value is 0 = activated<BR>                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
+	</table>
 </ul>
 =end html
-
 
 =begin html_DE
 
 <a name="km200"></a>
 <h3>KM200</h3>
 <ul>
-<table>
-	<tr>
-		<td>
-			Das Buderus <a href="https://www.buderus.de/de/produkte/catalogue/alle-produkte/7719_Gateway-Logamatic-web-KM200-KM100-KM50">KM200, KM100  or KM50 (ab hier als KMxxx beschrieben)</a> ist eine Schnittstelle zwischen der Buderus Zentralheizungssteuerung un dem Internet.<BR>
-			Es wurde entwickelt um den Bewohnern den Zugang zu Ihrem Heizungssystem durch die Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl zu erlauben.</a>.<BR>
-			Dar&uuml;ber hinaus erlaubt es nach vorheriger Freigabe dem Heizungs- bzw. Wartungsbetrieb die Heizungsanlage von aussen zu warten und Werte zu ver&auml;ndern.<BR>
-			Das km200 fhem-Modul erlaubt den Lese-/Schreibzugriff dieser Parameter durch fhem.<BR>
-			<BR>
-			Um das KMxxx Ger&auml;t mit fhem nutzen zu k&ouml;nnen, mu&szlig; zun&auml;chst ein privates Passwort mit der Buderus Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App gesetzt werden.<BR>
-			<BR>
-			<b><u>Anmerkung:</u></b><BR>
-			Unabh&auml;ngig der Installationsanleitung des Buderus KMxxx Ger&auml;ts, sollten die Ports 5222 und 5223 am Router geschlossen bleiben um keinen Zugriff von au&szlig;en auf das Ger&auml;t zu erlauben.<BR>
-			Der Router sollte entsprechend Konfiguriert bzw. so belassen werden.<BR>
-			Wenn der Lese-/Schreibzugriff von aussen gew&uuml;nscht ist, so sollte man ausschlie&szlig;lich &uuml;ber das fhem-System auf die Zentralheizung zugreifen.<BR>
-			<BR>
-			Sobald das Modul in der fhem.cfg definiert ist, wird das Modul versuchen alle bekannten Services abzuklopfen ob diese in der angeschlossenen Konstellation &uuml;berhaupt vorhanden sind.<BR>
-			Nach diesem Initial-Kontakt unterscheidet das Modul zwisachen einem Satz an Services die sich st&auml;ndig (dynamisch) &auml;ndern (z.B.: Vorlauftemperatur) sowie sich nicht st&auml;ndig (statisch) &auml;ndernden Werten (z.B.: Firmware Version).<BR>
-			Diese beiden S&auml;tze an Services k&ouml;nnen mir einem individuellen Abfrageintervall versehen werden. Siehe <a href="#KM200Attr">Attributes</a><BR> 
-			<BR>
-		</td>
-	</tr>
-</table>
-  
-<table>
-<tr><td><a name="KM200define"></a><b>Define</b></td></tr>
-</table>
-
-<table><tr><td><ul><code>define &lt;name&gt; km200 &lt;IPv4-address&gt; &lt;GatewayPassword&gt; &lt;PrivatePassword&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;name&gt;</code> : </td><td>Der Name des Ger&auml;tes. Empfehlung: "myKm200".</td></tr>
-		<tr><td><code>&lt;IPv4-address&gt;</code> : </td><td>Eine g&uuml;ltige IPv4 Adresse des KM200. Eventuell im Router nachschauen welche DHCP - Addresse dem KM200/KM50 vergeben wurde.</td></tr>
-		<tr><td><code>&lt;GatewayPassword&gt;</code> : </td><td>Das gateway Passwort, welches auf dem Typenschild des KM200/KM50 zu finden ist.</td></tr>
-		<tr><td><code>&lt;PrivatePassword&gt;</code> : </td><td>Das private Passwort, welches durch den User mit Hilfe der <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App vergeben wurde.</td></tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Set"></a><b>Set</b></td></tr>
-	<tr><td>
-		<ul>
-				Die set Funktion &auml;ndert die Werte der Services welche das Flag "schreibbar" innerhalb der KMxxx Service Struktur besitzen.<BR>
-				Die meisten dieser beschreibbaren Werte haben eine exklusive Liste von m&ouml;glichen Werten innerhalb dessen sich der neue Wert bewegen muss.<BR>
-				Andere Flie&szlig;komma Werte haben einen maximum und minumum Wert, in dessen sich der neue Wert bewegen mu&szlig;.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<table><tr><td><ul><code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr><td><code>&lt;service&gt;</code> : </td><td>Der Name des Service welcher gesetzt werden soll. Z.B.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR></td></tr>
-		<tr><td><code>&lt;value&gt;</code> : </td><td>Ein g&uuml;ltiger Wert f&uuml;r diesen Service.<BR></td></tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Get"></a><b>Get</b></td></tr>
-	<tr><td>
-		<ul>
-				Die get-Funktion ist in der Lage einen Wert eines Service innerhalb der KMxxx Service Struktur auszulesen.<BR>
-				Die zus&auml;tzliche Liste von erlaubten Werten oder der Wertebereich zwischen Minimum und Maximum wird nicht zur&uuml;ck gegeben.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<table><tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr></table>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;service&gt;</code> : </td><td>Der Name des Service welcher ausgelesen werden soll. Z.B.:  "<code>/heatingCircuits/hc1/operationMode</code>"<BR>
-														&nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR>
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<ul><ul>
-	<table>
-		<tr>
-			<td><code>&lt;option&gt;</code> : </td><td>Das optionelle Argument f&uuml;r Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>
-														&nbsp;&nbsp;Folgende Optionen sind verf&uuml;gbar:<BR>
-														&nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zur&uuml;ck 
-			</td>
-		</tr>
-	</table>
-</ul></ul>
-
-<BR>
-
-<table>
-	<tr><td><a name="KM200Attr"></a><b>Attributes</b></td></tr>
-	<tr><td>
-		<ul>
-				Die folgenden Modul-spezifischen Attribute k&ouml;nnen neben den bekannten globalen Attributen gesetzt werden wie z.B.: <a href="#room">room</a>.<BR>
-		</ul>
-	</td></tr>
-</table>
-
-<ul><ul>
 	<table>
 		<tr>
 			<td>
-			<tr><td><li><code>IntervalDynVal</code> : </li></td><td>Ein g&uuml;ltiges Abfrageintervall f&uuml;r die sich st&auml;ndig ver&auml;ndernden - dynamischen Werte der KMxxx Services. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet.<BR>
-																	 Der Default-Wert ist 300s.<BR>
-			</td></tr>
+				Das Buderus <a href="https://www.buderus.de/de/produkte/catalogue/alle-produkte/7719_Gateway-Logamatic-web-KM200-KM100-KM50">KM200, KM100  or KM50 (ab hier als KMxxx beschrieben)</a> ist eine Schnittstelle zwischen der Buderus Zentralheizungssteuerung un dem Internet.<BR>
+				Es wurde entwickelt um den Bewohnern den Zugang zu Ihrem Heizungssystem durch die Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl zu erlauben.</a>.<BR>
+				Dar&uuml;ber hinaus erlaubt es nach vorheriger Freigabe dem Heizungs- bzw. Wartungsbetrieb die Heizungsanlage von aussen zu warten und Werte zu ver&auml;ndern.<BR>
+				Das km200 fhem-Modul erlaubt den Lese-/Schreibzugriff dieser Parameter durch fhem.<BR>
+				<BR>
+				Um das KMxxx Ger&auml;t mit fhem nutzen zu k&ouml;nnen, mu&szlig; zun&auml;chst ein privates Passwort mit der Buderus Buderus App <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App gesetzt werden.<BR>
+				<BR>
+				<b><u>Anmerkung:</u></b><BR>
+				Unabh&auml;ngig der Installationsanleitung des Buderus KMxxx Ger&auml;ts, sollten die Ports 5222 und 5223 am Router geschlossen bleiben um keinen Zugriff von au&szlig;en auf das Ger&auml;t zu erlauben.<BR>
+				Der Router sollte entsprechend Konfiguriert bzw. so belassen werden.<BR>
+				Wenn der Lese-/Schreibzugriff von aussen gew&uuml;nscht ist, so sollte man ausschlie&szlig;lich &uuml;ber das fhem-System auf die Zentralheizung zugreifen.<BR>
+				<BR>
+				Sobald das Modul in der fhem.cfg definiert ist, wird das Modul versuchen alle bekannten Services abzuklopfen ob diese in der angeschlossenen Konstellation &uuml;berhaupt vorhanden sind.<BR>
+				Nach diesem Initial-Kontakt unterscheidet das Modul zwisachen einem Satz an Services die sich st&auml;ndig (dynamisch) &auml;ndern (z.B.: Vorlauftemperatur) sowie sich nicht st&auml;ndig (statisch) &auml;ndernden Werten (z.B.: Firmware Version).<BR>
+				Diese beiden S&auml;tze an Services k&ouml;nnen mir einem individuellen Abfrageintervall versehen werden. Siehe <a href="#KM200Attr">Attributes</a><BR> 
+				<BR>
 			</td>
 		</tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>  
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>PollingTimeout</code> : </li></td><td>Ein g&uuml;ltiger Zeitwert um dem KMxxx gen&uuml;gend Zeit zur Antwort einzelner Werte einzur&auml;umen. Normalerweise braucht dieser Wert nicht ver&auml;ndert werden, muss jedoch im Falle eines langsamen Netzwerks erh&ouml;ht werden<BR>
-																	 Der Default-Wert ist 5s.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200define"></a><b>Define</b></td></tr>
+		<tr><td><ul><code>define &lt;name&gt; km200 &lt;IPv4-address&gt; &lt;GatewayPassword&gt; &lt;PrivatePassword&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;name&gt;</code> : </td><td>Der Name des Ger&auml;tes. Empfehlung: "myKm200".</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;IPv4-address&gt;</code> : </td><td>Eine g&uuml;ltige IPv4 Adresse des KM200. Eventuell im Router nachschauen welche DHCP - Addresse dem KM200/KM50 vergeben wurde.</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;GatewayPassword&gt;</code> : </td><td>Das gateway Passwort, welches auf dem Typenschild des KM200/KM50 zu finden ist.</ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;PrivatePassword&gt;</code> : </td><td>Das private Passwort, welches durch den User mit Hilfe der <a href="http://www.buderus.de/Online_Anwendungen/Apps/fuer_den_Endverbraucher/EasyControl-4848514.html"> EasyControl</a> - App vergeben wurde.</ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>DoNotPoll</code> : </li></td><td>Eine durch Leerzeichen (Blank) getrennte Liste von Services welche von der Abfrage aufgrund irrelevanter Werte oder fhem - Abst&uuml;rzen ausgenommen werden sollen.<BR>
-																Die Liste kann auch Hierarchien von services enthalten. Dies bedeutet, das alle Services unterhalb dieses Services ebenfalls gel&ouml;scht werden.<BR>
-																Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt.<BR>
-			</td></tr>			
-			</td>
-		</tr>
+		<tr><td><a name="KM200Set"></a><b>Set</b></td></tr>
+		<tr><td><ul>Die set Funktion &auml;ndert die Werte der Services welche das Flag "schreibbar" innerhalb der KMxxx Service Struktur besitzen.<BR>Die meisten dieser beschreibbaren Werte haben eine exklusive Liste von m&ouml;glichen Werten innerhalb dessen sich der neue Wert bewegen muss.<BR>Andere Flie&szlig;komma Werte haben einen maximum und minumum Wert, in dessen sich der neue Wert bewegen mu&szlig;.<BR></ul></td></tr>
+		<tr><td><ul>    <code>set &lt;service&gt; &lt;value&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;service&gt;</code> : </td><td>Der Name des Service welcher gesetzt werden soll. Z.B.: "<code>/heatingCircuits/hc1/operationMode</code>"<BR></ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;value&gt;</code> : </td><td>Ein g&uuml;ltiger Wert f&uuml;r diesen Service.<BR></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>ReadBackDelay</code> : </li></td><td>Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zur&uuml;cklesen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>
-																	 Der  Default-Wert ist 100 = 100ms = 0,1s.<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200Get"></a><b>Get</b></td></tr>
+		<tr><td><ul>Die get-Funktion ist in der Lage einen Wert eines Service innerhalb der KMxxx Service Struktur auszulesen.<BR>Die zus&auml;tzliche Liste von erlaubten Werten oder der Wertebereich zwischen Minimum und Maximum wird nicht zur&uuml;ck gegeben.<BR></ul></td></tr>
+		<tr><td><ul><code>get &lt;service&gt; &lt;option&gt;</code></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;service&gt;</code> : </td><td>Der Name des Service welcher ausgelesen werden soll. Z.B.:  "<code>/heatingCircuits/hc1/operationMode</code>"<BR>&nbsp;&nbsp;Es gibt nur den Wert, aber nicht die Werteliste oder den m&ouml;glichen Wertebereich zur&uuml;ck.<BR></ul></ul></td></tr>
+		<tr><td><ul><ul><code>&lt;option&gt;</code> : </td><td>Das optionelle Argument f&uuml;r Ausgabe des get-Befehls Z.B.:  "<code>json</code>"<BR>&nbsp;&nbsp;Folgende Optionen sind verf&uuml;gbar:<BR>&nbsp;&nbsp;json - Gibt anstelle des Wertes, die gesamte Json Antwort des KMxxx als String zur&uuml;ck<BR></ul></ul></td></tr>
 	</table>
-</ul></ul>
-
-<ul><ul>
+	<BR>
 	<table>
-		<tr>
-			<td>
-			<tr><td><li><code>disable</code> : </li></td><td>Deaktiviert das Device und l&ouml;scht alle bestehenden Readings.<BR>
-															   Der Default-Wert ist 0 = aktiviert<BR>
-			</td></tr>
-			</td>
-		</tr>
+		<tr><td><a name="KM200Attr"></a><b>Attributes</b></td></tr>
+		<tr><td><ul>Die folgenden Modul-spezifischen Attribute k&ouml;nnen neben den bekannten globalen Attributen gesetzt werden wie z.B.: <a href="#room">room</a>.<BR></ul></td></tr>
 	</table>
-</ul></ul>
-
+	<table>
+		<tr><td><ul><ul><a name="IntervalDynVal" ></a><li><b><u><code>IntervalDynVal </code></u></b> : Ein g&uuml;ltiges Abfrageintervall f&uuml;r die sich st&auml;ndig ver&auml;ndernden - dynamischen Werte der KMxxx Services. Der Wert muss gr&ouml;&szlig;er gleich >=20s sein um dem Modul gen&uuml;gend Zeit einzur&auml;umen eine volle Abfrage auszuf&uuml;hren bevor die n&auml;chste Abfrage startet.<BR>Der Default-Wert ist 300s.                                                                   <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="PollingTimeout" ></a><li><b><u><code>PollingTimeout </code></u></b> : Ein g&uuml;ltiger Zeitwert um dem KMxxx gen&uuml;gend Zeit zur Antwort einzelner Werte einzur&auml;umen. Normalerweise braucht dieser Wert nicht ver&auml;ndert werden, muss jedoch im Falle eines langsamen Netzwerks erh&ouml;ht werden<BR>Der Default-Wert ist 5s.	                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="DoNotPoll"      ></a><li><b><u><code>DoNotPoll      </code></u></b> : Eine durch Leerzeichen (Blank) getrennte Liste von Services welche von der Abfrage aufgrund irrelevanter Werte oder fhem - Abst&uuml;rzen ausgenommen werden sollen.<BR>Die Liste kann auch Hierarchien von services enthalten. Dies bedeutet, das alle Services unterhalb dieses Services ebenfalls gel&ouml;scht werden.<BR>Der Default Wert ist (empty) somit werden alle bekannten Services abgefragt. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ReadBackDelay"  ></a><li><b><u><code>ReadBackDelay  </code></u></b> : Ein g&uuml;ltiger Zeitwert in Mllisekunden [ms] f&uuml;r die Pause zwischen schreiben und zur&uuml;cklesen des Wertes durch den "set" - Befehl. Der Wert muss >=0ms sein.<BR>Der  Default-Wert ist 100 = 100ms = 0,1s.                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="disable"        ></a><li><b><u><code>disable        </code></u></b> : Deaktiviert das Device und l&ouml;scht alle bestehenden Readings.<BR>Der Default-Wert ist 0 = aktiviert.                                                                                                                                                                                                                                                                                                   <BR></li></ul></ul></td></tr>
+	</table>
 </ul>
 =end html_DE
+
+=for :application/json;q=META.json 73_km200.pm
+{
+  "abstract": "Connects fhem to Buderus KM300, KM200, KM100, KM50<BR>",
+  "description": "The Buderus KM200, KM100  or KM50 (hereafter described as KMxxx) is a communication device to establish a connection between the Buderus central heating control unit and the internet.<BR>It has been designed in order to allow the inhabitants accessing their heating system via his Buderus App EasyControl.<BR>Furthermore it allows the maintenance companies to access the central heating control system to read and change settings.<BR>The km200 fhem-module enables read/write access to these parameters.<BR>",
+  "x_lang": {
+    "de": {
+      "abstract": "Verbindet fhem mit Buderus KM300, KM200, KM100, KM50<BR>",
+      "description": "Das Buderus KM200, KM100  or KM50 (ab hier als KMxxx beschrieben) ist eine Schnittstelle zwischen der Buderus Zentralheizungssteuerung un dem Internet.<BR>Es wurde entwickelt um den Bewohnern den Zugang zu Ihrem Heizungssystem durch die Buderus App EasyControl zu erlauben.<BR>Dar&uuml;ber hinaus erlaubt es nach vorheriger Freigabe dem Heizungs- bzw. Wartungsbetrieb die Heizungsanlage von aussen zu warten und Werte zu ver&auml;ndern.<BR>Das km200 fhem-Modul erlaubt den Lese-/Schreibzugriff dieser Parameter durch fhem.<BR>"
+    }
+  },
+  "author": [
+    "I am the maintainer matthias.deeke@deeke.eu"
+  ],
+  "x_fhem_maintainer": [
+    "Sailor"
+  ],
+  "keywords": [
+    "Buderus",
+    "Bosch",
+	"KM50",
+    "KM100",
+    "KM200",
+    "KM300",
+    "communication",
+    "network"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918623,
+        "FHEM::Meta": 0.001006,
+        "HttpUtils": 0,
+        "JSON": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_support_community": {
+		"rss": "https://forum.fhem.de/index.php/topic,25540.msg",
+		"web": "https://forum.fhem.de/index.php/topic,25540.msg",
+		"subCommunity" : {
+			"rss" : "https://forum.fhem.de/index.php/topic,25540.msg",
+			"title" : "This sub-board will be first contact point",
+			"web" : "https://forum.fhem.de/index.php/topic,25540.msg"
+		}
+    },
+	"x_wiki" : {
+		"title" : "FHEM Wiki: Buderus Web Gateway",
+		"web" : "https://wiki.fhem.de/wiki/Buderus_Web_Gateway"
+	}
+  },
+  "x_support_status": "supported"
+}
+=end :application/json;q=META.json
+
+=cut
