@@ -34,6 +34,7 @@ FHEM/00_MQTT2_SERVER.pm      rudolfkoenig         MQTT
 FHEM/00_MYSENSORS.pm         Beta-User            Bastelecke/MySensors
 FHEM/00_NetzerI2C.pm         klausw               Sonstige Systeme
 FHEM/00_Neuron.pm            klausw               Sonstige Systeme
+FHEM/00_OW2S0SMSGUARD.pm     wzut                 1Wire
 FHEM/00_OWX.pm               pahenning            1Wire
 FHEM/00_OWX_ASYNC            ntruchsess           1Wire
 FHEM/00_RPII2C               klausw               Einplatinencomputer
