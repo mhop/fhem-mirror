@@ -83,7 +83,8 @@ use GPUtils qw(GP_Import GP_Export);
 BEGIN {
     # Import from main context
     GP_Import(
-        qw( AttrVal
+        qw( AnalyzePerlCommand
+            AttrVal
             Debug
             Log3
             data
