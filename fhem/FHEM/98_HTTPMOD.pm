@@ -141,7 +141,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.01 - 18.1.2021';
+my $Module_Version = '4.1.02 - 4.2.2021';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -1479,11 +1479,10 @@ sub FormatReading {
     $expr    = GetFAttr($name, $context, $num, "Expr", $expr) if ($context ne "set");   # not for set!
     $expr    = GetFAttr($name, $context, $num, "OExpr", $expr);                         # new syntax
     
-    # if no encode is specified and bodyDecode did decode automatically, then encode as utf8 by default
+    # if no encode is specified and bodyDecode did decode, then encode as utf8 by default
     #my $fDefault   = ($featurelevel > 5.9 ? 'auto' : '');
-    #my $fDefault   = 'none';
-    #my $bodyDecode = AttrVal($name, 'bodyDecode', $fDefault);
-    #$encode = 'utf8' if (!$encode && $bodyDecode eq 'auto');
+    my $bodyDecode = AttrVal($name, 'bodyDecode', '');
+    $encode = 'utf8' if (!$encode && $bodyDecode ne 'none');
 
     $val = decode($decode, $val) if ($decode && $decode ne 'none');
     $val = encode($encode, $val) if ($encode && $encode ne 'none');
