@@ -61,67 +61,34 @@
 # 2016-09-04 - 12114 - added:   movecalculated
 #
 # 2018-05-06 - 16695 - changed: check plotName exists
-# 2018-05-28 - 21562 - changed: remove misleading link in commandref
-#
-# 2021-02-04 -       - changed: use own package
+# 2018-05-28 - $Rev$ - changed: remove misleading link in commandref
 #
 ##############################################
 =cut
 
-package FHEM::InfoPanel;    ## no critic
-
+package main;
 use strict;
 use warnings;
 
 #use Data::Dumper;
-#use HttpUtils;
 
-##############################################
-
-use GPUtils qw(GP_Import GP_Export);
-
-BEGIN {
-    # Import from main context
-    GP_Import(
-        qw( AnalyzePerlCommand
-            AttrVal
-            Debug
-            Log3
-            data
-            defs
-            FileRead
-            getKeyValue
-            readingFnAttributes
-            readingsSingleUpdate
-            setKeyValue
-            FW_userAgent
-            FW_wname
-            FW_RET
-            FW_webArgs
-            FW_pos
-            FW_plotsize
-            FW_ME
-            FW_httpheader
-            FW_CSRF )
-    );
-    
-    #-- Export to main context with different name
-    GP_Export(
-        qw( Initialize )
-    );
-}
-
-##############################################
-
-no if $] >= 5.017011, warnings => 'experimental';
 use feature qw/switch/;
 use vars qw(%data);
+use HttpUtils;
 
 my @valid_valign = qw(auto baseline middle center hanging);
 my @valid_halign = qw(start middle end);
+
 my $useImgTools = 1;
 
-##############################################
+no if $] >= 5.017011, warnings => 'experimental';
+
+sub btIP_Define;
+sub btIP_Undef;
+sub btIP_Set;
+sub btIP_Get;
+sub btIP_Notify;
+sub btIP_readLayout;
 
 sub btIP_itemArea;
 sub btIP_itemButton;
@@ -163,9 +130,10 @@ sub btIP_HTMLTail;
 sub btIP_Overview;
 sub btIP_getURL;
 
+
 ######################################
 
-sub Initialize {
+sub InfoPanel_Initialize {
     my ($hash) = @_;
 
 ## no critic
@@ -177,12 +145,11 @@ sub Initialize {
     Log3(undef,4,"InfoPanel: Image::Info missing.") unless $useImgTools;
 ## use critic
 
-    $hash->{DefFn}     = \&Define;
-    $hash->{UndefFn}   = \&Undef;
-    $hash->{SetFn}     = \&Set;
-    $hash->{GetFn}     = \&Get;
-    $hash->{NotifyFn}  = \&Notify;
-
+    $hash->{DefFn}     = "btIP_Define";
+    $hash->{UndefFn}   = "btIP_Undef";
+    $hash->{SetFn}     = "btIP_Set";
+    $hash->{GetFn}     = "btIP_Get";
+    $hash->{NotifyFn}  = "btIP_Notify";
     $hash->{AttrList}  = "autoreread:1,0 useViewPort:1,0 bgcolor refresh size ";
     $hash->{AttrList} .= "mobileApp:none,apple,other ";
     $hash->{AttrList} .= "title noscript showTime:1,0 ";
@@ -191,7 +158,7 @@ sub Initialize {
     return;
 }
 
-sub Define {
+sub btIP_Define {
   my ($hash, $def) = @_;
   my @a = split("[ \t]+", $def);
   return "Usage: define <name> InfoPanel filename"  if(int(@a) != 3);
@@ -202,14 +169,14 @@ sub Define {
   $hash->{fhem}{div} = '';
   $hash->{LAYOUTFILE} = $filename;
 
-  btIP_addExtension("FHEM::InfoPanel::btIP_CGI","btip","InfoPanel");
-  readLayout($hash);
+  btIP_addExtension("btIP_CGI","btip","InfoPanel");
+  btIP_readLayout($hash);
 
   readingsSingleUpdate($hash,'state','defined',1);
   return;
 }
 
-sub Undef {
+sub btIP_Undef {
 	my ($hash, $arg) = @_;
     # check if last device
     my $url = '/btip';
@@ -217,7 +184,7 @@ sub Undef {
 	return;
 }
 
-sub Set {
+sub btIP_Set {
 
   my ($hash, @a) = @_;
   my $name = $a[0];
@@ -241,7 +208,7 @@ sub Set {
         $defs{$name}{fhem}{override}{$a[2]} = 1;
      }
      when ("reread") {
-        readLayout($hash);
+        btIP_readLayout($hash);
      }
      default {
         $ret = $usage;
@@ -250,7 +217,7 @@ sub Set {
   return $ret;
 }
 
-sub Get {
+sub btIP_Get {
 
   my ($hash, @a) = @_;
   my $name = $a[0];
@@ -278,7 +245,7 @@ sub Get {
   return $ret;
 }
 
-sub Notify {
+sub btIP_Notify {
   my ($hash,$dev) = @_;
 
   return unless AttrVal($hash->{NAME},'autoreload',1);
@@ -286,11 +253,11 @@ sub Notify {
   return if(!grep(m/^FILEWRITE $hash->{LAYOUTFILE}$/, @{$dev->{CHANGED}}));
 
   Log3(undef, 4, "InfoPanel: $hash->{NAME} reread layout after edit.");
-  undef = readLayout($hash);
+  undef = btIP_readLayout($hash);
   return;
 }
 
-sub readLayout {
+sub btIP_readLayout {
   my ($hash)= @_;
   my $filename= $hash->{LAYOUTFILE};
   my $name= $hash->{NAME};
@@ -300,7 +267,7 @@ sub readLayout {
   if($err) {
 #    Log 1, "InfoPanel $name: $err";
 #    $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
-    Log3(undef, 1, "InfoPanel $name: $err");
+    Log 1, "InfoPanel $name: $err";
     $hash->{fhem}{layout} = "text ERROR 50 50 \"Error on reading layout!\"";
     my ($e,@layout) = FileRead('./FHEM/template.layout');
     unless ($e){
@@ -1383,6 +1350,31 @@ sub btIP_addExtension {
 	$data{FWEXT}{jqueryvticker}{SCRIPT} = "/pgm2/jquery.vticker.min.js" unless $data{FWEXT}{jqueryvticker}{SCRIPT};
 }
 
+sub btIP_CGI{
+
+  my ($request) = @_;
+  
+  my ($name,$ext)= btIP_splitRequest($request);
+
+  if(defined($name)) {
+    if($ext eq "") {
+          return("text/plain; charset=utf-8", "Illegal extension.");
+    }
+    if(!defined($defs{$name})) {
+          return("text/plain; charset=utf-8", "Unknown InfoPanel device: $name");
+    }
+    if($ext eq "png") {
+          return btIP_returnPNG($name);
+    }
+    if($ext eq "info" || $ext eq "html") {
+          return btIP_returnHTML($name);
+    }
+  } else {
+    return btIP_Overview();
+  }
+
+}
+
 sub btIP_splitRequest {
 
   my ($request) = @_;
@@ -1494,37 +1486,6 @@ sub btIP_getURL {
   my $proto = (AttrVal($FW_wname, 'HTTPS', 0) == 1) ? 'https' : 'http';
   return $proto."://$FW_httpheader{Host}$FW_ME";
 }
-
-
-####################
-#
-#package main;
-
-sub btIP_CGI{
-
-  my ($request) = @_;
-  
-  my ($name,$ext)= btIP_splitRequest($request);
-
-  if(defined($name)) {
-    if($ext eq "") {
-          return("text/plain; charset=utf-8", "Illegal extension.");
-    }
-    if(!defined($defs{$name})) {
-          return("text/plain; charset=utf-8", "Unknown InfoPanel device: $name");
-    }
-    if($ext eq "png") {
-          return btIP_returnPNG($name);
-    }
-    if($ext eq "info" || $ext eq "html") {
-          return btIP_returnHTML($name);
-    }
-  } else {
-    return btIP_Overview();
-  }
-
-}
-
 
 1;
  
