@@ -3388,7 +3388,7 @@ sub AddToSendQueue {
         <li><b>(get|set|reading)[0-9]*Encode</b></li> 
             defines an encoding to be used in a call to the perl function encode to convert the data string read from the device to a reading. 
             This can be used if the device delivers strings in an encoding like cp850 and after decoding it you want to reencode it to e.g. utf8.<br>
-            When the attribute bodyDecode is set to 'auto' or is not set (in which case the default is 'auto', then this encoding attribute defaults to utf8.
+            When the attribute bodyDecode is not set to 'none' then this encoding attribute defaults to utf8.
             If your reading values contain Umlauts and they are shown as strange looking icons then you probably need to modidify this attribute.
             Using this attribute for a set command only makes sense if you want to parse the HTTP response to the HTTP request that the set command sent by defining the attribute setXXParseResponse.<br>
         <li><b>bodyDecode</b></li> 
