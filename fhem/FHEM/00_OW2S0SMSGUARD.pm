@@ -43,19 +43,20 @@ BEGIN
 	DevIo_OpenDev
 	DevIo_SimpleRead
 	Dispatch
-	DoTrigger
 	init_done
 	IsDisabled
 	InternalTimer
 	Log3
 	modules
 	ReadingsVal
+	ReadingsNum
 	readingsSingleUpdate
 	readingsBulkUpdate
 	readingsBeginUpdate
 	readingsEndUpdate
 	readingFnAttributes
 	RemoveInternalTimer
+	setDevAttrList
 	setReadingsVal
 	TimeNow
 	)
@@ -77,18 +78,18 @@ if (-e $attr{global}{modpath}.'/FHEM/Meta.pm') {
 sub Initialize {
     my $hash = shift;
 
-    $hash->{Clients}   = ':OW2S0SMSGUARD:';
-    $hash->{MatchList} = { '1:OW2S0SMSGUARD' => '^OW.*' };
-    $hash->{ReadFn}    = \&ReadFn;
-    $hash->{DefFn}     = \&DefineFn;
-    $hash->{UndefFn}   = \&UndefFn;
-    $hash->{NotifyFn}  = \&NotifyFn;
-    $hash->{GetFn}     = \&GetFn;
-    $hash->{SetFn}     = \&SetFn;
-    $hash->{AttrFn}    = \&AttrFn;
-    $hash->{ParseFn}   = \&ParseFn;
-    $hash->{AttrList}  = 'interval disable:0,1 mapOWIDs useSubDevices:0,1 '
-			.'model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes;
+    $hash->{Clients}    = ':OW2S0SMSGUARD:';
+    $hash->{MatchList}  = { '1:OW2S0SMSGUARD' => '^OW.*' };
+    $hash->{ReadFn}     = \&ReadFn;
+    $hash->{DefFn}      = \&DefineFn;
+    $hash->{UndefFn}    = \&UndefFn;
+    $hash->{NotifyFn}   = \&NotifyFn;
+    $hash->{GetFn}      = \&GetFn;
+    $hash->{SetFn}      = \&SetFn;
+    $hash->{AttrFn}     = \&AttrFn;
+    $hash->{ParseFn}    = \&ParseFn;
+    $hash->{AttrList}   = 'model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes; # Slave Device
+    $hash->{AutoCreate} = { '^OW.*' => {ATTR => 'event-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}} };
 
     return  FHEM::Meta::InitMod( __FILE__, $hash ) if ($hasmeta);
 
@@ -99,13 +100,14 @@ sub Initialize {
 
 sub DefineFn {
 
-    my $msg = 'wrong syntax: define <name> OW2S0SMSGUARD devicename';
+    my $msg = 'wrong syntax: define <name> OW2S0SMSGUARD IO Device or model OWID';
     my $hash = shift;
     my $def  = shift // return $msg;
 
-    my ($name, undef, $dev, $interval) = split(m{ \s+ }xms, $def, 4);
+    my ($name, undef, $dev, $interval, $model) = split(m{ \s+ }xms, $def, 5);
 
     $dev // return $msg;
+    $model //= 'unknown';
 
     DevIo_CloseDev($hash);
 
@@ -116,19 +118,22 @@ sub DefineFn {
 	$interval //= 30;
 	$hash->{INTERVAL}   = $interval;
 	$hash->{OWDEVICES}  = 0;
+	$hash->{addr}       = 'master';
+	setDevAttrList($name,'interval disable:0,1 mapOWIDs useSubDevices:0,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
     else {
 	if (exists($modules{OW2S0SMSGUARD}{defptr}{$addr}) && $modules{OW2S0SMSGUARD}{defptr}{$addr}->{NAME} ne $name) {
 	    return "$name, a OW2S0SMSGUARD device with address $addr is already defined as ".$modules{OW2S0SMSGUARD}{defptr}{$addr}->{NAME};
 	}
+	$hash->{addr} = $addr;
+	CommandAttr(undef, "$name model $model")  if (!exists($attr{$name}{model}));
     }
 
     $hash->{STATE}      = 'defined';
     $hash->{NOTIFYDEV}  = 'global';
-    $hash->{addr}       = $addr;
-    $hash->{SVN}        = (qw($Id:BETA $))[2];
-
+    $hash->{DELAY}      = .5;
+    $hash->{SVN}        = (qw($Id$))[2];
 
     $modules{OW2S0SMSGUARD}{defptr}{$addr} = $hash;
 
@@ -236,7 +241,7 @@ sub DoInit {
     if ($hash->{INTERVAL}) {
 	RemoveInternalTimer($hash);
 	SimpleWrite($hash, "\$L+\n\$?");
-	InternalTimer(gettimeofday()+1, "FHEM::OW2S0SMSGUARD::GetUpdate", $hash, 0);
+	InternalTimer(gettimeofday()+1, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0);
     }
 
     return;
@@ -253,7 +258,7 @@ sub GetUpdate {
 
     return if (IsDisabled($name) || !$hash->{INTERVAL} || ($hash->{addr} ne 'master'));
 
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "FHEM::OW2S0SMSGUARD::GetUpdate", $hash, 0);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0);
     SimpleWrite($hash, '$?');
     return;
 }
@@ -264,7 +269,7 @@ sub read_OW {
     my $h = shift;
     my $hash = $h->{h};
     my $num  = $h->{n};
-    SimpleWrite($hash, '$'.$num);
+    SimpleWrite($hash, '$'.$num); # Antwort kommt via sub ReadFn
     Log3($hash, 5, "$hash->{NAME}, read_OW : $num");
     return;
 }
@@ -279,6 +284,7 @@ sub SetFn {
 
     my $name = shift;
     my $cmd  = shift // '?';
+    my $val  = shift // .5;
 
     if ($cmd eq 'reset') {
 	DevIo_CloseDev($hash);
@@ -287,7 +293,12 @@ sub SetFn {
 
     return SimpleWrite($hash, '$rez') if ($cmd eq 'S0-reset');
 
-    return "Unknown argument $cmd, choose one of reset:noArg S0-reset:noArg";
+    if ($cmd eq 'delay') {
+	$hash->{DELAY} = $val;
+	return;
+    }
+
+    return 'Unknown argument '.$cmd.', choose one of reset:noArg S0-reset:noArg delay';
 }
 
 #####################################
@@ -310,7 +321,7 @@ sub GetFn {
 	return formatOWList(@devs);
     }
 
-    return "$name get with unknown argument $cmd, choose one of OWdevicelist:noArg";
+    return 'Unknown argument '.$cmd.', choose one of OWdevicelist:noArg';
 }
 
 sub formatOWList {
@@ -477,7 +488,7 @@ sub Parse {
 	    return;
 	}
 
-	InternalTimer(gettimeofday()+1+($num*0.5), "FHEM::OW2S0SMSGUARD::read_OW", {h=>$hash, n=>$num}, 0) if ($ok && ($model > 9)); # 10 - 28
+	InternalTimer(gettimeofday()+1+($num*$hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 9)); # 10 - 28
 	return;
     }
 
@@ -572,7 +583,7 @@ sub ParseFn {
 	my $ac = (IsDisabled('autocreate')) ? 'disabled' : 'enabled' ; 
 	Log3($shash, 3, "$shash->{NAME}, got message for undefined device [$arr[1]] type $arr[2] autocreate is $ac");
 	return 'disable' if ($ac eq 'disabled');
-	return "UNDEFINED OW_$arr[1] OW2S0SMSGUARD $arr[1]";
+	return "UNDEFINED OW_$arr[1] OW2S0SMSGUARD $arr[1] 0 $arr[2]";
     }
 
     my $dhash  = $modules{OW2S0SMSGUARD}{defptr}{$arr[1]};
@@ -580,7 +591,7 @@ sub ParseFn {
 
     Log3($dname, 4, "$dname, ParseFn $msg");
 
-    $dhash->{model} = $model;
+    #$dhash->{model} = $model;
     $dhash->{busid} = $arr[4] //= -1;
 
     readingsBeginUpdate($dhash);
@@ -590,13 +601,21 @@ sub ParseFn {
 	readingsBulkUpdate($dhash, 'state',       "T: $val °C");
     }
     elsif ($model eq 'DS2401') {
+	my $since = int(ReadingsNum($dname, '.last' , gettimeofday()));
+	my $now   = int(gettimeofday());
+	if (ReadingsVal($dname, 'presence' ,'') ne $val) {
+	    $since = ($now-$since);
+	#    setReadingsVal($dhash, 'since', $since, TimeNow());
+	}
+	
+	#readingsBulkUpdate($dhash, '.last' , $now)  if (ReadingsVal($dname, 'presence' ,'') ne $val);
 	readingsBulkUpdate($dhash, 'state',    $val);
 	readingsBulkUpdate($dhash, 'presence', $val);
     }
 
     readingsEndUpdate($dhash,1);
 
-    CommandAttr(undef, "$dname model $model")   if (!exists($attr{$dname}{model}));
+    #CommandAttr(undef, "$dname model $model")   if (!exists($attr{$dname}{model}));
 
     return $dname;
 }
