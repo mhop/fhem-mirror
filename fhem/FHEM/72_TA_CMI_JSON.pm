@@ -39,7 +39,26 @@
 package main;
 use strict;
 use warnings;
+
+sub TA_CMI_JSON_Initialize {
+  my ($hash) = @_;
+
+  $hash->{GetFn}     = "TA_CMI_JSON::TA_CMI_JSON_Get";
+  $hash->{DefFn}     = "TA_CMI_JSON::TA_CMI_JSON_Define";
+  $hash->{UndefFn}   = "TA_CMI_JSON::TA_CMI_JSON_Undef";
+
+  $hash->{AttrList} = "username password interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus readingNamesLoggingAnalog readingNamesLoggingDigital includePrettyReadings:0,1 includeUnitReadings:0,1 " . $readingFnAttributes;
+
+  Log3 '', 3, "TA_CMI_JSON - Initialize done ...";
+}
+
+
+package TA_CMI_JSON;
+use strict;
+use warnings;
 use HttpUtils;
+
+use GPUtils qw(:all);
 
 my %deviceNames = (
   '80' => 'UVR1611',
@@ -78,17 +97,26 @@ my %rasStates = (
   3 => 'Standby/frost pr.'
 );
 
-sub TA_CMI_JSON_Initialize {
-  my ($hash) = @_;
-
-  $hash->{GetFn}     = "TA_CMI_JSON_Get";
-  $hash->{DefFn}     = "TA_CMI_JSON_Define";
-  $hash->{UndefFn}   = "TA_CMI_JSON_Undef";
-
-  $hash->{AttrList} = "username password interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus readingNamesLoggingAnalog readingNamesLoggingDigital includePrettyReadings:0,1 includeUnitReadings:0,1 " . $readingFnAttributes;
-
-  Log3 '', 3, "TA_CMI_JSON - Initialize done ...";
-}
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(qw(
+        readingsSingleUpdate
+        readingsBulkUpdate
+        readingsBulkUpdateIfChanged
+        readingsBeginUpdate
+        readingsEndUpdate
+        Log3
+        HttpUtils_Close
+        HttpUtils_NonblockingGet
+        CommandDeleteReading
+        RemoveInternalTimer
+        InternalTimer
+        makeReadingName
+        AttrVal
+        json2nameValue
+        gettimeofday
+    ))
+};
 
 sub TA_CMI_JSON_Define {
   my ( $hash, $def ) = @_;
@@ -218,7 +246,7 @@ sub TA_CMI_JSON_ParseHttpResponse {
 #     Log3 $name, 3, "TA_CMI_JSON ($name) - Device: $keyValues->{Header_Device}";
   }
 
-  my $functionName = "TA_CMI_JSON_GetStatus";
+  my $functionName = "TA_CMI_JSON::TA_CMI_JSON_GetStatus";
   RemoveInternalTimer($hash, $functionName);
   InternalTimer( gettimeofday() + $hash->{INTERVAL}, $functionName, $hash, 0 );
 
