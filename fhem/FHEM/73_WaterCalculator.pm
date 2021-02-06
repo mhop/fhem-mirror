@@ -446,13 +446,12 @@ sub WaterCalculator_MidnightTimer($)
 		}
 	}
 
-
 	### Create Log entries for debugging purpose
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer__________________________________________________________";
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : MidnightTimer initiated";
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - RegEx             : " . $RegEx;
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountName    : " . $WaterCountName;
-	#Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountReadList: " . Dumper(@WaterCountReadingNameListFiltered);
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountReadList: " . Dumper(@WaterCountReadingNameListFiltered);
 	
 
 	### Remove internal timer for WaterCalculator_MidnightTimer
@@ -763,7 +762,7 @@ sub WaterCalculator_Notify($$)
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - LastUpdateTimestampUnix                    : " . ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", "No value provided");
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingLastChangeDeltaSeconds    : " . $WaterCountReadingLastChangeDelta;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValuePrevious             : " . $WaterCountReadingValuePrevious;
-		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReadingPrefix_PrevRead            : " . $WaterCalcReadingPrefix . "_PrevRead";
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReadingPrefix                     : " . $WaterCalcReadingPrefix;
 
 		### Find out whether there has been a previous value being stored
 		if(defined($WaterCountReadingValuePrevious))
