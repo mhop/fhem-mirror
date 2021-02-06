@@ -201,7 +201,7 @@ sub AttrFn {
     if ($cmd eq 'del') {
 	RemoveInternalTimer($hash);
 	$hash->{INTERVAL} = 0 if ($attrName eq 'interval');
-	InternalTimer(gettimeofday()+1, "FHEM::OW2S0SMSGUARD::GetUpdate", $hash, 0) if ($attrName eq 'disable');
+	InternalTimer(gettimeofday()+1, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0) if ($attrName eq 'disable');
     }
 
     if ($cmd eq 'set') {
@@ -209,7 +209,7 @@ sub AttrFn {
 	    return "invalid value " if (int($attrVal) < 0);
 	    $hash->{INTERVAL} = int($attrVal);
 
-	    InternalTimer(gettimeofday()+1, "FHEM::OW2S0SMSGUARD::GetUpdate", $hash, 0) if ($hash->{INTERVAL});
+	    InternalTimer(gettimeofday()+1, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0) if ($hash->{INTERVAL});
 	    readingsSingleUpdate($hash, 'state', 'disabled', 1) if (!$hash->{INTERVAL});
 	}
 
@@ -222,7 +222,7 @@ sub AttrFn {
 	    }
 	    if (int($attrVal) == 0) {
 		$hash->{INTERVAL} = AttrNum($name, 'interval', 30);
-		InternalTimer(gettimeofday()+1, "FHEM::OW2S0SMSGUARD::GetUpdate", $hash, 0) if ($hash->{INTERVAL});
+		InternalTimer(gettimeofday()+1, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0) if ($hash->{INTERVAL});
 		DevIo_CloseDev($hash);
 		DevIo_OpenDev($hash, 1, \&DoInit) if ($hash->{INTERVAL}); #$hash, $reopen, $initfn, $callback
 	    }
@@ -274,17 +274,16 @@ sub read_OW {
     return;
 }
 
-
 #####################################
 
 sub SetFn {
 
-    my $hash = shift;
-    return if ($hash->{addr} ne 'master');
-
-    my $name = shift;
+    my $hash = shift // return;
+    my $name = shift // return;
     my $cmd  = shift // '?';
     my $val  = shift // .5;
+
+    return if ($hash->{addr} ne 'master');
 
     if ($cmd eq 'reset') {
 	DevIo_CloseDev($hash);
@@ -294,7 +293,7 @@ sub SetFn {
     return SimpleWrite($hash, '$rez') if ($cmd eq 'S0-reset');
 
     if ($cmd eq 'delay') {
-	$hash->{DELAY} = $val;
+	$hash->{DELAY} = $val if (looks_like_number($val));
 	return;
     }
 
@@ -305,12 +304,11 @@ sub SetFn {
 
 sub GetFn {
 
-    my $hash   = shift;
-    return if ($hash->{addr} ne 'master');
-
-    my $name   = shift;
+    my $hash   = shift // return;
+    my $name   = shift // return;
     my $cmd    = shift // '?';
-    my $device = shift // 0;
+
+    return if ($hash->{addr} ne 'master');
 
     if ($cmd eq 'OWdevicelist') {
         my @devs;
@@ -326,7 +324,7 @@ sub GetFn {
 
 sub formatOWList {
 
-    my (@devs) = @_;
+    my @devs = @_;
 
     # Type   | Address          | Name   | Time
     # -------+------------------+--------+--------------------
@@ -424,7 +422,7 @@ sub Parse {
     my @data = split(';', $rmsg);
 
     if (int(@data) < 3) {
-	$txt = 'message is too short ['.int(@data).']';
+	$txt = 'message is too short -> '.int(@data);
 	Log3($name, 3, "$name, $txt");
 	readingsSingleUpdate($hash, 'error', $txt, 1);
 	return;
@@ -439,103 +437,145 @@ sub Parse {
 	return;
     }
 
-    my $ok   = (defined($data[1]) && ($data[1] eq 'o')) ? 1 : 0;
-    my $temp = '';
     my $num  = int($data[0]);
 
-    if ($num > 63) {
+    if (($num > 63) | ($num < 0)) {
 	$txt = "invalid OW number $num";
 	Log3($name, 3, "$name, $txt");
 	readingsSingleUpdate($hash, 'error', $txt, 1);
 	return;
     }
 
-    if (defined($data[2]) && (length($data[2]) == 16) && ( $data[2] =~ m{ [0-9A-F]+ }x )) {
-	delete $hash->{helper}{$num};
-	
-	my $model = int(substr($data[2],0,2));
-	$model = -1 if (!$model || ($model > 28) );
+    my $ok   = (defined($data[1]) && ($data[1] eq 'o')) ? 1 : 0;
 
-	$hash->{helper}{$num}{state} = $ok;
-	$hash->{helper}{$num}{time}  = TimeNow();
-	$hash->{helper}{$num}{addr}  = $data[2];
-	$hash->{helper}{$num}{fam}   = $model;
-	$hash->{'OW-Dev'.$num}       = $hash->{helper}{$num}{addr}." => $ok";
-	$hash->{OWDEVICES}           = ($num + 1);
-
-	if ($num == 0) {
-	    for my $i (1..63) {delete $hash->{'OW-Dev'.$i} if (exists($hash->{'OW-Dev'.$i})); }
-	}
-
-	mapNames($hash, $num);
-
-	$hash->{helper}{$num}{typ} = 'DS1822'  if ($model == 22);
-	$hash->{helper}{$num}{typ} = 'DS18B20' if ($model == 28);
-	$hash->{helper}{$num}{typ} = 'DS1820'  if ($model == 10);
-
-	if ($model == 1) {
-	    $hash->{helper}{100}{$data[2]}{name}  = $hash->{helper}{$num}{name};
-	    $hash->{helper}{100}{$data[2]}{time}  = TimeNow();
-	    $hash->{helper}{100}{$data[2]}{busid} = $num;
-	    $hash->{helper}{$num}{typ} = 'DS2401';
-	    $hash->{DS2401} .= $data[2].' ';
-	}
-	
-	if (!defined($hash->{helper}{$num}{typ})) {
-	    $txt = "unknown OW type, address $data[2]";
-	    Log3($name, 3, "$name, $txt");
-	    readingsSingleUpdate($hash, 'error', $txt, 1);
-	    return;
-	}
-
-	InternalTimer(gettimeofday()+1+($num*$hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 9)); # 10 - 28
-	return;
-    }
-
-    if ($ok && defined($data[11]) && exists($hash->{helper}{$num})) {
-
-        # das 10.Byte ist eine Checksumme für die serielle Übertragung
-        my $crc;
-        for my $i (2..10) { $crc += hex('0x'.$data[$i]); }
-        $crc = $crc & 0xFF;
-
-        if ($crc != hex('0x'.$data[11])) {
-	    $txt = "CRC error OW device $num : ".$data[11]. ' != '. sprintf('%02x', $crc);
-	    Log3($name, 3, "$name, $txt");
-	    readingsSingleUpdate($hash, 'error', $txt, 1);
-	    return;
-	}
-
-	shift @data;
-	shift @data;
-
-	my $model = $hash->{helper}{$num}{typ};
-	$hash->{helper}{$num}{raw} = join(' ' , @data);
-
-	$temp = decodeTemperature($model, @data);
-
-	if ($temp eq '') {
-	    $txt = "unable to decode data $hash->{helper}{$num}{raw} for model $model";
-	    Log3($name, 3, "$name, $txt");
-	    readingsSingleUpdate($hash, 'error', $txt, 1);
-	    return;
-	}
-
-	$hash->{helper}{$num}{value} = $temp;
-
-	if (!AttrNum($name, 'useSubDevices', 0)) {
-	    readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 1);
-	    return;
-	}
-
-	readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 0);
-	Dispatch($hash, "OW,$hash->{helper}{$num}{addr},$model,$temp,$num");
-    }
+    return decodeList($hash, $name, $num, $ok, @data) if (defined($data[2]) && (length($data[2]) == 16) && ( $data[2] =~ m{ [0-9A-F]+ }x ));
+    return decodeVal($hash, $name, $num, @data) if ($ok && defined($data[11]) && exists($hash->{helper}{$num}));
 
     return;
 }
 
 #####################################
+
+sub decodeList {
+
+    my ($hash, $name, $num, $ok, @data) = @_;
+    my $error;
+
+    delete $hash->{helper}{$num};
+
+    $hash->{helper}{$num}{state} = $ok;
+    $hash->{helper}{$num}{time}  = TimeNow();
+    $hash->{helper}{$num}{addr}  = $data[2];
+    $hash->{'OW-Dev'.$num}       = $hash->{helper}{$num}{addr}." => $ok";
+    $hash->{OWDEVICES}           = ($num + 1);
+
+    if (!$ok) {
+	$error = "got NOK for OW device $num [".$data[2].']';
+	Log3($name, 3, "$name, $error");
+	readingsSingleUpdate($hash, 'error', $error, 1);
+	return;
+    }
+
+    my $model = int(substr($data[2],0,2));
+    my $owid  = substr($data[2],0,14);
+    my $owcrc = substr($data[2],14,2);
+    my $crc   = 0;
+
+    for my $i (0,2,4,6,8,10,12) { # die ersten 7 Byte
+	my $byte = substr($owid, $i , 2);
+	for (my $bit=1; $bit<256; $bit=$bit*2) {
+	    my $cbit = ((hex($byte) & $bit) == $bit) ? 1 : 0;
+	    $crc= (($crc & 1) != $cbit) ? ($crc >> 1)^0x8c : $crc >> 1;
+	}
+    }
+
+    if ($crc != hex($owcrc)) {
+	$error = "CRC error OW device $num [$data[2]] : $owcrc != ". sprintf('%02x', $crc);
+	Log3($name, 3, "$name, $error");
+	readingsSingleUpdate($hash, 'error', $error, 1);
+	return;
+    }
+
+    $model = -1 if (!$model || ($model > 28) );
+
+    $hash->{helper}{$num}{fam} = $model;
+
+    if ($num == 0) {
+        for my $i (1..63) {delete $hash->{'OW-Dev'.$i} if (exists($hash->{'OW-Dev'.$i})); }
+    }
+
+    mapNames($hash, $num);
+
+    $hash->{helper}{$num}{typ} = 'DS1822'  if ($model == 22);
+    $hash->{helper}{$num}{typ} = 'DS18B20' if ($model == 28);
+    $hash->{helper}{$num}{typ} = 'DS1820'  if ($model == 10);
+
+    if ($model == 1) {
+	$hash->{helper}{100}{$data[2]}{name}  = $hash->{helper}{$num}{name};
+	$hash->{helper}{100}{$data[2]}{time}  = TimeNow();
+	$hash->{helper}{100}{$data[2]}{busid} = $num;
+	$hash->{helper}{$num}{typ} = 'DS2401';
+	$hash->{DS2401} .= $data[2].' ';
+    }
+
+    if (!defined($hash->{helper}{$num}{typ})) {
+	$error = "unknown OW type, address $data[2]";
+	Log3($name, 3, "$name, $error");
+	readingsSingleUpdate($hash, 'error', $error, 1);
+	return;
+    }
+
+    InternalTimer(gettimeofday()+1+($num*$hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 9)); # 10 - 28
+    return;
+}
+
+sub decodeVal {
+
+    my ($hash, $name, $num, @data)  = @_;
+    my $error;
+    my $crc;
+
+    # das 10.Byte ist eine Checksumme für die serielle Übertragung
+
+    for my $i (2..10) { 
+	$crc += hex($data[$i]) if (($data[$i] =~ m{ [0-9A-F]+ }x) && (length($data[$i]) == 2)) ;
+    }
+    $crc = $crc & 0xFF;
+    $data[11] = (($data[11] =~ m{ [0-9A-F]+ }x) && (length($data[11]) == 2)) ? hex($data[11]) : -1; # das CRC Byte selbst ist ungültig
+
+    if ($crc != $data[11]) {
+        $error = "CRC error OW device $num : $data[11] != $crc";
+        Log3($name, 3, "$name, $error");
+        readingsSingleUpdate($hash, 'error', $error, 1);
+        return;
+    }
+
+    shift @data;
+    shift @data;
+
+    my $model = $hash->{helper}{$num}{typ};
+    $hash->{helper}{$num}{raw} = join(' ' , @data);
+
+    my $temp = decodeTemperature($model, @data);
+
+    if ($temp eq '') {
+        $error = "unable to decode data $hash->{helper}{$num}{raw} for model $model";
+        Log3($name, 3, "$name, $error");
+        readingsSingleUpdate($hash, 'error', $error, 1);
+        return;
+    }
+
+    $hash->{helper}{$num}{value} = $temp;
+
+    if (!AttrNum($name, 'useSubDevices', 0)) {
+	readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 1);
+	return;
+    }
+
+    readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 0);
+    Dispatch($hash, "OW,$hash->{helper}{$num}{addr},$model,$temp,$num");
+    return;
+}
 
 sub decodeTemperature {
 
@@ -543,14 +583,14 @@ sub decodeTemperature {
     my $temp = '';
 
     if ($model eq 'DS1820')  {
-        $temp = (( hex('0x'.$data[1]) << 8) + hex('0x'.$data[0])) << 3;
-        $temp = ($temp & 0xFFF0) +12 - hex('0x'.$data[6]) if ($data[7] eq '10');
+        $temp = (( hex($data[1]) << 8) + hex($data[0])) << 3;
+        $temp = ($temp & 0xFFF0) +12 - hex($data[6]) if ($data[7] eq '10');
     }
 
     if (($model eq 'DS18B20') || ($model eq 'DS1822')) {
-        $temp = (( hex('0x'.$data[1]) << 8) + hex('0x'.$data[0]));
+        $temp = (( hex($data[1]) << 8) + hex($data[0]));
 
-        my $cfg = (hex('0x'.$data[4]) & 0x60);
+        my $cfg = (hex($data[4]) & 0x60);
         $temp  = $temp << 3 if ($cfg == 0);
         $temp  = $temp << 2 if ($cfg == 0x20);
         $temp  = $temp << 1 if ($cfg == 0x40);
@@ -558,7 +598,7 @@ sub decodeTemperature {
 
     if ($temp) {
 	$temp = $temp/16.0;
-	$temp -= 4096 if (hex('0x'.$data[1]) > 127);
+	$temp -= 4096 if (hex($data[1]) > 127);
 	$temp = sprintf('%.1f', $temp);
     }
 
