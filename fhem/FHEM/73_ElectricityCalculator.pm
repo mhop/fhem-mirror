@@ -219,16 +219,15 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 	$argument[0] =~ s/:.*//;
  
 	### Log entries for debugging
-	Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - Content of event                   : " . $event;
-	Log3 $name, 5, $name. " : ElectricityCalculator_splitFn - Content of argument[0]                   : " . $argument[0];
-	Log3 $name, 5, $name. " : ElectricityCalculator_splitFn - Content of argument[1]                   : " . $argument[1];
-
+	#Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - Content of event                   : " . $event;
+	#Log3 $name, 5, $name. " : ElectricityCalculator_splitFn - Content of argument[0]                   : " . $argument[0];
+	#Log3 $name, 5, $name. " : ElectricityCalculator_splitFn - Content of argument[1]                   : " . $argument[1];
 
 	### If the reading contains "_EnergyCost" or "_FinanceReserve"
 	if (($argument[0] =~ /_EnergyCost/) || ($argument[0] =~ /_FinanceReserve/))
 	{
 		### Log entries for debugging
-		Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - EnergyCost-Reading detected    : " . $argument[0];
+		#Log3 $name, 5, $name. " : ElectricityCalculator - DbLog_splitFn - EnergyCost-Reading detected      : " . $argument[0];
 		
 		### Get values being changed from hash
 		$reading = $argument[0];
@@ -239,7 +238,7 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 	elsif ($argument[0] =~ /_Power/)
 	{
 		### Log entries for debugging
-		Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - Power-Reading detected         : " . $argument[0];
+		#Log3 $name, 5, $name. " : ElectricityCalculator - DbLog_splitFn - Power-Reading detected           : " . $argument[0];
 		
 		### Get values being changed from hash
  		$reading = $argument[0];
@@ -250,7 +249,7 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 	elsif (($argument[0] =~ /_Counter/) || ($argument[0] =~ /_Last/) || (($argument[0] =~ /_Energy/) && ($argument[0] !~ /_EnergyCost/)) || ($argument[0] =~ /_PrevRead/))
 	{
 		### Log entries for debugging
-		Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - Counter/Energy-Reading detected: " . $argument[0];
+		#Log3 $name, 5, $name. " : ElectricityCalculator - DbLog_splitFn - Counter/Energy-Reading detected  : " . $argument[0];
 		
 		### Get values being changed from hash
 		$reading = $argument[0];
@@ -261,7 +260,7 @@ sub ElectricityCalculator_DbLog_splitFn($$)
 	else
 	{
 		### Log entries for debugging
-		Log3 $name, 5, $name. " : ElectricityCalculator_DbLog_splitFn - unspecified-Reading detected   : " . $argument[0];
+		#Log3 $name, 5, $name. " : ElectricityCalculator - DbLog_splitFn - unspecified-Reading detected     : " . $argument[0];
 		
 		### Get values being changed from hash
 		$reading = $argument[0];
@@ -291,8 +290,8 @@ sub ElectricityCalculator_Get($@)
 	my @cList;
 
 	### Create Log entries for debugging
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Get - reading         : " . $reading;
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Get - value           : " . $value;
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Get - reading         : " . $reading;
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Get - value           : " . $value;
 
 	
 	if(defined($hash->{READINGS})) {
@@ -304,7 +303,7 @@ sub ElectricityCalculator_Get($@)
 	}
 
 	### Create Log entries for debugging
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - set list: " . join(" ", @cList);
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - set list: " . join(" ", @cList);
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';	
 	
@@ -343,8 +342,8 @@ sub ElectricityCalculator_Set($@)
 	my @cList;
 
 	### Create Log entries for debugging
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - reading         : " . $reading;
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - value           : " . $value;
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - reading         : " . $reading;
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - value           : " . $value;
 
 	
 	if(defined($hash->{READINGS})) {
@@ -356,7 +355,7 @@ sub ElectricityCalculator_Set($@)
 	}
 
 	### Create Log entries for debugging
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - set list: " . join(" ", @cList);
+	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - set list: " . join(" ", @cList);
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';
 
@@ -453,7 +452,7 @@ sub ElectricityCalculator_MidnightTimer($)
 
 		# ### Restore Destination of readings
 		my $ElectricityCalcReadingPrefix                = $ElectricityCountName . "_" . $ElectricityCountReadingName;
-		my $ElectricityCalcReadingDestinationDeviceName	= ReadingsVal($ElectricityCalcName, ".ReadingDestinationDeviceName"                           , "error");
+		my $ElectricityCalcReadingDestinationDeviceName	= ReadingsVal($ElectricityCalcName, ".ReadingDestinationDeviceName"                                 , "error");
 		my $ElectricityCounterReadingValue 				= ReadingsVal($ElectricityCountName, $ElectricityCountReadingName                                   , "error");
 		my $LastUpdateTimestampUnix                 	= ReadingsVal($ElectricityCalcName, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
 	
@@ -488,7 +487,8 @@ sub ElectricityCalculator_MidnightTimer($)
 				### Create Log entries for debugging purpose
 				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
 			}
-			
+
+			### Create Log entries for debugging purpose			
 			#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCalcRDD      : \n" . Dumper($ElectricityCalcReadingDestinationDevice);
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCounter: " . $ElectricityCounterReadingValue;
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "."  . 	$ElectricityCalcReadingPrefix . "_PowerDaySum",     	"error");
@@ -504,7 +504,12 @@ sub ElectricityCalculator_MidnightTimer($)
 
 
 			if ($ElectricityCounterReadingValue ne "error") {
-				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Counter   : " . $ElectricityCounterReadingValue;
+				### Create Log entries for debugging purpose
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Device    : " . $ElectricityCountDev->{NAME};
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Reading   : " . $ElectricityCountReadingName;
+				Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Writing Value     : " . $ElectricityCounterReadingValue;
+				
+				### Writing Counter Value
 				readingsSingleUpdate($ElectricityCountDev, $ElectricityCountReadingName, $ElectricityCounterReadingValue, 1);
 			}
 			else {
@@ -530,7 +535,7 @@ sub ElectricityCalculator_MidnightTimer($)
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - timelocal         : " . timelocal(1, 0, 0, $mday, $mon, $year+1900);
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - nextMidnight      : " . $EpochNextMidnight;
 }
-####END####### Midnight Routine ################################################################################END#####
+####END####### Midnight Routine ########################################################################################END#####
 
 
 ###START###### Calculate Electricity meter values on changed events ###################################################START####
@@ -545,7 +550,8 @@ sub ElectricityCalculator_Notify($$)
  	my $RegEx										= $ElectricityCalcDev->{REGEXP};
 
 	### For debugging purpose only
-	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify - Trigger Dev Name   : " . $ElectricityCountDev->{NAME};
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator Begin_________________________________________________________________________________________________________________________";
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Notify - Trigger Dev Name                        : " . $ElectricityCountDev->{NAME};
 
 	### Check whether the Electricity calculator has been disabled
 	if(IsDisabled($ElectricityCalcName))
@@ -696,10 +702,6 @@ sub ElectricityCalculator_Notify($$)
 		   $ElectricityCountReadingValueCurrent      = $1 * $attr{$ElectricityCalcName}{ElectricityKwhPerCounts} + $attr{$ElectricityCalcName}{ElectricityCounterOffset};
 		my $ElectricityCountReadingTimestampCurrent  = ReadingsTimestamp($ElectricityCountName,$ElectricityCountReadingName,0);		
 
-		
-		### Create Log entries for debugging
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator Begin_______________________________________________________________________________________________________________________________";
-		
 		### Create name and destination device for general reading prefix
 		my $ElectricityCalcReadingPrefix;
 		my $ElectricityCalcReadingDestinationDevice;
@@ -747,6 +749,8 @@ sub ElectricityCalculator_Notify($$)
 		my $ElectricityCountReadingLastChangeDelta   = time() - ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - LastUpdateTimestampUnix                          : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", "No Value provided");
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingLastChangeDeltaSeconds    : " . $ElectricityCountReadingLastChangeDelta;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValuePrevious             : " . $ElectricityCountReadingValuePrevious;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcReadingPrefix_PrevRead            : " . $ElectricityCalcReadingPrefix . "_PrevRead";
 
@@ -836,9 +840,10 @@ sub ElectricityCalculator_Notify($$)
 		
 		####### Check whether Initial readings needs to be written
 		### Check whether the current value is the first one after change of day = First one after midnight or if last update is older than 1 day
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimeCurHour             : " . $ElectricityCountReadingTimestampCurrentHour;
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimePrevHour            : " . $ElectricityCountReadingTimestampPreviousHour;
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_Notify ElectricityCountReadTimeRelDelta            : " . $ElectricityCountReadingLastChangeDelta;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadTimeCurHour                  : " . $ElectricityCountReadingTimestampCurrentHour;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadTimePrevHour                 : " . $ElectricityCountReadingTimestampPreviousHour;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - LastUpdateTimestampUnix                          : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadTimeRelDelta                 : " . $ElectricityCountReadingLastChangeDelta;
 
 		if (($ElectricityCountReadingTimestampCurrentHour < $ElectricityCountReadingTimestampPreviousHour) || ($ElectricityCountReadingLastChangeDelta > 86400))
 		{
@@ -1094,7 +1099,7 @@ sub ElectricityCalculator_Notify($$)
 		}
 		
 		### Create Log entries for debugging
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator End_________________________________________________________________________________________________________________________________";
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator End___________________________________________________________________________________________________________________________";
 	}
 		
 	### If readings exist, update list of available readings
