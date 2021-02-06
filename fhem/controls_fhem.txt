@@ -1,4 +1,4 @@
-REV 23677
+REV 23678
 DIR unused
 UPD 2021-02-03_07:45:03 357495 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -736,8 +736,8 @@ UPD 2021-02-05_07:45:08 4462601 docs/commandref.html
 UPD 2021-02-04_07:45:10 2761354 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2020-12-08_07:45:02 90762 docs/commandref_frame_DE.html
-UPD 2021-02-05_07:45:11 235308 docs/commandref_modular.html
-UPD 2021-02-05_07:45:13 246083 docs/commandref_modular_DE.html
+UPD 2021-02-06_07:45:12 235308 docs/commandref_modular.html
+UPD 2021-02-06_07:45:14 246083 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
