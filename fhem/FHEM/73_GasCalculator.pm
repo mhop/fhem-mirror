@@ -232,8 +232,8 @@ sub GasCalculator_Get($@)
 	my @cList;
 
 	### Create Log entries for debugging
-	Log3 $GasCalcName, 5, $GasCalcName. "_Get - reading         : " . $reading;
-	Log3 $GasCalcName, 5, $GasCalcName. "_Get - value           : " . $value;
+	#Log3 $GasCalcName, 5, $GasCalcName. "_Get - reading         : " . $reading;
+	#Log3 $GasCalcName, 5, $GasCalcName. "_Get - value           : " . $value;
 
 	
 	if(defined($hash->{READINGS})) {
@@ -245,7 +245,7 @@ sub GasCalculator_Get($@)
 	}
 
 	### Create Log entries for debugging
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set list: " . join(" ", @cList);
+	#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set list: " . join(" ", @cList);
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';	
 	
@@ -283,8 +283,8 @@ sub GasCalculator_Set($@)
 	my @cList;
 
 	### Create Log entries for debugging
-	Log3 $GasCalcName, 5, $GasCalcName. "_Set - reading         : " . $reading;
-	Log3 $GasCalcName, 5, $GasCalcName. "_Set - value           : " . $value;
+	#Log3 $GasCalcName, 5, $GasCalcName. "_Set - reading         : " . $reading;
+	#Log3 $GasCalcName, 5, $GasCalcName. "_Set - value           : " . $value;
 
 	
 	if(defined($hash->{READINGS})) {
@@ -296,7 +296,7 @@ sub GasCalculator_Set($@)
 	}
 
 	### Create Log entries for debugging
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set list: " . join(" ", @cList);
+	#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - set list: " . join(" ", @cList);
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';
 
@@ -374,13 +374,12 @@ sub GasCalculator_MidnightTimer($)
 		}
 	}
 
-
 	### Create Log entries for debugging purpose
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer__________________________________________________________";
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer                     : MidnightTimer initiated";
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - RegEx             : " . $RegEx;
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountName      : " . $GasCountName;
-	#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadList: " . Dumper(@GasCountReadingNameListFiltered);
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadList: " . Dumper(@GasCountReadingNameListFiltered);
 	
 
 	### Remove internal timer for GasCalculator_MidnightTimer
@@ -444,7 +443,12 @@ sub GasCalculator_MidnightTimer($)
 
 
 			if ($GasCounterReadingValue ne "error") {
-				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Counter   : " . $GasCounterReadingValue;
+				### Create Log entries for debugging purpose
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Device    : " . $GasCountDev->{NAME};
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Reading   : " . $GasCountReadingName;
+				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Writing Value     : " . $GasCounterReadingValue;
+				
+				### Writing Counter Value
 				readingsSingleUpdate($GasCountDev, $GasCountReadingName, $GasCounterReadingValue, 1);
 			}
 			else {
@@ -483,6 +487,10 @@ sub GasCalculator_Notify($$)
 	my $GasCountNameEvents			= deviceEvents($GasCountDev, 1);
 	my $NumberOfChangedEvents		= int(@{$GasCountNameEvents});
  	my $RegEx						= $GasCalcDev->{REGEXP};
+
+	### Create Log entries for debugging
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator Begin_______________________________________________________________________________________________________________________________";
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Notify - Trigger Dev Name                                                : " . $GasCountDev->{NAME};
 
 	### Check whether the gas calculator has been disabled
 	if(IsDisabled($GasCalcName))
@@ -657,10 +665,6 @@ sub GasCalculator_Notify($$)
 		###Get current Counter and transform in Volume (cubic) as read on mechanic gas meter
 		   $GasCountReadingValueCurrent      = $1 * $attr{$GasCalcName}{GasCubicPerCounts} + $attr{$GasCalcName}{GasCounterOffset};
 		my $GasCountReadingTimestampCurrent  = ReadingsTimestamp($GasCountName,$GasCountReadingName,0);		
-
-		
-		### Create Log entries for debugging
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator Begin_______________________________________________________________________________________________________________________________";
 		
 		### Create name and destination device for general reading prefix
 		my $GasCalcReadingPrefix;
@@ -709,6 +713,8 @@ sub GasCalculator_Notify($$)
 		my $GasCountReadingLastChangeDelta   = time() - ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", "No Value provided");
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingLastChangeDeltaSeconds    : " . $GasCountReadingLastChangeDelta;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValuePrevious             : " . $GasCountReadingValuePrevious;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcReadingPrefix_PrevRead            : " . $GasCalcReadingPrefix . "_PrevRead";
 
@@ -813,9 +819,10 @@ sub GasCalculator_Notify($$)
 
 		####### Check whether Initial readings needs to be written
 		### Check whether the current value is the first one after change of day = First one after midnight
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimeCurHour  : " . $GasCountReadingTimestampCurrentHour;
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimePrevHour : " . $GasCountReadingTimestampPreviousHour;
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_Notify GasCountReadTimeRelDelta : " . $GasCountReadingLastChangeDelta;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimeCurHour                 : " . $GasCountReadingTimestampCurrentHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimePrevHour                : " . $GasCountReadingTimestampPreviousHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  LastUpdateTimestampUnix                 : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimeRelDelta                : " . $GasCountReadingLastChangeDelta;
 
 		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > 86400))
 		{
@@ -1081,7 +1088,7 @@ sub GasCalculator_Notify($$)
 		%GasCalculator_sets = %{$GasCalcDev->{READINGS}};
 
 		### Create Log entries for debugging
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
+		#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - notify x_sets list: " . join(" ", (keys %GasCalculator_sets));
 	}
 	
 	return undef;
