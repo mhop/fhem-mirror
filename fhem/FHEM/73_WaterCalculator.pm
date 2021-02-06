@@ -514,9 +514,13 @@ sub WaterCalculator_MidnightTimer($)
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDay  : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDay",		"error");
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDayL : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDayLast",	"error");
 
-
 			if ($WaterCounterReadingValue ne "error") {
-				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Counter   : " . $WaterCounterReadingValue;
+				### Create Log entries for debugging purpose
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Device    : " . $WaterCountDev->{NAME};
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Reading   : " . $WaterCountReadingName;
+				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Writing Value     : " . $WaterCounterReadingValue;
+				
+				### Writing Counter Value
 				readingsSingleUpdate($WaterCountDev, $WaterCountReadingName, $WaterCounterReadingValue, 1);
 			}
 			else {
@@ -756,6 +760,8 @@ sub WaterCalculator_Notify($$)
 		my $WaterCountReadingLastChangeDelta   = time() - ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 
 		### Create Log entries for debugging
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - LastUpdateTimestampUnix                    : " . ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", "No value provided");
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingLastChangeDeltaSeconds    : " . $WaterCountReadingLastChangeDelta;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingValuePrevious             : " . $WaterCountReadingValuePrevious;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCalcReadingPrefix_PrevRead            : " . $WaterCalcReadingPrefix . "_PrevRead";
 
