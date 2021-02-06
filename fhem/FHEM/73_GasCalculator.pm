@@ -392,7 +392,7 @@ sub GasCalculator_MidnightTimer($)
 
 		# ### Restore Destination of readings
 		my $GasCalcReadingPrefix                = $GasCountName . "_" . $GasCountReadingName;
-		my $GasCalcReadingDestinationDeviceName	= ReadingsVal($GasCalcName, ".ReadingDestinationDeviceName"                           , "error");
+		my $GasCalcReadingDestinationDeviceName	= ReadingsVal($GasCalcName, ".ReadingDestinationDeviceName"                         , "error");
 		my $GasCounterReadingValue 				= ReadingsVal($GasCountName, $GasCountReadingName                                   , "error");
 		my $LastUpdateTimestampUnix             = ReadingsVal($GasCalcName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
 	
@@ -716,7 +716,7 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", "No Value provided");
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingLastChangeDeltaSeconds    : " . $GasCountReadingLastChangeDelta;
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingValuePrevious             : " . $GasCountReadingValuePrevious;
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcReadingPrefix_PrevRead            : " . $GasCalcReadingPrefix . "_PrevRead";
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCalcReadingPrefix                     : " . $GasCalcReadingPrefix;
 
 		### Find out whether there has been a previous value being stored
 		if(defined($GasCountReadingValuePrevious))
