@@ -433,13 +433,12 @@ sub ElectricityCalculator_MidnightTimer($)
 		}
 	}
 
-
 	### Create Log entries for debugging purpose
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer__________________________________________________________";
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                            : MidnightTimer initiated";
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - RegEx                    : " . $RegEx;
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountName     : " . $ElectricityCountName;
-	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountReadList : " . Dumper(@ElectricityCountReadingNameListFiltered);
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountReadList : " . Dumper(@ElectricityCountReadingNameListFiltered);
 	
 
 	### Remove internal timer for ElectricityCalculator_MidnightTimer
@@ -752,7 +751,7 @@ sub ElectricityCalculator_Notify($$)
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - LastUpdateTimestampUnix                          : " . ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", "No Value provided");
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingLastChangeDeltaSeconds    : " . $ElectricityCountReadingLastChangeDelta;
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingValuePrevious             : " . $ElectricityCountReadingValuePrevious;
-		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcReadingPrefix_PrevRead            : " . $ElectricityCalcReadingPrefix . "_PrevRead";
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCalcReadingPrefix                     : " . $ElectricityCalcReadingPrefix;
 
 		### Find out whether there has been a previous value being stored
 		if(defined($ElectricityCountReadingValuePrevious))
