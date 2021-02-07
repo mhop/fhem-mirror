@@ -37,6 +37,8 @@ BEGIN
 	AttrNum
 	AttrVal
 	CommandAttr
+	CommandDelete
+	CommandDeleteReading
 	defs
 	deviceEvents
 	DevIo_CloseDev
@@ -50,6 +52,7 @@ BEGIN
 	modules
 	ReadingsVal
 	ReadingsNum
+	ReadingsTimestamp
 	readingsSingleUpdate
 	readingsBulkUpdate
 	readingsBeginUpdate
@@ -89,7 +92,7 @@ sub Initialize {
     $hash->{AttrFn}     = \&AttrFn;
     $hash->{ParseFn}    = \&ParseFn;
     $hash->{AttrList}   = 'model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes; # Slave Device
-    $hash->{AutoCreate} = { '^OW.*' => {ATTR => 'event-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}} };
+    $hash->{AutoCreate} = { '^OW.*' => {ATTR => 'event-on-change-reading:.* timestamp-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}} };
 
     return  FHEM::Meta::InitMod( __FILE__, $hash ) if ($hasmeta);
 
@@ -118,7 +121,9 @@ sub DefineFn {
 	$interval //= 30;
 	$hash->{INTERVAL}   = $interval;
 	$hash->{OWDEVICES}  = 0;
+	$hash->{OWVals}     = 0;
 	$hash->{addr}       = 'master';
+	$hash->{DELAY}      = .5;
 	setDevAttrList($name,'interval disable:0,1 mapOWIDs useSubDevices:0,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
@@ -132,7 +137,6 @@ sub DefineFn {
 
     $hash->{STATE}      = 'defined';
     $hash->{NOTIFYDEV}  = 'global';
-    $hash->{DELAY}      = .5;
     $hash->{SVN}        = (qw($Id$))[2];
 
     $modules{OW2S0SMSGUARD}{defptr}{$addr} = $hash;
@@ -169,13 +173,13 @@ sub NotifyFn {
 	$hash->{INTERVAL} = $attr{$name}{interval};
 
 	if (index($ev_str, 'INITIALIZED') > -1) { # nur bei FHEM Neustart eventuelle DS2401 vorbesetzen
-	    my @ds2401 = split(' ', ReadingsVal($name, '.ds2401' ,''));
+	    my @ds2401 = split(',', ReadingsVal($name, '.ds2401' ,''));
 
 	    foreach my $dev (@ds2401) { 
-		$hash->{helper}{100}{$dev}{name} = mapNames($hash, 100, $dev);
+		$hash->{helper}{OW}{100}{$dev}{name} = mapNames($hash, 100, $dev);
 	    }
 	    foreach my $dev (@ds2401) {
-		setReadingsVal($hash, $hash->{helper}{100}{$dev}{name}, 'unkown', TimeNow());
+		setReadingsVal($hash, $hash->{helper}{OW}{100}{$dev}{name}, 'unkown', TimeNow());
 		Log3($name, 5, "$name, restore hash for $dev");
 	    }
 	}
@@ -278,12 +282,16 @@ sub read_OW {
 
 sub SetFn {
 
-    my $hash = shift // return;
-    my $name = shift // return;
-    my $cmd  = shift // '?';
-    my $val  = shift // .5;
+    my $hash  = shift // return;
 
     return if ($hash->{addr} ne 'master');
+
+    my $name  = shift // return;
+    my $cmd   = shift // '?';
+    my $val   = shift // .5;
+    my $dlist = ReadingsVal($name, '.ds2401' ,'');
+    my $ds    = ($dlist) ? ' deleteDS2401:'.$dlist : '';
+
 
     if ($cmd eq 'reset') {
 	DevIo_CloseDev($hash);
@@ -297,7 +305,36 @@ sub SetFn {
 	return;
     }
 
-    return 'Unknown argument '.$cmd.', choose one of reset:noArg S0-reset:noArg delay';
+    if (($cmd eq 'deleteDS2401') && $dlist && ($val =~ m{ [0-9A-F]+ }x ) && (substr($val, 0, 2) eq '01')) {
+
+	my ($ret , $rr, $r);
+
+	if (exists($hash->{helper}{OW}{100}{$val})) {
+	    my $reading = (defined($hash->{helper}{OW}{100}{$val}->{name})) ? $hash->{helper}{OW}{100}{$val}->{name} : '';
+	    $ret = CommandDeleteReading(undef, "$name $reading") if ($reading);
+	    delete $hash->{helper}{OW}{100}{$val};
+	}
+
+	# Sub Device löschen ?
+	my $dname = (exists($modules{OW2S0SMSGUARD}{defptr}{$val})) ? $modules{OW2S0SMSGUARD}{defptr}{$val}->{NAME} : '';
+	$r = CommandDelete(undef, $dname) if ($dname && AttrVal($name, 'useSubDevices', ''));
+	$ret .= ($ret && $r) ? ' '.$r : $r;
+
+	$dlist =~ s/$val//x;
+	$dlist =~ s/,,/,/x; # $val war in der Mitte des Strings
+	$dlist =~ s/(^,|,$)//x; # einzelens Komma am Anfang oder Ende ?
+
+	readingsSingleUpdate($hash, '.ds2401', $dlist, 0) if ($dlist); # noch etwas übrig vom reading ?
+
+	if (!$dlist) {
+	    $rr = CommandDeleteReading(undef, "$name .ds2401");
+	    $ret .= ($ret && $rr) ? ' '.$rr : $rr;
+	}
+	Log3($name, 3, "$name, $ret") if ($ret);
+	return $ret;
+    }
+
+    return 'Unknown argument '.$cmd.', choose one of reset:noArg S0-reset:noArg delay '.$ds;
 }
 
 #####################################
@@ -310,11 +347,11 @@ sub GetFn {
 
     return if ($hash->{addr} ne 'master');
 
-    if ($cmd eq 'OWdevicelist') {
+    if (($cmd eq 'OWdevicelist') && (exists($hash->{helper}{OW}))) {
         my @devs;
-	foreach my $dev ( sort keys %{$hash->{helper}} ) {
+	foreach my $dev ( sort keys %{$hash->{helper}{OW}} ) {
 	    next if (int($dev) == 100);
-	    push @devs, "$dev,$hash->{helper}{$dev}{typ},$hash->{helper}{$dev}{addr},$hash->{helper}{$dev}{name},$hash->{helper}{$dev}{time}";
+	    push @devs, "$dev,$hash->{helper}{OW}{$dev}{typ},$hash->{helper}{OW}{$dev}{addr},$hash->{helper}{OW}{$dev}{name},$hash->{helper}{OW}{$dev}{time}";
 	}
 	return formatOWList(@devs);
     }
@@ -449,7 +486,7 @@ sub Parse {
     my $ok   = (defined($data[1]) && ($data[1] eq 'o')) ? 1 : 0;
 
     return decodeList($hash, $name, $num, $ok, @data) if (defined($data[2]) && (length($data[2]) == 16) && ( $data[2] =~ m{ [0-9A-F]+ }x ));
-    return decodeVal($hash, $name, $num, @data) if ($ok && defined($data[11]) && exists($hash->{helper}{$num}));
+    return decodeVal($hash, $name, $num, @data) if ($ok && defined($data[11]) && exists($hash->{helper}{OW}{$num}));
 
     return;
 }
@@ -461,13 +498,13 @@ sub decodeList {
     my ($hash, $name, $num, $ok, @data) = @_;
     my $error;
 
-    delete $hash->{helper}{$num};
+    delete $hash->{helper}{OW}{$num};
 
-    $hash->{helper}{$num}{state} = $ok;
-    $hash->{helper}{$num}{time}  = TimeNow();
-    $hash->{helper}{$num}{addr}  = $data[2];
-    $hash->{'OW-Dev'.$num}       = $hash->{helper}{$num}{addr}." => $ok";
-    $hash->{OWDEVICES}           = ($num + 1);
+    $hash->{helper}{OW}{$num}{state} = $ok;
+    $hash->{helper}{OW}{$num}{time}  = TimeNow();
+    $hash->{helper}{OW}{$num}{addr}  = $data[2];
+    $hash->{'OW-Dev'.$num}           = $hash->{helper}{OW}{$num}{addr}." => $ok";
+    $hash->{OWDEVICES}               = ($num + 1);
 
     if (!$ok) {
 	$error = "got NOK for OW device $num [".$data[2].']';
@@ -496,36 +533,43 @@ sub decodeList {
 	return;
     }
 
-    $model = -1 if (!$model || ($model > 28) );
-
-    $hash->{helper}{$num}{fam} = $model;
-
     if ($num == 0) {
         for my $i (1..63) {delete $hash->{'OW-Dev'.$i} if (exists($hash->{'OW-Dev'.$i})); }
+	$hash->{OWVals} = 0;
+    }
+
+    $hash->{helper}{OW}{$num}{fam} = $model;
+    $hash->{OWVals}++ if ($model > 1);
+
+    # passen DELAY und Inetrvall zusammen ?
+    if ((($hash->{OWVals} * $hash->{DELAY}) > $hash->{INTERVAL}) && $hash->{INTERVAL}) {
+	$error = "intervall $hash->{INTERVAL} is very short to read all $hash->{OWVals} OW devices !";
+	Log3($name, 3, "$name, $error");
+	readingsSingleUpdate($hash, 'error', $error, 1);
     }
 
     mapNames($hash, $num);
 
-    $hash->{helper}{$num}{typ} = 'DS1822'  if ($model == 22);
-    $hash->{helper}{$num}{typ} = 'DS18B20' if ($model == 28);
-    $hash->{helper}{$num}{typ} = 'DS1820'  if ($model == 10);
+    $hash->{helper}{OW}{$num}{typ} = 'DS1822'  if ($model == 22);
+    $hash->{helper}{OW}{$num}{typ} = 'DS18B20' if ($model == 28);
+    $hash->{helper}{OW}{$num}{typ} = 'DS1820'  if ($model == 10);
 
     if ($model == 1) {
-	$hash->{helper}{100}{$data[2]}{name}  = $hash->{helper}{$num}{name};
-	$hash->{helper}{100}{$data[2]}{time}  = TimeNow();
-	$hash->{helper}{100}{$data[2]}{busid} = $num;
-	$hash->{helper}{$num}{typ} = 'DS2401';
-	$hash->{DS2401} .= $data[2].' ';
+	$hash->{helper}{OW}{100}{$data[2]}{name}  = $hash->{helper}{OW}{$num}{name};
+	$hash->{helper}{OW}{100}{$data[2]}{time}  = TimeNow();
+	$hash->{helper}{OW}{100}{$data[2]}{busid} = $num;
+	$hash->{helper}{OW}{$num}{typ} = 'DS2401';
+	$hash->{DS2401} .= (!$hash->{DS2401}) ? $data[2] : ','.$data[2];
     }
 
-    if (!defined($hash->{helper}{$num}{typ})) {
+    if (!defined($hash->{helper}{OW}{$num}{typ})) {
 	$error = "unknown OW type, address $data[2]";
 	Log3($name, 3, "$name, $error");
 	readingsSingleUpdate($hash, 'error', $error, 1);
 	return;
     }
 
-    InternalTimer(gettimeofday()+1+($num*$hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 9)); # 10 - 28
+    InternalTimer(gettimeofday()+1+(($hash->{OWVals}-1) * $hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 1)); # nicht bei DS2401
     return;
 }
 
@@ -553,27 +597,27 @@ sub decodeVal {
     shift @data;
     shift @data;
 
-    my $model = $hash->{helper}{$num}{typ};
-    $hash->{helper}{$num}{raw} = join(' ' , @data);
+    my $model = $hash->{helper}{OW}{$num}{typ};
+    $hash->{helper}{OW}{$num}{raw} = join(' ' , @data);
 
     my $temp = decodeTemperature($model, @data);
 
     if ($temp eq '') {
-        $error = "unable to decode data $hash->{helper}{$num}{raw} for model $model";
+        $error = "unable to decode data $hash->{helper}{OW}{$num}{raw} for model $model";
         Log3($name, 3, "$name, $error");
         readingsSingleUpdate($hash, 'error', $error, 1);
         return;
     }
 
-    $hash->{helper}{$num}{value} = $temp;
+    $hash->{helper}{OW}{$num}{value} = $temp;
 
     if (!AttrNum($name, 'useSubDevices', 0)) {
-	readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 1);
+	readingsSingleUpdate($hash, $hash->{helper}{OW}{$num}{name}, $temp, 1);
 	return;
     }
 
-    readingsSingleUpdate($hash, $hash->{helper}{$num}{name}, $temp, 0);
-    Dispatch($hash, "OW,$hash->{helper}{$num}{addr},$model,$temp,$num");
+    readingsSingleUpdate($hash, $hash->{helper}{OW}{$num}{name}, $temp, 0);
+    Dispatch($hash, "OW,$hash->{helper}{OW}{$num}{addr},$model,$temp,$num");
     return;
 }
 
@@ -631,7 +675,6 @@ sub ParseFn {
 
     Log3($dname, 4, "$dname, ParseFn $msg");
 
-    #$dhash->{model} = $model;
     $dhash->{busid} = $arr[4] //= -1;
 
     readingsBeginUpdate($dhash);
@@ -641,21 +684,16 @@ sub ParseFn {
 	readingsBulkUpdate($dhash, 'state',       "T: $val °C");
     }
     elsif ($model eq 'DS2401') {
-	my $since = int(ReadingsNum($dname, '.last' , gettimeofday()));
-	my $now   = int(gettimeofday());
-	if (ReadingsVal($dname, 'presence' ,'') ne $val) {
-	    $since = ($now-$since);
-	#    setReadingsVal($dhash, 'since', $since, TimeNow());
+	if ((ReadingsVal($dname, 'presence' ,'absent') ne $val) && ($val eq 'absent')) {
+	    $dhash->{busid} = -1;
+	    setReadingsVal($dhash, 'last_present', ReadingsTimestamp($dname, 'presence', 'unknown'), TimeNow());
 	}
 	
-	#readingsBulkUpdate($dhash, '.last' , $now)  if (ReadingsVal($dname, 'presence' ,'') ne $val);
 	readingsBulkUpdate($dhash, 'state',    $val);
 	readingsBulkUpdate($dhash, 'presence', $val);
     }
 
     readingsEndUpdate($dhash,1);
-
-    #CommandAttr(undef, "$dname model $model")   if (!exists($attr{$dname}{model}));
 
     return $dname;
 }
@@ -681,18 +719,19 @@ sub UpdateReadings {
     readingsBulkUpdate($hash, 'state',  "A: $S0A - B: $S0B") if (($S0A ne '') && ($S0B ne ''));
     readingsEndUpdate($hash, 1);
 
-    if ($hash->{DS2401}) {
+    #if ($hash->{DS2401}) {
+    if (exists($hash->{helper}{OW}{100})) {
+	$hash->{DS2401} //= '';
 	readingsBeginUpdate($hash);
-        Log3($hash, 4, "$hash->{NAME}, DS2401 Devices $hash->{DS2401}");
-	#readingsBulkUpdate($hash,'TEST',$hash->{DS2401});
 
-        foreach my $dev ( keys %{$hash->{helper}{100}} ) {
-	    $hash->{helper}{100}{$dev}{presence} = (index($hash->{DS2401}, $dev) != -1) ? 'present' : 'absent';
-	    readingsBulkUpdate($hash, $hash->{helper}{100}{$dev}{name}, $hash->{helper}{100}{$dev}{presence});
-	    push @arr, "OW,$dev,DS2401,$hash->{helper}{100}{$dev}{presence},$hash->{helper}{100}{$dev}{busid}";
+        foreach my $dev ( keys %{$hash->{helper}{OW}{100}} ) {
+	    $hash->{helper}{OW}{100}{$dev}{presence} = (index($hash->{DS2401}, $dev) != -1) ? 'present' : 'absent';
+	    readingsBulkUpdate($hash, $hash->{helper}{OW}{100}{$dev}{name}, $hash->{helper}{OW}{100}{$dev}{presence});
+	    $hash->{helper}{OW}{100}{$dev}{busid} //= -1;
+	    push @arr, "OW,$dev,DS2401,$hash->{helper}{OW}{100}{$dev}{presence},$hash->{helper}{OW}{100}{$dev}{busid}";
 	}
 
-	readingsBulkUpdate($hash, '.ds2401', OW_uniq($hash->{NAME}, '.ds2401', $hash->{DS2401}));
+	readingsBulkUpdate($hash, '.ds2401', OW_uniq($hash->{NAME}, '.ds2401', $hash->{DS2401})) if ($hash->{DS2401});
 	delete $hash->{DS2401};
 
 	if (!AttrNum($hash->{NAME}, 'useSubDevices', 0)) {
@@ -716,7 +755,7 @@ sub mapNames {
     my $address = shift // '';
 
     my $m = AttrVal($hash->{NAME}, 'mapOWIDs' , '');
-    $hash->{helper}{$num}{name} = $hash->{helper}{$num}{addr} if ($num != 100);
+    $hash->{helper}{OW}{$num}{name} = $hash->{helper}{OW}{$num}{addr} if ($num != 100);
 
     return $address if (!$m);
 
@@ -726,8 +765,8 @@ sub mapNames {
 
     foreach my $n (@names) {
 	my ($addr,$reading) = split('=' , $n);
-	if (($num != 100) && ($addr eq $hash->{helper}{$num}{addr})) {
-	    $hash->{helper}{$num}{name} = $reading;
+	if (($num != 100) && ($addr eq $hash->{helper}{OW}{$num}{addr})) {
+	    $hash->{helper}{OW}{$num}{name} = $reading;
 	    Log3($hash, 4, "$hash->{NAME}, found name $reading for device [$num] $addr");
 	    return;
 	}
@@ -763,8 +802,8 @@ sub SimpleWrite {
 
 sub OW_uniq {
 
-    my @arr = split(' ', ReadingsVal(shift, shift, ''));
-    my @vals = split(' ', shift);
+    my @arr = split(',', ReadingsVal(shift, shift, ''));
+    my @vals = split(',', shift);
     foreach (@vals) {push @arr, $_;}
 
     my @unique;
@@ -778,7 +817,7 @@ sub OW_uniq {
     }
 
     @arr = sort @unique;
-    return join(' ', @arr);
+    return join(',', @arr);
 }
 
 #####################################
@@ -814,8 +853,10 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDset"></a>
   <b>Set</b>
     <a name="reset"></a><li>reset IO device ( master only )</li><br>
-    <a name="S0-reset"></a><li>S0-reset reset of both S0 counters ( master only )</li><br>
- 
+    <a name="S0-reset"></a><li>S0-reset : reset of both S0 counters ( master only )</li><br>
+    <a name="deleteDS2401"></a><li>deleteDS2401 : deletes reading and defined sub device ( master only )</li><br>
+    <a name="delay"></a><li>delay : default 0.5 seconds to read temperatur value ( master only )</li><br>
+
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
     <a name="OWdeviceList"></a><li>list of found OW devices ( master only )</li><br>
@@ -862,6 +903,10 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     <a name="reset"></a><li>reset IO Device ( nur Master Device )</li><br>
     <a name="S0-reset"></a><li>S0-resets ( nur Master Device )<br>
     setzt die beiden internen S0 Zähler ( A & B) auf 0 zurück</li><br>
+    <a name="deleteDS2401"></a><li>deleteDS2401 ( nur Master Device )<br>
+    löscht das das Reading und falls definiert auch das dazugehörige Sub-Device (siehe Attr useSubDevice)</li><br>
+    <a name="delay"></a><li>delay : default 0.5 ( nur Master Device )<br>
+    Wartezeit in Sekunden zum Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist</li><br>
  
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
@@ -882,7 +927,7 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   </ul>
   <ul>
     <a name="useSubDevices"></a><li>useSubDevices ( nur Master Device ) , default 0<br>
-    Legt für jedes gefundene Device am 1-W Bus ein eigenes Device an<br></li>
+    Legt für jedes gefundene Device am 1-W Bus ein eigenes extra Device an<br></li>
   </ul>
 
 =end html_DE
