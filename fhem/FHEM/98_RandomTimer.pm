@@ -99,7 +99,7 @@ sub Define {
       if ( !defined $timeToSwitch );
 
     my ( $rel, $rep, $tspec );
-    if ( $timespec_start =~ m{^(\+)?(\*)?(.*)$}ixms ) {
+    if ( $timespec_start =~ m{\A(\+)?(\*)?(.*)\z}ixms ) {
         $rel   = $1;
         $rep   = $2;
         $tspec = $3;
@@ -111,11 +111,11 @@ sub Define {
     my ( $err, $hr, $min, $sec, $fn ) = GetTimeSpec($tspec);
     return $err if ($err);
 
-    $rel = $rel // "";
-    $rep = $rep // "";
+    $rel = $rel // q{};
+    $rep = $rep // q{};
 
     my ( $srel, $srep, $stspec );
-    if ( $timespec_stop =~ m{^(\+)?(\*)?(.*)$}ixms ) {
+    if ( $timespec_stop =~ m{\A(\+)?(\*)?(.*)\z}ixms ) {
         $srel   = $1;
         $srep   = $2;
         $stspec = $3;
@@ -162,8 +162,10 @@ sub Define {
     readingsSingleUpdate( $hash, "TimeToSwitch", $hash->{helper}{TIMETOSWITCH},
         1 );
 
-    RmInternalTimer( "RT_SetTimer", $hash );
-    MkInternalTimer( "RT_SetTimer", time(), \&RT_SetTimer, $hash, 0 );
+    RemoveInternalTimer($hash,\&RT_SetTimer);
+    InternalTimer(time,\&RT_SetTimer,$hash);
+    #RmInternalTimer( "RT_SetTimer", $hash );
+    #MkInternalTimer( "RT_SetTimer", time(), \&RT_SetTimer, $hash, 0 );
 
     return;
 }
@@ -172,9 +174,11 @@ sub Undef {
 
     my $hash = shift;
     my $arg  = shift // return;
+    
+    RemoveInternalTimer($hash);
 
-    RmInternalTimer( "RT_SetTimer", $hash );
-    RmInternalTimer( "RT_Exec",     $hash );
+    #RmInternalTimer( "RT_SetTimer", $hash );
+    #RmInternalTimer( "RT_Exec",     $hash );
     delete $modules{RandomTimer}{defptr}{ $hash->{NAME} };
     return;
 }
@@ -191,20 +195,23 @@ sub Attr {
     if ( $attrName =~ m{\A disable(Cond)? \z}xms ) {
 
         # Immediately execute next switch check
-        RmInternalTimer( "RT_Exec", $hash );
-        MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
+        RemoveInternalTimer( $hash, \&RT_Exec );
+        InternalTimer( time, \&RT_Exec, $hash );
+
+        #RmInternalTimer( "RT_Exec", $hash );
+        #MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
     }
 
     if ( $attrName eq 'offState' ) {
-        my ( $offRegex, $offReading ) = split ' ', $attrVal, 2;
+        my ( $offRegex, $offReading ) = split m{\s+}x, $attrVal, 2;
         $hash->{helper}{offRegex} = $offRegex;
         $hash->{helper}{offReading} = $offReading // 'state';
     }
     
     if ( $attrName eq 'disableCond' ) {
-        if( $cmd eq "set" ) {
+        if( $cmd eq 'set' ) {
             my $err = perlSyntaxCheck($attrVal);
-            return $err if ( $err );
+            return $err if $err;
         }
     }
   
@@ -227,8 +234,10 @@ sub Set {
             Log3( $hash, 3, "[$name] is disabled, set execNow not possible" );
         }
         else {
-            RmInternalTimer( "RT_Exec", $hash );
-            MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
+            RemoveInternalTimer($hash,\&RT_Exec);
+            InternalTimer(time + 1,\&RT_Exec,$hash);
+            #RmInternalTimer( "RT_Exec", $hash );
+            #MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
         }
         return;
     }
@@ -239,8 +248,10 @@ sub Set {
         }
         my $statevalue = $v eq "active" ? "activated" : $v;
         readingsSingleUpdate( $hash, "state", $statevalue, 1 );
-        RmInternalTimer( "RT_Exec", $hash );
-        MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
+        RemoveInternalTimer($hash,\&RT_Exec);
+        InternalTimer(time + 1,\&RT_Exec,$hash);
+        #RmInternalTimer( "RT_Exec", $hash );
+        #MkInternalTimer( "RT_Exec", time() + 1, \&RT_Exec, $hash, 0 );
         return;
     }
     return;
@@ -357,12 +368,9 @@ sub down {
 }
 
 sub RT_Exec {
-    my $myHash = shift // return;
+    my $hash = shift // return;
 
-    my $hash = GetHashIndirekt( $myHash, ( caller(0) )[3] );
-    return if ( !defined($hash) );
-
-    my $now = time();
+    my $now = time;
 
     # Wenn aktiv aber disabled, dann timer abschalten, Meldung ausgeben.
     my $active          = isAktive($hash);
@@ -456,10 +464,12 @@ sub RT_Exec {
     }
 
     my $nextSwitch = time() + getSecsToNextAbschaltTest($hash);
-    RmInternalTimer( "RT_Exec", $hash );
+    #RmInternalTimer( "RT_Exec", $hash );
     $hash->{helper}{NEXT_CHECK} =
       strftime( "%d.%m.%Y  %H:%M:%S", localtime($nextSwitch) );
-    MkInternalTimer( "RT_Exec", $nextSwitch, \&RT_Exec, $hash, 0 );
+    #MkInternalTimer( "RT_Exec", $nextSwitch, \&RT_Exec, $hash, 0 );
+    RemoveInternalTimer($hash,\&RT_Exec);
+    InternalTimer($nextSwitch,\&RT_Exec,$hash);
     return;
 }
 
@@ -486,10 +496,10 @@ sub isDisabled {
 
     my $disable =
       IsDisabled( $hash->{NAME} );    #AttrVal($hash->{NAME}, "disable", 0 );
-    return $disable if ($disable);
+    return $disable if $disable;
 
     my $disableCond = AttrVal( $hash->{NAME}, "disableCond", "nf" );
-    return 0 if ( $disableCond eq "nf" );
+    return 0 if $disableCond eq "nf";
 
     return AnalyzePerlCommand( $hash, $disableCond );
 }
@@ -503,8 +513,6 @@ sub schaltZeitenErmitteln {
 
     readingsBeginUpdate($hash);
 
-#  readingsBulkUpdate ($hash,  "Startzeit", FmtDateTime($hash->{helper}{startTime}));
-#  readingsBulkUpdate ($hash,  "Stoppzeit", FmtDateTime($hash->{helper}{stopTime}));
     readingsBulkUpdate( $hash, "StartTime",
         FmtDateTime( $hash->{helper}{startTime} ) );
     readingsBulkUpdate( $hash, "StopTime",
@@ -561,10 +569,8 @@ sub setSwitchmode {
 }
 
 sub RT_SetTimer {
-    my $myHash = shift // return;
-    my $hash = GetHashIndirekt( $myHash, ( caller(0) )[3] );
-    return if ( !defined($hash) );
-
+    my $hash = shift // return;
+    
     my $now = time();
     my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
       localtime($now);
@@ -584,15 +590,21 @@ sub RT_SetTimer {
     my $secToMidnight = 24 * 3600 - ( 3600 * $hour + 60 * $min + $sec );
 
     my $setExecTime = max( $now, $hash->{helper}{startTime} );
-    RmInternalTimer( "RT_Exec", $hash );
-    MkInternalTimer( "RT_Exec", $setExecTime, \&RT_Exec, $hash, 0 );
+    RemoveInternalTimer($hash,\&RT_Exec);
+    InternalTimer($setExecTime,\&RT_Exec,$hash);
+
+    #RmInternalTimer( "RT_Exec", $hash );
+    #MkInternalTimer( "RT_Exec", $setExecTime, \&RT_Exec, $hash, 0 );
 
     if ( $hash->{helper}{REP} gt "" ) {
         my $setTimerTime =
           max( $now + $secToMidnight + 15, $hash->{helper}{stopTime} ) +
           $hash->{helper}{TIMETOSWITCH} + 15;
-        RmInternalTimer( "RT_SetTimer", $hash );
-        MkInternalTimer( "RT_SetTimer", $setTimerTime, \&RT_SetTimer, $hash, 0 );
+        #RmInternalTimer( "RT_SetTimer", $hash );
+        #MkInternalTimer( "RT_SetTimer", $setTimerTime, \&RT_SetTimer, $hash, 0 );
+        RemoveInternalTimer($hash,\&RT_SetTimer);
+        InternalTimer($setTimerTime,\&RT_SetTimer,$hash);
+
     }
     return;
 }
@@ -683,60 +695,12 @@ sub zeitBerechnen {
 
     my @jetzt_arr = localtime($now);
 
-    #Stunden               Minuten               Sekunden
+    #Stunden    Minuten    Sekunden
     $jetzt_arr[2] = $hour;
     $jetzt_arr[1] = $min;
     $jetzt_arr[0] = $sec;
     my $next = timelocal_nocheck(@jetzt_arr);
     return $next;
-}
-
-sub MkInternalTimer {
-    my ( $modifier, $tim, $callback, $hash, $waitIfInitNotDone ) = @_;
-
-    my $timerName = "$hash->{NAME}_$modifier";
-    my $mHash     = {
-        HASH     => $hash,
-        NAME     => "$hash->{NAME}_$modifier",
-        MODIFIER => $modifier
-    };
-    if ( defined( $hash->{TIMER}{$timerName} ) ) {
-        Log3( $hash, 1, "[$hash->{NAME}] possible overwriting of timer $timerName - please delete first" );
-        stacktrace();
-    }
-    else {
-        $hash->{TIMER}{$timerName} = $mHash;
-    }
-
-    Log3( $hash, 5,
-      "[$hash->{NAME}] setting  Timer: $timerName " . FmtDateTime($tim) );
-    InternalTimer( $tim, $callback, $mHash, $waitIfInitNotDone );
-    return $mHash;
-}
-################################################################################
-sub RmInternalTimer {
-    my $modifier = shift;
-    my $hash = shift // return;
-
-    my $timerName = "$hash->{NAME}_$modifier";
-    my $myHash    = $hash->{TIMER}{$timerName};
-    if ( defined($myHash) ) {
-        delete $hash->{TIMER}{$timerName};
-        Log3( $hash, 5, "[$hash->{NAME}] removing Timer: $timerName" );
-        RemoveInternalTimer($myHash);
-    }
-    return;
-}
-
-sub GetHashIndirekt {
-    my $myHash = shift;
-    my $function = shift // return;
-
-    if ( !defined( $myHash->{HASH} ) ) {
-        Log3( $myHash, 3, "[$function] myHash not valid" );
-        return;
-    }
-    return $myHash->{HASH};
 }
 
 1;
