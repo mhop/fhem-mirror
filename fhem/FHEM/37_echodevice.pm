@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2021.02.07 v0.2.8
+# - BUG:     Sonso aktualisiert keine voice Readings
+#
 # 2021.01.28 v0.2.7
 # - BUG:     Routinen werden nicht mehr angezeigt
 #
@@ -447,7 +450,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.7";
+my $ModulVersion     = "0.2.8";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 
@@ -2763,10 +2766,10 @@ sub echodevice_Parse($$$) {
 					# Device ID herausfiltern
 					my $sourceDeviceIds = ""; 
 					foreach my $cards (@{$card->{sourceDeviceIds}}) {
-						next if (echodevice_getModel($cards->{deviceType}) eq "Echo Multiroom");
-						next if (echodevice_getModel($cards->{deviceType}) eq "Sonos Display");
-						next if (echodevice_getModel($cards->{deviceType}) eq "Echo Stereopaar");
-						next if (echodevice_getModel($cards->{deviceType}) eq "unbekannt");
+						#next if (echodevice_getModel($cards->{deviceType}) eq "Echo Multiroom");
+						#next if (echodevice_getModel($cards->{deviceType}) eq "Sonos Display");
+						#next if (echodevice_getModel($cards->{deviceType}) eq "Echo Stereopaar");
+						#next if (echodevice_getModel($cards->{deviceType}) eq "unbekannt");
 						$sourceDeviceIds = $cards->{serialNumber};
 					}
 				
