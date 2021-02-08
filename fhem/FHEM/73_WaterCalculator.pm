@@ -435,7 +435,7 @@ sub WaterCalculator_MidnightTimer($)
  	my $RegEx									  = $WaterCalcDev->{REGEXP};
 	my ($WaterCountName, $WaterCountReadingRegEx) = split(":", $RegEx, 2);
 	my $WaterCountDev							  = $defs{$WaterCountName};
-	$WaterCountReadingRegEx						  =~ s/[\.\*]//g;
+	$WaterCountReadingRegEx						  =~ s/[\.\*]+$//;
 
 	my @WaterCountReadingNameListComplete = keys(%{$WaterCountDev->{READINGS}});
 	my @WaterCountReadingNameListFiltered;
@@ -450,7 +450,9 @@ sub WaterCalculator_MidnightTimer($)
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer__________________________________________________________";
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : MidnightTimer initiated";
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - RegEx             : " . $RegEx;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - ReadingRegEx      : " . $WaterCountReadingRegEx;
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountName    : " . $WaterCountName;
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountReadComp: " . Dumper(@WaterCountReadingNameListComplete);
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCountReadList: " . Dumper(@WaterCountReadingNameListFiltered);
 	
 
