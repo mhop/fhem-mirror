@@ -168,7 +168,7 @@ function FW_weekprofilePRF_chached(devName,select)
   var prfName = select.options[select.selectedIndex].value;
   widget.CURPRF = prfName;
   widget.PROFILE = null;  
-  FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
+  FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF+' 1', widget);
 }
 
 function FW_weekprofileTOPIC_chached(devName,select)
@@ -201,10 +201,10 @@ function FW_weekprofileRestoreTopic(devName,bnt)
         FW_cmd(FW_root+'?cmd=set '+devName+' restore_topic '+widget.CURTOPIC+'&XHR=1',function(data){
         if (data != "")
         {
-			console.log(devName+" error restore topic '" +data+"'");
-			FW_errmsg(devName+" error restore topic '" +data+"'",5000);
-			return;
-		}
+            console.log(devName+" error restore topic '" +data+"'");
+            FW_errmsg(devName+" error restore topic '" +data+"'",5000);
+            return;
+        }
       });
     });
 }
@@ -535,6 +535,9 @@ function FW_weekprofileTemp_chached(select)
 
 function FW_weekprofileEditDay(widget,day)
 { 
+  if (widget.PROFILE == null) {
+    return "";
+  }
   var div = $("<div>").get(0);
   var html= '';
   html += "<div style=\"padding:5px;\">";
@@ -548,8 +551,9 @@ function FW_weekprofileEditDay(widget,day)
   $(table).attr('class',"block wide weekprofile");
   
   html = '';
-  var times = widget.PROFILE[shortDays[day]]['time'];
-  var temps = widget.PROFILE[shortDays[day]]['temp'];
+  var sday = shortDays[day];  
+  var times = widget.PROFILE[sday]['time'];
+  var temps = widget.PROFILE[sday]['temp'];
   
   for (var i = 0; i < times.length; ++i) {
     var startTime = (i>0) ? times[i-1] : "00:00";
@@ -563,39 +567,18 @@ function FW_weekprofileEditDay(widget,day)
     //to
     html += "<td><input type=\"text\" name=\"ENDTIME\" size=\"5\" maxlength=\"5\" align=\"center\" value=\""+endTime+"\" onblur=\"FW_weekprofileEditTime_changed(this)\"/></td>"; 
     
-    //temp
-    var tempOn = widget.TEMP_ON;
-    var tempOff = widget.TEMP_OFF;
-
-    if (tempOn == null)
-      tempOn = 30;
-    
-    if (tempOff == null)
-      tempOff = 5;
-      
-    if (tempOff > tempOn)
-    {
-		var tmp = tempOn;
-		tempOn = tempOff;
-		tempOff = tmp;
-	}
-    
+    // temp
+    if (widget.TEMPLIST == null) {
+      widget.TEMPLIST = new Array();
+      for (var k=5; k <= 30; k+=0.5) {
+        widget.TEMPLIST.push(k);
+      }
+    }
     html += "<td><select name=\"TEMP\" size=\"1\" onchange=\"FW_weekprofileTemp_chached(this)\">";
-    for (var k=tempOff; k <= tempOn; k+=.5)
+    for (var k=0; k < widget.TEMPLIST.length; ++k)
     {
-        var selected = (k == temps[i]) ? "selected " : "";
-        if (k == widget.TEMP_OFF) {
-          // currently weekprofile save on|off into json data
-          selected = (temps[i] == "off") ? "selected " : "";
-          html += "<option "+selected+"value=\"off\">off</option>";
-        }
-        else if (k == widget.TEMP_ON) {
-          // currently weekprofile save on|off into json data
-          selected = (temps[i] == "on") ? "selected " : "";  
-          html += "<option "+selected+"value=\"on\">on</option>";
-        }
-        else
-          html += "<option "+selected+"value=\""+k.toFixed(1)+"\">"+k.toFixed(1)+"</option>";
+        var selected = (widget.TEMPLIST[k] == temps[i]) ? "selected " : "";
+        html += "<option "+selected+"value=\""+widget.TEMPLIST[k]+"\">"+widget.TEMPLIST[k]+"</option>";
     }
     html += "</select></td>";    
     //ADD-Button
@@ -707,7 +690,7 @@ function FW_weekprofileBack(widget)
             window.location.assign(document.referrer)
       } else {
         window.history.back() //maybe problems with reload
-        }       
+        }
   }
   else {
     widget.MODE = "SHOW";
@@ -783,7 +766,7 @@ function FW_weekprofileGetValues(devName,what,data)
       if (widget.CURPRF == null && widget.PROFILENAMES) {
           widget.CURPRF = widget.PROFILENAMES[0]; 
       }
-      FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
+      FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF+' 1', widget);
     } else {
         widget.setValueFn("REUSEPRF");
     }
@@ -808,6 +791,14 @@ function FW_weekprofileGetValues(devName,what,data)
         if (trans.length == 2)
           widget.TRANSLATIONS[trans[0].trim()] = trans[1].trim();
       }
+  } else if (what == "TEMPLIST") {
+    console.log(devName+" TEMPLIST '" +data+"'");
+    var arr = data.split(',');
+    widget.TEMPLIST = new Array();
+    var i = -1;
+    while (++i < arr.length) {
+      widget.TEMPLIST[i] = arr[i];
+    }
   }
 }
 
@@ -846,8 +837,7 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   widget.JMPBACK = null;
   widget.MODE = 'SHOW';
   widget.USETOPICS = 0;
-  widget.TEMP_ON = null;
-  widget.TEMP_OFF = null;
+  widget.TEMPLIST = null;
 
   for (var i = 1; i < vArr.length; ++i) {
     var arg = vArr[i].split(':');
@@ -857,8 +847,6 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
       case "MASTERDEV": widget.MASTERDEV = arg[1];      break;
       case "USETOPICS": widget.USETOPICS = arg[1];      break;
       case "DAYINROW":  widget.EDIT_DAYSINROW = arg[1]; break;
-      case "TEMP_ON":   widget.TEMP_ON = parseFloat(arg[1]); break;
-      case "TEMP_OFF":  widget.TEMP_OFF = parseFloat(arg[1]);break;
     }
   }
   
@@ -871,7 +859,8 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
   
   widget.setValueFn = function(arg){FW_weekprofileGetProfileData(devName,arg);}
   widget.activateFn = function(arg){
-    FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF, widget);
+    FW_cmd(FW_root+'?cmd=get '+devName+' tempList&XHR=1',function(data){FW_weekprofileGetValues(devName,"TEMPLIST",data);});
+    FW_queryValue('get '+devName+' profile_data '+widget.CURTOPIC+':'+widget.CURPRF+' 1', widget); // use keywords
     FW_cmd(FW_root+'?cmd={AttrVal("'+devName+'","widgetWeekdays","")}&XHR=1',function(data){FW_weekprofileGetValues(devName,"WEEKDAYS",data);});
     FW_cmd(FW_root+'?cmd={AttrVal("'+devName+'","widgetTranslations","")}&XHR=1',function(data){FW_weekprofileGetValues(devName,"TRANSLATE",data);}); 
     if (widget.USETOPICS == 1) {
@@ -888,6 +877,7 @@ FW_weekprofileCreate(elName, devName, vArr, currVal, set, params, cmd)
       // do not update profile data in edit mode
       return;
     }
+    FW_cmd(FW_root+'?cmd=get '+devName+' tempList&XHR=1',function(data){FW_weekprofileGetValues(devName,"TEMPLIST",data);});
     if (widget.USETOPICS == 1) {
       FW_cmd(FW_root+'?cmd=get '+devName+' topic_names&XHR=1',function(data){FW_weekprofileGetValues(devName,"TOPICNAMES",data);});
     } else {
