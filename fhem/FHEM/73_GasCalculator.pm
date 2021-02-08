@@ -287,7 +287,7 @@ sub GasCalculator_Set($@)
 	#Log3 $GasCalcName, 5, $GasCalcName. "_Set - value           : " . $value;
 
 	### For Test purpose only
-	push(@cList, "Test"); 
+	#push(@cList, "Test"); 
 	
 	### Create set-List
 	if(defined($hash->{READINGS})) {
@@ -342,9 +342,9 @@ sub GasCalculator_Set($@)
 		$ReturnMessage = $GasCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
 	}
 	### For Test purpose only
-	elsif ($reading eq "Test") {
-		GasCalculator_MidnightTimer($hash);
-	}
+	#elsif ($reading eq "Test") {
+	#	GasCalculator_MidnightTimer($hash);
+	#}
 	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
