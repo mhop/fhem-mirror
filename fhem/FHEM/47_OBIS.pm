@@ -8,8 +8,6 @@
 # Other credits:
 # hdgucken, 02/2021: non-blocking extension, optimize ser2net integration
 # 
-# credits by Icinger, main developer until 02/2021:
-#
 # Original credits by Icinger, main developer until 02/2021:
 # Thanks to matzefizi for letting me merge this with 70_SMLUSB.pm and for testing
 # Thanks to immi for testing and supporting help and tips
