@@ -1083,7 +1083,6 @@ ZWave_Cmd($$@)
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
   my $cmdFmt = $cmdList{$cmd}{fmt};
   my $cmdId  = $cmdList{$cmd}{id};
-  unshift @a, $cmd if($cmdList{$cmd}{unshiftCmd});
   # 0x05=AUTO_ROUTE+ACK, 0x20: ExplorerFrames
 
   my $nArg = 0;
@@ -1126,7 +1125,11 @@ ZWave_Cmd($$@)
     $cmdFmt = $lcmd;
 
   } else {
-    $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+    if($cmdList{$cmd}{unshiftCmd}) {
+      $cmdFmt = sprintf($cmdFmt, "$cmd @a");
+    } elsif($nArg) {
+      $cmdFmt = sprintf($cmdFmt, @a);
+    }
     $@ = undef;
     my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
