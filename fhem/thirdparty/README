@@ -1,0 +1,13 @@
+This is the place for thirdparty files.
+
+Requirements:
+- the file itself cannot be easily downloaded from the "native" site, or
+  building it from source (by supplying a description) is not reasonable.
+- the licence is compatible with GPLv2
+- the file (or files) is residing in a subdirectory describing its
+  name (e.g. libXYZ)
+- the directory contains a README, with following content:
+  - the exact licence
+  - the current maintainer
+  - which module is in need of this file
+  - why is it not feasible to just download the file or build it
