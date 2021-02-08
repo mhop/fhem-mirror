@@ -1519,7 +1519,7 @@ sub EnOcean_Get($@) {
       Log3 $name, 3, "EnOcean get $name $cmd";
 
     } elsif ($cmd eq "signal") {
-      # trigger status massage of device
+      # trigger status message of device
       $rorg = "D0";
       $destinationID = $hash->{DEF} if ($destinationID eq 'F' x 8);
       shift(@a);
@@ -2575,7 +2575,12 @@ sub EnOcean_Set($@) {
         $data = sprintf "%02X%02X%02X%02X", $setpoint, $humidity, $actualTemp, $setCmd;
 
       } else {
-        return "Unknown argument " . $cmd . ", choose one of " . $cmdList . " setpoint:slider,0,1,255 setpointScaled switch:on,off teach:noArg"
+        if (AttrVal($name, 'devMode', 'master') eq 'master') {
+          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . " setpoint:slider,0,1,255 setpointScaled switch:on,off teach:noArg"
+        }
+        else {
+          return undef;
+        }
       }
       Log3 $name, 3, "EnOcean set $name $cmd";
 
@@ -2710,7 +2715,12 @@ sub EnOcean_Set($@) {
           $data = sprintf "%02X%02X%02X%02X", $nightReduction, $setpointTemp, $actualTemp, $setCmd;
 
         } else {
-          return "Unknown argument " . $cmd . ", choose one of setpointTemp:slider,0,1,40 desired-temp nightReduction:0,1,2,3,4,5 teach:noArg"
+          if (AttrVal($name, 'devMode', 'master') eq 'master') {
+            return "Unknown argument " . $cmd . ", choose one of setpointTemp:slider,0,1,40 desired-temp nightReduction:0,1,2,3,4,5 teach:noArg"
+          }
+          else {
+            return undef;
+          }
         }
 
       } else {
@@ -2879,7 +2889,12 @@ sub EnOcean_Set($@) {
           $data = sprintf "%02X%02X%02X%02X", $fanStage, $setpoint, $actualTemp, $setCmd;
 
         } else {
-          return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "setpoint:slider,0,1,255 fanStage:auto,0,1,2,3 setpointScaled switch:on,off teach:noArg"
+          if (AttrVal($name, 'devMode', 'master') eq 'master') {
+            return "Unknown argument " . $cmd . ", choose one of " . $cmdList . "setpoint:slider,0,1,255 fanStage:auto,0,1,2,3 setpointScaled switch:on,off teach:noArg"
+          }
+          else {
+            return undef;
+          }
         }
 
       }
@@ -9808,7 +9823,7 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "lightSensor.01") {
       # Light Sensor (EEP A5-06-01)
-      # [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI, untested]
+      # [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI]
       # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
       # $db[3] is the low illuminance for Eltako devices where
       # min 0x00 = 0 lx, max 0xFF = 100 lx, if $db[2] = 0
@@ -9838,7 +9853,12 @@ sub EnOcean_Parse($$) {
       }
       push @event, "3:brightness:$lux";
       push @event, "3:state:$lux";
-
+      readingsDelete($hash, 'alarm');
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 110), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
     } elsif ($st eq "lightSensor.02") {
       # Light Sensor (EEP A5-06-02)
       # $db[3] is the voltage where 0x00 = 0 V ... 0xFF = 5.1 V
@@ -9941,6 +9961,13 @@ sub EnOcean_Parse($$) {
         @{$hash->{helper}{timer}{state}} = ($hash, 'state', 'off', 1, 5);
         InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{motion}, 0);
         InternalTimer(gettimeofday() + AttrVal($name, 'trackerWakeUpCycle', 30) * 1.1, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{state}, 0);
+      } else {
+        readingsDelete($hash, 'alarm');
+        if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+          RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+          @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+          InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1320), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        }
       }
       if (!exists($hash->{helper}{lastVoltage}) || $hash->{helper}{lastVoltage} != $db[3]) {
         push @event, "3:battery:" . ($db[3] * 0.02 > 2.8 ? "ok" : "low");
@@ -10032,6 +10059,12 @@ sub EnOcean_Parse($$) {
       }
       push @event, "3:brightness:$lux";
       push @event, "3:motion:$motion";
+      readingsDelete($hash, 'alarm');
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1320), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "lightCtrlState.01") {
       # Lighting Controller State (EEP A5-11-01)
@@ -15450,7 +15483,7 @@ EnOcean_roomCtrlPanel_00Snd($$$$$$$$)
   my $messagePart = 1;
 
   if ($mid == 0) {
-    # general massage
+    # general message
     ($err, $response, $data, $logLevel) = EnOcean_roomCtrlPanel_00Cmd(undef, $hash, $mcf, $messagePart);
     EnOcean_SndRadio(undef, $hash, $packetType, "D2", $data, AttrVal($name, "subDef", "00000000"), "00", $hash->{DEF});
     if ($err) {
@@ -18724,6 +18757,7 @@ sub EnOcean_Delete($$) {
       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.05. The attribute must be set manually.
     </li>
     <br><br>
@@ -18754,6 +18788,7 @@ sub EnOcean_Delete($$) {
       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.05 and attr manufID must be 019. The attribute must be set manually.
     </li>
     <br><br>
@@ -18783,6 +18818,7 @@ sub EnOcean_Delete($$) {
       is teached in, the temperature control of the FTR55* can be either blocked
       or to a setpoint deviation of +/- 3 K be limited. For this use the optional parameter
       [block] = lock|unlock, unlock is default.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.05 and attr manufID must be 00D.
       The attributes must be set manually.
     </li>
@@ -18815,6 +18851,7 @@ sub EnOcean_Delete($$) {
       attributes <a href="#scaleMax">scaleMax</a>, <a href="#scaleMin">scaleMin</a> and
       <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled setting
       setpointScaled.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.01. The attribute must be set manually.
     </li>
     <br><br>
@@ -18839,6 +18876,7 @@ sub EnOcean_Delete($$) {
       primarily or from the attribute <a href="#actualTemp">actualTemp</a> if it is set.<br>
       If the attribute <a href="#EnOcean_setCmdTrigger">setCmdTrigger</a> is set to "refDev", a setpoint
       command is sent when the reference device is updated.<br>
+      The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
       The attr subType must be roomSensorControl.01 and attr manufID must be 00D. The attribute must be set manually.
     </li>
     <br><br>
@@ -21163,16 +21201,18 @@ sub EnOcean_Delete($$) {
          [Eltako FAH60, FAH63, FIH63, Thermokon SR65 LI]<br>
      <ul>
        <li>E/lx</li>
+       <li>alarm: dead_sensor</li>
        <li>brightness: E/lx (Sensor Range: 300 lx ... 30 klx, 600 lx ... 60 klx
        , Sensor Range for Eltako: E = 0 lx ... 100 lx, 300 lx ... 30 klx)</li>
        <li>voltage: U/V</li> (Sensor Range: U = 0 V ... 5.1 V)
        <li>state: E/lx</li>
      </ul><br>
-        Eltako devices only support Brightness.<br>
         Please set the attribute model to Eltako_FAH60 if the sensor is from the production year 2015 or later.<br>
         The attr subType must be lightSensor.01 and attr manufID must be 00D
         for Eltako Devices. This is done if the device was created by
-        autocreate.
+        autocreate.<br>
+        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 110 is default).<br>
+
      </li>
      <br><br>
 
@@ -21233,6 +21273,7 @@ sub EnOcean_Delete($$) {
          [EnOcean EOSW]<br>
      <ul>
        <li>on|off</li>
+       <li>alarm: dead_sensor</li>
        <li>battery: ok|low</li>
        <li>button: pressed|released</li>
        <li>current: I/&#181;A (Sensor Range: I = 0 V ... 127.0 &#181;A)</li>
@@ -21244,7 +21285,8 @@ sub EnOcean_Delete($$) {
      </ul><br>
         The attr subType must be occupSensor.<01|02>. This is done if the device was
         created by autocreate. Current is the solar panel current. Some values are
-        displayed only for certain types of devices.
+        displayed only for certain types of devices.<br>
+        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
      </li>
      <br><br>
 
@@ -21268,6 +21310,7 @@ sub EnOcean_Delete($$) {
          [untested]<br>
      <ul>
        <li>M: on|off E: E/lx U: U/V</li>
+       <li>alarm: dead_sensor</li>
        <li>battery: ok|low</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 1000 lx, over range)</li>
        <li>errorCode: 251 ... 255</li>
@@ -21276,7 +21319,8 @@ sub EnOcean_Delete($$) {
        <li>state: M: on|off E: E/lx U: U/V</li>
      </ul><br>
         The attr subType must be occupSensor.03. This is done if the device was
-        created by autocreate.
+        created by autocreate.<br>
+        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
      </li>
      <br><br>
 
@@ -21284,6 +21328,7 @@ sub EnOcean_Delete($$) {
          [Eltako FABH63, FBx5B, FBH55, FBH63, FBH65x, FBHF65SB, FIBH63, Thermokon SR-MDS, PEHA 482 FU-BM DE]<br>
      <ul>
        <li>M: on|off E: E/lx P: absent|present T: t/&#176C U: U/V</li>
+       <li>alarm: dead_sensor</li>
        <li>brightness: E/lx (Sensor Range: E = 0 lx ... 510, 1020, 1530 or 2048 lx)</li>
        <li>motion: on|off</li>
        <li>presence: absent|present</li>
@@ -21294,7 +21339,9 @@ sub EnOcean_Delete($$) {
         Eltako and PEHA devices only support Brightness and Motion.<br>
         The attr subType must be lightTempOccupSensor.<01|02|03> and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
-        created by autocreate. Set model to Eltako_TF manually for Eltako TF devices or to FBH55SB, FBH65SB, FBHF65SB.
+        created by autocreate. Set model to Eltako_TF manually for Eltako TF devices or to FBH55SB, FBH65SB, FBHF65SB.<br>
+        <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a> ([signOfLifeInterval] = 1320 is default).<br>
+
      </li>
      <br><br>
 
