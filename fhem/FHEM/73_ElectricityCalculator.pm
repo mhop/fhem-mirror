@@ -422,8 +422,8 @@ sub ElectricityCalculator_MidnightTimer($)
  	my $RegEx													= $ElectricityCalcDev->{REGEXP};
 	my ($ElectricityCountName, $ElectricityCountReadingRegEx)	= split(":", $RegEx, 2);
 	my $ElectricityCountDev							  			= $defs{$ElectricityCountName};
-	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]//g;
-
+	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]+$//;
+	
 	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
 	my @ElectricityCountReadingNameListFiltered;
 
@@ -437,7 +437,9 @@ sub ElectricityCalculator_MidnightTimer($)
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer__________________________________________________________";
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                            : MidnightTimer initiated";
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - RegEx                    : " . $RegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ReadingRegEx             : " . $ElectricityCountReadingRegEx;
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountName     : " . $ElectricityCountName;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountReadComp : " . Dumper(@ElectricityCountReadingNameListComplete);
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ElectricityCountReadList : " . Dumper(@ElectricityCountReadingNameListFiltered);
 	
 
