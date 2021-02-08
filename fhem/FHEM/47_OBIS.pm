@@ -1,15 +1,20 @@
 ###############################################
 #
-# 47_OBIS.pm
+# 47_OBIS.pm 
+# 
+# maintained by gvzdus, however ~95% of code and functionally was
+# written by Icinger - consider the bugs at me, gvzdus and the genius at Icinger :-)
+# 
+# Other credits:
+# hdgucken, 02/2021: non-blocking extension, optimize ser2net integration
+# 
+# credits by Icinger, main developer until 02/2021:
 #
+# Original credits by Icinger, main developer until 02/2021:
 # Thanks to matzefizi for letting me merge this with 70_SMLUSB.pm and for testing
-# Tanks to immi for testing and supporting help and tips
+# Thanks to immi for testing and supporting help and tips
 # 
 # $Id$
-
-# Removed: PERL WARNING: Hexadecimal number > 0xffffffff non-portable at
-# Added:   attr ExtChannels -> set History-Readings
-
 
 package main;
 use strict;
@@ -17,75 +22,83 @@ use warnings;
 use Time::HiRes qw(gettimeofday usleep);
 use Scalar::Util qw(looks_like_number);
 use POSIX qw{strftime};
+use DevIo;
 no warnings 'portable';  # Support for 64-bit ints required
-#use Math::BigInt ':constant';
 
-my %OBIS_channels = ( "21"	=>"power_L1",
-	                  "41"	=>"power_L2",
-	                  "61"	=>"power_L3",
-	                  "12"	=>"voltage_avg",
-	                  "32"	=>"voltage_L1",
-	                  "52"	=>"voltage_L2",
-	                  "72"	=>"voltage_L3",
-	                  "11"	=>"current_sum",
-	                  "31"	=>"current_L1",
-	                  "51"	=>"current_L2",
-	                  "71"	=>"current_L3",
-	                  "1.8"	=>"total_consumption",
-	                  "2.8"	=>"total_feed",
-	                  "2"	=>"feed_L1",
-	                  "4"	=>"feed_L2",
-	                  "6"	=>"feed_L3",
-	                  "1"	=>"power", 
-	                  "15"	=>"power",
-	                  "16"	=>"power",
-	                  "24"	=>"Gas",
-	                 );
-                 
-my %OBIS_codes = (	"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
-					"Serial"		=> qr{^(?:1-0:)?0\.0\.[1-9]+(?:.\d+)?\((.*?)\).*},
-					"Owner" 		=> qr{^1.0.0.0.0(?:.\d+)?\((.*?)\).*}x,
-					"Status" 		=> qr{^1.0.96.5.5(?:.\d+)?\((.*?)\).*}x,
-					"Powerdrops"	=> qr{^0.0.96.7.\d(?:.\d+)?\((.*?)\).*},
-					"Time_param"	=> qr{^0.0.96.2.1(?:.\d+)?\((.*?)\).*},
-					"Time_current"	=> qr{^0.0.1.0.0(?:.\d+)?\((.*?)\).*},
-					"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
-					"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
-					"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d).(\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},    #^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*
-					"ManufID"		=> qr{^129-129:199\.130\.3(?:.\d+)?\((.*?)\).*},
-					"PublicKey"		=> qr{^129-129:199\.130\.5(?:.\d+)?\((.*?)\).*},
-				);
-
-my %SML_specialities = ("TIME"			=> [qr{0.0.96.2.1
-											   |0.0.1.0.0		}x, sub{return strftime("%d-%m-%Y %H:%M:%S", localtime(unpack("i", pack("I", hex(@_)))))}],
-						"HEX2"			=> [qr{1-0:0\.0\.[0-9]	}x, sub{my $a=shift;
-																		if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(..)/$1-/g;$a=~s/-$//};
-																		return $a;}],
-						"HEX4"			=> [qr{1.0.96.5.5
-										 	  |0.0.96.240.\d+
-											  |129.129.199.130.5}x, sub{my $a=shift;
-											  							if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(....)/$1-/g;$a=~s/-$//};
-											  							return $a;}],
-						"INFO"			=> [qr{1-0:0\.0\.[0-9]
-											  |129.129.199.130.3}x, ""],
+my %OBIS_channels = (
+		"21"  =>"power_L1", # Positive active instantaneous power
+		"36"  =>"power_L1", # Sum active instantaneous power
+		"41"  =>"power_L2",
+		"56"  =>"power_L2",
+		"61"  =>"power_L3",
+		"76"  =>"power_L3",
+		"12"  =>"voltage_avg",
+		"32"  =>"voltage_L1",
+		"52"  =>"voltage_L2",
+		"72"  =>"voltage_L3",
+		"11"  =>"current_sum",
+		"31"  =>"current_L1",
+		"51"  =>"current_L2",
+		"71"  =>"current_L3",
+		"1.8" =>"total_consumption",
+		"2.8" =>"total_feed",
+		"2"   =>"feed_L1",
+		"4"   =>"feed_L2",
+		"6"   =>"feed_L3",
+		"1"   =>"power",    # Positive active instantaneous power
+		"15"  =>"power",    # Absolute active instantaneous power
+		"16"  =>"power",    # Sum active instantaneous power
+		"24"  =>"Gas",
 );
+
+my %OBIS_codes = (
+		"Serial" 		=> qr{^0-0:96.1.255(?:.\d+)?\((.*?)\).*},
+		"Serial"		=> qr{^(?:1-0:)?0\.0\.[1-9]+(?:.\d+)?\((.*?)\).*},
+		"Owner" 		=> qr{^1.0.0.0.0(?:.\d+)?\((.*?)\).*}x,
+		"Status" 		=> qr{^1.0.96.5.5(?:.\d+)?\((.*?)\).*}x,
+		"Powerdrops"	=> qr{^0.0.96.7.\d(?:.\d+)?\((.*?)\).*},
+		"Time_param"	=> qr{^0.0.96.2.1(?:.\d+)?\((.*?)\).*},
+		"Time_current"	=> qr{^0.0.1.0.0(?:.\d+)?\((.*?)\).*},
+		"Channel_sum" 	=> qr{^(?:1.0.)?(\d+).1.7(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+		"Channels"		=> qr{^(?:\d.0.)?(\d+).7\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?([-+]?\d+\.?\d*)\*?(.*)\).*},
+		"Channels2"		=> qr{^(?:0.1.)?(\d+).2\.\d+(?:.0|.255)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},
+		"Counter"		=> qr{^(?:1.\d.)?(\d).(8)\.(\d).(\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*},    #^(?:1.\d.)?(\d).(8)\.(\d)(?:.\d+)?(?:\(.*?\))?\((<|>)?(-?\d+\.?\d*)\*?(.*)\).*
+		"ManufID"		=> qr{^129-129:199\.130\.3(?:.\d+)?\((.*?)\).*},
+		"PublicKey"		=> qr{^129-129:199\.130\.5(?:.\d+)?\((.*?)\).*},
+		"ManufID2"	    => qr{^1.0.96.50.1(?:.\d+)?\((.*?)\).*}
+);
+
+my %SML_specialities = (
+		"TIME"			=> [qr{0.0.96.2.1
+							|0.0.1.0.0		}x, sub{return strftime("%d-%m-%Y %H:%M:%S", localtime(unpack("i", pack("I", hex(@_)))))}],
+		"HEX2"			=> [qr{1-0:0\.0\.[0-9]	}x, sub{my $a=shift;
+							if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(..)/$1-/g;$a=~s/-$//};
+							return $a;}],
+		"HEX4"			=> [qr{1.0.96.5.5
+							|0.0.96.240.\d+
+							|129.129.199.130.5}x, sub{my $a=shift;
+							if ( $a =~ /^[0-9a-fA-F]+$/ ) {$a=~s/(....)/$1-/g;$a=~s/-$//};
+							return $a;}],
+		"INFO"			=> [qr{1-0:0\.0\.[0-9]
+							|129.129.199.130.3}x, ""],
+);
+
+my $SML_ENDTAG = chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1A);
     
 #####################################
 sub OBIS_Initialize($)
 {
   my ($hash) = @_;
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
   $hash->{Match}     = "^\/(?s:.*)\!\$";
   $hash->{ReadFn}  = "OBIS_Read";
   $hash->{ReadyFn}  = "OBIS_Ready";
   $hash->{DefFn}   = "OBIS_Define";
   $hash->{ParseFn}   = "OBIS_Parse";
-    $hash->{GetFn} = "OBIS_Get";
+  $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both createPreValues:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off ".
   					  $readingFnAttributes;
 }
 
@@ -120,10 +133,9 @@ sub OBIS_Define($$)
 	  	$modules{OBIS}{defptr}{$device_name} = $hash;
   	}
     AssignIoPort($hash);
-    Log3 ($hash,1, "OBIS ($name) - OBIS device is none, commands will be echoed only");
+    Log3 $hash, 1, "OBIS ($name) - OBIS device is none, commands will be echoed only";
    return undef;
   }
-
 
   my $baudrate;
   my $devi;
@@ -131,13 +143,17 @@ sub OBIS_Define($$)
   $hash->{helper}{SPEED}="0";
   if (defined($baudrate)) {   ## added for ser2net connection
 	if($baudrate =~ m/(\d+)(,([78])(,([NEO])(,([012]))?)?)?/) {
-	$baudrate = $1 if(defined($1));
+	  $baudrate = $1 if(defined($1));
 	}
 	my %bd=("300"=>"0","600"=>"1","1200"=>"2","2400"=>"3","4800"=>"4","9600"=>"5","18200"=>"6","36400"=>"7","57600"=>"8","115200"=>"9");
 	$hash->{helper}{SPEED}=$bd{$baudrate};
 	$hash->{helper}{SPEED2}=$bd{$a[4]//$baudrate};
   }
-  else {$baudrate=9600; $hash->{helper}{SPEED}="5";}
+  else { 
+    $baudrate=9600;
+    $hash->{helper}{SPEED}="5";
+    $hash->{helper}{NETDEV}=1;
+  }
   
   my %devs= (
 #   Name,      Init-String,                 interval,  2ndInit
@@ -154,19 +170,41 @@ sub OBIS_Define($$)
     if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
     $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
     $hash->{helper}{DEVICES} =$devs{$type};
+    $hash->{helper}{RULECACHE} = {};
     $hash->{helper}{TRIGGERTIME}=gettimeofday();
 #    if( !$init_done ) {
 #	    $attr{$name}{"event-on-change-reading"} = ".*";
  #   }
-	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
-    Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-	InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+    if ($hash->{helper}{DEVICES}[1]>0) {
+	  my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
+      Log3 $hash, 5, "OBIS ($name) - Internal timer set to ".FmtDateTime($t);
+	  InternalTimer($t, "GetUpdate", $hash, 0);
+    }
+	InternalTimer(gettimeofday()+60, "CheckNoData", $hash, 0) if ($hash->{helper}{NETDEV});
 	$hash->{helper}{EoM}=-1;
   
-  	Log3 $hash,5,"OBIS ($name) - Opening device...";
-  	  return DevIo_OpenDev($hash, 0, "OBIS_Init");
+  	Log3 $hash, 5, "OBIS ($name) - Opening device...";
+
+    DevIo_OpenDev($hash, 0, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
+
+    return;
 }
 
+#####################################
+# will be executed if connection establishment fails (see DevIo_OpenDev())
+sub OBIS_Callback($$)
+{
+    my ($hash, $error) = @_;
+    my $name = $hash->{NAME};
+
+    # create a log entry with the error message
+    if ($error) {
+      Log3 $name, 4, "OBIS ($name) - error while connecting: $error";
+    } 
+    return;
+}
+
+#####################################
 sub OBIS_Get($@)
 {
   my ($hash, @a) = @_;
@@ -181,6 +219,7 @@ sub OBIS_Get($@)
   
 }
 
+#####################################
 sub OBIS_Set($@)
 {
 	my ( $hash, @a ) = @_;
@@ -214,23 +253,41 @@ sub GetUpdate($)
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $type= $hash->{MeterType};
-	RemoveInternalTimer($hash);
+	RemoveInternalTimer($hash, "GetUpdate");
 
 	$hash->{helper}{EoM}=-1;
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
 	if( $init_done ) {
 		DevIo_SimpleWrite($hash,$hash->{helper}{DEVICES}[0],undef) ;
-		Log3 $hash,4,"Wrote $hash->{helper}{DEVICES}[0]";
+		Log3 $hash, 4, "OBIS ($name) - Wrote $hash->{helper}{DEVICES}[0]";
 	}
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-	InternalTimer($t, "GetUpdate", $hash, 1)  if ($hash->{helper}{DEVICES}[1]>0);
+	InternalTimer($t, "GetUpdate", $hash, 0)  if ($hash->{helper}{DEVICES}[1]>0);
+}
+
+# Periodic check for dead connections (no data send for some time)
+sub CheckNoData 
+{
+	my ($hash) = @_;
+	my $name = $hash->{NAME};
+	RemoveInternalTimer($hash, "CheckNoData");
+    my $t = gettimeofday();
+    my $maxSilence = AttrVal($name,"resetAfterNoDataTime",90);
+    if ( $hash->{helper}{LastPacketTime} && $hash->{helper}{LastPacketTime} < $t-$maxSilence) {
+      Log3 $hash, 3, "OBIS ($name) - No data received for " . (int ($t-$hash->{helper}{LastPacketTime})) . 
+           " seconds, resetting connection";
+	  DevIo_CloseDev($hash);
+      DevIo_OpenDev($hash, 1, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
+    }
+	InternalTimer($t+60, "CheckNoData", $hash);
 }
 
 sub OBIS_Init($)
 {
-	Log 3,"Init done";
-  return undef;
+    my ($hash) = @_;
+	Log3 $hash, 3, "OBIS ($hash->{NAME}) - Init done";
+    return undef;
 }
 #####################################
 sub OBIS_Undef($$)
@@ -249,8 +306,7 @@ sub OBIS_Read($)
 		my $name = $hash->{NAME};
 	
     	my $buf = DevIo_SimpleRead($hash);
-    	my $b=$buf;
-    	$b =~ s/(.)/sprintf("%X",ord($1))/eg;
+        return if(!defined($buf));
     	if ( !defined($hash->{helper}{SpeedChange}) ||  ($hash->{helper}{SpeedChange} eq ""))
     	{
     		OBIS_Parse($hash,$buf) if ($hash->{helper}{EoM}!=1);
@@ -303,16 +359,28 @@ sub OBIS_Read($)
 sub OBIS_trySMLdecode($$)
 {
 	my ( $hash, $remainingSML ) = @_;
+    my $name = $hash->{NAME};
+    my $ll = AttrVal($name, "verbose", 3);
 	my $t=$remainingSML;
-	if ($remainingSML=~m/SML\((.*)\)/g) {$remainingSML=$1};
-	if($remainingSML!~/[\x00-\x09|\x10-\x1F]/g) {return $remainingSML} else {$hash->{MeterType}="SML"};
-	$remainingSML=uc(unpack('H*',$remainingSML));
+	if ($remainingSML=~m/SML\((.*)\)/g) {
+		$remainingSML=$1
+	};
+	return $remainingSML
+		if($remainingSML!~/[\x00-\x09|\x10-\x1F]/g);
 	$hash->{MeterType}="SML";
+
+    # Fast fail for messages w/o end tag
+	my $endtagIdx = rindex ($remainingSML, $SML_ENDTAG);
+      if ($endtagIdx<0 || ((length $remainingSML)-$endtagIdx) < 3) {
+	return ("", $remainingSML);
+	}
+
+	$remainingSML=uc(unpack('H*',$remainingSML));
 	my $newMsg="";
 	while ($remainingSML=~/(1B1B1B1B010101.*?1B1B1B1B1A[0-9A-F]{6})/mip) {
 		
 		my $msg=$1;
-	Log3 $hash,5,"SML-Parse $1";
+	    Log3 $hash,5,"OBIS ($name) - SML-Parse $1" if ($ll>=5);
 		
 		$remainingSML=${^POSTMATCH};
 		if (OBIS_CRC16($hash,pack('H*',$msg)) == 1) {
@@ -320,11 +388,11 @@ sub OBIS_trySMLdecode($$)
 			my $OBISmsg="";
 			my $initstr="/";
 			my $OBISid=$msg=~m/7701([0-9A-F]*?)01/g;
-			Log3 $hash,5,"OBIS: Full message-> $msg";
+			Log3 $hash,5,"OBIS ($name) - Full message-> $msg" if ($ll>=5);
 			(undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
 			while ($msg =~ m/(7707)([0-9A-F]*)/g) {
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
-      			Log3 $hash, 5,"OBIS: Telegram=$msg";
+      			Log3 $hash,5,"OBIS ($name) - Telegram=$msg" if ($ll>=5);
       			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		if ($line eq '255-255:255.255.255*255(') {
@@ -369,7 +437,12 @@ sub OBIS_trySMLdecode($$)
 						# signed Values
 						my $tmp="";
 						if ($dataT & 0b00010000) {
-							if ($data =~ /^[89a-f]/i) {$val =  hex($data) - hex(sprintf ("FF" x $dataL)) -1;}
+                            # Was: if ($data =~ /^[89a-f]/i)
+                            # workaround for DZG meter wrongly encoding positive values:
+							if ($data =~ /^[89a-f]/i && 
+                               ($line!~/^1-0:16\.7\.0/ || $dataL>3 || $newMsg!~/1-0:96\.50\.1\*255\(DZG\)/)) {
+                               $val =  hex($data) - hex(sprintf ("FF" x $dataL)) -1;
+                            }
 							else {$val = hex($data)} #positive value
 						}
 						if ($dataT & 0b00100000 || $val>=0) {
@@ -395,67 +468,67 @@ sub OBIS_trySMLdecode($$)
 			$initstr=~s/\\$//;
 			$newMsg=$initstr.chr(13).chr(10).$newMsg;
 			$newMsg.="!".chr(13).chr(10);
-			Log3 $hash,4,"MSG IS: \r\n$newMsg";
+			Log3 $hash,4,"OBIS ($name) - MSG IS: \r\n$newMsg" if ($ll>=4);
 		} else {
 			$hash->{CRC_Errors}+=1;
 		}
 	}
-		return ($newMsg,pack('H*',$remainingSML));
-	
+	return ($newMsg,pack('H*',$remainingSML));
 }
 
 sub OBIS_Parse($$)
 {
 	my ($hash, $buf) = @_;
+	my $name = $hash->{NAME};
+
 	my $buf2=uc(unpack('H*',$buf));
 	if($hash->{MeterType}!~/SML|Unknown/ && $buf2=~m/7701([0-9A-F]*?)01/g) {
-		Log 3,"OBIS_Ext called";
+		Log3 $hash, 3, "OBIS ($name) - OBIS_Ext called";
 		my (undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
 		
 	  	my $device_name = "OBIS.".$OBISid;
-  		Log3 $hash,5,"New Devicename: $device_name";
+  		Log3 $hash,5,"OBIS ($name) - New Devicename: $device_name";
   		my $def = $modules{OBIS}{defptr}{"$device_name"};
   		if(!$def) {
-        	Log3 $hash, 3, "OBIS: Unknown device $device_name, please define it";
+        	Log3 $hash, 3, "OBIS ($name) - Unknown device $device_name, please define it";
         	return "UNDEFINED $device_name OBIS none Ext $OBISid";
   		}
 	}
 	$hash->{helper}{BUFFER} .= $buf;
 	if (length($hash->{helper}{BUFFER}) >10000) { #longer than 3 messages, this is a traffic jam
 	  	$hash->{helper}{BUFFER}  =substr( $hash->{helper}{BUFFER} , -10000);
-   }	
-   my %dir=("<"=>"out",">"=>"in");
+	}	
+	my %dir=("<"=>"out",">"=>"in");
 	my $buffer=$hash->{helper}{BUFFER};
 	my $remainingSML;
 	($buffer,$remainingSML) = OBIS_trySMLdecode($hash,$buffer) if ($hash->{MeterType}=~/SML|Ext|Unknown/);
 	my $type= $hash->{MeterType};
-	my $name = $hash->{NAME};
-			$buf='/'.$buf;  
-	    	$buf =~ /!((?!\/).*)$/gmsi;
-			$buf=$1;
+	$buf='/'.$buf;  
+	$buf =~ /!((?!\/).*)$/gmsi;
+	$buf=$1;
+    my $ll = AttrVal($name, "verbose", 3);
 	
-	if(index($buffer,chr(13).chr(10)) ne -1){
+    my $crlfPos = index($buffer,chr(13).chr(10));
+	if($crlfPos > -1){
 		readingsBeginUpdate($hash);
+		my $ignoreUnknownOff = AttrVal($name,"ignoreUnknown","off") eq "off";
+		my $unitReadingsOff = AttrVal($name,"unitReadings","off") eq "off";
+		my $extChannels = AttrVal($name,"extChannels","off") eq "on";
+		my $ruleCache = $hash->{helper}{RULECACHE};
 		
-	    while(index($buffer,chr(13).chr(10)) ne -1)
+	    while($crlfPos > -1)
 	    {
 		    my $rmsg="";
-		    $rmsg = substr($buffer, 0, index($buffer,chr(13).chr(10)));
-			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg";
+		    $rmsg = substr($buffer, 0, $crlfPos);
+			Log3 $hash,5,"OBIS ($name) - Msg-Parse: $rmsg" if ($ll>=5);
 				my $channel=" ";
 				if($rmsg=~/\/.*|^((?:\d{1,3}-\d{1,3}:)?(?:\d{1,3}|[CF]).\d{1,3}(?:.\d{1,3})?(?:\*\d{1,3})?)(?:\(.*?\))?\(.*?\)|!/) { # old regex: \/.*|\d-\d{1,3}:\d{1,3}.\d{1,3}.\d{1,3}\*\d{1,3}\(.*?\)|!
 					if (length $1) {
 						$channel=$1;
-#						$channel=~s/[\:\-*]/\./;
-						$channel=~s/:/\./;
-						$channel=~s/-/\./;
-						$channel=~s/\*/\./;
+						$channel=~tr/:*-/.../;
 #						Log 3,"Channel would be: $channel";
 					}
 					if ($hash->{MeterType} eq "Unknown") {$hash->{MeterType}="Standard"}
-#					if($rmsg=~/^([23456789]+)-.*/) {
-#						Log3 $hash,3,"OBIS ($name) - Unknown OBIS-Device, please report: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de";
-#					}
 			
 			# End of Message
 					if ($rmsg=~/^!.*/) {
@@ -468,75 +541,88 @@ sub OBIS_Parse($$)
 			 			$hash->{helper}{EoM}=0;
 				  	}
 				  	elsif ($hash->{helper}{EoM}!=1) {
-				  		my @patterns=values %OBIS_codes;
-				  		if (!$rmsg~~@patterns) {
-				  			Log3 $hash,3,"OBIS ($name) - Unknown Message: $rmsg".chr(13).chr(10)."Please report to User icinger at forum.fhem.de"
-				  		} else {
-				  			my $found=0;
-				  			if (!($hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1})) {
-								for my $code (keys %OBIS_codes) {
+				  		my $found=0;
+						# Check superseeding settings in channels attribute:
+				  		if (!($hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1})) {
+							my $cache_code = $rmsg;
+							$cache_code =~ s/\(.*$//;
+							my $code = $ruleCache->{$cache_code};
+#				  			Log3 $hash,3,"OBIS ($name) - Cache result for " . $cache_code . " is " . $code;
+							if (! defined $code) {
+							    for my $c (keys %OBIS_codes) {
+									if ($rmsg =~ $OBIS_codes{$c}) {
+										$ruleCache->{$cache_code} = $c;
+				  						Log3 $hash,4,"OBIS ($name) - Storing $c for $cache_code in Cache";
+										$hash->{helper}{RULECACHE} = $ruleCache;
+										$code = $c;
+									}
+								}
+							}
+							if (defined $code && $code ne "unknown") {
 									if ($rmsg =~ $OBIS_codes{$code}) {
-										Log3 $hash,5,"Msg $rmsg is of type $code";
-										if ($code=~/Channel_sum.*/) {
-											$rmsg =~ $OBIS_codes{$code};
+										Log3 $hash,5,"OBIS ($name) - Msg $rmsg is of type $code" if ($ll>=5);
+										if (rindex ($code, "Channel_sum", 0) eq 0) {
 								    		my $L= $hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} // "sum_$OBIS_channels{$1}" //$channel;
-    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
-							  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+    										if ($ignoreUnknownOff || $L ne $channel) {
+							  					readingsBulkUpdate($hash, $L,(looks_like_number($3) ? $3+0 : $3).($unitReadingsOff?"":" $4"));
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
     										}
 										}
 										 
-										elsif ($code=~/Channels.*/) {
-											$rmsg =~ $OBIS_codes{$code};
+										elsif (rindex ($code, "Channels", 0) eq 0) {
 								    		my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
-    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
-							  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).(AttrVal($name,"unitReadings","off") eq "off"?"":" $4"));
+    										if ($ignoreUnknownOff || $L ne $channel) {
+							  					readingsBulkUpdate($hash, "$L",(looks_like_number($3) ? $3+0 : $3).($unitReadingsOff?"":" $4"));
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$2} // $dir{$2}) if (length $2);
     										}
 										}
 										
-										elsif ($code=~/Counter.*/) {
-											$rmsg =~ $OBIS_codes{$code};
+										elsif (rindex ($code, "Counter", 0) eq 0) {
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
-											if (AttrVal($name,"extChannels","off") eq "on") {$chan.=".$4" if $4;}
-    										if (AttrVal($name,"ignoreUnknown","off") eq "off" || $L ne $channel) {
+											if ($extChannels) {$chan.=".$4" if $4;}
+    										if ($ignoreUnknownOff || $L ne $channel) {
 												if($1==1) {
-    												Log3($hash,4,"Set ".$L.$chan." to ".((looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0)));
+    												Log3($hash,4,"OBIS ($name) - Set ".$L.$chan." to ".((looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0))) if ($ll>=4);
 
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $7")); 
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0).($unitReadingsOff?"":" $7")); 
 												} elsif ($1==2) {
-													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_feed",0).(AttrVal($name,"unitReadings","off") eq "off"?"":" $7")); 				
+													readingsBulkUpdate($hash, $L.$chan  ,(looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_feed",0).($unitReadingsOff?"":" $7")); 				
 												}
 							  					readingsBulkUpdate($hash, "dir_$L",$hash->{helper}{directions}{$4} // $dir{$4}) if (length $4);
     										}											
-										} else 
-											{
-												$rmsg =~ $OBIS_codes{$code};
-												my $data=$1;
-												if($rmsg=~$SML_specialities{"HEX4"}[0]) {
-		    				    					$data=$SML_specialities{"HEX4"}[1]->($data)
-		    									} elsif($rmsg=~$SML_specialities{"HEX2"}[0]) {
-	    											$data=$SML_specialities{"HEX2"}[1]->($data)
-		    									} elsif($rmsg=~$SML_specialities{"TIME"}[0]) {
+										} else {
+											my $data=$1;
+											if (rindex ($code, "Time", 0) eq 0) {
+		    									if($rmsg=~$SML_specialities{"TIME"}[0]) {
 		    										$data=~/(\d+)/;
 		    										$data=$SML_specialities{"TIME"}[1]->($1)
 		    									}
-		    									my $chan=$code//$OBIS_channels{$channel} //$channel;
-		    									if ($#+ > 0) {
-		    										$chan=$hash->{helper}{Channels}{$channel} // $hash->{helper}{Channels}{$1} //  $OBIS_channels{$1} //$channel;
-		    									} else {
-		    										$chan=$hash->{helper}{Channels}{$channel} //$channel;
-		    									}
-		    									
-												if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
-												readingsBulkUpdate($hash, $chan  ,$data); }
+											} elsif ($code eq "Status" || $code eq "PublicKey") {
+												if ($rmsg=~$SML_specialities{"HEX4"}[0]) {
+		    				    					$data=$SML_specialities{"HEX4"}[1]->($data)
+												}
+											} elsif ($code eq "Owner" || $code eq "Serial") {
+	    										$data=$SML_specialities{"HEX2"}[1]->($data)
+		    								} 
+
+											my $userChannelName = $hash->{helper}{Channels}{$channel};
+											$code = $userChannelName if (defined $userChannelName);
+											if (defined $1) {
+												$userChannelName = $hash->{helper}{Channels}{$1};
+												$code = $userChannelName if (defined $userChannelName);
+											}
+											readingsBulkUpdate($hash, $code  ,$data);
 										}
 										$found=1;
-										last;
 									}
-									
-					     		}
+								} else {
+									if (! $code) {
+						  			  Log3 $hash,3,"OBIS ($name) - Unknown Message: $rmsg";
+                                      $ruleCache->{$cache_code} = "unknown";
+                                      $hash->{helper}{RULECACHE} = $ruleCache;
+									}
+								}
 				  			}
 				     		if ($found==0) {
 #				     			Log 3,"Found a Channel-Attr";
@@ -547,33 +633,36 @@ sub OBIS_Parse($$)
 #    							Log 3,"Setting $chan";
     							my $v1=$3;
     							my $v2;
-    							if (AttrVal($name,"valueBracket","second") eq "first") {
+								my $valueBracket = AttrVal($name,"valueBracket","second");
+    							if ($valueBracket eq "first") {
     								$v1=length $2 ? $2 : $3;
-    							}
-    							if (AttrVal($name,"valueBracket","second") eq "both") {
+    							} elsif ($valueBracket eq "both") {
     								$v2=$2;
     								($v1,$v2)=($v2,$v1);
     								if (!length $v1 and length $v2) {$v1=$v2;$v2=""}
     								$chan1.="_1" if length $2;
     							}
-    							if (AttrVal($name,"unitReadings","off") eq "off") {
+    							if ($unitReadingsOff) {
     								$v1=~s/(.*)\*.*/$1/;
     								if ($v2) {$v2=~s/(.*)\*.*/$1/};
     							}
     							$v1+=0 if (looks_like_number($v1));
     							$v2+=0 if (looks_like_number($v2));
 								
-    							if (AttrVal($name,"ignoreUnknown","off") eq "off" || $chan ne $channel) {
+    							if ($ignoreUnknownOff || $chan ne $channel) {
 									readingsBulkUpdate($hash, $chan1  ,$v1) if length $v1;
-									readingsBulkUpdate($hash, $chan2  ,$v2) if length $v2;}
+									readingsBulkUpdate($hash, $chan2  ,$v2) if length $v2;
+								}
 				     		}
-			   			}
+#			   			}
 				  	}
 		   			if ($hash->{helper}{EoM}==1) {last;}
 			  	}
-	       $buffer = substr($buffer, index($buffer,chr(13).chr(10))+2);;
+	       $buffer = substr($buffer, $crlfPos+2);
+		   $crlfPos = index($buffer,chr(13).chr(10));
     	}
     	readingsEndUpdate($hash,1);
+        $hash->{helper}{LastPacketTime} = gettimeofday;
 	}
     if (defined($remainingSML)) {$hash->{helper}{BUFFER}=$remainingSML}
     	else{$hash->{helper}{BUFFER}=$buffer;}
@@ -586,11 +675,11 @@ sub OBIS_Parse($$)
 sub OBIS_Ready($)
 {
   my ($hash) = @_;
-  return DevIo_OpenDev($hash, 1, "OBIS_Init")
+  return DevIo_OpenDev($hash, 1, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef)
                 if($hash->{STATE} eq "disconnected");
 
-     my $name = $hash->{NAME}; 
-    my $dev=$hash->{DeviceName};
+  my $name = $hash->{NAME}; 
+  my $dev=$hash->{DeviceName};
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
@@ -611,13 +700,13 @@ sub OBIS_Attr(@)
     if ($cmd eq "del") {
 		if ($aName eq "channels") { $hash->{helper}{Channels}=undef;}
 		if ($aName eq "interval") {
-		  		RemoveInternalTimer($hash);
+		  		RemoveInternalTimer($hash,"GetUpdate");
 				$hash->{helper}{DEVICES}[1]=0;
 		}
 		if ($aName eq "pollingMode") {
 				delete($readyfnlist{"$name.$dev"});
 				$selectlist{"$name.$dev"} = $hash;
-				 DevIo_CloseDev($hash);
+				DevIo_CloseDev($hash);
 				DevIo_OpenDev($hash, 0, "OBIS_Init");
 		}		
 	}
@@ -640,7 +729,7 @@ sub OBIS_Attr(@)
 		if ($aName eq "interval") {
 			if ($aVal=~/^[1-9][0-9]*$/) {
 			    $hash->{helper}{TRIGGERTIME}=gettimeofday();
-		  		RemoveInternalTimer($hash);
+		  		RemoveInternalTimer($hash,"GetUpdate");
 				$hash->{helper}{DEVICES}[1]=$aVal;
 				my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
 			    Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
@@ -652,7 +741,7 @@ sub OBIS_Attr(@)
 		if ($aName eq "alignTime") {
 			 if ($hash->{helper}{DEVICES}[1]>0 || !$init_done) {
 			 	if ($aVal=~/\d+/) {
-			  		RemoveInternalTimer($hash);
+			  		RemoveInternalTimer($hash,"GetUpdate");
 				    $hash->{helper}{TRIGGERTIME}=gettimeofday();
 					my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
 				    Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
@@ -746,11 +835,11 @@ sub OBIS_CRC16($$) {
 		0xc514, 0xb1ab, 0xa022, 0x92b9, 0x8330, 0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78);
 		
 	my $crc=0xFFFF;
-	my $a=substr($buff,0,-2);
+	my $a=reverse substr($buff,0,-2);
 	my $b=substr($buff,-2);
 	my $crc2=OBIS_hex2int(uc(unpack('H*',$b)));
-	foreach (split //, $a) {
-		$crc = ($crc >> 8) ^ $crc16[($crc ^ ord($_)) & 0xff];
+	while (length $a) {
+		$crc = ($crc >> 8) ^ $crc16[($crc ^ ord(chop $a)) & 0xff];
 	}
 	$crc ^= 0xffff;
     $crc = (($crc & 0xff) << 8) | (($crc & 0xff00) >> 8);
@@ -763,7 +852,7 @@ sub OBIS_CRC16($$) {
 # Input: Whole Datastream, inkl. TL-Byte      #
 # Output: Length, Type, Value, remaining Data #
 ###############################################
-sub OBIS_decodeTL($){
+sub OBIS_decodeTL {
 	my ($msg)=@_;
 	my $msgLength=0;
 	my $msgType=0;
@@ -800,7 +889,7 @@ sub OBIS_decodeTL($){
 	};
 }
 
-"Cogito, ergo sum.";
+1;
 
 =pod
 =item device
@@ -811,15 +900,24 @@ sub OBIS_decodeTL($){
 <a name="OBIS"></a>
 <h3>OBIS</h3>
 <ul>
-  This module is for SmartMeters, that report their data in OBIS-Standard. It dosen't matter, wether the data comes as PlainText or SML-encoded.
+  This module is for SmartMeters, that report their data in OBIS-Standard. It doesn't matter,
+  whether the data comes as PlainText or SML-encoded.
   <br><br>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
-      &lt;device&gt; specifies the serial port to communicate with the smartmeter.
-      Normally on Linux the device will be named /dev/ttyUSBx, where x is a number.
-      For example /dev/ttyUSB0. You may specify the baudrate used after the @ char.<br>
+      &lt;device&gt; specifies the serial port or hostname/ip-address:port
+      to communicate with the smartmeter.
+      In case of a <b>serial device</b> and with Linux:
+      <ul>
+      <li>the device will be named /dev/ttyUSBx, where x is a number.</li>
+      <li>or - to avoid wrong numbering on server reboots - use the ID of the USB device, e.g.
+      /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A106Q3OW-if00-port0</li>
+      </ul>
+      You may specify the baudrate used after the @ char, 9600 is common<br>
+      <br>
+      If you use a ser2net connection, &lt;device&gt; is ip-address:port or hostname:port.<br>
       <br>
       Optional: MeterType can be of
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
@@ -829,7 +927,8 @@ sub OBIS_decodeTL($){
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
       Example: <br>
-    <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
+    <code>define myPowerMeter OBIS /dev/ttyPlugwise@9600,7,E,1 VSM102</code><br>
+    <code>define myPowerMeter OBIS 192.168.0.12:1234 Standard</code>
       <br>
     <br>
   </ul>
@@ -867,6 +966,10 @@ sub OBIS_decodeTL($){
    <code>valueBracket</code><br>
       Sets, weather to use the value from the first or the second bracket, if applicable.
       Standard is "second"
+      </li><li>  
+   <code>resetAfterNoDataTime</code><br>
+      If on a TCP-connection no data was received for the given time, the connection is
+      closed and reopened
       </li>
       
   <br>
@@ -885,7 +988,14 @@ sub OBIS_decodeTL($){
   <ul>
     <code>define &lt;name&gt; OBIS device|none [MeterType] </code><br>
     <br>
-      &lt;device&gt; gibt den seriellen Port an.
+      &lt;device&gt; gibt den seriellen Port oder den Hostnamen/die IP-Adresse:Port an. <br>
+      Bei <b>seriellem Port</b> (USB) und Linux gibt man hier entweder
+      <ul>
+      <li>als Ger&auml;t etwas wie /dev/ttyUSBx, an (x eine Zahl)</li>
+      <li>oder - um nach einem Neustart der Hardware keine ge&auml;nderte Reihenfolge zu riskieren -
+      sucht man die passende ID unter /dev/serial/by-id/, also z.B.
+      /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A106Q3OW-if00-port0</li>
+      </ul>
       <br><br>
       Optional: MeterType kann sein:
       <ul><li>VSM102 -&gt; Voltcraft VSM102</li>
@@ -895,7 +1005,8 @@ sub OBIS_decodeTL($){
       <li>SML -&gt; Smart Message Language</li></ul>
       <br>
       Beispiel: <br>
-    <code>define myPowerMeter OBIS /dev/ttyPlugwise@@9600,7,E,1 VSM102</code>
+    <code>define myPowerMeter OBIS /dev/ttyPlugwise@9600,7,E,1 VSM102</code><br>
+    <code>define myPowerMeter OBIS 192.168.0.12:1234 Standard</code>
       <br>
     <br>
   </ul>
@@ -918,7 +1029,7 @@ sub OBIS_decodeTL($){
    <code>interval</code><br>
       Abrufinterval der Daten. (Bringt nur im Polling-Mode was)
       </li><li>
-   <code>algignTime</code><br>
+   <code>alignTime</code><br>
       Richtet den Zeitpunkt von <interval> nach einer bestimmten Uhrzeit aus. 
       </li><li>
    <code>pollingMode</code><br>
@@ -932,6 +1043,10 @@ sub OBIS_decodeTL($){
    <code>valueBracket</code><br>
       Legt fest, ob der Wert aus dem ersten oder zweiten Klammernpaar genommen wird. 
       Standard ist "second"
+      </li><li>  
+   <code>resetAfterNoDataTime</code><br>
+      Bei TCP-Verbindungen wird nach der angegebenen Zahl Sekunden die Verbindung
+      geschlossen und neu ge&ouml;ffnet, wenn keine Daten empfangen wurden
       </li>
   <br>
 </ul></ul>
