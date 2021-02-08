@@ -286,7 +286,10 @@ sub GasCalculator_Set($@)
 	#Log3 $GasCalcName, 5, $GasCalcName. "_Set - reading         : " . $reading;
 	#Log3 $GasCalcName, 5, $GasCalcName. "_Set - value           : " . $value;
 
+	### For Test purpose only
+	push(@cList, "Test"); 
 	
+	### Create set-List
 	if(defined($hash->{READINGS})) {
 		push(@cList, "SyncCounter"); 
 		push(@cList, keys(%{$hash->{READINGS}}));
@@ -338,6 +341,10 @@ sub GasCalculator_Set($@)
 		### Create ReturnMessage
 		$ReturnMessage = $GasCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
 	}
+	### For Test purpose only
+	elsif ($reading eq "Test") {
+		GasCalculator_MidnightTimer($hash);
+	}
 	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
@@ -363,7 +370,7 @@ sub GasCalculator_MidnightTimer($)
  	my $RegEx								  = $GasCalcDev->{REGEXP};
 	my ($GasCountName, $GasCountReadingRegEx) = split(":", $RegEx, 2);
 	my $GasCountDev							  = $defs{$GasCountName};
-	$GasCountReadingRegEx					  =~ s/[\.\*]//g;
+	$GasCountReadingRegEx					  =~ s/[\.\*]+$//;
 
 	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
 	my @GasCountReadingNameListFiltered;
@@ -378,8 +385,10 @@ sub GasCalculator_MidnightTimer($)
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer__________________________________________________________";
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer                     : MidnightTimer initiated";
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - RegEx             : " . $RegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - ReadingRegEx      : " . $GasCountReadingRegEx;
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountName      : " . $GasCountName;
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadList: " . Dumper(@GasCountReadingNameListFiltered);
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadCompl : \n" . Dumper(@GasCountReadingNameListComplete);
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCountReadList  : \n" . Dumper(@GasCountReadingNameListFiltered);
 	
 
 	### Remove internal timer for GasCalculator_MidnightTimer
@@ -819,10 +828,10 @@ sub GasCalculator_Notify($$)
 
 		####### Check whether Initial readings needs to be written
 		### Check whether the current value is the first one after change of day = First one after midnight
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimeCurHour                 : " . $GasCountReadingTimestampCurrentHour;
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimePrevHour                : " . $GasCountReadingTimestampPreviousHour;
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  LastUpdateTimestampUnix                 : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator -  GasCountReadTimeRelDelta                : " . $GasCountReadingLastChangeDelta;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadTimeCurHour                  : " . $GasCountReadingTimestampCurrentHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadTimePrevHour                 : " . $GasCountReadingTimestampPreviousHour;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($GasCalcReadingDestinationDeviceName,  "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadTimeRelDelta                 : " . $GasCountReadingLastChangeDelta;
 
 		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > 86400))
 		{
