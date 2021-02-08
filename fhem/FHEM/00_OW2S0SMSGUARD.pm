@@ -259,11 +259,12 @@ sub GetUpdate {
     my $name = $hash->{NAME};
 
     Log3($name, 5, "$name, GetUpdate");
-
+    RemoveInternalTimer($hash);
     return if (IsDisabled($name) || !$hash->{INTERVAL} || ($hash->{addr} ne 'master'));
 
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0);
     SimpleWrite($hash, '$?');
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0);
+
     return;
 }
 
@@ -424,8 +425,9 @@ sub ReadFn {
     return '' if (!defined($buf));
 
     my $raw = $hash->{PARTIAL};
-    Log3($name, 5, "$name, RAW: $raw / $buf");
     $raw .= $buf;
+
+    Log3($name, 5, "$name, ReadFn RAW: $raw / buf :$ buf");
 
     my $i = 0;
 
@@ -569,7 +571,7 @@ sub decodeList {
 	return;
     }
 
-    InternalTimer(gettimeofday()+1+(($hash->{OWVals}-1) * $hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 1)); # nicht bei DS2401
+    InternalTimer(gettimeofday()+1+($num * $hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 1)); # nicht bei DS2401
     return;
 }
 
@@ -628,6 +630,9 @@ sub decodeTemperature {
 
     if ($model eq 'DS1820')  {
         $temp = (( hex($data[1]) << 8) + hex($data[0])) << 3;
+
+        #$temp = ( hex($data[1]) << 8) + hex($data[0]);
+
         $temp = ($temp & 0xFFF0) +12 - hex($data[6]) if ($data[7] eq '10');
     }
 
@@ -673,6 +678,8 @@ sub ParseFn {
     my $dhash  = $modules{OW2S0SMSGUARD}{defptr}{$arr[1]};
     my $dname  = $dhash->{NAME} // return;
 
+    $dhash->{last_present} //= '???';
+    
     Log3($dname, 4, "$dname, ParseFn $msg");
 
     $dhash->{busid} = $arr[4] //= -1;
@@ -682,13 +689,23 @@ sub ParseFn {
     if (($model eq 'DS1820') || ($model eq 'DS18B20') || ($model eq 'DS1822') ) {
 	readingsBulkUpdate($dhash, 'temperature', $val);
 	readingsBulkUpdate($dhash, 'state',       "T: $val °C");
+	$dhash->{last_present} = TimeNow();
     }
     elsif ($model eq 'DS2401') {
-	if ((ReadingsVal($dname, 'presence' ,'absent') ne $val) && ($val eq 'absent')) {
-	    $dhash->{busid} = -1;
-	    setReadingsVal($dhash, 'last_present', ReadingsTimestamp($dname, 'presence', 'unknown'), TimeNow());
+	$dhash->{last_present} = TimeNow() if ($val eq 'present');
+	$dhash->{last_absent}  = TimeNow() if ($val eq 'absent');
+	$dhash->{last_absent}  //= '???';
+
+	if (ReadingsVal($dname, 'presence' ,'') ne $val) {
+	    if ($val eq 'absent') {
+		$dhash->{busid} = -1;
+		readingsBulkUpdate($dhash, 'last_present', $dhash->{last_present});
+	    }
+	    else {  
+		readingsBulkUpdate($dhash, 'last_absent', $dhash->{last_absent});
+	    }
 	}
-	
+
 	readingsBulkUpdate($dhash, 'state',    $val);
 	readingsBulkUpdate($dhash, 'presence', $val);
     }
