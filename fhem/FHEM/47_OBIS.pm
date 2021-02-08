@@ -83,6 +83,17 @@ my %SML_specialities = (
 							|129.129.199.130.3}x, ""],
 );
 
+# Mapping for historical energy consumption, used with 1-0:1.8.0
+my %Ext_Channel_Postfix = (
+		"255"			=> "",
+		"0"				=> "",
+		"96"			=> "_last1d",
+		"97"			=> "_last7d",
+		"98"			=> "_last30d",
+		"99"			=> "_last365d",
+		"100"			=> "_since_rst"
+);
+
 my $SML_ENDTAG = chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1A);
     
 #####################################
@@ -98,7 +109,7 @@ sub OBIS_Initialize($)
   $hash->{GetFn} = "OBIS_Get";
   $hash->{UndefFn} = "OBIS_Undef";
   $hash->{AttrFn}	= "OBIS_Attr";
-  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off ".
+  $hash->{AttrList}= "do_not_notify:1,0 interval offset_feed offset_energy IODev channels directions alignTime pollingMode:on,off extChannels:on,off,auto unitReadings:on,off ignoreUnknown:on,off valueBracket:first,second,both resetAfterNoDataTime createPreValues:on,off ".
   					  $readingFnAttributes;
 }
 
@@ -393,7 +404,7 @@ sub OBIS_trySMLdecode($$)
 			while ($msg =~ m/(7707)([0-9A-F]*)/g) {
       			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
       			Log3 $hash,5,"OBIS ($name) - Telegram=$msg" if ($ll>=5);
-      			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg"};
+      			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg";next};
 	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
 	    		if ($line eq '255-255:255.255.255*255(') {
 	    			$list[7]=~/(7707.*)/;
@@ -513,7 +524,7 @@ sub OBIS_Parse($$)
 		readingsBeginUpdate($hash);
 		my $ignoreUnknownOff = AttrVal($name,"ignoreUnknown","off") eq "off";
 		my $unitReadingsOff = AttrVal($name,"unitReadings","off") eq "off";
-		my $extChannels = AttrVal($name,"extChannels","off") eq "on";
+		my $extChannels = AttrVal($name,"extChannels","auto");
 		my $ruleCache = $hash->{helper}{RULECACHE};
 		
 	    while($crlfPos > -1)
@@ -580,7 +591,12 @@ sub OBIS_Parse($$)
 										elsif (rindex ($code, "Counter", 0) eq 0) {
 											my $L=$hash->{helper}{Channels}{$channel} //$hash->{helper}{Channels}{$1.".".$2} // $OBIS_channels{$1.".".$2} // $channel;
 											my $chan=$3+0 > 0 ? "_Ch$3" : "";
-											if ($extChannels) {$chan.=".$4" if $4;}
+											if ($extChannels eq "auto" && defined $4) {
+												my $ecp = $Ext_Channel_Postfix{$4};
+												$chan.= $ecp // ".$4";
+											} elsif ($extChannels eq "on") {
+												$chan.=".$4" if $4;
+											}
     										if ($ignoreUnknownOff || $L ne $channel) {
 												if($1==1) {
     												Log3($hash,4,"OBIS ($name) - Set ".$L.$chan." to ".((looks_like_number($3) ? $6+0 : $5) +AttrVal($name,"offset_energy",0))) if ($ll>=4);
@@ -948,6 +964,15 @@ sub OBIS_decodeTL {
       Here, you can change this text with, e.g.: 
       <code>attr myOBIS directions {">" => "pwr consuming", "<"=>"pwr feeding"}</code>
       </li><li>
+   <code>extChannels</code><br>
+      Possible values:<br>
+	  <code>auto</code> (default). The values 0 and 255 will give the base counter name like with off.
+	  Values from 96 to 100 add a postfix "_last1d" / "_last7d", "_last30d", "_last365d" and
+	  "_since_rst" to the reading. Other values lead to results like "on".<br/>
+	  <code>off</code> Historical values are not considered and might overwrite current values.<br/>
+	  <code>on</code> Every counter-reading gets appended by the extChannel-number, e.g.
+      <code>total_consumption</code> becomes <code>total_consumption.255</code>
+      </li><li>
    <code>interval</code><br>
       The polling-interval in seconds. (Only useful in Polling-Mode)
       </li><li>
@@ -1025,6 +1050,16 @@ sub OBIS_decodeTL {
       In diesem Fall gibt es ein extra Reading "dir_total_consumption" welches standardmäßig "in" and "out" beinhaltet<BR>
       Hiermit kann dieser Text geändert werden, z.B.:
       <code>attr myOBIS directions {">" => "pwr consuming", "<"=>"pwr feeding"}</code>
+      </li><li>
+   <code>extChannels</code><br>
+      M&ouml;gliche Werte:<br>
+	  <code>auto</code> (default). Die Werte 0 und 255 werden wie bei extChannels off geschrieben.
+	  Die Werte 96-100 f&uuml;hren zu Postfix "_last1d" / "_last7d", "_last30d", "_last365d" und
+	  "_since_rst". Andere Werte werden wie bei "on" geschrieben.<br/>
+	  <code>off</code> Historische Werte werden nicht ber&uuml;cksichtigt und 
+	  &uuml;berschreiben ggf. aktuelle Werte.<br/>
+	  <code>on</code> Jedem Counter-Wert wird die extChannel-Nummer angeh&auml;ngt, aus
+      <code>total_consumption</code> wird z.B. <code>total_consumption.255</code>
       </li><li>
    <code>interval</code><br>
       Abrufinterval der Daten. (Bringt nur im Polling-Mode was)
