@@ -91,7 +91,7 @@ sub Initialize {
     $hash->{SetFn}      = \&SetFn;
     $hash->{AttrFn}     = \&AttrFn;
     $hash->{ParseFn}    = \&ParseFn;
-    $hash->{AttrList}   = 'model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes; # Slave Device
+    $hash->{AttrList}   = 'model:unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes; # Slave Device
     $hash->{AutoCreate} = { '^OW.*' => {ATTR => 'event-on-change-reading:.* timestamp-on-change-reading:.*', FILTER => '%NAME', GPLOT => q{}} };
 
     return  FHEM::Meta::InitMod( __FILE__, $hash ) if ($hasmeta);
@@ -123,8 +123,8 @@ sub DefineFn {
 	$hash->{OWDEVICES}  = 0;
 	$hash->{OWVals}     = 0;
 	$hash->{addr}       = 'master';
-	$hash->{DELAY}      = .5;
-	setDevAttrList($name,'interval disable:0,1 mapOWIDs useSubDevices:0,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
+	$hash->{TIMEOUT}    = 0.5;
+	setDevAttrList($name,'interval disable:0,1 mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
     else {
@@ -262,7 +262,8 @@ sub GetUpdate {
     RemoveInternalTimer($hash);
     return if (IsDisabled($name) || !$hash->{INTERVAL} || ($hash->{addr} ne 'master'));
 
-    SimpleWrite($hash, '$?');
+    my $c = ($hash->{STATE} ne 'disconnected') ? SimpleWrite($hash, '$?') : DevIo_OpenDev($hash, 1, \&DoInit);
+
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0);
 
     return;
@@ -301,11 +302,6 @@ sub SetFn {
 
     return SimpleWrite($hash, '$rez') if ($cmd eq 'S0-reset');
 
-    if ($cmd eq 'delay') {
-	$hash->{DELAY} = $val if (looks_like_number($val));
-	return;
-    }
-
     if (($cmd eq 'deleteDS2401') && $dlist && ($val =~ m{ [0-9A-F]+ }x ) && (substr($val, 0, 2) eq '01')) {
 
 	my ($ret , $rr, $r);
@@ -335,7 +331,7 @@ sub SetFn {
 	return $ret;
     }
 
-    return 'Unknown argument '.$cmd.', choose one of reset:noArg S0-reset:noArg delay '.$ds;
+    return 'Unknown argument '.$cmd.', choose one of reset:noArg S0-reset:noArg '.$ds;
 }
 
 #####################################
@@ -544,9 +540,11 @@ sub decodeList {
     $hash->{OWVals}++ if ($model > 1);
 
     # passen DELAY und Inetrvall zusammen ?
-    if ((($hash->{OWVals} * $hash->{DELAY}) > $hash->{INTERVAL}) && $hash->{INTERVAL}) {
-	$error = "intervall $hash->{INTERVAL} is very short to read all $hash->{OWVals} OW devices !";
-	Log3($name, 3, "$name, $error");
+    $hash->{DELAY} = AttrNum($name, 'delay' ,0.5);
+
+    if (((($hash->{OWVals} * $hash->{DELAY})+1) >= $hash->{INTERVAL}) && $hash->{INTERVAL}) {
+	$error = "intervall $hash->{INTERVAL} is very short to read all $hash->{OWVals} OW devices with a delay of $hash->{DELAY} seconds";
+	Log3($name, 3, "$name, $error !");
 	readingsSingleUpdate($hash, 'error', $error, 1);
     }
 
@@ -565,10 +563,10 @@ sub decodeList {
     }
 
     if (!defined($hash->{helper}{OW}{$num}{typ})) {
+	$hash->{helper}{OW}{$num}{typ} = 'unknown';
 	$error = "unknown OW type, address $data[2]";
 	Log3($name, 3, "$name, $error");
 	readingsSingleUpdate($hash, 'error', $error, 1);
-	return;
     }
 
     InternalTimer(gettimeofday()+1+($num * $hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 1)); # nicht bei DS2401
@@ -602,14 +600,20 @@ sub decodeVal {
     my $model = $hash->{helper}{OW}{$num}{typ};
     $hash->{helper}{OW}{$num}{raw} = join(' ' , @data);
 
-    my $temp = decodeTemperature($model, @data);
+    my $temp;
 
-    if ($temp eq '') {
-        $error = "unable to decode data $hash->{helper}{OW}{$num}{raw} for model $model";
-        Log3($name, 3, "$name, $error");
-        readingsSingleUpdate($hash, 'error', $error, 1);
-        return;
+    if ($model ne 'unknown') {
+	$temp = decodeTemperature($model, @data);
+
+	if ($temp eq '') {
+	    $error = "unable to decode data $hash->{helper}{OW}{$num}{raw} for model $model";
+	    Log3($name, 3, "$name, $error");
+	    readingsSingleUpdate($hash, 'error', $error, 1);
+	    return;
+	}
     }
+
+    $temp //= $hash->{helper}{OW}{$num}{raw};
 
     $hash->{helper}{OW}{$num}{value} = $temp;
 
@@ -678,23 +682,24 @@ sub ParseFn {
     my $dhash  = $modules{OW2S0SMSGUARD}{defptr}{$arr[1]};
     my $dname  = $dhash->{NAME} // return;
 
-    $dhash->{last_present} //= '???';
-    
     Log3($dname, 4, "$dname, ParseFn $msg");
 
     $dhash->{busid} = $arr[4] //= -1;
 
     readingsBeginUpdate($dhash);
 
-    if (($model eq 'DS1820') || ($model eq 'DS18B20') || ($model eq 'DS1822') ) {
+    if ($model =~ m{ ^DS18 }x) {
+
 	readingsBulkUpdate($dhash, 'temperature', $val);
+
 	readingsBulkUpdate($dhash, 'state',       "T: $val °C");
-	$dhash->{last_present} = TimeNow();
     }
     elsif ($model eq 'DS2401') {
+
 	$dhash->{last_present} = TimeNow() if ($val eq 'present');
 	$dhash->{last_absent}  = TimeNow() if ($val eq 'absent');
 	$dhash->{last_absent}  //= '???';
+	$dhash->{last_present} //= '???';
 
 	if (ReadingsVal($dname, 'presence' ,'') ne $val) {
 	    if ($val eq 'absent') {
@@ -708,7 +713,9 @@ sub ParseFn {
 
 	readingsBulkUpdate($dhash, 'state',    $val);
 	readingsBulkUpdate($dhash, 'presence', $val);
+
     }
+    else { readingsBulkUpdate($dhash, 'state', $val); } # bisher unbekanntes OW Device
 
     readingsEndUpdate($dhash,1);
 
@@ -872,7 +879,6 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     <a name="reset"></a><li>reset IO device ( master only )</li><br>
     <a name="S0-reset"></a><li>S0-reset : reset of both S0 counters ( master only )</li><br>
     <a name="deleteDS2401"></a><li>deleteDS2401 : deletes reading and defined sub device ( master only )</li><br>
-    <a name="delay"></a><li>delay : default 0.5 seconds to read temperatur value ( master only )</li><br>
 
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
@@ -893,6 +899,9 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     <a name="useSubDevices"></a><li>useSubDevices ( master only ) , default 0<br>
     create for each found device on the bus a separate subdevice<br></li>
   </ul>
+ <ul>
+    <a name="delay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values </li><br>
+ </ul>
 
 =end html
 
@@ -922,8 +931,6 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     setzt die beiden internen S0 Zähler ( A & B) auf 0 zurück</li><br>
     <a name="deleteDS2401"></a><li>deleteDS2401 ( nur Master Device )<br>
     löscht das das Reading und falls definiert auch das dazugehörige Sub-Device (siehe Attr useSubDevice)</li><br>
-    <a name="delay"></a><li>delay : default 0.5 ( nur Master Device )<br>
-    Wartezeit in Sekunden zum Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist</li><br>
  
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
@@ -946,6 +953,10 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     <a name="useSubDevices"></a><li>useSubDevices ( nur Master Device ) , default 0<br>
     Legt für jedes gefundene Device am 1-W Bus ein eigenes extra Device an<br></li>
   </ul>
+  <ul>
+    <a name="delay"></a><li>delay ( nur Master Device ) , default 0.5 Sekukunden<br>
+    Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist</li><br>
+   </ul>
 
 =end html_DE
 
