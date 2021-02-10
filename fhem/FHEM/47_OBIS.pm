@@ -2,8 +2,9 @@
 #
 # 47_OBIS.pm 
 # 
-# maintained by gvzdus, however ~95% of code and functionally was
-# written by Icinger - consider the bugs at me, gvzdus and the genius at Icinger :-)
+# maintained by gvzdus, however ~95% of code and functions created by
+# icinger. gvzdus accepts full accountability for the bugs, but the credits
+# for brilliance go to icinger :-)
 # 
 # Other credits:
 # hdgucken, 02/2021: non-blocking extension, optimize ser2net integration
@@ -111,8 +112,6 @@ sub OBIS_Initialize($)
   					  $readingFnAttributes;
 }
 
-#1B1B1B1B010101017605002605426200620072630101760107FFFFFFFFFFFF05000CAC6C0B0A01454D4800005A561C726201640DF29B620163676F0076050026054362006200726307017707FFFFFFFFFFFF0B0A01454D4800005A561C070100620AFFFF726201640DF29B7577070100603201010101010104454D480177070100600100FF010101010B0A01454D4800005A561C0177070100010800FF641C0104726201640DF29B621E52FF6404AB760177070100020800FF01726201640DF29B621E52FF6324910177070100100700FF0101621B52005301360101016373F100760500260544620062007263020171016326A3000000001B1B1B1B1A03CDC9
-#1B1B1B1B010101017605002605456200620072630101760107FFFFFFFFFFFF05000CAC6D0B0A01454D4800005A561C726201640DF29C62016343D30076050026054662006200726307017707FFFFFFFFFFFF0B0A01454D4800005A561C070100620AFFFF726201640DF29C7577070100603201010101010104454D480177070100600100FF010101010B0A01454D4800005A561C0177070100010800FF641C0104726201640DF29C621E52FF6404AB770177070100020800FF01726201640DF29C621E52FF6324910177070100100700FF0101621B520053012C0101016319F6007605002605476200620072630201710163955D000000001B1B1B1B1A0310B4
 
 #####################################
 sub OBIS_Define($$)
@@ -887,7 +886,7 @@ sub OBIS_decodeTL {
 #				Log 3,"--> $msg";
 				(undef,undef,undef,$msg,$tmp2)=OBIS_decodeTL($msg);
 #				Log 3,"<-- $tmp2 $msg";
-				$tmp.=$tmp2;
+				$tmp.=$tmp2 if (defined $tmp2);
 			}
 			$msgLength-=1;
 		}
@@ -954,7 +953,7 @@ sub OBIS_decodeTL {
       </li><li>
    <code>channels</code><br>
       With this, you can rename the reported channels.<BR>e.g.: 
-      <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}></code>
+      <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}</code>
       </li><li>
    <code>directions</code><br>
       Some Meters report feeding/comnsuming of power in a statusword.
@@ -987,7 +986,7 @@ sub OBIS_decodeTL {
       Adds the units to the readings like w, wH, A etc.
       </li><li>  
    <code>valueBracket</code><br>
-      Sets, weather to use the value from the first or the second bracket, if applicable.
+      Sets, if to use the value from the first or the second bracket, if applicable.
       Standard is "second"
       </li><li>  
    <code>resetAfterNoDataTime</code><br>
@@ -1041,7 +1040,7 @@ sub OBIS_decodeTL {
       </li><li>
    <code>channels</code><br>
       Hiermit können die einzelnen Kanal-Readings mittels RegExes umbenannt werden.<BR>
-      Beispiel: <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}></code>
+      Beispiel: <code>attr myOBIS channels {"1.0.96.5.5.255"=>"Status","1.0.0.0.0.255"=>"Info","16.7"=>"Verbrauch"}</code>
       </li><li>
    <code>directions</code><br>
       Manche SmartMeter senden im Statusbyte die Stromrichtung.
