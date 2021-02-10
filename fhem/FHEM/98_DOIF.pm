@@ -4322,8 +4322,8 @@ sub bar
     $trans = -1;
   } else {
     $bwidth= 60 if (!defined $bwidth);
-    $trans = 13;
-    $bheight += 13;
+    $trans = 14;
+    $bheight += 14;
   }
   
   $bwidth=60 if (!defined $bwidth);
@@ -4410,8 +4410,8 @@ sub bar
 
   $ic="$ic\@".color($currColor,$ln) if (defined($icon) and $icon !~ /@/);
 
-  $out.= sprintf('<text x="23" y="10" style="fill:%s;font-size:10px;">%s</text>',color($maxColor,$ln),sprintf($format,$max));
-  $out.= sprintf('<text x="23" y="%d" style="fill:%s;font-size:10px;">%s</text>',$height+9,color($minCol,$ln),sprintf($format,$min));
+  $out.= sprintf('<text x="23" y="10" style="fill:%s;font-size:9px;">%s</text>',color($maxColor,$ln),sprintf($format,$max));
+  $out.= sprintf('<text x="23" y="%d" style="fill:%s;font-size:9px;">%s</text>',$height+9,color($minCol,$ln),sprintf($format,$min));
   $out.= sprintf('<rect x="15" y="%d" width="5" height="%d" rx="2" ry="2" fill="url(#gradbar_%d_%d_%d)"/>',$y,$val1,$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.= sprintf('<rect x="15" y="6" width="5" height="%d" rx="2" ry="2" fill="url(#gradbackg)"/>',$height);
   ##$out.= sprintf('<rect x="15" y="6" width="10" height="%d" rx="2" ry="2" fill="none" stroke="rgb(160, 160, 160)" stroke-width="0.5"/>',$height);
@@ -4426,7 +4426,7 @@ sub bar
     ##$out.='</g>';
   }
   
-  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6,(defined ($icon) ? $height/2+23:$height/2+13),color($currColor,$ln),sprintf($format,$val),$unit);
+  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),sprintf($format,$val),$unit);
 
   $out.= '</g>';
  	$out.= '</svg>';
@@ -4699,7 +4699,7 @@ sub ring
   $out.='</defs>';
 
   $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26.5:24).'" fill="url(#gradbackring)" />';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?3:5).'">');
+  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?2:5).'">');
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, 280);
   $out.='</g>';
   ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
@@ -4717,7 +4717,7 @@ sub ring
   #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
   #$out.=describeArc(40, 30, 26, 270, 280);
   #$out.='</g>';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?3:5).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?2:5).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, int($prop*280));
   $out.='</g>';
   if (defined $icon and $icon ne "") {
@@ -4820,7 +4820,7 @@ sub ring2
   $out.='</defs>';
   
   $out.='<circle cx="40" cy="30" r="23" fill="url(#gradbackring2)" />';
-  $out.=sprintf('<g stroke="url(#grad_ring3)" fill="none" stroke-width="5">');
+  $out.=sprintf('<g stroke="url(#grad_ring3)" fill="none" stroke-width="4">');
   $out.=describeArc(40, 29, 25, 0, 280);
   $out.='</g>';
   
@@ -4833,11 +4833,11 @@ sub ring2
   ##$out.='</g>';
  
  
-  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor,$minColor,(defined $lr ? $lr:-1));
-  $out.=describeArc(40, 29, 27, 0, int($prop*280));
+  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=describeArc(40, 29, 26, 0, int($prop*280));
   $out.='</g>';
 
-  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 29, 23.5, 0, int($prop2*280));
   $out.='</g>';
   ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
