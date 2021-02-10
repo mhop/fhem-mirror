@@ -302,7 +302,7 @@ sub SetFn {
 
     return SimpleWrite($hash, '$rez') if ($cmd eq 'S0-reset');
 
-    if (($cmd eq 'deleteDS2401') && $dlist && ($val =~ m{ [0-9A-F]+ }x ) && (substr($val, 0, 2) eq '01')) {
+    if (($cmd eq 'deleteDS2401') && $dlist && (IsValidHex($val,16)) && (substr($val, 0, 2) eq '01')) {
 
 	my ($ret , $rr, $r);
 
@@ -483,7 +483,7 @@ sub Parse {
 
     my $ok   = (defined($data[1]) && ($data[1] eq 'o')) ? 1 : 0;
 
-    return decodeList($hash, $name, $num, $ok, @data) if (defined($data[2]) && (length($data[2]) == 16) && ( $data[2] =~ m{ [0-9A-F]+ }x ));
+    return decodeList($hash, $name, $num, $ok, @data) if (defined($data[2]) && (IsValidHex($data[2],16)));
     return decodeVal($hash, $name, $num, @data) if ($ok && defined($data[11]) && exists($hash->{helper}{OW}{$num}));
 
     return;
@@ -577,15 +577,15 @@ sub decodeVal {
 
     my ($hash, $name, $num, @data)  = @_;
     my $error;
-    my $crc;
+    my $crc = 0;
 
     # das 10.Byte ist eine Checksumme für die serielle Übertragung
 
     for my $i (2..10) { 
-	$crc += hex($data[$i]) if (($data[$i] =~ m{ [0-9A-F]+ }x) && (length($data[$i]) == 2)) ;
+	$crc += (IsValidHex($data[$i],2)) ? hex($data[$i]) : 0;
     }
     $crc = $crc & 0xFF;
-    $data[11] = (($data[11] =~ m{ [0-9A-F]+ }x) && (length($data[11]) == 2)) ? hex($data[11]) : -1; # das CRC Byte selbst ist ungültig
+    $data[11] = (IsValidHex($data[11],2)) ? hex($data[11]) : -1; # das CRC Byte selbst ist ungültig
 
     if ($crc != $data[11]) {
         $error = "CRC error OW device $num : $data[11] != $crc";
@@ -630,32 +630,30 @@ sub decodeVal {
 sub decodeTemperature {
 
     my ($model, @data) = @_;
-    my $temp = '';
+    my $temp = (( hex($data[1]) << 8) | hex($data[0]));
 
     if ($model eq 'DS1820')  {
-        $temp = (( hex($data[1]) << 8) + hex($data[0])) << 3;
 
-        #$temp = ( hex($data[1]) << 8) + hex($data[0]);
+	# heute eigentlich DS18S20 , echter alter DS1820 hat nur 0.5° Auflösung
+	$temp = $temp * 0.5;
+	#$temp = ($temp & 0xFFF0) +12 - hex($data[6]) if ($data[7] eq '10');
+	# Alternative Berechnung :
 
-        $temp = ($temp & 0xFFF0) +12 - hex($data[6]) if ($data[7] eq '10');
+	$temp = ($temp - 0.25) + ((hex($data[7]) - hex($data[6])) / hex($data[7])) if ($data[7] ne '00');
     }
 
     if (($model eq 'DS18B20') || ($model eq 'DS1822')) {
-        $temp = (( hex($data[1]) << 8) + hex($data[0]));
 
-        my $cfg = (hex($data[4]) & 0x60);
-        $temp  = $temp << 3 if ($cfg == 0);
-        $temp  = $temp << 2 if ($cfg == 0x20);
-        $temp  = $temp << 1 if ($cfg == 0x40);
+	my $cfg = (hex($data[4]) & 0x60);
+	$temp  = $temp << 3 if ($cfg == 0);
+	$temp  = $temp << 2 if ($cfg == 0x20);
+	$temp  = $temp << 1 if ($cfg == 0x40);
+	$temp  = $temp/16.0;
     }
 
-    if ($temp) {
-	$temp = $temp/16.0;
-	$temp -= 4096 if (hex($data[1]) > 127);
-	$temp = sprintf('%.1f', $temp);
-    }
+    $temp -= 4096 if (hex($data[1]) > 127); # ToDo : testen !
 
-    return $temp;
+    return sprintf('%.1f', $temp);
 }
 
 #####################################
@@ -667,7 +665,7 @@ sub ParseFn {
     Log3($shash, 5, "ParseFn, $msg");
 
     my @arr   = split(',', $msg);
-    return if (!defined($arr[1]) || (length($arr[1]) != 16) || ($arr[1] !~ m{ [0-9A-F]+ }x ));
+    return if (!defined($arr[1]) || (!validHex($arr[1],16)));
     my $model = $arr[2] // return;
     my $val   = $arr[3] // return;
 
@@ -845,6 +843,17 @@ sub OW_uniq {
 }
 
 #####################################
+
+sub IsValidHex {
+
+    my $d = shift;
+    my $l = shift;
+    return 0 if (length($d) != $l);
+    for my $i (0..$l-1) {
+	return 0 if (substr($d,$i,1) !~ m{ [0-9A-F] }x);
+    }
+    return 1;
+}
 
 1;
 
