@@ -2,6 +2,12 @@
 #
 ##############################################
 #
+# 2021.02.10 v0.2.9
+# - BUG:     Probleme wenn getbehavior keine Antwort liefert.
+# - CHANGE:  CMD_Queue check
+#            ($hash->{model} eq "Reverb" || $hash->{model} eq "Sonos One" || $hash->{model} eq "Sonos Beam" Unterscheidung entfernt 
+# - FEATURE: Geräte Kennung THIRD_PARTY_AVS_SONOS_BOOTLEG hinzugefügt
+#
 # 2021.02.07 v0.2.8
 # - BUG:     Sonso aktualisiert keine voice Readings
 #
@@ -450,9 +456,10 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.8";
+my $ModulVersion     = "0.2.9";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
+my $QueueNumber      = 0;
 
 ##############################################################################
 sub echodevice_Initialize($) {
@@ -867,29 +874,24 @@ sub echodevice_Set($@) {
 		
 	else {
 	
-		if ($hash->{model} eq "Reverb" || $hash->{model} eq "Sonos One" || $hash->{model} eq "Sonos Beam") {
-			$usage .= 'reminder_normal reminder_repeat ';
-		}
+		$usage .= 'volume:slider,0,1,100 play:noArg pause:noArg next:noArg previous:noArg forward:noArg rewind:noArg shuffle:on,off repeat:on,off dnd:on,off volume_alarm:slider,0,1,100 ';
+		$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter sounds:glocken,kirchenglocke,summer,tuerklingel_1,tuerklingel_2,tuerklingel_3,jubelnde_menschenmenge,publikumsapplaus,flugzeug,katastrophenalarm,motoren_an,schilde_hoch,sirenen,zappen,boing_1,boing_2,kamera,lufthupe,quitschende_tuer,tickende_uhr,trompete,hahn,hundegebell,katzenmauzen,loewengebruell,wolfsgeheul,gruselig_quitschende_tuer,weihnachtsglocken tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
+		$usage .= 'textcommand ';
+
+		$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
+			
+		# startownplaylist
+		$usage .= echodevice_GetOwnPlaylist($hash);
+			
+		if(defined($tracks)) {
+			$tracks =~ s/ /_/g;
+			$tracks =~ s/:/,/g;
+			$usage .= 'track:'.$tracks.' ';
+		} 
 		else {
-			$usage .= 'volume:slider,0,1,100 play:noArg pause:noArg next:noArg previous:noArg forward:noArg rewind:noArg shuffle:on,off repeat:on,off dnd:on,off volume_alarm:slider,0,1,100 ';
-			$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter sounds:glocken,kirchenglocke,summer,tuerklingel_1,tuerklingel_2,tuerklingel_3,jubelnde_menschenmenge,publikumsapplaus,flugzeug,katastrophenalarm,motoren_an,schilde_hoch,sirenen,zappen,boing_1,boing_2,kamera,lufthupe,quitschende_tuer,tickende_uhr,trompete,hahn,hundegebell,katzenmauzen,loewengebruell,wolfsgeheul,gruselig_quitschende_tuer,weihnachtsglocken tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
-			$usage .= 'textcommand ';
-			
-			$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
-			
-			# startownplaylist
-			$usage .= echodevice_GetOwnPlaylist($hash);
-			
-			if(defined($tracks)) {
-				$tracks =~ s/ /_/g;
-				$tracks =~ s/:/,/g;
-				$usage .= 'track:'.$tracks.' ';
-			} 
-			else {
-				$usage .= 'track ';
-			}
-			$usage .= 'bluetooth_connect:'.$hash->{helper}{bluetooth}.' bluetooth_disconnect:'.$hash->{helper}{bluetooth}.' ' if(defined($hash->{helper}{bluetooth}));
+			$usage .= 'track ';
 		}
+		$usage .= 'bluetooth_connect:'.$hash->{helper}{bluetooth}.' bluetooth_disconnect:'.$hash->{helper}{bluetooth}.' ' if(defined($hash->{helper}{bluetooth}));
 		
 		# Routinen auslesen
 		my $BehaviorName ;
@@ -1639,6 +1641,7 @@ sub echodevice_SendCommand($$$) {
 		return undef if(!defined($hash->{helper}{SERVER}));
 		$SendUrl = "https://".$hash->{helper}{SERVER};
 	}
+	
 	else {
 		return undef if(!defined($hash->{IODev}->{helper}{SERVER}));
 		$SendUrl = "https://".$hash->{IODev}->{helper}{SERVER};
@@ -2134,9 +2137,26 @@ sub echodevice_SendCommand($$$) {
 	};
 	
 	#2018.01.14 - PushToCmdQueue
-	push @{$hash->{helper}{CMD_QUEUE}}, $SendParam;  
-	echodevice_HandleCmdQueue($hash);
 	
+	my $QueueSize = scalar  @{$hash->{helper}{CMD_QUEUE}};
+	my $FoundCMDQueue = 0;
+	my @GetSettings = ("getnotifications","alarmvolume","bluetoothstate","getdnd","wakeword","listitems_task","listitems_shopping","getdevicesettings","getisonline","devices","namedListsIDs","devicesstate","account","cookielogin6","activities","getbehavior","getsettingstraffic");
+	# Doppelte Queue Einträge herausfiltern
+	foreach my $CMDQueue (@{$hash->{helper}{CMD_QUEUE}}) { 
+		if ($CMDQueue->{type} eq $type) {
+			if ((grep { $_ eq $type } @GetSettings)) {
+				Log3 $name, 3, "[$name] [echodevice_SendCommand] [$QueueSize] IGNORIERE Command=" . $type . ' Abfrage in CMD_Queue schon vorhanden!';
+				$FoundCMDQueue = 1;
+			last;
+			}
+		}
+	}
+
+	if ($FoundCMDQueue == 0) {
+		push @{$hash->{helper}{CMD_QUEUE}}, $SendParam;  
+		echodevice_HandleCmdQueue($hash);
+	}
+
 	return;
 }
 
@@ -2158,8 +2178,12 @@ sub echodevice_HandleCmdQueue($) {
 		$UserAgent = join('', map{('a'..'z','A'..'Z',0..9)[rand 62]} 0..20);
 	}
 
+	# Queuenumber
+	$QueueNumber += 1;
+
 	readingsSingleUpdate ($hash, "BrowserUserAgent", $UserAgent ,0);
 	readingsSingleUpdate ($hash, "BrowserLanguage", $HeaderLanguage ,0);
+	$hash->{helper}{CMD_QUEUE_NUMBER} = $QueueNumber ;
 	
 #	if($hash->{model} eq "ACCOUNT") {$AmazonHeader = "Cookie: ".$hash->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
 #	else 							{$AmazonHeader = "Cookie: ".$hash->{IODev}->{helper}{".COOKIE"}."\r\ncsrf: ".$hash->{IODev}->{helper}{".CSRF"}."\r\nContent-Type: application/json; charset=UTF-8";}
@@ -2182,6 +2206,7 @@ sub echodevice_HandleCmdQueue($) {
                        hash            => $hash,
 					   type            => $param->{type},
 					   httpversion     => $param->{httpversion},
+					   queuenumber     => $QueueNumber,
                        callback        => \&echodevice_Parse
                       };
   
@@ -2193,10 +2218,16 @@ sub echodevice_HandleCmdQueue($) {
 		my $type = $hash->{helper}{".HTTP_CONNECTION"}{type};
         
         $hash->{helper}{RUNNING_REQUEST} = 1;
-        Log3 $name, 4, "[$name] [echodevice_HandleCmdQueue] [$type] send command=" .echodevice_anonymize($hash, $hash->{helper}{".HTTP_CONNECTION"}{url}). " Data=" . $hash->{helper}{".HTTP_CONNECTION"}{data};
+		
+		my $QueueSize = scalar  @{$hash->{helper}{CMD_QUEUE}};
+		
+        Log3 $name, 4, "[$name] [echodevice_HandleCmdQueue] [$type] [$QueueNumber] [$QueueSize] send command=" .echodevice_anonymize($hash, $hash->{helper}{".HTTP_CONNECTION"}{url}). " Data=" . $hash->{helper}{".HTTP_CONNECTION"}{data};
         HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
 		
     }
+	else {
+		Log3 $name, 4, "[$name] [echodevice_HandleCmdQueue] RUNNING_REQUEST=" . $hash->{helper}{RUNNING_REQUEST} . " type=" . $hash->{helper}{".HTTP_CONNECTION"}{type} if($hash->{helper}{RUNNING_REQUEST} == 1);
+	}
 }
 
 sub echodevice_SendLoginCommand($$$) {
@@ -2396,15 +2427,19 @@ sub echodevice_Parse($$$) {
 	my $hash = $param->{hash};
 	my $name = $hash->{NAME};
 	my $msgtype = $param->{type};
+	my $msgnumber = $param->{queuenumber};
   
-    Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] ";
-	Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] DATA Dumper=" . Dumper(echodevice_anonymize($hash, $data));
+    Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] ";
+	Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] DATA Dumper=" . Dumper(echodevice_anonymize($hash, $data));
 
 	$hash->{helper}{RUNNING_REQUEST} = 0;
 	
 	if ($msgtype eq "account") {
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] DATA Dumper=" . Dumper(echodevice_anonymize($hash, $data));
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] DATA Dumper=" . Dumper(echodevice_anonymize($hash, $data));
 	}
+	
+	# Nächsten Auftrag starten
+	echodevice_HandleCmdQueue($hash);
 	
 	# HTML Informationen mit schreiben
 	if (AttrVal($name,"browser_save_data",0) == 1) {
@@ -2578,7 +2613,7 @@ sub echodevice_Parse($$$) {
 		
 		if($cookiestring =~ /doctype html/) {
 			#RemoveInternalTimer($hash);
-			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] Login failed";
+			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] Login failed";
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", "unauthorized", 1);
 			readingsEndUpdate($hash,1);
@@ -2608,124 +2643,63 @@ sub echodevice_Parse($$$) {
 	if($msgtype eq "notifications_delete" || $msgtype eq "alarm_on" || $msgtype eq "alarm_off" || $msgtype eq "reminderitem") {
 		
 		my $IODev = $hash->{IODev}->{NAME};
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] sendToFHEM get $IODev settings";
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] sendToFHEM get $IODev settings";
 		print (fhem( "get $IODev settings" )) ;
 		
-		echodevice_HandleCmdQueue($hash);
 		return;
 	}
     
 	if($data =~ /doctype html/ || $data =~ /cookie is missing/){
 		#RemoveInternalTimer($hash);
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] Invalid cookie";
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] Invalid cookie";
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "state", "unauthorized", 1);
 		readingsEndUpdate($hash,1);
 		$hash->{STATE} = "COOKIE ERROR";
-		echodevice_HandleCmdQueue($hash);
+
 		return undef;
 	}
 
 	if($err){
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] connection error $msgtype $err";
-		echodevice_HandleCmdQueue($hash);
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] connection error $msgtype $err";
 		return undef;
 	}
   
 	if($data =~ /No routes found/){
-
 		# Spezial set Volume
 		if ($msgtype eq "command") {}
 		else {
-			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] No routes found $msgtype";
+			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] No routes found $msgtype";
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", "timeout", 1);	
 			readingsEndUpdate($hash,1);
 		}
-
-		echodevice_HandleCmdQueue($hash);
 		return undef;
 	}
 	
 	if($data =~ /UnknownOperationException/){
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] Unknown Operation";
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] Unknown Operation";
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "state", "unknown", 1);
 		readingsEndUpdate($hash,1);
-		echodevice_HandleCmdQueue($hash);
 		return undef;
 	}
 
-	if($msgtype eq "null"){
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "setting") {
+	if($msgtype eq "setting" || $msgtype eq "command"){
 		InternalTimer( gettimeofday() + 3, "echodevice_GetSettings", $hash, 0);
-		echodevice_HandleCmdQueue($hash);
 		return undef;
 	}
 	
-	elsif($msgtype eq "command") {
-		InternalTimer( gettimeofday() + 3, "echodevice_GetSettings", $hash, 0);
-		echodevice_HandleCmdQueue($hash);
+	elsif($msgtype eq "null" || $msgtype eq "primeplayeigeneplaylist" || $msgtype eq "primeplayeigene" || $msgtype eq "primeplaysender" || $msgtype eq "primeplaylist" || $msgtype eq "textmessage" || $msgtype eq "volume_alarm" || $msgtype eq "bluetooth_disconnect" || $msgtype eq "bluetooth_connect" || $msgtype eq "dnd" ||	$msgtype eq "list" || $msgtype eq "track") {
 		return undef;
 	}
-	
-	elsif($msgtype eq "primeplaylist") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "track") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "primeplayeigeneplaylist" || $msgtype eq "primeplayeigene" || $msgtype eq "primeplaysender") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "textmessage") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "volume_alarm") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "bluetooth_disconnect") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "bluetooth_connect") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-	
-	elsif($msgtype eq "dnd") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}
-
-	elsif($msgtype eq "list") {
-		echodevice_HandleCmdQueue($hash);
-		return undef;
-	}	
 
 	elsif($msgtype eq "item_task_delete" || $msgtype eq "item_task_add") {
-		echodevice_HandleCmdQueue($hash);
 		echodevice_SendCommand($hash,"listitems_task","TASK");
 		return undef;
 	}		
 
 	elsif($msgtype eq "item_shopping_delete" || $msgtype eq "item_shopping_add") {
-		echodevice_HandleCmdQueue($hash);
 		echodevice_SendCommand($hash,"listitems_shopping","SHOPPING_ITEM");
 		return undef;
 	}	
@@ -2733,20 +2707,20 @@ sub echodevice_Parse($$$) {
 	if($@) {
 		if($data =~ /doctype html/ || $data =~ /cookie is missing/){
 			#RemoveInternalTimer($hash);
-			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] Invalid cookie";
+			Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] Invalid cookie";
 			readingsBeginUpdate($hash);
 			readingsBulkUpdate($hash, "state", "unauthorized", 1);
 			readingsEndUpdate($hash,1);
 			$hash->{STATE} = "COOKIE ERROR";
 			#InternalTimer( gettimeofday() + 10, "echodevice_CheckAuth", $hash, 0) if($hash->{model} eq "ACCOUNT");
-			echodevice_HandleCmdQueue($hash);
+	
 			return undef;
 		}
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "state", "error", 1);
 		readingsEndUpdate($hash,1);
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] json evaluation error ".$@."\n".Dumper(echodevice_anonymize($hash, $data));
-		echodevice_HandleCmdQueue($hash);
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] json evaluation error ".$@."\n".Dumper(echodevice_anonymize($hash, $data));
+
 		return undef;
 	}
 
@@ -2777,10 +2751,9 @@ sub echodevice_Parse($$$) {
 					if(defined($modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds})) {
 						my $echohash = $modules{$hash->{TYPE}}{defptr}{$sourceDeviceIds};
 						#my $timestamp = int(time - ReadingsAge($echohash->{NAME},'voice',time))-5;
-						my $timestamp = int(ReadingsVal($echohash->{NAME},'voice_timestamp',time));
+						my $timestamp = int(ReadingsVal($echohash->{NAME},'voice_timestamp',9999));
 						my $IgnoreVoiceCommand = AttrVal($name,"ignorevoicecommand","");
 						#Log3 $name, 3, "[$name] [echodevice_Parse] [" . $echohash->{NAME} . "] timestamp = $timestamp / " . int($card->{creationTimestamp});
-						#Log3 $name, 3, "[$name] [echodevice_Parse] echohash  = ".$echohash->{NAME};
 						
 						#next if($timestamp eq $card->{creationTimestamp});
 						next if($timestamp >= int($card->{creationTimestamp}));
@@ -2814,7 +2787,7 @@ sub echodevice_Parse($$$) {
 			my $IntervalVoice = int(AttrVal($name,"intervalvoice",999999));
 			
 			if ($IntervalVoice != 999999 && $hash->{STATE} eq "connected" && AttrVal($name,"disable",0) == 0) {
-				Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] refresh voice command IntervalVoice=$IntervalVoice ";
+				Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] refresh voice command IntervalVoice=$IntervalVoice ";
 				$hash->{helper}{echodevice_refreshvoice} = 1;
 				$hash->{helper}{echodevice_refreshvoice_lastdate} = time();
 				RemoveInternalTimer($hash, "echodevice_refreshvoice");
@@ -2825,7 +2798,7 @@ sub echodevice_Parse($$$) {
 			}
 		}
 		else {
-			Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
+			Log3 $name, 3, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] WRONG JSON Type Type=" . ref($json);
 		}
 	} 
  
@@ -3009,7 +2982,7 @@ sub echodevice_Parse($$$) {
 			}
 		}
 		else {
-			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
+			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] WRONG JSON Type Type=" . ref($json);
 		}
 
 	}
@@ -3540,7 +3513,7 @@ sub echodevice_Parse($$$) {
 				#next if($device->{deviceFamily} eq "FIRE_TV");
 				#next if($device->{deviceFamily} =~ /AMAZON/);
 				$isautocreated = 0;
-				if($autocreate && ($device->{deviceFamily} eq "UNKNOWN" || $device->{deviceFamily} eq "FIRE_TV" || $device->{deviceFamily} eq "TABLET" || $device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT" || $device->{deviceFamily} eq "THIRD_PARTY_AVS_MEDIA_DISPLAY"  || $device->{deviceFamily} eq "WHA" || $device->{deviceFamily} eq "ROOK" )) {
+				if($autocreate && ($device->{deviceFamily} eq "UNKNOWN" || $device->{deviceFamily} eq "FIRE_TV" || $device->{deviceFamily} eq "TABLET" || $device->{deviceFamily} eq "ECHO" || $device->{deviceFamily} eq "KNIGHT" || $device->{deviceFamily} eq "THIRD_PARTY_AVS_SONOS_BOOTLEG" || $device->{deviceFamily} eq "THIRD_PARTY_AVS_MEDIA_DISPLAY" || $device->{deviceFamily} eq "WHA" || $device->{deviceFamily} eq "ROOK" )) {
 					if( defined($modules{$hash->{TYPE}}{defptr}{"$device->{serialNumber}"}) ) {
 						Log3 $name, 4, "[$name] [echodevice_Parse] device '$device->{serialNumber}' already defined";
 						if (AttrVal($name, "autocreate_refresh", 0) == 1) {
@@ -3660,7 +3633,7 @@ sub echodevice_Parse($$$) {
 			}
 		}
 		else {
-			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] WRONG JSON Type Type=" . ref($json);
+			Log3 $name, 5, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] WRONG JSON Type Type=" . ref($json);
 		}
 	}
 	
@@ -3963,10 +3936,8 @@ sub echodevice_Parse($$$) {
 	}
 	
 	else {
-		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] json for unknown message \n".Dumper(echodevice_anonymize($hash, $json));
+		Log3 $name, 4, "[$name] [echodevice_Parse] [$msgtype] [$msgnumber] json for unknown message \n".Dumper(echodevice_anonymize($hash, $json));
 	}
-  
-	echodevice_HandleCmdQueue($hash);
 
 }
 
