@@ -2332,12 +2332,13 @@ sub CheckReadingDoIf($$$)
 
 sub CheckRegexpDoIf
 {
-  my ($hash,$type,$device,$id,$eventa,$eventas,$readingupdate)=@_;
+  my ($hash,$type,$device,$id,$eventa,$eventas,$reading)=@_;
   my $nameExp;
   my $notifyExp;
   my $event;
   my @idlist;
   my @devlist;
+  my @readinglist;
   
   return undef if (!defined $hash->{Regex}{$type});
   if (!AttrVal($hash->{NAME}, "checkReadingEvent", 1))  {
@@ -2353,7 +2354,8 @@ sub CheckRegexpDoIf
     if (defined $hash->{Regex}{$type}{$dev}) {
       @idlist=($id eq "") ? (keys %{$hash->{Regex}{$type}{$dev}}):($id);
       foreach my $id (@idlist) {
-        foreach my $i (keys %{$hash->{Regex}{$type}{$dev}{$id}}) {
+        @readinglist=(!defined $reading) ? (keys %{$hash->{Regex}{$type}{$dev}{$id}}):($reading);
+        foreach my $i (@readinglist) {
           $nameExp="";
           $notifyExp="";
           if ($hash->{Regex}{$type}{$dev}{$id}{$i} =~ /([^\:]*):(.*)/) {
@@ -2382,11 +2384,6 @@ sub CheckRegexpDoIf
                 $s = "" if(!defined($s));
                 $found = ($s =~ m/$notifyExp/);
                 if ($found) {
-                  if ($readingupdate==1) {
-                    #readingsSingleUpdate ($hash, "matched_regex_$id",$s,0);
-                  } elsif ($readingupdate==2) {
-                    #readingsBulkUpdate ($hash, "matched_event_$event"."_".($i+1),$s);
-                  }
                   return $i;
                 }
               }
@@ -2450,7 +2447,7 @@ sub DOIF_Perl_Trigger
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      next if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState},1)));
+      next if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState})));
       $event="$device";
     }
     DOIF_block($hash,$i); 
@@ -2499,7 +2496,7 @@ sub DOIF_Trigger
       $hash->{helper}{triggerDev}="";
       $hash->{helper}{event}=$event;
     } else { #event
-      if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState},1))) {
+      if (!defined (CheckRegexpDoIf($hash,"cond", $device,$i,$hash->{helper}{triggerEvents},$hash->{helper}{triggerEventsState}))) {
         if (!defined ($checkall) and AttrVal($pn, "checkall", 0) !~ "1|all|event") {
           next;
         } 
@@ -2679,7 +2676,7 @@ DOIF_Notify($$)
   #return "" if (!$hash->{itimer}{all} and !$hash->{devices}{all} and !keys %{$hash->{Regex}});
   
   #if (($hash->{itimer}{all}) and $hash->{itimer}{all} =~ / $dev->{NAME} /) {
-  if (defined CheckRegexpDoIf($hash,"itimer",$dev->{NAME},"itimer",$eventa,$eventas,1)) {
+  if (defined CheckRegexpDoIf($hash,"itimer",$dev->{NAME},"itimer",$eventa,$eventas)) {
     for (my $j=0; $j<$hash->{helper}{last_timer};$j++) {
       if (CheckiTimerDoIf ($dev->{NAME},$hash->{time}{$j},$eventas)) {
         DOIF_SetTimer ($hash,"DOIF_TimerTrigger",$j);
@@ -2694,16 +2691,28 @@ DOIF_Notify($$)
   return "" if (ReadingsVal($pn,"mode","") eq "disabled");
   
   $ret=0;
+  if (defined $hash->{Regex}{"event_Readings"}) {
+    foreach $device ("$dev->{NAME}","") {
+      if (defined $hash->{Regex}{"event_Readings"}{$device}) {
+        #readingsBeginUpdate($hash);
+        foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
+          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
+          setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
+        }
+        #readingsEndUpdate($hash,1);
+      }
+    }
+  }
   
   if (defined $hash->{Regex}{"accu"}{"$dev->{NAME}"}) {
     my $device=$dev->{NAME};
-    my $reading=CheckRegexpDoIf($hash,"accu",$dev->{NAME},"accu",$eventa,$eventas,0);
-    if (defined $reading) {
-      accu_setValue($hash,$device,$reading);
+    foreach my $reading (keys %{$hash->{Regex}{"accu"}{$device}{"accu"}}) {
+      my $readingregex=CheckRegexpDoIf($hash,"accu",$dev->{NAME},"accu",$eventa,$eventas,$reading);
+      accu_setValue($hash,$device,$readingregex) if (defined $readingregex);
     }
   }
 
-  if (defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,$eventas,0)) {
+  if (defined CheckRegexpDoIf($hash,"cond",$dev->{NAME},"",$eventa,$eventas)) {
     $hash->{helper}{cur_cmd_nr}="Trigger  $dev->{NAME}" if (AttrVal($hash->{NAME},"selftrigger","") ne "all");
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
@@ -2735,7 +2744,7 @@ DOIF_Notify($$)
     $ret=$hash->{MODEL} eq "Perl" ? DOIF_Perl_Trigger($hash,$dev->{NAME}) : DOIF_Trigger($hash,$dev->{NAME});
   }
   
-  if ((defined CheckRegexpDoIf($hash,"STATE",$dev->{NAME},"STATE",$eventa,$eventas,1)) and !$ret) {
+  if ((defined CheckRegexpDoIf($hash,"STATE",$dev->{NAME},"STATE",$eventa,$eventas)) and !$ret) {
     $hash->{helper}{triggerEvents}=$eventa;
     $hash->{helper}{triggerEventsState}=$eventas;
     $hash->{helper}{triggerDev}=$dev->{NAME};
@@ -2751,7 +2760,7 @@ DOIF_Notify($$)
       if (defined $hash->{Regex}{"DOIF_Readings"}{$device}) {
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventa,$eventas,0);
+          my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$dev->{NAME},$reading,$eventa,$eventas);
           setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash, 1);
@@ -2759,7 +2768,7 @@ DOIF_Notify($$)
     }
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"DOIF_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas},0);
+        my $readingregex=CheckRegexpDoIf($hash,"DOIF_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
         setDOIF_Reading($hash,$reading,$readingregex,"DOIF_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
@@ -2770,14 +2779,14 @@ DOIF_Notify($$)
       foreach $device ("$dev->{NAME}","") {
         if (defined $hash->{Regex}{$table}{$device}) {
           foreach my $doifId (keys %{$hash->{Regex}{$table}{$device}}) {
-            my $readingregex=CheckRegexpDoIf($hash,$table,$dev->{NAME},$doifId,$eventa,$eventas,0);
+            my $readingregex=CheckRegexpDoIf($hash,$table,$dev->{NAME},$doifId,$eventa,$eventas);
             DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
           }
         }
       }
       if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
         foreach my $doifId (keys %{$hash->{Regex}{$table}{$hash->{NAME}}}) {
-          my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas},0);
+          my $readingregex=CheckRegexpDoIf($hash,$table,$hash->{NAME},$doifId,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
           DOIF_UpdateCell($hash,$doifId,$hash->{NAME},$readingregex) if (defined($readingregex));
         }
       }
@@ -2789,7 +2798,7 @@ DOIF_Notify($$)
       if (defined $hash->{Regex}{"event_Readings"}{$device}) {
         #readingsBeginUpdate($hash);
         foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$device}}) {
-          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas,0);
+          my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$dev->{NAME},$reading,$eventa,$eventas);
           setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
         }
         #readingsEndUpdate($hash,1);
@@ -2797,7 +2806,7 @@ DOIF_Notify($$)
     }
     if (defined ($hash->{helper}{DOIF_eventas})) { #$SELF events
       foreach my $reading (keys %{$hash->{Regex}{"event_Readings"}{$hash->{NAME}}}) {
-        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas},0);
+        my $readingregex=CheckRegexpDoIf($hash,"event_Readings",$hash->{NAME},$reading,$hash->{helper}{DOIF_eventa},$hash->{helper}{DOIF_eventas});
         setDOIF_Reading($hash,$reading,$readingregex,"event_Readings",$eventa, $eventas,$dev->{NAME}) if (defined($readingregex));
       }
     }
@@ -4689,8 +4698,8 @@ sub ring
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
   $out.='</defs>';
 
-  $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26:24).'" fill="url(#gradbackring)" />';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?4:5).'">');
+  $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26.5:24).'" fill="url(#gradbackring)" />';
+  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?3:5).'">');
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, 280);
   $out.='</g>';
   ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
@@ -4708,7 +4717,7 @@ sub ring
   #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
   #$out.=describeArc(40, 30, 26, 270, 280);
   #$out.='</g>';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?4:5).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?3:5).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, int($prop*280));
   $out.='</g>';
   if (defined $icon and $icon ne "") {
@@ -4824,11 +4833,11 @@ sub ring2
   ##$out.='</g>';
  
  
-  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="3">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 29, 27, 0, int($prop*280));
   $out.='</g>';
 
-  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="3">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 29, 23.5, 0, int($prop2*280));
   $out.='</g>';
   ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
