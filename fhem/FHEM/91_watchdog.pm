@@ -70,7 +70,8 @@ watchdog_Define($$)
 
   if(defined($watchdog->{TO})) { # modify
     $re1 = $watchdog->{RE1} if(!defined($re1));
-    $to  = $watchdog->{TO}  if(!defined($to));
+    $to  = sprintf("%02d:%02d:%02d", $watchdog->{TO}/3600,
+                ($watchdog->{TO}/60)%60, $watchdog->{TO}%60) if(!defined($to));
     $re2 = $watchdog->{RE2} if(!defined($re2));
     $cmd = $watchdog->{CMD} if(!defined($cmd));
     $watchdog->{DEF} = "$re1 $to $re2 $cmd";
