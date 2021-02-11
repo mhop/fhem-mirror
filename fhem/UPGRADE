@@ -38,6 +38,8 @@ enable the old feature.
   - 98_structure: propagateAttr defaults to empty and not to all => setting
     attributes on structure wont be set automatically on the members.
 
-- 2020-03-07 (6.1) 
+- ????-??-?? (6.1) 
   - 98_RandomTimer: evaluate state reading instead of STATE (Value()).
     NOTE: In 6.0 version this can be forced by new attribute offState
+  - 96_allowed: the default for allowedIfAuthenticatedByMe is now 1 (relevant
+    if there are multiple allowed devices valid for the same target).

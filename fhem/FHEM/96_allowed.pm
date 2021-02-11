@@ -98,9 +98,10 @@ allowed_Authorize($$$$;$)
   return 0 if($me->{disabled});
   my $vName = $cl->{SNAME} ? $cl->{SNAME} : $cl->{NAME};
   return 0 if(!$me->{".validFor"}{$vName});
-  return 0 if(AttrVal($me->{NAME}, "allowedIfAuthenticatedByMe", 0) &&
+  my $mName = $me->{NAME};
+  return 0 if(AttrVal($mName, "allowedIfAuthenticatedByMe",$featurelevel>6.0) &&
               (!$cl->{AuthenticatedBy} ||
-                $cl->{AuthenticatedBy} ne $me->{NAME}));
+                $cl->{AuthenticatedBy} ne $mName));
 
   if($type eq "cmd") {
     return 0 if(!$me->{".allowedCommands"});
