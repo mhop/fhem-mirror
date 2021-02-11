@@ -665,7 +665,7 @@ sub ParseFn {
     Log3($shash, 5, "ParseFn, $msg");
 
     my @arr   = split(',', $msg);
-    return if (!defined($arr[1]) || (!validHex($arr[1],16)));
+    return if (!defined($arr[1]) || (!IsValidHex($arr[1],16)));
     my $model = $arr[2] // return;
     my $val   = $arr[3] // return;
 
