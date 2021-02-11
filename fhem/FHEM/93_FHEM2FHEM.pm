@@ -33,7 +33,8 @@ FHEM2FHEM_Initialize($)
   $hash->{DefFn}   = "FHEM2FHEM_Define";
   $hash->{UndefFn} = "FHEM2FHEM_Undef";
   $hash->{AttrList}= "addStateEvent:1,0 dummy:1,0 disable:0,1 ".
-                     "disabledForIntervals eventOnly:1,0 excludeEvents";
+                     "disabledForIntervals eventOnly:1,0 excludeEvents ".
+                     "setState";
 }
 
 #####################################
@@ -177,7 +178,11 @@ FHEM2FHEM_Read($)
           if($msg =~ m/^([^:]*): (.*)$/) {
             readingsSingleUpdate($defs{$rname}, $1, $2, 1);
           } else {
-            readingsSingleUpdate($defs{$rname}, "state", $msg, 1);
+            if(AttrVal($name,"setState",0)) {
+              AnalyzeCommand($hash, "set $rname $msg");
+            } else {
+              readingsSingleUpdate($defs{$rname}, "state", $msg, 1);
+            }
           }
         }
 
@@ -338,7 +343,7 @@ FHEM2FHEM_Attr(@)
   my ($type, $devName, $attrName, @param) = @_;
   my $hash = $defs{$devName};
 
-  return undef if($attrName ne "addStateEvent");
+  return undef if($attrName && $attrName ne "addStateEvent");
   $attr{$devName}{$attrName} = 1;
   FHEM2FHEM_CloseDev($hash);
   FHEM2FHEM_OpenDev($hash, 1);
@@ -450,18 +455,22 @@ FHEM2FHEM_Attr(@)
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-    <li><a name="#eventOnly">eventOnly</a><br>
+    <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
       if set, generate only events, do not set corresponding readings.
       This is a compatibility feature, available only for LOG-Mode.
       </li>
-    <li><a name="#addStateEvent">addStateEvent</a><br>
+    <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
       if set, state events are transmitted correctly. Notes: this is relevant
       only with LOG mode, setting it will generate an additional "reappeared"
       Log entry, and the remote FHEM must support inform onWithState (i.e. must
       be up to date).
       </li>
-    <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
+    <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
       do not publish events matching &lt;regexp&gt;
+      </li>
+    <li><a name="#FHEM2FHEMsetState">setState</a>
+      if set to 1, and there is a local device with the same name, then remote
+      set commands will be executed for the local device.
       </li>
   </ul>
 
@@ -579,19 +588,24 @@ FHEM2FHEM_Attr(@)
      <li><a href="#dummy">dummy</a></li>
      <li><a href="#disable">disable</a></li>
      <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-     <li><a name="#eventOnly">eventOnly</a><br>
+     <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
        falls gesetzt, werden nur die Events generiert, und es wird kein
        Reading aktualisiert. Ist nur im LOG-Mode aktiv.
        </li>
-     <li><a name="#addStateEvent">addStateEvent</a><br>
+     <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
        falls gesetzt, werden state Events als solche uebertragen. Zu beachten:
        das Attribut ist nur f&uuml;r LOG-Mode relevant, beim Setzen wird eine
        zus&auml;tzliche reopened Logzeile generiert, und die andere Seite muss
        aktuell sein.
        </li>
-     <li><a name="#excludeEvents">excludeEvents &lt;regexp&gt;</a>
+     <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
        die auf das &lt;regexp&gt; zutreffende Events werden nicht
        bereitgestellt.
+       </li>
+     <li><a name="#FHEM2FHEMsetState">setState</a>
+       falls gesetzt (auf 1), und ein lokales Ger&auml;t mit dem gleichen Namen
+       existiert, dann werden set Befehle vom entfernten Ger&auml;t als Solches
+       &uuml;bertragen.
        </li>
    </ul>
 
