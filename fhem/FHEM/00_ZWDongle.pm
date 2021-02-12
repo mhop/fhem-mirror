@@ -484,7 +484,8 @@ ZWDongle_Get($@)
   my $msg="";
   $a[0] = $a0 if(defined($a0));
   $msg = $ret if($ret);
-  my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
+  my @r;
+  @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
 
   if($cmd eq "nodeList") {                     ############################
     $msg =~ s/^.{10}(.{58}).*/$1/;

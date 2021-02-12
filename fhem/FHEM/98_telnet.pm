@@ -139,8 +139,8 @@ telnet_Define($$$)
   my $port = $pport;
   $port =~ s/^IPV6://;
 
-  my $isServer = 1 if(defined($port) && $port =~ m/^\d+$/);
-  my $isClient = 1 if($port && $port =~ m/^(.+):\d+$/);
+  my $isServer = (defined($port) && $port =~ m/^\d+$/);
+  my $isClient = ($port && $port =~ m/^(.+):\d+$/);
 
   return "Usage: define <name> telnet { [IPV6:]<tcp-portnr> [global] | ".
                                       " [IPV6:]serverName:port }"

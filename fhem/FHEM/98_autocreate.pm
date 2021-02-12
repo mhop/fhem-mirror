@@ -570,7 +570,7 @@ CommandUsb($$)
   my ($cl, $n) = @_;
 
   return "Usage: usb [scan|create]" if("$n" !~ m/^(scan|create)$/);
-  my $scan = 1 if($n eq "scan");
+  my $scan = ($n eq "scan");
   my $ret = "";
   my $msg;
   my $dir = "/dev";

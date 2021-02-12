@@ -2212,7 +2212,8 @@ FW_returnFileAsStream($$$$$)
                   "Transfer-Encoding: chunked\r\n" .
                   "Content-Type: $type; charset=$FW_encoding\r\n\r\n");
 
-  my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
+  my $d;
+  $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
   FW_outputChunk($FW_chash, $FW_RET, $d);
   FW_outputChunk($FW_chash, "<a name='top'></a>".
         "<a href='#end_of_file'>jump to the end</a><br><br>", $d)
@@ -2505,7 +2506,8 @@ FW_style($$)
       FW_addContent(">$filePath: $!</div");
       return;
     }
-    my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
+    my $ret;
+    $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
     $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
     $ret = FW_Set("","","rereadicons") if($isImg);
     DoTrigger("global", "FILEWRITE $filePath", 1) if(!$ret); # Forum #32592
@@ -2672,7 +2674,8 @@ FW_makeImage(@)
       $data =~ s/ *$//g;
       $data =~ s/<svg/<svg class="$class" data-txt="$txt"/; #52967
       $name =~ m/(@.*)$/;
-      my $col = $1 if($1);
+      my $col;
+      $col = $1 if($1);
       if($col) {
         $col =~ s/@//;
         $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);

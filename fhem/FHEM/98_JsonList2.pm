@@ -37,7 +37,8 @@ JsonList2_dumpHash($$$$$$)
 {
   my ($arrp, $name, $h, $isReading, $showInternal, $attr) = @_;
   my $ret = "";
-  my %filter = map { $_=>1 } @$attr if(@$attr);
+  my %filter;
+  %filter = map { $_=>1 } @$attr if(@$attr);
   
   my @arr = grep { ($showInternal || $_ !~ m/^\./) &&
                    ($isReading || $_ eq "IODev" || !ref($h->{$_}) ) &&

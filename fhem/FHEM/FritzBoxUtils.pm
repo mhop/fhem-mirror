@@ -37,8 +37,9 @@ FB_doCheckPW($$$)
               "getpage=../html/login_sid.xml" );
     $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
     $data = GetFileFromURL(FB_host2URL($host)."cgi-bin/webcm", undef, $data, 1);
-    my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
-    $sid = undef if($sid =~ m/^0*$/);
+    my $sid;
+    $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
+    $sid = undef if(defined($sid) && $sid =~ m/^0*$/);
     return $sid;
 
   } else {                            # FritzOS >= 5.50
@@ -49,8 +50,9 @@ FB_doCheckPW($$$)
 
     $data = GetFileFromURL($url, undef, $data, 1);
     return if(!$data);
-    my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
-    return if($sid =~ m/^0*$/);
+    my $sid;
+    $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
+    return if(defined($sid) && $sid =~ m/^0*$/);
     return $sid;
   }
 }

@@ -87,7 +87,8 @@ HMS_Parse($$)
   my $cde = substr($msg, 11, 1);
 #                        012345678901234567890123456789
 #                        810e047f0214a001a81f000001000000 HMS100TFK
-  my $val = substr($msg, 24, 8) if(length($msg) == 32);
+  my $val;
+  $val = substr($msg, 24, 8) if(length($msg) == 32);
   if(!defined($val)) {
     Log3 $hash, 3, "Strange HMS message $msg";
     return "";

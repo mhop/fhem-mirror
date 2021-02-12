@@ -923,8 +923,9 @@ ZWave_execInits($$;$)
 
   my $NAME = $hash->{NAME};
   my $iodev = $hash->{IODev};
-  my $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
-  my $CTRLID=hex($1) if($homeReading && $homeReading =~ m/CtrlNodeIdHex:(..)/);
+  my ($homeReading, $CTRLID);
+  $homeReading = ReadingsVal($iodev->{NAME}, "homeId", "") if($iodev);
+  $CTRLID = hex($1) if($homeReading && $homeReading =~ m/CtrlNodeIdHex:(..)/);
 
   # ZWavePlus devices with MCA need mcaAdd instead of associationAdd
   my $cls = AttrVal($NAME, "classes", "");
@@ -980,7 +981,8 @@ ZWave_neighborList($)
   no strict "refs";
   my $iohash = $hash->{IODev};
   my $fn = $modules{$iohash->{TYPE}}{ReadAnswerFn};
-  my ($err, $data) = &{$fn}($iohash, "neighborList", "^0180") if($fn);
+  my ($err, $data);
+  ($err, $data) = &{$fn}($iohash, "neighborList", "^0180") if($fn);
   use strict "refs";
 
   return $err if($err);
@@ -1131,7 +1133,8 @@ ZWave_Cmd($$@)
       $cmdFmt = sprintf($cmdFmt, @a);
     }
     $@ = undef;
-    my ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
+    my ($err, $ncmd);
+    ($err, $ncmd) = eval($cmdFmt) if($cmdFmt !~ m/^\d/);
     return $err if($err);
     return $@ if($@);
     $cmdFmt = $ncmd if(defined($ncmd));
@@ -2908,8 +2911,9 @@ ZWave_configParseModel($;$)
     }
 
     if($line =~ m/^\s*<Item/) {
-      my $label = $1 if($line =~ m/label="([^"]*)"/i);
-      my $value = $1 if($line =~ m/value="([^"]*)"/i);
+      my ($label, $value);
+      $label = $1 if($line =~ m/label="([^"]*)"/i);
+      $value = $1 if($line =~ m/value="([^"]*)"/i);
       my ($item, $shortened) = ZWave_cleanString($label, $value, 1);
       $hash{$cmdName}{Item}{$item} = $value;
       $hash{$cmdName}{type} = "list";   # Forum #42604

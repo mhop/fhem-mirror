@@ -180,7 +180,8 @@ allowed_Authenticate($$$$)
     if($pwok && (!defined($authcookie) || $secret ne $authcookie)) {
       my $time = AttrVal($aName, "basicAuthExpiry", 0);
       if ( $time ) {
-        my ($user, $password) = split(":", decode_base64($secret)) if($secret);
+        my ($user, $password);
+        ($user, $password) = split(":", decode_base64($secret)) if($secret);
         $time = int($time*86400+time());
         # generate timestamp according to RFC-1130 in Expires
         my $expires = FmtDateTimeRFC1123($time);
@@ -248,7 +249,8 @@ allowed_CheckBasicAuth($$$$)
   my $aName = $me->{NAME};
 
   my $pwok = ($secret && $secret eq $basicAuth) ? 1 : 2;      # Base64
-  my ($user, $password) = split(":", decode_base64($secret)) if($secret);
+  my ($user, $password);
+  ($user, $password) = split(":", decode_base64($secret)) if($secret);
   ($user,$password) = ("","") if(!defined($user) || !defined($password));
 
   if($secret && $basicAuth =~ m/^{.*}$/) {

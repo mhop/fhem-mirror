@@ -836,7 +836,8 @@ FileLog_Get($@)
   }
   Log3 $name, 4, "$name get: Input file $inf, from:$from  to:$to";
 
-  my $ifh = new IO::File $inf if($inf);
+  my $ifh;
+  $ifh = new IO::File $inf if($inf);
   FileLog_seekTo($inf, $ifh, $hash, $from, $reformatFn) if($ifh);
 
   # Return the the plain file data, $outf is ignored
