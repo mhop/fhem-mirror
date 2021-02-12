@@ -539,6 +539,7 @@ f18_addDragger(el)
   /////////////////////////////////////
   // Size
   var off = 20;
+  var elPadding = ($(el).outerWidth()-$(el).width());
   if(!$(el).hasClass("SVGlabel")) {
     $("<div class='dragSize'></div>")
       .appendTo(el)
@@ -547,7 +548,7 @@ f18_addDragger(el)
              top:$(comp).height()+2, left:$(comp).width()-off, "z-index":1 })
       .draggable({
         drag:function(evt,ui){
-          $(el).css(  { width:ui.position.left+off });
+          $(el).css(  { width:ui.position.left+off-elPadding });
           $(comp).css({ width:ui.position.left+off,
                         height:ui.position.top });
         },
