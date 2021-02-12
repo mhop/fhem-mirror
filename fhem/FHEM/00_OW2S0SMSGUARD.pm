@@ -62,6 +62,7 @@ BEGIN
 	setDevAttrList
 	setReadingsVal
 	TimeNow
+	time_str2num
 	)
     );
 
@@ -124,7 +125,7 @@ sub DefineFn {
 	$hash->{OWVals}     = 0;
 	$hash->{addr}       = 'master';
 	$hash->{TIMEOUT}    = 0.5;
-	setDevAttrList($name,'interval disable:0,1 mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
+	setDevAttrList($name,'interval disable:0,1 DS2401_Timeout mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
     else {
@@ -180,6 +181,7 @@ sub NotifyFn {
 	    }
 	    foreach my $dev (@ds2401) {
 		setReadingsVal($hash, $hash->{helper}{OW}{100}{$dev}{name}, 'unkown', TimeNow());
+		$hash->{helper}{OW}{100}{$dev}{time} = TimeNow();
 		Log3($name, 5, "$name, restore hash for $dev");
 	    }
 	}
@@ -210,11 +212,15 @@ sub AttrFn {
 
     if ($cmd eq 'set') {
 	if ($attrName eq 'interval') { 
-	    return "invalid value " if (int($attrVal) < 0);
+	    return "invalid value" if (int($attrVal) < 0);
 	    $hash->{INTERVAL} = int($attrVal);
 
 	    InternalTimer(gettimeofday()+1, 'FHEM::OW2S0SMSGUARD::GetUpdate', $hash, 0) if ($hash->{INTERVAL});
 	    readingsSingleUpdate($hash, 'state', 'disabled', 1) if (!$hash->{INTERVAL});
+	}
+
+	if ($attrName eq 'DS2401_Timeout') {
+	    return "invalid value" if (((int($attrVal) < 0) || (int($attrVal) < $hash->{INTERVAL})) && $init_done);
 	}
 
 	if ($attrName eq 'disable') {
@@ -275,6 +281,7 @@ sub read_OW {
     my $h = shift;
     my $hash = $h->{h};
     my $num  = $h->{n};
+
     SimpleWrite($hash, '$'.$num); # Antwort kommt via sub ReadFn
     Log3($hash, 5, "$hash->{NAME}, read_OW : $num");
     return;
@@ -430,16 +437,17 @@ sub ReadFn {
     while($raw =~ m/\n/x) {
 	my $rmsg;
 	($rmsg,$raw) = split("\n", $raw, 2);
-	$rmsg =~ s/[\r\$]//xg;
+	$rmsg =~ s/[\r\$]//xg; # alle Antwortenn beginnen mit einem $ , Bsp $0;o;31;00;4B;46;FF;FF;07;10;8D;64;
 
 	if ($rmsg) {
 	    $i++;
 	    Log3($name, 4, "$name, read[$i] : $rmsg");
-	    Parse($hash,  $rmsg) if (index($rmsg, ';') != -1);
+	    Parse($hash,  $rmsg);
 	}
     }
 
     $hash->{PARTIAL} = $raw;
+    Log3($name, 5, "$name, ReadFn RAW: $raw");
     return;
 }
 
@@ -456,35 +464,27 @@ sub Parse {
 
     my @data = split(';', $rmsg);
 
-    if (int(@data) < 3) {
-	$txt = 'message is too short -> '.int(@data);
-	Log3($name, 3, "$name, $txt");
-	readingsSingleUpdate($hash, 'error', $txt, 1);
-	return;
-    }
+    return ErrorLog($hash, 'message is too short -> '.int(@data)) if (int(@data) < 3);
 
-    return UpdateReadings($hash, $rmsg) if ($data[0] eq 'S0'); # Liste ist vollständig
+    return UpdateReadings($hash, $rmsg) if ($data[0] eq 'S0'); # Liste ist jetzt vollständig
 
-    if (!looks_like_number($data[0])) {
-	$txt = "first byte $data[0] is not a number !";
-	Log3($name, 3, "$name, $txt");
-	readingsSingleUpdate($hash, 'error', $txt, 1);
-	return;
-    }
+    return ErrorLog($hash, "first byte $data[0] is not a number !") if (!looks_like_number($data[0]));
 
     my $num  = int($data[0]);
 
-    if (($num > 63) | ($num < 0)) {
-	$txt = "invalid OW number $num";
-	Log3($name, 3, "$name, $txt");
-	readingsSingleUpdate($hash, 'error', $txt, 1);
-	return;
-    }
+    return ErrorLog($hash, "invalid OW number $num") if (($num > 63) || ($num < 0));
+
 
     my $ok   = (defined($data[1]) && ($data[1] eq 'o')) ? 1 : 0;
 
-    return decodeList($hash, $name, $num, $ok, @data) if (defined($data[2]) && (IsValidHex($data[2],16)));
+    # Werte Telegramm eines DS18xx ?
     return decodeVal($hash, $name, $num, @data) if ($ok && defined($data[11]) && exists($hash->{helper}{OW}{$num}));
+
+    # eine Zeile aus list :  0;o;1080974B020800BA;
+    if (defined($data[2])) {
+	return ErrorLog($hash, "invalid hex address for device $num") if (!IsValidHex($data[2], 16));
+	decodeList($hash, $name, $num, $ok, @data);
+    }
 
     return;
 }
@@ -494,7 +494,6 @@ sub Parse {
 sub decodeList {
 
     my ($hash, $name, $num, $ok, @data) = @_;
-    my $error;
 
     delete $hash->{helper}{OW}{$num};
 
@@ -504,12 +503,7 @@ sub decodeList {
     $hash->{'OW-Dev'.$num}           = $hash->{helper}{OW}{$num}{addr}." => $ok";
     $hash->{OWDEVICES}               = ($num + 1);
 
-    if (!$ok) {
-	$error = "got NOK for OW device $num [".$data[2].']';
-	Log3($name, 3, "$name, $error");
-	readingsSingleUpdate($hash, 'error', $error, 1);
-	return;
-    }
+    return ErrorLog($hash, "got NOK for OW device $num [".$data[2].']') if (!$ok); 
 
     my $model = int(substr($data[2],0,2));
     my $owid  = substr($data[2],0,14);
@@ -524,12 +518,7 @@ sub decodeList {
 	}
     }
 
-    if ($crc != hex($owcrc)) {
-	$error = "CRC error OW device $num [$data[2]] : $owcrc != ". sprintf('%02x', $crc);
-	Log3($name, 3, "$name, $error");
-	readingsSingleUpdate($hash, 'error', $error, 1);
-	return;
-    }
+    return ErrorLog($hash, "CRC error OW device $num [$data[2]] : $owcrc != ". sprintf('%02x', $crc)) if ($crc != hex($owcrc));
 
     if ($num == 0) {
         for my $i (1..63) {delete $hash->{'OW-Dev'.$i} if (exists($hash->{'OW-Dev'.$i})); }
@@ -539,13 +528,11 @@ sub decodeList {
     $hash->{helper}{OW}{$num}{fam} = $model;
     $hash->{OWVals}++ if ($model > 1);
 
-    # passen DELAY und Inetrvall zusammen ?
+    # passen DELAY und Intervall zusammen ?
     $hash->{DELAY} = AttrNum($name, 'delay' ,0.5);
 
     if (((($hash->{OWVals} * $hash->{DELAY})+1) >= $hash->{INTERVAL}) && $hash->{INTERVAL}) {
-	$error = "intervall $hash->{INTERVAL} is very short to read all $hash->{OWVals} OW devices with a delay of $hash->{DELAY} seconds";
-	Log3($name, 3, "$name, $error !");
-	readingsSingleUpdate($hash, 'error', $error, 1);
+	ErrorLog($hash, "intervall $hash->{INTERVAL} is very short to read all $hash->{OWVals} OW devices with a delay of $hash->{DELAY} seconds");
     }
 
     mapNames($hash, $num);
@@ -564,9 +551,7 @@ sub decodeList {
 
     if (!defined($hash->{helper}{OW}{$num}{typ})) {
 	$hash->{helper}{OW}{$num}{typ} = 'unknown';
-	$error = "unknown OW type, address $data[2]";
-	Log3($name, 3, "$name, $error");
-	readingsSingleUpdate($hash, 'error', $error, 1);
+	ErrorLog($hash, "unknown OW type, address $data[2]");
     }
 
     InternalTimer(gettimeofday()+1+($num * $hash->{DELAY}), 'FHEM::OW2S0SMSGUARD::read_OW', {h=>$hash, n=>$num}, 0) if ($ok && ($model > 1)); # nicht bei DS2401
@@ -576,7 +561,7 @@ sub decodeList {
 sub decodeVal {
 
     my ($hash, $name, $num, @data)  = @_;
-    my $error;
+
     my $crc = 0;
 
     # das 10.Byte ist eine Checksumme für die serielle Übertragung
@@ -587,12 +572,7 @@ sub decodeVal {
     $crc = $crc & 0xFF;
     $data[11] = (IsValidHex($data[11],2)) ? hex($data[11]) : -1; # das CRC Byte selbst ist ungültig
 
-    if ($crc != $data[11]) {
-        $error = "CRC error OW device $num : $data[11] != $crc";
-        Log3($name, 3, "$name, $error");
-        readingsSingleUpdate($hash, 'error', $error, 1);
-        return;
-    }
+    return ErrorLog($hash, "CRC error OW device $num : $data[11] != $crc") if ($crc != $data[11]); 
 
     shift @data;
     shift @data;
@@ -604,13 +584,7 @@ sub decodeVal {
 
     if ($model ne 'unknown') {
 	$temp = decodeTemperature($model, @data);
-
-	if ($temp eq '') {
-	    $error = "unable to decode data $hash->{helper}{OW}{$num}{raw} for model $model";
-	    Log3($name, 3, "$name, $error");
-	    readingsSingleUpdate($hash, 'error', $error, 1);
-	    return;
-	}
+	return ErrorLog($hash,"unable to decode data $hash->{helper}{OW}{$num}{raw} for model $model") if ($temp eq '');
     }
 
     $temp //= $hash->{helper}{OW}{$num}{raw};
@@ -699,14 +673,12 @@ sub ParseFn {
 	$dhash->{last_absent}  //= '???';
 	$dhash->{last_present} //= '???';
 
-	if (ReadingsVal($dname, 'presence' ,'') ne $val) {
+	if (ReadingsVal($dname, 'presence' ,'') ne $val) { # aber nicht bei timeout !
 	    if ($val eq 'absent') {
 		$dhash->{busid} = -1;
 		readingsBulkUpdate($dhash, 'last_present', $dhash->{last_present});
 	    }
-	    else {  
-		readingsBulkUpdate($dhash, 'last_absent', $dhash->{last_absent});
-	    }
+	    readingsBulkUpdate($dhash, 'last_absent', $dhash->{last_absent}) if ($val eq 'present');
 	}
 
 	readingsBulkUpdate($dhash, 'state',    $val);
@@ -747,7 +719,17 @@ sub UpdateReadings {
 	readingsBeginUpdate($hash);
 
         foreach my $dev ( keys %{$hash->{helper}{OW}{100}} ) {
-	    $hash->{helper}{OW}{100}{$dev}{presence} = (index($hash->{DS2401}, $dev) != -1) ? 'present' : 'absent';
+	    my $state = (index($hash->{DS2401}, $dev) != -1) ? 'present' : '';
+
+	    if (!$state) {
+		my $t = (defined($hash->{helper}{OW}{100}{$dev}{time})) ? int(gettimeofday() - time_str2num($hash->{helper}{OW}{100}{$dev}{time})) : 9999;
+		my $to = AttrNum($hash->{NAME}, 'DS2401_Timeout', ($hash->{INTERVAL} * 1.5));
+
+		ErrorLog($hash, "DS2401 timeout ($to) is smaller as your interval ($hash->{INTERVAL}) !") if ($to < $hash->{INTERVAL});
+		$state = ($t > $to) ? 'absent' : 'timeout';
+	    }
+
+	    $hash->{helper}{OW}{100}{$dev}{presence} = $state;
 	    readingsBulkUpdate($hash, $hash->{helper}{OW}{100}{$dev}{name}, $hash->{helper}{OW}{100}{$dev}{presence});
 	    $hash->{helper}{OW}{100}{$dev}{busid} //= -1;
 	    push @arr, "OW,$dev,DS2401,$hash->{helper}{OW}{100}{$dev}{presence},$hash->{helper}{OW}{100}{$dev}{busid}";
@@ -842,7 +824,6 @@ sub OW_uniq {
     return join(',', @arr);
 }
 
-#####################################
 
 sub IsValidHex {
 
@@ -854,6 +835,22 @@ sub IsValidHex {
     }
     return 1;
 }
+
+#####################################
+
+sub ErrorLog {
+
+    my $hash  = shift;
+    my $txt   = shift;
+    my $level = shift // 3;
+
+    Log3($hash, $level, "$hash->{NAME}, $txt");
+
+    # ist readingsBulkUpdate ist aktiv ?  wird von fhem.pl gesetzt/gelöscht
+    return readingsBulkUpdate($hash, 'error', $txt) if (exists($hash->{'.updateTimestamp'}));
+    return readingsSingleUpdate($hash, 'error', $txt, 1);
+}
+
 
 1;
 
