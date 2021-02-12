@@ -668,8 +668,8 @@ f18_doSetPos(el, comp, pos)
   f18_applyGrid(pos);
   $(el).css({ position:"absolute", left:pos.left, top:pos.top });
   if(!$(el).hasClass("SVGlabel")) {
-    var padding = parseInt($(el).css("padding-left").replace("px",""));
-    $(el).css({ width:pos.width-padding });
+    var elPadding = ($(el).outerWidth()-$(el).width());
+    $(el).css({ width:pos.width-elPadding });
   }
   $(comp).css({ position:"absolute", 
                 left:pos.left+pos.oLeft, top:pos.top+pos.oTop,
