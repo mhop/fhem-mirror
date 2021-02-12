@@ -1,0 +1,19 @@
+Maintainer: Adimarantis
+FHEM Module: Signalbot
+Content: 
+Native libraries for armv7l (Raspberry Pi) required to run the software signalcli (https://github.com/AsamK/signal-cli) which is a prequisite for the Signalbot
+The signal-cli distribution only contains x86 libraries and the build process for Raspberry is cumbersome, introduces even more dependencies and requires more RAM than a standard Raspberry (so potentially cross compiling)
+Libraries will be pulled by the install script automatically from here.
+
+1.) zkgroup (required for V2 Signal groups)
+Name: libzkgroup.so
+Version: 0.7.1 (May 15 2020)
+License: GPL-3.0
+Source: https://github.com/signalapp/zkgroup
+
+2.) libsignal (required from signal-cli 0.7.5 beta)
+Name: libsignal.so
+Version: Jan 31 2021
+License: AGPL-3.0
+Source: https://github.com/signalapp/libsignal-client
+
