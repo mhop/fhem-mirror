@@ -7,6 +7,7 @@
 #     the counter device.
 #     Written and best viewed with Notepad++ v.6.8.6; Language Markup: Perl
 #
+#
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
 #     Fhem Forum                 : https://forum.fhem.de/index.php/topic,57106.msg485195.html
@@ -32,12 +33,19 @@
 #     Example 1:
 #     define myElectricityCalculator ElectricityCalculator myElectricityCounter:CounterA.*
 #
+#
+#
+#
 ########################################################################################################################
 
 ########################################################################################################################
 # List of open Problems / Issues:
 #
-#	- set command to create Plots automatically
+#
+#
+#
+#
+#
 #
 ########################################################################################################################
 
@@ -46,6 +54,8 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+my %ElectricityCalculator_gets;
+my %EolectricityCalculator_sets;
 
 ###START###### Initialize module ##############################################################################START####
 sub ElectricityCalculator_Initialize($)
@@ -75,6 +85,9 @@ sub ElectricityCalculator_Initialize($)
 								  "Currency:&#8364;,&#163;,&#36; " .
 								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
+								  
+								  
+								  
 	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -104,19 +117,22 @@ sub ElectricityCalculator_Define($$$)
 	$hash->{REGEXP}             			= $RegEx;
     
 	### Convert SiPrefixPowerFactor 
-	if(defined($attr{$hash}{SiPrefixPower})) {
+	if(defined($attr{$hash}{SiPrefixPower})) 
+	{
 		if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
 		elsif ($attr{$hash}{SiPrefixPower} eq "GW") {$hash->{system}{SiPrefixPowerFactor} = 1000000000 ;}
 		else                                        {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 	}
-	else {
+	else 
+	{
                                                      $hash->{system}{SiPrefixPowerFactor} = 1;
 	}
 
 	### Convert Decimal Places 
-	if(defined($attr{$hash}{DecimalPlace})) {
+	if(defined($attr{$hash}{DecimalPlace})) 
+	{
 		$hash->{system}{DecimalPlace} = "%." . $attr{$hash}{DecimalPlace} . "f";
 	
 	}
@@ -157,6 +173,10 @@ sub ElectricityCalculator_Undefine($$)
 	my ($hash, $def)  = @_;
 	my $name = $hash->{NAME};	
 
+	### Stop internal timer
+	RemoveInternalTimer($hash);
+	
+	### Write log information
 	Log3 $name, 3, $name. " ElectricityCalculator- The Electricity calculator has been undefined. Values corresponding to electricity meter will no longer calculated";
 	
 	return undef;
@@ -172,7 +192,8 @@ sub ElectricityCalculator_Attr(@)
 	my $hash                   = $defs{$name};
 	
 	### Check whether "disable" attribute has been provided
-	if ($a[2] eq "disable") {
+	if ($a[2] eq "disable") 
+	{
 		if    ($a[3] eq 0)
 		{	
 			$hash->{STATE} = "active";
@@ -184,7 +205,8 @@ sub ElectricityCalculator_Attr(@)
 	}
 	
 	### Check whether "SiPrefixPower" attribute has been provided
-	elsif ($a[2] eq "SiPrefixPower") {
+	elsif ($a[2] eq "SiPrefixPower") 
+	{
 		if    ($a[3] eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 		elsif ($a[3] eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
 		elsif ($a[3] eq "MW") {$hash->{system}{SiPrefixPowerFactor} = 1000000    ;}
@@ -193,11 +215,14 @@ sub ElectricityCalculator_Attr(@)
 	}
 	
 	### Convert Decimal Places 
-	elsif ($a[2] eq "DecimalPlace") {
-		if (($a[3] >= 3) && ($a[3] <= 8)) {
+	elsif ($a[2] eq "DecimalPlace") 
+	{
+		if (($a[3] >= 3) && ($a[3] <= 8)) 
+		{
 			$hash->{system}{DecimalPlace} = "%." . $a[3] . "f";
 		}
-		else {
+		else 
+		{
 			$hash->{system}{DecimalPlace} = "%.3f";
 		}
 	}
@@ -307,7 +332,6 @@ sub ElectricityCalculator_Get($@)
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';	
 	
-	
 	if ( $reading ne "?")
 	{
 		### Write current value
@@ -345,7 +369,10 @@ sub ElectricityCalculator_Set($@)
 	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - reading         : " . $reading;
 	#Log3 $ElectricityCalcName, 5, $ElectricityCalcName. "_Set - value           : " . $value;
 
-	
+	### For Test purpose only
+	#push(@cList, "Test"); 
+
+	### Create set-List
 	if(defined($hash->{READINGS})) {
 		push(@cList, "SyncCounter"); 
 		push(@cList, keys(%{$hash->{READINGS}}));
@@ -397,6 +424,11 @@ sub ElectricityCalculator_Set($@)
 		### Create ReturnMessage
 		$ReturnMessage = $ElectricityCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
 	}
+	### For Test purpose only
+	# elsif ($reading eq "Test") 
+	# {
+		# ElectricityCalculator_MidnightTimer($hash);
+	# }
 	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
@@ -423,12 +455,13 @@ sub ElectricityCalculator_MidnightTimer($)
 	my ($ElectricityCountName, $ElectricityCountReadingRegEx)	= split(":", $RegEx, 2);
 	my $ElectricityCountDev							  			= $defs{$ElectricityCountName};
 	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]+$//;
+	my $ElectricityCountReadingRegExNeg							= $ElectricityCountReadingRegEx . "_";
 	
 	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
 	my @ElectricityCountReadingNameListFiltered;
 
 	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
-		if ($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) {
+		if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
 			push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
 		}
 	}
@@ -450,12 +483,35 @@ sub ElectricityCalculator_MidnightTimer($)
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
 	
 	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListFiltered) {
+		### Create Readings 
+		my $ElectricityCalcReadingDestinationDeviceName;
+		my $ElectricityCalcReadingPrefix;
+		my $ElectricityCalcReadingDestinationDevice;
 
-		# ### Restore Destination of readings
-		my $ElectricityCalcReadingPrefix                = $ElectricityCountName . "_" . $ElectricityCountReadingName;
-		my $ElectricityCalcReadingDestinationDeviceName	= ReadingsVal($ElectricityCalcName, ".ReadingDestinationDeviceName"                                 , "error");
-		my $ElectricityCounterReadingValue 				= ReadingsVal($ElectricityCountName, $ElectricityCountReadingName                                   , "error");
-		my $LastUpdateTimestampUnix                 	= ReadingsVal($ElectricityCalcName, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+		if ($attr{$ElectricityCalcName}{ReadingDestination} eq "CalculatorDevice")
+		{
+			$ElectricityCalcReadingDestinationDeviceName	=  $ElectricityCalcName;
+			$ElectricityCalcReadingPrefix					= ($ElectricityCountName . "_" . $ElectricityCountReadingName);
+			$ElectricityCalcReadingDestinationDevice		=  $ElectricityCalcDev;
+
+		}
+		elsif ($attr{$ElectricityCalcName}{ReadingDestination} eq "CounterDevice")
+		{
+			$ElectricityCalcReadingPrefix 					=  $ElectricityCountReadingName;
+			$ElectricityCalcReadingDestinationDevice		=  $ElectricityCountDev;
+			$ElectricityCalcReadingDestinationDeviceName	=  $ElectricityCountName;
+		}
+		else
+		{
+			### Create Log entries for debugging
+			Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Attribut ReadingDestination has not been set up correctly. Skipping event.";
+			
+			### Skipping event
+			next;
+		}
+		
+		my $ElectricityCounterReadingValue 				= ReadingsVal($ElectricityCountName,                              $ElectricityCountReadingName                              , "error");
+		my $LastUpdateTimestampUnix                     = ReadingsVal($ElectricityCalcReadingDestinationDeviceName, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
 	
 		### Calculate time difference since last update
 		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
@@ -472,12 +528,6 @@ sub ElectricityCalculator_MidnightTimer($)
 		### If the Readings for midnight settings have been provided
 		if (($ElectricityCalcReadingPrefix ne "error") && ($ElectricityCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
 
-			### Create Log entries for debugging purpose
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - ReadingPrefix     : " . $ElectricityCalcReadingPrefix;
-			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer - DeviceName        : " . $ElectricityCalcReadingDestinationDeviceName;
-			
 			### If there was no update in the last 24h
 			if ( $DeltaTimeSinceLastUpdate >= 86400) {
 				### Create Log entries for debugging purpose
@@ -635,6 +685,30 @@ sub ElectricityCalculator_Notify($$)
 		### Writing log entry
 		Log3 $ElectricityCalcName, 3, $ElectricityCalcName. " : ElectricityCalculator - The attribute ReadingDestination was missing and has been set to CalculatorDevice";
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	if(!defined($attr{$ElectricityCalcName}{room}))
 	{
 		if(defined($attr{$ElectricityCountName}{room}))
@@ -703,6 +777,9 @@ sub ElectricityCalculator_Notify($$)
 		   $ElectricityCountReadingValueCurrent      = $1 * $attr{$ElectricityCalcName}{ElectricityKwhPerCounts} + $attr{$ElectricityCalcName}{ElectricityCounterOffset};
 		my $ElectricityCountReadingTimestampCurrent  = ReadingsTimestamp($ElectricityCountName,$ElectricityCountReadingName,0);		
 
+		### Create Log entries for debugging
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator Begin_______________________________________________________________________________________________________________________________";
+
 		### Create name and destination device for general reading prefix
 		my $ElectricityCalcReadingPrefix;
 		my $ElectricityCalcReadingDestinationDevice;
@@ -770,6 +847,21 @@ sub ElectricityCalculator_Notify($$)
 			### Write current electric Energy as previous Value for future use in the ElectricityCalc-Device
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix. "_PrevRead", sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
 
+			### Save current Electricity Consumption as first reading of day = first after midnight and reset min, max value, value counter and value sum
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDay1st",        sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDayLast",       sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterMonth1st",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterMonthLast",     sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterMeter1st",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterMeterLast",     sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterYear1st",       sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterYearLast",      sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)),1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_WFRDaySum",            0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_WFRDayCount",          0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_WFRDayMin",            0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_WFRDayMax",            0, 1);
+			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
+
 			### Create Log entries for debugging
 			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - Previous value NOT found. Skipping Loop";
 			
@@ -781,6 +873,9 @@ sub ElectricityCalculator_Notify($$)
 		### Find out whether the reading for the daily start value has not been written yet 
 		if(!defined(ReadingsVal($ElectricityCalcReadingDestinationDeviceName,  $ElectricityCalcReadingPrefix . "_CounterDay1st", undef)))
 		{
+			### Create Log entries for debugging
+			Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - _CounterDay1st value NOT found!";			
+	
 			### Save current electric Energy as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDay1st",  $ElectricityCountReadingValueCurrent,  1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,       $ElectricityCalcReadingPrefix . "_CounterDayLast", $ElectricityCountReadingValuePrevious, 1);
@@ -868,7 +963,6 @@ sub ElectricityCalculator_Notify($$)
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMin",        (sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcPowerCurrent          ))), 1);
 			readingsSingleUpdate( $ElectricityCalcReadingDestinationDevice,        $ElectricityCalcReadingPrefix . "_PowerDayMax",        0                                                          , 1);
 			
-			
 			### Check whether the current value is the first one after change of month
 			if ($ElectricityCountReadingTimestampCurrentMday < $ElectricityCountReadingTimestampPreviousMday)
 			{
@@ -934,7 +1028,7 @@ sub ElectricityCalculator_Notify($$)
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator - ElectricityCountReadingTimestampDelta            : " . $ElectricityCountReadingTimestampDelta . " s";
 
 		### Continue with calculations only if time difference is larger than 1 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
-		if ($ElectricityCountReadingTimestampDelta > 1)
+		if ($ElectricityCountReadingTimestampDelta > 0)
 		{
 			### Calculate DW (electric Energy difference) of previous and current value / [kWh]
 			my $ElectricityCountReadingValueDelta = sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)) - sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValuePrevious));
@@ -943,7 +1037,7 @@ sub ElectricityCalculator_Notify($$)
 			### If the value has been changed since the last one
 			if ($ElectricityCountReadingValueDelta > 0) {
 				### Save current Timestamp as UNIX epoch into hash if the 
-				readingsSingleUpdate($ElectricityCalcDev, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", $ElectricityCountReadingTimestampCurrentRelative, 0);
+				readingsSingleUpdate($ElectricityCalcReadingDestinationDevice, "." . $ElectricityCalcReadingPrefix . "_LastUpdateTimestampUnix", $ElectricityCountReadingTimestampCurrentRelative, 0);
 			}
 
 			### Calculate Current Power P = DW/Dt[kWh/s] * 3600[s/h] * 1000 [1/k] / SiPrefixPowerFactor
@@ -1084,7 +1178,7 @@ sub ElectricityCalculator_Notify($$)
 			### Write reserves at electricity supplier based on monthly advance payments within year of Electricity meter reading
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_FinanceReserve",    sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCalcReserves)));
 
-			### Write current meter reading as sshown on the mechanical meter
+			### Write current meter reading as shown on the mechanical meter
 			readingsBulkUpdate($ElectricityCalcReadingDestinationDevice, $ElectricityCalcReadingPrefix . "_CounterCurrent",    sprintf($ElectricityCalcDev->{system}{DecimalPlace}, ($ElectricityCountReadingValueCurrent)));
 			
 			### Write months since last meter reading
@@ -1155,7 +1249,12 @@ sub ElectricityCalculator_Notify($$)
 			</td>
 		</tr>
 	</table>
-	  
+
+
+
+
+
+	<BR>
 	<table>
 		<tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr>
 		<tr><td><ul><code>define &lt;name&gt; ElectricityCalculator &lt;regex&gt;</code></ul></td></tr>
@@ -1174,7 +1273,6 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul>The get - function just returns the individual value of the reading.<BR>The get - function works only for readings which have been stored in the CalculatorDevice.<BR>The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR></ul></td></tr>
 	</table>
 	<BR>
-
 	<table>
 		<tr><td><a name="ElectricityCalculatorAttr"></a><b>Attributes</b></td></tr>
 		<tr><td><ul>If the below mentioned attributes have not been pre-defined completly beforehand, the program will create the ElectricityCalculator specific attributes with default values.<BR>In addition the global attributes e.g. <a href="#room">room</a> can be used.<BR></ul></td></tr>
@@ -1192,6 +1290,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul><ul><a name="SiPrefixPower"            ></a><li><b><u><code>SiPrefixPower            </code></u></b> :  One value of the pre-defined list: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>It defines which SI-prefix for the power value shall be used. The power value will be divided accordingly by multiples of 1000.<BR>The default value is W (Watt).                                                                                                                                                                                                                                           <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="DecimalPlace"             ></a><li><b><u><code>DecimalPlace             </code></u></b> :  One value of the pre-defined list 3 to 7.<BR>It defines to which accuracy in decimal places all results shall be calculated.<BR>The default value is 3 = 0.001.                                                                                                                                                                                                                                                                                                                                            <BR></li></ul></ul></td></tr>
 	</table>
+	
 	<BR>
 	<table>
 		<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
@@ -1262,6 +1361,9 @@ sub ElectricityCalculator_Notify($$)
 			</td>
 		</tr>
 	</table>
+
+
+
 	<BR>
 	<table>
 		<tr><td><a name="ElectricityCalculatorDefine"></a><b>Define</b></td></tr>
@@ -1276,7 +1378,6 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul>Die set - Funktion erlaubt individuelle Readings zu ver&auml;ndern um beispielsweise nach einem Stromausfall Werte zu korrigieren.<BR>Die set - Funktion funktioniert f&uumlr Readings welche im CalculatorDevice gespeichert wurden und zum update des Offsets zwischen den Z&aumlhlern.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>set</code> - Befehl gesetzt werden.<BR>Der Befehl "SyncCounter" errechnet und update den Offset. Hierbei einfach den Wert des mechanischen Z&aumlhlers eingeben.<BR></ul></td></tr>
 	</table>
 	<BR>
-
 	<table>
 		<tr><td><a name="ElectricityCalculatorGet"></a><b>Get</b></td></tr>
 		<tr><td><ul>Die get - Funktion liefert nur den Wert des jeweiligen Readings zur&uuml;ck.<BR>Die get - Funktion funktioniert nur f&uumlr Readings welche im CalculatorDevice gespeichert wurden.<BR>Die Readings welche im Counter - Device gespeichert wurden, m&uumlssen individuell mit <code>get</code> - Befehl ausgelesen werden.<BR></ul></td></tr>
@@ -1299,6 +1400,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr><td><ul><ul><a name="WFRUnit"             ></a><li><b><u><code>SiPrefixPower            </code></u></b> : Ein Wert der vorgegebenen Auswahlliste: W (Watt), kW (Kilowatt), MW (Megawatt) or GW (Gigawatt).<BR>Es definiert welcher SI-Prefix verwendet werden soll und teilt die Leistung entsprechend durch ein Vielfaches von 1000.<BR>Der Standard-Wert ist W (Watt).                                                                                                                                                                                                                                                                                                                        <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="DecimalPlace"        ></a><li><b><u><code>DecimalPlace             </code></u></b> : Ein Wert der vorgegebenen Auswahlliste von 3 bis 7.<BR>Es definiert die Genauigkeit in Nachkommastellen mit welcher die Ergebnisse berechnet werden.Der Standard-Wert ist 3 = 0,001.                                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
 	</table>
+
 	<BR>
 	<table>
 		<tr><td><a name="ElectricityCalculatorReadings"></a><b>Readings</b></td></tr>
