@@ -4625,7 +4625,7 @@ sub ring
   my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$model,$lr,$ln,$icon) = @_;
   my $out;
   
-  my ($ic,$iscale,$ix,$iy);
+  my ($ic,$iscale,$ix,$iy)=();
   
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,)=split(",",$icon);
@@ -4640,6 +4640,7 @@ sub ring
       $iy=9;
     };
     $iscale=1 if (!defined($iscale));
+    $ic="" if (!defined($ic));
   }
     
   my ($format,$value);
@@ -4685,8 +4686,9 @@ sub ring
       $minColor=$currColor;
     }
   }  
-
-  $ic="$ic\@".color($currColor,$ln) if (defined($icon) and $icon !~ /@/); 
+  if (defined $icon and $icon ne "") {
+    $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
+  }
   
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 '.(defined($icon)?61:60).' '.(defined($icon)?57:55).'" style="width:%dpx; height:%dpx;">',$size/100*(defined($icon)?61:60),$size/100*(defined($icon)?57:55));
   $out.= '<defs>';
@@ -4698,8 +4700,8 @@ sub ring
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
   $out.='</defs>';
 
-  $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26.5:24).'" fill="url(#gradbackring)" />';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?2:5).'">');
+  $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26.5:25).'" fill="url(#gradbackring)" />';
+  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?2:4).'">');
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, 280);
   $out.='</g>';
   ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
@@ -4717,10 +4719,10 @@ sub ring
   #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
   #$out.=describeArc(40, 30, 26, 270, 280);
   #$out.='</g>';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?2:5).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?2:4).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, int($prop*280));
   $out.='</g>';
-  if (defined $icon and $icon ne "") {
+  if (defined $icon and $icon ne "" and  $icon ne " ") {
     $out.='<symbol id="Image_'.$ic.'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
     $out.= ::FW_makeImage($ic);
     $out.='</symbol>';
@@ -4728,8 +4730,8 @@ sub ring
     $out.='<use href="#Image_'.$ic.'" height="22" width="22" />';#height="18" width="18"
     ##$out.='</g>';
   }
-  $out.= sprintf('<text text-anchor="middle" x="40" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;">%s</text>',(defined ($icon) ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:18),sprintf($format,$val));
-  $out.= sprintf('<text text-anchor="middle" x="40" y="%s" style="fill:%s;font-size:10px;">%s</text>',(defined ($icon) ? 53:47),color($currColor,$ln),$unit) if (defined $unit);
+  $out.= sprintf('<text text-anchor="middle" x="40" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;">%s</text>',((defined ($icon) and $icon ne "") ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:18),sprintf($format,$val));
+  $out.= sprintf('<text text-anchor="middle" x="40" y="%s" style="fill:%s;font-size:10px;">%s</text>',((defined ($icon) and $icon ne "") ? 53:47),color($currColor,$ln),$unit) if (defined $unit);
   $out.= '</svg>';
   return ($out);
 }
