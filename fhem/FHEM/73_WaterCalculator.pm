@@ -41,11 +41,11 @@
 ########################################################################################################################
 # List of open Problems / Issues:
 #
-#   - EXPERIMENTAL VERSION ONLY!
-#	_Define: Start Time
-#   _Undefine Timer
-#   _notify: helper zwischenspeichern
-#   _MidnightTimer
+#
+#
+#
+#
+#
 #
 ########################################################################################################################
 
@@ -54,6 +54,8 @@ use strict;
 use warnings;
 use Time::Local;
 use FHEM::Meta;
+my %WaterCalculator_gets;
+my %WaterCalculator_sets;
 
 ###START###### Initialize module ##############################################################################START####
 sub WaterCalculator_Initialize($)
@@ -83,6 +85,9 @@ sub WaterCalculator_Initialize($)
 								  "Currency:&#8364;,&#163;,&#36; " .
 								  "DecimalPlace:3,4,5,6,7 " .
 								  $readingFnAttributes;
+								  
+								  
+								  
 	return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 ####END####### Initialize module ###############################################################################END#####
@@ -111,12 +116,14 @@ sub WaterCalculator_Define($$$)
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
     
+	### Convert FlowRate Factor 
 	if(defined($attr{$hash}{WFRUnit}))
 	{
 		if    ($attr{$hash}{WFRUnit} eq "l/min" )      {$hash->{system}{WFRUnitFactor} = 1         ;}
 		elsif ($attr{$hash}{WFRUnit} eq "m&sup3;/min") {$hash->{system}{WFRUnitFactor} = 0.001     ;}
 		elsif ($attr{$hash}{WFRUnit} eq "m&sup3;/h")   {$hash->{system}{WFRUnitFactor} = 0.06      ;}
 		else                                           {$hash->{system}{WFRUnitFactor} = 1         ;}
+		
 	}
 	else
 	{
@@ -124,7 +131,8 @@ sub WaterCalculator_Define($$$)
 	}
 
 	### Convert Decimal Places 
-	if(defined($attr{$hash}{DecimalPlace})) {
+	if(defined($attr{$hash}{DecimalPlace})) 
+	{
 		$hash->{system}{DecimalPlace} = "%." . $attr{$hash}{DecimalPlace} . "f";
 	
 	}
@@ -203,14 +211,18 @@ sub WaterCalculator_Attr(@)
 		elsif ($a[3] eq "m&sup3;/min") {$hash->{system}{WFRUnitFactor} = 0.001      ;}
 		elsif ($a[3] eq "m&sup3;/h")   {$hash->{system}{WFRUnitFactor} = 0.06       ;}
 		else                           {$hash->{system}{WFRUnitFactor} = 1          ;}
+		
 	}
 
 	### Convert Decimal Places 
-	elsif ($a[2] eq "DecimalPlace") {
-		if (($a[3] >= 3) && ($a[3] <= 8)) {
+	elsif ($a[2] eq "DecimalPlace") 
+	{
+		if (($a[3] >= 3) && ($a[3] <= 8)) 
+		{
 			$hash->{system}{DecimalPlace} = "%." . $a[3] . "f";
 		}
-		else {
+		else 
+		{
 			$hash->{system}{DecimalPlace} = "%.3f";
 		}
 	}
@@ -235,7 +247,6 @@ sub WaterCalculator_DbLog_splitFn($$)
 	Log3 $name, 5, $name. " : WaterCalculator_DbLog_splitFn - Content of event                   : " . $event;
 	Log3 $name, 5, $name. " : WaterCalculator_splitFn - Content of argument[0]                   : " . $argument[0];
 	Log3 $name, 5, $name. " : WaterCalculator_splitFn - Content of argument[1]                   : " . $argument[1];
-
 
 	### If the reading contains "_ConsumptionCost" or "_FinanceReserve"
 	if (($argument[0] =~ /_ConsumptionCost/) || ($argument[0] =~ /_FinanceReserve/))
@@ -355,10 +366,13 @@ sub WaterCalculator_Set($@)
 	my @cList;
 
 	### Create Log entries for debugging
-	Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - reading         : " . $reading;
-	Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - value           : " . $value;
+	#Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - reading         : " . $reading;
+	#Log3 $WaterCalcName, 5, $WaterCalcName. "_Set - value           : " . $value;
 
+	### For Test purpose only
+	#push(@cList, "Test"); 
 	
+	### Create set-List
 	if(defined($hash->{READINGS})) {
 		push(@cList, "SyncCounter");
 		push(@cList, keys(%{$hash->{READINGS}}));
@@ -368,7 +382,7 @@ sub WaterCalculator_Set($@)
 	}
 
 	### Create Log entries for debugging
-	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set list: " . join(" ", @cList);
+	#Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - set list: " . join(" ", @cList);
 
 	return "Unknown argument $reading, choose one of " . join(" ", @cList) if $reading eq '?';
 
@@ -392,6 +406,9 @@ sub WaterCalculator_Set($@)
 		### Calculate new Offset
 		my $CounterOffsetNew = $value - $CounterValueCurrent;
 
+		### Calculate Ceck
+#		my $CounterValueNew = $CounterValueCurrent + $CounterOffsetNew;
+
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - Search Result               : " . Dumper(@SearchResult);
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Given  : " . $value;
@@ -399,6 +416,7 @@ sub WaterCalculator_Set($@)
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetCurrent Result : " . $CounterOffsetCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueCurrent  Result : " . $CounterValueCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterOffsetNew     Result : " . $CounterOffsetNew;
+#		Log3 $WaterCalcName, 5, $WaterCalcName. " - CounterValueNew      Check  : " . $CounterValueNew;
 
 		### Set new Offset in Attributes
 		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
@@ -406,10 +424,11 @@ sub WaterCalculator_Set($@)
 		### Create ReturnMessage
 		$ReturnMessage = $WaterCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
 	}
-	elsif ($reading eq "TriggerCalc")
-	{
-		WaterCalculator_MidnightTimer($hash)
-	}
+	### For Test purpose only
+	# elsif ($reading eq "Test") 
+	# {
+		# WaterCalculator_MidnightTimer($hash);
+	# }	
 	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
@@ -436,12 +455,13 @@ sub WaterCalculator_MidnightTimer($)
 	my ($WaterCountName, $WaterCountReadingRegEx) = split(":", $RegEx, 2);
 	my $WaterCountDev							  = $defs{$WaterCountName};
 	$WaterCountReadingRegEx						  =~ s/[\.\*]+$//;
+	my $WaterCountReadingRegExNeg					  = $WaterCountReadingRegEx . "_";
 
 	my @WaterCountReadingNameListComplete = keys(%{$WaterCountDev->{READINGS}});
 	my @WaterCountReadingNameListFiltered;
 
 	foreach my $WaterCountReadingName (@WaterCountReadingNameListComplete) {
-		if ($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) {
+		if (($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) && ($WaterCountReadingName !~ m[$WaterCountReadingRegExNeg])) {
 			push(@WaterCountReadingNameListFiltered, $WaterCountReadingName);
 		}
 	}
@@ -463,13 +483,36 @@ sub WaterCalculator_MidnightTimer($)
 	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
 	
 	foreach my $WaterCountReadingName (@WaterCountReadingNameListFiltered) {
+		### Create Readings 
+		my $WaterCalcReadingDestinationDeviceName;
+		my $WaterCalcReadingPrefix;
+		my $WaterCalcReadingDestinationDevice;
 
-		# ### Restore Destination of readings
-		my $WaterCalcReadingPrefix                  = $WaterCountName . "_" . $WaterCountReadingName;
-		my $WaterCalcReadingDestinationDeviceName	= ReadingsVal($WaterCalcName, ".ReadingDestinationDeviceName"                           , "error");
-		my $WaterCounterReadingValue 				= ReadingsVal($WaterCountName, $WaterCountReadingName                                   , "error");
-		my $LastUpdateTimestampUnix                 = ReadingsVal($WaterCalcName, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
-	
+		if ($attr{$WaterCalcName}{ReadingDestination} eq "CalculatorDevice")
+		{
+			$WaterCalcReadingDestinationDeviceName	=  $WaterCalcName;
+			$WaterCalcReadingPrefix					= ($WaterCountName . "_" . $WaterCountReadingName);
+			$WaterCalcReadingDestinationDevice		=  $WaterCalcDev;
+
+		}
+		elsif ($attr{$WaterCalcName}{ReadingDestination} eq "CounterDevice")
+		{
+			$WaterCalcReadingPrefix 				=  $WaterCountReadingName;
+			$WaterCalcReadingDestinationDevice		=  $WaterCountDev;
+			$WaterCalcReadingDestinationDeviceName	=  $WaterCountName;
+		}
+		else
+		{
+			### Create Log entries for debugging
+			Log3 $WaterCalcName, 3, $WaterCalcName. " : WaterCalculator_MidnightTimer - Attribut ReadingDestination has not been set up correctly. Skipping event.";
+			
+			### Skipping event
+			next;
+		}
+		
+		my $WaterCounterReadingValue 				= ReadingsVal($WaterCountName,                              $WaterCountReadingName                              , "error");
+		my $LastUpdateTimestampUnix                     = ReadingsVal($WaterCalcReadingDestinationDeviceName, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );	
+
 		### Calculate time difference since last update
 		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
 
@@ -485,12 +528,6 @@ sub WaterCalculator_MidnightTimer($)
 		### If the Readings for midnight settings have been provided
 		if (($WaterCalcReadingPrefix ne "error") && ($WaterCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
 
-			### Create Log entries for debugging purpose
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - ReadingPrefix     : " . $WaterCalcReadingPrefix;
-			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - DeviceName        : " . $WaterCalcReadingDestinationDeviceName;
-			
 			### If there was no update in the last 24h
 			if ( $DeltaTimeSinceLastUpdate >= 86400) {
 				### Create Log entries for debugging purpose
@@ -502,6 +539,7 @@ sub WaterCalculator_MidnightTimer($)
 				Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
 			}
 			
+			### Create Log entries for debugging purpose	
 			#Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCalcRDD      : \n" . Dumper($WaterCalcReadingDestinationDevice);
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - WaterCounter      : " . $WaterCounterReadingValue;
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, "."  . 	$WaterCalcReadingPrefix . "_WFRDaySum",     			"error");
@@ -514,6 +552,7 @@ sub WaterCalculator_MidnightTimer($)
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumDayLast : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionDayLast",		"error");
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDay  : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDay",		"error");
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator_MidnightTimer - Pre ConsumCstDayL : " . ReadingsVal($WaterCalcReadingDestinationDeviceName, 		$WaterCalcReadingPrefix . "_ConsumptionCostDayLast",	"error");
+
 
 			if ($WaterCounterReadingValue ne "error") {
 				### Create Log entries for debugging purpose
@@ -560,6 +599,10 @@ sub WaterCalculator_Notify($$)
 	my $WaterCountNameEvents			= deviceEvents($WaterCountDev, 1);
 	my $NumberOfChangedEvents			= int(@{$WaterCountNameEvents});
  	my $RegEx							= $WaterCalcDev->{REGEXP};
+
+	### Create Log entries for debugging
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator Begin_______________________________________________________________________________________________________________________________";
+	Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Notify - Trigger Dev Name                                                : " . $WaterCountDev->{NAME};
 
 	### Check whether the Water calculator has been disabled
 	if(IsDisabled($WaterCalcName))
@@ -642,6 +685,30 @@ sub WaterCalculator_Notify($$)
 		### Writing log entry
 		Log3 $WaterCalcName, 3, $WaterCalcName. " : WaterCalculator - The attribute ReadingDestination was missing and has been set to CalculatorDevice";
 	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	if(!defined($attr{$WaterCalcName}{room}))
 	{
 		if(defined($attr{$WaterCountName}{room}))
@@ -710,7 +777,6 @@ sub WaterCalculator_Notify($$)
 		   $WaterCountReadingValueCurrent      = $1 * $attr{$WaterCalcName}{WaterCubicPerCounts} + $attr{$WaterCalcName}{WaterCounterOffset};
 		my $WaterCountReadingTimestampCurrent  = ReadingsTimestamp($WaterCountName,$WaterCountReadingName,0);		
 
-				
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator Begin_______________________________________________________________________________________________________________________________";
 		
@@ -732,7 +798,7 @@ sub WaterCalculator_Notify($$)
 
 		}
 		elsif ($attr{$WaterCalcName}{ReadingDestination} eq "CounterDevice")
-		{
+		{	
 			$WaterCalcReadingPrefix 				=  $WaterCountReadingName;
 			$WaterCalcReadingDestinationDevice		=  $WaterCountDev;
 			$WaterCalcReadingDestinationDeviceName	=  $WaterCountName;
@@ -778,8 +844,10 @@ sub WaterCalculator_Notify($$)
 		### If not: save value and quit loop
 		else
 		{
+			### Write current Volume as previous Voulume for future use in the WaterCalc-Device
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix. "_PrevRead", sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
+
 			### Write current water Consumption as previous Value for future use in the WaterCalc-Device
-			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_PrevRead",             sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDay1st",        sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterDayLast",       sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_CounterMonth1st",      sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)),1);
@@ -792,7 +860,7 @@ sub WaterCalculator_Notify($$)
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_WFRDayCount",          0, 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_WFRDayMin",            0, 1);
 			readingsSingleUpdate( $WaterCalcReadingDestinationDevice,       $WaterCalcReadingPrefix . "_WFRDayMax",            0, 1);
-			readingsSingleUpdate( $WaterCalcDev,                      "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
+			readingsSingleUpdate( $WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
 
 			### Create Log entries for debugging
 			Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous value NOT found. Skipping Loop";
@@ -865,11 +933,12 @@ sub WaterCalculator_Notify($$)
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Reading Value                            : " . $WaterCountReadingTimestampCurrent;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Previous Reading Value                           : " . $WaterCountReadingValuePrevious;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - Current Reading Value                            : " . $WaterCountReadingValueCurrent;
-###		
+	
 		####### Check whether Initial readings needs to be written
 		### Check whether the current value is the first one after change of day = First one after midnight or if last update is older than 1 day
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeCurHour                        : " . $WaterCountReadingTimestampCurrentHour;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimePrevHour                       : " . $WaterCountReadingTimestampPreviousHour;
+		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - LastUpdateTimestampUnix                  : " . ReadingsVal($WaterCalcReadingDestinationDeviceName,  "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", undef);
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadTimeRelDelta                       : " . $WaterCountReadingLastChangeDelta;
 
 		if (($WaterCountReadingTimestampCurrentHour < $WaterCountReadingTimestampPreviousHour) || ($WaterCountReadingLastChangeDelta > 86400))
@@ -957,9 +1026,9 @@ sub WaterCalculator_Notify($$)
 		### Calculate DtCurrent (time difference) of previous and current timestamp / [s]
 		my $WaterCountReadingTimestampDelta = $WaterCountReadingTimestampCurrentRelative - $WaterCountReadingTimestampPreviousRelative;
 		Log3 $WaterCalcName, 5, $WaterCalcName. " : WaterCalculator - WaterCountReadingTimestampDelta                  : " . $WaterCountReadingTimestampDelta . " s";
-###
+
 		### Continue with calculations only if time difference is larger than 10 seconds to avoid "Illegal division by zero" and erroneous due to small values for divisor
-		if ($WaterCountReadingTimestampDelta > 10)
+		if ($WaterCountReadingTimestampDelta > 0)
 		{
 			### Calculate water consumption (water consumption difference) of previous and current value / [qm]
 			my $WaterCountReadingValueDelta = sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent )) - sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValuePrevious));
@@ -968,7 +1037,7 @@ sub WaterCalculator_Notify($$)
 			### If the value has been changed since the last one
 			if ($WaterCountReadingValueDelta > 0) {
 				### Save current Timestamp as UNIX epoch into hash if the 
-				readingsSingleUpdate($WaterCalcDev, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", $WaterCountReadingTimestampCurrentRelative, 0);
+				readingsSingleUpdate($WaterCalcReadingDestinationDevice, "." . $WaterCalcReadingPrefix . "_LastUpdateTimestampUnix", $WaterCountReadingTimestampCurrentRelative, 0);
 			}
 
 			### Calculate Current water flow rate WFR = DV/Dt[qm/s] * 60[s/min] * 1000 [qm --> l] * WFRUnitFactor
@@ -1109,7 +1178,7 @@ sub WaterCalculator_Notify($$)
 			### Write reserves at Water supplier based on monthly advance payments within year of water meter reading
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_FinanceReserve",    sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCalcReserves)));
 
-			### Write current meter reading as sshown on the mechanical meter
+			### Write current meter reading as shown on the mechanical meter
 			readingsBulkUpdate($WaterCalcReadingDestinationDevice, $WaterCalcReadingPrefix . "_CounterCurrent",    sprintf($WaterCalcDev->{system}{DecimalPlace}, ($WaterCountReadingValueCurrent)));
 			
 			### Write months since last meter reading
@@ -1222,6 +1291,7 @@ sub WaterCalculator_Notify($$)
 		<tr><td><ul><ul><a name="DecimalPlace"        ></a><li><b><u><code>DecimalPlace                           </code></u></b> : A valid integer number for the number of decimal places taken into account.<BR>The default value is 3.                                                                                                                                                                                                                                                                                                     <BR></li></ul></ul></td></tr>
 	</table>
 	<BR>
+	
 	<table>
 		<tr><td><b>Readings</b></td></tr>
 		<tr><td><ul>As soon the device has been able to read at least 2 times the counter, it automatically will create a set of readings:<BR>The placeholder <code>&lt;DestinationDevice&gt;</code> is the device which has been chosen in the attribute <code>ReadingDestination</code> above.<BR>This will not appear if CalculatorDevice has been chosen.<BR>The placeholder <code>&lt;SourceCounterReading&gt;</code> is the reading based on the defined regular expression where the counting ticks are coming from.                                  </ul></td></tr>
@@ -1260,6 +1330,7 @@ sub WaterCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_WFRDayMin                </code></li></td><td>: Minimum water flow rate peak since midnight.                                                                                                                                                                                                                                                                                                                                                          <BR>     </ul></ul></td></tr>
 	</table>
 </ul>
+
 =end html
 
 =begin html_DE
@@ -1293,7 +1364,7 @@ sub WaterCalculator_Notify($$)
 			</td>
 		</tr>
 	</table>
-	  
+	<BR>
 	<table>
 		<tr><td><a name="WaterCalculatorDefine"></a><b>Define</b></td></tr>
 		<tr><td><ul><code>define &lt;name&gt; WaterCalculator &lt;regex&gt;</code></ul></td></tr><
@@ -1388,8 +1459,9 @@ sub WaterCalculator_Notify($$)
     "Sailor"
   ],
   "keywords": [
-    "Water",
-    "Caluclation",
+    "water",
+	"flow",
+    "caluclation",
     "consumption",
     "cost",
     "counter"
@@ -1423,4 +1495,5 @@ sub WaterCalculator_Notify($$)
   "x_support_status": "supported"
 }
 =end :application/json;q=META.json
+
 =cut
