@@ -300,7 +300,7 @@ sub SetFn {
     my $val   = shift // .5;
     my $dlist = ReadingsVal($name, '.ds2401' ,'');
     my $ds    = ($dlist) ? ' deleteDS2401:'.$dlist : '';
-
+    my $ret;
 
     if ($cmd eq 'reset') {
 	DevIo_CloseDev($hash);
@@ -311,30 +311,27 @@ sub SetFn {
 
     if (($cmd eq 'deleteDS2401') && $dlist && (IsValidHex($val,16)) && (substr($val, 0, 2) eq '01')) {
 
-	my ($ret , $rr, $r);
-
 	if (exists($hash->{helper}{OW}{100}{$val})) {
 	    my $reading = (defined($hash->{helper}{OW}{100}{$val}->{name})) ? $hash->{helper}{OW}{100}{$val}->{name} : '';
-	    $ret = CommandDeleteReading(undef, "$name $reading") if ($reading);
+	    CommandDeleteReading(undef, "$name $reading") if ($reading);
 	    delete $hash->{helper}{OW}{100}{$val};
 	}
 
 	# Sub Device löschen ?
 	my $dname = (exists($modules{OW2S0SMSGUARD}{defptr}{$val})) ? $modules{OW2S0SMSGUARD}{defptr}{$val}->{NAME} : '';
-	$r = CommandDelete(undef, $dname) if ($dname && AttrVal($name, 'useSubDevices', ''));
-	$ret .= ($ret && $r) ? ' '.$r : $r;
+	$ret   = CommandDelete(undef, $dname) if ($dname && AttrVal($name, 'useSubDevices', ''));
 
 	$dlist =~ s/$val//x;
 	$dlist =~ s/,,/,/x; # $val war in der Mitte des Strings
 	$dlist =~ s/(^,|,$)//x; # einzelens Komma am Anfang oder Ende ?
 
-	readingsSingleUpdate($hash, '.ds2401', $dlist, 0) if ($dlist); # noch etwas übrig vom reading ?
-
-	if (!$dlist) {
-	    $rr = CommandDeleteReading(undef, "$name .ds2401");
-	    $ret .= ($ret && $rr) ? ' '.$rr : $rr;
+	if ($dlist) {
+	    readingsSingleUpdate($hash, '.ds2401', $dlist, 0); # noch etwas übrig vom reading ?
 	}
-	Log3($name, 3, "$name, $ret") if ($ret);
+	else {
+	    CommandDeleteReading(undef, "$name .ds2401");
+	}
+
 	return $ret;
     }
 
@@ -506,19 +503,8 @@ sub decodeList {
     return ErrorLog($hash, "got NOK for OW device $num [".$data[2].']') if (!$ok); 
 
     my $model = int(substr($data[2],0,2));
-    my $owid  = substr($data[2],0,14);
-    my $owcrc = substr($data[2],14,2);
-    my $crc   = 0;
 
-    for my $i (0,2,4,6,8,10,12) { # die ersten 7 Byte
-	my $byte = substr($owid, $i , 2);
-	for (my $bit=1; $bit<256; $bit=$bit*2) {
-	    my $cbit = ((hex($byte) & $bit) == $bit) ? 1 : 0;
-	    $crc= (($crc & 1) != $cbit) ? ($crc >> 1)^0x8c : $crc >> 1;
-	}
-    }
-
-    return ErrorLog($hash, "CRC error OW device $num [$data[2]] : $owcrc != ". sprintf('%02x', $crc)) if ($crc != hex($owcrc));
+    return ErrorLog($hash, "CRC error OW device $num [$data[2]]") if (!crc8($data[2]));
 
     if ($num == 0) {
         for my $i (1..63) {delete $hash->{'OW-Dev'.$i} if (exists($hash->{'OW-Dev'.$i})); }
@@ -640,8 +626,9 @@ sub ParseFn {
 
     my @arr   = split(',', $msg);
     return if (!defined($arr[1]) || (!IsValidHex($arr[1],16)));
-    my $model = $arr[2] // return;
-    my $val   = $arr[3] // return;
+    my $model   = $arr[2] // return;
+    my $val     = $arr[3] // return;
+    my $timeout = $arr[5] // 0;
 
 
     if (!exists($modules{OW2S0SMSGUARD}{defptr}{$arr[1]})) {
@@ -680,6 +667,7 @@ sub ParseFn {
 	    }
 	    readingsBulkUpdate($dhash, 'last_absent', $dhash->{last_absent}) if ($val eq 'present');
 	}
+	readingsBulkUpdate($dhash, 'timeout',  $timeout);
 
 	readingsBulkUpdate($dhash, 'state',    $val);
 	readingsBulkUpdate($dhash, 'presence', $val);
@@ -713,26 +701,31 @@ sub UpdateReadings {
     readingsBulkUpdate($hash, 'state',  "A: $S0A - B: $S0B") if (($S0A ne '') && ($S0B ne ''));
     readingsEndUpdate($hash, 1);
 
-    #if ($hash->{DS2401}) {
     if (exists($hash->{helper}{OW}{100})) {
 	$hash->{DS2401} //= '';
 	readingsBeginUpdate($hash);
 
         foreach my $dev ( keys %{$hash->{helper}{OW}{100}} ) {
-	    my $state = (index($hash->{DS2401}, $dev) != -1) ? 'present' : '';
+	    my $timeout =  AttrNum($hash->{NAME}, 'DS2401_Timeout', ($hash->{INTERVAL} * 1.5));
+	    my $state   = (index($hash->{DS2401}, $dev) != -1) ? 'present' : '';
+	    my $t       = 0;
 
 	    if (!$state) {
-		my $t = (defined($hash->{helper}{OW}{100}{$dev}{time})) ? int(gettimeofday() - time_str2num($hash->{helper}{OW}{100}{$dev}{time})) : 9999;
-		my $to = AttrNum($hash->{NAME}, 'DS2401_Timeout', ($hash->{INTERVAL} * 1.5));
+		$t = (defined($hash->{helper}{OW}{100}{$dev}{time})) ? int(gettimeofday() - time_str2num($hash->{helper}{OW}{100}{$dev}{time})) : 0;
 
-		ErrorLog($hash, "DS2401 timeout ($to) is smaller as your interval ($hash->{INTERVAL}) !") if ($to < $hash->{INTERVAL});
-		$state = ($t > $to) ? 'absent' : 'timeout';
+		ErrorLog($hash, "DS2401 timeout ($timeout) is smaller as your interval ($hash->{INTERVAL}) !") if ($timeout < $hash->{INTERVAL});
+		$state = ($t > $timeout) ? 'absent' : 'timeout';
+		
+		if ($state eq 'absent') {
+		    $hash->{helper}{OW}{100}{$dev}{busid} = -1;
+		    $t = 0;
+		}
 	    }
 
 	    $hash->{helper}{OW}{100}{$dev}{presence} = $state;
-	    readingsBulkUpdate($hash, $hash->{helper}{OW}{100}{$dev}{name}, $hash->{helper}{OW}{100}{$dev}{presence});
+	    readingsBulkUpdate($hash, $hash->{helper}{OW}{100}{$dev}{name}, $state);
 	    $hash->{helper}{OW}{100}{$dev}{busid} //= -1;
-	    push @arr, "OW,$dev,DS2401,$hash->{helper}{OW}{100}{$dev}{presence},$hash->{helper}{OW}{100}{$dev}{busid}";
+	    push @arr, "OW,$dev,DS2401,$state,$hash->{helper}{OW}{100}{$dev}{busid},$t";
 	}
 
 	readingsBulkUpdate($hash, '.ds2401', OW_uniq($hash->{NAME}, '.ds2401', $hash->{DS2401})) if ($hash->{DS2401});
@@ -824,6 +817,7 @@ sub OW_uniq {
     return join(',', @arr);
 }
 
+#####################################
 
 sub IsValidHex {
 
@@ -851,6 +845,30 @@ sub ErrorLog {
     return readingsSingleUpdate($hash, 'error', $txt, 1);
 }
 
+#####################################
+
+sub crc8 {
+
+    my $data  = shift // return 0;
+    return 0 if (!IsValidHex($data, 16));
+
+    my $owid  = substr($data,0,14);
+    my $owcrc = substr($data,14,2);
+    my $crc   = 0;
+
+    for my $i (0,2,4,6,8,10,12) { # die ersten 7 Byte
+	my $byte = substr($owid, $i , 2);
+	for (my $bit=1; $bit<256; $bit=$bit*2) {
+	    my $cbit = ((hex($byte) & $bit) == $bit) ? 1 : 0;
+	    $crc= (($crc & 1) != $cbit) ? ($crc >> 1)^0x8c : $crc >> 1;
+	}
+    }
+
+    return 1  if ($crc == hex($owcrc));
+    return 0;
+}
+
+#####################################
 
 1;
 
@@ -893,9 +911,13 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="DS2401_Timeout"></a><li>DS2401_Timeout ( master only ) , default 1.5 x Interval<br>
+    </li>
+  </ul>
+  <ul>
     <a name="mapOWIDs"></a><li>mapOWIDs ( master only )<br>
     Comma separeted list of ID=Name pairs<br>
-    Example : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code></li>
+    Example : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br></li>
   </ul>
   <ul>
     <a name="model"></a><li>model<br>
@@ -906,7 +928,7 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     create for each found device on the bus a separate subdevice<br></li>
   </ul>
  <ul>
-    <a name="delay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values </li><br>
+    <a name="delay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values<br></li>
  </ul>
 
 =end html
@@ -946,10 +968,16 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="DS2401_Timeout"></a><li>DS2401_Timeout in Sekunden ( nur Master Device ) , default 1.5 x interval<br>
+    Werte kleiner als Interval sind nicht zulässig.<br>
+    Wartezeit in Sekunden bis ein fehlender DS2401 seinen Status von timeout auf absent wechselt.
+    </li>
+  </ul>
+  <ul>
     <a name="mapOWIDs"></a><li>mapOWIDs<br>
     Kommata getrennte Liste von ID=Name Paaren<br>
     Beispiel : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br>
-    Statt der OW ID wird Name als Reading verwendet.( nur Master Device )</li>
+    Statt der OW ID wird Name als Reading verwendet.( nur Master Device )<br></li>
   </ul>
   <ul>
     <a name="model"></a><li>model<br>
@@ -961,7 +989,7 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   </ul>
   <ul>
     <a name="delay"></a><li>delay ( nur Master Device ) , default 0.5 Sekukunden<br>
-    Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist</li><br>
+    Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist<br></li>
    </ul>
 
 =end html_DE
