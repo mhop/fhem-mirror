@@ -7,6 +7,7 @@
 #     the counter device.
 #     Written and best viewed with Notepad++ v.6.8.6; Language Markup: Perl
 #
+#
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
 #     Fhem Forum                 : https://forum.fhem.de/index.php/topic,47909.0.html
@@ -32,22 +33,29 @@
 #     Example 1:
 #     define myGasCalculator GasCalculator myGasCounter:CounterA.*
 #
+#
+#
+#
 ########################################################################################################################
 
 ########################################################################################################################
 # List of open Problems / Issues:
 #
-#	- set command to create Plots automatically
+#
+#
+#
+#
+#
 #
 ########################################################################################################################
 
 package main;
 use strict;
 use warnings;
-my %GasCalculator_gets;
-my %GasCalculator_sets;
 use Time::Local;
 use FHEM::Meta;
+my %GasCalculator_gets;
+my %GasCalculator_sets;
 
 ###START###### Initialize module ##############################################################################START####
 sub GasCalculator_Initialize($)
@@ -61,6 +69,7 @@ sub GasCalculator_Initialize($)
 	$hash->{SetFn}           	= "GasCalculator_Set";
     $hash->{AttrFn}				= "GasCalculator_Attr";
 	$hash->{NotifyFn}			= "GasCalculator_Notify";
+	$hash->{DbLog_splitFn}   	= "GasCalculator_DbLog_splitFn";
 	$hash->{NotifyOrderPrefix}	= "10-";   					# Want to be called before the rest
 
 	$hash->{AttrList}       	= "disable:0,1 " .
@@ -107,6 +116,7 @@ sub GasCalculator_Define($$$)
 	$hash->{STATE}              			= "active";
 	$hash->{REGEXP}             			= $RegEx;
 
+	### Convert SiPrefixPowerFactor 
 	if(defined($attr{$hash}{SiPrefixPower}))
 	{
 		if    ($attr{$hash}{SiPrefixPower} eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
@@ -121,7 +131,8 @@ sub GasCalculator_Define($$$)
 	}
 
 	### Convert Decimal Places 
-	if(defined($attr{$hash}{DecimalPlace})) {
+	if(defined($attr{$hash}{DecimalPlace})) 
+	{
 		$hash->{system}{DecimalPlace} = "%." . $attr{$hash}{DecimalPlace} . "f";
 	
 	}
@@ -162,6 +173,10 @@ sub GasCalculator_Undefine($$)
 	my ($hash, $def)  = @_;
 	my $name = $hash->{NAME};	
 
+	### Stop internal timer
+	RemoveInternalTimer($hash);
+	
+	### Write log information
 	Log3 $name, 3, $name. " GasCalculator- The gas calculator has been undefined. Values corresponding to Gas Counter will no longer calculated";
 	
 	return undef;
@@ -190,7 +205,7 @@ sub GasCalculator_Attr(@)
 	}
 
 	### Check whether "SiPrefixPower" attribute has been provided
-	if ($a[2] eq "SiPrefixPower")
+	elsif ($a[2] eq "SiPrefixPower")
 	{
 		if    ($a[3] eq "W" ) {$hash->{system}{SiPrefixPowerFactor} = 1          ;}
 		elsif ($a[3] eq "kW") {$hash->{system}{SiPrefixPowerFactor} = 1000       ;}
@@ -200,11 +215,14 @@ sub GasCalculator_Attr(@)
 	}
 	
 	### Convert Decimal Places 
-	elsif ($a[2] eq "DecimalPlace") {
-		if (($a[3] >= 3) && ($a[3] <= 8)) {
+	elsif ($a[2] eq "DecimalPlace") 
+	{
+		if (($a[3] >= 3) && ($a[3] <= 8)) 
+		{
 			$hash->{system}{DecimalPlace} = "%." . $a[3] . "f";
 		}
-		else {
+		else 
+		{
 			$hash->{system}{DecimalPlace} = "%.3f";
 		}
 	}
@@ -212,6 +230,71 @@ sub GasCalculator_Attr(@)
 	return undef;
 }
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
+
+
+###START###### Provide units for DbLog database via DbLog_splitFn #############################################START####
+sub GasCalculator_DbLog_splitFn($$)
+{
+	my ($event, $name)	= @_;
+	my ($reading, $value, $unit);
+    my $hash 			= $defs{$name};
+	my @argument		= split("[ \t][ \t]*", $event);
+	
+	### Delete ":" and everything behind in readings name
+	$argument[0] =~ s/:.*//;
+ 
+	### Log entries for debugging
+	#Log3 $name, 5, $name. " : GasCalculator_DbLog_splitFn - Content of event                   : " . $event;
+	#Log3 $name, 5, $name. " : GasCalculator_splitFn - Content of argument[0]                   : " . $argument[0];
+	#Log3 $name, 5, $name. " : GasCalculator_splitFn - Content of argument[1]                   : " . $argument[1];
+
+	### If the reading contains "_EnergyCost" or "_FinanceReserve"
+	if (($argument[0] =~ /_EnergyCost/) || ($argument[0] =~ /_FinanceReserve/))
+	{
+		### Log entries for debugging
+		#Log3 $name, 5, $name. " : GasCalculator - DbLog_splitFn - EnergyCost-Reading detected      : " . $argument[0];
+		
+		### Get values being changed from hash
+		$reading = $argument[0];
+		$value   = $argument[1];
+		$unit    = $attr{$hash}{Currency};
+	}
+	### If the reading contains "_Power"
+	elsif ($argument[0] =~ /_Power/)
+	{
+		### Log entries for debugging
+		#Log3 $name, 5, $name. " : GasCalculator - DbLog_splitFn - Power-Reading detected           : " . $argument[0];
+		
+		### Get values being changed from hash
+ 		$reading = $argument[0];
+		$value   = $argument[1];
+		$unit    = $attr{$hash}{SiPrefixPower};
+	}
+	### If the reading contains "_Counter" or "_Last" or ("_Energy" but not "_EnergyCost") or "_PrevRead"
+	elsif (($argument[0] =~ /_Counter/) || ($argument[0] =~ /_Last/) || (($argument[0] =~ /_Energy/) && ($argument[0] !~ /_EnergyCost/)) || ($argument[0] =~ /_PrevRead/))
+	{
+		### Log entries for debugging
+		#Log3 $name, 5, $name. " : GasCalculator - DbLog_splitFn - Counter/Energy-Reading detected  : " . $argument[0];
+		
+		### Get values being changed from hash
+		$reading = $argument[0];
+		$value   = $argument[1];
+		$unit    = $attr{$hash}{Volume};
+	}
+	### If the reading is unknown
+	else
+	{
+		### Log entries for debugging
+		#Log3 $name, 5, $name. " : GasCalculator - DbLog_splitFn - unspecified-Reading detected     : " . $argument[0];
+		
+		### Get values being changed from hash
+		$reading = $argument[0];
+		$value   = $argument[1];
+		$unit    = "";
+	}
+	return ($reading, $value, $unit);
+}
+####END####### Provide units for DbLog database via DbLog_splitFn ##############################################END#####
 
 
 ###START###### Manipulate reading after "get" command by fhem #################################################START####
@@ -342,9 +425,10 @@ sub GasCalculator_Set($@)
 		$ReturnMessage = $GasCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
 	}
 	### For Test purpose only
-	#elsif ($reading eq "Test") {
-	#	GasCalculator_MidnightTimer($hash);
-	#}
+	# elsif ($reading eq "Test") 
+	# {
+		# GasCalculator_MidnightTimer($hash);
+	# }
 	elsif ($reading ne "?")
 	{
 		### Create Log entries for debugging
@@ -371,12 +455,13 @@ sub GasCalculator_MidnightTimer($)
 	my ($GasCountName, $GasCountReadingRegEx) = split(":", $RegEx, 2);
 	my $GasCountDev							  = $defs{$GasCountName};
 	$GasCountReadingRegEx					  =~ s/[\.\*]+$//;
+	my $GasCountReadingRegExNeg				  = $GasCountReadingRegEx . "_";
 
 	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
 	my @GasCountReadingNameListFiltered;
 
 	foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
-		if ($GasCountReadingName =~ m[$GasCountReadingRegEx]) {
+		if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
 			push(@GasCountReadingNameListFiltered, $GasCountReadingName);
 		}
 	}
@@ -398,12 +483,35 @@ sub GasCalculator_MidnightTimer($)
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Looping through every Counter defined by RegEx";
 	
 	foreach my $GasCountReadingName (@GasCountReadingNameListFiltered) {
+		### Create Readings 
+		my $GasCalcReadingDestinationDeviceName;
+		my $GasCalcReadingPrefix;
+		my $GasCalcReadingDestinationDevice;
 
-		# ### Restore Destination of readings
-		my $GasCalcReadingPrefix                = $GasCountName . "_" . $GasCountReadingName;
-		my $GasCalcReadingDestinationDeviceName	= ReadingsVal($GasCalcName, ".ReadingDestinationDeviceName"                         , "error");
-		my $GasCounterReadingValue 				= ReadingsVal($GasCountName, $GasCountReadingName                                   , "error");
-		my $LastUpdateTimestampUnix             = ReadingsVal($GasCalcName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
+		if ($attr{$GasCalcName}{ReadingDestination} eq "CalculatorDevice")
+		{
+			$GasCalcReadingDestinationDeviceName	=  $GasCalcName;
+			$GasCalcReadingPrefix					= ($GasCountName . "_" . $GasCountReadingName);
+			$GasCalcReadingDestinationDevice		=  $GasCalcDev;
+
+		}
+		elsif ($attr{$GasCalcName}{ReadingDestination} eq "CounterDevice")
+		{
+			$GasCalcReadingPrefix 					=  $GasCountReadingName;
+			$GasCalcReadingDestinationDevice		=  $GasCountDev;
+			$GasCalcReadingDestinationDeviceName	=  $GasCountName;
+		}
+		else
+		{
+			### Create Log entries for debugging
+			Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator_MidnightTimer - Attribut ReadingDestination has not been set up correctly. Skipping event.";
+			
+			### Skipping event
+			next;
+		}
+		
+		my $GasCounterReadingValue 				= ReadingsVal($GasCountName,                              $GasCountReadingName                              , "error");
+		my $LastUpdateTimestampUnix             = ReadingsVal($GasCalcReadingDestinationDeviceName, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", 0      );
 	
 		### Calculate time difference since last update
 		my $DeltaTimeSinceLastUpdate = time() - $LastUpdateTimestampUnix ;
@@ -419,12 +527,6 @@ sub GasCalculator_MidnightTimer($)
 
 		### If the Readings for midnight settings have been provided
 		if (($GasCalcReadingPrefix ne "error") && ($GasCalcReadingDestinationDeviceName ne "error") && ($LastUpdateTimestampUnix > 0)){
-
-			### Create Log entries for debugging purpose
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp update  : " . $LastUpdateTimestampUnix;
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Timestamp Delta   : " . $DeltaTimeSinceLastUpdate;
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - ReadingPrefix     : " . $GasCalcReadingPrefix;
-			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - DeviceName        : " . $GasCalcReadingDestinationDeviceName;
 			
 			### If there was no update in the last 24h
 			if ( $DeltaTimeSinceLastUpdate >= 86400) {
@@ -437,6 +539,7 @@ sub GasCalculator_MidnightTimer($)
 				Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Last Update       : There was an Update in the last 24h!";
 			}
 			
+			### Create Log entries for debugging purpose	
 			#Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCalcRDD      : \n" . Dumper($GasCalcReadingDestinationDevice);
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - GasCounter        : " . $GasCounterReadingValue;
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer - Pre WFRDaySum     : " . ReadingsVal($GasCalcReadingDestinationDeviceName, "."  . 	$GasCalcReadingPrefix . "_PowerDaySum",     	"error");
@@ -499,7 +602,7 @@ sub GasCalculator_Notify($$)
 
 	### Create Log entries for debugging
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator Begin_______________________________________________________________________________________________________________________________";
-	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Notify - Trigger Dev Name                                                : " . $GasCountDev->{NAME};
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Notify - Trigger Dev Name               : " . $GasCountDev->{NAME};
 
 	### Check whether the gas calculator has been disabled
 	if(IsDisabled($GasCalcName))
@@ -635,7 +738,6 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 3, $GasCalcName. " : GasCalculator - The attribute DecimalPlace was missing and has been set to 3";
 	}
 
-
 	### For each feedback on in the array of defined regexpression which has been changed
 	for (my $i = 0; $i < $NumberOfChangedEvents; $i++) 
 	{
@@ -674,6 +776,9 @@ sub GasCalculator_Notify($$)
 		###Get current Counter and transform in Volume (cubic) as read on mechanic gas meter
 		   $GasCountReadingValueCurrent      = $1 * $attr{$GasCalcName}{GasCubicPerCounts} + $attr{$GasCalcName}{GasCounterOffset};
 		my $GasCountReadingTimestampCurrent  = ReadingsTimestamp($GasCountName,$GasCountReadingName,0);		
+
+		### Create Log entries for debugging
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator Begin_______________________________________________________________________________________________________________________________";
 		
 		### Create name and destination device for general reading prefix
 		my $GasCalcReadingPrefix;
@@ -755,7 +860,7 @@ sub GasCalculator_Notify($$)
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_WFRDayCount",          0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_WFRDayMin",            0, 1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_WFRDayMax",            0, 1);
-			readingsSingleUpdate( $GasCalcDev,                      "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
+			readingsSingleUpdate( $GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", time(), 0);
 
 			### Create Log entries for debugging
 			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - Previous value NOT found. Skipping Loop";
@@ -768,6 +873,9 @@ sub GasCalculator_Notify($$)
 		### Find out whether the reading for the daily start value has not been written yet 
 		if(!defined(ReadingsVal($GasCalcReadingDestinationDeviceName,  $GasCalcReadingPrefix . "_Vol1stDay", undef)))
 		{
+			### Create Log entries for debugging
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - _CounterDay1st value NOT found!";			
+			
 			### Save current Volume as first reading of day = first after midnight and reset min, max value, value counter and value sum
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_Vol1stDay",     $GasCountReadingValueCurrent,  1);
 			readingsSingleUpdate( $GasCalcReadingDestinationDevice,       $GasCalcReadingPrefix . "_VolLastDay",    $GasCountReadingValuePrevious, 1);
@@ -835,8 +943,8 @@ sub GasCalculator_Notify($$)
 
 		if (($GasCountReadingTimestampCurrentHour < $GasCountReadingTimestampPreviousHour) || ($GasCountReadingLastChangeDelta > 86400))
 		{
-		### Create Log entries for debugging
-		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected OR last reading is older than 24h!";
+			### Create Log entries for debugging
+			Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - First reading of day detected OR last reading is older than 24h!";
 
 			### Calculate gas energy of previous day € = (Vprevious[cubic] - V1stDay[cubic]) * GaszValue * GasNominalHeatingValue[kWh/cubic] 
 			my $GasCalcEnergyDayLast      = ($GasCountReadingValuePrevious - ReadingsVal($GasCalcReadingDestinationDeviceName, $GasCalcReadingPrefix . "_Vol1stDay", "0")) * $attr{$GasCalcName}{GaszValue} * $attr{$GasCalcName}{GasNominalHeatingValue};
@@ -920,7 +1028,7 @@ sub GasCalculator_Notify($$)
 		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator - GasCountReadingTimestampDelta            : " . $GasCountReadingTimestampDelta . " s";
 
 		### Continue with calculations only if time difference is not 0 to avoid "Illegal division by zero"
-		if ($GasCountReadingTimestampDelta != 0)
+		if ($GasCountReadingTimestampDelta > 0)
 		{
 			### Calculate DV (Volume difference) of previous and current value / [cubic]
 			my $GasCountReadingValueDelta = sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent )) - sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValuePrevious));
@@ -929,7 +1037,7 @@ sub GasCalculator_Notify($$)
 			### If the value has been changed since the last one
 			if ($GasCountReadingValueDelta > 0) {
 				### Save current Timestamp as UNIX epoch into hash if the 
-				readingsSingleUpdate($GasCalcDev, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", $GasCountReadingTimestampCurrentRelative, 0);
+				readingsSingleUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_LastUpdateTimestampUnix", $GasCountReadingTimestampCurrentRelative, 0);
 			}
 
 			### Calculate Current Power P = DV/Dt[cubic/s] * GaszValue * GasNominalHeatingValue[kWh/cubic] * 3600[s/h] / SiPrefixPowerFactor
@@ -1005,9 +1113,6 @@ sub GasCalculator_Notify($$)
 			### Initialize Bulkupdate
 			readingsBeginUpdate($GasCalcReadingDestinationDevice);
 
-			### Write current mechanic meter reading
-			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Meter",            sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)));
-
 			### Write consumed volume (DV) since last measurement
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, "." . $GasCalcReadingPrefix . "_LastDV",     sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueDelta)));
 
@@ -1073,6 +1178,9 @@ sub GasCalculator_Notify($$)
 			### Write reserves at gas provider based on monthly advance payments within year of gas meter reading
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_FinanceReserve",   sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCalcReserves)));
 
+			### Write current mechanic meter reading
+			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_Meter",            sprintf($GasCalcDev->{system}{DecimalPlace}, ($GasCountReadingValueCurrent)));
+
 			### Write months since last meter reading
 			readingsBulkUpdate($GasCalcReadingDestinationDevice, $GasCalcReadingPrefix . "_MonthMeterReading", sprintf('%.0f', ($GasCalcMeterYearMonth)));
 			
@@ -1133,6 +1241,19 @@ sub GasCalculator_Notify($$)
 			</td>
 		</tr>
 	</table>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	<BR>
 	<table>
 		<tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr>
@@ -1147,7 +1268,6 @@ sub GasCalculator_Notify($$)
 		<tr><td><ul>The set - function sets individual values for example to correct values after power loss etc.<BR>The set - function works for readings which have been stored in the CalculatorDevice and to update the Offset.<BR>The Readings being stored in the Counter - Device need to be changed individially with the <code>set</code> - command.<BR>The command "SyncCounter" will calculate and update the Offset. Just enter the value of your mechanical Reader.<BR></ul></td></tr>
 	</table>
 	<BR>
-
 	<table>
 		<tr><td><a name="GasCalculatorGet"></a><b>Get</b></td></tr>
 		<tr><td><ul>The get - function just returns the individual value of the reading.<BR>The get - function works only for readings which have been stored in the CalculatorDevice.<BR>The Readings being stored in the Counter - Device need to be read individially with  <code>get</code> - command.<BR></ul></td></tr>
@@ -1207,6 +1327,7 @@ sub GasCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastYear         </code></li></td><td>: Volume reading of the previous year.                                                                                                                                                                                                                                                                                                                                        <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter         </code></li></td><td>: First volume reading of the first day of the month of the current meter reading period.                                                                                                                                                                                                                                                                                     <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter        </code></li></td><td>: Volume reading of the first day of the month of the last meter reading period.                                                                                                                                                                                                                                                                                              <BR>     </ul></ul></td></tr>
+
 	</table>
 </ul>
 
@@ -1233,6 +1354,16 @@ sub GasCalculator_Notify($$)
 			</td>
 		</tr>
 	</table>
+
+
+
+
+
+
+
+
+
+
 	<BR>
 	<table>
 		<tr><td><a name="GasCalculatorDefine"></a><b>Define</b></td></tr>
@@ -1307,6 +1438,7 @@ sub GasCalculator_Notify($$)
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_Vol1stMeter         </code></li></td><td>: Erster Volumenmesswert des Zeitraums seit Anfang des Monats wo der Gas-Versorger den Z&auml;hler abliest.                                                                <BR>     </ul></ul></td></tr>
 		<tr><td><ul><ul><li><code>&lt;DestinationDevice&gt;_&lt;SourceCounterReading&gt;_VolLastMeter        </code></li></td><td>: Verbrauchtes Volumen des vorherigen Abrechnungszeitraums.                                                                                                                <BR>     </ul></ul></td></tr>
 	</table>
+
 </ul>
 =end html_DE
 
