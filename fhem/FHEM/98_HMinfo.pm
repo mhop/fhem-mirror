@@ -716,7 +716,11 @@ sub HMinfo_burstCheck(@) { ####################################################
       my $prxt = CUL_HM_getRxType($defs{$pn});
       
       next if (!($prxt & 0x82)); # not a burst peer
-      my $pnb = ReadingsVal($eName,"R-$pn-peerNeedsBurst"   ,ReadingsVal($eName,".R-$pn-peerNeedsBurst",undef));
+      
+      my ($pnb) = map{$defs{$eName}{READINGS}{$_}{VAL}}
+                  grep/\.?R-$pn(_chn-..)?-peerNeedsBurst/,
+                  keys%{$defs{$eName}{READINGS}};
+
       if (!$pnb)           {push @needBurstMiss, "$eName:\t$pn";}
       elsif($pnb !~ m /on/){push @needBurstFail, "$eName:\t$pn";}
 
