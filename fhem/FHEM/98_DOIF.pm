@@ -4700,7 +4700,7 @@ sub ring
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
   $out.='</defs>';
   
-  $out.='<circle cx="41" cy="31" r="26.5" fill="url(#gradbackring)" />';
+  $out.='<circle cx="41" cy="30" r="26.5" fill="url(#gradbackring)" />';
   $out.='<g stroke="url(#grad_stroke3)" fill="none" stroke-width="4">';
   $out.=describeArc(41, 30, 28, 0, 280);
   $out.='</g>';
