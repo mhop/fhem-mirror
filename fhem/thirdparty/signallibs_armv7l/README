@@ -11,9 +11,9 @@ Version: 0.7.1 (May 15 2020)
 License: GPL-3.0
 Source: https://github.com/signalapp/zkgroup
 
-2.) libsignal (required from signal-cli 0.7.5 beta)
+2.) libsignal (required from signal-cli 0.8.0)
 Name: libsignal.so
-Version: Jan 31 2021
+Version: java-0.2.3
 License: AGPL-3.0
 Source: https://github.com/signalapp/libsignal-client
 
