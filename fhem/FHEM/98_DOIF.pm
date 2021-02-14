@@ -4690,7 +4690,7 @@ sub ring
     $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
   }
   
-  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 '.(defined($icon)?61:60).' '.(defined($icon)?57:55).'" style="width:%dpx; height:%dpx;">',$size/100*(defined($icon)?61:60),$size/100*(defined($icon)?57:55));
+  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 61 57 " style="width:%dpx; height:%dpx;">',$size/100*61,$size/100*57);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<linearGradient id="gradtemp_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
@@ -4700,27 +4700,12 @@ sub ring
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
   $out.='</defs>';
 
-  $out.='<circle cx="40" cy="30" r="'.(defined($icon)?26.5:25).'" fill="url(#gradbackring)" />';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="'.(defined($icon)?2:4).'">');
-  $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, 280);
+  $out.='<circle cx="40" cy="30" r="26.5" fill="url(#gradbackring)" />';
+  $out.=sprintf('<g stroke="url(#gradtemp_ring2)" fill="none" stroke-width="2">');
+  $out.=describeArc(40, 30, 27.5, 0, 280);
   $out.='</g>';
-  ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
-  ##$out.=describeArc(40, 30, 29, 0, 280);
-  ##$out.='</g>';
-  ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
-  ##$out.=describeArc(40, 30, (defined($icon)?26:23), 0, 280);
-  ##$out.='</g>';
-  ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="'.(defined($icon)?3:6).'">';
-  ##$out.=describeArc(40, 30, (defined($icon)?27.5:26), 0, 1);
-  ##$out.='</g>';
-  ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="'.(defined($icon)?3:6).'">';
-  ##$out.=describeArc(40, 30, (defined($icon)?27.5:26), 279, 280);
-  ##$out.='</g>';
-  #$out.=sprintf('<g stroke="%s" fill="none" stroke-width="6">',color ($maxColor));
-  #$out.=describeArc(40, 30, 26, 270, 280);
-  #$out.='</g>';
-  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="'.(defined($icon)?2:4).'">',$currColor,$minColor,(defined $lr ? $lr:-1));
-  $out.=describeArc(40, 30, (defined($icon)?27.5:26.5), 0, int($prop*280));
+  $out.=sprintf('<g stroke="url(#gradtemp_ring1_%d_%d_%d)" fill="none" stroke-width="2">',$currColor,$minColor,(defined $lr ? $lr:-1));
+  $out.=describeArc(40, 30, 27.5, 0, int($prop*280));
   $out.='</g>';
   if (defined $icon and $icon ne "" and  $icon ne " ") {
     $out.='<symbol id="Image_'.$ic.'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
@@ -4808,7 +4793,7 @@ sub ring2
     }
   }    
 
-  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 60 54" style="width:%dpx; height:%dpx;">',$size/100*60,$size/100*54);
+  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 61 57 " style="width:%dpx; height:%dpx;">',$size/100*61,$size/100*57);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<linearGradient id="grad2_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
@@ -4821,34 +4806,19 @@ sub ring2
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
   $out.='</defs>';
   
-  $out.='<circle cx="40" cy="30" r="23" fill="url(#gradbackring2)" />';
-  $out.=sprintf('<g stroke="url(#grad_ring3)" fill="none" stroke-width="4">');
-  $out.=describeArc(40, 29, 25, 0, 280);
+  $out.='<circle cx="40" cy="30" r="26.5" fill="url(#gradbackring2)" />';
+  $out.=sprintf('<g stroke="url(#grad_ring3)" fill="none" stroke-width="2">');
+  $out.=describeArc(40, 30, 27.5, 0, 280);
   $out.='</g>';
   
-  ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
-  ##$out.=describeArc(40, 30, 28.5, 0, 280);
-  ##$out.='</g>';
- 
-  ##$out.=sprintf('<g stroke="rgb(128,128,128)" fill="none" stroke-width="0.5">');
-  ##$out.=describeArc(40, 30, 22, 0, 280);
-  ##$out.='</g>';
- 
- 
+  
   $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2">',$currColor,$minColor,(defined $lr ? $lr:-1));
-  $out.=describeArc(40, 29, 26, 0, int($prop*280));
+  $out.=describeArc(40, 30, 27.5, 0, int($prop*280));
   $out.='</g>';
 
   $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2">',$currColor2,$minColor2,(defined $lr ? $lr:-1));
-  $out.=describeArc(40, 29, 23.5, 0, int($prop2*280));
+  $out.=describeArc(40, 30, 25, 0, int($prop2*280));
   $out.='</g>';
-  ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
-  ##$out.=describeArc(40, 30, 25.2, 0, 1.5);
-  ##$out.='</g>';
-
-  ##$out.='<g stroke="rgb(128,128,128)" fill="none" stroke-width="6.8">';
-  ##$out.=describeArc(40, 30, 25.2, 279, 280.5);
-  ##$out.='</g>';
    
   $out.= sprintf('<text text-anchor="middle" x="40" y="29" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor,$ln),sprintf($format,$val));
   $out.= sprintf('<text text-anchor="middle" x="40" y="16" style="fill:%s;font-size:8px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
@@ -4927,14 +4897,27 @@ sub cylinder_mode
   my $ybegin;
   my $bheight;
   my $trans=0;
+  my $heightval=10;
  
   $size=100 if (!defined $size or $size eq "");
   $dec=1 if (!defined $dec);
   my $format='%1.'.$dec.'f';  
   
+  my $heightcal=10+@values*10;
+  
   if (!defined $height or $height eq "") {
-    $height=10+@values*10 if (!defined $height or $height eq "");
-  }
+    if (@values/3 > 4) {
+      $heightval=5;
+      $height=10+@values*5;
+    } else {
+      $height=$heightcal;
+    }
+  } else {
+     if ($height < $heightcal) {
+       $heightval=5;
+     }
+  }   
+  
   if (!defined $header or $header eq "") {
     $trans=5;
     $bheight=$height-26;
@@ -4959,6 +4942,9 @@ sub cylinder_mode
       $bwidth=@values/3*($width+2)+60+$lenmax*4.3;
     } else {
       $bwidth=90+$lenmax*4.3;
+    }
+    if ($heightval==5) {
+      $bwidth=$bwidth*1.3;
     }
   }
   
@@ -4998,11 +4984,11 @@ sub cylinder_mode
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,$null+$heightoffset+2,0) if (defined $null);
   $out.= sprintf('<text x="%d" y="%d" style="fill:white; font-size:10px">%s</text>',$xBegin,+$heightoffset,$max);  
 
-  my $yBegin=13+($height-@values*10)/2;
+  my $yBegin=13+($height-@values*$heightval)/2;
   my $xValue=$xLeft;
   
   for (my $i=0;$i<@values;$i+=3){
-    my $yValue=$yBegin+9;
+    my $yValue=$yBegin+$heightval-1;
     my $value=$values[$i];
     my $val=$value;
     if (defined $mode) {
@@ -5025,10 +5011,14 @@ sub cylinder_mode
     }
 
     if (defined $text and $text ne "") {
-      $out.= sprintf('<text x="%d" y="%d" style="fill:%s; font-size:12px">%s</text>',$xBegin+10,$yBegin+$i*10,hsl_color($color),$text.":");
-      $yValue+=7;
+      $out.= sprintf('<text x="%d" y="%d" style="fill:%s; font-size:12px">%s</text>',$xBegin+10,$yBegin+$i*$heightval,hsl_color($color),$text.":");
+      if ($heightval == 10) {
+        $yValue+=7;
+      } else {
+        $yValue-=4;
+      }
     }
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*10,hsl_color ($color),($val eq "N/A" ? $val:sprintf($format,$val)),$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s";><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+5, $yValue+$i*$heightval,hsl_color ($color),($val eq "N/A" ? $val:sprintf($format,$val)),$unit);
   }  
 
   $out.= '</g>';
