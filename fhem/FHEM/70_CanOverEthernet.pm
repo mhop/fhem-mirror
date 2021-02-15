@@ -209,7 +209,7 @@ sub CanOverEthernet_sendDataAnalog {
   my @values = @{$valuesRef};
   my @types = @{$typesRef};
 
-  my $socket = new IO::Socket::INET (
+  my $socket = IO::Socket::INET->new(
     PeerAddr=>$targetIp,
     PeerPort=>5441,
     Proto=>"udp"
@@ -255,7 +255,7 @@ sub CanOverEthernet_sendDataDigital {
   my ( $hash, $targetIp, $targetNode, @values ) = @_;
   my $name = $hash->{NAME};
 
-  my $socket = new IO::Socket::INET (
+  my $socket = IO::Socket::INET->new(
     PeerAddr=>$targetIp,
     PeerPort=>5441,
     Proto=>"udp"
