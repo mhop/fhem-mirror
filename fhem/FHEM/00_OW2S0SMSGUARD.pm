@@ -125,7 +125,9 @@ sub DefineFn {
 	$hash->{OWVals}     = 0;
 	$hash->{addr}       = 'master';
 	$hash->{TIMEOUT}    = 0.5;
-	setDevAttrList($name,'interval disable:0,1 DS2401_Timeout mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
+	setDevAttrList($name,'interval disable:0,1 DS2401_Timeout A_offset A_calc:after,before,never B_calc:after,before,never B_offset '
+			    .'mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '
+			    .$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
     else {
@@ -590,7 +592,8 @@ sub decodeVal {
 sub decodeTemperature {
 
     my ($model, @data) = @_;
-    my $temp = (( hex($data[1]) << 8) | hex($data[0]));
+
+     my $temp =  hex($data[1].$data[0]);
 
     if ($model eq 'DS1820')  {
 
@@ -598,20 +601,19 @@ sub decodeTemperature {
 	$temp = $temp * 0.5;
 	#$temp = ($temp & 0xFFF0) +12 - hex($data[6]) if ($data[7] eq '10');
 	# Alternative Berechnung :
-
 	$temp = ($temp - 0.25) + ((hex($data[7]) - hex($data[6])) / hex($data[7])) if ($data[7] ne '00');
     }
 
     if (($model eq 'DS18B20') || ($model eq 'DS1822')) {
 
-	my $cfg = (hex($data[4]) & 0x60);
-	$temp  = $temp << 3 if ($cfg == 0);
-	$temp  = $temp << 2 if ($cfg == 0x20);
-	$temp  = $temp << 1 if ($cfg == 0x40);
+	my $cfg = (hex($data[4]) & 0x60);      #  volle 12 Bit Auflösung
+	$temp  = $temp << 3 if ($cfg == 0);    # / 1000 ? 9 Bit Auflösung  & -7
+	$temp  = $temp << 2 if ($cfg == 0x20); # / 100 ? 10 Bit Auflösung  & -3
+	$temp  = $temp << 1 if ($cfg == 0x40); # / 10 ? 11 Bit Auflösung   & -1
 	$temp  = $temp/16.0;
     }
 
-    $temp -= 4096 if (hex($data[1]) > 127); # ToDo : testen !
+    $temp -= 4096 if (hex($data[1]) > 127);
 
     return sprintf('%.1f', $temp);
 }
@@ -685,20 +687,22 @@ sub ParseFn {
 sub UpdateReadings {
 
     my $hash = shift;
+    my $name = $hash->{NAME};
     my @data = split(';', shift);
+    Log3($hash, 5, "$name, UpdateReadings data : ".join(' ',@data)); 
 
     my @arr;
 
-    my $S0A = (looks_like_number($data[1])) ? int($data[1]) : '';
-    my $S0B = (looks_like_number($data[2])) ? int($data[2]) : '';
-    
+    my $S0A = (looks_like_number($data[1])) ? int($data[1]) : undef;
+    my $S0B = (looks_like_number($data[2])) ? int($data[2]) : undef;
 
-    Log3($hash, 5, "$hash->{NAME}, UpdateReadings data : ".join(' ',@data)); 
+    $S0A += AttrNum($name, 'A_offset', 0) if (defined($S0A));
+    $S0B += AttrNum($name, 'B_offset', 0) if (defined($S0B));
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash, 'A',  $S0A) if ($S0A ne '');
-    readingsBulkUpdate($hash, 'B',  $S0B) if ($S0B ne '');
-    readingsBulkUpdate($hash, 'state',  "A: $S0A - B: $S0B") if (($S0A ne '') && ($S0B ne ''));
+    calcS0($hash, 'A', $S0A);
+    calcS0($hash, 'B', $S0B);
+    readingsBulkUpdate($hash, 'state',  "A: $S0A - B: $S0B") if ((defined($S0A)) && (defined($S0B)));
     readingsEndUpdate($hash, 1);
 
     if (exists($hash->{helper}{OW}{100})) {
@@ -706,7 +710,7 @@ sub UpdateReadings {
 	readingsBeginUpdate($hash);
 
         foreach my $dev ( keys %{$hash->{helper}{OW}{100}} ) {
-	    my $timeout =  AttrNum($hash->{NAME}, 'DS2401_Timeout', ($hash->{INTERVAL} * 1.5));
+	    my $timeout =  AttrNum($name, 'DS2401_Timeout', ($hash->{INTERVAL} * 1.5));
 	    my $state   = (index($hash->{DS2401}, $dev) != -1) ? 'present' : '';
 	    my $t       = 0;
 
@@ -731,7 +735,7 @@ sub UpdateReadings {
 	readingsBulkUpdate($hash, '.ds2401', OW_uniq($hash->{NAME}, '.ds2401', $hash->{DS2401})) if ($hash->{DS2401});
 	delete $hash->{DS2401};
 
-	if (!AttrNum($hash->{NAME}, 'useSubDevices', 0)) {
+	if (!AttrNum($name, 'useSubDevices', 0)) {
 	    readingsEndUpdate($hash, 1);
 	    return;
 	}
@@ -870,6 +874,82 @@ sub crc8 {
 
 #####################################
 
+sub calcS0 {
+
+    my $hash = shift;
+    my $c    = shift // return;
+    my $v    = shift // return;
+ 
+    my $ti = time();
+
+    my ($Min,  $Hour,  $Month,  $Year,  $Wday);
+    my ($nMin, $nHour, $nMonth, $nYear, $nWday);
+
+    readingsBulkUpdate($hash, $c,  $v);
+
+    if (AttrVal($hash->{NAME}, $c.'_calc', '') eq 'before') {
+	(undef, $Min,  $Hour,  undef, $Month,  $Year,  $Wday)  = localtime($ti);
+	# Wann wäre der nächste Duchlauf ?
+	(undef, $nMin, $nHour, undef, $nMonth, $nYear, $nWday) = localtime($ti+$hash->{INTERVAL});
+	Log3($hash, 4, "$hash->{NAME}, calcS0 $c before -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
+    }
+    elsif (AttrVal($hash->{NAME}, $c.'_calc', '') eq 'after') {
+	# Wann war der letzte Durchlauf ?
+	$hash->{lastrun} = $ti if (!defined($hash->{lastrun})); # erster Durchlauf nach FHEM Neustart
+	(undef, $Min,  $Hour,  undef, $Month,  $Year,  $Wday)  = localtime($hash->{lastrun});
+	(undef, $nMin, $nHour, undef, $nMonth, $nYear, $nWday) = localtime($ti);
+	$hash->{lastrun} = $ti;
+	Log3($hash, 4, "$hash->{NAME}, calcS0 $c  after -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
+    }
+    else {
+	Log3($hash, 5, "$hash->{NAME}, calcS0 $c never");
+	return;
+    }
+
+    return if ($nMin == $Min);
+
+    my $o = ReadingsNum($hash->{NAME}, $c.'_start_min', undef);
+
+    readingsBulkUpdate($hash, $c.'_last_min' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_start_min', $v);
+
+    return if ($nHour == $Hour);
+
+    $o = ReadingsNum($hash->{NAME}, $c.'_start_hour', undef);
+
+    readingsBulkUpdate($hash,  $c.'_last_hour' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash,  $c.'_start_hour', $v);
+
+    return if ($nWday == $Wday);
+
+    $o = ReadingsNum($hash->{NAME}, $c.'_start_day', undef);
+
+    readingsBulkUpdate($hash, $c.'_last_day' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_start_day', $v);
+
+    if ($nWday == 1) {
+	$o = ReadingsNum($hash->{NAME}, $c.'_start_week', undef);
+
+	readingsBulkUpdate($hash, $c.'_last_week' , ($v-$o)) if (defined($o));
+	readingsBulkUpdate($hash, $c.'_start_week', $v);
+    }
+
+    return if ($nMonth == $Month);
+
+    $o = ReadingsNum($hash->{NAME}, $c.'_start_month', undef);
+
+    readingsBulkUpdate($hash, $c.'_last_month', ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_start_month', $v);
+
+    return if ($nYear == $Year);
+
+    $o = ReadingsNum($hash->{NAME}, $c.'_start_year', undef);
+    readingsBulkUpdate($hash, $c.'_last_year', ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_start_year', $v);
+
+    return;
+}
+
 1;
 
 __END__
@@ -900,34 +980,37 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <br>
   <a name="OW2S0SMSGUARDset"></a>
   <b>Set</b>
+  <ul>
     <a name="reset"></a><li>reset IO device ( master only )</li><br>
     <a name="S0-reset"></a><li>S0-reset : reset of both S0 counters ( master only )</li><br>
     <a name="deleteDS2401"></a><li>deleteDS2401 : deletes reading and defined sub device ( master only )</li><br>
-
+  </ul>
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
+  <ul>
     <a name="OWdeviceList"></a><li>list of found OW devices ( master only )</li><br>
-
+  </ul>
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="DS2401_Timeout"></a><li>DS2401_Timeout ( master only ) , default 1.5 x Interval<br>
-    </li>
-  </ul>
-  <ul>
+    <a name="A_calc"></a><li>A_calc ( master only ) after, before, never, default before<br></li>
+    <a name="B_calc"></a><li>B_calc ( master only ) after, before, never, default before<br></li>
+
+    <a name="A_offset"></a><li>A_offset ( master only )<br></li>
+    <a name="B_offset"></a><li>B_offset ( master only )<br></li>
+
+    <a name="DS2401_Timeout"></a><li>DS2401_Timeout ( master only ) , default 1.5 x Interval<br></li>
+
     <a name="mapOWIDs"></a><li>mapOWIDs ( master only )<br>
     Comma separeted list of ID=Name pairs<br>
     Example : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br></li>
-  </ul>
-  <ul>
+
     <a name="model"></a><li>model<br>
      only for FHEM modul statistics at <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a></li>
- </ul>
-  <ul>
+
     <a name="useSubDevices"></a><li>useSubDevices ( master only ) , default 0<br>
     create for each found device on the bus a separate subdevice<br></li>
-  </ul>
- <ul>
+
     <a name="delay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values<br></li>
  </ul>
 
@@ -950,47 +1033,52 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
     define myOW2S0 OW2S0SMSGUARD 192.168.0.100:2000 (socat, ser2net)</code><br>
 
   </ul>
-
   <br>
   <a name="OW2S0SMSGUARDset"></a>
   <b>Set</b>
+  <ul>
     <a name="reset"></a><li>reset IO Device ( nur Master Device )</li><br>
     <a name="S0-reset"></a><li>S0-resets ( nur Master Device )<br>
     setzt die beiden internen S0 Zähler ( A & B) auf 0 zurück</li><br>
     <a name="deleteDS2401"></a><li>deleteDS2401 ( nur Master Device )<br>
-    löscht das das Reading und falls definiert auch das dazugehörige Sub-Device (siehe Attr useSubDevice)</li><br>
- 
-  <a name="OW2S0SMSGUARDget"></a>
+    löscht das das Reading und falls definiert auch das dazugehörige Sub-Device (siehe Attr useSubDevice)</li>
+   </ul>
+   <br>
+   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
+  <ul>
     <a name="OWdeviceList"></a><li>OWdeviceList<br>
-    Liste der aktuell gefunden OW Geräte ( nur Master Device )</li><br>
-
+    Liste der aktuell gefunden OW Geräte ( nur Master Device )</li>
+  </ul>
+  <br>
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attribute</b>
   <ul>
+    <a name="A_calc"></a><li>A_calc ( master only ) after, before, never, default before<br></li>
+    <a name="B_calc"></a><li>B_calc ( master only ) after, before, never, default before<br></li>
+
+    <a name="A_offset"></a><li>A_offset ( master only )<br></li>
+    <a name="B_offset"></a><li>B_offset ( master only )<br></li>
+
     <a name="DS2401_Timeout"></a><li>DS2401_Timeout in Sekunden ( nur Master Device ) , default 1.5 x interval<br>
     Werte kleiner als Interval sind nicht zulässig.<br>
-    Wartezeit in Sekunden bis ein fehlender DS2401 seinen Status von timeout auf absent wechselt.
+    Wartezeit in Sekunden bis ein fehlender DS2401 seinen Status von timeout auf absent wechselt.<br>
     </li>
-  </ul>
-  <ul>
+
     <a name="mapOWIDs"></a><li>mapOWIDs<br>
     Kommata getrennte Liste von ID=Name Paaren<br>
     Beispiel : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br>
     Statt der OW ID wird Name als Reading verwendet.( nur Master Device )<br></li>
-  </ul>
-  <ul>
+
     <a name="model"></a><li>model<br>
-    nur f&uuml;r die FHEM Modul Statistik unter <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a></li>
-  </ul>
-  <ul>
+    nur f&uuml;r die FHEM Modul Statistik unter <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a><br></li>
+
     <a name="useSubDevices"></a><li>useSubDevices ( nur Master Device ) , default 0<br>
     Legt für jedes gefundene Device am 1-W Bus ein eigenes extra Device an<br></li>
-  </ul>
-  <ul>
+
     <a name="delay"></a><li>delay ( nur Master Device ) , default 0.5 Sekukunden<br>
     Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist<br></li>
-   </ul>
+  </ul>
 
 =end html_DE
 
