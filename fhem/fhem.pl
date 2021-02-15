@@ -635,27 +635,35 @@ if($pfn) {
 $init_done = 1;
 $lastDefChange = 1;
 
-foreach my $d (keys %defs) {
-  if($defs{$d}{IODevMissing}) {
-    if($defs{$d}{IODevName} && $defs{$defs{$d}{IODevName}}) {
-      $defs{$d}{IODev} = $defs{$defs{$d}{IODevName}};
-      delete $defs{$d}{IODevName};
-    } else {
-      AssignIoPort($defs{$d}); # For fhem.cfg editors? Needs init_done for Log.
+sub
+finish_init()
+{
+  foreach my $d (keys %defs) {
+    if($defs{$d}{IODevMissing}) {
+      if($defs{$d}{IODevName} && $defs{$defs{$d}{IODevName}}) {
+        $defs{$d}{IODev} = $defs{$defs{$d}{IODevName}};
+        delete $defs{$d}{IODevName};
+      } else {
+        AssignIoPort($defs{$d}); # For fhem.cfg editors?
+      }
+      delete $defs{$d}{IODevMissing};
     }
-    delete $defs{$d}{IODevMissing};
   }
-}
 
-my $init_errors_first = ($defs{global}{init_errors} ? 1 : 0);
-SecurityCheck();
-if($defs{global}{init_errors}) {
-  $attr{global}{autosave} = 0 if($init_errors_first);
-  $defs{global}{init_errors} = "Messages collected while initializing FHEM:".
-                 "$defs{global}{init_errors}\n".
-                 ($init_errors_first ? "Autosave deactivated" : "");
-  Log 1, $defs{global}{init_errors} if(AttrVal("global","motd","") ne "none");
+  my $init_errors_first = ($defs{global}{init_errors} ? 1 : 0);
+  SecurityCheck();
+  if($defs{global}{init_errors}) {
+    $attr{global}{autosave} = 0 if($init_errors_first);
+    $defs{global}{init_errors} =
+        "Messages collected while initializing FHEM:".
+        "$defs{global}{init_errors}\n".
+        ($init_errors_first ? "Autosave deactivated" : "");
+    Log 1, $defs{global}{init_errors}
+        if(AttrVal("global","motd","") ne "none");
+  }
+
 }
+finish_init();
 
 
 $fhem_started = int(gettimeofday());
@@ -1504,10 +1512,14 @@ CommandRereadCfg($$)
   }
   applyGlobalAttrFromEnv();
 
-  $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
+  $defs{$name} = $selectlist{$name} = $cl
+        if($name && $name ne "__anonymous__");
   $inform{$name} = $informMe if($informMe);
   @structChangeHist = ();
   $lastDefChange++;
+
+  finish_init();
+
   DoTrigger("global", "REREADCFG", 1);
 
   $init_done = 1;
