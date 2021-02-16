@@ -840,6 +840,8 @@ FileLog_Get($@)
   $ifh = new IO::File $inf if($inf);
   FileLog_seekTo($inf, $ifh, $hash, $from, $reformatFn) if($ifh);
 
+  $to .= "z"; # return the 23:59:59 line too (Forum #118858)
+
   # Return the the plain file data, $outf is ignored
   if(!@a) {
     return "" if(!$ifh);
