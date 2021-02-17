@@ -55,7 +55,7 @@ sub serviced_Define($$)
     if (@args < 3 || @args > 5);
   my ($name,$type,$service,$remote,$port) = @args;
   return "Remote host must be like 'pi\@192.168.2.22' or 'pi\@myserver' or 'pi\@192.168.2.22 222' if you need to declare a SSH port other than the default port!"
-    if (($remote && $remote !~ /^\w{2,}@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w\.\-_]{2,})$/ && !$port) || ($remote && $remote !~ /^\w{2,}@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w\.\-_]{2,})$/ && $port && $port !~ /^\d{2,5}$/));
+    if (($remote && $remote !~ /^\w{2,}@(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[\w\.\-_]{2,})$/) || ($port && $port !~ /^\d{2,5}$/));
   RemoveInternalTimer($hash);
   $hash->{NOTIFYDEV}   = "global";
   $hash->{SERVICENAME} = $service;
