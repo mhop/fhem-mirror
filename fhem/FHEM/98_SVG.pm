@@ -601,7 +601,8 @@ SVG_zoomLink($$$)
     } elsif($val eq "month") {
       $w_off = ($off < 0) ? $w_off*12: int($w_off/4);
     } elsif($val eq "year") {
-      $w_off =                         int($w_off/12);
+      my @t = localtime();
+      $w_off =                         int(($w_off+$t[4]-11)/12); # 118880
     } elsif($val eq "10years") {
       $w_off =                         int($w_off/120);
     } elsif($val eq "20years") {
