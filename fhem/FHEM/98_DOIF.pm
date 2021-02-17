@@ -4418,12 +4418,22 @@ sub bar
   $out.= sprintf('<line  x1="15.5"  y1="%d" x2="19.5" y2="%d" fill="none" stroke="rgb(192,192,192)" stroke-width="1"/>',$null,$null) if ($min < 0 and $max > 0);;
 
   if (defined $icon and $icon ne "") {
-    $out.='<symbol id="Image_'."$ic $ix $iy".'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
-    $out.= ::FW_makeImage($ic);
-    $out.='</symbol>';
-    ##$out.='<g stroke="rgb(128,128,128)" >';
-    $out.='<use href="#Image_'."$ic $ix $iy".'" height="22" width="22" />';#height="18" width="18"
-    ##$out.='</g>';
+    my $svg_icon=::FW_makeImage($ic);
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
+        $svg_icon =~ s/svg/svg height="22"/ 
+    }
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
+        $svg_icon =~ s/svg/svg width="22"/ 
+    }
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)">';
+    $out.= $svg_icon;
+    $out.='</g>';
+
+##    $out.='<symbol id="Image_'."$ic $ix $iy".'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
+##    $out.= ::FW_makeImage($ic);
+##    $out.='</symbol>';
+##    $out.='<use href="#Image_'."$ic $ix $iy".'" height="22" width="22" />';#height="18" width="18"
+##    $out.='</g>';
   }
   
   $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),sprintf($format,$val),$unit);
@@ -4708,12 +4718,24 @@ sub ring
   $out.=describeArc(41, 30, 27.5, 0, int($prop*280));
   $out.='</g>';
   if (defined $icon and $icon ne "" and  $icon ne " ") {
-    $out.='<symbol id="Image_'.$ic.'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
-    $out.= ::FW_makeImage($ic);
-    $out.='</symbol>';
-    ##$out.='<g stroke="rgb(128,128,128)" >';
-    $out.='<use href="#Image_'.$ic.'" height="22" width="22" />';#height="18" width="18"
-    ##$out.='</g>';
+    my $svg_icon=::FW_makeImage($ic);
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
+        $svg_icon =~ s/svg/svg height="22"/ }
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
+        $svg_icon =~ s/svg/svg width="22"/ }
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)">';
+    $out.= $svg_icon;
+    $out.='</g>';
+##    my $svg_icon=::FW_makeImage($ic);
+##    $svg_icon =~ s/height="[^"]*"/height="22"/;
+##    $svg_icon =~ s/width="[^"]*"/width="22"/;
+##  my $viewBox= ($svg_icon =~ /(viewBox="[^"]*")/) ? $1 : 'viewBox = "0 0 640 640"'; 
+##  my $viewBox='viewBox = "0 0 640 640"'; 
+##    $out.='<symbol id="Image_ring_'.$ic.'">';
+##    $out.= $svg_icon;
+##    $out.='</symbol>';
+##    $out.='<use href="#Image_ring_'.$ic.'" height="22" width="22" transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)"/>';
+##    $out.='</symbol>';
   }
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;">%s</text>',((defined ($icon) and $icon ne "") ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:18),sprintf($format,$val));
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:10px;">%s</text>',((defined ($icon) and $icon ne "") ? 53:47),color($currColor,$ln),$unit) if (defined $unit);
