@@ -215,6 +215,7 @@ my %DEVID_MODEL = (
     "SHCB-1"   => "shellybulb",
     "SHBLB-1"  => "shellybulb",
     "SHBDUO-1" => "shellybulb",
+    "SHMOS-01" => "generic",
     "SHWT-1"   => "generic",
     "SHHT-1"   => "generic",
     "SHGS-1"   => "generic",
@@ -240,7 +241,8 @@ my %DEVID_PREFIX = (
     "SHHT-1"   => "shelly_ht",
     "SHGS-1"   => "shelly_gas",
     "SHBTN-2"  => "shelly_button",
-    "SHIX3-1"  => "shelly_i3"
+    "SHIX3-1"  => "shelly_i3",
+    "SHMOS-01" => "shelly_motion"
 );
 
 # Mapping of DeviceId in Multicast to additional attributes on creation
@@ -462,8 +464,9 @@ sub ShellyMonitor_DoRead
 
     # Now lets unpack the raw packet data...
 
-    my ($b1,$b2,$msgid,$opt1byte,$remain) = unpack('CCSB8A*', $data);
-    if ($b1 != 0x50) {
+    my $opt1byte;
+    my ($b1,$b2,$msgid,$remain) = unpack('CCSA*', $data);
+    if ($b1 < 0x50 || $b1 > 0x5f) {
       Log3 $name, 3, "Unexpected byte at pos 0: " . sprintf("0x%X", $b1) . ", expecting Non-Confirm. w/o token";
       $hash->{".ReceivedBroken"}++;
       return;
@@ -473,6 +476,15 @@ sub ShellyMonitor_DoRead
       Log3 $name, 3, "Unexpected byte at pos 1: " . sprintf("0x%X", $b2) . ", expecting Code 30";
       return;
     }
+    my $tokenlen = $b1 & 0xf;
+    my $token;
+    if ($tokenlen>0) {
+      my $unpackstr = "A${tokenlen}B8A*";
+      ($token,$opt1byte,$remain) = unpack($unpackstr, $remain);
+    } else {
+      ($opt1byte,$remain) = unpack('B8A*', $remain);
+    }
+
     my $option = 0;
 
     my $uri = "";
