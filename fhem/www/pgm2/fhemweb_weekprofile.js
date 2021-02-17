@@ -409,7 +409,11 @@ function FW_weekprofileShow(widget)
       
       $(tr).append('<td>'+str+ '</td>');
       
-      str = widget.PROFILE[shortDays[i]]['temp'][k]+' °C';
+      str = widget.PROFILE[shortDays[i]]['temp'][k];
+      var tempV = parseFloat(str);
+      if(!isNaN(tempV)) {
+        str += ' °C';
+      }
       $(tr).append('<td>'+str+ '</td>');
     }
   }

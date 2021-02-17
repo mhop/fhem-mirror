@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  98_weekprofile: don't display '°C' by temperature keywords
  - change:  70_CanOverEthernet: changed indirect object notation (Perl 7 comp)
  - change:  70_ZoneMinder: fixed authentication for 1.34.x, API 2.0
  - feature: 98_weekprofile: custom temperature keywords
