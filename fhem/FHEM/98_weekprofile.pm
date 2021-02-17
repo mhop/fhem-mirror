@@ -1409,7 +1409,7 @@ sub weekprofile_createTempMap($) {
     my $tempMap = AttrVal($me,"tempMap", $attrMap);
     return if (!defined($tempMap));
     
-    Log3($me, 2, "$me(weekprofile_createTempMap): create map from $attrMap");
+    Log3($me, 2, "$me(weekprofile_createTempMap): create map from $tempMap");
     $tempMap .= ',';
     
     my @data = split(',',$tempMap);
