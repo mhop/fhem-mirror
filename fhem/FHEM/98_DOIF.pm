@@ -4645,9 +4645,9 @@ sub ring
       $ix=30;
     };
     if (defined ($iy)) {
-      $iy+=9;
+      $iy+=8;
     } else {
-      $iy=9;
+      $iy=8;
     };
     $iscale=1 if (!defined($iscale));
     $ic="" if (!defined($ic));
