@@ -85,6 +85,8 @@ my $SHELLY_DEF_SEN = {
 # Used by Shelly Spot SHSPOT-1, Shelly Spot 2 SHSPOT-2:
 "3116" => { "type"=>"S", "desc"=>"dayLight"},
 "3117" => { "type"=>"S", "desc"=>"extInput"},
+"3119" => { "type"=>"S", "desc"=>"timestamp"},
+"3120" => { "type"=>"S", "desc"=>"active"},
 "3201" => { "type"=>"T", "desc"=>"extTemp_1", "unit"=>"C"},
 "3202" => { "type"=>"T", "desc"=>"extTemp_1f", "unit"=>"F"},
 "3301" => { "type"=>"T", "desc"=>"extTemp_2", "unit"=>"C"},
