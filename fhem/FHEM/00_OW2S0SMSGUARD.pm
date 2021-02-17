@@ -125,9 +125,9 @@ sub DefineFn {
 	$hash->{OWVals}     = 0;
 	$hash->{addr}       = 'master';
 	$hash->{TIMEOUT}    = 0.5;
-	setDevAttrList($name,'interval disable:0,1 DS2401_Timeout A_offset A_calc:after,before,never B_calc:after,before,never B_offset '
-			    .'mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '
-			    .$readingFnAttributes);
+	setDevAttrList($name,'interval disable:0,1 DS2401_Timeout A_offset A_calc_mode:after,before,never A_calc_current:0,1 B_calc_mode:after,before,never '
+			    .'B_calc_current:0,1 B_offset mapOWIDs useSubDevices:0,1 delay:0.01,0.05,0.1,0.5,1 '
+			    .'model:master,unknown,DS2401,DS1820,DS18B20,DS1822 '.$readingFnAttributes);
 	CommandAttr(undef, "$name model master")   if (!exists($attr{$name}{model}));
     }
     else {
@@ -879,72 +879,73 @@ sub calcS0 {
     my $hash = shift;
     my $c    = shift // return;
     my $v    = shift // return;
- 
-    my $ti = time();
+     my $name = $hash->{NAME};
+    my $ti   = time();
 
     my ($Min,  $Hour,  $Month,  $Year,  $Wday);
     my ($nMin, $nHour, $nMonth, $nYear, $nWday);
 
     readingsBulkUpdate($hash, $c,  $v);
 
-    if (AttrVal($hash->{NAME}, $c.'_calc', '') eq 'before') {
+    if (AttrVal($name, $c.'_calc_mode', '') eq 'before') {
 	(undef, $Min,  $Hour,  undef, $Month,  $Year,  $Wday)  = localtime($ti);
 	# Wann wäre der nächste Duchlauf ?
 	(undef, $nMin, $nHour, undef, $nMonth, $nYear, $nWday) = localtime($ti+$hash->{INTERVAL});
-	Log3($hash, 4, "$hash->{NAME}, calcS0 $c before -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
+	Log3($hash, 4, "$name, calcS0 $c before -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
     }
-    elsif (AttrVal($hash->{NAME}, $c.'_calc', '') eq 'after') {
+    elsif (AttrVal($name, $c.'_calc_mode', '') eq 'after') {
 	# Wann war der letzte Durchlauf ?
 	$hash->{lastrun} = $ti if (!defined($hash->{lastrun})); # erster Durchlauf nach FHEM Neustart
 	(undef, $Min,  $Hour,  undef, $Month,  $Year,  $Wday)  = localtime($hash->{lastrun});
 	(undef, $nMin, $nHour, undef, $nMonth, $nYear, $nWday) = localtime($ti);
 	$hash->{lastrun} = $ti;
-	Log3($hash, 4, "$hash->{NAME}, calcS0 $c  after -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
+	Log3($hash, 4, "$name, calcS0 $c  after -> $Min:$nMin, $Hour:$nHour, $Month:$nMonth, $Year:$nYear, $Wday:$nWday");
     }
     else {
-	Log3($hash, 5, "$hash->{NAME}, calcS0 $c never");
+	Log3($hash, 5, "$name, calcS0 $c never");
 	return;
     }
 
+
+    my $o = ReadingsNum($name, $c.'_start_min', 0);
+    readingsBulkUpdate($hash, $c.'_current_min',  ($v - $o)) if (AttrNum($name, $c.'_calc_current', 0));
+
     return if ($nMin == $Min);
 
-    my $o = ReadingsNum($hash->{NAME}, $c.'_start_min', undef);
-
-    readingsBulkUpdate($hash, $c.'_last_min' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_last_min' , ($v-$o));
     readingsBulkUpdate($hash, $c.'_start_min', $v);
+
+    if (AttrNum($name, $c.'_calc_current', 0)) {
+	readingsBulkUpdate($hash, $c.'_current_hour',  ($v - ReadingsNum($name, $c.'_start_hour',  0)));
+	readingsBulkUpdate($hash, $c.'_current_day',   ($v - ReadingsNum($name, $c.'_start_day',   0)));
+	readingsBulkUpdate($hash, $c.'_current_week',  ($v - ReadingsNum($name, $c.'_start_week',  0)));
+	readingsBulkUpdate($hash, $c.'_current_month', ($v - ReadingsNum($name, $c.'_start_month', 0)));
+	readingsBulkUpdate($hash, $c.'_current_year',  ($v - ReadingsNum($name, $c.'_start_year',  0)));
+    }
 
     return if ($nHour == $Hour);
 
-    $o = ReadingsNum($hash->{NAME}, $c.'_start_hour', undef);
-
-    readingsBulkUpdate($hash,  $c.'_last_hour' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash,  $c.'_last_hour' , ($v - ReadingsNum($name, $c.'_start_hour', 0)));
     readingsBulkUpdate($hash,  $c.'_start_hour', $v);
 
     return if ($nWday == $Wday);
 
-    $o = ReadingsNum($hash->{NAME}, $c.'_start_day', undef);
-
-    readingsBulkUpdate($hash, $c.'_last_day' , ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_last_day' , ($v - ReadingsNum($name, $c.'_start_day', 0)));
     readingsBulkUpdate($hash, $c.'_start_day', $v);
 
     if ($nWday == 1) {
-	$o = ReadingsNum($hash->{NAME}, $c.'_start_week', undef);
-
-	readingsBulkUpdate($hash, $c.'_last_week' , ($v-$o)) if (defined($o));
+	readingsBulkUpdate($hash, $c.'_last_week' , ($v - ReadingsNum($name, $c.'_start_week', 0)));
 	readingsBulkUpdate($hash, $c.'_start_week', $v);
     }
 
     return if ($nMonth == $Month);
 
-    $o = ReadingsNum($hash->{NAME}, $c.'_start_month', undef);
-
-    readingsBulkUpdate($hash, $c.'_last_month', ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_last_month', ($v - ReadingsNum($name, $c.'_start_month', 0)));
     readingsBulkUpdate($hash, $c.'_start_month', $v);
 
     return if ($nYear == $Year);
 
-    $o = ReadingsNum($hash->{NAME}, $c.'_start_year', undef);
-    readingsBulkUpdate($hash, $c.'_last_year', ($v-$o)) if (defined($o));
+    readingsBulkUpdate($hash, $c.'_last_year', ($v - ReadingsNum($name, $c.'_start_year', 0)));
     readingsBulkUpdate($hash, $c.'_start_year', $v);
 
     return;
@@ -958,8 +959,8 @@ __END__
 =over
 =encoding utf8
 
-=item summary Module for SMS USB Guard
-=item summary_DE Modul für SMS USB Guard
+=item summary Module for two S0 Counter and One Wire from SMSGuard ( www.sms-guard.org )
+=item summary_DE Modul für S0 Zähler und OneWire von SMSGuard ( www.sms-guard.org )
 =begin html
 
 <a name="OW2S0SMSGUARD"></a>
@@ -993,8 +994,11 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="A_calc"></a><li>A_calc ( master only ) after, before, never, default before<br></li>
-    <a name="B_calc"></a><li>B_calc ( master only ) after, before, never, default before<br></li>
+    <a name="A_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br></li>
+    <a name="B_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br></li>
+
+    <a name="A_calc_current"></a><li>A_calc_current ( master only ) default 0,  A_calc_mode must be after or before<br></li>
+    <a name="B_calc_current"></a><li>B_calc_current ( master only ) default 0,  B_calc_mode must be after or before<br></li>
 
     <a name="A_offset"></a><li>A_offset ( master only )<br></li>
     <a name="B_offset"></a><li>B_offset ( master only )<br></li>
@@ -1054,8 +1058,11 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="A_calc"></a><li>A_calc ( master only ) after, before, never, default before<br></li>
-    <a name="B_calc"></a><li>B_calc ( master only ) after, before, never, default before<br></li>
+    <a name="A_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br></li>
+    <a name="B_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br></li>
+
+    <a name="A_calc_current"></a><li>A_calc_current ( master only ) default 0, setzt A_calc_mode after oder before vorraus<br></li>
+    <a name="B_calc_current"></a><li>B_calc_current ( master only ) default 0, setzt B_calc_mode after oder before vorraus<br></li>
 
     <a name="A_offset"></a><li>A_offset ( master only )<br></li>
     <a name="B_offset"></a><li>B_offset ( master only )<br></li>
