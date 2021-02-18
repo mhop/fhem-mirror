@@ -2904,88 +2904,88 @@ It is exactly the same Password as you use on the Website or inside the App.</p>
 
 <p><strong><a name="BOTVACget"></a>Get</strong></p>
 <ul>
-<li><a name="batteryPercent"></a><code>get &lt;name&gt; batteryPercent</code><br />
+<li><a name="BOTVACbatteryPercent"></a><code>get &lt;name&gt; batteryPercent</code><br />
 requests the state of the battery from Robot</li>
-<li><a name="securityTokens"></a><code>get &lt;name&gt; securityTokens</code><br />
+<li><a name="BOTVACsecurityTokens"></a><code>get &lt;name&gt; securityTokens</code><br />
 list of all tokens stored by the module. The tokens are relevant for user authentication and to get access to robot data.</li>
-<li><a name="statistics"></a><code>get &lt;name&gt; statistics</code><br />
+<li><a name="BOTVACstatistics"></a><code>get &lt;name&gt; statistics</code><br />
 display statistical data, extracted from available maps of recent cleanings</li>
 </ul>
 <p><strong><a name="BOTVACset"></a>Set</strong></p>
 <ul>
-<li><a name="findMe"></a><code>set &lt;name&gt; findMe</code><br />
+<li><a name="BOTVACfindMe"></a><code>set &lt;name&gt; findMe</code><br />
 plays a sound and let the LED light for easier finding of a stuck robot</li>
-<li><a name="dismissCurrentAlert"></a><code>set &lt;name&gt; dismissCurrentAlert</code><br />
+<li><a name="BOTVACdismissCurrentAlert"></a><code>set &lt;name&gt; dismissCurrentAlert</code><br />
 reset an actual Warning (e.g. dustbin full)</li>
-<li><a name="nextCleaningMode"></a><code>set &lt;name&gt; nextCleaningMode</code><br />
+<li><a name="BOTVACnextCleaningMode"></a><code>set &lt;name&gt; nextCleaningMode</code><br />
 Depending on Model, there are Arguments available: eco/turbo</li>
-<li><a name="nextCleaningModifier"></a><code>set &lt;name&gt; nextCleaningModifier</code><br />
+<li><a name="BOTVACnextCleaningModifier"></a><code>set &lt;name&gt; nextCleaningModifier</code><br />
 The modifier is used for next spot cleaning. Depending on Model, there are Arguments available: normal/double</li>
-<li><a name="nextCleaningNavigationMode"></a><code>set &lt;name&gt; nextCleaningNavigationMode</code><br />
+<li><a name="BOTVACnextCleaningNavigationMode"></a><code>set &lt;name&gt; nextCleaningNavigationMode</code><br />
 The navigation mode is used for the next house cleaning. Depending on Model, there are Arguments available: normal/extraCare/deep</li>
-<li><a name="nextCleaningZone"></a><code>set &lt;name&gt; nextCleaningZone</code><br />
+<li><a name="BOTVACnextCleaningZone"></a><code>set &lt;name&gt; nextCleaningZone</code><br />
 Depending on Model, the ID of the zone that will be used for the next zone cleaning can be set.</li>
-<li><a name="nextCleaningSpotHeight"></a><code>set &lt;name&gt; nextCleaningSpotHeight</code><br />
+<li><a name="BOTVACnextCleaningSpotHeight"></a><code>set &lt;name&gt; nextCleaningSpotHeight</code><br />
 Is defined as number between 100 - 400. The unit is cm.</li>
-<li><a name="nextCleaningSpotWidth"></a><code>set &lt;name&gt; nextCleaningSpotWidth</code><br />
+<li><a name="BOTVACnextCleaningSpotWidth"></a><code>set &lt;name&gt; nextCleaningSpotWidth</code><br />
 Is defined as number between 100 - 400. The unit is cm.</li>
-<li><a name="password"></a><code>set &lt;name&gt; password &lt;password&gt;</code><br />
+<li><a name="BOTVACpassword"></a><code>set &lt;name&gt; password &lt;password&gt;</code><br />
 set the password for the NEATO/VORWERK account</li>
-<li><a name="pause"></a><code>set &lt;name&gt; pause</code><br />
+<li><a name="BOTVACpause"></a><code>set &lt;name&gt; pause</code><br />
 interrupts the cleaning</li>
-<li><a name="pauseToBase"></a><code>set &lt;name&gt; pauseToBase</code><br />
+<li><a name="BOTVACpauseToBase"></a><code>set &lt;name&gt; pauseToBase</code><br />
 stops cleaning and returns to base</li>
-<li><a name="reloadMaps"></a><code>set &lt;name&gt; reloadMaps</code><br />
+<li><a name="BOTVACreloadMaps"></a><code>set &lt;name&gt; reloadMaps</code><br />
 load last map from server into the cache of the module. no file is stored!</li>
-<li><a name="resume"></a><code>set &lt;name&gt; resume</code><br />
+<li><a name="BOTVACresume"></a><code>set &lt;name&gt; resume</code><br />
 resume cleaning after pause</li>
-<li><a name="requestVerification"></a><code>set &lt;name&gt; requestVerification</code><br />
+<li><a name="BOTVACrequestVerification"></a><code>set &lt;name&gt; requestVerification</code><br />
 Request one-time password for account verfication.<br />
 One-time password will be sent to the account's email address.</li>
-<li><a name="schedule"></a><code>set &lt;name&gt; schedule</code><br />
+<li><a name="BOTVACschedule"></a><code>set &lt;name&gt; schedule</code><br />
 on and off, switch time control</li>
-<li><a name="sendToBase"></a><code>set &lt;name&gt; sendToBase</code><br />
+<li><a name="BOTVACsendToBase"></a><code>set &lt;name&gt; sendToBase</code><br />
 send roboter back to base</li>
-<li><a name="sendVerification"></a><code>set &lt;name&gt; sendVerification &lt;code&gt;</code><br />
+<li><a name="BOTVACsendVerification"></a><code>set &lt;name&gt; sendVerification &lt;code&gt;</code><br />
 Use one-time password from email as code to log in into your account, see <a href="#requestVerification">requestVerification</a>.</li>
-<li><a name="setBoundariesOnFloorplan"></a><code>set &lt;name&gt; setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name|{JSON String}&gt;</code><br />
+<li><a name="BOTVACsetBoundariesOnFloorplan"></a><code>set &lt;name&gt; setBoundariesOnFloorplan_&lt;floor plan&gt; &lt;name|{JSON String}&gt;</code><br />
 Set boundaries/nogo lines in the corresponding floor plan. The paramter can either be a name, which is already defined by attribute "boundaries", or alternatively a JSON string. (A comma-separated list of names is also possible.)<br />
 <a href="https://developers.neatorobotics.com/api/robot-remote-protocol/maps">Description of syntax</a><br />
 Examples:<br />
 <code>set &lt;name&gt; setBoundariesOnFloorplan_0 Bad</code><br />
 <code>set &lt;name&gt; setBoundariesOnFloorplan_0 Bad,Kueche</code><br />
 <code>set &lt;name&gt; setBoundariesOnFloorplan_0 {"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]], "name":"Bad","color":"#E54B1C","enabled":true}</code></li>
-<li><a name="setRobot"></a><code>set &lt;name&gt; setRobot</code><br />
+<li><a name="BOTVACsetRobot"></a><code>set &lt;name&gt; setRobot</code><br />
 choose robot if more than one is registered at the used account</li>
-<li><a name="startCleaning"></a><code>set &lt;name&gt; startCleaning ([house|map|zone])</code><br />
+<li><a name="BOTVACstartCleaning"></a><code>set &lt;name&gt; startCleaning ([house|map|zone])</code><br />
 start the Cleaning from the scratch. If the robot supports boundaries/nogo lines/zones, the additional parameter can be used as:
 <ul>
 <li><code>house</code> - cleaning without a persisted map</li>
 <li><code>map</code> - cleaning with a persisted map</li>
 <li><code>zone</code> - cleaning in a specific zone, set zone with nextCleaningZone</li>
 </ul></li>
-<li><a name="startSpot"></a><code>set &lt;name&gt; startSpot</code><br />
+<li><a name="BOTVACstartSpot"></a><code>set &lt;name&gt; startSpot</code><br />
 start spot-Cleaning from actual position.</li>
-<li><a name="startManual"></a><code>set &lt;name&gt; startManual</code><br />
+<li><a name="BOTVACstartManual"></a><code>set &lt;name&gt; startManual</code><br />
 start Manual Cleaning. This cleaning mode opens a direct websocket connection to the robot. Therefore robot and FHEM installation has to reside in the same LAN. Even though an internet connection is necessary as the initialization is triggered by a remote call.<br />
 <em>Note:</em> If the robot does not receive any messages for 30 seconds it will exit Manual Cleaning, but it will not close the websocket connection automaticaly.</li>
-<li><a name="statusRequest"></a><code>set &lt;name&gt; statusRequest</code><br />
+<li><a name="BOTVACstatusRequest"></a><code>set &lt;name&gt; statusRequest</code><br />
 pull update of all readings. necessary because NEATO/VORWERK does not send updates at their own.</li>
-<li><a name="stop"></a><code>set &lt;name&gt; stop</code><br />
+<li><a name="BOTVACstop"></a><code>set &lt;name&gt; stop</code><br />
 stop cleaning and in case of manual cleaning mode close also the websocket connection</li>
-<li><a name="syncRobots"></a><code>set &lt;name&gt; syncRobots</code><br />
+<li><a name="BOTVACsyncRobots"></a><code>set &lt;name&gt; syncRobots</code><br />
 sync robot data with online account. Useful if one has more then one robot registered</li>
-<li><a name="pollingMode"></a><code>set &lt;name&gt; pollingMode &lt;on|off&gt;</code><br />
+<li><a name="BOTVACpollingMode"></a><code>set &lt;name&gt; pollingMode &lt;on|off&gt;</code><br />
 set polling on (default) or off like attribut disable.</li>
-<li><a name="robotSounds"></a><code>set &lt;name&gt; robotSounds &lt;on|off&gt;</code><br />
+<li><a name="BOTVACrobotSounds"></a><code>set &lt;name&gt; robotSounds &lt;on|off&gt;</code><br />
 set sounds on or off.</li>
-<li><a name="dirtbinAlertReminderInterval"></a><code>set &lt;name&gt; dirtbinAlertReminderInterval &lt;30|60|90|120|150&gt;</code><br />
+<li><a name="BOTVACdirtbinAlertReminderInterval"></a><code>set &lt;name&gt; dirtbinAlertReminderInterval &lt;30|60|90|120|150&gt;</code><br />
 set alert intervall in minutes.</li>
-<li><a name="filterChangeReminderInterval"></a><code>set &lt;name&gt; filterChangeReminderInterval &lt;1|2|3&gt;</code><br />
+<li><a name="BOTVACfilterChangeReminderInterval"></a><code>set &lt;name&gt; filterChangeReminderInterval &lt;1|2|3&gt;</code><br />
 set alert intervall in months.</li>
-<li><a name="brushChangeReminderInterval"></a><code>set &lt;name&gt; brushChangeReminderInterval &lt;4|5|6|7|8&gt;</code><br />
+<li><a name="BOTVACbrushChangeReminderInterval"></a><code>set &lt;name&gt; brushChangeReminderInterval &lt;4|5|6|7|8&gt;</code><br />
 set alert intervall in months.</li>
-<li><a name="wsCommand"></a><code>set &lt;name&gt; wsCommand</code><br />
+<li><a name="BOTVACwsCommand"></a><code>set &lt;name&gt; wsCommand</code><br />
 Commands start or stop cleaning activities.
 <ul>
 <li><code>eco-on</code></li>
@@ -2997,7 +2997,7 @@ Commands start or stop cleaning activities.
 <li><code>vacuum-on</code></li>
 <li><code>vacuum-off</code></li>
 </ul></li>
-<li><a name="wsCombo"></a><code>set &lt;name&gt; wsCombo</code><br />
+<li><a name="BOTVACwsCombo"></a><code>set &lt;name&gt; wsCombo</code><br />
 Combos specify a behavior on the robot.<br />
 They need to be sent with less than 1Hz frequency. If the robot doesn't receive a combo with the specified frequency it will stop moving. Also, if the robot does not receive any messages for 30 seconds it will exit Manual Cleaning.
 <ul>
@@ -3012,9 +3012,9 @@ They need to be sent with less than 1Hz frequency. If the robot doesn't receive 
 </ul>
 <p><strong><a name="BOTVACattr"></a>Attributes</strong></p>
 <ul>
-<li><a name="actionInterval"></a><code>actionInterval</code><br />
+<li><a name="BOTVACactionInterval"></a><code>actionInterval</code><br />
 time in seconds between status requests while Device is working</li>
-<li><a name="boundaries"></a><code>boundaries</code><br />
+<li><a name="BOTVACboundaries"></a><code>boundaries</code><br />
 Boundary entries separated by space in JSON format, e.g.<br />
 <code>{"type":"polyline","vertices":[[0.710,0.6217],[0.710,0.6923]],"name":"Bad","color":"#E54B1C","enabled":true}</code><br />
 <code>{"type":"polyline","vertices":[[0.7139,0.4101],[0.7135,0.4282],[0.4326,0.3322],[0.4326,0.2533],[0.3931,0.2533],[0.3931,0.3426],[0.7452,0.4637],[0.7617,0.4196]],"name":"Kueche","color":"#000000","enabled":true}</code><br />
