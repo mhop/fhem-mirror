@@ -538,25 +538,25 @@ isday</pre>
         <li><code>sunset()</code> - absolute Zeit des n&auml;chsten
         Sonnenuntergangs (+ 24 h, wenn am n&auml;chsten Tag)</li>
 
-        <li><code>sunrise_rel()</code> - relative Zeit des n&auml;chsten
-        Sonnenaufgangs</li>
+        <li><code>sunrise_rel()</code> - relative Zeit bis zum n&auml;chsten
+        Sonnenaufgang</li>
 
-        <li><code>sunset_rel()</code> - relative Zeit des n&auml;chsten
-        Sonnenuntergangs</li>
+        <li><code>sunset_rel()</code> - relative Zeit bis zum n&auml;chsten
+        Sonnenuntergang</li>
 
-        <li><code>sunrise_abs()</code> - absolute Zeit des n&auml;chsten
-        Sonnenaufgangs (ohne Stundenzuschlag)</li>
+        <li><code>sunrise_abs()</code> - absolute Zeit des entsprechenden
+        Sonnenaufgangs am heutigen Tag (ohne Stundenzuschlag)</li>
 
-        <li><code>sunset_abs()</code> - absolute Zeit des n&auml;chsten
-        Sonnenuntergangs (ohne Stundenzuschlag)</li>
+        <li><code>sunset_abs()</code> - absolute Zeit des entsprechenden 
+        Sonnenuntergangs am heutigen Tag (ohne Stundenzuschlag)</li>
 
-        <li><code>sunrise_abs_dat()</code> - absolute Zeit des n&auml;chsten
+        <li><code>sunrise_abs_dat()</code> - absolute Zeit des entsprechenden
         Sonnenaufgangs an einem bestimmten Tag</li>
 
-        <li><code>sunset_abs_dat()</code> - absolute Zeit des n&auml;chsten
+        <li><code>sunset_abs_dat()</code> - absolute Zeit des entsprechenden
         Sonnenuntergangs an einem bestimmten Tag</li>
 
-        <li><code>isday()</code> - Tag oder Nacht</li>
+        <li><code>isday()</code> - (1) Tag oder (0) Nacht</li>
     </ul>
 
     <h4>Breite, L&auml;nge und H&ouml;henwinkel</h4>
@@ -626,37 +626,6 @@ isday</pre>
         zur&uuml;ckliefern, wenn max gesetzt und der aktuelle Zeitstempel
         gr&ouml;&szlig;er ist.
         </li>
-    </ul>
-
-    <h5>Subroutinen</h5>
-    <ul>
-      <li><code>sunrise(), sunset()</code><br>
-        liefern den absoluten Wert des n&auml;chsten Sonnenauf- bzw.
-        -untergangs zur&uuml;ck, wobei 24 Stunden zu diesem Wert addiert
-        werden, wenn der Zeitpunkt am n&auml;chsten Tag sein wird, im Format
-        hh:mm:ss.
-        </li><br>
-
-      <li><code>sunrise_rel(), sunset_rel()</code><br>
-        liefern die relative Zeit bis zum n&auml;chsten Sonnenauf- bzw.
-        -untergang im Format hh:mm:ss.
-        </li><br>
-        
-      <li><code>sunrise_abs(), sunset_abs()</code><br>
-        liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten
-        Sonnenauf- bzw. -untergangs ohne 24 Stunden zu addieren im Format
-        hh:mm:ss.
-        </li><br>
-        
-      <li><code>sunrise_abs_dat(), sunset_abs()_dat</code><br>
-        liefern den n&auml;chsten absoluten Zeitpunkt des n&auml;chsten
-        Sonnenauf- bzw. -untergangs ohne 24 Stunden zu addieren im Format
-        hh:mm:ss zu einem als ersten Parameter angegebenen Datum.
-        </li><br>
-
-      <li><code>isday()</code><br>
-        liefert (int) 1 wenn Tag ist, (int) 0 wenn Nacht ist.
-        </li><br>
     </ul>
 
     <h5>Beispiele</h5>
