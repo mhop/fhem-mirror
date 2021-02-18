@@ -190,8 +190,8 @@ sub SetupIntervals {
   }
   
   my $outputStatesInterval = AttrVal( $name, 'outputStatesInterval', undef);
-  Log3 $name, 0, "TA_CMI_JSON ($name) - Define::outputStatesInterval: $outputStatesInterval";
   if ( defined $outputStatesInterval ) {
+    Log3 $name, 0, "TA_CMI_JSON ($name) - Define::outputStatesInterval: $outputStatesInterval";
     RequestOutputStates ( $hash );
   }
 
@@ -217,7 +217,10 @@ sub Undef {
 sub PerformHttpRequest {
     my ($hash, $def) = @_;
     my $name = $hash->{NAME};
-    my $url = "http://$hash->{CMIURL}/INCLUDE/api.cgi?jsonnode=$hash->{NODEID}&jsonparam=$hash->{QUERYPARAM}";
+    
+    my $queryParam = $hash->{QUERYPARAM};
+    $queryParam = '' unless defined $queryParam;
+    my $url = "http://$hash->{CMIURL}/INCLUDE/api.cgi?jsonnode=$hash->{NODEID}&jsonparam=$queryParam";
     my $username = AttrVal($name, 'username', 'admin');
     my $password = AttrVal($name, 'password', 'admin');
 
@@ -260,6 +263,7 @@ sub ParseHttpResponse {
     readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status});
     if ( $keyValues->{Status} eq 'OK' ) {
       my $queryParams = $hash->{QUERYPARAM};
+      $queryParams = '' unless defined $queryParams;
 
       extractReadings($hash, $keyValues, 'Inputs', 'Inputs') if ($queryParams =~ /I/);
       extractReadings($hash, $keyValues, 'Outputs', 'Outputs') if ($queryParams =~ /O/);
@@ -294,9 +298,11 @@ sub ParseHttpResponse {
 #     Log3 $name, 3, "TA_CMI_JSON ($name) - Device: $keyValues->{Header_Device}";
   }
 
-  my $functionName = "TA_CMI_JSON::GetStatus";
-  RemoveInternalTimer($hash, $functionName);
-  InternalTimer( gettimeofday() + $hash->{INTERVAL}, $functionName, $hash, 0 );
+  if ( defined $hash->{QUERYPARAM} ) {
+    my $functionName = "TA_CMI_JSON::GetStatus";
+    RemoveInternalTimer($hash, $functionName);
+    InternalTimer( gettimeofday() + $hash->{INTERVAL}, $functionName, $hash, 0 );
+  }
 
   return undef;
 }
