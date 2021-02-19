@@ -982,9 +982,9 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDset"></a>
   <b>Set</b>
   <ul>
-    <a name="reset"></a><li>reset IO device ( master only )</li><br>
-    <a name="S0-reset"></a><li>S0-reset : reset of both S0 counters ( master only )</li><br>
-    <a name="deleteDS2401"></a><li>deleteDS2401 : deletes reading and defined sub device ( master only )</li><br>
+    <a name="OW2S0SMSGUARDreset"></a><li>reset IO device ( master only )</li><br>
+    <a name="OW2S0SMSGUARDS0-reset"></a><li>S0-reset : reset of both S0 counters ( master only )</li><br>
+    <a name="OW2S0SMSGUARDdeleteDS2401"></a><li>deleteDS2401 : deletes reading and defined sub device ( master only )</li><br>
   </ul>
   <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
@@ -994,28 +994,28 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="A_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br></li>
-    <a name="B_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br></li>
+    <a name="OW2S0SMSGUARDA_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br><br></li>
+    <a name="OW2S0SMSGUARDB_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br><br></li>
 
-    <a name="A_calc_current"></a><li>A_calc_current ( master only ) default 0,  A_calc_mode must be after or before<br></li>
-    <a name="B_calc_current"></a><li>B_calc_current ( master only ) default 0,  B_calc_mode must be after or before<br></li>
+    <a name="OW2S0SMSGUARDA_calc_current"></a><li>A_calc_current ( master only ) default 0,  A_calc_mode must be after or before<br><br></li>
+    <a name="OW2S0SMSGUARDB_calc_current"></a><li>B_calc_current ( master only ) default 0,  B_calc_mode must be after or before<br><br></li>
 
-    <a name="A_offset"></a><li>A_offset ( master only )<br></li>
-    <a name="B_offset"></a><li>B_offset ( master only )<br></li>
+    <a name="OW2S0SMSGUARDA_offset"></a><li>A_offset ( master only )<br><br></li>
+    <a name="OW2S0SMSGUARDB_offset"></a><li>B_offset ( master only )<br><br></li>
 
-    <a name="DS2401_Timeout"></a><li>DS2401_Timeout ( master only ) , default 1.5 x Interval<br></li>
+    <a name="OW2S0SMSGUARDDS2401_Timeout"></a><li>DS2401_Timeout ( master only ) , default 1.5 x Interval<br><br></li>
 
-    <a name="mapOWIDs"></a><li>mapOWIDs ( master only )<br>
+    <a name="OW2S0SMSGUARDmapOWIDs"></a><li>mapOWIDs ( master only )<br>
     Comma separeted list of ID=Name pairs<br>
-    Example : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br></li>
+    Example : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br><br></li>
 
-    <a name="model"></a><li>model<br>
-     only for FHEM modul statistics at <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a></li>
+    <a name="OW2S0SMSGUARDmodel"></a><li>model<br>
+     only for FHEM modul statistics at <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a><br><br></li>
 
-    <a name="useSubDevices"></a><li>useSubDevices ( master only ) , default 0<br>
-    create for each found device on the bus a separate subdevice<br></li>
+    <a name="OW2S0SMSGUARDuseSubDevices"></a><li>useSubDevices ( master only ) , default 0<br>
+    create for each found device on the bus a separate subdevice<br><br></li>
 
-    <a name="delay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values<br></li>
+    <a name="OW2S0SMSGUARDdelay"></a><li>delay ( master only ) ,  default 0.5 seconds to read OW device values<br><br></li>
  </ul>
 
 =end html
@@ -1041,8 +1041,8 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
   <a name="OW2S0SMSGUARDset"></a>
   <b>Set</b>
   <ul>
-    <a name="reset"></a><li>reset IO Device ( nur Master Device )</li><br>
-    <a name="S0-reset"></a><li>S0-resets ( nur Master Device )<br>
+    <a name="OW2S0SMSGUARDreset"></a><li>reset IO Device ( nur Master Device )</li><br>
+    <a name="OW2S0SMSGUARDS0-reset"></a><li>S0-resets ( nur Master Device )<br>
     setzt die beiden internen S0 Zähler ( A & B) auf 0 zurück</li><br>
     <a name="deleteDS2401"></a><li>deleteDS2401 ( nur Master Device )<br>
     löscht das das Reading und falls definiert auch das dazugehörige Sub-Device (siehe Attr useSubDevice)</li>
@@ -1051,40 +1051,40 @@ FHEM Forum : <a href='https://forum.fhem.de/index.php/topic,28447.0.html'>1Wire<
    <a name="OW2S0SMSGUARDget"></a>
   <b>Get</b>
   <ul>
-    <a name="OWdeviceList"></a><li>OWdeviceList<br>
+    <a name="OW2S0SMSGUARDOWdeviceList"></a><li>OWdeviceList<br>
     Liste der aktuell gefunden OW Geräte ( nur Master Device )</li>
   </ul>
   <br>
   <a name="OW2S0SMSGUARDattr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="A_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br></li>
-    <a name="B_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br></li>
+    <a name="OW2S0SMSGUARDA_calc_mode"></a><li>A_calc_mode ( master only ) after, before, never, default before<br><br></li>
+    <a name="OW2S0SMSGUARDB_calc_mode"></a><li>B_calc_mode ( master only ) after, before, never, default before<br><br></li>
 
-    <a name="A_calc_current"></a><li>A_calc_current ( master only ) default 0, setzt A_calc_mode after oder before vorraus<br></li>
-    <a name="B_calc_current"></a><li>B_calc_current ( master only ) default 0, setzt B_calc_mode after oder before vorraus<br></li>
+    <a name="OW2S0SMSGUARDA_calc_current"></a><li>A_calc_current ( master only ) default 0, setzt A_calc_mode after oder before vorraus<br><br></li>
+    <a name="OW2S0SMSGUARDB_calc_current"></a><li>B_calc_current ( master only ) default 0, setzt B_calc_mode after oder before vorraus<br><br></li>
 
-    <a name="A_offset"></a><li>A_offset ( master only )<br></li>
-    <a name="B_offset"></a><li>B_offset ( master only )<br></li>
+    <a name="OW2S0SMSGUARDA_offset"></a><li>A_offset ( master only )<br><br></li>
+    <a name="OW2S0SMSGUARDB_offset"></a><li>B_offset ( master only )<br><br></li>
 
-    <a name="DS2401_Timeout"></a><li>DS2401_Timeout in Sekunden ( nur Master Device ) , default 1.5 x interval<br>
+    <a name="OW2S0SMSGUARDDS2401_Timeout"></a><li>DS2401_Timeout in Sekunden ( nur Master Device ) , default 1.5 x interval<br>
     Werte kleiner als Interval sind nicht zulässig.<br>
-    Wartezeit in Sekunden bis ein fehlender DS2401 seinen Status von timeout auf absent wechselt.<br>
+    Wartezeit in Sekunden bis ein fehlender DS2401 seinen Status von timeout auf absent wechselt.<br><br>
     </li>
 
-    <a name="mapOWIDs"></a><li>mapOWIDs<br>
+    <a name="OW2S0SMSGUARDmapOWIDs"></a><li>mapOWIDs<br>
     Kommata getrennte Liste von ID=Name Paaren<br>
     Beispiel : <code>10D64CBF02080077=Badezimmer, 01E5D9370B00005D=Kellerfenster</code><br>
-    Statt der OW ID wird Name als Reading verwendet.( nur Master Device )<br></li>
+    Statt der OW ID wird Name als Reading verwendet.( nur Master Device )<br><br></li>
 
-    <a name="model"></a><li>model<br>
-    nur f&uuml;r die FHEM Modul Statistik unter <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a><br></li>
+    <a name="OW2S0SMSGUARDmodel"></a><li>model<br>
+    nur f&uuml;r die FHEM Modul Statistik unter <a href="https://fhem.de/stats/statistics.html">https://fhem.de/stats/statistics.html</a><br><br></li>
 
-    <a name="useSubDevices"></a><li>useSubDevices ( nur Master Device ) , default 0<br>
-    Legt für jedes gefundene Device am 1-W Bus ein eigenes extra Device an<br></li>
+    <a name="OW2S0SMSGUARDuseSubDevices"></a><li>useSubDevices ( nur Master Device ) , default 0<br>
+    Legt für jedes gefundene Device am 1-W Bus ein eigenes extra Device an<br><br></li>
 
-    <a name="delay"></a><li>delay ( nur Master Device ) , default 0.5 Sekukunden<br>
-    Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist<br></li>
+    <a name="OW2S0SMSGUARDdelay"></a><li>delay ( nur Master Device ) , default 0.5 Sekukunden<br>
+    Wartezeit in Sekunden zwischen dem Auslesen der Temperaturwerte wenn mehr als ein DS18XX am OW Bus angeschlosen ist<br><br></li>
   </ul>
 
 =end html_DE
