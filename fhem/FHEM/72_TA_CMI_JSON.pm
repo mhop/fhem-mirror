@@ -47,6 +47,8 @@ sub TA_CMI_JSON_Initialize {
   $hash->{DefFn}     = "TA_CMI_JSON::Define";
   $hash->{UndefFn}   = "TA_CMI_JSON::Undef";
   $hash->{NotifyFn}  = "TA_CMI_JSON::Notify";
+#  $hash->{FW_detailFn} = "TA_CMI_JSON::DetailFn";
+#  $hash->{FW_directNotify} = "TA_CMI_JSON::DirectNotify";
 
   $hash->{AttrList} = "username password outputStatesInterval interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus readingNamesLoggingAnalog readingNamesLoggingDigital includePrettyReadings:0,1 includeUnitReadings:0,1 prettyOutputStates:0,1 " . $readingFnAttributes;
 
@@ -184,14 +186,15 @@ sub SetupIntervals {
   my $queryParams = $hash->{QUERYPARAM};
   if ( defined $queryParams ) {
     $hash->{INTERVAL} = AttrVal( $name, "interval", "60" );
-    Log3 $name, 0, "TA_CMI_JSON ($name) - queryParam interval: ".$hash->{INTERVAL};
-    Log3 $name, 0, "TA_CMI_JSON ($name) - queryParams=$queryParams";
-    GetStatus( $hash );
+    Log3 $name, 3, "TA_CMI_JSON ($name) - queryParam interval: ".$hash->{INTERVAL};
+    Log3 $name, 3, "TA_CMI_JSON ($name) - queryParams=$queryParams";
   }
+  #make initial call in any case, even if queryParams not defined. because that brings us model and number of outputs
+  GetStatus( $hash );
   
   my $outputStatesInterval = AttrVal( $name, 'outputStatesInterval', undef);
   if ( defined $outputStatesInterval ) {
-    Log3 $name, 0, "TA_CMI_JSON ($name) - Define::outputStatesInterval: $outputStatesInterval";
+    Log3 $name, 3, "TA_CMI_JSON ($name) - Define::outputStatesInterval: $outputStatesInterval";
     RequestOutputStates ( $hash );
   }
 
@@ -272,7 +275,7 @@ sub ParseHttpResponse {
         if ($canDevice eq 'UVR16x2' or $canDevice eq 'RSM610' ) {
           extractReadings($hash, $keyValues, 'DL-Bus', 'DL-Bus');
         } else {
-          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading DL-Bus input is not supported on $canDevice";
+          Log3 $name, 1, "TA_CMI_JSON ($name) - Reading DL-Bus input is not supported on $canDevice";
         }
       }
 
@@ -280,7 +283,7 @@ sub ParseHttpResponse {
         if ($canDevice eq 'UVR16x2') {
           extractReadings($hash, $keyValues, 'LoggingAnalog', 'Logging_Analog');
         } else {
-          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading Logging Analog data is not supported on $canDevice";
+          Log3 $name, 1, "TA_CMI_JSON ($name) - Reading Logging Analog data is not supported on $canDevice";
         }
       }
 
@@ -288,7 +291,7 @@ sub ParseHttpResponse {
         if ($canDevice eq 'UVR16x2') {
           extractReadings($hash, $keyValues, 'LoggingDigital', 'Logging_Digital');
         } else {
-          Log3 $name, 0, "TA_CMI_JSON ($name) - Reading Logging Digital data is not supported on $canDevice";
+          Log3 $name, 1, "TA_CMI_JSON ($name) - Reading Logging Digital data is not supported on $canDevice";
         }
       }
     }
@@ -429,7 +432,7 @@ sub ParseOutputStateResponse {
      my $prettyOutputStates = AttrVal( $name, "prettyOutputStates", '0' );
      my $readingNames = AttrVal($name, "readingNamesOutputs", undef);
      if ( ! defined $readingNames ) {
-       Log3 $name, 0, "TA_CMI_JSON ($name) - Unable to assign output states, please set attribute readingNamesOutputs";
+       Log3 $name, 1, "TA_CMI_JSON ($name) - Unable to assign output states, please set attribute readingNamesOutputs";
        return undef;
      }
      my @readingsArray = split(/ /, $readingNames); #1:T.Kollektor 5:T.Vorlauf
@@ -464,6 +467,96 @@ sub ParseOutputStateResponse {
 
   return undef;
 }
+
+my $counter = 0;
+
+sub DetailFn {
+  my $css = '<style>
+#headag{
+	float:left;
+	border-right:solid 1px black;
+	cursor:pointer;
+}
+.headag{
+	color:grey;
+	padding-bottom:4px;
+	display:inline-block;
+	min-width:11px;
+	position:relative;
+}
+.agmisch{
+	display:inline;
+	font-size:0.8em;
+	margin-right:-0.3em;
+	position:relative;
+	width:0;
+}
+.headagshow{
+	color:black;
+}
+.headag > .hand{
+	width:100%;
+	position:absolute;
+	left:0px;
+	bottom:0px;
+	height:8px;
+}
+.hand img{
+	margin-left:auto;
+	margin-right:auto;
+	display:block;
+	width:11px;
+	height:7px;
+}
+.headagshow.hand{
+	background:url("../images/hand.png") no-repeat scroll 0px 19px / 9px 5px;
+}
+.headagshow.on{
+	background:#00f000;
+	border:#000 solid 1px;
+	border-radius:2px;
+}
+.headagshow.hand.on{
+	background:#00f000 url("../images/hand.png") no-repeat scroll 0 19px / 9px 5px;
+}
+.headag.headagshow.dom{
+	border:1px solid red;
+	border-radius:2px;
+}
+</style>';
+
+
+my $html = '
+<div id="headag" fadresse="10045800">
+<span id="headag1" class="headag headagshow">1</span>
+<span id="headag2" class="headag headagshow">2</span>
+<span id="headag3" class="headag headagshow">3</span>
+<span id="headag4" class="headag">'.$counter.'</span>
+<span id="headag5" class="headag headagshow">5</span>
+<span id="headag6" class="headag headagshow">6</span>
+<span id="headag7" class="headag headagshow on">7</span>
+<span id="headag8" class="headag headagshow">8</span>
+<span id="headag9" class="headag headagshow on">9</span>
+<span id="headag10" class="headag headagshow on">10</span>
+<span id="headag11" class="headag">11</span>
+<span id="headag12" class="headag headagshow">12</span>
+<span id="headag13" class="headag headagshow">13</span>
+<span id="headag14" class="headag">14</span>
+<span id="headag15" class="headag">15</span>
+<span id="headag16" class="headag">16</span>
+</div>
+';
+
+$counter++;
+
+#InternalTimer( gettimeofday() + $hash->{INTERVAL}, $functionName, $hash, 0 );
+
+  return $css.$html;
+}
+
+#sub DirectNotify {
+#  my ($filter,$fhemweb_instance,
+#}
 
 
 # Eval-Rückgabewert für erfolgreiches
