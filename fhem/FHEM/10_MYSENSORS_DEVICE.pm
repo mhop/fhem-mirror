@@ -64,6 +64,8 @@ BEGIN {
     asyncOutput
     readingFnAttributes
     IsDisabled
+    defs
+    init_done
   ))
 };
 
@@ -360,7 +362,7 @@ sub Set {
           readingsSingleUpdate($hash,"state","set $command",1) ;
           }
         };
-        return "$command not defined: ".GP_Catch($@) if $@;
+        if ($@) { return "$command not defined: ".GP_Catch($@) };
         return;
     }
     
@@ -373,9 +375,9 @@ sub Set {
                           subType => $type, 
                           payload => $mappedValue
                           );
-        readingsSingleUpdate($hash,$command,$value,1) unless ($hash->{ack} or $hash->{IODev}->{ack});
+        readingsSingleUpdate($hash,$command,$value,1) if !$hash->{ack} || !$hash->{IODev}->{ack};
     };
-    return "$command not defined: ".GP_Catch($@) if $@;
+    if ($@) { return "$command not defined: ".GP_Catch($@)};
     return;
 }
 
@@ -506,12 +508,12 @@ sub onStreamMessage {
         readingsBulkUpdate($hash, 'BL_VERSION', $blVersion);
         readingsEndUpdate($hash, 1);
         Log3($name, 4, "$name: received ST_FIRMWARE_CONFIG_REQUEST");
-        if ((AttrVal($name, "OTA_autoUpdate", 0) == 1) && ($blVersion eq "3.0" or $blType eq "Optiboot")) {
+        if ((AttrVal($name, 'OTA_autoUpdate', 0)) && ($blVersion eq '3.0' || $blType eq 'Optiboot')) {
           Log3($name, 4, "$name: Optiboot BL, Node set to OTA_autoUpdate => calling firmware update procedure");
           flashFirmware($hash, $fwType);
-        } elsif ($blType eq "MYSBootloader" && $hash->{OTA_requested} == 1) {
+        } elsif ($blType eq 'MYSBootloader' && $hash->{OTA_requested}) {
           Log3($name, 4, "$name: MYSBootloader asking for firmware update, calling firmware update procedure");
-          $fwType = ReadingsVal($name, "FW_TYPE", "unknown");
+          $fwType = ReadingsVal($name, 'FW_TYPE', 'unknown');
           flashFirmware($hash, $fwType);
         }
       } else {
@@ -615,8 +617,8 @@ sub onStreamMessage {
 
 sub Attr {
   my ($command,$name,$attribute,$value) = @_;
-  my $hash = $main::defs{$name};
-    if ($attribute eq "config" && $main::init_done) {
+  my $hash = $defs{$name};
+    if ($attribute eq "config" && $init_done) {
       sendClientMessage($hash, 
                         cmd => C_INTERNAL, 
                         childId => 255, 
