@@ -583,15 +583,15 @@ sub HMinfo_peerCheck(@) { #####################################################
     foreach (grep /^......$/, HMinfo_noDup(map {CUL_HM_name2Id(substr($_,8))} 
                                            grep /^trigDst_/,
                                            keys %{$defs{$eName}{READINGS}})){
-      push @peerIDsTrigUnp,"triggerUnpeered: $eName:\t".$_ 
+      push @peerIDsTrigUnp,"$eName:\t".$_ 
             if(  ($peerIDs &&  $peerIDs !~ m/$_/)
                &&("CCU-FHEM" ne AttrVal(CUL_HM_id2Name($_),"model","")));
-      push @peerIDsTrigUnd,"triggerUndefined: $eName:\t".$_ 
+      push @peerIDsTrigUnd,"$eName:\t".$_ 
             if(!$modules{CUL_HM}{defptr}{$_});
     }
     
     if($peersUsed == 2){#peerList incomplete
-      push @peerIDsFail,"incomplete: $eName:\t".$peerIDs;
+      push @peerIDsFail,"$eName:\t".$peerIDs;
     }
     else{# work on a valid list
       my $id = $defs{$eName}{DEF};
@@ -1312,8 +1312,8 @@ sub HMinfo_GetFn($@) {#########################################################
         }
         elsif($_ =~m /^[ ,0-9]{1,5}/){
            my ($cnt,$date) = split(":",$_,2);
-           $_ = sprintf("%-5s>%s",$cnt,$date) if (defined $date);
-           $plSum[$c] +=$cnt;
+           #$_ = sprintf("%-5s>%s",$cnt,$date) if (defined $date);
+           $plSum[$c] +=$cnt if ($cnt =~ m/^\d+$/);
         }
         else{
         }
@@ -1451,10 +1451,12 @@ sub HMinfo_GetFn($@) {#########################################################
   elsif($cmd eq "regCheck")   {##check register--------------------------------
     my @entities = HMinfo_getEntities($opt."v",$filter);
     $ret = $cmd." done:" .HMinfo_regCheck(@entities);
+    $ret = HMinfo_applTxt2Check($ret);
   }
   elsif($cmd eq "peerCheck")  {##check peers-----------------------------------
     my @entities = HMinfo_getEntities($opt,$filter);
     $ret = $cmd." done:" .HMinfo_peerCheck(@entities);
+    $ret = HMinfo_applTxt2Check($ret);
   }
   elsif($cmd eq "configCheck"){##check peers and register----------------------
     if($modules{HMinfo}{helper}{initDone}){
