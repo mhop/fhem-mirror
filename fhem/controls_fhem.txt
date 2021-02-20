@@ -1,4 +1,4 @@
-REV 23771
+REV 23774
 DIR unused
 UPD 2021-02-19_07:45:02 358020 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -376,7 +376,7 @@ UPD 2019-11-07_07:45:03 19531 FHEM/71_ZM_Monitor.pm
 UPD 2019-10-14_07:45:02 89155 FHEM/72_FB_CALLLIST.pm
 UPD 2020-12-01_07:45:03 124527 FHEM/72_FB_CALLMONITOR.pm
 UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
-UPD 2021-02-19_07:45:02 22250 FHEM/72_TA_CMI_JSON.pm
+UPD 2021-02-20_07:45:03 24462 FHEM/72_TA_CMI_JSON.pm
 UPD 2020-10-26_07:45:03 225504 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
 UPD 2021-01-30_07:45:03 98033 FHEM/73_AutoShuttersControl.pm
@@ -640,7 +640,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2021-01-09_07:45:04 70537 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-02-12_07:45:03 302905 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-02-20_07:45:03 303834 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-01-29_07:45:08 13303 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -736,8 +736,8 @@ UPD 2021-02-19_07:45:06 4468692 docs/commandref.html
 UPD 2021-02-19_07:45:08 2765313 docs/commandref_DE.html
 UPD 2020-12-08_07:45:02 81114 docs/commandref_frame.html
 UPD 2021-02-19_07:45:02 90761 docs/commandref_frame_DE.html
-UPD 2021-02-19_07:45:10 235953 docs/commandref_modular.html
-UPD 2021-02-19_07:45:11 246721 docs/commandref_modular_DE.html
+UPD 2021-02-20_07:45:10 235953 docs/commandref_modular.html
+UPD 2021-02-20_07:45:12 246721 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
