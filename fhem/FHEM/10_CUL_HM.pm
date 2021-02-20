@@ -330,7 +330,7 @@ sub CUL_HM_updateConfig($){##########################
     }
 
     if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
-      $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
+#      $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
       delete $hash->{helper}{mId};
    }
     elsif ($md =~ m/^HM-CC-RT-DN/){
@@ -1406,7 +1406,7 @@ sub CUL_HM_Parse($$) {#########################################################
           ReadingsVal($mh{dstN},"sabotageAttack_ErrIoAttack_cnt:",undef);
       }
       
-      Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:$mh{dstH}->{helper}{cSnd}:".$tm;
+      Log3 $mh{dstN},2,"CUL_HM $mh{dstN} attack:".($mh{dstH}->{helper}{cSnd} ? $mh{dstH}->{helper}{cSnd} : "").":$tm";
       CUL_HM_eventP($mh{dstH},"ErrIoAttack");
       my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoAttack"},2);
       push @evtEt,[$mh{dstH},1,"sabotageAttack_ErrIoAttack_cnt:$evntCnt"];
