@@ -312,7 +312,7 @@ return;
 sub DbLog_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
-  my @a            = split m{\s+}x, $def;
+  my @a            = split("[ \t][ \t]*", $def);
   
   if($DbLogMMDBI) {
       Log3($name, 1, "DbLog $name - ERROR - Perl module ".$DbLogMMDBI." is missing. DbLog module is not loaded ! On Debian systems you can install it with \"sudo apt-get install libdbi-perl\" ");
