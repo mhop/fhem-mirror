@@ -4332,7 +4332,8 @@ par:ALIAS;friendly name as set in sonos gadget itself;{ ReadingsVal("DEVICE","na
 par:DEVNAME;friendly name, used for topic in lowercase;{ lc(ReadingsVal("DEVICE","name","unknown")) }
 par:ICON;ICON as set, defaults to audio_volume_low;{ AttrVal("DEVICE","icon","audio_volume_low") }
 attr DEVICE icon ICON
-attr DEVICE jsonMap volume_Master:volume mute_Master:mute transportState:state
+attr DEVICE jsonMap volume_Master:volume mute_Master:mute
+attr DEVICE stateFormat transportState
 attr DEVICE readingList\
   BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList\
@@ -4356,7 +4357,18 @@ attr DEVICE setList\
 attr DEVICE devStateIcon (STOPPED|PAUSED_PLAYBACK):rc_PLAY:toggle PLAYING:rc_PAUSE:pause .*:refresh:play
 attr DEVICE alias ALIAS
 attr DEVICE model sonos2mqtt_speaker
-setreading DEVICE attrTemplateVersion 20200729
+attr DEVICE userReadings Master:groupName.* {(split(' +',ReadingsVal($name,'groupName','')))[0]},\
+isMaster:coordinatorUuid.* {ReadingsVal($name,'coordinatorUuid','') eq ReadingsVal($name,'uuid','')?1:0},\
+inGroup:groupName.* {ReadingsVal($name,'groupName','') =~ / \+ /?1:0},\
+inCouple:coordinatorUuid.* {(ReadingsVal($name,'coordinatorUuid','') ne ReadingsVal($name,'uuid','') and (index(ReadingsVal($name,'groupName',''), ReadingsVal($name,'name','')) != -1))?1:0},\
+Input:currentTrack_TrackUri.* {my $currentTrack_TrackUri = ReadingsVal($name,'currentTrack_TrackUri','');\
+   $currentTrack_TrackUri =~ 'x-rincon-stream'\
+      ? 'LineIn': $currentTrack_TrackUri =~ 'spdif'\
+      ? 'TV'    : ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast'\
+      ? 'Radio' : 'Playlist'}
+# to initiate setting the userReadings
+set DEVICE volume {(ReadingsVal($DEV,'volume',''))}
+setreading DEVICE attrTemplateVersion 20210220
 
 
 ###########################################
