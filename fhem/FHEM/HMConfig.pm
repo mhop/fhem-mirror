@@ -1109,7 +1109,8 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
  ,"HM-CC-SCD"         =>{ peerNeedsBurst  =>1,expectAES       =>1
                          ,                                        transmitTryMax  =>1,evtFltrTime     =>1
                          ,msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1}
- ,"HM-SEC-RHS"        =>{ msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1
+ ,"HM-SEC-RHS"        =>{                     sabotageMsg     =>1
+                         ,msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1
                          ,                    ledOnTime       =>1,eventDlyTime    =>1}
  ,"HM-SEC-SC"         =>{                     sabotageMsg     =>1
                          ,msgScPosA       =>1,msgScPosB       =>1
@@ -1683,6 +1684,7 @@ $culHmRegChan{"HM-OU-CFM-TW02"}         = $culHmRegChan{"HM-OU-CFM-PL02"};
 %culHmVrtGets       = (
                        param      => "-param-",
                        cmdList    => "[({short}|long)]",
+                       list       => "[({normal}|full)]"
                       );
 %culHmSubTypeGets   = (
                        none4Type  =>{ "test"=>"" }
