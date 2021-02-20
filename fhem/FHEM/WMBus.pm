@@ -2228,6 +2228,11 @@ sub decodeLinkLayer($$)
     $self->{datablocks}++ if $self->{datalen} % LL_BLOCK_SIZE != 0;
     $self->{msglen} = TL_BLOCK_SIZE + $self->{crc_size} + $self->{datalen} + $self->{datablocks} * $self->{crc_size};
       
+    if (length($self->{msg}) < $self->{msglen}) {
+      $self->{errormsg} = "message too short, expected " . $self->{msglen} . ", got " . length($self->{msg}) . " bytes";
+      $self->{errorcode} = ERR_MSG_TOO_SHORT;
+      return 0;
+    }
     #printf("calc len %d, actual %d crc_size %d\n", $self->{msglen}, length($self->{msg}), $self->{crc_size});
     $self->{applicationlayer} = $self->removeCRC(substr($self->{msg},TL_BLOCK_SIZE + $self->{crc_size}));
     return 0 if $self->{errorcode};
@@ -2279,10 +2284,6 @@ sub decodeLinkLayer($$)
 
   if (length($self->{msg}) > $self->{msglen}) {
     $self->{remainingData} = substr($self->{msg},$self->{msglen});
-  } elsif (length($self->{msg}) < $self->{msglen}) {
-    $self->{errormsg} = "message too short, expected " . $self->{msglen} . ", got " . length($self->{msg}) . " bytes";
-    $self->{errorcode} = ERR_MSG_TOO_SHORT;
-    return 0;
   }
   
   
