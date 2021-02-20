@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2020 by Heiko Maaz
+#       (c) 2015-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -184,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.4"  => "20.02.2021  sub Define minor fix ",
   "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
   "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
   "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
@@ -841,9 +842,8 @@ sub Define {
   # define CamCP1 SSCAM Carport 192.168.2.20 [5000] 
   #       ($hash)  [1]    [2]        [3]      [4]  
   #
-  my $hash = shift;
-  my $def  = shift;
-  my $name = $hash->{NAME};
+  my ($hash, $def) = @_;
+  my $name         = $hash->{NAME};
   
  return "Error: Perl module ".$MMJSON." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($MMJSON);
   
@@ -1269,7 +1269,7 @@ return $ret;
 ################################################################
 sub Attr {
     my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $hash                     = $defs{$name};
     
     my ($do,$val,$cache);
       
