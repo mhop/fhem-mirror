@@ -4301,12 +4301,18 @@ sub format_value {
 
 sub bar
 {
-  my ($val,$min,$max,$header,$minColor,$maxColor,$unit,$bwidth,$bheight,$size,$func,$dec,$model,$lr,$ln,$icon) = @_;
+  my ($val,$min,$max,$header,$minColor,$maxColor,$unit,$bwidth,$bheight,$size,$func,$decfont,$model,$lr,$ln,$icon) = @_;
   my $out;
   my $trans=0;
   my ($format,$value);
-  my ($ic,$iscale,$ix,$iy);
+  my ($ic,$iscale,$ix,$iy,$rotate);
   my $minCol=$minColor;
+  
+  my ($dec,$fontformat);
+  
+  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  $fontformat="" if (!defined $fontformat);
+ 
   
   if (defined $lr) {
     if (!defined $ln) {
@@ -4368,7 +4374,7 @@ sub bar
   }
   
   if (defined ($icon)) {
-    ($ic,$iscale,$ix,$iy,)=split(",",$icon);
+    ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
     if (defined ($ix)) {
       $ix+=$bwidth/2+5;
     } else {
@@ -4379,7 +4385,9 @@ sub bar
     } else {
       $iy=($height/2-12);
     };
-    $iscale=1 if (!defined($iscale));
+    $rotate=0 if (!defined $rotate);
+    $iscale=1 if (!defined $iscale);
+    $ic="" if (!defined($ic));
   }
 
   
@@ -4414,10 +4422,9 @@ sub bar
   $out.= sprintf('<text x="23" y="%d" style="fill:%s;font-size:9px;">%s</text>',$height+9,color($minCol,$ln),sprintf($format,$min));
   $out.= sprintf('<rect x="15" y="%d" width="5" height="%d" rx="2" ry="2" fill="url(#gradbar_%d_%d_%d)"/>',$y,$val1,$currColor,$minColor,(defined $lr ? $lr:-1));
   $out.= sprintf('<rect x="15" y="6" width="5" height="%d" rx="2" ry="2" fill="url(#gradbackg)"/>',$height);
-  ##$out.= sprintf('<rect x="15" y="6" width="10" height="%d" rx="2" ry="2" fill="none" stroke="rgb(160, 160, 160)" stroke-width="0.5"/>',$height);
   $out.= sprintf('<line  x1="15.5"  y1="%d" x2="19.5" y2="%d" fill="none" stroke="rgb(192,192,192)" stroke-width="1"/>',$null,$null) if ($min < 0 and $max > 0);;
 
-  if (defined $icon and $icon ne "") {
+  if (defined $icon and $icon ne "" and  $icon ne " ") {
     my $svg_icon=::FW_makeImage($ic);
     if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
         $svg_icon =~ s/svg/svg height="22"/ 
@@ -4425,75 +4432,79 @@ sub bar
     if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
         $svg_icon =~ s/svg/svg width="22"/ 
     }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)">';
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11) rotate('.$rotate.',11,11) ">';
     $out.= $svg_icon;
     $out.='</g>';
-
-##    $out.='<symbol id="Image_'."$ic $ix $iy".'" x="'.$ix.'" y="'.$iy.'" viewBox="0 0 '.int(640/$iscale).' '.int(640/$iscale).'">';
-##    $out.= ::FW_makeImage($ic);
-##    $out.='</symbol>';
-##    $out.='<use href="#Image_'."$ic $ix $iy".'" height="22" width="22" />';#height="18" width="18"
-##    $out.='</g>';
   }
+  my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
   
-  $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',$bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),sprintf($format,$val),$unit);
-
+  if (defined $valDec) {
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unit);
+  } else {
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unit);
+  }
   $out.= '</g>';
  	$out.= '</svg>';
 return ($out);
 }
  
 sub temp_bar {
-  my ($value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
+  my ($value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
   $min=-20 if (!defined $min or $min eq "");
   $max=60  if (!defined $max or $max eq "");
-  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,1,undef,$lightbar,$lightnumber));
+  $decfont=1 if (!defined $decfont);
+  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,$decfont,undef,$lightbar,$lightnumber));
 } 
 
 sub temp_mbar {
-  my ($value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
+  my ($value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
   $min=-20 if (!defined $min or $min eq "");
   $max=60  if (!defined $max or $max eq "");
-  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,1,1,$lightbar,$lightnumber));
+  $decfont=1 if (!defined $decfont);
+  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,$decfont,1,$lightbar,$lightnumber));
 } 
 
 sub icon_temp_bar {
-  my ($icon,$value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
+  my ($icon,$value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
   $min=-20 if (!defined $min or $min eq "");
   $max=60  if (!defined $max or $max eq "");
-  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,1,undef,$lightbar,$lightnumber,$icon));
+  $decfont=1 if (!defined $decfont);
+  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,$decfont,undef,$lightbar,$lightnumber,$icon));
 } 
 
 sub icon_temp_mbar {
-  my ($icon,$value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
+  my ($icon,$value,$min,$max,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
   $min=-20 if (!defined $min or $min eq "");
   $max=60  if (!defined $max or $max eq "");
-  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,1,1,$lightbar,$lightnumber,$icon));
+  $decfont=1 if (!defined $decfont);
+  return(bar($value,$min,$max,$header,undef,undef,"°C",$width,$height,$size,\&temp_hue,$decfont,1,$lightbar,$lightnumber,$icon));
 } 
 
 
 sub hum_bar {
-  my ($value,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
-##  $width=50 if (!defined $width);
-  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,0,undef,$lightbar,$lightnumber));
+  my ($value,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
+  $decfont=0 if (!defined $decfont);
+  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,$decfont,undef,$lightbar,$lightnumber));
 } 
 
 sub hum_mbar {
-  my ($value,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
-##  $width=50 if (!defined $width);
-  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,0,1,$lightbar,$lightnumber));
+  my ($value,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
+  $decfont=0 if (!defined $decfont);
+  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,$decfont,1,$lightbar,$lightnumber));
 } 
 
 sub icon_hum_bar {
-  my ($icon,$value,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
-##  $width=50 if (!defined $width);
-  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,0,undef,$lightbar,$lightnumber,$icon));
+  my ($icon,$value,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
+  $decfont=0 if (!defined $decfont);
+  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,$decfont,undef,$lightbar,$lightnumber,$icon));
 } 
 
 sub icon_hum_mbar {
-  my ($icon,$value,$header,$width,$height,$size,$lightbar,$lightnumber) = @_;
-##  $width=50 if (!defined $width);
-  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,0,1,$lightbar,$lightnumber,$icon));
+  my ($icon,$value,$header,$width,$height,$size,$lightbar,$lightnumber,$decfont) = @_;
+  $decfont=0 if (!defined $decfont);
+  return(bar($value,0,100,$header,undef,undef,"%",$width,$height,$size,\&hum_hue,$decfont,1,$lightbar,$lightnumber,$icon));
 }
 
 sub icon_bar {
@@ -4542,103 +4553,139 @@ sub color {
 }
 
 sub temp_uring {
-  my ($value,$min,$max,$size,$type,$lightring,$lightnumber,$icon) = @_;
+  my ($value,$min,$max,$size,$type,$lightring,$lightnumber,$icon,$decfont) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=80 if (!defined $size);
-  return(ring($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$type,$lightring,$lightnumber,$icon));
+  $decfont=1 if (!defined $decfont);
+  return(ring($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,$decfont,$type,$lightring,$lightnumber,$icon));
 }
 
 sub temp_ring{
-  my ($value,$min,$max,$size,$lightring,$lightnumber) = @_;
-  return(temp_uring($value,$min,$max,$size,undef,$lightring,$lightnumber));
+  my ($value,$min,$max,$size,$lightring,$lightnumber,$decfont) = @_;
+  return(temp_uring($value,$min,$max,$size,undef,$lightring,$lightnumber,undef,$decfont));
 }
 
 sub temp_mring{
-  my ($value,$min,$max,$size,$lightring,$lightnumber) = @_;
-  return(temp_uring($value,$min,$max,$size,1,$lightring,$lightnumber));
+  my ($value,$min,$max,$size,$lightring,$lightnumber,$decfont) = @_;
+  return(temp_uring($value,$min,$max,$size,1,$lightring,$lightnumber,undef,$decfont));
 }
 sub icon_temp_ring{
-  my ($icon,$value,$min,$max,$size,$lightring,$lightnumber) = @_;
+  my ($icon,$value,$min,$max,$size,$lightring,$lightnumber,$decfont) = @_;
   $size=100 if (!defined $size);
-  return(temp_uring($value,$min,$max,$size,undef,$lightring,$lightnumber,$icon));
+  return(temp_uring($value,$min,$max,$size,undef,$lightring,$lightnumber,$icon,$decfont));
 }
 
 sub icon_temp_mring{
-  my ($icon,$value,$min,$max,$size,$lightring,$lightnumber) = @_;
+  my ($icon,$value,$min,$max,$size,$lightring,$lightnumber,$decfont) = @_;
   $size=100 if (!defined $size);
-  return(temp_uring($value,$min,$max,$size,1,$lightring,$lightnumber,$icon));
+  return(temp_uring($value,$min,$max,$size,1,$lightring,$lightnumber,$icon,$decfont));
 }
 
 sub hum_uring {
-  my ($value,$size,$type,$lightring,$lightnumber,$icon) = @_;
+  my ($value,$size,$type,$lightring,$lightnumber,$icon,$decfont) = @_;
   $size=80 if (!defined $size);
-  return(ring($value,0,100,undef,undef,"%",$size,\&hum_hue,0,$type,$lightring,$lightnumber,$icon));
+  $decfont=0 if (!defined $decfont);
+  return(ring($value,0,100,undef,undef,"%",$size,\&hum_hue,$decfont,$type,$lightring,$lightnumber,$icon));
 } 
 
 sub hum_ring{
-  my ($value,$size,$lightring,$lightnumber) = @_;
-  return(hum_uring($value,$size,undef,$lightring,$lightnumber));
+  my ($value,$size,$lightring,$lightnumber,$decfont) = @_;
+  return(hum_uring($value,$size,undef,$lightring,$lightnumber,undef,$decfont));
 }
 
 sub hum_mring{
-  my ($value,$size,$lightring,$lightnumber) = @_;
-  return(hum_uring($value,$size,1,$lightring,$lightnumber));
+  my ($value,$size,$lightring,$lightnumber,$decfont) = @_;
+  return(hum_uring($value,$size,1,$lightring,$lightnumber,undef,$decfont));
 }
 
 sub icon_hum_ring{
-  my ($icon,$value,$size,$lightring,$lightnumber) = @_;
+  my ($icon,$value,$size,$lightring,$lightnumber,$decfont) = @_;
   $size=100 if (!defined $size);
-  return(hum_uring($value,$size,undef,$lightring,$lightnumber,$icon));
+  return(hum_uring($value,$size,undef,$lightring,$lightnumber,$icon,$decfont));
 }
 
 sub icon_hum_mring{
-  my ($icon,$value,$size,$lightring,$lightnumber) = @_;
+  my ($icon,$value,$size,$lightring,$lightnumber,$decfont) = @_;
   $size=100 if (!defined $size);
-  return(hum_uring($value,$size,1,$lightring,$lightnumber,$icon));
+  return(hum_uring($value,$size,1,$lightring,$lightnumber,$icon,$decfont));
 }
 
 sub temp_hum_ring {
-  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber) = @_;
+  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber,$decfont1,$decfont2) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=90 if (!defined $size);
-  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,0,100,0,0,"%",\&hum_hue,0,$lightring,$lightnumber));
+  $decfont1=1 if (!defined $decfont1);
+  $decfont2=0 if (!defined $decfont2);
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,$decfont1,$value2,0,100,0,0,"%",\&hum_hue,$decfont2,$lightring,$lightnumber));
 } 
 
 sub temp_temp_ring {
-  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber) = @_;
+  my ($value,$value2,$min,$max,$size,$lightring,$lightnumber,$decfont1,$decfont2) = @_;
   $min=-20 if (!defined $min);
   $max=60  if (!defined $max);
   $size=90 if (!defined $size);
-  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,1,$lightring,$lightnumber));
+  $decfont1=1 if (!defined $decfont1);
+  $decfont2=1 if (!defined $decfont2);
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,$decfont1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,$decfont2,$lightring,$lightnumber));
 } 
 
 sub icon_ring {
-  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$dec,$size,$func,$lr,$ln) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,undef,$lr,$ln,$icon));
+  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$lr,$ln) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,undef,$lr,$ln,$icon));
 }
 
 sub icon_mring {
-  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$dec,$size,$func,$lr,$ln) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,1,$lr,$ln,$icon,$icon));
+  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$lr,$ln) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$lr,$ln,$icon,$icon));
 }
 
 sub mring
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$lr,$ln) = @_;
-  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,1,$lr,$ln));
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$lr,$ln) = @_;
+  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$lr,$ln));
 }
+
+sub icon_ring2 {
+    my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$lr,$ln) = @_;
+    return (ring2($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$lr,$ln,$icon));
+}
+
+sub icon_temp_hum_ring {
+  my ($icon,$value,$value2,$min,$max,$size,$lightring,$lightnumber,$decfont1,$decfont2) = @_;
+  $min=-20 if (!defined $min);
+  $max=60  if (!defined $max);
+  $size=100 if (!defined $size);
+  $decfont1=1 if (!defined $decfont1);
+  $decfont2=0 if (!defined $decfont2);
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,$decfont1,$value2,0,100,0,0,"%",\&hum_hue,$decfont2,$lightring,$lightnumber,$icon));
+} 
+
+sub icon_temp_temp_ring {
+  my ($icon,$value,$value2,$min,$max,$size,$lightring,$lightnumber,$decfont1,$decfont2) = @_;
+  $min=-20 if (!defined $min);
+  $max=60  if (!defined $max);
+  $size=100 if (!defined $size);
+  $decfont1=1 if (!defined $decfont1);
+  $decfont2=1 if (!defined $decfont2);
+  return(ring2($value,$min,$max,undef,undef,"°C",$size,\&temp_hue,$decfont1,$value2,$min,$max,undef,undef,"°C",\&temp_hue,$decfont2,$lightring,$lightnumber,$icon));
+} 
 
 sub ring
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$model,$lr,$ln,$icon) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$lr,$ln,$icon) = @_;
   my $out;
   
-  my ($ic,$iscale,$ix,$iy)=();
+  my ($dec,$fontformat);
+  
+  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  $fontformat="" if (!defined $fontformat);
+  
+  my ($ic,$iscale,$ix,$iy,$rotate)=();
   
   if (defined ($icon)) {
-    ($ic,$iscale,$ix,$iy,)=split(",",$icon);
+    ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
     if (defined ($ix)) {
       $ix+=30;
     } else {
@@ -4649,7 +4696,8 @@ sub ring
     } else {
       $iy=8;
     };
-    $iscale=1 if (!defined($iscale));
+    $rotate=0 if (!defined $rotate);
+    $iscale=1 if (!defined $iscale);
     $ic="" if (!defined($ic));
   }
     
@@ -4723,32 +4771,64 @@ sub ring
         $svg_icon =~ s/svg/svg height="22"/ }
     if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
         $svg_icon =~ s/svg/svg width="22"/ }
-    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)">';
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11) rotate('.$rotate.',11,11) ">';
     $out.= $svg_icon;
     $out.='</g>';
-##    my $svg_icon=::FW_makeImage($ic);
-##    $svg_icon =~ s/height="[^"]*"/height="22"/;
-##    $svg_icon =~ s/width="[^"]*"/width="22"/;
-##  my $viewBox= ($svg_icon =~ /(viewBox="[^"]*")/) ? $1 : 'viewBox = "0 0 640 640"'; 
-##  my $viewBox='viewBox = "0 0 640 640"'; 
-##    $out.='<symbol id="Image_ring_'.$ic.'">';
-##    $out.= $svg_icon;
-##    $out.='</symbol>';
-##    $out.='<use href="#Image_ring_'.$ic.'" height="22" width="22" transform="translate('.$ix.', '.$iy.') translate(11, 11) scale('.$iscale.') translate(-11, -11)"/>';
-##    $out.='</symbol>';
   }
-  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;">%s</text>',((defined ($icon) and $icon ne "") ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:18),sprintf($format,$val));
-  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:10px;">%s</text>',((defined ($icon) and $icon ne "") ? 53:47),color($currColor,$ln),$unit) if (defined $unit);
+  my $icflag = (defined ($icon) and $icon ne "") ? 1:0;
+  
+  my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
+  if (defined $valDec) {
+      $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></text>',
+                     ($icflag ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:20),$fontformat,$valInt,$valDec);
+
+  } else {
+    $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
+                   ($icflag ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:20),$fontformat,$valInt);
+  }
+  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;">%s</text>',
+                 ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unit) if (defined $unit);
   $out.= '</svg>';
   return ($out);
 }
 
 sub ring2
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$dec,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$dec2,$lr,$ln) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$val2,$min2,$max2,$minColor2,$maxColor2,$unit2,$func2,$decfont2,$lr,$ln,$icon) = @_;
   my $out;
   my ($format,$value);
   my ($format2,$value2);
+  
+  my ($dec,$fontformat);
+  
+  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  $fontformat="" if (!defined $fontformat);
+
+  my ($dec2,$fontformat2);
+  
+  ($dec2,$fontformat2)=split (/,/,$decfont2) if (defined $decfont2);
+  $fontformat2="" if (!defined $fontformat2);
+
+  
+   my ($ic,$iscale,$ix,$iy,$rotate)=();
+  
+  if (defined ($icon)) {
+    ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
+    if (defined ($ix)) {
+      $ix+=19.5;
+    } else {
+      $ix=19.5;
+    };
+    if (defined ($iy)) {
+      $iy+=22;
+    } else {
+      $iy=22;
+    };
+    $rotate=0 if (!defined $rotate);
+    $iscale=1 if (!defined $iscale);
+    $ic="" if (!defined($ic));
+  }
+  
   if (defined $lr) {
     if (!defined $ln) {
        $ln=$lr;
@@ -4815,6 +4895,10 @@ sub ring2
     }
   }    
 
+  if (defined $icon and $icon ne "") {
+    $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
+  }
+
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 57 " style="width:%dpx; height:%dpx;">',$size/100*63,$size/100*57);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
@@ -4837,19 +4921,55 @@ sub ring2
   $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2">',$currColor,$minColor,(defined $lr ? $lr:0));
   $out.=describeArc(41, 30, 28, 0, int($prop*280));
   $out.='</g>';
+  
+  if (defined $icon and $icon ne "" and  $icon ne " ") {
+    my $svg_icon=::FW_makeImage($ic);
+    if(!($svg_icon =~ s/\sheight="[^"]*"/ height="16"/)) {
+        $svg_icon =~ s/svg/svg height="16"/ }
+    if(!($svg_icon =~ s/\swidth="[^"]*"/ width="16"/)) {
+        $svg_icon =~ s/svg/svg width="16"/ }
+    $out.='<g transform="translate('.$ix.', '.$iy.') translate(8, 8) scale('.$iscale.') translate(-8, -8) rotate('.$rotate.',8,8)">';
+    $out.= $svg_icon;
+    $out.='</g>';
+ }
 
+ 
   $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2">',$currColor2,$minColor2,(defined $lr ? $lr:0));
   $out.=describeArc(41, 30, 25.5, 0, int($prop2*280));
   $out.='</g>';
-   
-  $out.= sprintf('<text text-anchor="middle" x="41" y="29" style="fill:%s;font-size:16px;font-weight:bold;">%s</text>',color($currColor,$ln),sprintf($format,$val));
-  $out.= sprintf('<text text-anchor="middle" x="41" y="16" style="fill:%s;font-size:8px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
-  
-  $out.= sprintf('<text text-anchor="middle" x="41" y="42.5" style="fill:%s;font-size:14px;font-weight:bold;">%s</text>',color($currColor2,$ln),sprintf($format2,$val2));
-  $out.= sprintf('<text text-anchor="middle" x="41" y="49" style="fill:%s;font-size:7px;">%s</text>',color($currColor2,$ln),$unit2) if (defined $unit2);
 
+  my ($valInt,$valDec)=split(/\./,sprintf($format,$val));  
+
+  my $icflag = (defined ($icon) and $icon ne "") ? 1:0;
+
+  if (defined $valDec) {
+    $out.= sprintf('<text text-anchor="middle" x="%s" y="29" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></text>',
+                   ($icflag ? 50:41),color($currColor,$ln),(defined ($icon) ? 13:16),$fontformat,$valInt,$valDec);
+  } else {
+    $out.= sprintf('<text text-anchor="middle" x="%s" y="29" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
+                   ($icflag ? 50:41),color($currColor,$ln),(defined ($icon) ? 13:16),$fontformat,$valInt);
+  }
+  $out.= sprintf('<text text-anchor="middle" x="41" y="16" style="fill:%s;font-size:9px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
+  
+  my ($valInt2,$valDec2)=split(/\./,sprintf($format2,$val2));  
+  
+  if (defined $valDec2) {
+    $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></text>',
+                   ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:14),$fontformat2,$valInt2,$valDec2);
+  } else {
+    $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
+                   ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:14),$fontformat2,$valInt2);
+  }
+  $out.= sprintf('<text text-anchor="middle" x="41" y="52" style="fill:%s;font-size:9px;">%s</text>',color($currColor2,$ln),$unit2) if (defined $unit2);
+  
   $out.= '</svg>';
   return ($out);
+}
+
+sub dec 
+{
+  my ($format,$value)=@_;
+  return(split(/\./,sprintf($format,$value)));
 }
 
 sub y_h
