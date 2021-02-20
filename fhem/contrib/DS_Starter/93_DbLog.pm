@@ -312,15 +312,14 @@ return;
 sub DbLog_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
-  my @a            = split("[ \t][ \t]*", $def);
+  my @a            = split "[ \t][ \t]*", $def;
   
   if($DbLogMMDBI) {
       Log3($name, 1, "DbLog $name - ERROR - Perl module ".$DbLogMMDBI." is missing. DbLog module is not loaded ! On Debian systems you can install it with \"sudo apt-get install libdbi-perl\" ");
       return "Error: Perl module ".$DbLogMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl";
   }        
 
-  return "wrong syntax: define <name> DbLog configuration regexp"
-    if(int(@a) != 4);
+  return "wrong syntax: define <name> DbLog configuration regexp" if(int(@a) != 4);
   
   $hash->{CONFIGURATION} = $a[2];
   my $regexp             = $a[3];
