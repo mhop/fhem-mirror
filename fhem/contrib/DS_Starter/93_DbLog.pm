@@ -8587,8 +8587,31 @@ attr SMA_Energymeter DbLogValueFn
        </code><br>
      
        Im asynchronen Logmodus wird der Cache in die Datenbank weggeschrieben und geleert wenn die Anzahl &lt;n&gt; Datensätze
-       im Cache erreicht ist (Default: 500). Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
+       im Cache erreicht ist (default: 500). <br>
+       Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
        gesetzt. Im Fehlerfall wird ein erneuter Schreibversuch frühestens nach syncInterval/2 gestartet. <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a name="cacheOverflowThreshold"></a>
+     <li><b>cacheOverflowThreshold</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt; 
+       </code><br>
+     
+       Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cache Inhalt in ein File 
+       exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
+       Die Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. <br>    
+       Mit diesem Attribut kann eine Überlastung des Serverspeichers verhindert werden falls die Datenbank für eine längere 
+       Zeit nicht verfügbar ist (z.B. im Fehler- oder Wartungsfall). Ist der Attributwert kleiner oder gleich dem Wert des 
+       Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
+       In diesem Fall wird der Cache <b>immer</b> in ein File geschrieben anstatt in die Datenbank. Somit kann diese 
+       Einstellung bewußt genutzt werden, um die Daten zu einem späteren Zeitpunkt mit dem Set-Kommando "importCachefile"
+       in die Datenbank zu reimportieren.
      </ul>
      </li>
   </ul>
