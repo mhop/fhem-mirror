@@ -531,6 +531,31 @@ set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
 setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20201213
 
+# A blind drive motor TS0601_cover connected via zigbee2mqtt
+#contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1134215.html#msg1134215
+name:zigbee2mqtt_blind_drive
+desc: A blind drive motor connected via zigbee2mqtt <br>Tested with: Tuya AM43 TS0601_cover
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_05f
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to fts_shutter_100;{ AttrVal("DEVICE","icon","fts_shutter_100") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
+attr DEVICE webCmd open:close:pct
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE jsonMap position:pct
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  open:noArg $\DEVICETOPIC/set {"state":"OPEN"}\
+  close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}
+attr DEVICE stateFormat pct
+set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=blind HOMEBRIDGEMAPPING="CurrentPosition=pct,minValue=0,maxValue=100,minStep=100;TargetPosition=pct,minValue=0,maxValue=100,minStep=100,cmds=0:close;;/.*/:open"
+attr DEVICE model zigbee2mqtt_blind_drive
+setreading DEVICE attrTemplateVersion 20210220
+
+
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
