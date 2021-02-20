@@ -4439,11 +4439,11 @@ sub bar
   my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
   
   if (defined $valDec) {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unit);
   } else {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:14px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+23:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unit);
   }
   $out.= '</g>';
  	$out.= '</svg>';
@@ -4960,7 +4960,7 @@ sub ring2
     $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
                    ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:14),$fontformat2,$valInt2);
   }
-  $out.= sprintf('<text text-anchor="middle" x="41" y="52" style="fill:%s;font-size:9px;">%s</text>',color($currColor2,$ln),$unit2) if (defined $unit2);
+  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:9px;">%s</text>',($icflag ? 51:52),color($currColor2,$ln),$unit2) if (defined $unit2);
   
   $out.= '</svg>';
   return ($out);
