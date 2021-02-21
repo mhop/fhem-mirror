@@ -610,14 +610,14 @@ use Blocking;
 use HttpUtils;
 
 use feature qw(switch);
-no if $] >= 5.010001, warnings => 'experimental::smartmatch';
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 use constant UPDATE_DISTRICTS     => -1;
 use constant UPDATE_COMMUNEUNIONS => -2;
 use constant UPDATE_ALL           => -3;
 
 require Exporter;
-our $VERSION   = '1.016002';
+our $VERSION   = '1.016003';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -2728,6 +2728,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 16.02.2021 (version 1.16.3) jensb
+# bugfix: fix version for experimental::smartmatch
 #
 # 03.12.2020 (version 1.16.2) jensb
 # change: increased log level in sub RotateForecast
