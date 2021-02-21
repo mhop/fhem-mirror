@@ -30,7 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastnum, remove prototypes ",
+  "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
+                           "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
   "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
   "4.10.1"  => "22.06.2020 configCheck changed for SQLite ",
   "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
@@ -467,7 +468,8 @@ sub DbLog_Attr {
           $hash->{MODE} = "synchronous";
           delete($defs{$name}{READINGS}{NextSync});
           delete($defs{$name}{READINGS}{CacheUsage});
-          delete($defs{$name}{READINGS}{CacheOverflowLastnum});
+          delete($defs{$name}{READINGS}{CacheOverflowLastNum});
+          delete($defs{$name}{READINGS}{CacheOverflowLastState});
           delete($defs{$name}{READINGS}{background_processing_time});
           InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
       }
@@ -514,8 +516,7 @@ sub DbLog_Attr {
       # letzter CacheSync vor disablen
       DbLog_execmemcache($hash) if($do == 1);
       
-      readingsSingleUpdate($hash, "state", $val, 1);
-      $hash->{HELPER}{OLDSTATE} = $val;
+      DbLog_setReadingstate ($hash, $val);
         
       if ($do == 0) {
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
@@ -791,8 +792,8 @@ sub DbLog_Set {
         
         my ($out,$outfile,$error);
         
-        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});    # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled, nicht im asynch-Mode
-        return if(!AttrVal($name, "asyncMode", undef));
+        return "device is disabled"                if(IsDisabled($name));   
+        return "device not in asynch working mode" if(!AttrVal($name, "asyncMode", undef));
         
         if(@logs && AttrVal($name, "exportCacheAppend", 0)) {            # exportiertes Cachefile existiert und es soll an das neueste angehängt werden
             $outfile = $dir.pop(@logs);
@@ -820,13 +821,10 @@ sub DbLog_Set {
             readingsSingleUpdate($hash, "lastCachefile", $outfile." (".$crows." cache rows exported)", 1);
         }
         
-        # readingsSingleUpdate($hash, "state", $crows." cache rows exported to ".$outfile, 1);
+        my $state  = $error // $hash->{HELPER}{OLDSTATE};
+        DbLog_setReadingstate ($hash, $state);
         
-        my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-        my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-        readingsSingleUpdate($hash, "state", $state, $evt);
-        
-        $hash->{HELPER}{OLDSTATE} = $state;
+        return $error if($error);
         
         Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
         
@@ -844,8 +842,7 @@ sub DbLog_Set {
         my @row_array;
         readingsSingleUpdate($hash, "lastCachefile", "", 0);
         
-        # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
-        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
+        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});                   # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
         
         if (!$a[2]) {
             return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
@@ -872,21 +869,21 @@ sub DbLog_Set {
         if(@row_array) {
             my $error = DbLog_Push($hash, 1, @row_array);
             if($error) {
-                readingsSingleUpdate($hash, "lastCachefile", $infile." - Error - ".$!, 1);
-                readingsSingleUpdate($hash, "state", $error, 1);
+                readingsSingleUpdate  ($hash, "lastCachefile", $infile." - Error - ".$!, 1);
+                DbLog_setReadingstate ($hash, $error);
                 Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
             } 
             else {
                 unless(rename($dir.$a[2], $dir."impdone_".$a[2])) {
                     Log3($name, 2, "DbLog $name: cachefile $infile couldn't be renamed after import !");
                 }
-                readingsSingleUpdate($hash, "lastCachefile", $infile." import successful", 1);
-                readingsSingleUpdate($hash, "state", $crows." cache rows processed from ".$infile, 1);
+                readingsSingleUpdate  ($hash, "lastCachefile", $infile." import successful", 1);
+                DbLog_setReadingstate ($hash, $crows." cache rows processed from ".$infile);
                 Log3($name, 3, "DbLog $name: $crows cache rows processed from $infile.");
             }
         } 
         else {
-            readingsSingleUpdate($hash, "state", "no rows in ".$infile, 1);
+            DbLog_setReadingstate ($hash, "no rows in ".$infile);
             Log3($name, 3, "DbLog $name: $infile doesn't contain any rows - no imports done.");
         }
         
@@ -1389,10 +1386,10 @@ sub DbLog_Log {
   #one Transaction
   eval {  
       for (my $i = 0; $i < $max; $i++) {
-          my $next = 0;
+          my $next  = 0;
           my $event = $events->[$i];
-          $event = "" if(!defined($event));
-          $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
+          $event    = "" if(!defined($event));
+          $event    = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
       
           if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
@@ -1598,35 +1595,28 @@ sub DbLog_Log {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}); 
                   
-                  if($async) {
-                      # asynchoner non-blocking Mode
-                      # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-                      $data{DbLog}{$name}{cache}{index}++;
+                  if($async) {                                             # asynchoner non-blocking Mode                                                  
+                      $data{DbLog}{$name}{cache}{index}++;                 # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
                       my $index = $data{DbLog}{$name}{cache}{index};
                       $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
                       
-                      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
-                      if($ce == 1) {
-                          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
-                      } 
-                      else {
-                          readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
-                      }
-                      # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
-                      if($memcount >= $clim) {
+                      my $memcount = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
+                      my $mce      = $ce == 1 ? 1 : 0;
+
+                      readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
+
+                      if($memcount >= $clim) {                             # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
                           my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
                           my $syncival = AttrVal($name, "syncInterval", 30);
                           if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
                               Log3 $hash->{NAME}, 4, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
-                              DbLog_execmemcache($hash);
+                              DbLog_execmemcache ($hash);
                               $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
                           }
                       }
-                      # Notify-Routine Laufzeit ermitteln
-                      $net = tv_interval($nst);
+                      $net = tv_interval($nst);                 # Notify-Routine Laufzeit ermitteln
                   } 
-                  else {
-                      # synchoner Mode
+                  else {                                        # synchoner Mode
                       push(@row_array, $row);       
                   }  
               }       
@@ -1645,9 +1635,7 @@ sub DbLog_Log {
           Log3 ($name, 2, "DbLog $name - Last database write cycle done") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
           
           my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
-          my $evt   = ($state eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
-          readingsSingleUpdate($hash, "state", $state, $evt);
-          $hash->{HELPER}{OLDSTATE} = $state;
+          DbLog_setReadingstate ($hash, $state);
           
           # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
@@ -2287,16 +2275,13 @@ sub DbLog_execmemcache {
   my $ce         = AttrVal($name, "cacheEvents",            0               );
   my $timeout    = AttrVal($name, "timeout",                86400           );
   my $DbLogType  = AttrVal($name, "DbLogType",              "History"       );
-  my $coft       = AttrVal($name, "cacheOverflowThreshold", 0               );              # Steuerung exportCache statt schreiben in DB
   
-  $coft          = ($coft && $coft < $clim) ? $clim : $coft;                                # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
+  my $dbconn        = $hash->{dbconn};
+  my $dbuser        = $hash->{dbuser};
+  my $dbpassword    = $attr{"sec$name"}{secret};
+  my $dolog         = 1;
   
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  my $dolog      = 1;
-  
-  my (@row_array,$memcount,$dbh,$error,$overflownum);
+  my (@row_array,$memcount,$dbh,$error);
   
   RemoveInternalTimer($hash, "DbLog_execmemcache");
     
@@ -2334,11 +2319,16 @@ sub DbLog_execmemcache {
       }
   }
   
-  $memcount    = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
-  $overflownum = ($coft && $memcount >= $coft) ? $memcount-$coft : $memcount >= $clim ? $memcount-$clim : 0; 
-  my $mce      = $ce == 2 ? 1 : 0;
+  $memcount      = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
+  my $mce        = $ce == 2 ? 1 : 0;
 
   readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
+  
+  my $params = {
+      hash          => $hash,
+      clim          => $clim,
+      memcount      => $memcount
+  };
     
   if($memcount && $dolog && !$hash->{HELPER}{".RUNNING_PID"}) {     
       Log3 ($name, 4, "DbLog $name -> ################################################################");
@@ -2347,12 +2337,8 @@ sub DbLog_execmemcache {
       Log3 ($name, 4, "DbLog $name -> MemCache contains $memcount entries to process");
       Log3 ($name, 4, "DbLog $name -> DbLogType is: $DbLogType");
 
-      if($coft && $memcount >= $coft) {
-          Log3 ($name, 2, "DbLog $name -> WARNING - Cache is exported to file instead of logging it to database");
-          CommandSet (undef, qq{$name exportCache purgecache});
-          readingsSingleUpdate($hash, "CacheOverflowLastnum", $overflownum, 1); 
-          return;
-      }      
+      my $wrotefile = DbLog_writeFileIfCacheOverflow ($params);                             # Cache exportieren bei Overflow
+      return if($wrotefile);
           
       for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
           Log3 ($hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key});
@@ -2379,6 +2365,7 @@ sub DbLog_execmemcache {
   else {
       if($dolog && $hash->{HELPER}{".RUNNING_PID"}) {
           $error = "Commit already running - resync at NextSync";
+          DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
       } 
       else {
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
@@ -2392,18 +2379,67 @@ sub DbLog_execmemcache {
   
   readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", $se);
   
-  readingsBeginUpdate($hash);
-  readingsBulkUpdateIfChanged($hash, "CacheOverflowLastnum", $overflownum, 1);
-  readingsEndUpdate($hash, 1);
-  
-  
-  my $state = $error // $hash->{HELPER}{OLDSTATE};
-  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
-  readingsSingleUpdate($hash, "state", $state, $evt);
-  $hash->{HELPER}{OLDSTATE} = $state;
+  DbLog_setReadingstate ($hash, $error);
   
   InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
 
+return;
+}
+
+################################################################
+#     wenn Cache Overflow vorhanden ist und die Behandlung mit
+#     dem Attr "cacheOverflowThreshold" eingeschaltet ist,
+#     wirde der Cache in ein File weggeschrieben
+#     Gibt "1" zurück wenn File geschrieben wurde
+################################################################
+sub DbLog_writeFileIfCacheOverflow {
+  my $paref         = shift;
+  my $hash          = $paref->{hash};
+  my $clim          = $paref->{clim};
+  my $memcount      = $paref->{memcount};
+  
+  my $name    = $hash->{NAME};
+  my $success = 0;
+  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);              # Steuerung exportCache statt schreiben in DB
+  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                 # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
+  
+  my $overflowstate = "normal";
+  my $overflownum   = ($coft && $memcount >= $coft) ? $memcount-$coft : $memcount >= $clim ? $memcount-$clim : 0; 
+  $overflowstate    = "exceeded" if($overflownum);
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate          ($hash, "CacheOverflowLastNum",   $overflownum     );
+  readingsBulkUpdateIfChanged ($hash, "CacheOverflowLastState", $overflowstate, 1);
+  readingsEndUpdate($hash, 1);
+
+  if($coft && $memcount >= $coft) {
+      Log3 ($name, 2, "DbLog $name -> WARNING - Cache is exported to file instead of logging it to database");
+      my $error = CommandSet (undef, qq{$name exportCache purgecache});
+      
+      if($error) {                                                       # Fehler beim Export Cachefile
+          DbLog_setReadingstate ($hash, $error);                   
+          return $success;
+      }
+      
+      DbLog_setReadingstate ($hash, qq{Cache exported to "lastCachefile" due to Cache overflow});
+      delete $hash->{HELPER}{LASTLIMITRUNTIME};
+      $success = 1;
+  }
+    
+return $success;
+}
+
+################################################################
+#             Reading state setzen
+################################################################
+sub DbLog_setReadingstate {
+  my $hash = shift; 
+  my $val  = shift // $hash->{HELPER}{OLDSTATE};
+
+  my $evt   = ($val eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
+  readingsSingleUpdate($hash, "state", $val, $evt);
+  $hash->{HELPER}{OLDSTATE} = $val;
+  
 return;
 }
 
@@ -2959,7 +2995,7 @@ sub DbLog_PushAsyncDone {
  my @a          = split("\\|",$string);
  my $name       = $a[0];
  my $hash       = $defs{$name};
- my $error      = $a[1]?decode_base64($a[1]):0;
+ my $error      = $a[1] ? decode_base64($a[1]) : 0;
  my $bt         = $a[2];
  my $rowlist    = $a[3];
  my $asyncmode  = AttrVal($name, "asyncMode", undef);
@@ -2973,8 +3009,7 @@ sub DbLog_PushAsyncDone {
      
      #one Transaction
      eval { 
-       foreach my $row (@row_array) {
-           # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+       for my $row (@row_array) {                               # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
            $data{DbLog}{$name}{cache}{index}++;
            my $index = $data{DbLog}{$name}{cache}{index};
            $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
@@ -2994,10 +3029,8 @@ sub DbLog_PushAsyncDone {
       readingsEndUpdate($hash, 1);
   }
   
-  my $state = $error?$error:(IsDisabled($name))?"disabled":"connected";
-  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-  readingsSingleUpdate($hash, "state", $state, $evt);
-  $hash->{HELPER}{OLDSTATE} = $state;
+  my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
+  DbLog_setReadingstate ($hash, $state);  
  
   if(!$asyncmode) {
       delete($defs{$name}{READINGS}{NextSync});
@@ -3024,7 +3057,8 @@ sub DbLog_PushAsyncAborted {
   $cause = $cause?$cause:"Timeout: process terminated";
   
   Log3 ($name, 2, "DbLog $name -> ".$hash->{HELPER}{".RUNNING_PID"}{fn}." ".$cause) if(!$hash->{HELPER}{SHUTDOWNSEQ});
-  readingsSingleUpdate($hash,"state",$cause, 1);
+  DbLog_setReadingstate ($hash, $cause); 
+  
   delete $hash->{HELPER}{".RUNNING_PID"};
   delete $hash->{HELPER}{LASTLIMITRUNTIME};
   
@@ -3163,10 +3197,8 @@ sub DbLog_ConnectPush {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
     Log3 $hash->{NAME}, 4, "DbLog $name - Trying to connect to database";
     
-    $state = $err?$err:(IsDisabled($name))?"disabled":"disconnected";
-    $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-    readingsSingleUpdate($hash, "state", $state, $evt);
-    $hash->{HELPER}{OLDSTATE} = $state;  
+    $state = $err ? $err : (IsDisabled($name)) ? "disabled" : "disconnected";
+    DbLog_setReadingstate ($hash, $state);   
     
     InternalTimer(gettimeofday()+5, 'DbLog_ConnectPush', $hash, 0);
     Log3 $hash->{NAME}, 4, "DbLog $name - Waiting for database connection";
@@ -3180,9 +3212,7 @@ sub DbLog_ConnectPush {
   Log3 $hash->{NAME}, 3, "DbLog $name - UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
   if(!$get) {
       $state = "connected";
-      $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-      readingsSingleUpdate($hash, "state", $state, $evt);
-      $hash->{HELPER}{OLDSTATE} = $state;
+      DbLog_setReadingstate ($hash, $state);
   }
 
   $hash->{DBHP}= $dbhp;
@@ -3225,10 +3255,8 @@ sub DbLog_ConnectNewDBH {
       
   if($@) {
     Log3($name, 2, "DbLog $name - $@");
-    my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
-    my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-    readingsSingleUpdate($hash, "state", $state, $evt);
-    $hash->{HELPER}{OLDSTATE} = $state;
+    my $state = $@ ? $@ : (IsDisabled($name)) ? "disabled" : "disconnected";
+    DbLog_setReadingstate ($hash, $state);
   }
   
   if($dbh) {
@@ -4866,10 +4894,8 @@ sub DbLog_AddLog {
           return if($hash->{HELPER}{REOPEN_RUNS});    
           my $error = DbLog_Push($hash, 1, @row_array);
 
-          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-          readingsSingleUpdate($hash, "state", $state, $evt);
-          $hash->{HELPER}{OLDSTATE} = $state;
+          my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
+          DbLog_setReadingstate ($hash, $state);
           
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
       }
@@ -5757,9 +5783,9 @@ sub DbLog_countNbl_finished {
   my $err      = decode_base64($a[3]) if ($a[3]);
   my $bt       = $a[4] if($a[4]);  
 
-  readingsSingleUpdate($hash,"state",$err,1) if($err);
-  readingsSingleUpdate($hash,"countHistory",$hc,1) if ($hc);
-  readingsSingleUpdate($hash,"countCurrent",$cc,1) if ($cc);
+  DbLog_setReadingstate ($hash, $err) if($err);
+  readingsSingleUpdate  ($hash,"countHistory",$hc,1) if ($hc);
+  readingsSingleUpdate  ($hash,"countCurrent",$cc,1) if ($cc);
   
   if(AttrVal($name, "showproctime", undef) && $bt) {
       my ($rt,$brt)  = split(",", $bt);
@@ -5879,7 +5905,7 @@ sub DbLog_deldaysNbl_done {
   Log3 ($name, 5, "DbLog $name -> Start DbLog_deldaysNbl_done");
   
   if ($err) {
-      readingsSingleUpdate($hash,"state",$err,1);
+      DbLog_setReadingstate ($hash, $err);
       delete $hash->{HELPER}{DELDAYS_PID};
       Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl_done finished");
       return;
@@ -5888,9 +5914,9 @@ sub DbLog_deldaysNbl_done {
       if(AttrVal($name, "showproctime", undef) && $bt) {
           my ($rt,$brt)  = split(",", $bt);
           readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
-          readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
-          readingsEndUpdate($hash, 1);
+          readingsBulkUpdate ($hash, "background_processing_time", sprintf("%.4f",$brt));     
+          readingsBulkUpdate ($hash, "sql_processing_time", sprintf("%.4f",$rt));
+          readingsEndUpdate  ($hash, 1);
       }
       readingsSingleUpdate($hash, "lastRowsDeleted", $rows ,1);
   }
@@ -5939,9 +5965,9 @@ sub DbLog_reopen {
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
       delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
       Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
-      readingsSingleUpdate($hash, "state", "reopened", 1);
-      $hash->{HELPER}{OLDSTATE} = "reopened";
-      DbLog_execmemcache($hash) if($async);
+
+      DbLog_setReadingstate ($hash, "reopened");
+      DbLog_execmemcache    ($hash) if($async);
   } 
   else {
       InternalTimer(gettimeofday()+30, "DbLog_reopen", $hash, 0);       
@@ -8602,15 +8628,16 @@ attr SMA_Energymeter DbLogValueFn
        attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt; 
        </code><br>
      
-       Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cache Inhalt in ein File 
+       Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cacheinhalt in ein File 
        exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
        Die Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. <br>    
        Mit diesem Attribut kann eine Überlastung des Serverspeichers verhindert werden falls die Datenbank für eine längere 
        Zeit nicht verfügbar ist (z.B. im Fehler- oder Wartungsfall). Ist der Attributwert kleiner oder gleich dem Wert des 
        Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
-       In diesem Fall wird der Cache <b>immer</b> in ein File geschrieben anstatt in die Datenbank. Somit kann diese 
-       Einstellung bewußt genutzt werden, um die Daten zu einem späteren Zeitpunkt mit dem Set-Kommando "importCachefile"
-       in die Datenbank zu reimportieren.
+       In diesem Fall wird der Cache <b>immer</b> in ein File geschrieben anstatt in die Datenbank sofern der Schwellenwert
+       erreicht wurde. <br>
+       Somit kann diese Einstellung bewußt genutzt werden, um die Daten zu einem späteren Zeitpunkt mit dem Set-Kommando "importCachefile"
+       in die Datenbank zu importieren.
      </ul>
      </li>
   </ul>
