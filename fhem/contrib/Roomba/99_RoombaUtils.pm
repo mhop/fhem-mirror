@@ -203,6 +203,14 @@ my %roombastates_de = ("charge" => "Wird geladen",
 sub command($$@){
   my ($name,$cmd,@evt) = @_;
   my $hash = $main::defs{$name};
+  if( $cmd eq "start"){
+    my $hash = $main::defs{$name};
+    my $iodev= $hash->{IODev}->{NAME};
+    main::fhem("attr $iodev disconnectAfter 300");
+    if(main::Value($iodev) ne "opened"{
+      main::fhem("set $iodev connect");
+    }
+  }
   $cmd = 'cmd {"command": "'.$cmd.'", "time": '.time().', "initiator": "localApp"}';
   return $cmd;
 }
@@ -212,13 +220,9 @@ sub setting($$$){
   my $hash = $main::defs{$name};
   $hash->{helper}{setting} = $key;
   my (@evt,$val,$cmd);
-  if( $key !~ /^local.*/){
-    @evt = split(' ',$data);
-    $val = (defined($evt[1]))?$evt[1]:"false";
-    $cmd = 'delta {"state": {"'.$key.'":'.$val.'}}';
-  }else{
-    $cmd = 'delta {"state": {"vacHigh":'.main::ReadingsVal($name,"sVacHigh","false").'}}';
-  }  
+  @evt = split(' ',$data);
+  $val = (defined($evt[1]))?$evt[1]:"false";
+  $cmd = 'delta {"state": {"'.$key.'":'.$val.'}}';
   return $cmd;
 }
 
@@ -384,72 +388,34 @@ sub pose($$){
   #-- Reduction not useful
   push(@{$hash->{helper}{theta}},$theta);
   push(@{$hash->{helper}{path}},$pxp,$pyp);
+  my $count = $hash->{helper}{pcount};
+  $count++;
+  $hash->{helper}{pcount}=$count;
    
-  my %ret   = ("positionTheta",$theta,"position","(".$pxp.",".$pyp.")");
+  my %ret   = ("positionTheta",$theta,"positionCount",$count,"position","(".$pxp.",".$pyp.")");
   return {%ret};
 }
 
 sub mission($$){
   my ($name,$evt) = @_;
-  
   my $hash = $main::defs{$name};
+  my $oldphase = main::ReadingsVal($name,"cmPhase","");
   #-- getting events of the type
   # {"state":{"reported":{"dock":{"known":true},"cleanMissionStatus":{"cycle":"quick","phase":"run","expireM":0,"rechrgM":0,"error":0,"notReady":0,"mssnM":0,"sqft":0,"initiator":"localApp","nmain::Log 1,"[RoombaUtils] Device $name phase transition $oldphase -> $phase";Mssn":30}}}}
   my $dec   = decode_json($evt);
   my $cyc   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'cycle'};
   my $phase = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'phase'}; 
-  #  Normal Sequence is "" -> charge -> run -> hmPostMsn -> charge
-  #        Mid mission recharge is "" -> charge -> run -> hmMidMsn -> charge
-  #                                   -> run -> hmPostMsn -> charge
-  #        Stuck is "" -> charge -> run -> hmPostMsn -> stuck
-  #                    -> run/charge/stop/hmUsrDock -> charge
-  #        Start program during run is "" -> run -> hmPostMsn -> charge
-  #        Need to identify a new mission to initialize map, and end of mission to
-  #        finalise map.
-  #        Assume  charge -> run = start of mission (init map)
-  #                stuck -> charge = init map ???
-  #        Assume hmPostMsn -> charge = end of mission (finalize map)
-  #               hmPostMsn -> charge = end of mission (finalize map)
-  #               hmUsrDock -> charge finalize map
-  #               hmUsrDock -> stop finalize map
-  #        Anything else = continue with existing map
-  my $oldphase=main::ReadingsVal($name,"cmPhase","");
-  if( $oldphase.$phase eq "stuckcharge" ||
-      $oldphase.$phase eq "chargerun" ||
-      $oldphase.$phase eq "hmUsrDockrun" ){
-      main::Log 1,"[RoombaUtils] transition $oldphase -> $phase should start intialization";
-    initmap($hash);
-  }elsif( $oldphase.$phase eq "runstop" ){
-    main::Log 1,"[RoombaUtils] pausing $oldphase -> $phase";
-  }elsif( $oldphase.$phase eq "stoprun" ){
-    main::Log 1,"[RoombaUtils] resuming $oldphase -> $phase";
-  }elsif( 
-          $oldphase.$phase eq "hmPostMsncharge" ||
-          $oldphase.$phase eq "hmPostMsnstop" ||
-          $oldphase.$phase eq "hmUsrDockcharge" ||
-          $oldphase.$phase eq "hmUsrDockstop" ||
-          $oldphase.$phase eq "stophmUsrDock" ){
-    main::Log 1,"[RoombaUtils] transition $oldphase -> $phase should start finalization";
-    finalizemap($hash);
-  }elsif( $oldphase.$phase eq "runrun" ||
-          $oldphase.$phase eq "stopstop" ||
-          $oldphase.$phase eq "chargestop" ||
-          $oldphase.$phase eq "chargecharge"){
-    # do nothing
-  }else{
-    main::Log 1,"[RoombaUtils] Device $name phase transition $oldphase -> $phase";
-  }
- 
   my $number= $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'nMssn'};
   my $exp   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'expireM'};
   my $rech  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'rechrgM'};
+  #-- Manage mission
+  missionmanager($hash,$oldphase,$phase);  
   $exp = ($exp == 0)?"Never":$exp." min";
   my $time   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'mssnM'};
   $time = $time." min";
   my $error = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'error'};
   my $eemsg = $roombaerrs_en{$error};
   my $demsg = $roombaerrs_de{$error};
-  
   my $notr  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'notReady'};
   my $sqm   = int($dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'sqft'}*10/10.7639)/10;
   my $init  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'initiator'};
@@ -462,6 +428,9 @@ sub mission($$){
                "cmPhaseD",$roombastates_de{$phase},"cmArea",$sqm." m²","cmExpire",$exp,"cmError",$eemsg,"cmErrorD",$demsg,"cmInitiator",$init);
   $ret{"cmNotReady"} = numtobool($notr)
     if(defined($notr));
+  my $bat   = $dec->{'state'}->{'reported'}->{'batPct'};
+  $ret{"battery"} = $bat
+    if(defined($bat));
   
   return {%ret};
 }
@@ -471,7 +440,7 @@ sub schedule($){
   my @weekdays = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
   #-- getting events of the type
   # {"state":{"reported":{"cleanSchedule":{"cycle":["none","none","none","none","none","none","none"],"h":[9,9,9,9,9,9,9],"m":[0,0,0,0,0,0,0]},"bbchg3":{"avgMin":374,"hOnDock":199,"nAvail":32,"estCap":12311,"nLithChrg":8,"nNimhChrg":0,"nDocks":35}}}}
-  my $dec   = decode_json($evt);
+  my $dec    = decode_json($evt);
   my @acyc   = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'cycle'}};
   my @ahours = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'h'}};
   my @amin   = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'m'}};
@@ -594,10 +563,72 @@ sub numtobool($){
   my $ret = (($num==1)?"true":"false");
   return $ret;
 }
-
+ 
 #############################################################################
 #
-#  Map
+#  missionmanager
+#
+#############################################################################
+
+sub missionmanager($$$){
+  my ($hash,$oldphase,$phase)=@_;
+  
+  my $name     = $hash->{NAME};
+  my $iodev    = $hash->{IODev}->{NAME};
+  
+  #  Normal Sequence is "" -> charge -> run -> hmPostMsn -> charge
+  #        Mid mission recharge is "" -> charge -> run -> hmMidMsn -> charge
+  #                                   -> run -> hmPostMsn -> charge
+  #        Stuck is "" -> charge -> run -> hmPostMsn -> stuck
+  #                    -> run/charge/stop/hmUsrDock -> charge
+  #        Start program during run is "" -> run -> hmPostMsn -> charge
+  #        Need to identify a new mission to initialize map, and end of mission to
+  #        finalise map.
+  #        Assume  charge -> run = start of mission (init map)
+  #                stuck -> charge = init map ???
+  #        Assume hmPostMsn -> charge = end of mission (finalize map)
+  #               hmPostMsn -> charge = end of mission (finalize map)
+  #               hmUsrDock -> charge finalize map
+  #               hmUsrDock -> stop finalize map
+  #        Anything else = continue with existing map
+  
+  if( $oldphase.$phase eq "stuckcharge" ||
+      $oldphase.$phase eq "chargerun" ||
+      $oldphase.$phase eq "hmUsrDockrun" ){
+    main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
+    initmap($hash);
+    main::fhem("attr $iodev disconnectAfter 60");
+  }elsif( $oldphase.$phase eq "runstop" ){
+    main::Log 1,"[RoombaUtils] Device $name pausing $oldphase -> $phase";
+  }elsif( $oldphase.$phase eq "stoprun" ){
+    main::Log 1,"[RoombaUtils] Device $name resuming $oldphase -> $phase";
+  }elsif( 
+          $oldphase.$phase eq "hmPostMsncharge" ||
+          $oldphase.$phase eq "hmPostMsnstop" ||
+          $oldphase.$phase eq "hmUsrDockcharge" ||
+          $oldphase.$phase eq "hmUsrDockstop" ||
+          $oldphase.$phase eq "stophmUsrDock" ){
+    main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
+    finalizemap($hash);
+    main::fhem("attr $iodev disconnectAfter 7");
+  }elsif(
+          $oldphase.$phase eq "hmUsrDockhmUsrDock"){
+    main::Log 1,"[RoombaUtils] Device $name arrived in dock after user docking";
+  }elsif( $oldphase.$phase eq "runrun" ||
+          $oldphase.$phase eq "stopstop" ||
+          $oldphase.$phase eq "chargestop" ||
+          $oldphase.$phase eq "chargecharge" ||
+          $oldphase.$phase eq "hmUsrDockhmUsrDock"){
+    # do nothing
+  }else{
+    main::Log 1,"[RoombaUtils] Device $name phase transition $oldphase -> $phase";
+  }
+  
+}
+ 
+#############################################################################
+#
+#  initmap
 #
 #############################################################################
 
@@ -605,19 +636,29 @@ sub initmap($){
   my ($hash) = @_;
   $hash->{helper}{initmap}=1;
   $hash->{helper}{path}=();
-  $hash->{helper}{hull}=();
+  $hash->{helper}{pcount}=0;
   $hash->{helper}{theta}=();
   $hash->{helper}{thetaold}=undef;
   main::Log 1,"[RoombaUtils] Initialization of map for device ".$hash->{NAME};
   main::fhem("setreading ".($hash->{NAME})." cmMap initialized");
   }
   
+  
+#############################################################################
+#
+#  listmaps
+#
+#############################################################################
+
 sub listmaps($){
   my ($name) = @_;
   
   my $hash = $main::defs{$name};
   my $out    = "";
+  #my $now    = main::TimeNow();
   my $run    = 0;
+  
+  #main::Log 1,"[RoombaUtils] mapping for device $name";
   
   my ($fhb,$fhc);
   my $svgdir =  main::AttrVal($name,"SVG_dir","/opt/fhem/www/images");
@@ -642,9 +683,18 @@ sub listmaps($){
     }
     close($fhb);  
   }
-  #main::fhem("setreading $name cmMapList ",$out,1);
-  return $out;
+  #main::Log 1,"[RoombaUtils] setting READING cmMapList for device $name at time $now";
+  #$hash->{READINGS}{cmMapList}{VAL}=$out;
+  #$hash->{READINGS}{cmMapList}{TIME}=$now;
+  main::fhem("setreading $name cmMapList $out");
+  return
 }
+
+#############################################################################
+#
+#  delmap
+#
+#############################################################################
 
 sub delmap($$){
   my ($name,$evt) = @_;
@@ -654,7 +704,10 @@ sub delmap($$){
   
   my $hash = $main::defs{$name};
   my $out    = "";
+  #my $now    = main::TimeNow();
   my $run    = 0;
+  
+  #main::Log 1,"[RoombaUtils] deleting run $rundel for device $name";
   
   my ($fhb,$fhc);
   my $svgdir =  main::AttrVal($name,"SVG_dir","/opt/fhem/www/images");
@@ -697,13 +750,21 @@ sub delmap($$){
     close($fhb);  
     rename $svgdir."/".$filename2b.".tmp",$svgdir."/".$filename2b;
   }
-  return $out;
+
+  main::fhem("setreading $name cmMapList $out");
+  return
 }
+
+#############################################################################
+#
+#  finalizemap
+#
+#############################################################################
 
 sub finalizemap($){
   my ($hash) = @_;
   
-   my $name   = $hash->{NAME};
+  my $name   = $hash->{NAME};
   if(!defined($hash->{helper}{path})){
      main::Log 1,"[RoombaUtils] Finalization of map for device $name not possible, path undefined";
      return
@@ -823,9 +884,7 @@ sub finalizemap($){
   
   #-- save a lot of memory
   $hash->{helper}{path}=();
-  $hash->{helper}{hull}=();
   $hash->{helper}{theta}=();
-  $hash->{helper}{velocity}=();
   
   #######################################################              
   #-- prepare content and filename for file 2
@@ -955,9 +1014,8 @@ sub finalizemap($){
   #-- write output to collection file
   print $fhb $out2;
   close($fhb);
-  
-  main::fhem("setreading ".($hash->{NAME})." cmMap <html>finalized as <a href=\" http://192.168.0.94:8083/fhem/images/".$filename2c."\">".$filename2c."</a></html>");
-  
+  main::fhem("setreading $name cmMap <html>finalized as <a href=\"/fhem/images/".$filename2c."\">".$filename2c."</a></html>");
+  listmaps($name)
 }
 
 1;
