@@ -2281,7 +2281,7 @@ sub DbLog_execmemcache {
   my $dbpassword    = $attr{"sec$name"}{secret};
   my $dolog         = 1;
   
-  my (@row_array,$memcount,$dbh,$error);
+  my (@row_array,$dbh,$error);
   
   RemoveInternalTimer($hash, "DbLog_execmemcache");
     
@@ -2290,7 +2290,15 @@ sub DbLog_execmemcache {
       return;
   }
   
+  my $memcount = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
+  my $params   = {
+      hash          => $hash,
+      clim          => $clim,
+      memcount      => $memcount
+  };
+  
   if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {                         # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchroner Mode oder wenn disabled
+      DbLog_writeFileIfCacheOverflow ($params);                                              # Cache exportieren bei Overflow
       return;
   }
     
@@ -2319,16 +2327,9 @@ sub DbLog_execmemcache {
       }
   }
   
-  $memcount      = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
-  my $mce        = $ce == 2 ? 1 : 0;
+  my $mce = $ce == 2 ? 1 : 0;
 
   readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
-  
-  my $params = {
-      hash          => $hash,
-      clim          => $clim,
-      memcount      => $memcount
-  };
     
   if($memcount && $dolog && !$hash->{HELPER}{".RUNNING_PID"}) {     
       Log3 ($name, 4, "DbLog $name -> ################################################################");
@@ -2393,10 +2394,10 @@ return;
 #     Gibt "1" zurück wenn File geschrieben wurde
 ################################################################
 sub DbLog_writeFileIfCacheOverflow {
-  my $paref         = shift;
-  my $hash          = $paref->{hash};
-  my $clim          = $paref->{clim};
-  my $memcount      = $paref->{memcount};
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $clim     = $paref->{clim};
+  my $memcount = $paref->{memcount};
   
   my $name    = $hash->{NAME};
   my $success = 0;
@@ -2404,8 +2405,16 @@ sub DbLog_writeFileIfCacheOverflow {
   $coft       = ($coft && $coft < $clim) ? $clim : $coft;                 # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
   
   my $overflowstate = "normal";
-  my $overflownum   = ($coft && $memcount >= $coft) ? $memcount-$coft : $memcount >= $clim ? $memcount-$clim : 0; 
-  $overflowstate    = "exceeded" if($overflownum);
+  my $overflownum; 
+  
+  if($coft) {
+      $overflownum = $memcount >= $coft ? $memcount-$coft : 0;
+  }
+  else {
+      $overflownum = $memcount >= $clim ? $memcount-$clim : 0;
+  }
+  
+  $overflowstate = "exceeded" if($overflownum);
   
   readingsBeginUpdate($hash);
   readingsBulkUpdate          ($hash, "CacheOverflowLastNum",   $overflownum     );
