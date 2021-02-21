@@ -551,9 +551,9 @@ attr DEVICE setList \
   close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
   pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}
 attr DEVICE stateFormat pct
-set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=blind HOMEBRIDGEMAPPING="CurrentPosition=pct,minValue=0,maxValue=100,minStep=100;TargetPosition=pct,minValue=0,maxValue=100,minStep=100,cmds=0:close;;/.*/:open"
+set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20210220
+setreading DEVICE attrTemplateVersion 20210221
 
 
 name:zigbee2mqtt_ContactSensor
