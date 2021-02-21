@@ -7791,9 +7791,8 @@ sub CUL_HM_statCntRfresh($) {# update statistic once a day
 
 sub CUL_HM_trigLastEvent($$$$$){#set trigLast for central setting commands
   my ($dst,$mTp,$p01,$p02,$chn) = @_;
-  my $name = CUL_HM_id2Name($dst.$chn);
-  return if (!defined $defs{$name});
-  CUL_HM_UpdtReadSingle($defs{$name},"trigLast","fhem:".$p01,1);
+  my $hash = CUL_HM_id2Hash($dst.$chn);
+  CUL_HM_UpdtReadSingle($hash,"trigLast","fhem:".$p01,1);
 }
 
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
