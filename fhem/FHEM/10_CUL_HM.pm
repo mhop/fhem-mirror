@@ -305,8 +305,7 @@ sub CUL_HM_updateConfig($){##########################
                      ,"IODev","IOList","IOgrp","hmProtocolEvents","rssiLog"); 
       $hash->{helper}{role}{vrt} = 1;
       $hash->{helper}{role}{dev} = 1;
-      delete $hash->{helper}{mId};
-
+      delete $hash->{helper}{rxType};#will update rxType and mId
       next;
     }
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
@@ -318,7 +317,6 @@ sub CUL_HM_updateConfig($){##########################
     
     my $dHash = CUL_HM_getDeviceHash($hash);
     $dHash->{helper}{role}{prs} = 1 if($hash->{helper}{regLst} && $hash->{helper}{regLst} =~ m/3p/);
-    delete $hash->{helper}{mId};
 
     foreach my $rName ("D-firmware","D-serialNr",".D-devInfo",".D-stc"){
       # move certain attributes to readings for future handling
@@ -331,7 +329,6 @@ sub CUL_HM_updateConfig($){##########################
 
     if    ($md =~ /(HM-CC-TC|ROTO_ZEL-STG-RM-FWT)/){
 #      $hash->{helper}{role}{chn} = 1 if (length($id) == 6); #tc special
-      delete $hash->{helper}{mId};
    }
     elsif ($md =~ m/^HM-CC-RT-DN/){
       $hash->{helper}{shRegR}{"07"} = "00" if ($chn eq "04");# shadowReg List 7 read from CH 0
@@ -419,7 +416,6 @@ sub CUL_HM_updateConfig($){##########################
     }
     elsif ($st eq "virtual" ) {#setup virtuals
       $hash->{helper}{role}{vrt} = 1;
-      delete $hash->{helper}{mId};
       if (   $hash->{helper}{fkt} 
           && $hash->{helper}{fkt} =~ m/^(vdCtrl|virtThSens)$/){
         my $vId = substr($id."01",0,8);
@@ -464,6 +460,7 @@ sub CUL_HM_updateConfig($){##########################
         CUL_HM_hmInitMsg($hash);
       }
       if (CUL_HM_getRxType($hash)&0x02){#burst dev must restrict retries!
+                                        # set rxType and mId
         $attr{$name}{msgRepeat} = 1 if (!$attr{$name}{msgRepeat});
       }
     }
@@ -8156,7 +8153,17 @@ sub CUL_HM_ID2PeerList ($$$) { # {CUL_HM_ID2PeerList ("lvFrei","12345678",1)}
   
   my $peerIDs   = join(",",sort(CUL_HM_getPeers($name,"IDsRaw")));
   my $peerNames = join(",",sort(CUL_HM_getPeers($name,"Names" )));
-  $attr{$name}{peerIDs} = $peerIDs ? $peerIDs : "peerUnread";                 # make it public
+  if($defs{$name}{helper}{role}{vrt}){
+      if (!$peerIDs){
+        delete $attr{$name}{peerIDs};
+      }
+      else{
+        $attr{$name}{peerIDs} = $peerIDs;
+      }
+  }
+  else{
+      $attr{$name}{peerIDs} = $peerIDs ? $peerIDs : "peerUnread";                 # make it public
+  }
 
   my $hash  = $defs{$name};
   my $dHash = CUL_HM_getDeviceHash($hash);
