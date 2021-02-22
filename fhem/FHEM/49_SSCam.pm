@@ -184,6 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
   "9.8.4"  => "20.02.2021  sub Define minor fix ",
   "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
   "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
@@ -412,16 +413,16 @@ my %vNotesExtern = (
 # Tooltipps Textbausteine (http://www.walterzorn.de/tooltip/tooltip.htm#download), §NAME§ wird durch Kameranamen ersetzt 
 my %ttips_en = (
   ttrefresh   => "The playback of streaming content of camera of &quot;§NAME§&quot; will be restartet.",
-  ttrecstart  => "Start an endless recording of camera &quot;§NAME§&quot;.<br>You have to stop the recording manually.",
+  ttrecstart  => "Start an endless recording of camera &quot;§NAME§&quot;.\nYou have to stop the recording manually.",
   ttrecstop   => "Stopp the recording of camera &quot;§NAME§&quot;.",
   ttsnap      => "Take a snapshot of camera &quot;§NAME§&quot;.",
   ttcmdstop   => "Stopp playback of camera &quot;§NAME§&quot;",
-  tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.<br>The camera is enforced to restart HLS transmission.",
+  tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.\nThe camera is enforced to restart HLS transmission.",
   ttmjpegrun  => "Playback the MJPEG Livestream of camera &quot;§NAME§&quot;.",
   tthlsrun    => "Playback the native HTTP Livestream of camera &quot;§NAME§&quot;. The browser must have native support for HLS streaming.",
-  ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.<br>Both MJPEG and H.264 recordings are rendered.",
-  tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type H.264",
-  ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type MJPEG",
+  ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.\nBoth MJPEG and H.264 recordings are rendered.",
+  tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.\nIt only starts if the recording is type H.264",
+  ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.\nIt only starts if the recording is type MJPEG",
   ttlsnaprun  => "Playback of last snapshot of camera &quot;§NAME§&quot;.",
   confcam     => "The configuration menu of camera &quot;§NAME§&quot; will be opened in a new Browser page",
   confsvs     => "The configuration page of Synology Surveillance Station will be opened in a new Browser page",
@@ -430,16 +431,16 @@ my %ttips_en = (
       
 my %ttips_de = (
   ttrefresh   => "Die Wiedergabe des Streams von Kamera &quot;§NAME§&quot; wird neu gestartet.",
-  ttrecstart  => "Startet eine Endlosaufnahme von Kamera &quot;§NAME§&quot;.<br>Die Aufnahme muß manuell gestoppt werden.",
+  ttrecstart  => "Startet eine Endlosaufnahme von Kamera &quot;§NAME§&quot;.\nDie Aufnahme muß manuell gestoppt werden.",
   ttrecstop   => "Stoppt die laufende Aufnahme von Kamera &quot;§NAME§&quot;.",
   ttsnap      => "Ein Schnappschuß von Kamera &quot;§NAME§&quot; wird aufgenommen.", 
   ttcmdstop   => "Stopp Wiedergabe von Kamera &quot;§NAME§&quot;",
-  tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
+  tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.\nDie Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
   ttmjpegrun  => "Wiedergabe des MJPEG Livestreams von Kamera &quot;§NAME§&quot;",
-  tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet. (der Browser muss HLS nativ unterstützen)",
-  ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.<br>Es werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
-  tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
-  ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
+  tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.\nEs wird die HLS Funktion der Synology Surveillance Station verwendet. (der Browser muss HLS nativ unterstützen)",
+  ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.\nEs werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
+  tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.\nDie Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
+  ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.\nDie Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
   ttlsnaprun  => "Wiedergabe des letzten Schnappschusses von Kamera &quot;§NAME§&quot;.",
   confcam     => "Das Konfigurationsmenü von Kamera &quot;§NAME§&quot; wird in einer neuen Browserseite geöffnet",
   confsvs     => "Die Konfigurationsseite der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
@@ -1032,9 +1033,8 @@ sub FWsummaryFn {
   my $attr = AttrVal($d, "htmlattr", " ");
   Log3($name, 4, "$name - FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
   my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
+
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
   if(AttrVal("global","language","EN") =~ /EN/x) {
       $ttrecstart = $ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/gx;
@@ -1051,8 +1051,6 @@ sub FWsummaryFn {
       $tthlsreact = $ttips_de{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/gx;
   }
   
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
-  
   if($wltype eq "image") {
     if(ReadingsVal($name, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
@@ -1061,19 +1059,19 @@ sub FWsummaryFn {
       $ret .= "<img src=$link $attr><br>";
     }
     
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\")\">$imgstop </a>";
     $ret .= $imgblank; 
     
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {
       if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" title=\"$ttrecstart\">$imgrecendless </a>";
       } 
       else {
         # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" title=\"$ttrecstop\">$imgrecstop </a>";
       }       
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>"; 
     }
     
     $ret .= "<br>";
@@ -1089,7 +1087,7 @@ sub FWsummaryFn {
             "Iframes disabled".
             "</iframe>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
                 "Your browser does not support the audio element.".      
@@ -1111,9 +1109,9 @@ sub FWsummaryFn {
   elsif($wltype eq "base64img") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret .= "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     $ret .= $imgblank;
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>"; 
   } 
   elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
@@ -1123,18 +1121,16 @@ sub FWsummaryFn {
              "Your browser does not support the video tag".
              "</video>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" title=\"$tthlsreact\">$imghlsreact </a>";
     $ret .= $imgblank;
-    if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
-        # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+    if(ReadingsVal($d, "Record", "Stop") eq "Stop") {                # Aufnahmebutton endlos Start
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" title=\"$ttrecstart\">$imgrecendless </a>";
     } 
-    else {
-        # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+    else {                                                           # Aufnahmebutton Stop
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" title=\"$ttrecstop\">$imgrecstop </a>";
     }       
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>";                 
   
   } 
   elsif($wltype eq "video") {
@@ -1145,7 +1141,7 @@ sub FWsummaryFn {
             "Your browser does not support the video tag.".
             "</video>"; 
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     $ret .= "<br>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
@@ -1198,7 +1194,6 @@ sub FWconfCam {
   my $svsip   = $hash->{SERVERADDR};
   my $svsport = $hash->{SERVERPORT};
   my $svsprot = $hash->{PROTOCOL};
-  my $ttjs    = "/fhem/pgm2/sscam_tooltip.js"; 
   my $attr    = AttrVal($name, "htmlattr", "");
   my $alias   = AttrVal($name, "alias", $name);    
   my $winname = $name."_view";
@@ -1211,10 +1206,10 @@ sub FWconfCam {
   if(IsModelCam($hash)) {                                         # Camera Device
       return $ret if(!$cip);
       if(AttrVal("global","language","EN") =~ /DE/x) {
-          $cexpl = $ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/gx;
       } 
       else {
-          $cexpl = $ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/gx;
       }
       $cs = "window.open('http://$cip')";
   
@@ -1222,10 +1217,10 @@ sub FWconfCam {
   else {                                                              # SVS-Device
       return $ret if(!$svsip);
       if(AttrVal("global","language","EN") =~ /DE/x) {
-          $cexpl = $ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/gx;
       } 
       else {
-          $cexpl = $ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/gx;
       }    
       $cs = "window.open('$svsprot://$svsip:$svsport/cam')";      
   }
@@ -1240,20 +1235,17 @@ sub FWconfCam {
   }   
   
   $cicon = FW_makeImage($cicon); $hicon = FW_makeImage($hicon);
-  $bs    = "Tip(`$cexpl`)";
-  $bh    = "Tip(`$hexpl`)";
   
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $ret .= "<style>TD.confcam {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'>";
   $ret .= '<tbody>';  
   $ret .= "<td>"; 
   
-  $ret .= "<a onClick=$cs onmouseover=$bs onmouseout=\"UnTip()\"> $cicon </a>";  
+  $ret .= "<a onClick=$cs title=\"$cexpl\"> $cicon </a>";  
   
   $ret .= "</td><td>";  
   
-  $ret .= "<a onClick=$ch onmouseover=$bh onmouseout=\"UnTip()\"> $hicon </a>";  
+  $ret .= "<a onClick=$ch title=\"$hexpl\"> $hicon </a>";  
  
   $ret .= "</td>";
   $ret .= "</tr>";
@@ -7620,9 +7612,7 @@ sub streamDev {                                               ## no critic 'comp
       $cmdrefresh    = "ftui.setFhemStatus('set $camname refresh STRM:$uuid')";      
   }
   
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
   my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact);
   my ($ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
   
@@ -7735,8 +7725,7 @@ sub streamDev {                                               ## no critic 'comp
     ttlsnaprun         => $ttlsnaprun,
   );
   
-  $ret  = "";
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
+  $ret  = "";            
   $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   if($ftui) {
       $ret .= "<span align=\"$hdrAlign\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
@@ -7852,15 +7841,13 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   }
   
   if(!$hb) {
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {            # Aufnahmebutton endlos Start
+             $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
           } 
-          else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          else {                                                         # Aufnahmebutton Stop
+             $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
           }       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>"; 
   }    
   
   $ret .= "</td>"; 
@@ -7934,7 +7921,7 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
       }
       
       if(!$hb) {
-          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
       }
       
       $ret .= "</td>";
@@ -7996,7 +7983,7 @@ sub _streamDevGENERIC {                                        ## no critic 'not
   }
 
   if(!$htag) {
-      $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"/fhem?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
+      $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"$FW_ME?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
       return $ret; 
   }
   
@@ -8018,17 +8005,17 @@ sub _streamDevGENERIC {                                        ## no critic 'not
   Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
   
   if(!$hb) {
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
       $ret .= $imgblank;
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {            # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
       } 
       else {                                                             # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
       }       
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   }      
   $ret .= "</td>";
   
@@ -8092,7 +8079,7 @@ sub _streamDevHLS {                                            ## no critic 'not
   $d    =~ s/\./_/x;                                                             # Namensableitung zur javascript Codeanpassung
   
   if(!$m3u8) {
-      $cause = "You have to specify attribute \"hlsStrmObject\" in Camera $cam !";
+      $cause = qq{You have to specify attribute "hlsStrmObject" in Camera <a href="$FW_ME?detail=$cam">$cam</a> !};
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";
       return $ret; 
   }      
@@ -8104,17 +8091,17 @@ sub _streamDevHLS {                                            ## no critic 'not
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                      # Statusbit wenn ein Stream aktiviert ist
   
   if(!$hb) {
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
       $ret .= $imgblank;
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {                   # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
       } 
       else {                                                                    # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecstop\"  title=\"$ttrecstop\">$imgrecstop </a>";
       }       
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>"; 
   }      
   
   $ret .= "</td>";      
@@ -8171,12 +8158,12 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
       my $cam = AttrVal($camname, "alias", $camname);
       $cause  = "Playback cam \"$cam\" switched off";
       $ret   .= "<td> <br> <b> $cause </b> <br><br>";
-      $ret   .= "<a onClick=\"$cmdmjpegrun\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
-      $ret   .= "<a onClick=\"$cmdhlsrun\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(IsCapHLS($hash));  
-      $ret   .= "<a onClick=\"$cmdlrirun\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
-      $ret   .= "<a onClick=\"$cmdlh264run\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
-      $ret   .= "<a onClick=\"$cmdlmjpegrun\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
-      $ret   .= "<a onClick=\"$cmdlsnaprun\" onmouseover=\"Tip('$ttlsnaprun')\" onmouseout=\"UnTip()\">$imglsnaprun </a>";            
+      $ret   .= "<a onClick=\"$cmdmjpegrun\" title=\"$ttmjpegrun\">$imgmjpegrun </a>";
+      $ret   .= "<a onClick=\"$cmdhlsrun\" title=\"$tthlsrun\">$imghlsrun </a>" if(IsCapHLS($hash));  
+      $ret   .= "<a onClick=\"$cmdlrirun\" title=\"$ttlrrun\">$imglrirun </a>"; 
+      $ret   .= "<a onClick=\"$cmdlh264run\" title=\"$tth264run\">$imglh264run </a>";
+      $ret   .= "<a onClick=\"$cmdlmjpegrun\" title=\"$ttlmjpegrun\">$imglmjpegrun </a>";
+      $ret   .= "<a onClick=\"$cmdlsnaprun\" title=\"$ttlsnaprun\">$imglsnaprun </a>";            
       $ret   .= "</td>";
       return $ret;      
   }
@@ -8247,18 +8234,18 @@ sub __switchedIMAGE {                                          ## no critic 'not
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                         # Statusbit wenn ein Stream aktiviert ist
   }  
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
   $ret .= $imgblank; 
   
   if($hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {              
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {          # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
       } 
       else {                                                           # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
       }  
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   }   
   
   $ret .= "</td>";
@@ -8329,8 +8316,8 @@ sub __switchedIFRAME {                                         ## no critic 'not
                                         "</iframe>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                          # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";              
   $ret .= "</td>";
   
   if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
@@ -8383,7 +8370,7 @@ sub __switchedVIDEO {                                          ## no critic 'not
   
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                           # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>"; 
   $ret .= "</td>";
   
   if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
@@ -8435,9 +8422,9 @@ sub __switchedBASE64IMG {                                      ## no critic 'not
   $streamHash->{HELPER}{STREAM}       = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                                # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
   $ret .= $imgblank;
-  $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+  $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   $ret .= "</td>";
 
 return $ret;
@@ -8525,19 +8512,19 @@ sub __switchedHLS {                                            ## no critic 'not
   
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                   # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-  $ret .= "<a onClick=\"$cmdhlsreact\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
+  $ret .= "<a onClick=\"$cmdhlsreact\" title=\"$tthlsreact\">$imghlsreact </a>";
   $ret .= $imgblank;
   
   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {    # Aufnahmebutton endlos Start
-      $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
+      $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
   } 
   else {                                                     # Aufnahmebutton Stop
-      $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+      $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
   }     
   
-  $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
+  $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";                   
   $ret .= "</td>";
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
@@ -8716,8 +8703,8 @@ sub bindhlsjs {
        Log3($strmdev, 4, "$strmdev - HLS Streaming use net library \"$lib\" ");
    } 
    else {
-       $ret .= "<script type=\"text/javascript\" src=\"/fhem/pgm2/$hlsjs\"></script>";
-       Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"/fhem/pgm2/$hlsjs\" ");
+       $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/$hlsjs\"></script>";
+       Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"$FW_ME/pgm2/$hlsjs\" ");
    }
       
    my $back = << "END_HLSJS";
@@ -8783,7 +8770,7 @@ sub composeGallery {
           $dlink = $alias;                                                                    # keine Links im Stream-Dev generieren
       } 
       else {
-          $dlink = "<a href=\"/fhem?detail=$strmdev\">$alias</a>"; 
+          $dlink = "<a href=\"$FW_ME?detail=$strmdev\">$alias</a>"; 
       }
   }
   
@@ -8812,12 +8799,9 @@ sub composeGallery {
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
   if($strmdev && !AttrVal($name,"snapGalleryBoost",0)) {
-      $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>";
-      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a> setzen." if ($lang eq "DE");
+      $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"$FW_ME?detail=$name\">$name</a>";
+      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"$FW_ME?detail=$name\">$name</a> setzen." if ($lang eq "DE");
   }
-  
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
   
   my $ttsnap = $ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/xg;
   if(AttrVal("global","language","EN") =~ /DE/x) {
@@ -8852,7 +8836,6 @@ sub composeGallery {
   # Ausgabetabelle erstellen
   my $htmlCode;
   $htmlCode  = "<html>";
-  $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= "<div class=\"makeTable wide\"; style=\"text-align:$hdrAlign\"> $header <br>";
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
@@ -8950,7 +8933,7 @@ sub composeGallery {
   if(!$hb) {
       $htmlCode .= "<tr>";
       $htmlCode .= "<td style=\"text-align:left\" colspan=10>";
-      $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+      $htmlCode .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>" if($strmdev);
       $htmlCode .= "</td>";
       $htmlCode .= "</tr>";
   }

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  49_SSCam: solve JS error, remove sscam_tooltip.js
  - bugfix:  55_DWD_OpenData: no smartmatch warning (forum #118669)
  - bugfix:  70_BOTVAC: commandref anker point style <module><get|set|attr>
  - feature: 72_TA_CMI_JSON: added readOutputStates and according attributes
