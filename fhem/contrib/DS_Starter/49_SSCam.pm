@@ -184,7 +184,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "9.8.5"  => "22.02.2021  remove sscam_tooltip.js ",
+  "9.8.5"  => "22.02.2021  remove sscam_tooltip.js, substitute /fhem by \$FW_ME ",
   "9.8.4"  => "20.02.2021  sub Define minor fix ",
   "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
   "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
@@ -413,16 +413,16 @@ my %vNotesExtern = (
 # Tooltipps Textbausteine (http://www.walterzorn.de/tooltip/tooltip.htm#download), §NAME§ wird durch Kameranamen ersetzt 
 my %ttips_en = (
   ttrefresh   => "The playback of streaming content of camera of &quot;§NAME§&quot; will be restartet.",
-  ttrecstart  => "Start an endless recording of camera &quot;§NAME§&quot;.<br>You have to stop the recording manually.",
+  ttrecstart  => "Start an endless recording of camera &quot;§NAME§&quot;.\nYou have to stop the recording manually.",
   ttrecstop   => "Stopp the recording of camera &quot;§NAME§&quot;.",
   ttsnap      => "Take a snapshot of camera &quot;§NAME§&quot;.",
   ttcmdstop   => "Stopp playback of camera &quot;§NAME§&quot;",
-  tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.<br>The camera is enforced to restart HLS transmission.",
+  tthlsreact  => "Reactivate HTTP Livestreaming Interface of camera &quot;§NAME§&quot;.\nThe camera is enforced to restart HLS transmission.",
   ttmjpegrun  => "Playback the MJPEG Livestream of camera &quot;§NAME§&quot;.",
   tthlsrun    => "Playback the native HTTP Livestream of camera &quot;§NAME§&quot;. The browser must have native support for HLS streaming.",
-  ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.<br>Both MJPEG and H.264 recordings are rendered.",
-  tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type H.264",
-  ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.<br>It only starts if the recording is type MJPEG",
+  ttlrrun     => "Playback of last recording of camera &quot;§NAME§&quot; in an iFrame.\nBoth MJPEG and H.264 recordings are rendered.",
+  tth264run   => "Playback of last H.264 recording of camera &quot;§NAME§&quot;.\nIt only starts if the recording is type H.264",
+  ttlmjpegrun => "Playback of last MJPEG recording of camera &quot;§NAME§&quot;.\nIt only starts if the recording is type MJPEG",
   ttlsnaprun  => "Playback of last snapshot of camera &quot;§NAME§&quot;.",
   confcam     => "The configuration menu of camera &quot;§NAME§&quot; will be opened in a new Browser page",
   confsvs     => "The configuration page of Synology Surveillance Station will be opened in a new Browser page",
@@ -431,16 +431,16 @@ my %ttips_en = (
       
 my %ttips_de = (
   ttrefresh   => "Die Wiedergabe des Streams von Kamera &quot;§NAME§&quot; wird neu gestartet.",
-  ttrecstart  => "Startet eine Endlosaufnahme von Kamera &quot;§NAME§&quot;.<br>Die Aufnahme muß manuell gestoppt werden.",
+  ttrecstart  => "Startet eine Endlosaufnahme von Kamera &quot;§NAME§&quot;.\nDie Aufnahme muß manuell gestoppt werden.",
   ttrecstop   => "Stoppt die laufende Aufnahme von Kamera &quot;§NAME§&quot;.",
   ttsnap      => "Ein Schnappschuß von Kamera &quot;§NAME§&quot; wird aufgenommen.", 
   ttcmdstop   => "Stopp Wiedergabe von Kamera &quot;§NAME§&quot;",
-  tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.<br>Die Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
+  tthlsreact  => "Reaktiviert das HTTP Livestreaming Interface von Kamera &quot;§NAME§&quot;.\nDie Kamera wird aufgefordert die HLS Übertragung zu restarten.",     
   ttmjpegrun  => "Wiedergabe des MJPEG Livestreams von Kamera &quot;§NAME§&quot;",
-  tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.<br>Es wird die HLS Funktion der Synology Surveillance Station verwendet. (der Browser muss HLS nativ unterstützen)",
-  ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.<br>Es werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
-  tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
-  ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.<br>Die Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
+  tthlsrun    => "Wiedergabe des HTTP Livestreams von Kamera &quot;§NAME§&quot;.\nEs wird die HLS Funktion der Synology Surveillance Station verwendet. (der Browser muss HLS nativ unterstützen)",
+  ttlrrun     => "Wiedergabe der letzten Aufnahme von Kamera &quot;§NAME§&quot; in einem iFrame.\nEs werden sowohl MJPEG als auch H.264 Aufnahmen wiedergegeben.",
+  tth264run   => "Wiedergabe der letzten H.264 Aufnahme von Kamera &quot;§NAME§&quot;.\nDie Wiedergabe startet nur wenn die Aufnahme vom Typ H.264 ist.",
+  ttlmjpegrun => "Wiedergabe der letzten MJPEG Aufnahme von Kamera &quot;§NAME§&quot;.\nDie Wiedergabe startet nur wenn die Aufnahme vom Typ MJPEG ist.", 
   ttlsnaprun  => "Wiedergabe des letzten Schnappschusses von Kamera &quot;§NAME§&quot;.",
   confcam     => "Das Konfigurationsmenü von Kamera &quot;§NAME§&quot; wird in einer neuen Browserseite geöffnet",
   confsvs     => "Die Konfigurationsseite der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
@@ -7983,7 +7983,7 @@ sub _streamDevGENERIC {                                        ## no critic 'not
   }
 
   if(!$htag) {
-      $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"/fhem?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
+      $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"$FW_ME?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
       return $ret; 
   }
   
@@ -8079,7 +8079,7 @@ sub _streamDevHLS {                                            ## no critic 'not
   $d    =~ s/\./_/x;                                                             # Namensableitung zur javascript Codeanpassung
   
   if(!$m3u8) {
-      $cause = "You have to specify attribute \"hlsStrmObject\" in Camera $cam !";
+      $cause = qq{You have to specify attribute "hlsStrmObject" in Camera <a href="$FW_ME?detail=$cam">$cam</a> !};
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";
       return $ret; 
   }      
@@ -8703,8 +8703,8 @@ sub bindhlsjs {
        Log3($strmdev, 4, "$strmdev - HLS Streaming use net library \"$lib\" ");
    } 
    else {
-       $ret .= "<script type=\"text/javascript\" src=\"/fhem/pgm2/$hlsjs\"></script>";
-       Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"/fhem/pgm2/$hlsjs\" ");
+       $ret .= "<script type=\"text/javascript\" src=\"$FW_ME/pgm2/$hlsjs\"></script>";
+       Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"$FW_ME/pgm2/$hlsjs\" ");
    }
       
    my $back = << "END_HLSJS";
@@ -8770,7 +8770,7 @@ sub composeGallery {
           $dlink = $alias;                                                                    # keine Links im Stream-Dev generieren
       } 
       else {
-          $dlink = "<a href=\"/fhem?detail=$strmdev\">$alias</a>"; 
+          $dlink = "<a href=\"$FW_ME?detail=$strmdev\">$alias</a>"; 
       }
   }
   
@@ -8799,8 +8799,8 @@ sub composeGallery {
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
   if($strmdev && !AttrVal($name,"snapGalleryBoost",0)) {
-      $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>";
-      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a> setzen." if ($lang eq "DE");
+      $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"$FW_ME?detail=$name\">$name</a>";
+      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"$FW_ME?detail=$name\">$name</a> setzen." if ($lang eq "DE");
   }
   
   my $ttsnap = $ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/xg;
