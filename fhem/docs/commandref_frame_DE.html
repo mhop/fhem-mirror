@@ -177,72 +177,65 @@ gesetzte Werte &uuml;berschreiben die Werte aus der Konfigurationsdatei.
 <a name="command"></a>
 <h3>FHEM Befehlstypen</h3>
 <ul>
-Es gibt drei Arten von Befehlen: "FHEM" Befehle (werden in diesem Dokument
+<p>Es gibt drei Arten von Befehlen: "FHEM" Befehle (werden in diesem Dokument
 beschrieben), Shell-Befehle (diese m&uuml;ssen von doppelten
 Anf&uuml;hrungszeichen "" eingeschlossen werden) und perl-Ausdr&uuml;cken (von
 geschwungenen Klammern {} eingeschlossen). Shell-Befehle oder
 perl-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> oder <a
 href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch
-als "normale" Befehle angewendet werden.
-<br>
-<br>
+als "normale" Befehle angewendet werden.</p>
 
-Die folgenden drei Befehle bewirken z.B. dasselbe Ergebnis, wenn sie am
-telnet-Prompt eingegeben werden:
+<p>Die folgenden drei Befehle bewirken z.B. dasselbe Ergebnis, wenn sie am
+telnet-Prompt eingegeben werden:</p>
   <ul>
   set lamp off<br>
   "fhem.pl 7072 "set lamp off""<br>
   {fhem("set lamp off")}<br>
   </ul>
-Shell-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
-perl-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
-perl-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
+<p>Shell-Kommandos werden im Hintergrund ausgef&uuml;hrt,
+perl-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um
+perl-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und
 Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte <a href="#perl">
 Perl special</a> zum besseren Verst&auml;ndnis durch.</p>
-<p>Um FHEM-Befehle in einen Shell-Script zu triggern (dies ist 
-eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
-der fhem.pl.
-<br>
+<p>Um FHEM-Befehle in einen Shell-Script zu triggern (dies ist
+eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form
+der fhem.pl.</p>
 
-Mehrere FHEM-Kommandos hintereinander werden mittels 
-Semikolon (;) getrennt. Weil Semikola auch in perl-Code oder Shell-Programmen 
-benutzt werden, m&uuml;ssen sie mittels doppelten Semikola gesch&uuml;tzt werden. Lesen 
-Sie sich bitte die <b>Bemerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.
-<br>
+<p>Mehrere FHEM-Kommandos hintereinander werden mittels
+Semikolon (;) getrennt. Weil Semikola auch in perl-Code oder Shell-Programmen
+benutzt werden, m&uuml;ssen sie mittels doppelten Semikola gesch&uuml;tzt werden. Lesen
+Sie sich bitte die <b>Bemerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.</p>
 
-Z.B. schaltet die erste der folgenden Befehlszeilen die Lampe 1 nur/erst zur
+<p>Z.B. schaltet die erste der folgenden Befehlszeilen die Lampe 1 nur/erst zur
 Uhrzeit 07:00 Uhr aus, die Lampe 2 aber sofort und die zweite Befehlszeile
-schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus.
+schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus.</p>
   <ul>
   define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
   define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
   </ul>
-  <br>
-F&uuml;r jede weitere Indirektion muss man die Strichpunkte verdoppeln. Um also die beiden Lampen um 7:00 f&uuml;r 10 Minuten einzuschalten schreibt man:
+<p>F&uuml;r jede weitere Indirektion muss man die Strichpunkte verdoppeln. 
+Um also die beiden Lampen um 7:00 f&uuml;r 10 Minuten einzuschalten schreibt man:</p>
   <ul>
   define onAt at 07:00 set Lamp1 on;;set Lamp2 on;; define offAt at +00:10 set Lamp1 off;;;;set Lamp2 off
   </ul>
-Keine Angst, das Vorherige kann in FHEM auch deutlich einfacher formuliert werden als:
+<p>Keine Angst, das Vorherige kann in FHEM auch deutlich einfacher formuliert werden als:</p>
   <ul>
   define onAt at 07:00 set Lamp1,Lamp2 on-for-timer 600
   </ul>
-  <br>
 
-Befehle k&ouml;nnen entweder direkt eingegeben oder aus einer Datei (z.B. am
+<p>Befehle k&ouml;nnen entweder direkt eingegeben oder aus einer Datei (z.B. am
 Start von FHEM aus der Konfugurationsdatei) eingelesen werden. Die Befehle
 werden entweder direkt ausgef&uuml;hrt oder sp&auml;ter wenn sie als Argumente
 eines <a href="#at">at</a> oder <a href="#notify">notify</a>-Befehles verwendet
-werden.
+werden.</p>
 
-<p>Eine mit einem \ abgeschlossene Zeile wird mit der 
-nachfolgenden Zeile verbunden. Somit k&ouml;nnen lange Befehlszeilen (die z.B. aus 
-mehreren perl-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
-Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich &uuml;ber mehrere 
+<p>Eine mit einem \ abgeschlossene Zeile wird mit der
+nachfolgenden Zeile verbunden. Somit k&ouml;nnen lange Befehlszeilen (die z.B. aus
+mehreren perl-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige
+Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich &uuml;ber mehrere
 Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
-<p>&nbsp;</p>
-<br>
-Acthung: das Verwenden unterschiedlicher Befehlsarten (FHEM/Shell/perl) ist
-nicht unterst&uuml;tzt, auch wenn es in manchen F&auml;llen funktioniert.
+<p>Achtung: unterschiedlicher Befehlsarten (FHEM/Shell/perl) in einer Kommandozeile sind
+nicht unterst&uuml;tzt, auch wenn es in manchen F&auml;llen funktioniert.</p>
 
 </ul>
 <!-- command end - diese Zeile nicht entfernen! -->

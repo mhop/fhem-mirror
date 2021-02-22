@@ -5129,7 +5129,8 @@ utf8ToLatin1($)
 
 # replaces some common control chars by escape sequences
 # in order to make logs more readable
-sub escapeLogLine($) {
+sub
+escapeLogLine($) {
   my ($s)= @_;
   
   # http://perldoc.perl.org/perlrebackslash.html
