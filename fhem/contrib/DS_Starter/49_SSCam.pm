@@ -1,9 +1,9 @@
 ########################################################################################################################
-# $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $
+# $Id: 49_SSCam.pm 23781 2021-02-20 14:22:03Z DS_Starter $
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2020 by Heiko Maaz
+#       (c) 2015-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -36,14 +36,39 @@ package FHEM::SSCam;                                                            
 
 use strict;                           
 use warnings;
-use GPUtils qw(GP_Import GP_Export);                                               # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw( GP_Import GP_Export );                                             # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+use FHEM::SynoModules::API qw(:all);                                               # API Modul
+use FHEM::SynoModules::ErrCodes qw(:all);                                          # Error Code Modul
+use FHEM::SynoModules::SMUtils qw(
+                                  getClHash
+                                  delClHash
+                                  trim
+                                  moduleVersion
+                                  sortVersion
+                                  showModuleInfo
+                                  jboolmap
+                                  completeAPI
+                                  showAPIinfo
+                                  setCredentials
+                                  getCredentials
+                                  showStoredCredentials
+                                  evaljson
+                                  login
+                                  logout
+                                  setActiveToken
+                                  delActiveToken
+                                  delCallParts
+                                  setReadingErrorNone
+                                  setReadingErrorState
+                                 );                                                # Hilfsroutinen Modul
 use Data::Dumper;                                                                
 use MIME::Base64;
 use Time::HiRes qw( gettimeofday tv_interval );
 use HttpUtils;
 use Blocking;                                                                      # für EMail-Versand
 use Encode;
-eval "use JSON;1;"               or my $SScamMMDBI        = "JSON";                ## no critic 'eval' # Debian: apt-get install libjson-perl
+eval "use JSON;1;"               or my $MMJSON            = "JSON";                ## no critic 'eval' # Debian: apt-get install libjson-perl
 eval "use FHEM::Meta;1"          or my $modMetaAbsent     = 1;                     ## no critic 'eval'
 
 # Cache 
@@ -137,7 +162,7 @@ BEGIN {
           TelegramBot_Callback     
           TelegramBot_BinaryFileRead  
           FHEM::SSChatBot::formString          
-          FHEM::SSChatBot::addQueue
+          FHEM::SSChatBot::addSendqueue
           FHEM::SSChatBot::getApiSites
         )
   );
@@ -159,6 +184,43 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.8.5"  => "22.02.2021  remove sscam_tooltip.js ",
+  "9.8.4"  => "20.02.2021  sub Define minor fix ",
+  "9.8.3"  => "29.11.2020  fix cannot send snaps/recs if snapTelegramTxt + snapChatTxt and no cacheType (cacheType=internal) is set ",
+  "9.8.2"  => "04.10.2020  use showStoredCredentials from SMUtils ",
+  "9.8.1"  => "28.09.2020  align getApiSites_Parse to other syno modules ",
+  "9.8.0"  => "27.09.2020  optimize getApiSites_Parse, new getter apiInfo ",
+  "9.7.26" => "26.09.2020  use moduleVersion and other from SMUtils ",
+  "9.7.25" => "25.09.2020  change FHEM::SSChatBot::addQueue to FHEM::SSChatBot::addSendqueue ",
+  "9.7.24" => "24.09.2020  optimize prepareSendData ",
+  "9.7.23" => "23.09.2020  setVersionInfo back from SMUtils, separate prepareSendData ",
+  "9.7.22" => "22.09.2020  bugfix error condition if try new login in some cases ",
+  "9.7.21" => "21.09.2020  control parse function by the hparse hash step 4 ",
+  "9.7.20" => "20.09.2020  control parse function by the hparse hash step 3 (refactored getsnapinfo, getsnapgallery, runView Snap) ",
+  "9.7.19" => "18.09.2020  control parse function by the hparse hash step 2 ",
+  "9.7.18" => "16.09.2020  control parse function by the hparse hash ",
+  "9.7.17" => "13.09.2020  optimize _Oprunliveview ",
+  "9.7.16" => "12.09.2020  function _Oprunliveview to execute livestream (no snap / HLS) in new camOp variant ",
+  "9.7.15" => "12.09.2020  changed audiolink handling to new execution variant in camOp ",
+  "9.7.14" => "10.09.2020  bugfix in reactivation HLS streaming ",
+  "9.7.13" => "10.09.2020  optimize liveview handling ",
+  "9.7.12" => "09.09.2020  implement new getApiSites usage, httptimeout default value increased to 20s, fix setting motdetsc ",
+  "9.7.11" => "07.09.2020  implement new camOp control ",
+  "9.7.10" => "06.09.2020  rebuild timer sequences, minor fixes ",
+  "9.7.9"  => "05.09.2020  more refactoring according PBP ",
+  "9.7.8"  => "02.09.2020  refactored setter: pirSensor runPatrol goAbsPTZ move runView hlsreactivate hlsactivate refresh ".
+                           "extevent stopView setPreset setHome, camOP_parse for extevent, use setReadingErrorNone from SMUtils ".
+                           "fix setting CamNTPServer",
+  "9.7.7"  => "01.09.2020  minor fixes, refactored setter: createReadingsGroup enable disable motdetsc expmode homeMode ".
+                           "autocreateCams goPreset optimizeParams ",
+  "9.7.6"  => "31.08.2020  refactored setter: snapGallery createSnapGallery createPTZcontrol createStreamDev, minor bugfixes ",
+  "9.7.5"  => "30.08.2020  some more code review and optimisation, exitOnDis with fix check Availability instead of state ",
+  "9.7.4"  => "29.08.2020  some code changes ",
+  "9.7.3"  => "29.08.2020  move login, loginReturn, logout, logoutReturn, setActiveToken, delActiveToken to SMUtils.pm ".
+                           "move expErrorsAuth, expErrors to ErrCodes.pm",
+  "9.7.2"  => "26.08.2020  move setCredentials, getCredentials, evaljson to SMUtils.pm ",
+  "9.7.1"  => "25.08.2020  switch to lib/FHEM/SynoModules/API.pm and lib/FHEM/SynoModules/SMUtils.pm ".
+                           "move __getPtzPresetList, __getPtzPatrolList to return path of OpMOde Getcaminfo ",
   "9.7.0"  => "17.08.2020  compatibility to SSChatBot version 1.10.0 ",
   "9.6.1"  => "13.08.2020  avoid warnings during FHEM shutdown/restart ",
   "9.6.0"  => "12.08.2020  new attribute ptzNoCapPrePat ",
@@ -181,7 +243,7 @@ my %vNotesIntern = (
   "9.0.6"  => "26.11.2019  minor code change ",
   "9.0.5"  => "22.11.2019  commandref revised ",
   "9.0.4"  => "18.11.2019  fix FHEM crash when sending data by telegramBot, Forum: https://forum.fhem.de/index.php/topic,105486.0.html ",
-  "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix sendEmailblocking ",
+  "9.0.3"  => "04.11.2019  change send Telegram routines, undef variables, fix cache and transaction coding, fix __sendEmailblocking ",
   "9.0.2"  => "03.11.2019  change Streamdev type \"lastsnap\" use \$data Hash or CHI cache ",
   "9.0.1"  => "02.11.2019  correct snapgallery number of snaps in case of cache usage, fix display number of retrieved snaps ",
   "9.0.0"  => "26.10.2019  finalize all changes beginning with 8.20.0 and revised commandref ",
@@ -190,10 +252,10 @@ my %vNotesIntern = (
   "8.21.0" => "20.10.2019  implement Redis driver for CHI ",
   "8.20.0" => "19.10.2019  implement caching with CHI, implement {SENDCOUNT} ",
   "8.19.6" => "14.10.2019  optimize memory usage of composeGallery ",
-  "8.19.5" => "13.10.2019  change FH to Data in sendEmailblocking, save variables ",
+  "8.19.5" => "13.10.2019  change FH to Data in __sendEmailblocking, save variables ",
   "8.19.4" => "11.10.2019  further optimize memory usage when send recordings by email and/or telegram ",
   "8.19.3" => "09.10.2019  optimize memory usage when send images and recordings by email and/or telegram ",
-  "8.19.2" => "06.10.2019  delete key/value pairs in extractForTelegram and sendEmailblocking, ".
+  "8.19.2" => "06.10.2019  delete key/value pairs in __extractForTelegram and sendEmailblocking, ".
                            "change datacontainer of SNAPHASH(OLD) from %defs to %data ",
   "8.19.1" => "26.09.2019  set compatibility to 8.2.6 ",
   "8.19.0" => "21.09.2019  support attr \"hideAudio\" SSCamSTRM-device ",
@@ -214,6 +276,7 @@ my %vNotesIntern = (
 
 # Versions History extern
 my %vNotesExtern = (
+  "9.8.0"   => "27.09.2020 New get command 'apiInfo' retrieves the API information and opens a popup window to show it.  ", 
   "9.6.0"   => "12.08.2020 The new attribute 'ptzNoCapPrePat' is available. It's helpful if your PTZ camera doesn't have the capability ".
                            "to deliver Presets and Patrols. Setting the attribute avoid error log messages in that case. ",      
   "9.5.0"   => "15.07.2020 A new type 'master' supplements the possible createStreamDev command options. The streaming type ".
@@ -298,7 +361,7 @@ my %vNotesExtern = (
   "3.4.0"   => "21.03.2018 new commands startTracking, stopTracking ",
   "3.3.1"   => "20.03.2018 new readings CapPTZObjTracking, CapPTZPresetNumber ",
   "3.3.0"   => "25.02.2018 code review, API bug fix of runview lastrec, commandref revised (forum:#84953) ",
-  "3.2.4"   => "18.11.2017 fix bug don't retrieve getPtzPresetList if cam is disabled ",
+  "3.2.4"   => "18.11.2017 fix bug don't retrieve __getPtzPresetList if cam is disabled ",
   "3.2.3"   => "08.10.2017 set optimizeParams, get caminfo (simple), minor bugfix, commandref revised ",
   "3.2.0"   => "27.09.2017 new command get listLog, change to \$hash->{HELPER}{\".SNAPHASH\"} for avoid huge \"list\"-report ",
   "3.1.0"   => "26.09.2017 move extevent from CAM to SVS model, Reading PollState enhanced for CAM-Model, minor fixes ",
@@ -347,55 +410,6 @@ my %vNotesExtern = (
   "1.0.0"   => "12.12.2015 initial, changed completly to HttpUtils_NonblockingGet "
 );
 
-# Aufbau Errorcode-Hashes (siehe Surveillance Station Web API)
-my %errauthlist = (
-  100 => "Unknown error",
-  101 => "The account parameter is not specified",
-  102 => "API does not exist",
-  400 => "Invalid user or password",
-  401 => "Guest or disabled account",
-  402 => "Permission denied - DSM-Session: make sure user is member of Admin-group, SVS-Session: make sure SVS package is started, make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  403 => "One time password not specified",
-  404 => "One time password authenticate failed",
-  405 => "method not allowd - maybe the password is too long",
-  406 => "OTP code enforced",
-  407 => "Max Tries (if auto blocking is set to true) - make sure FHEM-Server IP won't be blocked in DSM automated blocking list",
-  408 => "Password Expired Can not Change",
-  409 => "Password Expired",
-  410 => "Password must change (when first time use or after reset password by admin)",
-  411 => "Account Locked (when account max try exceed)",
-);
-
-my %errlist = (
-  100 => "Unknown error",
-  101 => "Invalid parameters",
-  102 => "API does not exist",
-  103 => "Method does not exist",
-  104 => "This API version is not supported",
-  105 => "Insufficient user privilege",
-  106 => "Connection time out",
-  107 => "Multiple login detected",
-  117 => "need manager rights in SurveillanceStation for operation",
-  400 => "Execution failed",
-  401 => "Parameter invalid",
-  402 => "Camera disabled",
-  403 => "Insufficient license",
-  404 => "Codec activation failed",
-  405 => "CMS server connection failed",
-  407 => "CMS closed",
-  410 => "Service is not enabled",
-  412 => "Need to add license",
-  413 => "Reach the maximum of platform",
-  414 => "Some events not exist",
-  415 => "message connect failed",
-  417 => "Test Connection Error",
-  418 => "Object is not exist",
-  419 => "Visualstation name repetition",
-  439 => "Too many items selected",
-  502 => "Camera disconnected",
-  600 => "Presetname and PresetID not found in Hash",
-);
-
 # Tooltipps Textbausteine (http://www.walterzorn.de/tooltip/tooltip.htm#download), §NAME§ wird durch Kameranamen ersetzt 
 my %ttips_en = (
   ttrefresh   => "The playback of streaming content of camera of &quot;§NAME§&quot; will be restartet.",
@@ -433,9 +447,157 @@ my %ttips_de = (
   helpsvs     => "Die Onlinehilfe der Synology Surveillance Station wird in einer neuen Browserseite geöffnet",
 );
 
+my %hset = (                                                                # Hash für Set-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+  credentials         => { fn => "_setcredentials",         needcred => 0 },                     
+  smtpcredentials     => { fn => "_setsmtpcredentials",     needcred => 0 },
+  on                  => { fn => "_seton",                  needcred => 1 },
+  off                 => { fn => "_setoff",                 needcred => 1 },
+  snap                => { fn => "_setsnap",                needcred => 1 },
+  snapCams            => { fn => "_setsnapCams",            needcred => 1 },
+  startTracking       => { fn => "_setstartTracking",       needcred => 1 },
+  stopTracking        => { fn => "_setstopTracking",        needcred => 1 },
+  setZoom             => { fn => "_setsetZoom",             needcred => 1 },
+  snapGallery         => { fn => "_setsnapGallery",         needcred => 1 },
+  createSnapGallery   => { fn => "_setcreateSnapGallery",   needcred => 1 },
+  createPTZcontrol    => { fn => "_setcreatePTZcontrol",    needcred => 1 },
+  createStreamDev     => { fn => "_setcreateStreamDev",     needcred => 1 },
+  createReadingsGroup => { fn => "_setcreateReadingsGroup", needcred => 1 },
+  enable              => { fn => "_setenable",              needcred => 1 },
+  disable             => { fn => "_setdisable",             needcred => 1 },
+  motdetsc            => { fn => "_setmotdetsc",            needcred => 1 },
+  expmode             => { fn => "_setexpmode",             needcred => 1 },
+  homeMode            => { fn => "_sethomeMode",            needcred => 1 },
+  autocreateCams      => { fn => "_setautocreateCams",      needcred => 1 },
+  goPreset            => { fn => "_setgoPreset",            needcred => 1 },
+  optimizeParams      => { fn => "_setoptimizeParams",      needcred => 1 },
+  pirSensor           => { fn => "_setpirSensor",           needcred => 1 },
+  runPatrol           => { fn => "_setrunPatrol",           needcred => 1 },
+  goAbsPTZ            => { fn => "_setgoAbsPTZ",            needcred => 1 },
+  move                => { fn => "_setmove",                needcred => 1 },
+  runView             => { fn => "_setrunView",             needcred => 1 },
+  hlsreactivate       => { fn => "_sethlsreactivate",       needcred => 1 },
+  hlsactivate         => { fn => "_sethlsactivate",         needcred => 1 },
+  refresh             => { fn => "_setrefresh",             needcred => 0 },
+  extevent            => { fn => "_setextevent",            needcred => 1 },
+  stopView            => { fn => "_setstopView",            needcred => 1 },
+  setPreset           => { fn => "_setsetPreset",           needcred => 1 },
+  setHome             => { fn => "_setsetHome",             needcred => 1 },
+  delPreset           => { fn => "_setdelPreset",           needcred => 1 },
+);
+
+my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
+  apiInfo           => { fn => "_getapiInfo",           needcred => 1 },  
+  caminfo           => { fn => "_getcaminfo",           needcred => 1 },
+  caminfoall        => { fn => "_getcaminfoall",        needcred => 1 },
+  homeModeState     => { fn => "_gethomeModeState",     needcred => 1 },
+  listLog           => { fn => "_getlistLog",           needcred => 1 },
+  listPresets       => { fn => "_getlistPresets",       needcred => 1 },
+  saveRecording     => { fn => "_getsaveRecording",     needcred => 1 },
+  svsinfo           => { fn => "_getsvsinfo",           needcred => 1 },
+  storedCredentials => { fn => "_getstoredCredentials", needcred => 1 },
+  snapGallery       => { fn => "_getsnapGallery",       needcred => 1 },
+  snapinfo          => { fn => "_getsnapinfo",          needcred => 1 },
+  snapfileinfo      => { fn => "_getsnapfileinfo",      needcred => 1 },
+  eventlist         => { fn => "_geteventlist",         needcred => 1 },
+  stmUrlPath        => { fn => "_getstmUrlPath",        needcred => 1 },
+  scanVirgin        => { fn => "_getscanVirgin",        needcred => 1 },
+  versionNotes      => { fn => "_getversionNotes",      needcred => 1 },
+);
+
+my %hparse = (                                                              # Hash der Opcode Parse Funktionen
+  Start            => { fn => "_parseStart",            },
+  Stop             => { fn => "_parseStop",             },
+  GetRec           => { fn => "_parseGetRec",           },
+  MotDetSc         => { fn => "_parseMotDetSc",         },
+  getsvslog        => { fn => "_parsegetsvslog",        },
+  SaveRec          => { fn => "_parseSaveRec",          },
+  gethomemodestate => { fn => "_parsegethomemodestate", },
+  getPresets       => { fn => "_parsegetPresets",       },
+  Snap             => { fn => "_parseSnap",             },
+  getsvsinfo       => { fn => "_parsegetsvsinfo",       },
+  runliveview      => { fn => "_parserunliveview",      },
+  getStmUrlPath    => { fn => "_parsegetStmUrlPath",    },
+  Getcaminfo       => { fn => "_parseGetcaminfo",       },
+  Getptzlistpatrol => { fn => "_parseGetptzlistpatrol", },
+  Getptzlistpreset => { fn => "_parseGetptzlistpreset", },
+  Getcapabilities  => { fn => "_parseGetcapabilities",  },
+  getmotionenum    => { fn => "_parsegetmotionenum",    },
+  geteventlist     => { fn => "_parsegeteventlist",     },
+  gopreset         => { fn => "_parsegopreset",         },
+  getsnapinfo      => { fn => "_parsegetsnapinfo",      },
+  getsnapgallery   => { fn => "_parsegetsnapgallery",   },
+);
+
+my %hdt = (                                                                 # Delta Timer Hash für Zeitsteuerung der Funktionen
+  __camSnap          => 0.2,                                                # ab hier hohe Prio
+  __camStartRec      => 0.3,                                                
+  __camStopRec       => 0.3,
+  __startTrack       => 0.3,
+  __stopTrack        => 0.3,
+  __moveStop         => 0.3,
+  __doPtzAaction     => 0.4,
+  __setZoom          => 0.4,
+  __getSnapFilename  => 0.5,
+  __runLiveview      => 0.5,
+  __stopLiveview     => 0.5,
+  __extEvent         => 0.5,
+  __camEnable        => 0.5,
+  __camDisable       => 0.5,
+  __setOptParams     => 0.6,                                                # ab hier mittlere Prio
+  __setHomeMode      => 0.6,
+  __getHomeModeState => 0.7,
+  __getRec           => 0.7,
+  __getCapabilities  => 0.7,
+  __activateHls      => 0.7,
+  __reactivateHls    => 0.7,
+  __getSvsLog        => 0.8,
+  __getRecAndSave    => 0.9,
+  __getSvsInfo       => 1.0,
+  __camExpmode       => 1.1,
+  __getPresets       => 1.2,
+  __setPreset        => 1.2,
+  __setHome          => 1.2,
+  __managePir        => 1.2,
+  __delPreset        => 1.4,
+  __getStreamFormat  => 1.4,
+  __getSnapInfo      => 1.7,                                                # ab hier niedrige Prio
+  __camMotDetSc      => 1.8,
+  __getStmUrlPath    => 2.0,
+  __getEventList     => 2.0,
+  __getMotionEnum    => 2.0,
+  __getPtzPresetList => 2.0,
+  __getPtzPatrolList => 2.0,
+  __getCamInfo       => 2.0,
+  __camAutocreate    => 2.1,
+  __sessionOff       => 2.7,
+  __getApiInfo       => 2.7,
+);
+
 my %imc = (                                                                 # disbled String modellabhängig (SVS / CAM)
   0 => { 0 => "initialized", 1 => "inactive" },
   1 => { 0 => "off",         1 => "inactive" },              
+);
+
+my %hexmo = (                                                               # Hash Exposure Modes
+  auto  => 0,
+  day   => 1,
+  night => 2,
+);
+
+my %hrkeys = (                                                              # Hash der möglichen Response Keys 
+  camLiveMode      => { 0  => "Liveview from DS", 1 => "Liveview from Camera", },
+  source           => { -1 => "disabled",         0 => "Camera",                 1 => "SVS", },   
+  deviceType       => { 1  => "Camera",           2 => "Video_Server",           4 => "PTZ",          8 => "Fisheye", },
+  camStatus        => { 1  => "enabled",          2 => "deleted",                3 => "disconnected", 4 => "unavailable", 5  => "ready",   6 => "inaccessible", 7 => "disabled", 8 => "unrecognized", 9 => "setting", 10 => "Server disconnected", 11 => "migrating", 12 => "others", 13 => "Storage removed", 14 => "stopping", 15 => "Connect hist failed", 16 => "unauthorized", 17 => "RTSP error", 18 => "No video", },    
+  exposure_control => { 0  => "Auto",             1 => "50HZ",                   2 => "60HZ",         3 => "Hold",        4  => "Outdoor", 5 => "None",         6 => "Unknown", }, 
+  camAudioType     => { 0  => "Unknown",          1 => "PCM",                    2 => "G711",         3 => "G726",        4  => "AAC",     5 => "AMR", },
+  exposure_mode    => { 0  => "Auto",             1 => "Day",                    2 => "Night",        3 => "Schedule",    4  => "Unknown", },
+  userPriv         => { 0  => "No Access",        1 => "Admin",                  2 => "Manager",      4 => "Viewer",      FF => "All", },
+  ptzFocus         => { 0  => "false",            1 => "support step operation", 2 => "support continuous operation", },
+  ptzTilt          => { 0  => "false",            1 => "support step operation", 2 => "support continuous operation", },
+  ptzZoom          => { 0  => "false",            1 => "support step operation", 2 => "support continuous operation", },
+  ptzPan           => { 0  => "false",            1 => "support step operation", 2 => "support continuous operation", },
+  ptzIris          => { 0  => "false",            1 => "support step operation", 2 => "support continuous operation", },
 );
 
 my %zd = (                                                                  # Hash der Zoomsteuerung 
@@ -465,10 +627,12 @@ my %sdswfn = (                                                             # Fun
 
 # Standardvariablen und Forward-Deklaration
 my $defSlim           = 3;                                 # default Anzahl der abzurufenden Schnappschüsse mit snapGallery
+my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $defSnum           = "1,2,3,4,5,6,7,8,9,10";            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $compstat          = "8.2.8";                           # getestete SVS-Version
 my $valZoom           = ".++,+,stop,-,--.";                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
+my $todef             = 20;                                # httptimeout default Wert
 
 #use vars qw($FW_ME);                                      # webname (default is fhem), used by 97_GROUP/weblink
 #use vars qw($FW_subdir);                                  # Sub-path in URL, used by FLOORPLAN/weblink
@@ -526,7 +690,7 @@ my %vHintsExt_en = (
          "<br><br>",
   "4" => "The message Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" means that ".
          "the used SSCam version was currently not tested or (partially) incompatible with the installed version of Synology Surveillance Station (Reading \"SVSversion\"). ".
-         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY.\n".
+         "The compatible SVS-Version is printed out in the Internal COMPATIBILITY. <br>".
          "<b>Actions:</b> At first please update your SSCam version. If the message does appear furthermore, please inform the SSCam Maintainer. ".
          "To ignore this message temporary, you may reduce the verbose level of your SSCam device. ".
          "<br><br>",
@@ -592,7 +756,7 @@ my %vHintsExt_de = (
          "<br><br>",
   "4" => "Die Meldung \"WARNING - The current/simulated SVS-version ... may be incompatible with SSCam version...\" ist ein Hinweis darauf, dass ".
          "die eingesetzte SSCam Version noch nicht mit der verwendeten Version von Synology Surveillance Station (Reading \"SVSversion\") getestet ".
-         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.\n".
+         "wurde oder (teilweise) mit dieser Version nicht kompatibel ist. Die kompatible SVS-Version ist im Internal COMPATIBILITY ersichtlich.<br>".
          "<b>Maßnahmen:</b> Bitte SSCam zunächst updaten. Sollte die Meldung weiterhin auftreten, bitte den SSCam Maintainer informieren. Zur ".
          "vorübergehenden Ignorierung kann der verbose Level des SSCam-Devices entsprechend reduziert werden. ".
          "<br><br>",
@@ -679,11 +843,10 @@ sub Define {
   # define CamCP1 SSCAM Carport 192.168.2.20 [5000] 
   #       ($hash)  [1]    [2]        [3]      [4]  
   #
-  my $hash = shift;
-  my $def  = shift;
-  my $name = $hash->{NAME};
+  my ($hash, $def) = @_;
+  my $name         = $hash->{NAME};
   
- return "Error: Perl module ".$SScamMMDBI." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($SScamMMDBI);
+ return "Error: Perl module ".$MMJSON." is missing. Install it on Debian with: sudo apt-get install libjson-perl" if($MMJSON);
   
   my @a = split m{\s+}x, $def;
   
@@ -703,32 +866,12 @@ sub Define {
   $hash->{PROTOCOL}               = $proto;
   $hash->{COMPATIBILITY}          = $compstat;                                   # getestete SVS-version Kompatibilität 
   $hash->{HELPER}{MODMETAABSENT}  = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
-  
-  # benötigte API's in $hash einfügen
-  $hash->{HELPER}{APIINFO}        = "SYNO.API.Info";                             # Info-Seite für alle API's, einzige statische Seite !                                                    
-  $hash->{HELPER}{APIAUTH}        = "SYNO.API.Auth";                             # API used to perform session login and logout
-  $hash->{HELPER}{APISVSINFO}     = "SYNO.SurveillanceStation.Info"; 
-  $hash->{HELPER}{APIEVENT}       = "SYNO.SurveillanceStation.Event"; 
-  $hash->{HELPER}{APIEXTREC}      = "SYNO.SurveillanceStation.ExternalRecording"; 
-  $hash->{HELPER}{APIEXTEVT}      = "SYNO.SurveillanceStation.ExternalEvent";
-  $hash->{HELPER}{APICAM}         = "SYNO.SurveillanceStation.Camera";           # stark geändert ab API v2.8
-  $hash->{HELPER}{APISNAPSHOT}    = "SYNO.SurveillanceStation.SnapShot";         # This API provides functions on snapshot, including taking, editing and deleting snapshots.
-  $hash->{HELPER}{APIPTZ}         = "SYNO.SurveillanceStation.PTZ";
-  $hash->{HELPER}{APIPRESET}      = "SYNO.SurveillanceStation.PTZ.Preset";
-  $hash->{HELPER}{APICAMEVENT}    = "SYNO.SurveillanceStation.Camera.Event";
-  $hash->{HELPER}{APIVIDEOSTM}    = "SYNO.SurveillanceStation.VideoStreaming";   # verwendet in Response von "SYNO.SurveillanceStation.Camera: GetLiveViewPath" -> StreamKey-Methode
-  # $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Streaming";        # provides methods to get Live View or Event video stream, removed in API v2.8
-  $hash->{HELPER}{APISTM}         = "SYNO.SurveillanceStation.Stream";           # Beschreibung ist falsch und entspricht "SYNO.SurveillanceStation.Streaming" auch noch ab v2.8
-  $hash->{HELPER}{APIHM}          = "SYNO.SurveillanceStation.HomeMode";
-  $hash->{HELPER}{APILOG}         = "SYNO.SurveillanceStation.Log";
-  $hash->{HELPER}{APIAUDIOSTM}    = "SYNO.SurveillanceStation.AudioStream";      # Audiostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
-  $hash->{HELPER}{APIVIDEOSTMS}   = "SYNO.SurveillanceStation.VideoStream";      # Videostream mit SID, removed in API v2.8 (noch undokumentiert verfügbar)
-  $hash->{HELPER}{APIREC}         = "SYNO.SurveillanceStation.Recording";        # This API provides method to query recording information.
-  
+    
   # Startwerte setzen
   if(IsModelCam($hash)) {                                                        # initiale Webkommandos setzen
       $attr{$name}{webCmd}             = "on:off:snap:enable:disable:runView:stopView";  
-  } else {
+  } 
+  else {
       $attr{$name}{webCmd}             = "homeMode";
       $attr{$name}{webCmdLabel}        = "HomeMode";
   }
@@ -737,26 +880,35 @@ sub Define {
   $hash->{HELPER}{OLDVALPOLL}          = "0";  
   $hash->{HELPER}{RECTIME_DEF}         = "15";                                   # Standard für rectime setzen, überschreibbar durch Attribut "rectime" bzw. beim "set .. on-for-time"
   $hash->{HELPER}{OLDPTZHOME}          = "";
-  $hash->{".ptzhtml"}                  = "";
+  $hash->{".ptzhtml"}                  = "";                                     # initial -> es wird ptzpanel neu eingelesen
   $hash->{HELPER}{HLSSTREAM}           = "inactive";                             # Aktivitätsstatus HLS-Streaming
   $hash->{HELPER}{SNAPLIMIT}           = 0;                                      # abgerufene Anzahl Snaps
   $hash->{HELPER}{TOTALCNT}            = 0;                                      # totale Anzahl Snaps
   
-  # Versionsinformationen setzen
-  setVersionInfo($hash);
+  my $params = {
+      hash        => $hash,
+      notes       => \%vNotesIntern,
+      useAPI      => 1,
+      useSMUtils  => 1,
+      useErrCodes => 1
+  };
+  use version 0.77; our $VERSION = moduleVersion ($params);                      # Versionsinformationen setzen
   
-  readingsBeginUpdate ($hash);
+  readingsBeginUpdate ($hash );
   readingsBulkUpdate  ($hash, "PollState", "Inactive");                          # es ist keine Gerätepolling aktiv  
+  
   if(IsModelCam($hash)) {
       readingsBulkUpdate ($hash, "Availability", "???");                         # Verfügbarkeit ist unbekannt
       readingsBulkUpdate ($hash, "state",        "off");                         # Init für "state" , Problemlösung für setstate, Forum #308
-  } else {
+  } 
+  else {
       readingsBulkUpdate ($hash, "state", "Initialized");                        # Init für "state" wenn SVS  
   }
-  readingsEndUpdate($hash,1);                                          
   
-  getCredentials($hash,1, "svs" );                                               # Credentials lesen und in RAM laden ($boot=1)      
-  getCredentials($hash,1, "smtp");
+  readingsEndUpdate ($hash,1);                                          
+  
+  getCredentials ($hash,1, "credentials" );                                      # Credentials lesen und in RAM laden ($boot=1)      
+  getCredentials ($hash,1, "SMTPcredentials");
   
   # initiale Routinen zufällig verzögert nach Restart ausführen
   RemoveInternalTimer ($hash,                        "FHEM::SSCam::initOnBoot"          );
@@ -796,11 +948,11 @@ sub delayedShutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  $shutdownInProcess = 1;                                       # Statusbit shutdown setzen -> getApiSites wird nicht mehr ausgeführt
+  $shutdownInProcess = 1;                                       # Statusbit shutdown setzen -> asynchrone Funktionen nicht mehr ausgeführen
   
   Log3($name, 2, "$name - Quit session due to shutdown ...");
 
-  sessionOff($hash);
+  __sessionOff($hash);
   
   if($hash->{HELPER}{CACHEKEY}) {
       cache($name, "c_destroy"); 
@@ -831,1272 +983,10 @@ sub Delete {
     CommandDelete($hash->{CL},"$sgdev");
     
     CommandDelete($hash->{CL},"TYPE=SSCamSTRM:FILTER=PARENT=$name");   # alle zugeordneten Streaming-Devices löschen falls vorhanden
-	
-	delete $data{SSCam}{$name};                                        # internen Cache löschen
+    
+    delete $data{SSCam}{$name};                                        # internen Cache löschen
     
 return;
-}
-
-################################################################
-sub Attr {
-    my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
-    
-    my ($do,$val,$cache);
-      
-    # $cmd can be "del" or "set"
-    # $name is device name
-    # aName and aVal are Attribute name and value
-    
-    if ($aName eq "session") {
-        delete $hash->{HELPER}{SID};
-    }
-    
-    if ($aName =~ /hlsNetScript/x && IsModelCam($hash)) {            
-        return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
-    }
-    
-    if ($aName =~ /snapReadingRotate/x && !IsModelCam($hash)) {            
-        return " The attribute \"$aName\" is not valid for devices of type \"SVS\"!.";
-    }
-    
-    # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
-    if ($cmd eq "set" && ($aName =~ m/ptzPanel_/x)) {
-        for my $n (0..9) { 
-            $n = sprintf("%2.2d",$n);
-            addToDevAttrList($name, "ptzPanel_row$n");
-        }
-        addToDevAttrList($name, "ptzPanel_iconPrefix");
-        addToDevAttrList($name, "ptzPanel_iconPath");
-    }
-    
-    if($aName =~ m/ptzPanel_row|ptzPanel_Home|ptzPanel_use/x) {
-        InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::addptzattr", "$name", 0);
-    } 
-       
-    if ($aName eq "disable") {
-        my $iscam = IsModelCam($hash); 
-        if($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-        if(IsModelCam($hash)) {
-            $val = ($do == 1 ? "inactive" : "off");
-        } else {
-            $val = ($do == 1 ? "inactive" : "initialized");
-        }
-        
-        if ($do == 1) {
-            RemoveInternalTimer($hash);
-        } else {
-            InternalTimer(gettimeofday()+int(rand(30)), "FHEM::SSCam::initOnBoot", $hash, 0);
-        }
-    
-        readingsSingleUpdate($hash, "state",        $imc{$iscam}{$do}, 1);
-        readingsSingleUpdate($hash, "PollState",    "Inactive",        1) if($do == 1);
-        readingsSingleUpdate($hash, "Availability", "???",             1) if($do == 1 && IsModelCam($hash));
-    }
-    
-    if($aName =~ m/cacheType/) {
-        my $type = AttrVal($name,"cacheType","internal");
-        if($cmd eq "set") {
-            if($aVal ne "internal") {
-                if($SScamMMCHI) {
-                    return "Perl cache module ".$SScamMMCHI." is missing. You need to install it with the FHEM Installer for example.";
-                }
-                if($aVal eq "redis") {
-                    if($SScamMMCHIRedis) {
-                        return "Perl cache module ".$SScamMMCHIRedis." is missing. You need to install it with the FHEM Installer for example.";
-                    }
-                    if(!AttrVal($name,"cacheServerParam","")) {
-                        return "For cacheType \"$aVal\" you must set first attribute \"cacheServerParam\" for Redis server connection: <Redis-server address>:<Redis-server port>";
-                    }
-                }   
-                if($aVal eq "file") {
-                    if($SScamMMCacheCache) {
-                        return "Perl cache module ".$SScamMMCacheCache." is missing. You need to install it with the FHEM Installer for example.";
-                    }
-                }                 
-            }
-            if ($aVal ne $type) {
-                if($hash->{HELPER}{CACHEKEY}) {
-                    cache($name, "c_destroy");                               # CHI-Cache löschen/entfernen    
-                } else {
-                    delete $data{SSCam}{$name};                              # internen Cache löschen
-                }              
-            }        
-        } else {
-            if($hash->{HELPER}{CACHEKEY}) {
-                cache($name, "c_destroy");                                   # CHI-Cache löschen/entfernen    
-            }        
-        }        
-    } 
-    
-    if ($aName eq "showStmInfoFull") {
-        if($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-
-        if ($do == 0) {
-            delete($defs{$name}{READINGS}{StmKeymjpegHttp});
-            delete($defs{$name}{READINGS}{LiveStreamUrl}); 
-            delete($defs{$name}{READINGS}{StmKeyUnicst});            
-            delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
-            delete($defs{$name}{READINGS}{StmKeymxpegHttp});            
-        }
-    }
-
-    if ($aName eq "snapGallerySize") {
-        if($cmd eq "set") {
-            $do = ($aVal eq "Icon")?1:2;
-        }
-        $do = 0 if($cmd eq "del");                  
-
-        if ($do == 0) {
-            delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name,"snapGalleryBoost",0));  # Snaphash nur löschen wenn Snaps gepollt werden   
-            Log3($name, 4, "$name - Snapshot hash deleted");
-        } elsif (AttrVal($name,"snapGalleryBoost",0)) {
-            # snap-Infos abhängig ermitteln wenn gepollt werden soll
-            my ($slim,$ssize);
-            $hash->{HELPER}{GETSNAPGALLERY} = 1;   
-            $slim  = AttrVal($name,"snapGalleryNumber",$defSlim);    # Anzahl der abzurufenden Snaps
-            $ssize = $do;
-            RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo" ); 
-            InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-        }
-    }     
-    
-    if ($aName eq "snapGalleryBoost") {
-        if($cmd eq "set") {
-            $do = ($aVal == 1) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-
-        if ($do == 0) {
-            delete($hash->{HELPER}{".SNAPHASH"});  # Snaphash löschen
-            Log3($name, 4, "$name - Snapshot hash deleted");
-        
-        } else {
-            # snapgallery regelmäßig neu einlesen wenn Polling ein
-            return "When you want activate \"snapGalleryBoost\", you have to set the attribute \"pollcaminfoall\" first because of the functionality depends on retrieving snapshots periodical." 
-               if(!AttrVal($name,"pollcaminfoall",0));
-               
-            my ($slim,$ssize);
-            $hash->{HELPER}{GETSNAPGALLERY} = 1;
-            $slim  = AttrVal($name, "snapGalleryNumber", $defSlim);        # Anzahl der abzurufenden Snaps
-            my $sg = AttrVal($name, "snapGallerySize",   "Icon"  );        # Auflösung Image
-            $ssize = ($sg eq "Icon") ? 1 : 2;
-            RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo" ); 
-            InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-        }
-    } 
-    
-    if ($aName eq "snapGalleryNumber" && AttrVal($name,"snapGalleryBoost",0)) {
-        my ($slim,$ssize);    
-        if($cmd eq "set") {
-            $do = ($aVal != 0) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-        
-        if ($do == 0) { 
-            $slim = 3;
-        } else {
-            $slim = $aVal;
-        }
-        
-        delete($hash->{HELPER}{".SNAPHASH"});              # bestehenden Snaphash löschen
-        $hash->{HELPER}{GETSNAPGALLERY} = 1;
-        my $sg = AttrVal($name,"snapGallerySize","Icon");  # Auflösung Image
-        $ssize = ($sg eq "Icon")?1:2;
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo" ); 
-        InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-    }
-    
-    if ($aName eq "snapReadingRotate") {
-        if($cmd eq "set") {
-            $do = ($aVal) ? 1 : 0;
-        }
-        $do = 0 if($cmd eq "del");
-        if(!$do) {$aVal = 0}
-        for my $i (1..10) { 
-            if($i>$aVal) {
-                readingsDelete($hash, "LastSnapFilename$i" );
-                readingsDelete($hash, "LastSnapId$i"       );
-                readingsDelete($hash, "LastSnapTime$i"     );  
-            }
-        }
-    }
-    
-    if ($aName eq "simu_SVSversion") {
-        delete $hash->{HELPER}{APIPARSET};
-        delete $hash->{HELPER}{SID};
-        delete $hash->{CAMID};
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCaminfoAll" );
-        InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::getCaminfoAll", $hash, 0);
-    }
-    
-    if($aName =~ m/pollcaminfoall/ && $init_done == 1) {
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCaminfoAll"          );
-        InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::getCaminfoAll", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"          );
-        InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
-    }
-    
-    if($aName =~ m/pollnologging/ && $init_done == 1) {
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"          );
-        InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
-    } 
-                         
-    if ($cmd eq "set") {
-        if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/x) {
-            unless ($aVal =~ /^\d+$/x) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
-        }
-        if($aName =~ m/pollcaminfoall/x) {
-            return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
-        }
-        if($aName =~ m/cacheServerParam/x) {
-            return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /:\d+$|unix:.+$/x);
-            my $type = AttrVal($name, "cacheType", "internal");
-            if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
-                cache($name, "c_destroy");
-            }
-        }
-        if($aName =~ m/snapChatTxt|recChatTxt/x) {
-            return "When you want activate \"$aName\", you have to set first the attribute \"videofolderMap\" to the root folder ".
-                   "of recordings and snapshots provided by an URL.\n".
-                   "Example: http://server.domain:8081/surveillance "                   
-                   if(!AttrVal($name, "videofolderMap", "") && $init_done == 1);
-
-        }  
-    }
-
-    if ($cmd eq "del") {
-        if ($aName =~ m/pollcaminfoall/x) {
-            # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
-            return "Please switch off \"snapGalleryBoost\" first if you want to deactivate \"pollcaminfoall\" because the functionality of \"snapGalleryBoost\" depends on retrieving snapshots periodical." 
-                   if(AttrVal($name,"snapGalleryBoost",0));
-        }       
-    }
-
-return;
-}
-
-################################################################
-sub Set {
-  my ($hash, @a) = @_;
-  return "\"set X\" needs at least an argument" if ( @a < 2 );
-  my $name    = $a[0];
-  my $opt     = $a[1];
-  my $prop    = $a[2];
-  my $prop1   = $a[3];
-  my $prop2   = $a[4];
-  my $prop3   = $a[5];
-  my $camname = $hash->{CAMNAME}; 
-  my $success;
-  my $setlist;
-        
-  return if(IsDisabled($name));
- 
-  if(!$hash->{CREDENTIALS}) {
-      # initiale setlist für neue Devices
-      $setlist = "Unknown argument $opt, choose one of ".
-                 "credentials "
-                 ;  
-  } elsif(IsModelCam($hash)) {
-      # selist für Cams
-      my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
-      $setlist = "Unknown argument $opt, choose one of ".
-                 "credentials ".
-                 "smtpcredentials ".
-                 "expmode:auto,day,night ".
-                 "on ".
-                 "off:noArg ".
-                 "motdetsc:disable,camera,SVS ".
-                 "snap ".
-                 (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
-                 "createReadingsGroup ".
-                 "createSnapGallery:noArg ".
-                 "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
-                 "enable:noArg ".
-                 "disable:noArg ".
-                 "optimizeParams ".
-                 "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
-                 "stopView:noArg ".
-                 (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
-                 (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
-                 (IsCapPTZPan($hash)      ? "setPreset ": "").
-                 (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
-                 (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
-                 (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
-                 (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
-                 (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
-                 (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
-                 (IsCapPTZDir($hash)      ? "move"." " : "").
-                 (IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
-                 (IsCapZoom($hash)        ? "setZoom:$valZoom " : "").
-                 "";
-  } else {
-      # setlist für SVS Devices
-      $setlist = "Unknown argument $opt, choose one of ".
-                 "autocreateCams:noArg ".
-                 "credentials ".
-                 "createStreamDev:master ".
-                 "smtpcredentials ".
-                 "createReadingsGroup ".
-                 "extevent:1,2,3,4,5,6,7,8,9,10 ".
-                 ($hash->{HELPER}{APIHMMAXVER} ? "homeMode:on,off " : "").
-                 "snapCams ";
-  }  
-
-  if ($opt eq "credentials") {
-      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);
-      return "Password is too long. It is limited up to and including 20 characters." if (length $prop1 > 20);
-      delete $hash->{HELPER}{SID};          
-      ($success) = setCredentials($hash,"svs",$prop,$prop1);
-      $hash->{HELPER}{ACTIVE} = "off";  
-      
-      if($success) {
-          getCaminfoAll($hash,0);
-          RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPresetList");
-          InternalTimer(gettimeofday()+11, "FHEM::SSCam::getPtzPresetList", $hash, 0);
-          RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPatrolList");
-          InternalTimer(gettimeofday()+12, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
-          versionCheck($hash);
-          return "Username and Password saved successfully";
-      } else {
-           return "Error while saving Username / Password - see logfile for details";
-      }
-            
-  }   
-  
-  if ($opt eq "smtpcredentials") {
-      return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
-      ($success) = setCredentials($hash,"smtp",$prop,$prop1);
-      
-      if($success) {
-          return "SMTP-Username and SMTP-Password saved successfully";
-      } else {
-           return "Error while saving SMTP-Username / SMTP-Password - see logfile for details";
-      }     
-  }
-  
-  if ($opt eq "on" && IsModelCam($hash)) {            
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (defined($prop) && $prop =~ /^\d+$/x) {
-          $hash->{HELPER}{RECTIME_TEMP} = $prop;
-      }
-      
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          my ($inf)               = $spec =~ m/STRM:(.*)/ix;                        # Aufnahme durch SSCamSTRM-Device
-          $hash->{HELPER}{INFORM} = $inf;
-      } 
-      
-      my $emtxt = AttrVal($name, "recEmailTxt", "");
-      if($spec =~ /recEmailTxt:/x) {
-          ($emtxt) = $spec =~ m/recEmailTxt:"(.*)"/xi;
-      }
-      
-      if($emtxt) {
-          # Recording soll nach Erstellung per Email versendet werden
-          # recEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
-          if (!$hash->{SMTPCREDENTIALS}) {return "Due to \"recEmailTxt\" is set, you want to send recordings by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
-          $hash->{HELPER}{SMTPRECMSG} = $emtxt;
-      }
-      
-      my $teletxt = AttrVal($name, "recTelegramTxt", "");
-      if($spec =~ /recTelegramTxt:/x) {
-          ($teletxt) = $spec =~ m/recTelegramTxt:"(.*)"/xi;
-      }
-      
-      if ($teletxt) {
-          # Recording soll nach Erstellung per TelegramBot versendet werden
-          # Format $teletxt muss sein: recTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
-          $hash->{HELPER}{TELERECMSG} = $teletxt;
-      }
-      
-      my $chattxt = AttrVal($name, "recChatTxt", "");
-      if($spec =~ /recChatTxt:/x) {
-          ($chattxt) = $spec =~ m/recChatTxt:"(.*)"/xi;
-      }
-      
-      if ($chattxt) {
-          # Recording soll nach Erstellung per SSChatBot versendet werden
-          # Format $chattxt muss sein: recChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
-          $hash->{HELPER}{CHATRECMSG} = $chattxt;
-      }
-
-      camStartRec("$name!_!$emtxt!_!$teletxt!_!$chattxt");
- 
-  } elsif ($opt eq "off" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;          # Aufnahmestop durch SSCamSTRM-Device
-      }
-      
-      camStopRec($hash);
-        
-  } elsif ($opt eq "snap" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      
-      my ($num,$lag,$ncount) = (1,2,1);     
-      if($prop && $prop =~ /^\d+$/x) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
-          $num    = $prop;
-          $ncount = $prop;
-      }
-      if($prop1 && $prop1 =~ /^\d+$/x) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
-          $lag = $prop1;
-      }
-      
-      Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");   
-      
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;          # Snap by SSCamSTRM-Device
-      } 
-       
-      my $emtxt = AttrVal($name, "snapEmailTxt", "");
-      if($spec =~ /snapEmailTxt:/x) {
-          ($emtxt) = $spec =~ m/snapEmailTxt:"(.*)"/xi;
-      }
-      
-      if ($emtxt) {
-          # Snap soll nach Erstellung per Email versendet werden
-          # Format $emtxt muss sein: snapEmailTxt:"subject => <Subject-Text>, body => <Body-Text>"
-          if (!$hash->{SMTPCREDENTIALS}) {return "It seems you want to send snapshots by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
-          $hash->{HELPER}{SMTPMSG} = $emtxt;
-      }
-      
-      my $teletxt = AttrVal($name, "snapTelegramTxt", "");
-      if($spec =~ /snapTelegramTxt:/x) {
-          ($teletxt) = $spec =~ m/snapTelegramTxt:"(.*)"/xi;
-      }
-      
-      if ($teletxt) {
-          # Snap soll nach Erstellung per TelegramBot versendet werden
-          # Format $teletxt muss sein: snapTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
-          $hash->{HELPER}{TELEMSG} = $teletxt;
-      }
-      
-      my $chattxt = AttrVal($name, "snapChatTxt", "");
-      if($spec =~ /snapChatTxt:/x) {
-          ($chattxt) = $spec =~ m/snapChatTxt:"(.*)"/xi;
-      }
-      
-      if ($chattxt) {
-          # Snap soll nach Erstellung per SSChatBot versendet werden
-          # Format $chattxt muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
-          $hash->{HELPER}{CHATMSG} = $chattxt;
-      }
-      
-      camSnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt");
-              
-  } elsif ($opt eq "snapCams" && !IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      
-      my ($num,$lag,$ncount) = (1,2,1);
-      my $cams  = "all";
-      if($prop && $prop =~ /^\d+$/x) {                                  # Anzahl der Schnappschüsse zu triggern (default: 1)
-          $num    = $prop;
-          $ncount = $prop;
-      }
-      if($prop1 && $prop1 =~ /^\d+$/x) {                                # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
-          $lag = $prop1;
-      }      
-      
-      my $at = join(" ",@a);
-      if($at =~ /CAM:/xi) {
-          ($cams) = $at =~ m/CAM:"(.*)"/xi;
-          $cams   =~ s/\s//gx;
-      }
-      
-      my @camdvs;                                                  
-      if($cams eq "all") {                                                  # alle nicht disabled Kameras auslösen, sonst nur die gewählten
-          @camdvs = devspec2array("TYPE=SSCam:FILTER=MODEL!=SVS");
-          for (@camdvs) {
-              if($defs{$_} && !IsDisabled($_)) {           
-                  $hash->{HELPER}{ALLSNAPREF}{$_} = "";                     # Schnappschuss Hash für alle Cams -> Schnappschußdaten sollen hinein  
-              }
-          }
-      } else {
-          @camdvs = split(",",$cams);
-          for (@camdvs) {
-              if($defs{$_} && !IsDisabled($_)) {           
-                  $hash->{HELPER}{ALLSNAPREF}{$_} = "";
-              }              
-          }
-      }
-      
-      return "No valid camera devices are specified for trigger snapshots" if(!$hash->{HELPER}{ALLSNAPREF});
-      
-      my $emtxt;
-      my $teletxt = "";
-      my $rawet = AttrVal($name, "snapEmailTxt", "");
-      my $bt = join(" ",@a);
-      if($bt =~ /snapEmailTxt:/x) {
-          ($rawet) = $bt =~ m/snapEmailTxt:"(.*)"/xi;
-      }
-      if($rawet) {
-          $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
-          $hash->{HELPER}{SMTPMSG} = $rawet;   
-      }
-      
-      my ($csnap,$cmail) = ("","");
-      for my $key (keys%{$hash->{HELPER}{ALLSNAPREF}}) {
-          if(!AttrVal($key, "snapEmailTxt", "")) {
-              delete $hash->{HELPER}{ALLSNAPREF}->{$key};                  # Snap dieser Kamera auslösen aber nicht senden
-              $csnap .= $csnap?", $key":$key;
-              $emtxt  = "";
-          } else {
-              $cmail .= $cmail?", $key":$key;
-              $emtxt  = $rawet;
-          }
-          camSnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
-      }
-      Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
-      
-              
-  } elsif ($opt eq "startTracking" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
-      startTrack($hash);
-        
-  } elsif ($opt eq "stopTracking" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if ($hash->{HELPER}{APIPTZMAXVER} < 5)  {return "Function \"$opt\" needs a higher version of Surveillance Station";}
-      stopTrack($hash);
-        
-  } elsif ($opt eq "setZoom" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      $prop = $prop // "+";                         # Korrektur -> "+" in Taste wird als undef geliefert 
-      $prop = ".++" if($prop eq ".");               # Korrektur -> ".++" in Taste wird als "." geliefert       
-      setZoom ("$name!_!$prop");
-        
-  } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my $ret = getClHash($hash);
-      return $ret if($ret);
-  
-      if(!AttrVal($name, "snapGalleryBoost",0)) {
-          # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
-          $hash->{HELPER}{GETSNAPGALLERY} = 1;
-        
-          # snap-Infos für Gallerie abrufen
-          my ($sg,$slim,$ssize); 
-          $slim  = $prop?AttrVal($name,"snapGalleryNumber",$prop):AttrVal($name,"snapGalleryNumber",$defSlim);  # Anzahl der abzurufenden Snapshots
-          $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon")?1:2;                                        # Image Size 1-Icon, 2-Full      
-        
-          getSnapInfo("$name:$slim:$ssize");
-        
-      } else {
-          # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
-          $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
-          my %pars = ( linkparent => $name,
-                       linkname   => '',
-                       ftui       => 0
-                     );
-          my $htmlCode = composeGallery(\%pars);
-          for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-              if ($hash->{HELPER}{CL}{$k}->{COMP}) {
-                  # CL zusammengestellt (Auslösung durch Notify)
-                  asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");                        
-              } else {
-                  # Output wurde über FHEMWEB ausgelöst
-                  return $htmlCode;
-              }
-          }
-          delete($hash->{HELPER}{CL});
-      }
-      
-  } elsif ($opt eq "createSnapGallery" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my ($ret,$sgdev);
-      return qq{Before you can use "$opt", you must first set the "snapGalleryBoost" attribute, since automatic snapshot retrieval is required.} 
-              if(!AttrVal($name,"snapGalleryBoost",0));
-      $sgdev = "SSCamSTRM.$name.snapgallery";
-      $ret   = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {FHEM::SSCam::composeGallery('$name','$sgdev','snapgallery')}");
-      return $ret if($ret);
-      my $room             = "SSCam";
-      $attr{$sgdev}{room}  = $room;
-      return qq{Snapgallery device "$sgdev" created and assigned to room "$room".};
-      
-  } elsif ($opt eq "createPTZcontrol" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
-      my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {FHEM::SSCam::ptzPanel('$name','$ptzcdev','ptzcontrol')}");
-      return $ret if($ret);
-      my $room               = AttrVal($name,"room","SSCam");
-      $attr{$ptzcdev}{room}  = $room;
-      $attr{$ptzcdev}{group} = $name."_PTZcontrol";
-      return qq{PTZ control device "$ptzcdev" created and assigned to room "$room".};
-  
-  } elsif ($opt eq "createStreamDev") {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my ($livedev,$ret);
-      
-      if($prop =~ /mjpeg/x) {
-          $livedev = "SSCamSTRM.$name.mjpeg";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','mjpeg')}");
-          return $ret if($ret);
-      }
-      if($prop =~ /generic/x) {
-          $livedev = "SSCamSTRM.$name.generic";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','generic')}");
-          return $ret if($ret);
-      } 
-      if($prop =~ /hls/x) {
-          $livedev = "SSCamSTRM.$name.hls";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','hls')}");
-          return $ret if($ret);
-          my $c = "The device needs to set attribute \"hlsStrmObject\" in camera device \"$name\" to a valid HLS videostream";
-          CommandAttr($hash->{CL},"$livedev comment $c");
-      }  
-      if($prop =~ /lastsnap/x) {
-          $livedev = "SSCamSTRM.$name.lastsnap";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','lastsnap')}");
-          return $ret if($ret);
-          my $c = "The device shows the last snapshot of camera device \"$name\". \n".
-                  "If you always want to see the newest snapshot, please set attribute \"pollcaminfoall\" in camera device \"$name\".\n".
-                  "Set also attribute \"snapGallerySize = Full\" in camera device \"$name\" to retrieve snapshots in original resolution.";
-          CommandAttr($hash->{CL},"$livedev comment $c");
-      }      
-      if($prop =~ /switched/x) {
-          $livedev = "SSCamSTRM.$name.switched";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','switched')}");
-          return $ret if($ret);
-      }
-      if($prop =~ /master/x) {
-          $livedev = "SSCamSTRM.$name.master";
-          $ret = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','master')}");
-          return $ret if($ret);
-      }
-      
-      my $room = AttrVal($name,"room","SSCam");
-      $attr{$livedev}{room} = $room;
-      return "Livestream device \"$livedev\" created and assigned to room \"$room\".";
-  
-  } elsif ($opt eq "createReadingsGroup") {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      my $rgdev = $prop?$prop:"RG.SSCam";
-      
-      my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
-                  'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,!CamMotDetSc,<&nbsp;>,!CamLastRecTime,<&nbsp;>,!UsedSpaceMB,<&nbsp;>,!LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
-                  '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
-                  'TYPE=SSCam:FILTER=MODEL=SVS:!HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
-                  '';
-      
-      my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
-      return $ret if($ret);
-      
-      my $room    = AttrVal($name,"room","SSCam");
-      CommandAttr($hash->{CL},"$rgdev room $room");
-      CommandAttr($hash->{CL},"$rgdev alias Überblick Kameras");
-      
-      my $cellStyle = '{'."\n". 
-                      '  "c:0" => \'style="text-align:left;font-weight:normal"\','."\n".
-                      '  "c:1" => \'style="text-align:left;font-weight:normal"\','."\n".
-                      '  "c:4" => \'style="text-align:center;font-weight:bold"\','."\n".
-                      '  "c:5" => \'style="text-align:center;color:green;font-weight:normal"\','."\n".
-                      '  "c:9" => \'style="text-align:center;font-weight:normal"\''."\n".
-                      '}';
-      CommandAttr($hash->{CL},"$rgdev cellStyle $cellStyle");
-                                 
-      my $commands = '{'."\n".
-                     '  "Availability.enabled"  => "set $DEVICE disable",'."\n".
-                     '  "Availability.disabled" => "set $DEVICE enable",'."\n".
-                     '  "HomeModeState.on"      => "set $DEVICE homeMode off",'."\n".
-                     '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
-                     '  "'.$rgdev.'.Start"        => "set %DEVICE runView live_fw",'."\n".
-                     '  "Start"                 => "set %DEVICE runView live_fw",'."\n".
-                     '  "LRec"                  => "set %DEVICE runView lastrec_fw",'."\n".
-                     '  "LSnap"                 => "set %DEVICE runView lastsnap_fw",'."\n".
-                     '  "Stop"                  => "set %DEVICE stopView",'."\n".
-                     '  "Record"                => "runView:",'."\n".
-                     '  "disable"               => "disable:"'."\n".    
-                     '}';
-      CommandAttr($hash->{CL},"$rgdev commands $commands");
-      
-      my $nameStyle = 'style = "color:black;font-weight:bold;text-align:center"';
-      CommandAttr($hash->{CL},"$rgdev nameStyle $nameStyle");
-      
-      my $valueColumns = '{'."\n".
-                         '  \'Wiedergabe\' => \'colspan="4"\''."\n".    
-                         '}';
-      CommandAttr($hash->{CL},"$rgdev valueColumns $valueColumns");
-    
-      my $valueFormat = '{'."\n". 
-                        '  ($READING eq "CamMotDetSc" && $VALUE eq "disabled") ? "external" : $VALUE'."\n". 
-                        '}';    
-      CommandAttr($hash->{CL},"$rgdev valueFormat $valueFormat");
-
-      my $valueIcon = '{'."\n". 
-                      '  "Availability.enabled"  => "remotecontrol/black_btn_GREEN",'."\n".
-                      '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
-                      '  "HomeModeState.on"      => "status_available",'."\n".
-                      '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
-                      '  "Start"                 => "black_btn_MJPEG",'."\n".
-                      '  "LRec"                  => "black_btn_LASTRECIFRAME",'."\n". 
-                      '  "LSnap"                 => "black_btn_LSNAP",'."\n".                      
-                      '  "Stop"                  => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
-                      '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
-                      '  "state"                 => "%devStateIcon"'."\n".
-                      '}';
-      CommandAttr($hash->{CL},"$rgdev valueIcon $valueIcon");
-      
-      my $valueStyle = '{'."\n". 
-                       '  if($READING eq "Availability" && $VALUE eq "enabled"){ \' style="color:green" \' }'."\n".
-                       '  elsif( $READING eq "Availability" && $VALUE eq  "disabled"){ \' style="color:red" \' }'."\n".
-                       '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /SVS.*/ ){ \' style="color:orange" \' }'."\n".
-                       '  elsif( $READING eq "CamMotDetSc" && $VALUE eq "disabled"){ \' style="color:LimeGreen" \' }'."\n".
-                       '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /Cam.*/ ){ \' style="color:SandyBrown" \' }'."\n".
-                       '}';     
-      CommandAttr($hash->{CL},"$rgdev valueStyle $valueStyle");
-          
-      
-      return "readingsGroup device \"$rgdev\" created and assigned to room \"$room\".";
-  
-  } elsif ($opt eq "enable" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      camEnable($hash);
-        
-  } elsif ($opt eq "disable" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      camDisable($hash);
-       
-  } elsif ($opt eq "motdetsc" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop || $prop !~ /disable|camera|SVS/x) { return qq{Command "$opt" needs one of those arguments: disable, camera, SVS !}; }
-            
-      $hash->{HELPER}{MOTDETSC} = $prop;
-            
-      if ($prop1) {
-          # check ob Zahl zwischen 1 und 99
-          return "invalid value for sensitivity (SVS or camera) - use number between 1 - 99" if ($prop1 !~ /^[1-9]$|^[1-9][0-9]$/x);
-          $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
-      }
-      if ($prop2) {
-          # check ob Zahl zwischen 1 und 99
-          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop1 !~ /^[1-9]$|^[1-9][0-9]$/x);
-          $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
-      }
-      if ($prop3) {
-          # check ob Zahl zwischen 1 und 99
-          return "invalid value for threshold (SVS) / object size (camera) - use number between 1 - 99" if ($prop1 !~ /^[1-9]$|^[1-9][0-9]$/x);
-          $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
-      }
-      amMotDetSc($hash);
-        
-  } elsif ($opt eq "expmode" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      unless ($prop) { return " \"$opt\" needs one of those arguments: auto, day, night !";}
-            
-      $hash->{HELPER}{EXPMODE} = $prop;
-      camExpmode($hash);
-        
-  } elsif ($opt eq "homeMode" && !IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      unless ($prop) { return " \"$opt\" needs one of those arguments: on, off !";}
-            
-      $hash->{HELPER}{HOMEMODE} = $prop;
-      setHomeMode($hash);
-        
-  } elsif ($opt eq "autocreateCams" && !IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-            
-      camAutocreate($hash);
-        
-  } elsif ($opt eq "goPreset" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop) {return "Function \"goPreset\" needs a \"Presetname\" as an argument";}
-            
-      $hash->{HELPER}{GOPRESETNAME} = $prop;
-      $hash->{HELPER}{PTZACTION}    = "gopreset";
-      doPtzAaction($hash);
-        
-  } elsif ($opt eq "optimizeParams" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-        my %cpcl = (ntp => 1, mirror => 2, flip => 4, rotate => 8);
-        extoptpar($hash,$prop,\%cpcl) if($prop);
-        extoptpar($hash,$prop1,\%cpcl) if($prop1);
-        extoptpar($hash,$prop2,\%cpcl) if($prop2);
-        setOptParams($hash);
-                
-  } elsif ($opt eq "pirSensor" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if(ReadingsVal("$name", "CapPIR", "false") eq "false") {return "Function \"$opt\" not possible. Camera \"$name\" don't have a PIR sensor."}
-      if(!$prop) {return "Function \"$opt\" needs an argument";}
-      $hash->{HELPER}{PIRACT} = ($prop eq "activate")?0:($prop eq "deactivate")?-1:5;
-      if($hash->{HELPER}{PIRACT} == 5) {return " Illegal argument for \"$opt\" detected, use \"activate\" or \"activate\" !";}
-      managePir($hash);
-        
-  } elsif ($opt eq "runPatrol" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop) {return "Function \"$opt\" needs a \"Patrolname\" as an argument";}
-            
-      $hash->{HELPER}{GOPATROLNAME} = $prop;
-      $hash->{HELPER}{PTZACTION}    = "runpatrol";
-      doPtzAaction($hash);
-        
-  } elsif ($opt eq "goAbsPTZ" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
-          if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
-          if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;}
-          if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0; $hash->{HELPER}{GOPTZPOSY} = 240;}    
-          if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
-                
-          $hash->{HELPER}{PTZACTION} = "goabsptz";
-          doPtzAaction($hash);
-          return;
-            
-      } else {
-          if ($prop !~ /\d+/x || $prop1 !~ /\d+/x || abs($prop) > 640 || abs($prop1) > 480) {
-              return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
-          }
-                
-          $hash->{HELPER}{GOPTZPOSX} = abs($prop);
-          $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
-                
-          $hash->{HELPER}{PTZACTION}  = "goabsptz";
-          doPtzAaction($hash);
-                
-          return;     
-      } 
-      return "Function \"goAbsPTZ\" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead";
-
-  } elsif ($opt eq "move" && IsModelCam($hash)) {     
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      return "PTZ version of Synology API isn't set. Use \"get $name scanVirgin\" first." if(!$hash->{HELPER}{APIPTZMAXVER});
-      
-      if($hash->{HELPER}{APIPTZMAXVER} <= 4) {
-          if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/x)) {return "Function \"move\" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)";}
-          $hash->{HELPER}{GOMOVEDIR} = $prop;
-      
-      } elsif ($hash->{HELPER}{APIPTZMAXVER} >= 5) {
-          if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/x)) {return "Function \"move\" needs an argument like right, upright, up, upleft, left, downleft, down, downright ";}
-          my %dirs = (
-                      right     => 0,
-                      upright   => 4,
-                      up        => 8,
-                      upleft    => 12,
-                      left      => 16,
-                      downleft  => 20,
-                      down      => 24,
-                      downright => 28,
-                     );
-          $hash->{HELPER}{GOMOVEDIR} = $dirs{$prop};
-      }
-      
-      $hash->{HELPER}{GOMOVETIME} = defined($prop1) ? $prop1 : 1;
-            
-      $hash->{HELPER}{PTZACTION}  = "movestart";
-      doPtzAaction($hash);
-        
-  } elsif ($opt eq "runView" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;  # Call by SSCamSTRM-Device
-      } 
-      
-      if ($prop eq "live_open") {
-          if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
-          $hash->{HELPER}{OPENWINDOW} = 1;
-          $hash->{HELPER}{WLTYPE}     = "link";    
-          $hash->{HELPER}{ALIAS}      = "LiveView";
-          $hash->{HELPER}{RUNVIEW}    = "live_open";
-          $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "live_link") {
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "link"; 
-          $hash->{HELPER}{ALIAS}      = "LiveView";
-          $hash->{HELPER}{RUNVIEW}    = "live_link";
-          $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastrec_open") {
-          if ($prop1) {$hash->{HELPER}{VIEWOPENROOM} = $prop1;} else {delete $hash->{HELPER}{VIEWOPENROOM};}
-          $hash->{HELPER}{OPENWINDOW} = 1;
-          $hash->{HELPER}{WLTYPE}     = "link"; 
-          $hash->{HELPER}{ALIAS}      = "LastRecording";
-          $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
-          $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      }  elsif ($prop eq "lastrec_fw") {                        # Video in iFrame eingebettet
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "iframe"; 
-          $hash->{HELPER}{ALIAS}      = " ";
-          $hash->{HELPER}{RUNVIEW}    = "lastrec";
-          $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastrec_fw_MJPEG") {                   # “video/avi” – MJPEG format event
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "image"; 
-          $hash->{HELPER}{ALIAS}      = " ";
-          $hash->{HELPER}{RUNVIEW}    = "lastrec";
-          $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {             # “video/mp4” – MPEG4/H.264 format event
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "video"; 
-          $hash->{HELPER}{ALIAS}      = " ";
-          $hash->{HELPER}{RUNVIEW}    = "lastrec";
-          $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "live_fw") {
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "image"; 
-          $hash->{HELPER}{ALIAS}      = " ";
-          $hash->{HELPER}{RUNVIEW}    = "live_fw";
-          $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "live_fw_hls") {
-          return "API \"SYNO.SurveillanceStation.VideoStream\" is not available or Reading \"CamStreamFormat\" is not \"HLS\". May be your API version is 2.8 or higher." if(!IsCapHLS($hash));
-          $hash->{HELPER}{OPENWINDOW} = 0;
-          $hash->{HELPER}{WLTYPE}     = "hls"; 
-          $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
-          $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
-          $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } elsif ($prop eq "lastsnap_fw") {
-          $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if($prop1);       # Anzeige durch SSCamSTRM-Device ausgelöst
-          $hash->{HELPER}{LSNAPBYDEV}     = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
-          $hash->{HELPER}{OPENWINDOW}     = 0;
-          $hash->{HELPER}{WLTYPE}         = "base64img"; 
-          $hash->{HELPER}{ALIAS}          = " ";
-          $hash->{HELPER}{RUNVIEW}        = "lastsnap_fw";
-          $hash->{HELPER}{ACTSTRM}        = "last Snapshot";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
-      } else {
-          return "$prop isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw";
-      }
-      runLiveview($hash); 
-            
-  } elsif ($opt eq "hlsreactivate" && IsModelCam($hash)) {
-      # ohne SET-Menüeintrag
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      reactivateHls($hash);
-        
-  } elsif ($opt eq "hlsactivate" && IsModelCam($hash)) {
-      # ohne SET-Menüeintrag
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Call by SSCamSTRM-Device
-      }
-      activateHls($hash);
-        
-  } elsif ($opt eq "refresh" && IsModelCam($hash)) {
-      # ohne SET-Menüeintrag
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Refresh by SSCamSTRM-Device
-          roomRefresh($hash,0,0,1);                                    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-      }
-      
-  } elsif ($opt eq "extevent" && !IsModelCam($hash)) {                                   
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      $hash->{HELPER}{EVENTID} = $prop;
-      extEvent($hash);
-        
-  } elsif ($opt eq "stopView" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-
-      my $spec = join(" ",@a);
-      if($spec =~ /STRM:/x) {
-          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Stop by SSCamSTRM-Device
-      } 
-      stopLiveview($hash);            
-        
-  } elsif ($opt eq "setPreset" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop)                {return qq{Syntax of function "$opt" was wrong. Please use "set $name setPreset <PresetNumber> <PresetName> [<Speed>]"};}
-      $hash->{HELPER}{PNUMBER} = $prop;
-      $hash->{HELPER}{PNAME}   = $prop1?$prop1:$prop;  # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
-      $hash->{HELPER}{PSPEED}  = $prop2 if($prop2);
-      setPreset($hash);
-                
-  } elsif ($opt eq "setHome" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop) {return "Function \"$opt\" needs a \"Presetname\" as argument";}      
-      $hash->{HELPER}{SETHOME} = $prop;
-      setHome($hash);
-                
-  } elsif ($opt eq "delPreset" && IsModelCam($hash)) {
-      if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-      if (!$prop) {return qq{Function "$opt" needs a "Presetname" as argument};}      
-      $hash->{HELPER}{DELPRESETNAME} = $prop;
-      delPreset($hash);
-        
-  } else {
-      return "$setlist";
-  }  
-  
-return;
-}
-
-################################################################
-sub Get {
-    my ($hash, @a) = @_;
-    return "\"get X\" needs at least an argument" if ( @a < 2 );
-    my $name = shift @a;
-    my $opt  = shift @a;
-    my $arg  = shift @a;
-    my $arg1 = shift @a;
-    my $arg2 = shift @a;
-    my $ret  = "";
-    my $getlist;
-
-    if(!$hash->{CREDENTIALS}) {
-        return;
-        
-    } elsif(IsModelCam($hash)) {
-        # getlist für Cams
-        $getlist = "Unknown argument $opt, choose one of ".
-                   "caminfoall:noArg ".
-                   "caminfo:noArg ".
-                   ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
-                       ? "snapGallery:noArg " : "snapGallery:$defSnum ").
-                   (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
-                   "snapinfo:noArg ".
-                   "svsinfo:noArg ".
-                   "saveRecording ".
-                   "snapfileinfo:noArg ".
-                   "eventlist:noArg ".
-                   "stmUrlPath:noArg ".
-                   "storedCredentials:noArg ".
-                   "scanVirgin:noArg ".
-                   "versionNotes " 
-                   ;
-    } else {
-        # getlist für SVS Devices
-        $getlist = "Unknown argument $opt, choose one of ".
-                   "caminfoall:noArg ".
-                   ($hash->{HELPER}{APIHMMAXVER}?"homeModeState:noArg ": "").
-                   "svsinfo:noArg ".
-                   "listLog ".
-                   "storedCredentials:noArg ".
-                   "scanVirgin:noArg ".
-                   "versionNotes "
-                   ;
-    }
-                  
-    return if(IsDisabled($name));             
-        
-    if ($opt eq "caminfo") {
-        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getCamInfo($hash);
-                
-    } elsif ($opt eq "caminfoall") {
-        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getCaminfoAll($hash,1);
-                
-    } elsif ($opt eq "homeModeState" && !IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getHomeModeState($hash);
-                
-    } elsif ($opt eq "listLog" && !IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        getClHash($hash,1);
-        
-        extlogargs($hash, $arg)  if($arg);
-        extlogargs($hash, $arg1) if($arg1);
-        extlogargs($hash, $arg2) if($arg2);
-        getSvsLog ($hash);
-                
-    } elsif ($opt eq "listPresets" && IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
-        getClHash($hash,1);
-        getPresets($hash);
-                
-    } elsif ($opt eq "saveRecording") {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        $hash->{HELPER}{RECSAVEPATH} = $arg if($arg);
-        getRecAndSave($hash);
-                
-    } elsif ($opt eq "svsinfo") {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getSvsInfo($hash);
-                
-    } elsif ($opt eq "storedCredentials") {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        # Credentials abrufen
-        my ($success, $username, $password) = getCredentials($hash,0,"svs");
-        unless ($success) {return "Credentials couldn't be retrieved successfully - see logfile"};
-        
-        my ($smtpsuccess, $smtpuname, $smtpword) = getCredentials($hash,0,"smtp");
-        my $so;
-        if($smtpsuccess) {
-            $so = "SMTP-Username: $smtpuname, SMTP-Password: $smtpword";
-        } else {
-            $so = "SMTP credentials are not set";
-        }
-        return "Stored Credentials to access surveillance station or DSM:\n".
-               "=========================================================\n".
-               "Username: $username, Password: $password\n".
-               "\n".
-               "Stored Credentials to access SMTP server:\n".
-               "=========================================\n".
-               "$so\n";
-                
-    } elsif ($opt eq "snapGallery" && IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return qq{Credentials of $name are not set - make sure you've set it with "set $name credentials username password"};}
-        my $txt = getClHash($hash);
-        return $txt if($txt);
-
-        if(!AttrVal($name, "snapGalleryBoost",0)) { 
-            # Snaphash ist nicht vorhanden und wird abgerufen       
-            $hash->{HELPER}{GETSNAPGALLERY} = 1;
-        
-            # snap-Infos für Gallerie abrufen
-            my ($sg,$slim,$ssize); 
-            $slim  = $arg // AttrVal($name,"snapGalleryNumber",$defSlim);                            # Anzahl der abzurufenden Snapshots
-            $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon") ? 1 : 2;                    # Image Size 1-Icon, 2-Full      
-        
-            getSnapInfo("$name:$slim:$ssize");
-        
-        } else {
-            # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
-            $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
-            my %pars = ( linkparent => $name,
-                         linkname   => '',
-                         ftui       => 0
-                       );
-            my $htmlCode = composeGallery(\%pars);
-            for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-                if ($hash->{HELPER}{CL}{$k}->{COMP}) {
-                    # CL zusammengestellt (Auslösung durch Notify)
-                    asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");                      
-                } else {
-                    # Output wurde über FHEMWEB ausgelöst
-                    return $htmlCode;
-                }
-            }
-            delete($hash->{HELPER}{CL});
-        }
-
-    } elsif ($opt eq "snapinfo" && IsModelCam($hash)) {
-        # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        my ($slim,$ssize) = snapLimSize($hash,1);       # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} gesetzt !
-        getSnapInfo("$name:$slim:$ssize");
-                
-    } elsif ($opt eq "snapfileinfo" && IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        if (!ReadingsVal("$name", "LastSnapId", undef)) {return "Reading LastSnapId is empty - please take a snapshot before !"}
-        getSnapFilename($hash);
-                
-    } elsif ($opt eq "eventlist" && IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getEventList ($hash);
-                
-    } elsif ($opt eq "stmUrlPath" && IsModelCam($hash)) {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        getStmUrlPath ($hash);
-            
-    } elsif ($opt eq "scanVirgin") {
-        if (!$hash->{CREDENTIALS}) {return "Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"";}
-        sessionOff($hash);
-        delete $hash->{HELPER}{APIPARSET};
-        delete $hash->{CAMID};
-        # alte Readings außer state löschen
-        my @allrds = keys%{$defs{$name}{READINGS}};
-        for my $key(@allrds) {
-            # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
-            delete($defs{$name}{READINGS}{$key}) if($key ne "state");
-        }
-        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
-        getCaminfoAll($hash,1);
-    
-    } elsif ($opt =~ /versionNotes/x) {
-      my $header  = "<b>Module release information</b><br>";
-      my $header1 = "<b>Helpful hints</b><br>";
-      my %hs;
-      
-      # Ausgabetabelle erstellen
-      my ($val0,$val1);
-      my $i = 0;
-      
-      $ret  = "<html>";
-      
-      # Hints
-      if(!$arg || $arg =~ /hints/x || $arg =~ /[\d]+/x) {
-          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header1 <br>");
-          $ret .= "<table class=\"block wide internals\">";
-          $ret .= "<tbody>";
-          $ret .= "<tr class=\"even\">";  
-          if($arg && $arg =~ /[\d]+/x) {
-              my @hints = split(",",$arg);
-              for (@hints) {
-                  if(AttrVal("global","language","EN") eq "DE") {
-                      $hs{$_} = $vHintsExt_de{$_};
-                  } else {
-                      $hs{$_} = $vHintsExt_en{$_};
-                  }
-              }                      
-          } else {
-              if(AttrVal("global","language","EN") eq "DE") {
-                  %hs = %vHintsExt_de;
-              } else {
-                  %hs = %vHintsExt_en; 
-              }
-          }          
-          $i = 0;
-          for my $key (sortVersion("desc",keys %hs)) {
-              $val0 = $hs{$key};
-              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0</td>" );
-              $ret .= "</tr>";
-              $i++;
-              if ($i & 1) {
-                  # $i ist ungerade
-                  $ret .= "<tr class=\"odd\">";
-              } else {
-                  $ret .= "<tr class=\"even\">";
-              }
-          }
-          $ret .= "</tr>";
-          $ret .= "</tbody>";
-          $ret .= "</table>";
-          $ret .= "</div>";
-      }
-      
-      # Notes
-      if(!$arg || $arg =~ /rel/x) {
-          $ret .= sprintf("<div class=\"makeTable wide\"; style=\"text-align:left\">$header <br>");
-          $ret .= "<table class=\"block wide internals\">";
-          $ret .= "<tbody>";
-          $ret .= "<tr class=\"even\">";
-          $i = 0;
-          for my $key (sortVersion("desc",keys %vNotesExtern)) {
-              ($val0,$val1) = split(/\s/x,$vNotesExtern{$key},2);
-              $ret .= sprintf("<td style=\"vertical-align:top\"><b>$key</b>  </td><td style=\"vertical-align:top\">$val0  </td><td>$val1</td>" );
-              $ret .= "</tr>";
-              $i++;
-              if ($i & 1) {
-                  # $i ist ungerade
-                  $ret .= "<tr class=\"odd\">";
-              } else {
-                  $ret .= "<tr class=\"even\">";
-              }
-          }
-          $ret .= "</tr>";
-          $ret .= "</tbody>";
-          $ret .= "</table>";
-          $ret .= "</div>";
-      }
-      
-      $ret .= "</html>";
-                    
-      return $ret;
-  
-    } else {
-        return "$getlist";
-    }
-
-return $ret;                                   # do not generate trigger out of command
 }
 
 ######################################################################################
@@ -2143,9 +1033,8 @@ sub FWsummaryFn {
   my $attr = AttrVal($d, "htmlattr", " ");
   Log3($name, 4, "$name - FWsummaryFn called - FW_wname: $FW_wname, device: $d, room: $room, attributes: $attr");
   
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
   my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
+
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact, $ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
   if(AttrVal("global","language","EN") =~ /EN/x) {
       $ttrecstart = $ttips_en{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/gx;
@@ -2153,7 +1042,8 @@ sub FWsummaryFn {
       $ttsnap     = $ttips_en{"ttsnap"};     $ttsnap     =~ s/§NAME§/$calias/gx;
       $ttcmdstop  = $ttips_en{"ttcmdstop"};  $ttcmdstop  =~ s/§NAME§/$calias/gx;
       $tthlsreact = $ttips_en{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/gx;
-  } else {
+  } 
+  else {
       $ttrecstart = $ttips_de{"ttrecstart"}; $ttrecstart =~ s/§NAME§/$calias/gx;
       $ttrecstop  = $ttips_de{"ttrecstop"};  $ttrecstop  =~ s/§NAME§/$calias/gx;
       $ttsnap     = $ttips_de{"ttsnap"};     $ttsnap     =~ s/§NAME§/$calias/gx;
@@ -2161,65 +1051,69 @@ sub FWsummaryFn {
       $tthlsreact = $ttips_de{"tthlsreact"}; $tthlsreact =~ s/§NAME§/$calias/gx;
   }
   
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
-  
   if($wltype eq "image") {
-    if(ReadingsVal($name, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
+    if(ReadingsVal($name, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($name, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
-    } else {
+    } 
+    else {
       $ret .= "<img src=$link $attr><br>";
     }
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-    $ret .= $imgblank;  
+    
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\")\">$imgstop </a>";
+    $ret .= $imgblank; 
+    
     if($hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {
       if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
         # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-      } else {
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" title=\"$ttrecstart\">$imgrecendless </a>";
+      } 
+      else {
         # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" title=\"$ttrecstop\">$imgrecstop </a>";
       }       
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
-    }      
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>"; 
+    }
+    
     $ret .= "<br>";
+    
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
                 "Your browser does not support the audio element.".
                 "</audio>";
-    }
-    
-  } elsif($wltype eq "iframe") {
+    }  
+  } 
+  elsif($wltype eq "iframe") {
     $ret .= "<iframe src=$link $attr controls autoplay>".
             "Iframes disabled".
             "</iframe>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
                 "Your browser does not support the audio element.".      
                 "</audio>";
-    }
-           
-  } elsif($wltype eq "embed") {
+    }         
+  } 
+  elsif($wltype eq "embed") {
     $ret .= "<embed src=$link $attr>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
                 "Your browser does not support the audio element.".      
                 "</audio>";
-    }
-           
-  } elsif($wltype eq "link") {
+    }  
+  } 
+  elsif($wltype eq "link") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret .= "<a href=$link $attr>$alias</a><br>";     
-
-  } elsif($wltype eq "base64img") {
+  } 
+  elsif($wltype eq "base64img") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret .= "<img $attr alt='$alias' src='data:image/jpeg;base64,$link'><br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     $ret .= $imgblank;
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
-    
-  } elsif($wltype eq "hls") {
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>"; 
+  } 
+  elsif($wltype eq "hls") {
     $alias = $hash->{HELPER}{ALIAS};
     $ret  .= "<video $attr controls autoplay>".
              "<source src=$link type=\"application/x-mpegURL\">".
@@ -2227,19 +1121,19 @@ sub FWsummaryFn {
              "Your browser does not support the video tag".
              "</video>";
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdhlsreact')\" title=\"$tthlsreact\">$imghlsreact </a>";
     $ret .= $imgblank;
-    if(ReadingsVal($d, "Record", "Stop") eq "Stop") {
-        # Aufnahmebutton endlos Start
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-    } else {
-        # Aufnahmebutton Stop
-        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+    if(ReadingsVal($d, "Record", "Stop") eq "Stop") {                # Aufnahmebutton endlos Start
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecendless')\" title=\"$ttrecstart\">$imgrecendless </a>";
+    } 
+    else {                                                           # Aufnahmebutton Stop
+        $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdrecstop')\" title=\"$ttrecstop\">$imgrecstop </a>";
     }       
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                 
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmddosnap')\" title=\"$ttsnap\">$imgdosnap </a>";                 
   
-  } elsif($wltype eq "video") {
+  } 
+  elsif($wltype eq "video") {
     $ret .= "<video $attr controls autoplay>".
             "<source src=$link type=\"video/mp4\">".
             "<source src=$link type=\"video/ogg\">".
@@ -2247,7 +1141,7 @@ sub FWsummaryFn {
             "Your browser does not support the video tag.".
             "</video>"; 
     $ret .= "<br>";
-    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+    $ret .= "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$cmdstop')\" title=\"$ttcmdstop\">$imgstop </a>";
     $ret .= "<br>";
     if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($d, "CamAudioType", "Unknown") !~ /Unknown/x) {
         $ret .= "<audio src=$hash->{HELPER}{AUDIOLINK} preload='none' volume='0.5' controls>".
@@ -2265,6 +1159,7 @@ return $ret;
 sub FWdetailFn {
   my ($FW_wname, $name, $room, $pageHash) = @_;           # pageHash is set for summaryFn.
   my $hash = $defs{$name};
+  
   my $ret = "";
   
   checkIconpath ($name, $FW_wname);
@@ -2274,10 +1169,11 @@ sub FWdetailFn {
       $ret .= $hash->{".setup"};
   }
   
-  my %pars = ( linkparent => $name,
-               linkname   => $name,
-               ftui       => 0
-             );
+  my %pars = ( 
+      linkparent => $name,
+      linkname   => $name,
+      ftui       => 0
+  );
              
   $hash->{".ptzhtml"} = ptzPanel(\%pars) if($hash->{".ptzhtml"} eq "");
 
@@ -2298,7 +1194,6 @@ sub FWconfCam {
   my $svsip   = $hash->{SERVERADDR};
   my $svsport = $hash->{SERVERPORT};
   my $svsprot = $hash->{PROTOCOL};
-  my $ttjs    = "/fhem/pgm2/sscam_tooltip.js"; 
   my $attr    = AttrVal($name, "htmlattr", "");
   my $alias   = AttrVal($name, "alias", $name);    
   my $winname = $name."_view";
@@ -2311,18 +1206,21 @@ sub FWconfCam {
   if(IsModelCam($hash)) {                                         # Camera Device
       return $ret if(!$cip);
       if(AttrVal("global","language","EN") =~ /DE/x) {
-          $cexpl = $ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
-      } else {
-          $cexpl = $ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_de{confcam}; $cexpl =~ s/§NAME§/$alias/gx;
+      } 
+      else {
+          $cexpl = $ttips_en{confcam}; $cexpl =~ s/§NAME§/$alias/gx;
       }
       $cs = "window.open('http://$cip')";
   
-  } else {                                                              # SVS-Device
+  } 
+  else {                                                              # SVS-Device
       return $ret if(!$svsip);
       if(AttrVal("global","language","EN") =~ /DE/x) {
-          $cexpl = $ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
-      } else {
-          $cexpl = $ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/gx; $cexpl =~ s/\s+/&nbsp;/gx;
+          $cexpl = $ttips_de{confsvs}; $cexpl =~ s/§NAME§/$alias/gx;
+      } 
+      else {
+          $cexpl = $ttips_en{confsvs}; $cexpl =~ s/§NAME§/$alias/gx;
       }    
       $cs = "window.open('$svsprot://$svsip:$svsport/cam')";      
   }
@@ -2330,26 +1228,24 @@ sub FWconfCam {
   if(AttrVal("global","language","EN") =~ /DE/x) {
       $hexpl = $ttips_de{"helpsvs"}; $hexpl =~ s/\s/&nbsp;/gx; 
       $ch    = "window.open('https://www.synology.com/de-de/knowledgebase/Surveillance/help')"; 
-  } else {
+  } 
+  else {
       $hexpl = $ttips_en{"helpsvs"}; $hexpl =~ s/\s/&nbsp;/gx; 
       $ch    = "window.open('https://www.synology.com/en-global/knowledgebase/Surveillance/help')"; 
   }   
   
   $cicon = FW_makeImage($cicon); $hicon = FW_makeImage($hicon);
-  $bs    = "Tip(`$cexpl`)";
-  $bh    = "Tip(`$hexpl`)";
   
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $ret .= "<style>TD.confcam {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'>";
   $ret .= '<tbody>';  
   $ret .= "<td>"; 
   
-  $ret .= "<a onClick=$cs onmouseover=$bs onmouseout=\"UnTip()\"> $cicon </a>";  
+  $ret .= "<a onClick=$cs title=\"$cexpl\"> $cicon </a>";  
   
   $ret .= "</td><td>";  
   
-  $ret .= "<a onClick=$ch onmouseover=$bh onmouseout=\"UnTip()\"> $hicon </a>";  
+  $ret .= "<a onClick=$ch title=\"$hexpl\"> $hicon </a>";  
  
   $ret .= "</td>";
   $ret .= "</tr>";
@@ -2360,341 +1256,1582 @@ sub FWconfCam {
 return $ret;
 }
 
-######################################################################################
-#                   initiale Startroutinen nach Restart FHEM
-######################################################################################
-sub initOnBoot {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  
-  RemoveInternalTimer($hash, "FHEM::SSCam::initOnBoot");
-  
-  if ($init_done == 1) {
-     RemoveInternalTimer($hash);                                                                     # alle Timer löschen
-     
-     delete($defs{$name}{READINGS}{LiveStreamUrl}) if($defs{$name}{READINGS}{LiveStreamUrl});        # LiveStream URL zurücksetzen
-     
-     # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
-     if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {
-         Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
-         camStopRec($hash);
-     }
-         
-     # Konfiguration der Synology Surveillance Station abrufen
-     if (!$hash->{CREDENTIALS}) {
-         Log3($name, 2, "$name - Credentials of $name are not set - make sure you've set it with \"set $name credentials username password\"");
-     } else {
-         readingsSingleUpdate($hash, "compstate", "true", 0);                                        # Anfangswert f. versionCheck setzen
-         # allg. SVS-Eigenschaften abrufen
-         getSvsInfo($hash);
-         
-         if(IsModelCam($hash)) {
-             # Kameraspezifische Infos holen
-             getCamInfo($hash);           
-             getCapabilities($hash);
-             getStmUrlPath($hash);
-             
-             # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
-             getPtzPresetList($hash);
-             getPtzPatrolList($hash);
-
-             # Schnappschußgalerie abrufen oder nur Info des letzten Snaps
-             my ($slim,$ssize) = snapLimSize($hash,1);   # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-             RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"); 
-             InternalTimer       (gettimeofday()+0.9, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0); 
-         }
-         versionCheck($hash);                                                                  # Einstieg in regelmäßigen Check Kompatibilität
-     }
-         
-     # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
-     RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
-     InternalTimer(gettimeofday()+int(rand(30)), "FHEM::SSCam::wdpollcaminfo", $hash, 0);
-  
-  } else {
-      InternalTimer(gettimeofday()+3, "FHEM::SSCam::initOnBoot", $hash, 0);
-  }
-return;
-}
-
-###############################################################################
-#          Dauerschleife Kompatibilitätscheck SSCam <-> SVS
-###############################################################################
-sub versionCheck {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  my $rc   = 21600;
-  
-  RemoveInternalTimer($hash, "FHEM::SSCam::versionCheck");
-  return if(IsDisabled($name));
-
-  my $cs = ReadingsVal($name, "compstate", "true");
-  if($cs eq "false") {
-      Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
-       " may be incompatible with SSCam version $hash->{HELPER}{VERSION}. ".
-       "For further information execute \"get $name versionNotes 4\".");
-  }
-  
-InternalTimer(gettimeofday()+$rc, "FHEM::SSCam::versionCheck", $hash, 0);
-
-return; 
-}
-
-###############################################################################
-#          Liefert die bereinigte SVS-Version dreistellig xxx
-###############################################################################
-sub myVersion {
-  my $hash  = shift;
-  my $name  = $hash->{NAME};
-  my $actvs = 0; 
-
-  my @vl = split (/-/x,ReadingsVal($name, "SVSversion", ""),2);
-  if(@vl) {
-      $actvs = $vl[0];
-      $actvs =~ s/\.//gx;
-  }
-  
-return $actvs; 
-}
-
-######################################################################################
-#                            Username / Paßwort speichern
-#   $cre = "svs"  -> Credentials für SVS und Cams
-#   $cre = "smtp" -> Credentials für Mailversand
-######################################################################################
-sub setCredentials {
-    my ($hash, $cre, @credentials) = @_;
-    my $name                       = $hash->{NAME};
-    my ($success, $credstr, $index, $retcode);
-    my (@key,$len,$i);
-    my $ao = ($cre eq "svs")?"credentials":"SMTPcredentials";
+################################################################
+#                            Attr
+################################################################
+sub Attr {
+    my ($cmd,$name,$aName,$aVal) = @_;
+    my $hash                     = $defs{$name};
     
+    my ($do,$val,$cache);
+      
+    # $cmd can be "del" or "set"
+    # $name is device name
+    # aName and aVal are Attribute name and value
     
-    $credstr = encode_base64(join(':', @credentials));
+    if ($aName eq "session") {
+        delete $hash->{HELPER}{SID};
+    }
     
-    # Beginn Scramble-Routine
-    @key = qw(1 3 4 5 6 3 2 1 9);
-    $len = scalar @key;  
-    $i = 0;  
-    $credstr = join "",  
-            map { $i = ($i + 1) % $len; chr((ord($_) + $key[$i]) % 256) } split //, $credstr;   ## no critic 'Map blocks';
-    # End Scramble-Routine    
+    if ($aName =~ /hlsNetScript/x && IsModelCam($hash)) {            
+        return " The attribute \"$aName\" is only valid for devices of type \"SVS\"! Please set this attribute in a device of this type.";
+    }
+    
+    if ($aName =~ /snapReadingRotate/x && !IsModelCam($hash)) {            
+        return " The attribute \"$aName\" is not valid for devices of type \"SVS\"!.";
+    }
+    
+    # dynamisch PTZ-Attribute setzen (wichtig beim Start wenn Reading "DeviceType" nicht gesetzt ist)
+    if ($cmd eq "set" && ($aName =~ m/ptzPanel_/x)) {
+        for my $n (0..9) { 
+            $n = sprintf("%2.2d",$n);
+            addToDevAttrList($name, "ptzPanel_row$n");
+        }
+        addToDevAttrList($name, "ptzPanel_iconPrefix");
+        addToDevAttrList($name, "ptzPanel_iconPath");
+    }
+    
+    if($aName =~ m/ptzPanel_row|ptzPanel_Home|ptzPanel_use/x) {
+        InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::addptzattr", "$name", 0);
+    } 
        
-    $index = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-    $retcode = setKeyValue($index, $credstr);
+    if ($aName eq "disable") {
+        my $iscam = IsModelCam($hash); 
+        if($cmd eq "set") {
+            $do = $aVal ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        
+        if ($do == 1) {
+            RemoveInternalTimer($hash);
+        } 
+        else {
+            InternalTimer(gettimeofday()+int(rand(30)), "FHEM::SSCam::initOnBoot", $hash, 0);
+        }
     
-    if ($retcode) { 
-        Log3($name, 2, "$name - Error while saving the Credentials - $retcode");
-        $success = 0;
-    } else {
-        getCredentials($hash,1,$cre);        # Credentials nach Speicherung lesen und in RAM laden ($boot=1), $ao = credentials oder SMTPcredentials
-        $success = 1;
+        readingsSingleUpdate($hash, "state",        $imc{$iscam}{$do}, 1);
+        readingsSingleUpdate($hash, "PollState",    "Inactive",        1) if($do == 1);
+        readingsSingleUpdate($hash, "Availability", "???",             1) if($do == 1 && IsModelCam($hash));
+    }
+    
+    if($aName =~ m/cacheType/) {
+        my $type = AttrVal($name,"cacheType","internal");
+        if($cmd eq "set") {
+            if($aVal ne "internal") {
+                if($SScamMMCHI) {
+                    return "Perl cache module ".$SScamMMCHI." is missing. You need to install it with the FHEM Installer for example.";
+                }
+                if($aVal eq "redis") {
+                    if($SScamMMCHIRedis) {
+                        return "Perl cache module ".$SScamMMCHIRedis." is missing. You need to install it with the FHEM Installer for example.";
+                    }
+                    if(!AttrVal($name,"cacheServerParam","")) {
+                        return "For cacheType \"$aVal\" you must set first attribute \"cacheServerParam\" for Redis server connection: <Redis-server address>:<Redis-server port>";
+                    }
+                }   
+                if($aVal eq "file") {
+                    if($SScamMMCacheCache) {
+                        return "Perl cache module ".$SScamMMCacheCache." is missing. You need to install it with the FHEM Installer for example.";
+                    }
+                }                 
+            }
+            if ($aVal ne $type) {
+                if($hash->{HELPER}{CACHEKEY}) {
+                    cache($name, "c_destroy");                                                 # CHI-Cache löschen/entfernen    
+                } 
+                else {
+                    delete $data{SSCam}{$name};                                                # internen Cache löschen
+                }              
+            }        
+        } 
+        else {
+            if($hash->{HELPER}{CACHEKEY}) {
+                cache($name, "c_destroy");                                                     # CHI-Cache löschen/entfernen    
+            }        
+        }        
+    } 
+    
+    if ($aName eq "showStmInfoFull") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+
+        if ($do == 0) {
+            delete($defs{$name}{READINGS}{StmKeymjpegHttp});
+            delete($defs{$name}{READINGS}{LiveStreamUrl}); 
+            delete($defs{$name}{READINGS}{StmKeyUnicst});            
+            delete($defs{$name}{READINGS}{StmKeyUnicstOverHttp});
+            delete($defs{$name}{READINGS}{StmKeymxpegHttp});            
+        }
     }
 
-return ($success);
-}
+    if ($aName eq "snapGallerySize") {
+        if($cmd eq "set") {
+            $do = ($aVal eq "Icon")?1:2;
+        }
+        $do = 0 if($cmd eq "del");                  
 
-######################################################################################
-#                             Username / Paßwort abrufen
-#   $cre = "svs"  -> Credentials für SVS und Cams
-#   $cre = "smtp" -> Credentials für Mailversand
-######################################################################################
-sub getCredentials {
-    my ($hash,$boot, $cre) = @_;
-    my $name               = $hash->{NAME};
-    my ($success, $username, $passwd, $index, $retcode, $credstr);
-    my (@key,$len,$i);
-    my $ao = ($cre eq "svs")?"credentials":"SMTPcredentials";
-    my $pp = "";
-    
-    if ($boot) {
-        # mit $boot=1 Credentials von Platte lesen und als scrambled-String in RAM legen
-        $index = $hash->{TYPE}."_".$hash->{NAME}."_".$ao;
-        ($retcode, $credstr) = getKeyValue($index);
-    
-        if ($retcode) {
-            Log3($name, 2, "$name - Unable to read password from file: $retcode");
-            $success = 0;
-        }  
-
-        if ($credstr) {
-            if($cre eq "svs") {
-                # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{CREDENTIALS} = $credstr;
+        if ($do == 0) {
+            delete($hash->{HELPER}{".SNAPHASH"}) if(AttrVal($name,"snapGalleryBoost",0));     # Snaphash nur löschen wenn Snaps gepollt werden   
+            Log3($name, 4, "$name - Snapshot hash deleted");
         
-                # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $hash->{CREDENTIALS} = "Set";
-                $success = 1;
+        } 
+        elsif (AttrVal($name,"snapGalleryBoost",0) && $init_done == 1) {                      # snap-Infos abhängig ermitteln wenn gepollt werden soll
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;   
+            my $slim                        = AttrVal($name,"snapGalleryNumber",$defSlim);    # Anzahl der abzurufenden Snaps
+            my $ssize                       = $do;
             
-            } elsif ($cre eq "smtp") {
-                # beim Boot scrambled Credentials in den RAM laden
-                $hash->{HELPER}{SMTPCREDENTIALS} = $credstr;
+            RemoveInternalTimer($hash,              "FHEM::SSCam::__getSnapInfo" ); 
+            InternalTimer      (gettimeofday()+0.7, "FHEM::SSCam::__getSnapInfo", "$name:$slim:$ssize", 0);
+        }
+    }     
+    
+    if ($aName eq "snapGalleryBoost") {
+        if($cmd eq "set") {
+            $do = ($aVal == 1) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+
+        if($do == 0) {
+            delete($hash->{HELPER}{".SNAPHASH"});  # Snaphash löschen
+            Log3($name, 4, "$name - Snapshot hash deleted");
         
-                # "Credentials" wird als Statusbit ausgewertet. Wenn nicht gesetzt -> Warnmeldung und keine weitere Verarbeitung
-                $hash->{SMTPCREDENTIALS} = "Set";  
-                $success = 1;                
+        } 
+        elsif ($init_done == 1) {                                                            # snapgallery regelmäßig neu einlesen wenn Polling ein
+            return qq{When you want activate "snapGalleryBoost", you have to set the attribute "pollcaminfoall" first because of the functionality depends on retrieving snapshots periodical.} 
+               if(!AttrVal($name,"pollcaminfoall",0));
+               
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;
+            my $slim  = AttrVal($name, "snapGalleryNumber", $defSlim);                       # Anzahl der abzurufenden Snaps
+            my $sg    = AttrVal($name, "snapGallerySize",   "Icon"  );                       # Auflösung Image
+            my $ssize = ($sg eq "Icon") ? 1 : 2;
+            
+            RemoveInternalTimer ($hash,              "FHEM::SSCam::__getSnapInfo" ); 
+            InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::__getSnapInfo", "$name:$slim:$ssize", 0);
+        }
+    } 
+    
+    if ($aName eq "snapGalleryNumber" && AttrVal($name,"snapGalleryBoost",0)) {
+        my ($slim,$ssize);    
+        if($cmd eq "set") {
+            $do = ($aVal != 0) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        
+        if ($do == 0) { 
+            $slim = 3;
+        } 
+        else {
+            $slim = $aVal;
+        }
+        
+        if($init_done == 1) {
+            delete($hash->{HELPER}{".SNAPHASH"});                                               # bestehenden Snaphash löschen
+            $hash->{HELPER}{GETSNAPGALLERY} = 1;
+            my $sg                          = AttrVal($name,"snapGallerySize","Icon");          # Auflösung Image
+            $ssize                          = $sg eq "Icon" ? 1 : 2;
+            
+            RemoveInternalTimer ($hash,              "FHEM::SSCam::__getSnapInfo" ); 
+            InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::__getSnapInfo", "$name:$slim:$ssize", 0);
+        }
+    }
+    
+    if ($aName eq "snapReadingRotate") {
+        if($cmd eq "set") {
+            $do = ($aVal) ? 1 : 0;
+        }
+        $do = 0 if($cmd eq "del");
+        if(!$do) {$aVal = 0}
+        for my $i (1..10) { 
+            if($i>$aVal) {
+                readingsDelete($hash, "LastSnapFilename$i" );
+                readingsDelete($hash, "LastSnapId$i"       );
+                readingsDelete($hash, "LastSnapTime$i"     );  
             }
         }
-    } else {
-        # boot = 0 -> Credentials aus RAM lesen, decoden und zurückgeben
-        if ($cre eq "svs") {
-            $credstr = $hash->{HELPER}{CREDENTIALS};
-        } elsif ($cre eq "smtp") {
-            $pp = "SMTP";
-            $credstr = $hash->{HELPER}{SMTPCREDENTIALS};
-        }
-        
-        if($credstr) {
-            # Beginn Descramble-Routine
-            @key = qw(1 3 4 5 6 3 2 1 9); 
-            $len = scalar @key;  
-            $i = 0;  
-            $credstr = join "",  
-            map { $i = ($i + 1) % $len; chr((ord($_) - $key[$i] + 256) % 256) } split //, $credstr;    ## no critic 'Map blocks';  
-            # Ende Descramble-Routine
-            
-            ($username, $passwd) = split(":",decode_base64($credstr));
-            
-            my $logpw = AttrVal($name, "showPassInLog", "0") == 1 ? $passwd : "********";
-        
-            Log3($name, 4, "$name - ".$pp."Credentials read from RAM: $username $logpw");
-        
-        } else {
-            Log3($name, 2, "$name - ".$pp."Credentials not set in RAM !");
-        }
-    
-        $success = (defined($passwd)) ? 1 : 0;
-    }
-
-return ($success, $username, $passwd);        
-}
-
-######################################################################################
-#                              Polling Überwachung
-######################################################################################
-sub wdpollcaminfo {
-    # Überwacht die Wert von Attribut "pollcaminfoall" und Reading "PollState"
-    # wenn Attribut "pollcaminfoall" > 10 und "PollState"=Inactive -> start Polling
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
-    my $camname  = $hash->{CAMNAME};
-    my $pcia     = AttrVal($name,"pollcaminfoall",0); 
-    my $pnl      = AttrVal($name,"pollnologging",0); 
-    my $watchdogtimer = 60+rand(30);
-    my $lang     = AttrVal("global","language","EN");
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
-
-    # Poll-Logging prüfen
-    if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} != $pnl) {
-        $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $pnl;    # aktuellen pollnologging-Wert in $hash eintragen für späteren Vergleich
-        if ($pnl) {
-            Log3($name, 3, "$name - Polling-Log of $camname is deactivated");          
-        } else {
-            Log3($name, 3, "$name - Polling-Log of $camname is activated");
-        }
-    }    
-    
-    # Polling prüfen
-    if ($pcia && !IsDisabled($name)) {
-        if(ReadingsVal($name, "PollState", "Active") eq "Inactive") {
-            readingsSingleUpdate($hash,"PollState","Active",1);                             # Polling ist jetzt aktiv
-            readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));   # Polling-state bei einem SVS-Device setzten
-            Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: $pcia s");
-            $hash->{HELPER}{OLDVALPOLL} = $pcia;                                            # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
-            getCaminfoAll($hash,0);  
-        }
-        
-        my $lupd = ReadingsVal($name, "LastUpdateTime", "1970-01-01 / 01:00:00");
-        my ($year,$month,$mday,$hour,$min,$sec);
-        if ($lupd =~ /(\d+)\.(\d+)\.(\d+)/x) {
-            ($mday, $month, $year, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+)\s\/\s(\d+):(\d+):(\d+)/x);
-        } else {
-            ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)-(\d+)-(\d+)\s\/\s(\d+):(\d+):(\d+)/x);        
-        }
-        $lupd = fhemTimeLocal($sec, $min, $hour, $mday, $month-=1, $year-=1900);
-        if( gettimeofday() > ($lupd + $pcia + 20) ) {
-            getCaminfoAll($hash,0);  
-        }
-        
     }
     
-    if (defined($hash->{HELPER}{OLDVALPOLL}) && $pcia) {
-        if ($hash->{HELPER}{OLDVALPOLL} != $pcia) {
-            Log3($name, 3, "$name - Pollinginterval of $camname has been changed to: $pcia s");
-            $hash->{HELPER}{OLDVALPOLL} = $pcia;
+    if ($aName eq "simu_SVSversion") {
+        delete $hash->{HELPER}{API}{PARSET};
+        delete $hash->{HELPER}{SID};
+        delete $hash->{CAMID};
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::__getCaminfoAll" );
+        InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
+    }
+    
+    if($aName =~ m/pollcaminfoall/ && $init_done == 1) {
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::__getCaminfoAll"          );
+        InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::__getCaminfoAll", $hash, 0);
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"            );
+        InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::wdpollcaminfo",   $hash, 0);
+    }
+    
+    if($aName =~ m/pollnologging/ && $init_done == 1) {
+        RemoveInternalTimer ($hash,              "FHEM::SSCam::wdpollcaminfo"          );
+        InternalTimer       (gettimeofday()+1.0, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
+    } 
+                         
+    if ($cmd eq "set") {
+        if ($aName =~ m/httptimeout|snapGalleryColumns|rectime|pollcaminfoall/x) {
+            unless ($aVal =~ /^\d+$/x) { return " The Value for $aName is not valid. Use only figures 1-9 !";}
         }
+        if($aName =~ m/pollcaminfoall/x) {
+            return "The value of \"$aName\" has to be greater than 10 seconds." if($aVal <= 10);
+        }
+        if($aName =~ m/cacheServerParam/x) {
+            return "Please provide the Redis server parameters in form: <Redis-server address>:<Redis-server port> or unix:</path/to/sock>" if($aVal !~ /:\d+$|unix:.+$/x);
+            my $type = AttrVal($name, "cacheType", "internal");
+            if($hash->{HELPER}{CACHEKEY} && $type eq "redis") {
+                cache($name, "c_destroy");
+            }
+        }
+        if($aName =~ m/snapChatTxt|recChatTxt/x) {
+            return "When you want activate \"$aName\", you have to set first the attribute \"videofolderMap\" to the root folder ".
+                   "of recordings and snapshots provided by an URL.\n".
+                   "Example: http://server.domain:8081/surveillance "                   
+                   if(!AttrVal($name, "videofolderMap", "") && $init_done == 1);
+
+        }  
     }
 
-    InternalTimer(gettimeofday()+$watchdogtimer, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
-    
+    if ($cmd eq "del") {
+        if ($aName =~ m/pollcaminfoall/x) {
+            # Polling nicht ausschalten wenn snapGalleryBoost ein (regelmäßig neu einlesen)
+            return "Please switch off \"snapGalleryBoost\" first if you want to deactivate \"pollcaminfoall\" because the functionality of \"snapGalleryBoost\" depends on retrieving snapshots periodical." 
+                   if(AttrVal($name,"snapGalleryBoost",0));
+        }       
+    }
+
 return;
 }
 
-############################################################################################################
-#                                        OpMode-Startroutinen                                              #
-#   $hash->{HELPER}{ACTIVE} = Funktionstoken                                                               #
-#   $hash->{HELPER}{ACTIVE} = "on"    ->  eine Routine läuft, Start anderer Routine erst wenn "off".       #
-#   $hash->{HELPER}{ACTIVE} = "off"   ->  keine andere Routine läuft, sofortiger Start möglich             #
-############################################################################################################
+################################################################
+#                         Set
+################################################################
+sub Set {
+  my ($hash, @a) = @_;
+  return "\"set X\" needs at least an argument" if ( @a < 2 );
+  my $name    = $a[0];
+  my $opt     = $a[1];
+  my $prop    = $a[2];
+  my $prop1   = $a[3];
+  my $prop2   = $a[4];
+  my $prop3   = $a[5]; 
+  my $success;
+  my $setlist;
+        
+  return if(IsDisabled($name));
+ 
+  if(!$hash->{CREDENTIALS}) {
+      # initiale setlist für neue Devices
+      $setlist = "Unknown argument $opt, choose one of ".
+                 "credentials "
+                 ;  
+  } elsif(IsModelCam($hash)) {
+      # selist für Cams
+      my $hlslfw = IsCapHLS($hash) ? ",live_fw_hls," : ",";
+      $setlist   = "Unknown argument $opt, choose one of ".
+                   "credentials ".
+                   "smtpcredentials ".
+                   "expmode:auto,day,night ".
+                   "on ".
+                   "off:noArg ".
+                   "motdetsc:disable,camera,SVS ".
+                   "snap ".
+                   (AttrVal($name, "snapGalleryBoost",0) ? (AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0)) ? "snapGallery:noArg " : "snapGallery:$defSnum " : " ").
+                   "createReadingsGroup ".
+                   "createSnapGallery:noArg ".
+                   "createStreamDev:generic,hls,lastsnap,mjpeg,switched ".
+                   "enable:noArg ".
+                   "disable:noArg ".
+                   "optimizeParams ".
+                   "runView:live_fw".$hlslfw."live_link,live_open,lastrec_fw,lastrec_fw_MJPEG,lastrec_fw_MPEG4/H.264,lastrec_open,lastsnap_fw ".
+                   "stopView:noArg ".
+                   (IsCapPTZObjTrack($hash) ? "startTracking:noArg " : "").
+                   (IsCapPTZObjTrack($hash) ? "stopTracking:noArg " : "").
+                   (IsCapPTZPan($hash)      ? "setPreset ": "").
+                   (IsCapPTZPan($hash)      ? "setHome:---currentPosition---,".ReadingsVal("$name","Presets","")." " : "").
+                   (IsCapPTZPan($hash)      ? "delPreset:".ReadingsVal("$name","Presets","")." " : "").
+                   (IsCapPTZPan($hash)      ? "runPatrol:".ReadingsVal("$name", "Patrols", "")." " : "").
+                   (IsCapPTZPan($hash)      ? "goPreset:".ReadingsVal("$name", "Presets", "")." " : "").
+                   (IsCapPTZ($hash)         ? "createPTZcontrol:noArg " : "").
+                   (IsCapPTZAbs($hash)      ? "goAbsPTZ"." " : ""). 
+                   (IsCapPTZDir($hash)      ? "move"." " : "").
+                   (IsCapPIR($hash)         ? "pirSensor:activate,deactivate " : "").
+                   (IsCapZoom($hash)        ? "setZoom:$valZoom " : "").
+                   "";
+  } 
+  else {
+      # setlist für SVS Devices
+      $setlist = "Unknown argument $opt, choose one of ".
+                 "autocreateCams:noArg ".
+                 "credentials ".
+                 "createStreamDev:master ".
+                 "smtpcredentials ".
+                 "createReadingsGroup ".
+                 "extevent:1,2,3,4,5,6,7,8,9,10 ".
+                 ($hash->{HELPER}{API}{HMODE}{VER} ? "homeMode:on,off " : "").
+                 "snapCams ";
+  }
+
+  my $params = {
+      hash  => $hash,
+      name  => $name,
+      opt   => $opt,
+      prop  => $prop,
+      prop1 => $prop1,
+      prop2 => $prop2,
+      prop3 => $prop3,
+      aref  => \@a,
+  };
+  
+  no strict "refs";                                                        ## no critic 'NoStrict'  
+  if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
+      my $ret = q{};
+      
+      if (!$hash->{CREDENTIALS} && $hset{$opt}{needcred}) {                
+          return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"};
+      }
+  
+      $ret = &{$hset{$opt}{fn}} ($params);
+      
+      return $ret;
+  }
+  use strict "refs";  
+  
+return $setlist;
+}
+
+################################################################
+#                      Setter credentials
+################################################################
+sub _setcredentials {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  
+  return "Credentials are incomplete, use username password" if(!$prop || !$prop1);
+  return "Password is too long. It is limited up to and including 20 characters." if(length $prop1 > 20);
+  
+  delete $hash->{HELPER}{SID};  
+  
+  my ($success) = setCredentials($hash,"credentials",$prop,$prop1);
+  
+  $hash->{HELPER}{ACTIVE} = "off";  
+  
+  if($success) {
+      __getCaminfoAll($hash,0);
+      versionCheck   ($hash);
+      return "Username and Password saved successfully";
+  } 
+  else {
+      return "Error while saving Username / Password - see logfile for details";
+  }
+
+return;
+}
+
+################################################################
+#                      Setter smtpcredentials
+################################################################
+sub _setsmtpcredentials {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  
+  return "Credentials are incomplete, use username password" if (!$prop || !$prop1);        
+  my ($success) = setCredentials($hash,"SMTPcredentials",$prop,$prop1);
+  
+  if($success) {
+      return "SMTP-Username and SMTP-Password saved successfully";
+  } 
+  else {
+      return "Error while saving SMTP-Username / SMTP-Password - see logfile for details";
+  }  
+
+return;
+}
+
+################################################################
+#                      Setter on
+################################################################
+sub _seton {                             ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+  
+  if (defined($prop) && $prop =~ /^\d+$/x) {
+      $hash->{HELPER}{RECTIME_TEMP} = $prop;
+  }
+  
+  my $spec = join(" ",@$aref);
+
+  my ($inf)               = $spec =~ m/STRM:(.*)/ix;         # Aufnahme durch SSCamSTRM-Device
+  $hash->{HELPER}{INFORM} = $inf if($inf);
+  
+  my $emtxt = AttrVal($name, "recEmailTxt", "");
+  if($spec =~ /recEmailTxt:/x) {
+      ($emtxt) = $spec =~ m/recEmailTxt:"(.*)"/xi;
+  }
+  
+  if($emtxt) {                                               # Recording soll per Email versendet werden, recEmailTxt muss sein:  subject => <Subject-Text>, body => <Body-Text>
+      if (!$hash->{SMTPCREDENTIALS}) {return "Due to \"recEmailTxt\" is set, you want to send recordings by email but SMTP credentials are not set - make sure you've set credentials with \"set $name smtpcredentials username password\"";}
+      $hash->{HELPER}{SMTPRECMSG} = $emtxt;
+  }
+  
+  my $teletxt = AttrVal($name, "recTelegramTxt", "");
+  if($spec =~ /recTelegramTxt:/x) {
+      ($teletxt) = $spec =~ m/recTelegramTxt:"(.*)"/xi;
+  }
+  
+  if ($teletxt) {                                            # Recording soll per Telegram versendet werden, Format teletxt muss sein: recTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+      $hash->{HELPER}{TELERECMSG} = $teletxt;
+  }
+  
+  my $chattxt = AttrVal($name, "recChatTxt", "");
+  if($spec =~ /recChatTxt:/x) {
+      ($chattxt) = $spec =~ m/recChatTxt:"(.*)"/xi;
+  }
+  
+  if ($chattxt) {                                           # Recording soll per SSChatBot versendet werden, Format $chattxt muss sein: recChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+      $hash->{HELPER}{CHATRECMSG} = $chattxt;
+  }
+
+  __camStartRec("$name!_!$emtxt!_!$teletxt!_!$chattxt");
+
+return;
+}
+
+################################################################
+#                      Setter off
+################################################################
+sub _setoff {                            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+  
+  my $spec = join(" ",@$aref);
+  
+  my ($inf)               = $spec =~ m/STRM:(.*)/ix;         # Aufnahmestop durch SSCamSTRM-Device
+  $hash->{HELPER}{INFORM} = $inf if($inf);
+      
+  __camStopRec($hash);
+
+return;
+}
+
+################################################################
+#                      Setter snap
+################################################################
+sub _setsnap {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop}  // q{};
+  my $prop1 = $paref->{prop1} // q{};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+        
+  my ($num,$lag,$ncount) = (1,2,1);  
+  
+  if($prop =~ /^\d+$/x) {                                           # Anzahl der Schnappschüsse zu triggern (default: 1)
+      $num    = $prop;
+      $ncount = $prop;
+  }
+  
+  if($prop1 =~ /^\d+$/x) {                                          # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      $lag = $prop1;
+  }
+  
+  Log3($name, 4, "$name - Trigger snapshots - Number: $num, Lag: $lag");   
+  
+  my $spec = join " ",@$aref;
+  if($spec =~ /STRM:/x) {
+      ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;          # Snap by SSCamSTRM-Device
+  } 
+   
+  my $emtxt = AttrVal($name, "snapEmailTxt", "");
+  if($spec =~ /snapEmailTxt:/x) {
+      ($emtxt) = $spec =~ m/snapEmailTxt:"(.*)"/xi;
+  }
+  
+  if ($emtxt) {                                                     # Snap soll per Email versendet werden, Format $emtxt muss sein: snapEmailTxt:"subject => <Subject-Text>, body => <Body-Text>"
+      if (!$hash->{SMTPCREDENTIALS}) {
+          return "It seems you want to send snapshots by email but SMTP credentials are not set. Make sure set credentials with \"set $name smtpcredentials username password\"";
+      }
+      $hash->{HELPER}{SMTPMSG} = $emtxt;
+  }
+  
+  my $teletxt = AttrVal($name, "snapTelegramTxt", "");
+  if($spec =~ /snapTelegramTxt:/x) {
+      ($teletxt) = $spec =~ m/snapTelegramTxt:"(.*)"/xi;
+  }
+  
+  if ($teletxt) {                                                   # Snap soll per TelegramBot versendet werden, Format $teletxt muss sein: snapTelegramTxt:"tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+      $hash->{HELPER}{TELEMSG} = $teletxt;
+  }
+  
+  my $chattxt = AttrVal($name, "snapChatTxt", "");
+  if($spec =~ /snapChatTxt:/x) {
+      ($chattxt) = $spec =~ m/snapChatTxt:"(.*)"/xi;
+  }
+  
+  if ($chattxt) {                                                   # Snap soll per SSChatBot versendet werden, Format $chattxt muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
+      $hash->{HELPER}{CHATMSG} = $chattxt;
+  }
+  
+  __camSnap("$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt");
+
+return;
+}
+
+################################################################
+#                      Setter snapCams
+################################################################
+sub _setsnapCams {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop}  // q{};
+  my $prop1 = $paref->{prop1} // q{};
+  my $aref  = $paref->{aref};
+  
+  return if(IsModelCam($hash));
+           
+  my ($num,$lag,$ncount) = (1,2,1);
+  my $cams               = "all";
+  
+  if($prop =~ /^\d+$/x) {                                              # Anzahl der Schnappschüsse zu triggern (default: 1)
+      $num    = $prop;
+      $ncount = $prop;
+  }
+  
+  if($prop1 =~ /^\d+$/x) {                                             # Zeit zwischen zwei Schnappschüssen (default: 2 Sekunden)
+      $lag = $prop1;
+  }      
+  
+  my $at = join " ",@$aref;
+  if($at =~ /CAM:/xi) {
+      ($cams) = $at =~ m/CAM:"(.*)"/xi;
+      $cams   =~ s/\s//gx;
+  }
+  
+  my @camdvs;                                                  
+  if($cams eq "all") {                                                  # alle nicht disabled Kameras auslösen, sonst nur die gewählten
+      @camdvs = devspec2array("TYPE=SSCam:FILTER=MODEL!=SVS");
+      for (@camdvs) {
+          if($defs{$_} && !IsDisabled($_)) {           
+              $hash->{HELPER}{ALLSNAPREF}{$_} = "";                     # Schnappschuss Hash für alle Cams -> Schnappschußdaten sollen hinein  
+          }
+      }
+  } 
+  else {
+      @camdvs = split(",",$cams);
+      for (@camdvs) {
+          if($defs{$_} && !IsDisabled($_)) {           
+              $hash->{HELPER}{ALLSNAPREF}{$_} = "";
+          }              
+      }
+  }
+  
+  return "No valid camera devices are specified for trigger snapshots" if(!$hash->{HELPER}{ALLSNAPREF});
+  
+  my $emtxt;
+  my $teletxt = "";
+  my $rawet   = AttrVal($name, "snapEmailTxt", "");
+  my $bt      = join " ",@$aref;
+  
+  if($bt =~ /snapEmailTxt:/x) {
+      ($rawet) = $bt =~ m/snapEmailTxt:"(.*)"/xi;
+  }
+  
+  if($rawet) {
+      $hash->{HELPER}{CANSENDSNAP} = 1;                                # zentraler Schnappschußversand wird aktiviert
+      $hash->{HELPER}{SMTPMSG} = $rawet;   
+  }
+  
+  my ($csnap,$cmail) = ("","");
+  
+  for my $key (keys%{$hash->{HELPER}{ALLSNAPREF}}) {
+      if(!AttrVal($key, "snapEmailTxt", "")) {
+          delete $hash->{HELPER}{ALLSNAPREF}->{$key};                  # Snap dieser Kamera auslösen aber nicht senden
+          $csnap .= $csnap?", $key":$key;
+          $emtxt  = "";
+      } 
+      else {
+          $cmail .= $cmail?", $key":$key;
+          $emtxt  = $rawet;
+      }
+      __camSnap("$key!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt");
+  }
+  
+  Log3($name, 4, "$name - Trigger snapshots by SVS - Number: $num, Lag: $lag, Snap only: \"$csnap\", Snap and send: \"$cmail\" ");
+
+return;
+}
+
+################################################################
+#                      Setter startTracking
+################################################################
+sub _setstartTracking {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  
+  return if(!IsModelCam($hash));
+  
+  if ($hash->{HELPER}{API}{PTZ}{VER} < 5) {
+      return qq{Function "$opt" needs a higher version of Surveillance Station};
+  }
+  
+  __startTrack($hash);
+           
+return;
+}
+
+################################################################
+#                      Setter stopTracking
+################################################################
+sub _setstopTracking {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  
+  return if(!IsModelCam($hash));
+  
+  if ($hash->{HELPER}{API}{PTZ}{VER} < 5) {
+      return qq{Function "$opt" needs a higher version of Surveillance Station};
+  }
+  
+  __stopTrack($hash);
+           
+return;
+}
+
+################################################################
+#                      Setter setZoom
+################################################################
+sub _setsetZoom {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  $prop = $prop // "+";                         # Korrektur -> "+" in Taste wird als undef geliefert 
+  $prop = ".++" if($prop eq ".");               # Korrektur -> ".++" in Taste wird als "." geliefert       
+  __setZoom ("$name!_!$prop");
+           
+return;
+}
+
+################################################################
+#                      Setter snapGallery
+################################################################
+sub _setsnapGallery {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  my $ret = getClHash($hash);
+  return $ret if($ret);
+
+  if(!AttrVal($name, "snapGalleryBoost",0)) {                                     # Snaphash ist nicht vorhanden und wird neu abgerufen und ausgegeben
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;
+                                              
+      my $slim   = $prop // AttrVal($name,"snapGalleryNumber",$defSlim);          # Anzahl der abzurufenden Snapshots
+      my $ssize  = AttrVal($name,"snapGallerySize","Icon") eq "Icon" ? 1 : 2;     # Image Size 1-Icon, 2-Full      
+    
+      __getSnapInfo("$name:$slim:$ssize");
+  } 
+  else {                                                                          # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet (Polling ist aktiv)
+      $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
+      
+      my %pars = ( linkparent => $name,
+                   linkname   => '',
+                   ftui       => 0
+                 );
+                 
+      my $htmlCode = composeGallery(\%pars);
+      
+      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+          if ($hash->{HELPER}{CL}{$k}->{COMP}) {                                  # CL zusammengestellt (Auslösung durch Notify)
+              asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");    
+          } 
+          else {                                                                  # Output wurde über FHEMWEB ausgelöst
+              return $htmlCode;
+          }
+      }
+      
+      delClHash  ($name);
+  }
+           
+return;
+}
+
+################################################################
+#                      Setter createSnapGallery
+################################################################
+sub _setcreateSnapGallery {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  
+  return if(!IsModelCam($hash));
+  
+  if(!AttrVal($name,"snapGalleryBoost",0)) {
+      return qq{Before you can use "$opt", you must first set the "snapGalleryBoost" attribute, since automatic snapshot retrieval is required.};
+  }
+  
+  my $sgdev = "SSCamSTRM.$name.snapgallery";
+  my $ret   = CommandDefine($hash->{CL},"$sgdev SSCamSTRM {FHEM::SSCam::composeGallery('$name','$sgdev','snapgallery')}");
+  
+  return $ret if($ret);
+  
+  my $room             = "SSCam";
+  $attr{$sgdev}{room}  = $room;
+ 
+return qq{Snapgallery device "$sgdev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter createPTZcontrol
+################################################################
+sub _setcreatePTZcontrol {               ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  return if(!IsModelCam($hash));
+  
+  my $ptzcdev = "SSCamSTRM.$name.PTZcontrol";
+  my $ret     = CommandDefine($hash->{CL},"$ptzcdev SSCamSTRM {FHEM::SSCam::ptzPanel('$name','$ptzcdev','ptzcontrol')}");
+ 
+  return $ret if($ret);
+  
+  my $room               = AttrVal($name,"room","SSCam");
+  $attr{$ptzcdev}{room}  = $room;
+  $attr{$ptzcdev}{group} = $name."_PTZcontrol";
+      
+return qq{PTZ control device "$ptzcdev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter createStreamDev
+################################################################
+sub _setcreateStreamDev {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  my ($livedev,$ret);
+  
+  if($prop =~ /mjpeg/x) {
+      $livedev = "SSCamSTRM.$name.mjpeg";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','mjpeg')}");
+      return $ret if($ret);
+  }
+  
+  if($prop =~ /generic/x) {
+      $livedev = "SSCamSTRM.$name.generic";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','generic')}");
+      return $ret if($ret);
+  } 
+  
+  if($prop =~ /hls/x) {
+      $livedev = "SSCamSTRM.$name.hls";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','hls')}");
+      return $ret if($ret);
+     
+      my $c = qq{The device needs to set attribute "hlsStrmObject" in camera device "$name" to a valid HLS videostream};
+      CommandAttr($hash->{CL},"$livedev comment $c");
+  } 
+  
+  if($prop =~ /lastsnap/x) {
+      $livedev = "SSCamSTRM.$name.lastsnap";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','lastsnap')}");
+      return $ret if($ret);
+      
+      my $c = qq{The device shows the last snapshot of camera device "$name". \n}.
+              qq{If you always want to see the newest snapshot, please set attribute "pollcaminfoall" in camera device "$name".\n}.
+              qq{Set also attribute "snapGallerySize = Full" in camera device "$name" to retrieve snapshots in original resolution.};
+      CommandAttr($hash->{CL},"$livedev comment $c");
+  } 
+  
+  if($prop =~ /switched/x) {
+      $livedev = "SSCamSTRM.$name.switched";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','switched')}");
+      return $ret if($ret);
+  }
+  
+  if($prop =~ /master/x) {
+      $livedev = "SSCamSTRM.$name.master";
+      $ret     = CommandDefine($hash->{CL},"$livedev SSCamSTRM {FHEM::SSCam::streamDev('$name','$livedev','master')}");
+      return $ret if($ret);
+  }
+  
+  my $room              = AttrVal($name,"room","SSCam");
+  $attr{$livedev}{room} = $room;
+      
+return qq{Livestream device "$livedev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter createReadingsGroup
+################################################################
+sub _setcreateReadingsGroup {            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop};
+  
+  my $rgdev = $prop // "RG.SSCam";
+  
+  my $rgdef = '<%it_camera>,<Kamera<br>On/Offline>,< >,<Status>,< >,<Bewegungs<br>erkennung>,< >,<letzte Aufnahme>,< >,<bel. Platz<br>(MB)>,< >,<letzte Aktualisierung>,< >,<Disable<br>Modul>,< >,<Wiedergabe>'."\n". 
+              'TYPE=SSCam:FILTER=MODEL!=SVS:Availability,<&nbsp;>,state,<&nbsp;>,!CamMotDetSc,<&nbsp;>,!CamLastRecTime,<&nbsp;>,!UsedSpaceMB,<&nbsp;>,!LastUpdateTime,<&nbsp;>,?!disable,<&nbsp;>,?!LSnap,?!LRec,?!Start,?!Stop'."\n". 
+              '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+              '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+              '< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >,< >'."\n".
+              '<%it_server>,<HomeMode<br>On/Off>,<&nbsp;>,<Status>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+              'TYPE=SSCam:FILTER=MODEL=SVS:!HomeModeState,<&nbsp;>,state,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,?!disable,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>,<&nbsp;>'."\n".
+              '';
+  
+  my $ret     = CommandDefine($hash->{CL},"$rgdev readingsGroup $rgdef");
+  return $ret if($ret);
+  
+  my $room    = AttrVal($name,"room","SSCam");
+  CommandAttr($hash->{CL},"$rgdev room $room");
+  CommandAttr($hash->{CL},"$rgdev alias Überblick Kameras");
+  
+  my $cellStyle = '{'."\n". 
+                  '  "c:0" => \'style="text-align:left;font-weight:normal"\','."\n".
+                  '  "c:1" => \'style="text-align:left;font-weight:normal"\','."\n".
+                  '  "c:4" => \'style="text-align:center;font-weight:bold"\','."\n".
+                  '  "c:5" => \'style="text-align:center;color:green;font-weight:normal"\','."\n".
+                  '  "c:9" => \'style="text-align:center;font-weight:normal"\''."\n".
+                  '}';
+  CommandAttr($hash->{CL},"$rgdev cellStyle $cellStyle");
+                             
+  my $commands = '{'."\n".
+                 '  "Availability.enabled"  => "set $DEVICE disable",'."\n".
+                 '  "Availability.disabled" => "set $DEVICE enable",'."\n".
+                 '  "HomeModeState.on"      => "set $DEVICE homeMode off",'."\n".
+                 '  "HomeModeState.off"     => "set $DEVICE homeMode on",'."\n".
+                 '  "'.$rgdev.'.Start"        => "set %DEVICE runView live_fw",'."\n".
+                 '  "Start"                 => "set %DEVICE runView live_fw",'."\n".
+                 '  "LRec"                  => "set %DEVICE runView lastrec_fw",'."\n".
+                 '  "LSnap"                 => "set %DEVICE runView lastsnap_fw",'."\n".
+                 '  "Stop"                  => "set %DEVICE stopView",'."\n".
+                 '  "Record"                => "runView:",'."\n".
+                 '  "disable"               => "disable:"'."\n".    
+                 '}';
+  CommandAttr($hash->{CL},"$rgdev commands $commands");
+  
+  my $nameStyle = 'style = "color:black;font-weight:bold;text-align:center"';
+  CommandAttr($hash->{CL},"$rgdev nameStyle $nameStyle");
+  
+  my $valueColumns = '{'."\n".
+                     '  \'Wiedergabe\' => \'colspan="4"\''."\n".    
+                     '}';
+  CommandAttr($hash->{CL},"$rgdev valueColumns $valueColumns");
+
+  my $valueFormat = '{'."\n". 
+                    '  ($READING eq "CamMotDetSc" && $VALUE eq "disabled") ? "external" : $VALUE'."\n". 
+                    '}';    
+  CommandAttr($hash->{CL},"$rgdev valueFormat $valueFormat");
+
+  my $valueIcon = '{'."\n". 
+                  '  "Availability.enabled"  => "remotecontrol/black_btn_GREEN",'."\n".
+                  '  "Availability.disabled" => "remotecontrol/black_btn_RED",'."\n".
+                  '  "HomeModeState.on"      => "status_available",'."\n".
+                  '  "HomeModeState.off"     => "status_away_1\@orange",'."\n".
+                  '  "Start"                 => "black_btn_MJPEG",'."\n".
+                  '  "LRec"                  => "black_btn_LASTRECIFRAME",'."\n". 
+                  '  "LSnap"                 => "black_btn_LSNAP",'."\n".                      
+                  '  "Stop"                  => "remotecontrol/black_btn_POWEROFF3",'."\n".                     
+                  '  "state.initialized"     => "remotecontrol/black_btn_STOP",'."\n".
+                  '  "state"                 => "%devStateIcon"'."\n".
+                  '}';
+  CommandAttr($hash->{CL},"$rgdev valueIcon $valueIcon");
+  
+  my $valueStyle = '{'."\n". 
+                   '  if($READING eq "Availability" && $VALUE eq "enabled"){ \' style="color:green" \' }'."\n".
+                   '  elsif( $READING eq "Availability" && $VALUE eq  "disabled"){ \' style="color:red" \' }'."\n".
+                   '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /SVS.*/ ){ \' style="color:orange" \' }'."\n".
+                   '  elsif( $READING eq "CamMotDetSc" && $VALUE eq "disabled"){ \' style="color:LimeGreen" \' }'."\n".
+                   '  elsif( $READING eq "CamMotDetSc" && $VALUE =~ /Cam.*/ ){ \' style="color:SandyBrown" \' }'."\n".
+                   '}';     
+  CommandAttr($hash->{CL},"$rgdev valueStyle $valueStyle");
+          
+return qq{readingsGroup device "$rgdev" created and assigned to room "$room".};
+}
+
+################################################################
+#                      Setter enable
+################################################################
+sub _setenable {                         ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+  
+  __camEnable($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter disable
+################################################################
+sub _setdisable {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+  
+  __camDisable($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter motdetsc
+################################################################
+sub _setmotdetsc {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  my $prop2 = $paref->{prop2};
+  my $prop3 = $paref->{prop3};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!$prop || $prop !~ /disable|camera|SVS/x) { 
+      return qq{Command "$opt" needs one of those arguments: disable, camera, SVS !}; 
+  }
+        
+  $hash->{HELPER}{MOTDETSC} = $prop;
+        
+  if ($prop1) {                                                        
+      if ($prop1 !~ /^[1-9][0-9]?$/x) {
+          return "Invalid value for sensitivity (SVS or camera). Use numbers between 1 - 99";
+      }
+      $hash->{HELPER}{MOTDETSC_PROP1} = $prop1;
+  }
+  
+  if ($prop2) {                                                        
+      if ($prop2 !~ /^[1-9][0-9]?$/x) {
+          return "Invalid value for threshold (SVS) / object size (camera). Use numbers between 1 - 99";
+      }
+      $hash->{HELPER}{MOTDETSC_PROP2} = $prop2;
+  }
+  
+  if ($prop3) {                                                         
+      if ($prop3 !~ /^[1-9][0-9]?$/x) {
+          return "Invalid value for threshold (SVS) / object size (camera). Use numbers between 1 - 99";
+      }
+      $hash->{HELPER}{MOTDETSC_PROP3} = $prop3;
+  }
+  
+  __camMotDetSc($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter expmode
+################################################################
+sub _setexpmode {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  if(!$prop) {
+      return qq{Command "$opt" needs one of those arguments: auto, day, night};
+  }
+            
+  $hash->{HELPER}{EXPMODE} = $prop;
+  
+  __camExpmode($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter homeMode
+################################################################
+sub _sethomeMode {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(IsModelCam($hash));
+  
+  if(!$prop) {
+      return qq{Command "$opt" needs one of those arguments: on, off};
+  }
+            
+  $hash->{HELPER}{HOMEMODE} = $prop;
+  
+  __setHomeMode($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter autocreateCams
+################################################################
+sub _setautocreateCams {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(IsModelCam($hash));
+  
+  __camAutocreate($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter goPreset
+################################################################
+sub _setgoPreset {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!$prop) {
+      return qq{Command "$opt" needs a <Presetname> as an argument};
+  }
+        
+  $hash->{HELPER}{GOPRESETNAME} = $prop;
+  $hash->{HELPER}{PTZACTION}    = "gopreset";
+  
+  __doPtzAaction($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter optimizeParams
+################################################################
+sub _setoptimizeParams {                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+  
+  my %cpcl = (ntp => 1, mirror => 2, flip => 4, rotate => 8);
+        
+  for my $part (@$aref) {
+      $hash->{HELPER}{MIRROR}  = (split "mirror:", $part)[1] if(lc($part) =~ m/^mirror:/x);
+      $hash->{HELPER}{FLIP}    = (split "flip:",   $part)[1] if(lc($part) =~ m/^flip:/x);
+      $hash->{HELPER}{ROTATE}  = (split "rotate:", $part)[1] if(lc($part) =~ m/^rotate:/x);
+      $hash->{HELPER}{NTPSERV} = (split "ntp:",    $part)[1] if(lc($part) =~ m/^ntp:/x);      
+  }
+  
+  $hash->{HELPER}{CHKLIST} = ($hash->{HELPER}{NTPSERV} ? $cpcl{ntp}    : 0)+
+                             ($hash->{HELPER}{MIRROR}  ? $cpcl{mirror} : 0)+
+                             ($hash->{HELPER}{FLIP}    ? $cpcl{flip}   : 0)+
+                             ($hash->{HELPER}{ROTATE}  ? $cpcl{rotate} : 0);  
+        
+  __setOptParams($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter pirSensor
+################################################################
+sub _setpirSensor {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+
+  if(ReadingsVal($name, "CapPIR", "false") eq "false") {
+      return qq{Command "$opt" not possible. Camera "$name" don't provide a PIR sensor.};
+  }
+
+  if(!$prop) {
+      return qq{Command "$opt" needs an argument};
+  }
+      
+  $hash->{HELPER}{PIRACT} = ($prop eq "activate") ? 0 : ($prop eq "deactivate") ? -1 : 5;
+      
+  if($hash->{HELPER}{PIRACT} == 5) {
+      return qq{Illegal argument for "$opt" detected. Use "activate" or "activate".};
+  }
+   
+  __managePir($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter runPatrol
+################################################################
+sub _setrunPatrol {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+
+  if (!$prop) {
+      return qq{Command "$opt" needs a <Patrolname> as an argument};
+  }
+        
+  $hash->{HELPER}{GOPATROLNAME} = $prop;
+  $hash->{HELPER}{PTZACTION}    = "runpatrol";
+  
+  __doPtzAaction($hash);
+          
+return;
+}
+
+################################################################
+#                      Setter goAbsPTZ
+################################################################
+sub _setgoAbsPTZ {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  
+  return if(!IsModelCam($hash));
+
+  if ($prop eq "up" || $prop eq "down" || $prop eq "left" || $prop eq "right") {
+      if ($prop eq "up")    {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 480;}
+      if ($prop eq "down")  {$hash->{HELPER}{GOPTZPOSX} = 320; $hash->{HELPER}{GOPTZPOSY} = 0;  }
+      if ($prop eq "left")  {$hash->{HELPER}{GOPTZPOSX} = 0;   $hash->{HELPER}{GOPTZPOSY} = 240;}    
+      if ($prop eq "right") {$hash->{HELPER}{GOPTZPOSX} = 640; $hash->{HELPER}{GOPTZPOSY} = 240;} 
+            
+      $hash->{HELPER}{PTZACTION} = "goabsptz";
+      __doPtzAaction($hash);
+      return;    
+  } 
+  else {
+      if ($prop !~ /\d+/x || $prop1 !~ /\d+/x || abs($prop) > 640 || abs($prop1) > 480) {
+          return qq{Command "$opt" needs two coordinates within limits posX=0-640 and posY=0-480 as arguments or use up, down, left, right instead};
+      }
+            
+      $hash->{HELPER}{GOPTZPOSX} = abs($prop);
+      $hash->{HELPER}{GOPTZPOSY} = abs($prop1);
+      $hash->{HELPER}{PTZACTION} = "goabsptz";
+      __doPtzAaction($hash);
+      return;     
+  } 
+      
+return qq{Command "$opt" needs two coordinates, posX=0-640 and posY=0-480, as arguments or use up, down, left, right instead};
+}
+
+################################################################
+#                      Setter move
+################################################################
+sub _setmove {                           ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  
+  return if(!IsModelCam($hash));
+
+  if(!$hash->{HELPER}{API}{PTZ}{VER}) {
+      return qq{PTZ version of Synology API isn't set. Use "get $name scanVirgin" first.}
+  };
+  
+  if($hash->{HELPER}{API}{PTZ}{VER} <= 4) {
+      if (!defined($prop) || ($prop !~ /^up$|^down$|^left$|^right$|^dir_\d$/x)) {
+          return qq{Command "$opt" needs an argument like up, down, left, right or dir_X (X = 0 to CapPTZDirections-1)};
+      }
+      $hash->{HELPER}{GOMOVEDIR} = $prop;
+  
+  } elsif ($hash->{HELPER}{API}{PTZ}{VER} >= 5) {
+      if (!defined($prop) || ($prop !~ /^right$|^upright$|^up$|^upleft$|^left$|^downleft$|^down$|^downright$/x)) {
+          return qq{Command "$opt" needs an argument like right, upright, up, upleft, left, downleft, down, downright};
+      }
+      
+      my %dirs = (
+          right     => 0,
+          upright   => 4,
+          up        => 8,
+          upleft    => 12,
+          left      => 16,
+          downleft  => 20,
+          down      => 24,
+          downright => 28,
+      );
+      $hash->{HELPER}{GOMOVEDIR} = $dirs{$prop};
+  }
+  
+  $hash->{HELPER}{GOMOVETIME} = $prop1 // 1;      
+  $hash->{HELPER}{PTZACTION}  = "movestart";
+  
+  __doPtzAaction($hash); 
+      
+return;
+}
+
+################################################################
+#                      Setter runView
+################################################################
+sub _setrunView {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  
+  return if(!IsModelCam($hash));
+
+  my $spec = join " ", @$aref;
+  if($spec =~ /STRM:/x) {
+      ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;  # Call by SSCamSTRM-Device
+  } 
+  
+  if ($prop eq "live_open") {
+      if ($prop1) {
+          $hash->{HELPER}{VIEWOPENROOM} = $prop1;
+      } 
+      else {
+          delete $hash->{HELPER}{VIEWOPENROOM};
+      }
+      
+      $hash->{HELPER}{OPENWINDOW} = 1;
+      $hash->{HELPER}{WLTYPE}     = "link";    
+      $hash->{HELPER}{ALIAS}      = "LiveView";
+      $hash->{HELPER}{RUNVIEW}    = "live_open";
+      $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "live_link") {
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "link"; 
+      $hash->{HELPER}{ALIAS}      = "LiveView";
+      $hash->{HELPER}{RUNVIEW}    = "live_link";
+      $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "lastrec_open") {
+      if ($prop1) {
+          $hash->{HELPER}{VIEWOPENROOM} = $prop1;
+      } 
+      else {
+          delete $hash->{HELPER}{VIEWOPENROOM};
+      }
+      
+      $hash->{HELPER}{OPENWINDOW} = 1;
+      $hash->{HELPER}{WLTYPE}     = "link"; 
+      $hash->{HELPER}{ALIAS}      = "LastRecording";
+      $hash->{HELPER}{RUNVIEW}    = "lastrec_open";
+      $hash->{HELPER}{ACTSTRM}    = "";                     # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  }  elsif ($prop eq "lastrec_fw") {                        # Video in iFrame eingebettet
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "iframe"; 
+      $hash->{HELPER}{ALIAS}      = " ";
+      $hash->{HELPER}{RUNVIEW}    = "lastrec";
+      $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "lastrec_fw_MJPEG") {                   # “video/avi” – MJPEG format event
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "image"; 
+      $hash->{HELPER}{ALIAS}      = " ";
+      $hash->{HELPER}{RUNVIEW}    = "lastrec";
+      $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "lastrec_fw_MPEG4/H.264") {             # “video/mp4” – MPEG4/H.264 format event
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "video"; 
+      $hash->{HELPER}{ALIAS}      = " ";
+      $hash->{HELPER}{RUNVIEW}    = "lastrec";
+      $hash->{HELPER}{ACTSTRM}    = "last Recording";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "live_fw") {
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "image"; 
+      $hash->{HELPER}{ALIAS}      = " ";
+      $hash->{HELPER}{RUNVIEW}    = "live_fw";
+      $hash->{HELPER}{ACTSTRM}    = "MJPEG Livestream";     # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "live_fw_hls") {
+      if(!IsCapHLS($hash)) {
+          return qq{API "SYNO.SurveillanceStation.VideoStream" is not available or Reading "CamStreamFormat" is not "HLS". May be your API version is 2.8 or lower.};
+      }
+      
+      $hash->{HELPER}{OPENWINDOW} = 0;
+      $hash->{HELPER}{WLTYPE}     = "hls"; 
+      $hash->{HELPER}{ALIAS}      = "View only on compatible browsers";
+      $hash->{HELPER}{RUNVIEW}    = "live_fw_hls";
+      $hash->{HELPER}{ACTSTRM}    = "HLS Livestream";       # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  
+  } elsif ($prop eq "lastsnap_fw") {
+      $hash->{HELPER}{LSNAPBYSTRMDEV} = 1 if($prop1);       # Anzeige durch SSCamSTRM-Device ausgelöst
+      $hash->{HELPER}{LSNAPBYDEV}     = 1 if(!$prop1);      # Anzeige durch SSCam ausgelöst
+      $hash->{HELPER}{OPENWINDOW}     = 0;
+      $hash->{HELPER}{WLTYPE}         = "base64img"; 
+      $hash->{HELPER}{ALIAS}          = " ";
+      $hash->{HELPER}{RUNVIEW}        = "lastsnap_fw";
+      $hash->{HELPER}{ACTSTRM}        = "last Snapshot";    # sprechender Name des laufenden Streamtyps für SSCamSTRM
+  } 
+  else {
+      return qq{"$prop" isn't a valid option of runview, use one of live_fw, live_link, live_open, lastrec_fw, lastrec_open, lastsnap_fw};
+  }
+  
+  __runLiveview($hash);
+      
+return;
+}
+
+################################################################
+#                      Setter hlsreactivate
+#                      ohne SET-Menüeintrag 
+################################################################
+sub _sethlsreactivate {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+
+  __reactivateHls($hash);                  
+      
+return;
+}
+
+################################################################
+#                      Setter hlsactivate
+#                     ohne SET-Menüeintrag 
+################################################################
+sub _sethlsactivate {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+
+      my $spec = join " ", @$aref;
+      
+      if($spec =~ /STRM:/x) {
+          ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Call by SSCamSTRM-Device
+      }
+      
+      __activateHls($hash);                                                   
+
+return;
+}
+
+################################################################
+#                      Setter refresh
+#                   ohne SET-Menüeintrag
+################################################################
+sub _setrefresh {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+
+  my $spec = join " ", @$aref;
+  
+  if($spec =~ /STRM:/x) {
+      ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Refresh by SSCamSTRM-Device
+      roomRefresh($hash,0,0,1);                                    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+  }     
+
+return;
+}
+
+################################################################
+#                      Setter extevent
+################################################################
+sub _setextevent {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $prop  = $paref->{prop};
+  
+  return if(IsModelCam($hash));
+  
+  $hash->{HELPER}{EVENTID} = $prop;
+  __extEvent($hash);  
+
+return;
+}
+
+################################################################
+#                      Setter stopView
+################################################################
+sub _setstopView {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $aref  = $paref->{aref};
+  
+  return if(!IsModelCam($hash));
+  
+  my $spec = join " ", @$aref;
+  if($spec =~ /STRM:/x) {
+      ($hash->{HELPER}{INFORM}) = $spec =~ m/STRM:(.*)/xi;         # Stop by SSCamSTRM-Device
+  } 
+  __stopLiveview($hash);
+
+return;
+}
+
+################################################################
+#                      Setter setPreset
+################################################################
+sub _setsetPreset {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  my $prop1 = $paref->{prop1};
+  my $prop2 = $paref->{prop2};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!$prop) {
+      return qq{Syntax of Command "$opt" was wrong. Please use "set $name setPreset <PresetNumber> <PresetName> [<Speed>]"};
+  }
+  
+  $hash->{HELPER}{PNUMBER} = $prop;
+  $hash->{HELPER}{PNAME}   = $prop1 // $prop;    # wenn keine Presetname angegeben -> Presetnummer als Name verwenden
+  $hash->{HELPER}{PSPEED}  = $prop2 if($prop2);
+  
+  __setPreset($hash);
+
+return;
+}
+
+################################################################
+#                      Setter setHome
+################################################################
+sub _setsetHome {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!$prop) {
+      return qq{Command "$opt" needs a <Presetname> as argument};
+  }      
+  
+  $hash->{HELPER}{SETHOME} = $prop;
+  __setHome($hash);
+
+return;
+}
+
+################################################################
+#                      Setter delPreset
+################################################################
+sub _setdelPreset {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $opt   = $paref->{opt};
+  my $prop  = $paref->{prop};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!$prop) {
+      return qq{Function "$opt" needs a <Presetname> as argument};
+  }
+  
+  $hash->{HELPER}{DELPRESETNAME} = $prop;
+  __delPreset($hash);
+
+return;
+}
 
 ###############################################################################
 #                          Kamera Aufnahme starten
 ###############################################################################
-sub camStartRec {
-    my ($str)                           = @_;
+sub __camStartRec {
+    my $str                             = shift;
     my ($name,$emtxt,$teletxt,$chattxt) = split("!_!",$str);
     my $hash                            = $defs{$name};
     my $camname                         = $hash->{CAMNAME};
-    my ($errorcode,$error);
     
-    RemoveInternalTimer($hash, "camStartRec");
-    return if(IsDisabled($name));
+    my $caller  = (caller(0))[3];
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate ($hash);
-        readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate  ($hash,"Error",$error);
-        readingsEndUpdate   ($hash, 1);
+    RemoveInternalTimer($hash, $caller);
     
-        Log3($name, 2, "$name - ERROR - Start Recording of Camera $camname can't be executed - $error");
-        
-        return;
-    }
+    return if(IsDisabled($name)); 
+    return if(exitOnDis ($name, "Start Recording of Camera $camname can't be executed"));
         
     if (ReadingsVal("$name", "Record", "") eq "Start" && !AttrVal($name, "recextend", "")) {
         Log3($name, 3, "$name - another recording is already running - new start-command will be ignored");
         return;
     } 
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aufnahme starten                         
-        $hash->{OPMODE}               = "Start";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                      
+        $hash->{OPMODE}               = "Start"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=start&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraIds=_CID_&action=start&_sid="_SID_"};
+        }
+        
         if($emtxt || $teletxt || $chattxt) {
-            $hash->{HELPER}{CANSENDREC} = 1 if($emtxt);                  # Versand Aufnahme soll per Email erfolgen
-            $hash->{HELPER}{CANTELEREC} = 1 if($teletxt);                # Versand Aufnahme soll per TelegramBot erfolgen
-            $hash->{HELPER}{CANCHATREC} = 1 if($chattxt);                # Versand Aufnahme soll per SSChatBot erfolgen
-            $hash->{HELPER}{SMTPRECMSG} = $emtxt if($emtxt);             # Text für Email-Versand
+            $hash->{HELPER}{CANSENDREC} = 1        if($emtxt);           # Versand Aufnahme soll per Email erfolgen
+            $hash->{HELPER}{CANTELEREC} = 1        if($teletxt);         # Versand Aufnahme soll per TelegramBot erfolgen
+            $hash->{HELPER}{CANCHATREC} = 1        if($chattxt);         # Versand Aufnahme soll per SSChatBot erfolgen
+            $hash->{HELPER}{SMTPRECMSG} = $emtxt   if($emtxt);           # Text für Email-Versand
             $hash->{HELPER}{TELERECMSG} = $teletxt if($teletxt);         # Text für Telegram-Versand
             $hash->{HELPER}{CHATRECMSG} = $chattxt if($chattxt);         # Text für Synology Chat-Versand
         }   
         
         setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camStartRec",  "$name!_!$emtxt!_!$teletxt!_!$chattxt", 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $str);
     }
     
 return;
@@ -2703,35 +2840,17 @@ return;
 ###############################################################################
 #                           Kamera Aufnahme stoppen
 ###############################################################################
-sub camStopRec {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __camStopRec {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::camStopRec");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Stop Recording of Camera $camname can't be executed - $error");
-        return;
-    }
+    return if(exitOnDis ($name, "Stop Recording of Camera $camname can't be executed"));        
         
     if (ReadingsVal("$name", "Record", undef) eq "Stop") {
         Log3($name, 3, "$name - recording is already stopped - new stop-command will be ignored");
@@ -2739,14 +2858,27 @@ sub camStopRec {
     } 
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{OPMODE}               = "Stop";
+        $hash->{OPMODE}               = "Stop"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY} = "EXTREC";
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraId=_CID_&action=stop&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{EXTREC}{VER} >= 3) {
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Record&cameraIds=_CID_&action=stop&_sid="_SID_"};
+        }  
                
         setActiveToken($hash);  
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camStopRec", $hash, 0);
+        checkSid      ($hash);     
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
@@ -2755,45 +2887,39 @@ return;
 ###############################################################################
 #                   Kamera Auto / Day / Nightmode setzen
 ###############################################################################
-sub camExpmode {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __camExpmode {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::camExpmode");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Setting exposure mode of Camera $camname can't be executed - $error");
-        return;
-    }
+    return if(exitOnDis ($name, "Setting exposure mode of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                           
-        $hash->{OPMODE} = "ExpMode";
+        $hash->{OPMODE}               = "ExpMode"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camExpmode", $hash, 0);
+        my $expmode                   = $hexmo{$hash->{HELPER}{EXPMODE}};
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&cameraIds="_CID_"&expMode="$expmode"&camParamChkList=32&_sid="_SID_"};     
+                
+        setActiveToken($hash);
+        checkSid      ($hash);    
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
@@ -2802,45 +2928,101 @@ return;
 ###############################################################################
 #                    Art der Bewegungserkennung setzen
 ###############################################################################
-sub amMotDetSc {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __camMotDetSc {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::amMotDetSc");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Setting of motion detection source of Camera $camname can't be executed - $error");
-        return;
-    }
+    return if(exitOnDis ($name, "Setting of motion detection source of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "MotDetSc";
+        $hash->{OPMODE}               = "MotDetSc"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
-    
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
+        
+        my %motdetoptions = ();                                                  # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
+        my $motdetsc;
+        
+        if ($hash->{HELPER}{MOTDETSC} eq "disable") {
+            $motdetsc                   = "-1";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc&keep=true};
+      
+        } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
+            $motdetsc                   = "0";
+            $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+            $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
+            $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
+          
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc};
+          
+            if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP3}) {
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=1};                      # umschalten und neue Werte setzen
+            } 
+            else {                                                               # nur Umschaltung, alte Werte beibehalten
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=0};
+            }
+ 
+            if ($hash->{HELPER}{MOTDETSC_PROP1}) {                               # der Wert für Bewegungserkennung Kamera -> Empfindlichkeit ist gesetzt
+                my $sensitivity              = delete $hash->{HELPER}{MOTDETSC_PROP1};
+                $hash->{HELPER}{CALL}{PART} .= qq{&sensitivity="$sensitivity"};
+            }
+          
+            if ($hash->{HELPER}{MOTDETSC_PROP2}) {                               # der Wert für Bewegungserkennung Kamera -> Objektgröße ist gesetzt
+                my $objectsize               = delete $hash->{HELPER}{MOTDETSC_PROP2};
+                $hash->{HELPER}{CALL}{PART} .= qq{&objectSize="$objectsize"};
+            }
+ 
+            if ($hash->{HELPER}{MOTDETSC_PROP3}) {                               # der Wert für Bewegungserkennung Kamera -> Prozentsatz für Auslösung ist gesetzt
+                my $percentage               = delete $hash->{HELPER}{MOTDETSC_PROP3};
+                $hash->{HELPER}{CALL}{PART} .= qq{&percentage="$percentage"};
+            }          
+      
+        } elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
+            $motdetsc                   = "1";
+            $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
+            $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
+
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="MDParamSave"&camId="_CID_"&source=$motdetsc};
+
+            if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2}) {
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=1};                      # umschalten und neue Werte setzen
+            } 
+            else {                                                               # nur Umschaltung, alte Werte beibehalten
+                $hash->{HELPER}{CALL}{PART} .= qq{&mode=0};
+            }
+            
+            if ($hash->{HELPER}{MOTDETSC_PROP1}) {                               # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
+                my $sensitivity              = delete $hash->{HELPER}{MOTDETSC_PROP1};
+                $hash->{HELPER}{CALL}{PART} .= qq{&sensitivity="$sensitivity"};
+            }
+
+            if ($hash->{HELPER}{MOTDETSC_PROP2}) {                               # der Wert für Bewegungserkennung SVS -> Schwellwert ist gesetzt
+                my $threshold                = delete $hash->{HELPER}{MOTDETSC_PROP2};
+                $hash->{HELPER}{CALL}{PART} .= qq{&threshold="$threshold"};
+            }
+        }
+        
+        $hash->{HELPER}{CALL}{PART} .= qq{&_sid="_SID_"};
+      
+        $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;                        # Optionswerte in Hash sichern für Logausgabe in Befehlsauswertung
+     
         setActiveToken($hash);    
-        getApiSites($hash);
+        checkSid      ($hash);
         
     } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::amMotDetSc", $hash, 0);
+        schedule ($name, $hash);
     }
    
 return;
@@ -2852,45 +3034,31 @@ return;
 #   $lag    = Zeit zwischen zwei Schnappschüssen
 #   $ncount = Anzahl der Schnappschüsse zum rnterzählen
 ###############################################################################
-sub camSnap {
+sub __camSnap {
     my $str              = shift;
     my ($name,$num,$lag,$ncount,$emtxt,$teletxt,$chattxt,$tac) = split("!_!",$str);
     my $hash             = $defs{$name};
     my $camname          = $hash->{CAMNAME};
-    my $errorcode;
-    my $error;
     
-    $tac   = (defined $tac)?$tac:5000;
-    my $ta = $hash->{HELPER}{TRANSACTION};
+    $tac       = $tac // 5000;
+    my $ta     = $hash->{HELPER}{TRANSACTION};
+    my $caller = (caller(0))[3];
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::camSnap");
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Snapshot of Camera $camname can't be executed"));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
+    if ($hash->{HELPER}{ACTIVE} eq "off" || (defined $ta && $ta == $tac)) {             
+        $hash->{OPMODE}               = "Snap";
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
         }
         
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate ($hash);
-        readingsBulkUpdate  ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate  ($hash,"Error",$error);
-        readingsEndUpdate   ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Snapshot of Camera $camname can't be executed - $error");
-        
-        return;
-    }
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) { 
-        # einen Schnappschuß aufnehmen              
-        $hash->{OPMODE} = "Snap";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
         $hash->{HELPER}{CANSENDSNAP}  = 1       if($emtxt);                        # Versand Schnappschüsse soll per Email erfolgen
         $hash->{HELPER}{CANTELESNAP}  = 1       if($teletxt);                      # Versand Schnappschüsse soll per TelegramBot erfolgen
         $hash->{HELPER}{CANCHATSNAP}  = 1       if($chattxt);                      # Versand Schnappschüsse soll per SSChatBot erfolgen
@@ -2898,13 +3066,18 @@ sub camSnap {
         $hash->{HELPER}{SNAPLAG}      = $lag    if($lag);                          # Zeitverzögerung zwischen zwei Schnappschüssen
         $hash->{HELPER}{SNAPNUMCOUNT} = $ncount if($ncount);                       # Restzahl der auszulösenden Schnappschüsse  (wird runtergezählt)
         $hash->{HELPER}{SMTPMSG}      = $emtxt  if($emtxt);                        # Text für Email-Versand
+
+        $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&dsId="0"&method="TakeSnapshot"&blSave="true"&camId="_CID_"&_sid="_SID_"};
         
+        readingsSingleUpdate($hash,"state", "snap", 1); 
+    
         setActiveToken($hash); 
-        getApiSites($hash);
-        
-    } else {
-        $tac = (defined $tac)?$tac:"";
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
+        checkSid      ($hash);    
+    } 
+    else {
+        $tac = $tac // "";
+        schedule ($name, $str);
     } 
 
 return;    
@@ -2913,46 +3086,44 @@ return;
 ###############################################################################
 #                     Kamera gemachte Aufnahme abrufen
 ###############################################################################
-sub getRec {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __getRec {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getRec");
-    return if(IsDisabled($name));
+    my $caller  = (caller(0))[3];
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
+    RemoveInternalTimer($hash, $caller);
 
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
-        
-        return;
-    }
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {              
-        $hash->{OPMODE} = "GetRec";
+        $hash->{OPMODE}               = "GetRec"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "REC";
+        my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
+      
+        if($recid) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&id=$recid&mountId=0&method="Download"&_sid="_SID_"};      
+        } 
+        else {
+            Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
+            return;      
+        }
 
         setActiveToken($hash); 
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::getRec", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -2961,46 +3132,44 @@ return;
 ###############################################################################
 #                     Kamera gemachte Aufnahme lokal speichern
 ###############################################################################
-sub getRecAndSave {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __getRecAndSave {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getRecAndSave");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Save Recording of Camera $camname in local file can't be executed - $error");
-        
-        return;
-    }
+    return if(exitOnDis ($name, "Save Recording of Camera $camname in local file can't be executed"));    
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {              
-        $hash->{OPMODE} = "SaveRec";
+        $hash->{OPMODE}               = "SaveRec"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "REC";
+        my $recid                     = ReadingsVal("$name", "CamLastRecId", 0);
+      
+        if($recid) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&id=$recid&mountId=0&method="Download"&_sid="_SID_"};      
+        } 
+        else {
+            Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
+            return;      
+        }
 
         setActiveToken($hash); 
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::getRecAndSave", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3009,45 +3178,36 @@ return;
 ###############################################################################
 #                       Start Object Tracking
 ###############################################################################
-sub startTrack {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __startTrack {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::startTrack");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched on - $error");
-        
-        return;
-    }
+    return if(exitOnDis ($name, "Object Tracking of Camera $camname can't switched on"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "startTrack";
+        $hash->{OPMODE}               = "startTrack"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::startTrack", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&cameraId="_CID_"&_sid="_SID_"}; 
+        
+        setActiveToken($hash);
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3056,150 +3216,89 @@ return;
 ###############################################################################
 #                       Stopp Object Tracking
 ###############################################################################
-sub stopTrack {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __stopTrack {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::stopTrack");
-    return if(IsDisabled($name));
+    my $caller  = (caller(0))[3];
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
+    RemoveInternalTimer($hash, $caller);
 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Object Tracking of Camera $camname can't switched off - $error");
-        
-        return;
-    }
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Object Tracking of Camera $camname can't switched off"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "stopTrack";
+        $hash->{OPMODE}               = "stopTrack"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::stopTrack", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="ObjTracking"&moveType="Stop"&cameraId="_CID_"&_sid="_SID_"};     
+        
+        setActiveToken($hash);
+        checkSid      ($hash);    
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
 }
 
 ###############################################################################
-#                       Zoom starten / stoppen
-#        $op = + / stop / -
+#                 Zoom in / stop / out starten bzw. stoppen
+#                              $op = + / stop / -
 ###############################################################################
-sub setZoom {
+sub __setZoom {
     my $str        = shift;
     my ($name,$op) = split("!_!",$str);
     my $hash       = $defs{$name};
     my $camname    = $hash->{CAMNAME};
-    my $errorcode;
-    my $error;
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::setZoom");
-    return if(IsDisabled($name));
+    my $caller     = (caller(0))[3];
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
+    RemoveInternalTimer($hash, $caller);
 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Zoom $op of Camera $camname can't be started - $error");
-        
-        return;
-    }
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Zoom $op of Camera $camname can't be started"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
-        $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};     # Richtung (in / out)
-        $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                              # Start / Stop
-        $hash->{HELPER}{ZOOM}{STOPTIME} = $zd{$op}{sttime};                                # Stopzeit -> Verzögerungszeit für Stop nach Start
-        $hash->{OPMODE}                 = "setZoom";
+        $hash->{OPMODE}                 = "setZoom"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES}   = 0;
         
-        return if(!$hash->{HELPER}{ZOOM}{DIR});                                                  # es muss ! eine Richtung gesetzt sein
-    
-        InternalTimer(gettimeofday()+$zd{$op}{sttime}, "FHEM::SSCam::setZoom", "$name!_!stop", 0) if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop");
-        
-        setActiveToken($hash);
-        getApiSites   ($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.8, "FHEM::SSCam::setZoom", $str, 0);
-    }
-
-return;    
-}
-
-###############################################################################
-#                       Preset-Array abrufen
-###############################################################################
-sub getPresets {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getPresets");
-    return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
         }
         
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash, "Errorcode", $errorcode);
-        readingsBulkUpdate ($hash, "Error",     $error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset list of Camera $camname can't be get - $error");
+        $hash->{HELPER}{ZOOM}{DIR}      = $zd{$op}{dir} // $hash->{HELPER}{ZOOM}{DIR};     # Richtung (in / out)
+        $hash->{HELPER}{ZOOM}{MOVETYPE} = $zd{$op}{moveType};                              # Start / Stop                               
         
-        return;
-    }
+        return if(!$hash->{HELPER}{ZOOM}{DIR});                                            # es muss ! eine Richtung gesetzt sein
+
+        my $dir                     = $hash->{HELPER}{ZOOM}{DIR};
+        my $moveType                = $hash->{HELPER}{ZOOM}{MOVETYPE};
+      
+        $hash->{HELPER}{CALL}{VKEY} = "PTZ";                                                                     
+        $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Zoom"&cameraId="_CID_"&control="$dir"&moveType="$moveType"&_sid="_SID_"};
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "getPresets";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
+        if($hash->{HELPER}{ZOOM}{MOVETYPE} ne "Stop") {
+            InternalTimer(gettimeofday()+$zd{$op}{sttime}, "FHEM::SSCam::__setZoom", "$name!_!stop", 0);
+        }
         
         setActiveToken($hash);
-        
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::getPresets", $hash, 0);
-    }  
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $str);
+    }
 
 return;    
 }
@@ -3207,45 +3306,46 @@ return;
 ###############################################################################
 #                       einen Preset setzen
 ###############################################################################
-sub setPreset {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __setPreset {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::setPreset");
-    return if(IsDisabled($name));
+    my $caller  = (caller(0))[3];
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
+    RemoveInternalTimer($hash, $caller);
 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate ($hash,"Error",$error);
-        readingsEndUpdate  ($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be set - $error");
-        
-        return;
-    }
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Preset of Camera $camname can't be set"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE}               = "setPreset";
+        $hash->{OPMODE}               = "setPreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites   ($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::setPreset", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
+        
+        my $pnumber = $hash->{HELPER}{PNUMBER};
+        my $pname   = $hash->{HELPER}{PNAME};
+        my $pspeed  = $hash->{HELPER}{PSPEED};
+      
+        if ($pspeed) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetPreset"&position=$pnumber&name="$pname"&speed="$pspeed"&cameraId="_CID_"&_sid="_SID_"};                  
+        } 
+        else {    
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetPreset"&position=$pnumber&name="$pname"&cameraId="_CID_"&_sid="_SID_"};                          
+        }
+        
+        setActiveToken($hash);
+        checkSid      ($hash);    
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3254,46 +3354,37 @@ return;
 ###############################################################################
 #                       einen Preset löschen
 ###############################################################################
-sub delPreset {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __delPreset {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::delPreset");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Preset of Camera $camname can't be deleted - $error");
-        
-        return;
-    }
+    return if(exitOnDis ($name, "Preset of Camera $camname can't be deleted"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "delPreset";
+        $hash->{OPMODE}               = "delPreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $delp                      = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}};
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="DelPreset"&position="$delp"&cameraId="_CID_"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1.4, "FHEM::SSCam::delPreset", $hash, 0);
+        checkSid      ($hash);  
+    } 
+    else {
+        schedule ($name, $hash);
     }
 
 return;    
@@ -3302,94 +3393,167 @@ return;
 ###############################################################################
 #                       Preset Home setzen
 ###############################################################################
-sub setHome {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __setHome {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::setHome");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Home preset of Camera $camname can't be set - $error");
-        
-        return;
-    }
+    return if(exitOnDis ($name, "Home preset of Camera $camname can't be set"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "setHome";
+        $hash->{OPMODE}               = "setHome"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
+        
+        if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetHome"&cameraId="_CID_"&_sid="_SID_"};        
+        } 
+        else {
+            my $bindpos                 = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}}; 
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="SetHome"&bindPosition="$bindpos"&cameraId="_CID_"&_sid="_SID_"};      
+        }
+        
         setActiveToken($hash);
-        
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::setHome", $hash, 0);
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
 }
 
+###########################################################################
+#                                HomeMode setzen 
+###########################################################################
+sub __setHomeMode {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "sethomemode"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $sw                        = $hash->{HELPER}{HOMEMODE};                 # HomeMode on,off
+        $sw                           = ($sw eq "on") ? "true" : "false";
+        $hash->{HELPER}{CALL}{VKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=Switch&on=$sw&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+###########################################################################
+#                         Optimierparameter setzen 
+###########################################################################
+sub __setOptParams {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "setoptpar"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $mirr                    = $hash->{HELPER}{MIRROR}  // ReadingsVal($name, "CamVideoMirror", "");
+        my $flip                    = $hash->{HELPER}{FLIP}    // ReadingsVal($name, "CamVideoFlip",   "");
+        my $rot                     = $hash->{HELPER}{ROTATE}  // ReadingsVal($name, "CamVideoRotate", "");
+        my $ntp                     = $hash->{HELPER}{NTPSERV} // ReadingsVal($name, "CamNTPServer",   "");
+      
+        $ntp                        = q{} if($ntp eq "none");
+        my $clst                    = $hash->{HELPER}{CHKLIST} // "";
+
+        my $ver                     = $hash->{HELPER}{API}{CAM}{VER} >= 9 ? 8 : $hash->{HELPER}{API}{CAM}{VER};        
+               
+        $hash->{HELPER}{CALL}{VKEY} = "CAM";
+        $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="SaveOptimizeParam"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer="$ntp"&camParamChkList=$clst&cameraIds="_CID_"&_sid="_SID_"};  
+        $hash->{HELPER}{CALL}{TO}   = 90;                                                # setzen Optimierungsparameter dauert lange !
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
 ###############################################################################
 #                       PIR Sensor aktivieren/deaktivieren
 ###############################################################################
-sub managePir {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __managePir {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::managePir");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Home preset of Camera $camname can't be set - $error");
-        
-        return;
-    }
+    return if(exitOnDis ($name, "PIR of camera $camname cannot be managed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "piract";
+        $hash->{OPMODE}               = "piract"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
+        my $piract                    = $hash->{HELPER}{PIRACT};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="PDParamSave"&keep=true&source=$piract&camId="_CID_"&_sid="_SID_"};     
+        
         setActiveToken($hash);
-        
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1.2, "FHEM::SSCam::managePir", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
 
 return;    
@@ -3398,48 +3562,73 @@ return;
 ###############################################################################
 #                         Kamera Liveview starten
 ###############################################################################
-sub runLiveview {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __runLiveview {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::runLiveview");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Liveview of Camera $camname can't be started"));
     
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {           
+        $hash->{OPMODE}               = "runliveview"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0; 
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
         }
         
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - Liveview of Camera $camname can't be started - $error");
-        return;
-    }
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Liveview starten             
-        $hash->{OPMODE} = "runliveview";
-        $hash->{HELPER}{LOGINRETRIES} = 0; 
-        # erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
-        delete $hash->{CAMID};  
+        delete $hash->{CAMID};                                                               # erzwingen die Camid zu ermitteln und bei login-Fehler neue SID zu holen
+        
+        readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
+        
+        if ($hash->{HELPER}{RUNVIEW} =~ /snap/x) {                                           # den letzten Schnappschuß live anzeigen
+            my $limit                   = 1;                                                 # nur 1 Snap laden, für lastsnap_fw 
+            my $imgsize                 = 2;                                                 # full size image, für lastsnap_fw 
+            my $keyword                 = $hash->{CAMNAME};                                  # nur Snaps von $camname selektieren, für lastsnap_fw   
+            $hash->{HELPER}{CALL}{VKEY} = "SNAPSHOT";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
+        }
+        
+        if ($hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) {                                 # HLS Livestreaming aktivieren
+            $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS"; 
+            $hash->{HELPER}{CALL}{TO}   = 90;                                                # aktivieren HLS dauert lange !
+            $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
+        }
+        
+        if ($hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
+            if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
+                if($hash->{HELPER}{API}{AUDIOSTM}{VER}) {                                    # Audio aktivieren                                       
+                    $hash->{HELPER}{ACALL}{AKEY}  = "AUDIOSTM"; 
+                    $hash->{HELPER}{ACALL}{APART} = qq{api=_ANAME_&version=_AVER_&method=Stream&cameraId=_CID_&_sid=_SID_}; 
+                } 
+                else {
+                    delete $hash->{HELPER}{AUDIOLINK};
+                }
+                
+                if($hash->{HELPER}{API}{VIDEOSTMS}{VER}) {                                   # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
+                    $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS";
+                    $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Stream&cameraId=_CID_&format=mjpeg&_sid=_SID_};
+                }
+            } 
+            else {
+                my $lrecid                  = ReadingsVal("$name", "CamLastRecId", 0); 
+                $hash->{HELPER}{CALL}{VKEY} = "STM";
+                $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=EventStream&eventId=$lrecid&timestamp=1&_sid=_SID_};
+            }
+        }
         
         setActiveToken($hash);
-        readingsSingleUpdate($hash,"state","runView ".$hash->{HELPER}{RUNVIEW},1); 
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::runLiveview", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3448,91 +3637,37 @@ return;
 ###############################################################################
 #                         Kamera HLS-Stream aktivieren
 ###############################################################################
-sub activateHls {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __activateHls {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::activateHls");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
- 
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
-        return;
-    }
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Aktivierung starten             
-        $hash->{OPMODE} = "activate_hls";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::activateHls", $hash, 0);
-    }
-
-return;    
-}
-
-###############################################################################
-#                         Kameras mit Autocreate erstellen
-###############################################################################
-sub camAutocreate {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::camAutocreate");
-    return if(IsDisabled($name));
- 
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - autocreate cameras - $error");
-        return;
-    }
+    return if(exitOnDis ($name, "HLS-Stream of Camera $camname can't be activated"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {            
-        $hash->{OPMODE} = "Autocreate";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
+        $hash->{OPMODE}               = "activate_hls"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;  
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }       
+        
+        $hash->{HELPER}{CALL}{VKEY} = "VIDEOSTMS"; 
+        $hash->{HELPER}{CALL}{TO}   = 90;                                                # aktivieren HLS dauert lange !
+        $hash->{HELPER}{CALL}{PART} = qq{api=_NAME_&version=_VER_&method=Open&cameraId=_CID_&format=hls&_sid=_SID_};
         
         setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+2.1, "FHEM::SSCam::camAutocreate", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
 
 return;    
@@ -3541,45 +3676,71 @@ return;
 ###############################################################################
 #               HLS-Stream reaktivieren (stoppen & starten)
 ###############################################################################
-sub reactivateHls {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __reactivateHls {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::reactivateHls");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
     return if(IsDisabled($name));
- 
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - HLS-Stream of Camera $camname can't be activated - $error");
-        return;
-    }
+    return if(exitOnDis ($name, "HLS-Stream of Camera $camname can't be reactivated"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {             
-        $hash->{OPMODE} = "reactivate_hls";
-        $hash->{HELPER}{LOGINRETRIES} = 0;   
+        $hash->{OPMODE}               = "reactivate_hls"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+
+        $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_};     
         
         setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.4, "FHEM::SSCam::reactivateHls", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }  
+
+return;    
+}
+
+###############################################################################
+#                         Kameras mit Autocreate erstellen
+###############################################################################
+sub __camAutocreate {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "autocreate cameras not possible"));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {            
+        $hash->{OPMODE}               = "Autocreate"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;  
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }       
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    }
 
 return;    
 }
@@ -3587,46 +3748,50 @@ return;
 ###############################################################################
 #                         Kamera Liveview stoppen
 ###############################################################################
-sub stopLiveview {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    my $errorcode;
-    my $error;
+sub __stopLiveview {
+    my $hash = shift;
+    my $name = $hash->{NAME};
    
-    RemoveInternalTimer($hash, "FHEM::SSCam::stopLiveview");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        
-        # Liveview stoppen           
+    if ($hash->{HELPER}{ACTIVE} eq "off") {           
         $hash->{OPMODE}               = "stopliveview";
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
         setActiveToken($hash);
         
-        # Link aus Helper-hash löschen
-        delete $hash->{HELPER}{LINK};
+        delete $hash->{HELPER}{LINK};                       # Link aus Helper-hash löschen
         delete $hash->{HELPER}{AUDIOLINK};
         delete $hash->{HELPER}{ACTSTRM};                    # sprechender Name des laufenden Streamtyps für SSCamSTRM
         
-        # Reading LiveStreamUrl löschen
-        delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});
+        delete($defs{$name}{READINGS}{LiveStreamUrl}) if ($defs{$name}{READINGS}{LiveStreamUrl});  # Reading LiveStreamUrl löschen
         
         readingsSingleUpdate($hash,"state","stopview",1);           
         
-        if($hash->{HELPER}{WLTYPE} eq "hls") {
-            # HLS Stream war aktiv, Streaming beenden
-            $hash->{OPMODE} = "stopliveview_hls";
-            getApiSites($hash);
-        } else {
-            # kein HLS Stream
+        if($hash->{HELPER}{WLTYPE} eq "hls") {              # HLS Stream war aktiv, Streaming beenden
+            $hash->{OPMODE} = "stopliveview_hls"; 
+            
+            $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
+            $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Close&cameraId=_CID_&format=hls&_sid=_SID_}; 
+            
+            return if(startOrShut($name));
+            checkSid ($hash);
+        } 
+        else {                                              # kein HLS Stream
             roomRefresh   ($hash,0,1,1);                    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
             delActiveToken($hash);
         }
-    
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::stopLiveview", $hash, 0);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3635,127 +3800,148 @@ return;
 ###############################################################################
 #                       external Event 1-10 auslösen
 ###############################################################################
-sub extEvent {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
+sub __extEvent {
+    my $hash = shift;
+    my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::extEvent");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "extevent";
+        $hash->{OPMODE}               = "extevent"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::extEvent", $hash, 0);
+        my $evtid                     = $hash->{HELPER}{EVENTID};
+        $hash->{HELPER}{CALL}{VKEY}   = "EXTEVT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Trigger&eventId=$evtid&eventName=$evtid&_sid="_SID_"};       
+        
+        Log3($name, 4, "$name - trigger external event \"$evtid\"");
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
 }
 
 ###############################################################################
-#                      PTZ-Kamera auf Position fahren
+#                      PTZ-Kamera Aktion ausführen
 ###############################################################################
-sub doPtzAaction {
+sub __doPtzAaction {
     my $hash    = shift;
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
+    
     my ($errorcode,$error);
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::doPtzAaction");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
 
-    if (ReadingsVal("$name", "DeviceType", "Camera") ne "PTZ") {
+    if (!IsCapPTZ($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible for cameras of DeviceType \"PTZ\" - please compare with device Readings");
         return;
     }
-    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !ReadingsVal("$name", "CapPTZAbs", "false")) {
+    if ($hash->{HELPER}{PTZACTION} eq "goabsptz" && !IsCapPTZAbs($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports absolute PTZ action - please compare with Reading \"CapPTZAbs\"");
         return;
     }
-    if ( $hash->{HELPER}{PTZACTION} eq "movestart" && ReadingsVal("$name", "CapPTZDirections", "0") < 1) {
+    if ($hash->{HELPER}{PTZACTION} eq "movestart" && !IsCapPTZDir($hash)) {
         Log3($name, 2, "$name - ERROR - Operation \"$hash->{HELPER}{PTZACTION}\" is only possible if camera supports \"Tilt\" and \"Pan\" operations - please compare with device Reading \"CapPTZDirections\"");
         return;
     }
     
-    if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-        if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
-            $errorcode = "600";
-            # Fehlertext zum Errorcode ermitteln
-            $error = expErrors($hash,$errorcode);
-        
-            # Setreading 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
-    
-            Log3($name, 2, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
-            return;        
-        }
-    }
-    
-    if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
-        if (!defined($hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}})) {
-            $errorcode = "600";
-            # Fehlertext zum Errorcode ermitteln
-            $error = expErrors($hash,$errorcode);
-        
-            # Setreading 
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
-    
-            Log3($name, 2, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
-            return;        
-        }
-    }
-    
-    if (ReadingsVal("$name", "state", "") =~ /^dis/x) {
-        if (ReadingsVal("$name", "state", "") eq "disabled") {
-            $errorcode = "402";
-        } elsif (ReadingsVal("$name", "state", "") eq "disconnected") {
-            $errorcode = "502";
-        }
-        
-        # Fehlertext zum Errorcode ermitteln
-        $error = expErrors($hash,$errorcode);
-
-        # Setreading 
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate($hash,"Errorcode",$errorcode);
-        readingsBulkUpdate($hash,"Error",$error);
-        readingsEndUpdate($hash, 1);
-    
-        Log3($name, 2, "$name - ERROR - $hash->{HELPER}{PTZACTION} of Camera $camname can't be executed - $error");
-        return;
-        }
+    return if(exitOnDis ($name, "$hash->{HELPER}{PTZACTION} of Camera $camname can't be executed"));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {
+        if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
+            if (!defined($hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}})) {
+                $errorcode = "600";
+                $error     = expErrors($hash,$errorcode);                                    # Fehlertext zum Errorcode ermitteln
+            
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate  ($hash, "Error",     $error    );
+                readingsEndUpdate   ($hash, 1);
+        
+                Log3($name, 2, "$name - ERROR - goPreset to position \"$hash->{HELPER}{GOPRESETNAME}\" of Camera $camname can't be executed - $error");
+                return;        
+            }
+        }
+        
+        if ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
+            my $patid = $hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}};
+            if (!defined $patid) {
+                $errorcode = "600";
+                $error     = expErrors($hash,$errorcode);                                             # Fehlertext zum Errorcode ermitteln
+            
+                readingsBeginUpdate ($hash);
+                readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate  ($hash, "Error",     $error    );
+                readingsEndUpdate   ($hash, 1);
+        
+                Log3($name, 2, "$name - ERROR - runPatrol to patrol \"$hash->{HELPER}{GOPATROLNAME}\" of Camera $camname can't be executed - $error");
+                return;        
+            }
+            
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="RunPatrol"&patrolId="$patid"&cameraId="_CID_"&_sid="_SID_"};
+
+            Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
+        }
         
         if ($hash->{HELPER}{PTZACTION} eq "gopreset") {
-            Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\" now");
-        } elsif ($hash->{HELPER}{PTZACTION} eq "runpatrol") {
-            Log3($name, 4, "$name - Start patrol \"$hash->{HELPER}{GOPATROLNAME}\" with ID \"$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}\" of Camera $camname now");
-        } elsif ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
+            my $ver                     = ($hash->{HELPER}{API}{PTZ}{VER} >= 5) ? 4 : $hash->{HELPER}{API}{PTZ}{VER};
+            my $posid                   = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}};
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="$ver"&method="GoPreset"&position="$posid"&cameraId="_CID_"&_sid="_SID_"};
+
+            Log3($name, 4, "$name - Move Camera $camname to position \"$hash->{HELPER}{GOPRESETNAME}\" with ID \"$posid\" now");
+        }
+        
+        if ($hash->{HELPER}{PTZACTION} eq "goabsptz") {
+            my $posx                    = $hash->{HELPER}{GOPTZPOSX};
+            my $posy                    = $hash->{HELPER}{GOPTZPOSY};
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="AbsPtz"&cameraId="_CID_"&posX="$posx"&posY="$posy"&_sid="_SID_"};
+        
             Log3($name, 4, "$name - Start move Camera $camname to position posX=\"$hash->{HELPER}{GOPTZPOSX}\" and posY=\"$hash->{HELPER}{GOPTZPOSY}\" now");
-        } elsif ($hash->{HELPER}{PTZACTION} eq "movestart") {
+        } 
+        
+        if ($hash->{HELPER}{PTZACTION} eq "movestart") {
+            my $mdir                    = $hash->{HELPER}{GOMOVEDIR};
+            $hash->{HELPER}{CALL}{VKEY} = "PTZ";
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&speed="3"&moveType="Start"&_sid="_SID_"};
+
             Log3($name, 4, "$name - Start move Camera $camname to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
         }
      
-        $hash->{OPMODE} = $hash->{HELPER}{PTZACTION};
+        $hash->{OPMODE}               = $hash->{HELPER}{PTZACTION}; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
         setActiveToken($hash);
- 
-        getApiSites($hash);
- 
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::doPtzAaction", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3764,23 +3950,36 @@ return;
 ###############################################################################
 #                         stoppen continued move
 ###############################################################################
-sub moveStop {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __moveStop {                                        ## no critic "not used"
+    my $hash = shift;
+    my $name = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::moveStop");
+    my $caller = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "movestop";
+        $hash->{OPMODE}               = "movestop"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $mdir                      = $hash->{HELPER}{GOMOVEDIR};
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Move"&cameraId="_CID_"&direction="$mdir"&moveType="Stop"&_sid="_SID_"};
+        
+        Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
+        
         setActiveToken($hash);
-        getApiSites($hash);
-   
-    } else {
-        InternalTimer(gettimeofday()+0.3, "FHEM::SSCam::moveStop", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
 
 return;    
@@ -3789,26 +3988,40 @@ return;
 ###############################################################################
 #                           Kamera aktivieren
 ###############################################################################
-sub camEnable {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __camEnable {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::camEnable");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # eine Kamera aktivieren
-        Log3($name, 4, "$name - Enable Camera $camname");
-                        
-        $hash->{OPMODE} = "Enable";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "Enable"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Enable&cameraIds=_CID_&_sid="_SID_"};     
+        
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="Enable"&idList="_CID_"&_sid="_SID_"};     
+        }
+        
+        Log3($name, 4, "$name - Enable Camera $camname");
+        
         setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camEnable", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
@@ -3817,78 +4030,492 @@ return;
 ###############################################################################
 #                            Kamera deaktivieren
 ###############################################################################
-sub camDisable {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __camDisable {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::camDisable");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {
-        # eine Kamera deaktivieren
-        Log3($name, 4, "$name - Disable Camera $camname");
-                        
-        $hash->{OPMODE} = "Disable";
+    if ($hash->{HELPER}{ACTIVE} eq "off" and ReadingsVal("$name", "Record", "Start") ne "Start") {                       
+        $hash->{OPMODE}               = "Disable"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::camDisable", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{TO}     = 90;                                                # Disable dauert lange !
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Disable&cameraIds=_CID_&_sid="_SID_"};     
+        
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="Disable"&idList="_CID_"&_sid="_SID_"};     
+        }
+        
+        Log3($name, 4, "$name - Disable Camera $camname");
+        
+        setActiveToken($hash);
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
 }
 
+################################################################
+#                           Get
+################################################################
+sub Get {
+    my ($hash, @a) = @_;
+    return "\"get X\" needs at least an argument" if ( @a < 2 );
+    my $name = shift @a;
+    my $opt  = shift @a;
+    my $arg  = shift @a;
+    my $arg1 = shift @a;
+    my $arg2 = shift @a;
+    
+    my $getlist = "Unknown argument $opt, choose one of ";
+
+    if(!$hash->{CREDENTIALS}) {
+        return;  
+    } 
+    elsif(IsModelCam($hash)) {                                                        # getlist für Cams
+        $getlist .= "caminfo:noArg ".
+                    ((AttrVal($name,"snapGalleryNumber",undef) || AttrVal($name,"snapGalleryBoost",0))
+                       ? "snapGallery:noArg " : "snapGallery:$defSnum ").
+                    (IsCapPTZPan($hash) ? "listPresets:noArg " : "").
+                    "snapinfo:noArg ".
+                    "saveRecording ".
+                    "snapfileinfo:noArg ".
+                    "eventlist:noArg ".
+                    "stmUrlPath:noArg " 
+                    ;
+    } 
+    else {                                                                           # getlist für SVS Devices
+        $getlist .= ($hash->{HELPER}{API}{HMODE}{VER}?"homeModeState:noArg ": "").
+                    "listLog "
+                    ;
+    }
+    
+    $getlist .= "caminfoall:noArg ".                                                 # Ergänzend für beiden Device Typen
+                "svsinfo:noArg ".
+                "scanVirgin:noArg ".
+                "storedCredentials:noArg ".
+                "versionNotes ".
+                "apiInfo:noArg "
+                ;
+                  
+    return if(IsDisabled($name)); 
+
+    my $params = {
+        hash  => $hash,
+        name  => $name,
+        opt   => $opt,
+        arg   => $arg,
+        arg1  => $arg1,
+        arg2  => $arg2,
+    };
+  
+    no strict "refs";                                                        ## no critic 'NoStrict'  
+    if($hget{$opt} && defined &{$hget{$opt}{fn}}) {
+        my $ret = q{};
+      
+        if (!$hash->{CREDENTIALS} && $hget{$opt}{needcred}) {                
+            return qq{Credentials of $name are not set. Make sure they are set with "set $name credentials <username> <password>"};
+        }
+  
+        $ret = &{$hget{$opt}{fn}} ($params);
+      
+        return $ret;
+    }
+    use strict "refs";     
+        
+return $getlist;
+}
+
+################################################################
+#        Getter apiInfo - Anzeige die API Infos in Popup
+################################################################
+sub _getapiInfo {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  getClHash   ($hash,1);
+  __getApiInfo($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter caminfo
+################################################################
+sub _getcaminfo {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  __getCamInfo($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter caminfoall
+################################################################
+sub _getcaminfoall {                     ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  __getCaminfoAll($hash,1);                                 # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+        
+return;
+}
+
+################################################################
+#                      Getter homeModeState
+################################################################
+sub _gethomeModeState {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(IsModelCam($hash));
+  
+  __getHomeModeState($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter listLog
+################################################################
+sub _getlistLog {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $arg   = $paref->{arg};
+  my $arg1  = $paref->{arg1};
+  my $arg2  = $paref->{arg2};
+  
+  return if(IsModelCam($hash));
+  
+  getClHash($hash,1);                                     # übergebenen CL-Hash (FHEMWEB) in Helper eintragen
+    
+  extlogargs($hash, $arg)  if($arg);
+  extlogargs($hash, $arg1) if($arg1);
+  extlogargs($hash, $arg2) if($arg2);
+
+  __getSvsLog ($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter listPresets
+################################################################
+sub _getlistPresets {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+  
+  getClHash   ($hash,1);                                 # übergebenen CL-Hash (FHEMWEB) in Helper eintragen 
+  __getPresets($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter saveRecording
+################################################################
+sub _getsaveRecording {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $arg   = $paref->{arg};
+  
+  return if(!IsModelCam($hash));
+  
+  $hash->{HELPER}{RECSAVEPATH} = $arg if($arg);
+  __getRecAndSave($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter svsinfo
+################################################################
+sub _getsvsinfo {                        ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  __getSvsInfo($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter storedCredentials
+################################################################
+sub _getstoredCredentials {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $out = showStoredCredentials ($hash, 3);
+  
+return $out;
+}
+
+################################################################
+#                      Getter snapGallery
+################################################################
+sub _getsnapGallery {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg};
+  
+  return if(!IsModelCam($hash));
+  
+  my $ret = getClHash($hash);
+  return $ret if($ret);
+
+  if(!AttrVal($name, "snapGalleryBoost",0)) {                                                  # Snaphash ist nicht vorhanden und wird abgerufen       
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;
+                                                                                
+      my $slim  = $arg // AttrVal($name,"snapGalleryNumber",$defSlim);                         # Anzahl der abzurufenden Snapshots
+      my $ssize = (AttrVal($name,"snapGallerySize","Icon") eq "Icon") ? 1 : 2;                 # Image Size 1-Icon, 2-Full
+      
+      __getSnapInfo("$name:$slim:$ssize");
+  } 
+  else {                                                                                       # Snaphash ist vorhanden und wird zur Ausgabe aufbereitet
+      $hash->{HELPER}{SNAPLIMIT} = AttrVal($name,"snapGalleryNumber",$defSlim);
+      
+      my %pars = ( linkparent => $name,
+                   linkname   => '',
+                   ftui       => 0
+                 );
+      
+      my $htmlCode = composeGallery(\%pars);
+      
+      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
+          if ($hash->{HELPER}{CL}{$k}->{COMP}) {                                               # CL zusammengestellt (Auslösung durch Notify)
+              asyncOutput($hash->{HELPER}{CL}{$k}, "$htmlCode");                      
+          } 
+          else {                                                                               # Output wurde über FHEMWEB ausgelöst
+              return $htmlCode;
+          }
+      }
+      
+      delClHash  ($name);
+  }
+        
+return;
+}
+
+################################################################
+#                      Getter snapinfo
+# Schnappschußgalerie abrufen oder nur Info des letzten Snaps
+################################################################
+sub _getsnapinfo {                       ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  return if(!IsModelCam($hash));
+  
+  my ($slim,$ssize) = snapLimSize($hash,1);        # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} gesetzt !
+  __getSnapInfo("$name:$slim:$ssize");
+        
+return;
+}
+
+################################################################
+#                      Getter snapfileinfo
+################################################################
+sub _getsnapfileinfo {                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  return if(!IsModelCam($hash));
+  
+  if (!ReadingsVal($name, "LastSnapId", undef)) {
+      return "Reading LastSnapId is empty - please take a snapshot before !"
+  }
+  
+  __getSnapFilename($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter eventlist
+################################################################
+sub _geteventlist {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+  
+  __getEventList($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter stmUrlPath
+################################################################
+sub _getstmUrlPath {                      ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  return if(!IsModelCam($hash));
+  
+  __getStmUrlPath($hash);
+        
+return;
+}
+
+################################################################
+#                      Getter scanVirgin
+################################################################
+sub _getscanVirgin {                     ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  
+  __sessionOff($hash);
+  
+  delete $hash->{HELPER}{API}{PARSET};
+  delete $hash->{CAMID};
+
+  my @allrds = keys%{$defs{$name}{READINGS}};
+  for my $key(@allrds) {                                           # vorhandene Readings außer "state" löschen
+      delete($defs{$name}{READINGS}{$key}) if($key ne "state");
+  }
+
+  __getCaminfoAll($hash,1);                                        # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+    
+return;
+}
+
+################################################################
+#                      Getter versionNotes
+################################################################
+sub _getversionNotes {                   ## no critic "not used"
+  my $paref = shift;
+  
+  $paref->{hintextde} = \%vHintsExt_de;
+  $paref->{hintexten} = \%vHintsExt_en;
+  $paref->{notesext}  = \%vNotesExtern;
+  
+  my $ret = showModuleInfo ($paref);
+                    
+return $ret; 
+}
+
+###########################################################################
+#              API Infos abfragen und in einem Popup anzeigen
+###########################################################################
+sub __getApiInfo {
+    my $hash   = shift;
+    my $name   = $hash->{NAME};
+    
+    my $caller = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "apiInfo"; 
+        
+        return if(startOrShut($name));
+        
+        $hash->{HELPER}{API}{PARSET} = 0;                                                   # Abruf API Infos erzwingen
+        
+        setActiveToken ($hash);
+        getApiSites    ($hash, "", $hash);       
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+###########################################################################
+#               Kamera allgemeine Informationen abrufen (Get) 
+###########################################################################
+sub __getCamInfo {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "Getcaminfo"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="$ver"&method="GetInfo"&cameraIds="_CID_"&deviceOutCap="true"&streamInfo="true"&ptz="true"&basic="true"&camAppInfo="true"&optimize="true"&fisheye="true"&eventDetection="true"&_sid="_SID_"};            
+        
+        setActiveToken($hash); 
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
+    } 
+    
+return;
+}
+
 ###############################################################################
 #      Kamera alle Informationen abrufen (Get) bzw. Einstieg Polling
 ###############################################################################
-sub getCaminfoAll {
-    my ($hash,$mode)   = @_;
-    my $camname        = $hash->{CAMNAME};
-    my $name           = $hash->{NAME};
-    my ($now,$new);
+sub __getCaminfoAll {
+    my $hash    = shift;
+    my $mode    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getCaminfoAll");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getSvsInfo");
-    InternalTimer(gettimeofday()+1, "FHEM::SSCam::getSvsInfo", $hash, 0);
-    
-    if(IsModelCam($hash)) {
-        # Model ist CAM
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getEventList");
-        InternalTimer       (gettimeofday()+0.5, "FHEM::SSCam::getEventList", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getMotionEnum");
-        InternalTimer       (gettimeofday()+0.6, "FHEM::SSCam::getMotionEnum", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCamInfo");
-        InternalTimer       (gettimeofday()+0.9, "FHEM::SSCam::getCamInfo", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getCapabilities");
-        InternalTimer       (gettimeofday()+1.3, "FHEM::SSCam::getCapabilities", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStreamFormat");
-        InternalTimer       (gettimeofday()+1.4, "FHEM::SSCam::getStreamFormat", $hash, 0);
-        
-        # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps
-        my ($slim,$ssize) = snapLimSize($hash,1);                                         # Force-Bit, es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSnapInfo"); 
-        InternalTimer       (gettimeofday()+1.5, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
-    
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getPtzPresetList");
-        InternalTimer       (gettimeofday()+1.6, "FHEM::SSCam::getPtzPresetList", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getPtzPatrolList");
-        InternalTimer       (gettimeofday()+1.9, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getStmUrlPath");
-        InternalTimer       (gettimeofday()+2.1, "FHEM::SSCam::getStmUrlPath", $hash, 0);
 
-    } else {
-        # Model ist SVS
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getHomeModeState");
-        InternalTimer       (gettimeofday()+0.7, "FHEM::SSCam::getHomeModeState", $hash, 0);
-        RemoveInternalTimer ($hash,              "FHEM::SSCam::getSvsLog");
-        InternalTimer       (gettimeofday()+0.8, "FHEM::SSCam::getSvsLog", $hash, 0);
+    if(IsModelCam($hash)) {                                                               # Model ist CAM
+        __getCapabilities ($hash);
+        __getEventList    ($hash);
+        __getMotionEnum   ($hash);
+        __getCamInfo      ($hash);
+        __getStreamFormat ($hash);
+        __getStmUrlPath   ($hash);
+        
+        my ($slim,$ssize) = snapLimSize($hash,1);                                         
+        __getSnapInfo     ("$name:$slim:$ssize");                                         # Schnappschußgalerie abrufen (snapGalleryBoost) oder nur Info des letzten Snaps, Force-Bit -> es wird $hash->{HELPER}{GETSNAPGALLERY} erzwungen !
+    } 
+    else {                                                                                # Model ist SVS
+        __getHomeModeState ($hash);
+        __getSvsLog        ($hash);
     }
+    
+    __getSvsInfo ($hash);
     
     # wenn gesetzt = manuelle Abfrage
     # return if ($mode);                # 24.03.2018 geänd.
@@ -3896,23 +4523,140 @@ sub getCaminfoAll {
     my $pcia = AttrVal($name,"pollcaminfoall",0);
     my $pnl  = AttrVal($name,"pollnologging",0);
     if ($pcia) {        
-        $new = gettimeofday()+$pcia; 
-        InternalTimer($new, "FHEM::SSCam::getCaminfoAll", $hash, 0);
+        my $new = gettimeofday()+$pcia; 
+        InternalTimer($new, $caller, $hash, 0);
         
-        $now = FmtTime(gettimeofday());
-        $new = FmtTime(gettimeofday()+$pcia);
+        my $now = FmtTime(gettimeofday());
+        $new    = FmtTime(gettimeofday()+$pcia);
         readingsSingleUpdate($hash, "state",     "polling",                  1) if(!IsModelCam($hash));  # state für SVS-Device setzen
         readingsSingleUpdate($hash, "PollState", "Active - next time: $new", 1);  
         
         if (!$pnl) {
             Log3($name, 3, "$name - Polling now: $now , next Polling: $new");
         }
-    
-    } else {
-        # Beenden Polling aller Caminfos
+    } 
+    else {                                                                                               # Beenden Polling aller Caminfos
         readingsSingleUpdate($hash, "PollState", "Inactive",   1);
-        readingsSingleUpdate($hash, "state",     "initialized",1) if(!IsModelCam($hash));  # state für SVS-Device setzen
+        readingsSingleUpdate($hash, "state",     "initialized",1) if(!IsModelCam($hash));                # state für SVS-Device setzen
+        
         Log3($name, 3, "$name - Polling of $camname is deactivated");
+    }
+    
+return;
+}
+
+###########################################################################
+#                         HomeMode Status abfragen
+###########################################################################
+sub __getHomeModeState {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name) || !defined($hash->{HELPER}{API}{HMODE}{VER}));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "gethomemodestate"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "HMODE";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=GetInfo&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+###########################################################################
+#                         SVS Log abrufen
+###########################################################################
+sub __getSvsLog {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "getsvslog"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $sev                       = delete $hash->{HELPER}{LISTLOGSEVERITY} // "";
+        my $lim                       = delete $hash->{HELPER}{LISTLOGLIMIT}    // 0;
+        my $mco                       = delete $hash->{HELPER}{LISTLOGMATCH}    // "";
+        $lim                          = 1 if(!$hash->{HELPER}{CL}{1});                                   # Datenabruf im Hintergrund
+        $mco                          = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
+        $sev                          = (lc($sev) =~ /error/x) ? 3 :(lc($sev) =~ /warning/x) ? 2 :(lc($sev) =~ /info/x) ? 1 : "";
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "LOG";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version="2"&method="List"&time2String="no"&level="$sev"&limit="$lim"&keyword="$mco"&_sid="_SID_"};
+        
+        Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+###########################################################################
+#       allgemeine Infos über Synology Surveillance Station
+###########################################################################
+sub __getSvsInfo {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "getsvsinfo"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "SVSINFO";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetInfo"&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
@@ -3925,288 +4669,169 @@ return;
 #  $ssize = Snapgröße
 #  $tac   = Transaktionscode (für gemeinsamen Versand)
 ###########################################################################
-sub getSnapInfo {
-    my ($str)                   = @_;
+sub __getSnapInfo {
+    my $str                      = shift;
     my ($name,$slim,$ssize,$tac) = split(":",$str);
     my $hash                     = $defs{$name};
     my $camname                  = $hash->{CAMNAME};
     
-    $tac   = (defined $tac)?$tac:5000;
-    my $ta = $hash->{HELPER}{TRANSACTION};
+    $tac       = $tac // 5000;
+    my $ta     = $hash->{HELPER}{TRANSACTION};
+    my $caller = (caller(0))[3];
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getSnapInfo"); 
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off" || ((defined $ta) && $ta == $tac)) {               
         $hash->{OPMODE}               = "getsnapinfo";
         $hash->{OPMODE}               = "getsnapgallery" if(exists($hash->{HELPER}{GETSNAPGALLERY}));
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
-        $hash->{HELPER}{SNAPLIMIT}    = $slim;        # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
-        $hash->{HELPER}{SNAPIMGSIZE}  = $ssize;       # 0-Do not append image, 1-Icon size, 2-Full size
-        $hash->{HELPER}{KEYWORD}      = $camname;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $str);
+            return;
+        }
+        
+        my $limit                  = $slim;                                          # 0-alle Snapshots werden abgerufen und ausgewertet, sonst $slim
+        $hash->{HELPER}{SNAPLIMIT} = $slim;
+        
+        my $imgsize = $ssize;                                                        # 0-Do not append image, 1-Icon size, 2-Full size
+        my $keyword = $camname;
+        my $snapid  = ReadingsVal("$name", "LastSnapId", " ");       
+               
+        $hash->{HELPER}{CALL}{VKEY} = "SNAPSHOT";
+        
+        if($hash->{OPMODE} eq "getsnapinfo" && $snapid =~/\d+/x) {                   # getsnapinfo UND Reading LastSnapId gesetzt
+            Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&idList="$snapid"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};      
+        } 
+        else {                                                                       # snapgallery oder kein Reading LastSnapId gesetzt
+            Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version="_VER_"&method="List"&keyword="$keyword"&imgSize="$imgsize"&limit="$limit"&_sid="_SID_"};
+        }
         
         setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        $tac = (defined $tac)?$tac:"";
-        InternalTimer(gettimeofday()+1.7, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize", 0);
+        checkSid      ($hash);    
+    } 
+    else {
+        schedule ($name, $str);
     }
     
 return;
 }
 
 ###############################################################################
-#                     Filename zu Schappschuß ermitteln
+#                       Liste der Presets abrufen
 ###############################################################################
-sub getSnapFilename {
-    my ($hash)   = @_;
-    my $name     = $hash->{NAME};
+sub __getPresets {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getSnapFilename");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+
+    return if(IsDisabled($name));
+    return if(exitOnDis ($name, "Preset list of Camera $camname can't be get"));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {             
+        $hash->{OPMODE}               = "getPresets"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "PRESET";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="Enum"&cameraId="_CID_"&_sid="_SID_"}; 
+           
+        setActiveToken($hash);
+        checkSid      ($hash); 
+    } 
+    else {
+        schedule ($name, $hash);
+    }  
+
+return;    
+}
+
+###############################################################################
+#        der Filename der aktuellen Schnappschuß-ID wird ermittelt
+###############################################################################
+sub __getSnapFilename {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {    
-        $hash->{OPMODE}               = "getsnapfilename";
+        $hash->{OPMODE}               = "getsnapfilename"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        my $snapid = ReadingsVal("$name", "LastSnapId", "");
+        Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "SNAPSHOT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&imgSize="0"&idList="$snapid"&_sid="_SID_"};
+        
         setActiveToken($hash);
-        getApiSites($hash);
-    
-    } else {
-        InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::getSnapFilename", $hash, 0);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     } 
 
 return;    
 }
 
-###########################################################################
-#       allgemeine Infos über Synology Surveillance Station
-###########################################################################
-sub getSvsInfo {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getSvsInfo");
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getsvsinfo";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1, "FHEM::SSCam::getSvsInfo", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#                                HomeMode setzen 
-###########################################################################
-sub setHomeMode {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::setHomeMode");
-    return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "sethomemode";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.6, "FHEM::SSCam::setHomeMode", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#                         Optimierparameter setzen 
-###########################################################################
-sub setOptParams {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::setOptParams");
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "setoptpar";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.6, "FHEM::SSCam::setOptParams", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#                         HomeMode Status abfragen
-###########################################################################
-sub getHomeModeState {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getHomeModeState");
-    return if(IsDisabled($name) || !defined($hash->{HELPER}{APIHMMAXVER}));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "gethomemodestate";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.7, "FHEM::SSCam::getHomeModeState", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#                         SVS Log abrufen
-###########################################################################
-sub getSvsLog {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getSvsLog");
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getsvslog";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+0.9, "FHEM::SSCam::getSvsLog", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#                           Session logout
-###########################################################################
-sub sessionOff {
+################################################################################
+#                      Kamera Stream Urls abrufen (Get)
+################################################################################
+sub __getStmUrlPath {
     my $hash    = shift;
     my $camname = $hash->{CAMNAME};
     my $name    = $hash->{NAME};
     
-    RemoveInternalTimer ($hash, "FHEM::SSCam::sessionOff");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE} = "logout";
-        
-        setActiveToken($hash);
-        logout        ($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+1.1, "FHEM::SSCam::sessionOff", $hash, 0);
-    }
-    
-return;
-}
-
-###########################################################################
-#               Kamera allgemeine Informationen abrufen (Get) 
-###########################################################################
-sub getCamInfo {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getCamInfo");
-    return if(IsDisabled($name));
-
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "Getcaminfo";
-        $hash->{HELPER}{LOGINRETRIES} = 0;  
-        
-        setActiveToken($hash); 
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getCamInfo", $hash, 0);
-    } 
-    
-return;
-}
-
-###########################################################################
-#   SYNO.SurveillanceStation.VideoStream query aktuelles Streamformat 
-###########################################################################
-sub getStreamFormat {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getStreamFormat");
-    my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-    return if(IsDisabled($name));  
-    
-    if(!$apivideostmsmaxver) {
-        # keine API "SYNO.SurveillanceStation.VideoStream" mehr ab API v2.8
-        readingsSingleUpdate($hash,"CamStreamFormat", "no API", 1);
-        return;
-    }
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
-        $hash->{OPMODE}               = "getstreamformat";
+    if ($hash->{HELPER}{ACTIVE} eq "off") {            
+        $hash->{OPMODE}               = "getStmUrlPath"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash); 
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+1.4, "FHEM::SSCam::getStreamFormat", $hash, 0);
-    } 
-    
-return;
-}
-
-################################################################################
-#                      Kamera Stream Urls abrufen (Get)
-################################################################################
-sub getStmUrlPath {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getStmUrlPath");
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {
-        # Stream-Urls abrufen              
-        $hash->{OPMODE}               = "getStmUrlPath";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="GetStmUrlPath"&cameraIds="_CID_"&_sid="_SID_"};
+      
+        if($hash->{HELPER}{API}{CAM}{VER} >= 9) {
+            $hash->{HELPER}{CALL}{PART} = qq{api="_NAME_"&version=_VER_&method="GetLiveViewPath"&idList="_CID_"&_sid="_SID_"};   
+        }
         
         setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getStmUrlPath", $hash, 0);
+        checkSid      ($hash);  
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
@@ -4214,91 +4839,164 @@ return;
 
 ###########################################################################
 #                         query SVS-Event information 
+#                        Abruf der Events einer Kamera
 ###########################################################################
-sub getEventList {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __getEventList {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getEventList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {      
-        $hash->{OPMODE}               = "geteventlist";
+        $hash->{OPMODE}               = "geteventlist"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getEventList", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "EVENT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="List"&cameraIds="_CID_"&locked="0"&blIncludeSnapshot="false"&reason=""&limit="2"&includeAllCam="false"&_sid="_SID_"};       
+        
+        setActiveToken($hash);
+        checkSid      ($hash);   
+    } 
+    else {
+        schedule ($name, $hash);
     }
 
 return;    
 }
 
+##########################################################################
+#             Capabilities von Kamera abrufen (Get)
+##########################################################################
+sub __getCapabilities {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {
+        $hash->{OPMODE}               = "Getcapabilities";        
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "CAM";
+        my $ver                       = ($hash->{HELPER}{API}{CAM}{VER} >= 9) ? 8 : $hash->{HELPER}{API}{CAM}{VER};
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=$ver&method="GetCapabilityByCamId"&cameraId=_CID_&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+###########################################################################
+#   SYNO.SurveillanceStation.VideoStream query aktuelles Streamformat 
+###########################################################################
+sub __getStreamFormat {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));  
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE}               = "getstreamformat"; 
+        return if(startOrShut($name));
+        $hash->{HELPER}{LOGINRETRIES} = 0;
+        
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
+        
+        $hash->{HELPER}{CALL}{VKEY}   = "VIDEOSTMS";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=Query&cameraId=_CID_&_sid=_SID_};
+        
+        setActiveToken($hash); 
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
+    } 
+    
+return;
+}
+
 ###########################################################################
 #               Enumerate motion detection parameters
 ###########################################################################
-sub getMotionEnum {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __getMotionEnum {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getMotionEnum");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
     if ($hash->{HELPER}{ACTIVE} eq "off") {   
-        $hash->{OPMODE}               = "getmotionenum";
+        $hash->{OPMODE}               = "getmotionenum"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites   ($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getMotionEnum", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "CAMEVENT";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method="MotionEnum"&camId="_CID_"&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
    
 return;   
 }
 
 ##########################################################################
-#             Capabilities von Kamera abrufen (Get)
-##########################################################################
-sub getCapabilities {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
-    
-    RemoveInternalTimer($hash, "FHEM::SSCam::getCapabilities");
-    return if(IsDisabled($name));
-    
-    if ($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE}               = "Getcapabilities";
-        $hash->{HELPER}{LOGINRETRIES} = 0;
-        
-        setActiveToken($hash);
-        getApiSites($hash);
-        
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getCapabilities", $hash, 0);
-    }
-    
-return;
-}
-
-##########################################################################
 #                      PTZ Presets abrufen (Get)
 ##########################################################################
-sub getPtzPresetList {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __getPtzPresetList {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPresetList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(!IsCapPTZ($hash)) {
         Log3($name, 4, "$name - Retrieval of Presets for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4308,14 +5006,23 @@ sub getPtzPresetList {
     }
     
     if($hash->{HELPER}{ACTIVE} eq "off") {                       
-        $hash->{OPMODE}               = "Getptzlistpreset";
+        $hash->{OPMODE}               = "Getptzlistpreset"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getPtzPresetList", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api="_NAME_"&version="_VER_"&method=ListPreset&cameraId=_CID_&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
@@ -4324,15 +5031,17 @@ return;
 ##########################################################################
 #                    PTZ Patrols abrufen (Get)
 ##########################################################################
-sub getPtzPatrolList {
-    my ($hash)   = @_;
-    my $camname  = $hash->{CAMNAME};
-    my $name     = $hash->{NAME};
+sub __getPtzPatrolList {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
     
-    RemoveInternalTimer($hash, "FHEM::SSCam::getPtzPatrolList");
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
     return if(IsDisabled($name));
     
-    if(ReadingsVal("$name", "DeviceType", "") ne "PTZ") {
+    if(!IsCapPTZ($hash)) {
         Log3($name, 4, "$name - Retrieval of Patrols for $camname can't be executed - $camname is not a PTZ-Camera");
         return;
     }
@@ -4342,81 +5051,116 @@ sub getPtzPatrolList {
     }
 
     if($hash->{HELPER}{ACTIVE} ne "on") {                        
-        $hash->{OPMODE}               = "Getptzlistpatrol";
+        $hash->{OPMODE}               = "Getptzlistpatrol"; 
+        return if(startOrShut($name));
         $hash->{HELPER}{LOGINRETRIES} = 0;
         
-        setActiveToken($hash);
-        getApiSites($hash);
+        if (!$hash->{HELPER}{API}{PARSET}) {
+            getApiSites ($hash, $caller, $hash);
+            return;
+        }
         
-    } else {
-        InternalTimer(gettimeofday()+2, "FHEM::SSCam::getPtzPatrolList", $hash, 0);
+        $hash->{HELPER}{CALL}{VKEY}   = "PTZ";
+        $hash->{HELPER}{CALL}{PART}   = qq{api=_NAME_&version=_VER_&method=ListPatrol&cameraId=_CID_&_sid="_SID_"};
+        
+        setActiveToken($hash);
+        checkSid      ($hash);
+    } 
+    else {
+        schedule ($name, $hash);
     }
     
 return;
 }
 
-#############################################################################################################################
-#######    Begin Kameraoperationen mit NonblockingGet (nicht blockierender HTTP-Call)                                 #######
-#############################################################################################################################
+###########################################################################
+#                           Session logout
+###########################################################################
+sub __sessionOff {
+    my $hash    = shift;
+    my $camname = $hash->{CAMNAME};
+    my $name    = $hash->{NAME};
+    
+    my $caller  = (caller(0))[3];
+    
+    RemoveInternalTimer($hash, $caller);
+    return if(IsDisabled($name));
+    
+    if ($hash->{HELPER}{ACTIVE} eq "off") {                        
+        $hash->{OPMODE} = "logout"; 
+        
+        setActiveToken($hash);
+   
+        logout ($hash, $hash->{HELPER}{API});
+    } 
+    else {
+        schedule ($name, $hash);
+    }
+    
+return;
+}
+
+##################################################################################
+#                           API-Pfade und Versionen ermitteln 
+##################################################################################
 sub getApiSites {
-   my $hash         = shift;
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $name         = $hash->{NAME};
-   my $apiinfo      = $hash->{HELPER}{APIINFO};                # Info-Seite für alle API's, einzige statische Seite !
-   my $apiauth      = $hash->{HELPER}{APIAUTH};            
-   my $apiextrec    = $hash->{HELPER}{APIEXTREC};            
-   my $apiextevt    = $hash->{HELPER}{APIEXTEVT};             
-   my $apicam       = $hash->{HELPER}{APICAM};                          
-   my $apitakesnap  = $hash->{HELPER}{APISNAPSHOT};
-   my $apiptz       = $hash->{HELPER}{APIPTZ};
-   my $apipreset    = $hash->{HELPER}{APIPRESET};
-   my $apisvsinfo   = $hash->{HELPER}{APISVSINFO};
-   my $apicamevent  = $hash->{HELPER}{APICAMEVENT};
-   my $apievent     = $hash->{HELPER}{APIEVENT};
-   my $apivideostm  = $hash->{HELPER}{APIVIDEOSTM};
-   my $apiaudiostm  = $hash->{HELPER}{APIAUDIOSTM};
-   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apistm       = $hash->{HELPER}{APISTM};
-   my $apihm        = $hash->{HELPER}{APIHM};
-   my $apilog       = $hash->{HELPER}{APILOG};
-   my $apirec       = $hash->{HELPER}{APIREC};
-   my $proto        = $hash->{PROTOCOL};   
-   my $url;
-   my $param;
-  
-   # API-Pfade und MaxVersions ermitteln 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - --- Begin Function getApiSites nonblocking ---");
+   my $hash        = shift;
+   my $fret        = shift // "";
+   my $arg         = shift // "";
    
-   if ($shutdownInProcess) {                                                           # shutdown in Proces -> keine weiteren Aktionen
-       Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
-       return;       
-   }
+   my $serveraddr  = $hash->{SERVERADDR};
+   my $serverport  = $hash->{SERVERPORT};
+   my $name        = $hash->{NAME};
+   my $proto       = $hash->{PROTOCOL};   
    
-   if ($hash->{HELPER}{APIPARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
-       Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
-       return checkSid($hash);
+   my ($url,$param);
+   
+   if($fret) {                                                                           # Activetoken setzen wenn Caller angegeben
+       setActiveToken($hash);
    }
 
-   my $httptimeout = AttrVal($name,"httptimeout",4);
+   Log3($name, 4, "$name - --- Start getApiSites ---");
+   
+   if ($hash->{HELPER}{API}{PARSET}) {                                                   # API-Hashwerte sind bereits gesetzt -> Abruf überspringen
+       Log3($name, 4, "$name - API hashvalues already set - ignore get apisites");
+       checkSid($hash);
+       return;
+   }
+
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
 
-   # URL zur Abfrage der Eigenschaften der  API's
-   $url = "$proto://$serveraddr:$serverport/webapi/query.cgi?api=$apiinfo&method=Query&version=1&query=$apiauth,$apiextrec,$apicam,$apitakesnap,$apiptz,$apipreset,$apisvsinfo,$apicamevent,$apievent,$apivideostm,$apiextevt,$apistm,$apihm,$apilog,$apiaudiostm,$apivideostms,$apirec";
+   # API initialisieren und abrufen
+   ####################################
+   $hash->{HELPER}{API} = apistatic ("surveillance");                                    # API Template im HELPER instanziieren
+
+   Log3 ($name, 4, "$name - API imported:\n".Dumper $hash->{HELPER}{API});
+     
+   my @ak;
+   for my $key (keys %{$hash->{HELPER}{API}}) {
+       next if($key =~ /^PARSET$/x);  
+       push @ak, $hash->{HELPER}{API}{$key}{NAME};
+   }
+   my $apis = join ",", @ak;
+   
+   $url = "$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{INFO}{PATH}?".
+              "api=$hash->{HELPER}{API}{INFO}{NAME}".
+              "&method=Query".
+              "&version=$hash->{HELPER}{API}{INFO}{VER}".
+              "&query=$apis";
 
    Log3($name, 4, "$name - Call-Out now: $url");
    
    $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getApiSites_Parse
-            };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       fret     => $fret,
+       arg      => $arg,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getApiSites_Parse
+   };
    HttpUtils_NonblockingGet ($param);  
    
 return;
@@ -4426,240 +5170,64 @@ return;
 #                       Auswertung Abruf apisites
 ####################################################################################
 sub getApiSites_Parse {
-   my $param        = shift;
-   my $err          = shift;
-   my $myjson       = shift;
+    my $param  = shift;
+    my $err    = shift;
+    my $myjson = shift;
    
-   my $hash         = $param->{hash};
-   my $name         = $hash->{NAME};
-   my $serveraddr   = $hash->{SERVERADDR};
-   my $serverport   = $hash->{SERVERPORT};
-   my $apiauth      = $hash->{HELPER}{APIAUTH};
-   my $apiextrec    = $hash->{HELPER}{APIEXTREC};
-   my $apiextevt    = $hash->{HELPER}{APIEXTEVT};
-   my $apicam       = $hash->{HELPER}{APICAM};
-   my $apitakesnap  = $hash->{HELPER}{APISNAPSHOT};
-   my $apiptz       = $hash->{HELPER}{APIPTZ};
-   my $apipreset    = $hash->{HELPER}{APIPRESET};
-   my $apisvsinfo   = $hash->{HELPER}{APISVSINFO};
-   my $apicamevent  = $hash->{HELPER}{APICAMEVENT};
-   my $apievent     = $hash->{HELPER}{APIEVENT};
-   my $apivideostm  = $hash->{HELPER}{APIVIDEOSTM};
-   my $apiaudiostm  = $hash->{HELPER}{APIAUDIOSTM};
-   my $apivideostms = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apistm       = $hash->{HELPER}{APISTM};
-   my $apihm        = $hash->{HELPER}{APIHM};
-   my $apilog       = $hash->{HELPER}{APILOG};
-   my $apirec       = $hash->{HELPER}{APIREC};
+    my $hash   = $param->{hash};
+    my $fret   = $param->{fret};
+    my $arg    = $param->{arg};
+    my $name   = $hash->{NAME};
+    my $opmode = $hash->{OPMODE};
    
-   my ($apicammaxver,$apicampath);
+    my ($error,$errorcode,$success);
   
-    if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+    if ($err ne "") {                                                               # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
         readingsSingleUpdate($hash, "Error", $err, 1);
 
-        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        delActiveToken($hash);
+        delActiveToken($hash);                                                      # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
         return;
         
-    } elsif ($myjson ne "") {          
-        # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, my $success) = evaljson($hash,$myjson);
+    } elsif ($myjson ne "") {                                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
+        ($success) = evaljson($hash,$myjson);
         
-        unless ($success) {
+        if(!$success) {
             delActiveToken($hash);
             return;
         }
         
-        my $data = decode_json($myjson);
+        my $jdata = decode_json($myjson);
+        $success = $jdata->{success};
         
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
-   
-        $success = $data->{'success'};
+        Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);                    # Logausgabe decodierte JSON Daten
     
-        if ($success) {
-            my $logstr;
-                        
-          # Pfad und Maxversion von "SYNO.API.Auth" ermitteln
-            my $apiauthpath = $data->{'data'}->{$apiauth}->{'path'};
-            $apiauthpath =~ tr/_//d if (defined($apiauthpath));
-            my $apiauthmaxver = $data->{'data'}->{$apiauth}->{'maxVersion'}; 
-       
-            $logstr = defined($apiauthpath) ? "Path of $apiauth selected: $apiauthpath" : "Path of $apiauth undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiauthmaxver) ? "MaxVersion of $apiauth selected: $apiauthmaxver" : "MaxVersion of $apiauth undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-       
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalRecording" ermitteln
-            my $apiextrecpath = $data->{'data'}->{$apiextrec}->{'path'};
-            $apiextrecpath =~ tr/_//d if (defined($apiextrecpath));
-            my $apiextrecmaxver = $data->{'data'}->{$apiextrec}->{'maxVersion'}; 
-       
-            $logstr = defined($apiextrecpath) ? "Path of $apiextrec selected: $apiextrecpath" : "Path of $apiextrec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apiextrec selected: $apiextrecmaxver" : "MaxVersion of $apiextrec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-       
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Camera" ermitteln
-            $apicampath = $data->{'data'}->{$apicam}->{'path'};
-            $apicampath =~ tr/_//d if (defined($apicampath));
-            $apicammaxver = $data->{'data'}->{$apicam}->{'maxVersion'};
-                               
-            $logstr = defined($apicampath) ? "Path of $apicam selected: $apicampath" : "Path of $apicam undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextrecmaxver) ? "MaxVersion of $apicam: $apicammaxver" : "MaxVersion of $apicam undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-       
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.SnapShot" ermitteln  
-            my $apitakesnappath = $data->{'data'}->{$apitakesnap}->{'path'};
-            $apitakesnappath =~ tr/_//d if (defined($apitakesnappath));
-            my $apitakesnapmaxver = $data->{'data'}->{$apitakesnap}->{'maxVersion'};
-                            
-            $logstr = defined($apitakesnappath) ? "Path of $apitakesnap selected: $apitakesnappath" : "Path of $apitakesnap undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apitakesnapmaxver) ? "MaxVersion of $apitakesnap: $apitakesnapmaxver" : "MaxVersion of $apitakesnap undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ" ermitteln 
-            my $apiptzpath = $data->{'data'}->{$apiptz}->{'path'};
-            $apiptzpath =~ tr/_//d if (defined($apiptzpath));
-            my $apiptzmaxver = $data->{'data'}->{$apiptz}->{'maxVersion'};
-                            
-            $logstr = defined($apiptzpath) ? "Path of $apiptz selected: $apiptzpath" : "Path of $apiptz undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiptzmaxver) ? "MaxVersion of $apiptz: $apiptzmaxver" : "MaxVersion of $apiptz undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");  
-
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.PTZ.Preset" ermitteln 
-            my $apipresetpath = $data->{'data'}->{$apipreset}->{'path'};
-            $apipresetpath =~ tr/_//d if (defined($apipresetpath));
-            my $apipresetmaxver = $data->{'data'}->{$apipreset}->{'maxVersion'};
-                            
-            $logstr = defined($apipresetpath) ? "Path of $apipreset selected: $apipresetpath" : "Path of $apipreset undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apipresetmaxver) ? "MaxVersion of $apipreset: $apipresetmaxver" : "MaxVersion of $apipreset undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");              
+        if ($success) {                                       
+            my $completed = completeAPI ($jdata, $hash->{HELPER}{API});              # übergibt Referenz zum instanziierten API-Hash
+         
+            if(!$completed) {
+                $errorcode = "9001";
+                $error     = expErrors($hash,$errorcode);                            # Fehlertext zum Errorcode ermitteln
+                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+                readingsBulkUpdate ($hash, "Error",     $error    );
+                readingsEndUpdate  ($hash, 1);
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Info" ermitteln
-            my $apisvsinfopath = $data->{'data'}->{$apisvsinfo}->{'path'};
-            $apisvsinfopath =~ tr/_//d if (defined($apisvsinfopath));
-            my $apisvsinfomaxver = $data->{'data'}->{$apisvsinfo}->{'maxVersion'};
-                            
-            $logstr = defined($apisvsinfopath) ? "Path of $apisvsinfo selected: $apisvsinfopath" : "Path of $apisvsinfo undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apisvsinfomaxver) ? "MaxVersion of $apisvsinfo: $apisvsinfomaxver" : "MaxVersion of $apisvsinfo undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-                        
-          # Pfad und Maxversion von "SYNO.Surveillance.Camera.Event" ermitteln    
-            my $apicameventpath = $data->{'data'}->{$apicamevent}->{'path'};
-            $apicameventpath =~ tr/_//d if (defined($apicameventpath));
-            my $apicameventmaxver = $data->{'data'}->{$apicamevent}->{'maxVersion'};
-                            
-            $logstr = defined($apicameventpath) ? "Path of $apicamevent selected: $apicameventpath" : "Path of $apicamevent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apicameventmaxver) ? "MaxVersion of $apicamevent: $apicameventmaxver" : "MaxVersion of $apicamevent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-                        
-          # Pfad und Maxversion von "SYNO.Surveillance.Event" ermitteln     
-            my $apieventpath = $data->{'data'}->{$apievent}->{'path'};
-            $apieventpath =~ tr/_//d if (defined($apieventpath));
-            my $apieventmaxver = $data->{'data'}->{$apievent}->{'maxVersion'};
-                            
-            $logstr = defined($apieventpath) ? "Path of $apievent selected: $apieventpath" : "Path of $apievent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apieventmaxver) ? "MaxVersion of $apievent: $apieventmaxver" : "MaxVersion of $apievent undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-                        
-          # Pfad und Maxversion von "SYNO.Surveillance.VideoStream" ermitteln
-            my $apivideostmpath = $data->{'data'}->{$apivideostm}->{'path'};
-            $apivideostmpath =~ tr/_//d if (defined($apivideostmpath));
-            my $apivideostmmaxver = $data->{'data'}->{$apivideostm}->{'maxVersion'};
-                            
-            $logstr = defined($apivideostmpath) ? "Path of $apivideostm selected: $apivideostmpath" : "Path of $apivideostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apivideostmmaxver) ? "MaxVersion of $apivideostm: $apivideostmmaxver" : "MaxVersion of $apivideostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-                        
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.ExternalEvent" ermitteln
-            my $apiextevtpath = $data->{'data'}->{$apiextevt}->{'path'};
-            $apiextevtpath =~ tr/_//d if (defined($apiextevtpath));
-            my $apiextevtmaxver = $data->{'data'}->{$apiextevt}->{'maxVersion'}; 
-       
-            $logstr = defined($apiextevtpath) ? "Path of $apiextevt selected: $apiextevtpath" : "Path of $apiextevt undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiextevtmaxver) ? "MaxVersion of $apiextevt selected: $apiextevtmaxver" : "MaxVersion of $apiextevt undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-                        
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Streaming" ermitteln
-            my $apistmpath = $data->{'data'}->{$apistm}->{'path'};
-            $apistmpath =~ tr/_//d if (defined($apistmpath));
-            my $apistmmaxver = $data->{'data'}->{$apistm}->{'maxVersion'}; 
-       
-            $logstr = defined($apistmpath) ? "Path of $apistm selected: $apistmpath" : "Path of $apistm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apistmmaxver) ? "MaxVersion of $apistm selected: $apistmmaxver" : "MaxVersion of $apistm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.HomeMode" ermitteln
-            my $apihmpath = $data->{'data'}->{$apihm}->{'path'};
-            $apihmpath =~ tr/_//d if (defined($apihmpath));
-            my $apihmmaxver = $data->{'data'}->{$apihm}->{'maxVersion'}; 
-       
-            $logstr = defined($apihmpath) ? "Path of $apihm selected: $apihmpath" : "Path of $apihm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apihmmaxver) ? "MaxVersion of $apihm selected: $apihmmaxver" : "MaxVersion of $apihm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-        
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Log" ermitteln
-            my $apilogpath = $data->{'data'}->{$apilog}->{'path'};
-            $apilogpath =~ tr/_//d if (defined($apilogpath));
-            my $apilogmaxver = $data->{'data'}->{$apilog}->{'maxVersion'}; 
-       
-            $logstr = defined($apilogpath) ? "Path of $apilog selected: $apilogpath" : "Path of $apilog undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apilogmaxver) ? "MaxVersion of $apilog selected: $apilogmaxver" : "MaxVersion of $apilog undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
+                Log3($name, 2, "$name - ERROR - $error");                    
+                  
+                delActiveToken($hash);                                               # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+                return;               
+            }
             
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.AudioStream" ermitteln
-            my $apiaudiostmpath = $data->{'data'}->{$apiaudiostm}->{'path'};
-            $apiaudiostmpath =~ tr/_//d if (defined($apiaudiostmpath));
-            my $apiaudiostmmaxver = $data->{'data'}->{$apiaudiostm}->{'maxVersion'}; 
-       
-            $logstr = defined($apiaudiostmpath) ? "Path of $apiaudiostm selected: $apiaudiostmpath" : "Path of $apiaudiostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apiaudiostmmaxver) ? "MaxVersion of $apiaudiostm selected: $apiaudiostmmaxver" : "MaxVersion of $apiaudiostm undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.VideoStream" ermitteln
-            my $apivideostmspath = $data->{'data'}->{$apivideostms}->{'path'};
-            $apivideostmspath =~ tr/_//d if (defined($apivideostmspath));
-            my $apivideostmsmaxver = $data->{'data'}->{$apivideostms}->{'maxVersion'}; 
-       
-            $logstr = defined($apivideostmspath) ? "Path of $apivideostms selected: $apivideostmspath" : "Path of $apivideostms undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apivideostmsmaxver) ? "MaxVersion of $apivideostms selected: $apivideostmsmaxver" : "MaxVersion of $apivideostms undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            
-          # Pfad und Maxversion von "SYNO.SurveillanceStation.Recording" ermitteln
-            my $apirecpath = $data->{'data'}->{$apirec}->{'path'};
-            $apirecpath =~ tr/_//d if (defined($apirecpath));
-            my $apirecmaxver = $data->{'data'}->{$apirec}->{'maxVersion'}; 
-       
-            $logstr = defined($apirecpath) ? "Path of $apirec selected: $apirecpath" : "Path of $apirec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-            $logstr = defined($apirecmaxver) ? "MaxVersion of $apirec selected: $apirecmaxver" : "MaxVersion of $apirec undefined - Surveillance Station may be stopped";
-            Log3($name, 4, "$name - $logstr");
-        
             # aktuelle oder simulierte SVS-Version für Fallentscheidung setzen
             my $major = $hash->{HELPER}{SVSVERSION}{MAJOR} // "";
             my $minor = $hash->{HELPER}{SVSVERSION}{MINOR} // "";
             my $small = $hash->{HELPER}{SVSVERSION}{SMALL} // "";
             my $build = $hash->{HELPER}{SVSVERSION}{BUILD} // "";
             my $actvs = $major.$minor.$small.$build;
-            my $avsc  = $major.$minor.$small;                                # Variable zum Version Kompatibilitätscheck
+            
             Log3($name, 4, "$name - installed SVS version is: $actvs"); 
                         
             if(AttrVal($name,"simu_SVSversion",0)) {
@@ -4670,134 +5238,103 @@ sub getApiSites_Parse {
                 $actvs .= "-simu";
             }
             
-            # Downgrades für nicht kompatible API-Versionen
-            # hier nur nutzen wenn API zentral downgraded werden soll
-            # In den neueren API-Upgrades werden nur einzelne Funktionen auf eine höhere API-Version gezogen
-            # -> diese Steuerung erfolgt in den einzelnen Funktionsaufrufen in camOp            
+            # Downgrades für nicht kompatible API-Versionen. Hier nur nutzen wenn API zentral downgraded werden soll            
             Log3($name, 4, "$name - ------- Begin of adaption section -------");
             
-            #$apiptzmaxver = 4;
-            #Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-            #$apicammaxver = 8;
-            #Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
+            my @sims;
+            
+            # push @sims, "CAM:8";
+            # push @sims, "PTZ:4";
+            
+            for my $esim (@sims) {
+                my($k,$v) = split ":", $esim;
+                $hash->{HELPER}{API}{$k}{VER} = $v;
+                $hash->{HELPER}{API}{$k}{MOD} = "yes";
+                Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+            }
             
             Log3($name, 4, "$name - ------- End of adaption section -------");
-            
                                     
-            # Simulation anderer SVS-Versionen
+            # Simulation älterer SVS-Versionen
             Log3($name, 4, "$name - ------- Begin of simulation section -------");
             
             if (AttrVal($name, "simu_SVSversion", undef)) {
+                my @mods;
                 Log3($name, 4, "$name - SVS version $actvs will be simulated");
+                
                 if ($actvs =~ /^71/x) {
-                    $apicammaxver = 8;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 4;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 2;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 4;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");
-                } elsif ($actvs =~ /^72/x) {
-                    $apicammaxver = 8;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
-                } elsif ($actvs =~ /^800/x) {
-                    $apicammaxver = 9;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
-                } elsif ($actvs =~ /^815/x) {
-                    $apicammaxver = 9;
-                    Log3($name, 4, "$name - MaxVersion of $apicam adapted to: $apicammaxver");
-                    $apiauthmaxver = 6;
-                    Log3($name, 4, "$name - MaxVersion of $apiauth adapted to: $apiauthmaxver");
-                    $apiextrecmaxver = 3;
-                    Log3($name, 4, "$name - MaxVersion of $apiextrec adapted to: $apiextrecmaxver");
-                    $apiptzmaxver    = 5;
-                    Log3($name, 4, "$name - MaxVersion of $apiptz adapted to: $apiptzmaxver");                               
-                } elsif ($actvs =~ /^820/x) {
+                    push @mods, "CAM:8";
+                    push @mods, "AUTH:4";
+                    push @mods, "EXTREC:2";
+                    push @mods, "PTZ:4";           
+                } 
+                elsif ($actvs =~ /^72/x) {
+                    push @mods, "CAM:8";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^800/x) {
+                    push @mods, "CAM:9";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^815/x) {
+                    push @mods, "CAM:9";
+                    push @mods, "AUTH:6";
+                    push @mods, "EXTREC:3";
+                    push @mods, "PTZ:5"; 
+                } 
+                elsif ($actvs =~ /^820/x) {
                     # ab API v2.8 kein "SYNO.SurveillanceStation.VideoStream", "SYNO.SurveillanceStation.AudioStream",
                     # "SYNO.SurveillanceStation.Streaming" mehr enthalten
-                    $apivideostmsmaxver = 0;
-                    Log3($name, 4, "$name - MaxVersion of $apivideostms adapted to: $apivideostmsmaxver");
-                    $apiaudiostmmaxver = 0;
-                    Log3($name, 4, "$name - MaxVersion of $apiaudiostm adapted to: $apiaudiostmmaxver");                              
+                    push @mods, "VIDEOSTMS:0";
+                    push @mods, "AUDIOSTM:0";
                 }
-            
-            } else {
-                Log3($name, 4, "$name - no simulations done !");
+                
+                for my $elem (@mods) {
+                    my($k,$v) = split ":", $elem;
+                    $hash->{HELPER}{API}{$k}{VER} = $v;
+                    $hash->{HELPER}{API}{$k}{MOD} = "yes";
+                    Log3($name, 4, "$name - Version of $hash->{HELPER}{API}{$k}{NAME} adapted to: $hash->{HELPER}{API}{$k}{VER}");
+                }
             } 
+            
             Log3($name, 4, "$name - ------- End of simulation section -------");  
-                   
-            # ermittelte Werte in $hash einfügen
-            $hash->{HELPER}{APIAUTHPATH}        = $apiauthpath;
-            $hash->{HELPER}{APIAUTHMAXVER}      = $apiauthmaxver;
-            $hash->{HELPER}{APIEXTRECPATH}      = $apiextrecpath;
-            $hash->{HELPER}{APIEXTRECMAXVER}    = $apiextrecmaxver;
-            $hash->{HELPER}{APICAMPATH}         = $apicampath;
-            $hash->{HELPER}{APICAMMAXVER}       = $apicammaxver;
-            $hash->{HELPER}{APITAKESNAPPATH}    = $apitakesnappath;
-            $hash->{HELPER}{APITAKESNAPMAXVER}  = $apitakesnapmaxver;
-            $hash->{HELPER}{APIPTZPATH}         = $apiptzpath;
-            $hash->{HELPER}{APIPTZMAXVER}       = $apiptzmaxver;
-            $hash->{HELPER}{APIPRESETPATH}      = $apipresetpath;
-            $hash->{HELPER}{APIPRESETMAXVER}    = $apipresetmaxver;
-            $hash->{HELPER}{APISVSINFOPATH}     = $apisvsinfopath;
-            $hash->{HELPER}{APISVSINFOMAXVER}   = $apisvsinfomaxver;
-            $hash->{HELPER}{APICAMEVENTPATH}    = $apicameventpath;
-            $hash->{HELPER}{APICAMEVENTMAXVER}  = $apicameventmaxver;
-            $hash->{HELPER}{APIEVENTPATH}       = $apieventpath;
-            $hash->{HELPER}{APIEVENTMAXVER}     = $apieventmaxver;
-            $hash->{HELPER}{APIVIDEOSTMPATH}    = $apivideostmpath;
-            $hash->{HELPER}{APIVIDEOSTMMAXVER}  = $apivideostmmaxver;
-            $hash->{HELPER}{APIAUDIOSTMPATH}    = $apiaudiostmpath?$apiaudiostmpath:"undefinded";
-            $hash->{HELPER}{APIAUDIOSTMMAXVER}  = $apiaudiostmmaxver?$apiaudiostmmaxver:0;
-            $hash->{HELPER}{APIEXTEVTPATH}      = $apiextevtpath;
-            $hash->{HELPER}{APIEXTEVTMAXVER}    = $apiextevtmaxver;
-            $hash->{HELPER}{APISTMPATH}         = $apistmpath;
-            $hash->{HELPER}{APISTMMAXVER}       = $apistmmaxver;
-            $hash->{HELPER}{APIHMPATH}          = $apihmpath;
-            $hash->{HELPER}{APIHMMAXVER}        = $apihmmaxver;
-            $hash->{HELPER}{APILOGPATH}         = $apilogpath;
-            $hash->{HELPER}{APILOGMAXVER}       = $apilogmaxver;
-            $hash->{HELPER}{APIVIDEOSTMSPATH}   = $apivideostmspath?$apivideostmspath:"undefinded";
-            $hash->{HELPER}{APIVIDEOSTMSMAXVER} = $apivideostmsmaxver?$apivideostmsmaxver:0;
-            $hash->{HELPER}{APIRECPATH}         = $apirecpath;
-            $hash->{HELPER}{APIRECMAXVER}       = $apirecmaxver;
             
+            setReadingErrorNone( $hash, 1 );
+            
+            Log3 ($name, 4, "$name - API completed after retrieval and adaption:\n".Dumper $hash->{HELPER}{API}); 
+
+            if ($opmode eq "apiInfo") {                                             # API Infos in Popup anzeigen                            
+                showAPIinfo   ($hash, $hash->{HELPER}{API});                        # übergibt Referenz zum instanziierten API-Hash)              
+                delActiveToken($hash);                                              # Freigabe Funktionstoken
+                return;
+            }            
+        } 
+        else {
+            $errorcode = "806";
+            $error     = expErrors($hash,$errorcode);                                # Fehlertext zum Errorcode ermitteln
        
             readingsBeginUpdate($hash);
-            readingsBulkUpdate ($hash,"Errorcode","none");
-            readingsBulkUpdate ($hash,"Error",    "none");
-            readingsEndUpdate  ($hash,1);
-            
-            # API Hash values sind gesetzt
-            $hash->{HELPER}{APIPARSET} = 1;
-                        
-        } else {
-            my $error = "couldn't call API-Infosite";
-       
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate ($hash,"Errorcode","none");
-            readingsBulkUpdate ($hash,"Error",    $error);
+            readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate ($hash, "Error",     $error    );
             readingsEndUpdate  ($hash, 1);
 
-            Log3($name, 2, "$name - ERROR - the API-Query couldn't be executed successfully");                    
+            Log3($name, 2, "$name - ERROR - $error");                    
                         
-            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-            delActiveToken($hash);
+            delActiveToken($hash);                                                  # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
             return;
         }
+    }
+    
+    if($fret) {                                                                     # Caller aufrufen wenn angegeben
+        no strict "refs";                                                           ## no critic 'NoStrict' 
+        delActiveToken($hash);                                                      # Freigabe Funktionstoken vor Neudurchlauf der aufrufenden Funktion 
+        &$fret($arg);
+        use strict "refs";
+        return;
     }
     
 return checkSid($hash);
@@ -4807,31 +5344,29 @@ return checkSid($hash);
 #                        Check ob Session ID gesetzt ist - ggf. login
 #############################################################################################
 sub checkSid {  
-   my ($hash) = @_;
-   my $name   = $hash->{NAME};
+   my $hash = shift;
+   my $name = $hash->{NAME};
+   
    my $subref;
    
-   if(IsModelCam($hash)) {
-       # Folgefunktion wenn Cam-Device
-       $subref = "getCamId";
-   } else {
-       # Folgefunktion wenn SVS-Device
-       $subref = "camOp";
+   if(IsModelCam($hash)) {                                          # Folgefunktion wenn Cam-Device
+       $subref = \&getCamId;  
+   } 
+   else {                                                           # Folgefunktion wenn SVS-Device
+       $subref = \&camOp;
    }
    
-   # SID holen bzw. login
-   my $sid = $hash->{HELPER}{SID};
+   my $sid = $hash->{HELPER}{SID};                                  # SID holen bzw. login
    if(!$sid) {
        Log3($name, 3, "$name - no session ID found - get new one");
-       login($hash,$subref);
+       login($hash, $hash->{HELPER}{API}, $subref);
        return;
    }
    
-   if(IsModelCam($hash) || $hash->{OPMODE} eq "Autocreate") {
-       # Normalverarbeitung für Cams oder Autocreate Cams
+   if(IsModelCam($hash) || $hash->{OPMODE} eq "Autocreate") {       # Normalverarbeitung für Cams oder Autocreate Cams
        return getCamId($hash);
-   } else {
-       # Sprung zu camOp wenn SVS Device
+   } 
+   else {                                                           # Sprung zu camOp wenn SVS Device
        return camOp($hash);
    }
 
@@ -4840,47 +5375,46 @@ return;
 
 #############################################################################################
 #                             Abruf der installierten Cams
+#           die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt
 #############################################################################################
 sub getCamId {  
    my ($hash)       = @_;
    my $name         = $hash->{NAME};
    my $serveraddr   = $hash->{SERVERADDR};
    my $serverport   = $hash->{SERVERPORT};
-   my $apicam       = $hash->{HELPER}{APICAM};
-   my $apicampath   = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver = $hash->{HELPER}{APICAMMAXVER};
+   my $apicam       = $hash->{HELPER}{API}{CAM}{NAME};
+   my $apicampath   = $hash->{HELPER}{API}{CAM}{PATH};
+   my $apicamver    = $hash->{HELPER}{API}{CAM}{VER};
    my $sid          = $hash->{HELPER}{SID};
    my $proto        = $hash->{PROTOCOL};
    
    my $url;
     
-   # die Kamera-Id wird aus dem Kameranamen (Surveillance Station) ermittelt
-   Log3($name, 4, "$name - --- Begin Function getCamId nonblocking ---");
+   Log3($name, 4, "$name - --- Start getCamId ---");
     
-   if ($hash->{CAMID}) {
-       # Camid ist bereits ermittelt -> Abruf überspringen
+   if ($hash->{CAMID}) {                                                     # Camid ist bereits ermittelt -> Abruf überspringen
        Log3($name, 4, "$name - CAMID already set - ignore get camid");
        return camOp($hash);
    }
     
-   my $httptimeout = AttrVal($name,"httptimeout", 4);
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
    Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
   
-   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
-   if ($apicammaxver >= 9) {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
+   $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=List&basic=true&streamInfo=true&camStm=true&_sid=\"$sid\"";
+   if ($apicamver >= 9) {
+       $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicamver&method=\"List\"&basic=true&streamInfo=true&camStm=0&_sid=\"$sid\"";
    }
  
    Log3($name, 4, "$name - Call-Out now: $url");
   
    my $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&getCamId_Parse
-               };
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&getCamId_Parse
+   };
    
    HttpUtils_NonblockingGet($param);
    
@@ -4895,26 +5429,23 @@ sub getCamId_Parse {
    my $hash              = $param->{hash};
    my $name              = $hash->{NAME};
    my $camname           = $hash->{CAMNAME};
-   my $apicammaxver      = $hash->{HELPER}{APICAMMAXVER}; 
+   my $apicamver         = $hash->{HELPER}{API}{CAM}{VER}; 
    my $OpMode            = $hash->{OPMODE};   
    my ($data,$success,$error,$errorcode,$camid);
    my ($i,$n,$id,$errstate,$camdef,$nrcreated);
    my $cdall = "";
    my %allcams;
   
-   if ($err ne "") {
-       # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "") {                                                                          # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
        Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
        
        readingsSingleUpdate($hash, "Error", $err, 1);
-       return login($hash,'getApiSites');
+       return login($hash, $hash->{HELPER}{API}, \&getCamId);
    
-   } elsif ($myjson ne "") {
-       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
-       # evaluiere ob Daten im JSON-Format empfangen wurden, Achtung: sehr viele Daten mit verbose=5
-       ($hash, $success) = evaljson($hash,$myjson);
+   } elsif ($myjson ne "") {                                                                  # Datenabruf erfolgreich
+       ($success) = evaljson($hash,$myjson);
         
-       unless ($success) {
+       if (!$success) {
            Log3($name, 4, "$name - Data returned: ".$myjson);          
            delActiveToken($hash);
            return; 
@@ -4922,32 +5453,29 @@ sub getCamId_Parse {
         
        $data = decode_json($myjson);
         
-       # lesbare Ausgabe der decodierten JSON-Daten
        Log3($name, 5, "$name - JSON returned: ". Dumper $data);
    
        $success = $data->{'success'};
                 
-       if ($success) {
-           # die Liste aller Kameras konnte ausgelesen werden      
+       if ($success) {                                                                        # die Liste aller Kameras konnte ausgelesen werden      
            ($i,$nrcreated) = (0,0);
          
-           # Namen aller installierten Kameras mit Id's in Assoziatives Array einlesen
-           %allcams = ();
+           %allcams = ();                                                                     # Namen aller installierten Kameras mit Id's in Hash einlesen
            while ($data->{'data'}->{'cameras'}->[$i]) {
-               if ($apicammaxver <= 8) {
+               if ($apicamver <= 8) {
                    $n = $data->{'data'}->{'cameras'}->[$i]->{'name'};
-               } else {
-                   $n = $data->{'data'}->{'cameras'}->[$i]->{'newName'};  # Änderung ab SVS 8.0.0
+               } 
+               else {
+                   $n = $data->{'data'}->{'cameras'}->[$i]->{'newName'};                      # Änderung ab SVS 8.0.0
                }
                $id = $data->{'data'}->{'cameras'}->[$i]->{'id'};
                $allcams{"$n"} = "$id";
                $i += 1;
                
-               if ($OpMode eq "Autocreate") {
-                   # Cam autocreate
-                   ($err,$camdef) = setAutocreate($hash,$n);
-                   if($camdef) {
-                       $cdall = $cdall.($cdall?", ":"").$camdef;
+               if ($OpMode eq "Autocreate") {                                                 # Cam autocreate
+                   ($err,$camdef) = doAutocreate($hash,$n);
+                   if ($camdef) {
+                       $cdall = $cdall.($cdall ? ", " : "").$camdef;
                        $nrcreated++;
                    }
                    $errstate = $err if($err);  
@@ -4955,63 +5483,55 @@ sub getCamId_Parse {
                
            }
            
-           if ($OpMode eq "Autocreate") {
-               # Cam autocreate
+           if ($OpMode eq "Autocreate") {                                                     # Cam autocreate
                Log3($name, 3, "$name - Cameras defined by autocreate: $cdall") if($cdall);
                
-               $errstate = $errstate?$errstate:"none";
-               readingsBeginUpdate($hash); 
-               readingsBulkUpdate($hash,"NumberAutocreatedCams",$nrcreated);
-               readingsBulkUpdate($hash,"Errorcode","none");
-               readingsBulkUpdate($hash,"Error",$errstate);
-               readingsBulkUpdate($hash,"state","autocreate finished");
-               readingsEndUpdate($hash, 1);
+               $errstate = $errstate // "none";
+               
+               readingsBeginUpdate ($hash); 
+               readingsBulkUpdate  ($hash, "NumberAutocreatedCams", $nrcreated           );
+               readingsBulkUpdate  ($hash, "Errorcode",             "none"               );
+               readingsBulkUpdate  ($hash, "Error",                 $errstate            );
+               readingsBulkUpdate  ($hash, "state",                 "autocreate finished");
+               readingsEndUpdate   ($hash, 1);
            
                CommandSave(undef, undef) if($errstate eq "none" && $nrcreated && AttrVal("global","autosave", 1));
 
-               # Freigabe Funktionstoken
-               delActiveToken($hash);
+               delActiveToken($hash);                                                         # Freigabe Funktionstoken
                return;
            }
              
-           # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
-           if (exists($allcams{$camname})) {
-               $camid = $allcams{$camname};
+           if (exists($allcams{$camname})) {                                                  # Ist der gesuchte Kameraname im Hash enhalten (in SVS eingerichtet ?)
+               $camid         = $allcams{$camname};
                $hash->{CAMID} = $camid;
                  
                Log3($name, 4, "$name - Detection Camid successful - $camname ID: $camid");
-           
-           } else {
-               # Kameraname nicht gefunden, id = ""
-               readingsBeginUpdate($hash);
-               readingsBulkUpdate($hash,"Errorcode","none");
-               readingsBulkUpdate($hash,"Error","Camera(ID) not found in Surveillance Station");
-               readingsEndUpdate($hash, 1);
+           } 
+           else {                                                                             # Kameraname nicht gefunden, id = ""
+               readingsBeginUpdate ($hash);
+               readingsBulkUpdate  ($hash, "Errorcode", "none"                                        );
+               readingsBulkUpdate  ($hash, "Error",     "Camera(ID) not found in Surveillance Station");
+               readingsEndUpdate   ($hash, 1);
                                   
                Log3($name, 2, "$name - ERROR - Cameraname $camname wasn't found in Surveillance Station. Check Userrights, Cameraname and Spelling");          
                delActiveToken($hash);
                return;
            }
-      
-      } else {
-           # Errorcode aus JSON ermitteln
-           $errorcode = $data->{'error'}->{'code'};
-
-           # Fehlertext zum Errorcode ermitteln
-           $error = expErrors($hash,$errorcode);
+      } 
+      else {
+           $errorcode = $data->{'error'}->{'code'};                                          # Errorcode aus JSON ermitteln
+           $error     = expErrors($hash,$errorcode);                                         # Fehlertext zum Errorcode ermitteln
        
-           readingsBeginUpdate($hash);
-           readingsBulkUpdate($hash,"Errorcode",$errorcode);
-           readingsBulkUpdate($hash,"Error",$error);
-           readingsEndUpdate($hash, 1);
+           readingsBeginUpdate ($hash);
+           readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+           readingsBulkUpdate  ($hash, "Error",     $error    );
+           readingsEndUpdate   ($hash, 1);
            
-           if ($errorcode =~ /(105|401)/x) {
-               # neue Login-Versuche
+           if ($errorcode =~ /(105|401)/x) {                                                 # neue Login-Versuche
                Log3($name, 2, "$name - ERROR - $errorcode - $error -> try new login");
-               return login($hash,'getApiSites');
-           
-           } else {
-               # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+               return login($hash, $hash->{HELPER}{API}, \&getCamId);
+           } 
+           else {                                                                            # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
                delActiveToken($hash);
                Log3($name, 2, "$name - ERROR - ID of Camera $camname couldn't be selected. Errorcode: $errorcode - $error");
                return;
@@ -5026,445 +5546,133 @@ return camOp($hash);
 #                                     Ausführung Operation
 #############################################################################################
 sub camOp {  
-   my $hash = shift;
-   
-   my $name               = $hash->{NAME};
-   my $apicam             = $hash->{HELPER}{APICAM};                     # SYNO.SurveillanceStation.Camera
-   my $apicampath         = $hash->{HELPER}{APICAMPATH};
-   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER};  
-   my $apiextrec          = $hash->{HELPER}{APIEXTREC};                  # SYNO.SurveillanceStation.ExternalRecording
-   my $apiextrecpath      = $hash->{HELPER}{APIEXTRECPATH};
-   my $apiextrecmaxver    = $hash->{HELPER}{APIEXTRECMAXVER};
-   my $apiextevt          = $hash->{HELPER}{APIEXTEVT};                  # SYNO.SurveillanceStation.ExternalEvent
-   my $apiextevtpath      = $hash->{HELPER}{APIEXTEVTPATH};
-   my $apiextevtmaxver    = $hash->{HELPER}{APIEXTEVTMAXVER};
-   my $apitakesnap        = $hash->{HELPER}{APISNAPSHOT};                # SYNO.SurveillanceStation.SnapShot
-   my $apitakesnappath    = $hash->{HELPER}{APITAKESNAPPATH};
-   my $apitakesnapmaxver  = $hash->{HELPER}{APITAKESNAPMAXVER};
-   my $apiptz             = $hash->{HELPER}{APIPTZ};                     # SYNO.SurveillanceStation.PTZ
-   my $apiptzpath         = $hash->{HELPER}{APIPTZPATH};
-   my $apiptzmaxver       = $hash->{HELPER}{APIPTZMAXVER};
-   my $apipreset          = $hash->{HELPER}{APIPRESET};                  # SYNO.SurveillanceStation.PTZ.Preset
-   my $apipresetpath      = $hash->{HELPER}{APIPRESETPATH};
-   my $apipresetmaxver    = $hash->{HELPER}{APIPRESETMAXVER};
-   my $apisvsinfo         = $hash->{HELPER}{APISVSINFO};                 # SYNO.SurveillanceStation.Info
-   my $apisvsinfopath     = $hash->{HELPER}{APISVSINFOPATH};
-   my $apisvsinfomaxver   = $hash->{HELPER}{APISVSINFOMAXVER};
-   my $apicamevent        = $hash->{HELPER}{APICAMEVENT};                # SYNO.SurveillanceStation.Camera.Event
-   my $apicameventpath    = $hash->{HELPER}{APICAMEVENTPATH};
-   my $apicameventmaxver  = $hash->{HELPER}{APICAMEVENTMAXVER};
-   my $apievent           = $hash->{HELPER}{APIEVENT};                   # SYNO.SurveillanceStation.Event
-   my $apieventpath       = $hash->{HELPER}{APIEVENTPATH};
-   my $apieventmaxver     = $hash->{HELPER}{APIEVENTMAXVER};
-   my $apivideostm        = $hash->{HELPER}{APIVIDEOSTM};                # SYNO.SurveillanceStation.VideoStreaming
-   my $apivideostmpath    = $hash->{HELPER}{APIVIDEOSTMPATH};
-   my $apivideostmmaxver  = $hash->{HELPER}{APIVIDEOSTMMAXVER};  
-   my $apiaudiostm        = $hash->{HELPER}{APIAUDIOSTM};                # SYNO.SurveillanceStation.AudioStream
-   my $apiaudiostmpath    = $hash->{HELPER}{APIAUDIOSTMPATH};
-   my $apiaudiostmmaxver  = $hash->{HELPER}{APIAUDIOSTMMAXVER};   
-   my $apistm             = $hash->{HELPER}{APISTM};                     # SYNO.SurveillanceStation.Stream
-   my $apistmpath         = $hash->{HELPER}{APISTMPATH};
-   my $apistmmaxver       = $hash->{HELPER}{APISTMMAXVER};
-   my $apihm              = $hash->{HELPER}{APIHM};                      # SYNO.SurveillanceStation.HomeMode
-   my $apihmpath          = $hash->{HELPER}{APIHMPATH};
-   my $apihmmaxver        = $hash->{HELPER}{APIHMMAXVER};
-   my $apilog             = $hash->{HELPER}{APILOG};                     # SYNO.SurveillanceStation.Log
-   my $apilogpath         = $hash->{HELPER}{APILOGPATH};
-   my $apilogmaxver       = $hash->{HELPER}{APILOGMAXVER};
-   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};               # SYNO.SurveillanceStation.VideoStream
-   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
-   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-   my $apirec             = $hash->{HELPER}{APIREC};                     # SYNO.SurveillanceStation.Recording
-   my $apirecpath         = $hash->{HELPER}{APIRECPATH};
-   my $apirecmaxver       = $hash->{HELPER}{APIRECMAXVER};   
-   my $sid                = $hash->{HELPER}{SID};
-   my $OpMode             = $hash->{OPMODE};
-   my $camid              = $hash->{CAMID};
-   my $proto              = $hash->{PROTOCOL};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
-   my ($exturl,$winname,$attr,$room,$param);
-   my ($url,$httptimeout,$expmode,$motdetsc);
+   my $hash       = shift;
+   my $name       = $hash->{NAME};
+   my $OpMode     = $hash->{OPMODE};
+   my $proto      = $hash->{PROTOCOL};
+   my $serveraddr = $hash->{SERVERADDR};
+   my $serverport = $hash->{SERVERPORT};
+
+   my ($url,$part,$vkey);
        
-   Log3($name, 4, "$name - --- Begin Function $OpMode nonblocking ---");
+   Log3($name, 4, "$name - --- Start $OpMode ---");
 
-   $httptimeout = AttrVal($name, "httptimeout", 4);
-   $httptimeout = $httptimeout+90 if($OpMode =~ /setoptpar|Disable/x);                          # setzen der Optimierungsparameter/Disable dauert lange !
+   my $httptimeout = AttrVal($name, "httptimeout", $todef);
    
-   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
-   
-   if ($OpMode eq "Start") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=start&_sid=\"$sid\"";
-      if($apiextrecmaxver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=start&_sid=\"$sid\"";
-      }
-   } elsif ($OpMode eq "Stop") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraId=$camid&action=stop&_sid=\"$sid\"";
-      if($apiextrecmaxver >= 3) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apiextrecpath?api=$apiextrec&method=Record&version=$apiextrecmaxver&cameraIds=$camid&action=stop&_sid=\"$sid\"";
-      }   
-   
-   } elsif ($OpMode eq "Snap") {
-      # ein Schnappschuß wird ausgelöst
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&dsId=\"0\"&method=\"TakeSnapshot\"&version=\"$apitakesnapmaxver\"&camId=\"$camid\"&blSave=\"true\"&_sid=\"$sid\"";
-      readingsSingleUpdate($hash,"state", "snap", 1); 
-   
-   } elsif ($OpMode eq "SaveRec" || $OpMode eq "GetRec") {
-      # eine Aufnahme soll in lokalem File (.mp4) gespeichert werden
-      my $recid = ReadingsVal("$name", "CamLastRecId", 0);
-      if($recid) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apirecpath?api=\"$apirec\"&id=$recid&mountId=0&version=\"$apirecmaxver\"&method=\"Download\"&_sid=\"$sid\"";
-      } else {
-          Log3($name, 2, "$name - WARNING - Can't fetch recording due to no recording available.");
-          delActiveToken($hash);
-          return;      
-      }
-      
-   } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery") {
-      # Informationen über den letzten oder mehrere Schnappschüsse ermitteln
-      my $limit   = $hash->{HELPER}{SNAPLIMIT};
-      my $imgsize = $hash->{HELPER}{SNAPIMGSIZE};
-      my $keyword = $hash->{HELPER}{KEYWORD};
-      my $snapid  = ReadingsVal("$name", "LastSnapId", " ");
-      if($OpMode eq "getsnapinfo" && $snapid =~/\d+/x) {
-          # getsnapinfo UND Reading LastSnapId gesetzt
-          Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Id => $snapid");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&idList=\"$snapid\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";      
-      } else {
-          # snapgallery oder kein Reading LastSnapId gesetzt
-          Log3($name,4, "$name - Call getsnapinfo with params: Image numbers => $limit, Image size => $imgsize, Keyword => $keyword");
-          $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-      }
-      
-   } elsif ($OpMode eq "getsnapfilename") {
-      # der Filename der aktuellen Schnappschuß-ID wird ermittelt
-      my $snapid = ReadingsVal("$name", "LastSnapId", "");
-      Log3($name, 4, "$name - Get filename of present Snap-ID $snapid");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&imgSize=\"0\"&idList=\"$snapid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "gopreset") {
-      # Preset wird angefahren
-      $apiptzmaxver = ($apiptzmaxver >= 5)?4:$apiptzmaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"GoPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{GOPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "getPresets") {
-      # Liste der Presets abrufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"Enum\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "piract") {
-      # PIR Sensor aktivieren/deaktivieren
-      my $piract = $hash->{HELPER}{PIRACT};
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"PDParamSave\"&keep=true&source=$piract&camId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "setPreset") {
-      # einen Preset setzen
-      my $pnumber = $hash->{HELPER}{PNUMBER};
-      my $pname   = $hash->{HELPER}{PNAME};
-      my $pspeed  = $hash->{HELPER}{PSPEED};
-      if ($pspeed) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&speed=\"$pspeed\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      } else {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetPreset\"&position=$pnumber&name=\"$pname\"&cameraId=\"$camid\"&_sid=\"$sid\"";       
-      }
-      
-   } elsif ($OpMode eq "delPreset") {
-      # einen Preset löschen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"DelPreset\"&position=\"$hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{DELPRESETNAME}}\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-   
-   } elsif ($OpMode eq "setHome") {
-      # aktuelle Position als Home setzen
-      if($hash->{HELPER}{SETHOME} eq "---currentPosition---") {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      } else {
-          my $bindpos = $hash->{HELPER}{ALLPRESETS}{$hash->{HELPER}{SETHOME}};
-          $url = "$proto://$serveraddr:$serverport/webapi/$apipresetpath?api=\"$apipreset\"&version=\"$apipresetmaxver\"&method=\"SetHome\"&bindPosition=\"$bindpos\"&cameraId=\"$camid\"&_sid=\"$sid\""; 
-      }
-      
-   } elsif ($OpMode eq "startTrack") {
-      # Object Tracking einschalten
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "stopTrack") {
-      # Object Tracking stoppen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"ObjTracking\"&moveType=\"Stop\"&cameraId=\"$camid\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "setZoom") {
-      # Zoom in / stop / out
-      my $dir      = $hash->{HELPER}{ZOOM}{DIR};
-      my $moveType = $hash->{HELPER}{ZOOM}{MOVETYPE};
-      my $sttime   = $hash->{HELPER}{ZOOM}{STOPTIME} // "";
-      Log3($name, 4, qq{$name - execute operation Zoom "$dir:$moveType:$sttime"});
-      
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="Zoom"&cameraId="$camid"&control="$dir"&moveType="$moveType"&_sid="$sid"};
-      
-   } elsif ($OpMode eq "runpatrol") {
-      # eine Überwachungstour starten
-      $url = qq{$proto://$serveraddr:$serverport/webapi/$apiptzpath?api="$apiptz"&version="$apiptzmaxver"&method="RunPatrol"&patrolId="$hash->{HELPER}{ALLPATROLS}{$hash->{HELPER}{GOPATROLNAME}}"&cameraId="$camid"&_sid="$sid"};
-   
-   } elsif ($OpMode eq "goabsptz") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"AbsPtz\"&cameraId=\"$camid\"&posX=\"$hash->{HELPER}{GOPTZPOSX}\"&posY=\"$hash->{HELPER}{GOPTZPOSY}\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "movestart") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&speed=\"3\"&moveType=\"Start\"&_sid=\"$sid\"";
-      
-   } elsif ($OpMode eq "movestop") {
-      Log3($name, 4, "$name - Stop Camera $hash->{CAMNAME} moving to direction \"$hash->{HELPER}{GOMOVEDIR}\" now");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=\"$apiptz\"&version=\"$apiptzmaxver\"&method=\"Move\"&cameraId=\"$camid\"&direction=\"$hash->{HELPER}{GOMOVEDIR}\"&moveType=\"Stop\"&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "Enable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Enable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Enable\"&idList=\"$camid\"&_sid=\"$sid\"";     
-      }
-   
-   } elsif ($OpMode eq "Disable") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=Disable&cameraIds=$camid&_sid=\"$sid\"";     
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=$apicammaxver&method=\"Disable\"&idList=\"$camid\"&_sid=\"$sid\"";     
-      }
-      
-   } elsif ($OpMode eq "sethomemode") {
-      my $sw = $hash->{HELPER}{HOMEMODE};     # HomeMode on,off
-      $sw  = ($sw eq "on")?"true":"false";
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?on=$sw&api=$apihm&method=Switch&version=$apihmmaxver&_sid=\"$sid\"";     
-   
-   } elsif ($OpMode eq "gethomemodestate") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apihmpath?api=$apihm&method=GetInfo&version=$apihmmaxver&_sid=\"$sid\"";     
-   
-   } elsif ($OpMode eq "getsvslog") {
-      my $sev = $hash->{HELPER}{LISTLOGSEVERITY} // "";
-      my $lim = $hash->{HELPER}{LISTLOGLIMIT}    // 0;
-      my $mco = $hash->{HELPER}{LISTLOGMATCH}    // "";
-      
-      Log3($name,4, "$name - get logList with params: severity => $sev, limit => $lim, matchcode => $mco");
-      
-      $mco = IsModelCam($hash) ? $hash->{CAMNAME} : $mco;
-      $lim = 1 if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund
-      $sev = (lc($sev) =~ /error/x) ? 3 :(lc($sev) =~ /warning/x) ? 2 :(lc($sev) =~ /info/x) ? 1 : "";
-      
-      $url = "$proto://$serveraddr:$serverport/webapi/$apilogpath?api=$apilog&version=\"2\"&method=\"List\"&time2String=\"no\"&level=\"$sev\"&limit=\"$lim\"&keyword=\"$mco\"&_sid=\"$sid\"";     
-
-      delete($hash->{HELPER}{LISTLOGSEVERITY});
-      delete($hash->{HELPER}{LISTLOGLIMIT});
-      delete($hash->{HELPER}{LISTLOGMATCH});
-      
-   } elsif ($OpMode eq "getsvsinfo") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apisvsinfopath?api=\"$apisvsinfo\"&version=\"$apisvsinfomaxver\"&method=\"GetInfo\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "setoptpar") {
-      my $mirr = $hash->{HELPER}{MIRROR}?$hash->{HELPER}{MIRROR}:ReadingsVal("$name","CamVideoMirror","");
-      my $flip = $hash->{HELPER}{FLIP}?$hash->{HELPER}{FLIP}:ReadingsVal("$name","CamVideoFlip","");
-      my $rot  = $hash->{HELPER}{ROTATE}?$hash->{HELPER}{ROTATE}:ReadingsVal("$name","CamVideoRotate","");
-      my $ntp  = $hash->{HELPER}{NTPSERV}?$hash->{HELPER}{NTPSERV}:ReadingsVal("$name","CamNTPServer","");
-      my $clst = $hash->{HELPER}{CHKLIST}?$hash->{HELPER}{CHKLIST}:"";
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&vdoMirror=$mirr&vdoRotation=$rot&vdoFlip=$flip&timeServer=\"$ntp\"&camParamChkList=$clst&cameraIds=\"$camid\"&_sid=\"$sid\"";  
-             
-   } elsif ($OpMode eq "Getcaminfo") {
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetInfo\"&cameraIds=\"$camid\"&deviceOutCap=\"true\"&streamInfo=\"true\"&ptz=\"true\"&basic=\"true\"&camAppInfo=\"true\"&optimize=\"true\"&fisheye=\"true\"&eventDetection=\"true\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "getStmUrlPath") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"GetStmUrlPath\"&cameraIds=\"$camid\"&_sid=\"$sid\"";   
-      if($apicammaxver >= 9) {
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&method=\"GetLiveViewPath\"&version=$apicammaxver&idList=\"$camid\"&_sid=\"$sid\"";   
-      }
-   
-   } elsif ($OpMode eq "geteventlist") {
-      # Abruf der Events einer Kamera
-      $url = "$proto://$serveraddr:$serverport/webapi/$apieventpath?api=\"$apievent\"&version=\"$apieventmaxver\"&method=\"List\"&cameraIds=\"$camid\"&locked=\"0\"&blIncludeSnapshot=\"false\"&reason=\"\"&limit=\"2\"&includeAllCam=\"false\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "Getptzlistpreset") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPreset&cameraId=$camid&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "Getcapabilities") {
-      # Capabilities einer Cam werden abgerufen
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=$apicam&version=$apicammaxver&method=\"GetCapabilityByCamId\"&cameraId=$camid&_sid=\"$sid\"";    
-   
-   } elsif ($OpMode eq "Getptzlistpatrol") {
-      # PTZ-ListPatrol werden abgerufen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiptzpath?api=$apiptz&version=$apiptzmaxver&method=ListPatrol&cameraId=$camid&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "ExpMode") {
-      if ($hash->{HELPER}{EXPMODE} eq "auto") {
-          $expmode = "0";
-      }
-      elsif ($hash->{HELPER}{EXPMODE} eq "day") {
-          $expmode = "1";
-      }
-      elsif ($hash->{HELPER}{EXPMODE} eq "night") {
-          $expmode = "2";
-      }
-      $apicammaxver = ($apicammaxver >= 9)?8:$apicammaxver;
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicampath?api=\"$apicam\"&version=\"$apicammaxver\"&method=\"SaveOptimizeParam\"&cameraIds=\"$camid\"&expMode=\"$expmode\"&camParamChkList=32&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "MotDetSc") {
-      # Hash für Optionswerte sichern für Logausgabe in Befehlsauswertung
-      my %motdetoptions = ();    
-        
-      if ($hash->{HELPER}{MOTDETSC} eq "disable") {
-          $motdetsc = "-1";
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
-      } elsif ($hash->{HELPER}{MOTDETSC} eq "camera") {
-          $motdetsc = "0";
-          
-          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
-          $motdetoptions{OBJECTSIZE}  = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
-          $motdetoptions{PERCENTAGE}  = $hash->{HELPER}{MOTDETSC_PROP3} if ($hash->{HELPER}{MOTDETSC_PROP3});
-          
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&_sid=\"$sid\"";
-          
-          if ($hash->{HELPER}{MOTDETSC_PROP1} || $hash->{HELPER}{MOTDETSC_PROP2} || $hash->{HELPER}{MOTDETSC_PROP13}) {
-              # umschalten und neue Werte setzen
-              $url .= "&keep=false";
-          } else {
-              # nur Umschaltung, alte Werte beibehalten
-              $url .= "&keep=true";
-          }
- 
-          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
-              # der Wert für Bewegungserkennung Kamera -> Empfindlichkeit ist gesetzt
-              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
-              $url .= "&sensitivity=\"$sensitivity\"";
-          }
-          
-          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
-              # der Wert für Bewegungserkennung Kamera -> Objektgröße ist gesetzt
-              my $objectsize = delete $hash->{HELPER}{MOTDETSC_PROP2};
-              $url .= "&objectSize=\"$objectsize\"";
-          }
- 
-          if ($hash->{HELPER}{MOTDETSC_PROP3}) {
-              # der Wert für Bewegungserkennung Kamera -> Prozentsatz für Auslösung ist gesetzt
-              my $percentage = delete $hash->{HELPER}{MOTDETSC_PROP3};
-              $url .= "&percentage=\"$percentage\"";
-          }          
-      
-      } elsif ($hash->{HELPER}{MOTDETSC} eq "SVS") {
-          $motdetsc = "1";
-          
-          $motdetoptions{SENSITIVITY} = $hash->{HELPER}{MOTDETSC_PROP1} if ($hash->{HELPER}{MOTDETSC_PROP1});
-          $motdetoptions{THRESHOLD}   = $hash->{HELPER}{MOTDETSC_PROP2} if ($hash->{HELPER}{MOTDETSC_PROP2});
-      
-          # nur Umschaltung, alte Werte beibehalten
-          $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MDParamSave\"&camId=\"$camid\"&source=$motdetsc&keep=true&_sid=\"$sid\"";
-
-          if ($hash->{HELPER}{MOTDETSC_PROP1}) {
-              # der Wert für Bewegungserkennung SVS -> Empfindlichkeit ist gesetzt
-              my $sensitivity = delete $hash->{HELPER}{MOTDETSC_PROP1};
-              $url .= "&sensitivity=\"$sensitivity\"";
-          }
-
-          if ($hash->{HELPER}{MOTDETSC_PROP2}) {
-              # der Wert für Bewegungserkennung SVS -> Schwellwert ist gesetzt
-              my $threshold = delete $hash->{HELPER}{MOTDETSC_PROP2};
-              $url .= "&threshold=\"$threshold\"";
-          }
-      }
-      # Optionswerte in Hash sichern für Logausgabe in Befehlsauswertung
-      $hash->{HELPER}{MOTDETOPTIONS} = \%motdetoptions;
-   
-   } elsif ($OpMode eq "getmotionenum") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apicameventpath?api=\"$apicamevent\"&version=\"$apicameventmaxver\"&method=\"MotionEnum\"&camId=\"$camid\"&_sid=\"$sid\"";   
-   
-   } elsif ($OpMode eq "extevent") {
-      Log3($name, 4, "$name - trigger external event \"$hash->{HELPER}{EVENTID}\"");
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiextevtpath?api=$apiextevt&version=$apiextevtmaxver&method=Trigger&eventId=$hash->{HELPER}{EVENTID}&eventName=$hash->{HELPER}{EVENTID}&_sid=\"$sid\"";
-   
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
-      $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-      $exturl = ($exturl eq "DEF")?"$proto://$serveraddr:$serverport":$exturl;      
-      if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {
-          if($apiaudiostmmaxver) {   # API "SYNO.SurveillanceStation.AudioStream" vorhanden ? (removed ab API v2.8)
-              $hash->{HELPER}{AUDIOLINK} = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
-          } else {
-              delete $hash->{HELPER}{AUDIOLINK} if($hash->{HELPER}{AUDIOLINK});
-          }
-          
-          if($apivideostmsmaxver) {  # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8)
-              # externe URL in Reading setzen
-              $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-              
-              # interne URL
-              $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
-          } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
-              $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
-          }
-          readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
-      
-      } else {
-          # Abspielen der letzten Aufnahme (EventId)
-          my $lrecid = ReadingsVal("$name", "CamLastRecId", 0);
-          if($lrecid) {
-              # externe URL in Reading setzen
-              $exturl .= "/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid"; 
-              # interne URL          
-              $url = "$proto://$serveraddr:$serverport/webapi/$apistmpath?api=$apistm&version=$apistmmaxver&method=EventStream&eventId=$lrecid&timestamp=1&_sid=$sid";   
-              readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
-          }
-      }
+   if($hash->{HELPER}{CALL}) {                                                  # neue camOp Videosteuerung Ausführungsvariante
+       $vkey     = $hash->{HELPER}{CALL}{VKEY};                                 # API Key Video Parts
+       my $head  = $hash->{HELPER}{CALL}{HEAD};                                 # vom Standard abweichende Serveradresse / Port (z.B. bei external)
+       $part     = $hash->{HELPER}{CALL}{PART};                                 # URL-Teilstring ohne Startsequenz (Server, Port, ...) 
+       my $to    = $hash->{HELPER}{CALL}{TO} // 0;                              # evtl. zuätzlicher Timeout Add-On
        
-      # Liveview-Link in Hash speichern
-      $hash->{HELPER}{LINK} = $url;
- 
-      Log3($name, 4, "$name - Set Streaming-URL: $url");
-      
-      # livestream sofort in neuem Browsertab öffnen
-      if ($hash->{HELPER}{OPENWINDOW}) {
-          $winname = $name."_view";
-          $attr = AttrVal($name, "htmlattr", "");
-          
-          # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
-          if ($hash->{HELPER}{VIEWOPENROOM}) {
-              $room = $hash->{HELPER}{VIEWOPENROOM};
-              map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");   ## no critic 'void context'
-          } else {
-              map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");                        ## no critic 'void context'
-          }
-      }
-           
-      roomRefresh($hash,0,1,1);    # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-      
-      delActiveToken($hash);
-      return;
-      
-   } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/x) {
-      # den letzten Schnappschuß live anzeigen
-      my $limit   = 1;                # nur 1 Snap laden, für lastsnap_fw 
-      my $imgsize = 2;                # full size image, für lastsnap_fw 
-      my $keyword = $hash->{CAMNAME}; # nur Snaps von $camname selektieren, für lastsnap_fw   
-      $url = "$proto://$serveraddr:$serverport/webapi/$apitakesnappath?api=\"$apitakesnap\"&method=\"List\"&version=\"$apitakesnapmaxver\"&keyword=\"$keyword\"&imgSize=\"$imgsize\"&limit=\"$limit\"&_sid=\"$sid\"";
-   
-   } elsif (($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*?hls$/x) || $OpMode eq "activate_hls") {
-      # HLS Livestreaming aktivieren
-      $httptimeout = $httptimeout+90; # aktivieren HLS dauert lange !
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Open&cameraId=$camid&format=hls&_sid=$sid"; 
-   
-   } elsif ($OpMode eq "stopliveview_hls" || $OpMode eq "reactivate_hls") {
-      # HLS Livestreaming deaktivieren
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Close&cameraId=$camid&format=hls&_sid=$sid"; 
-   
-   } elsif ($OpMode eq "getstreamformat") {
-      # aktuelles Streamformat abfragen
-      $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Query&cameraId=$camid&_sid=$sid"; 
+       $httptimeout += $to;
+       
+       $part =~ s/_NAME_/$hash->{HELPER}{API}{$vkey}{NAME}/x;
+       $part =~ s/_VER_/$hash->{HELPER}{API}{$vkey}{VER}/x;
+       $part =~ s/_CID_/$hash->{CAMID}/x;
+       $part =~ s/_SID_/$hash->{HELPER}{SID}/x;
+       
+       if($head) {
+           $url = $head.qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+       } 
+       else {       
+           $url = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;
+       }
    }
    
+   if($hash->{HELPER}{ACALL}) {                                                 # neue camOp Audiosteuerung Ausführungsvariante 
+       my $akey  = $hash->{HELPER}{ACALL}{AKEY};                                # API Key Audio Parts
+       my $apart = $hash->{HELPER}{ACALL}{APART};                               # URL-Teilstring Audio
+       
+       $apart =~ s/_ANAME_/$hash->{HELPER}{API}{$akey}{NAME}/x;
+       $apart =~ s/_AVER_/$hash->{HELPER}{API}{$akey}{VER}/x;
+       $apart =~ s/_CID_/$hash->{CAMID}/x;
+       $apart =~ s/_SID_/$hash->{HELPER}{SID}/x;  
+
+       $hash->{HELPER}{AUDIOLINK} = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$akey}{PATH}?}.$apart;           
+   }
+   
+   if ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} !~ m/snap|^live_.*hls$/x) {
+      _Oprunliveview ($hash, $part, $vkey);
+      return;  
+   }  
+   
+   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
    Log3($name, 4, "$name - Call-Out now: $url");
    
-   $param = {
-            url      => $url,
-            timeout  => $httptimeout,
-            hash     => $hash,
-            method   => "GET",
-            header   => "Accept: application/json",
-            callback => \&camOp_Parse
-            };
+   my $param = {
+       url      => $url,
+       timeout  => $httptimeout,
+       hash     => $hash,
+       method   => "GET",
+       header   => "Accept: application/json",
+       callback => \&camOp_Parse
+   };
    
    HttpUtils_NonblockingGet ($param); 
 
 return;   
 } 
+
+################################################################
+#                       camOp runliveview
+# wird bei runliveview aufgerufen wenn nicht Anzeige Snaps 
+# oder kein HLS-Stream aktiviert werden soll
+################################################################
+sub _Oprunliveview {                   
+  my $hash = shift // return;
+  my $part = shift // delCallParts($hash) && return;
+  my $vkey = shift // delCallParts($hash) && return;
+  my $name = $hash->{NAME};
+  
+  my $proto      = $hash->{PROTOCOL};
+  my $serveraddr = $hash->{SERVERADDR};
+  my $serverport = $hash->{SERVERPORT};
+  
+  my $url;
+
+  my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");                      # externe URL
+  $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;      
+  
+  if ($hash->{HELPER}{RUNVIEW} =~ m/live/x) {    
+      if($part) {                                                                                           # API "SYNO.SurveillanceStation.VideoStream" vorhanden ? (removed ab API v2.8) 
+          $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;                                   
+          $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;  # interne URL
+      
+      } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
+          $url = $hash->{HELPER}{STMKEYMJPEGHTTP};
+      }
+  } 
+  else {                                                                                                    # Abspielen der letzten Aufnahme (EventId)                       
+      $exturl .= qq{/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part; 
+      $url     = qq{$proto://$serveraddr:$serverport/webapi/$hash->{HELPER}{API}{$vkey}{PATH}?}.$part;      # interne URL
+  }
+  
+  readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", 0));
+   
+  $hash->{HELPER}{LINK} = $url;                                                                             # Liveview-Link in Hash speichern
+
+  Log3($name, 4, "$name - Set Streaming-URL: $url");
+  
+  if ($hash->{HELPER}{OPENWINDOW}) {                                                                        # livestream sofort in neuem Browsertab öffnen
+      my $winname = $name."_view";
+      my $attr    = AttrVal($name, "htmlattr", "");
+      
+      if ($hash->{HELPER}{VIEWOPENROOM}) {                                                                  # öffnen streamwindow für die Instanz die "VIEWOPENROOM" oder Attr "room" aktuell geöffnet hat
+          my $room = $hash->{HELPER}{VIEWOPENROOM};
+          map {FW_directNotify("FILTER=room=$room", "#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");   ## no critic 'void context'
+      } 
+      else {
+          map {FW_directNotify("#FHEMWEB:$_", "window.open ('$url','$winname','$attr')", "")} devspec2array("TYPE=FHEMWEB");                        ## no critic 'void context'
+      }
+  }
+       
+  roomRefresh($hash,0,1,1);                                                                                 # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+
+  delActiveToken ($hash);
+
+return;
+}
   
 ###################################################################################  
 #      Check ob Kameraoperation erfolgreich wie in "OpMOde" definiert 
@@ -5478,360 +5686,123 @@ sub camOp_Parse {
    my $name               = $hash->{NAME};
    my $camname            = $hash->{CAMNAME};
    my $OpMode             = $hash->{OPMODE};
-   my $serveraddr         = $hash->{SERVERADDR};
-   my $serverport         = $hash->{SERVERPORT};
-   my $camid              = $hash->{CAMID};
-   my $apivideostms       = $hash->{HELPER}{APIVIDEOSTMS};
-   my $apivideostmspath   = $hash->{HELPER}{APIVIDEOSTMSPATH};
-   my $apivideostmsmaxver = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
-   my $apicammaxver       = $hash->{HELPER}{APICAMMAXVER}; 
-   my $sid                = $hash->{HELPER}{SID};
-   my $proto              = $hash->{PROTOCOL};
    
-   my ($rectime,$data,$success);
-   my ($error,$errorcode);
-   my ($snapid,$camLiveMode,$update_time);
-   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst);
-   my ($deviceType,$camStatus);
-   my ($patrolcnt,$patrolid,$patrolname,@patrolkeys,$patrollist);
-   my ($recStatus,$exposuremode,$exposurecontrol);
-   my ($userPriv,$verbose,$motdetsc);
-   my ($sensitivity_camCap,$sensitivity_value,$sensitivity_ssCap);
-   my ($threshold_camCap,$threshold_value,$threshold_ssCap);
-   my ($percentage_camCap,$percentage_value,$percentage_ssCap);
-   my ($objectSize_camCap,$objectSize_value,$objectSize_ssCap);
-   
-   my $lang = AttrVal("global","language","EN");
+   my ($data,$success);
    
    # Einstellung für Logausgabe Pollinginfos
    # wenn "pollnologging" = 1 -> logging nur bei Verbose=4, sonst 3 
-   if (AttrVal($name, "pollnologging", 0) == 1) {
+   my $verbose = 3;
+   if (AttrVal($name, "pollnologging", 0)) {
        $verbose = 4;
-   } else {
-       $verbose = 3;
    }
    
-   if ($err ne "") {
-        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
+   if ($err ne "") {                                                                  # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
         Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
         readingsSingleUpdate($hash, "Error", $err, 1);                                             
         
-        # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
-        delActiveToken($hash);
+        delActiveToken ($hash);                                                       # ausgeführte Funktion ist abgebrochen, Freigabe Funktionstoken
+        
         return;
-   
-   } elsif ($myjson ne "") {    
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-        # Evaluiere ob Daten im JSON-Format empfangen wurden 
-        if($OpMode !~ /SaveRec|GetRec/x) {                                # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
-            ($hash,$success,$myjson) = evaljson($hash,$myjson);        
-            unless ($success) {
+   } 
+   elsif ($myjson ne "") {                                                            # wenn die Abfrage erfolgreich war     
+        if($OpMode !~ /SaveRec|GetRec/x) {                                            # "SaveRec/GetRec" liefern MP4-Daten und kein JSON   
+            ($success,$myjson) = evaljson($hash,$myjson);        
+            
+            if (!$success) {
                 Log3($name, 4, "$name - Data returned: ".$myjson);
-                delActiveToken($hash);
+                
+                delActiveToken ($hash);
+                
                 return;
             }
             
             $data = decode_json($myjson);
             
-            # Logausgabe decodierte JSON Daten
-            Log3($name, 5, "$name - JSON returned: ". Dumper $data);
+            Log3($name, 5, "$name - JSON returned: ". Dumper $data);                  # Logausgabe decodierte JSON Daten
        
-            $success = $data->{'success'};
-        } else {
+            $success = $data->{'success'};    
+        } 
+        else {
             $success = 1; 
         }
 
-        if ($success) {       
-            # Kameraoperation entsprechend "OpMode" war erfolgreich                
-            
-            if ($OpMode eq "Start") {                             
-                # Die Aufnahmezeit setzen
-                # wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
-                # sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
-                if (defined($hash->{HELPER}{RECTIME_TEMP})) {
-                    $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
-                } else {
-                    $rectime = AttrVal($name, "rectime", $hash->{HELPER}{RECTIME_DEF});
-                }
-                
-                if ($rectime == 0) {
-                    Log3($name, 3, "$name - Camera $camname endless Recording started  - stop it by stop-command !");
-                } else {
-                    if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                        # Aufnahme läuft schon und wird verlängert
-                        Log3($name, 3, "$name - running recording renewed to $rectime s");
-                    } else {
-                        Log3($name, 3, "$name - Camera $camname recording with recording time $rectime s started");
-                    }
-                }
-                       
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Record","Start");
-                readingsBulkUpdate($hash,"state",    "on");
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                
-                if ($rectime != 0) {
-                    # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
-                    my $emtxt   = $hash->{HELPER}{SMTPRECMSG}?$hash->{HELPER}{SMTPRECMSG}:"";
-                    my $teletxt = $hash->{HELPER}{TELERECMSG}?$hash->{HELPER}{TELERECMSG}:"";
-                    RemoveInternalTimer($hash, "FHEM::SSCam::camStopRec");
-                    InternalTimer(gettimeofday()+$rectime, "FHEM::SSCam::camStopRec", $hash);
-                }      
-                
-                roomRefresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-            
-            } elsif ($OpMode eq "Stop") {                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash, "Record",    "Stop");
-                readingsBulkUpdate ($hash, "state",     "off" );
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error"    , "none");
-                readingsEndUpdate  ($hash, 1);
-       
-                Log3($name, 3, "$name - Camera $camname Recording stopped");
-                
-                roomRefresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                
-                # Aktualisierung Eventlist der letzten Aufnahme
-                getEventList($hash);
-            
-            } elsif ($OpMode eq "ExpMode") {
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error"    , "none");
-                readingsEndUpdate  ($hash, 1);
-       
-                Log3($name, 3, "$name - Camera $camname exposure mode was set to \"$hash->{HELPER}{EXPMODE}\"");
-            
-            } elsif ($OpMode eq "setZoom") { 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error"    , "none");
-                readingsEndUpdate  ($hash, 1);
-       
-                Log3($name, 3, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
-            
-            } elsif ($OpMode eq "GetRec") {              
-                my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
-                my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
-                my $lrec             = ReadingsVal("$name", "CamLastRec",     "");
-                my ($tdir,$fileName) = split("/",$lrec);
-                my $sn               = 0;
-                
-                my $tac = openOrgetTrans($hash);                    # Transaktion starten             
-                
-                my $cache;
-                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
-                    $cache = cache($name, "c_init");                # Cache initialisieren für Versandhash
-                    Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
-                    if(!$cache || $cache eq "internal" ) {
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{tdir}      = $tdir;
-                        $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
-                    } else {
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{recid}"     ,$recid);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{createdTm}" ,$createdTm);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{fileName}"  ,$fileName);
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{tdir}"      ,$tdir);                         
-                        cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{imageData}" ,$myjson);                         
-                    }
-                    Log3($name, 4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
-                }
-                
-                # Recording als Email / Telegram / Chat versenden 
-                if(!$cache || $cache eq "internal" ) {                
-                    prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
-                } else {
-                    prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
-                }
-                
-                closeTrans ($hash);                               # Transaktion beenden
-                        
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error",$err);
-                readingsEndUpdate   ($hash, 1);
-       
-            } elsif ($OpMode eq "SaveRec") {              
-
-                my $lrec = ReadingsVal("$name", "CamLastRec", "");
-                $lrec    = (split("/",$lrec))[1]; 
-                my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
-                my $file = $sp."/$lrec";
-                delete $hash->{HELPER}{RECSAVEPATH};
-                
-                open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
-                                                Log3($name, 2, "$name - $err");
-                                              };       
-                
-                if(!$err) {                
-                    binmode $fh;
-                    print $fh $myjson;
-                    close($fh);
-                    $err = "none";
-                    Log3($name, 3, qq{$name - Recording was saved to local file "$file"});
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error",$err);
-                readingsEndUpdate   ($hash, 1);
-            
-            } elsif ($OpMode eq "sethomemode") {              
-
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-       
-                Log3($name, 3, "$name - HomeMode was set to \"$hash->{HELPER}{HOMEMODE}\" ");
-                
-                # Token freigeben vor nächstem Kommando
-                delActiveToken($hash);
+        if ($success) {                                                               # Kameraoperation entsprechend "OpMode" war erfolgreich                
+            my $params = {
+                hash    => $hash,
+                name    => $name,
+                camname => $camname,
+                OpMode  => $OpMode,
+                myjson  => $myjson,
+                data    => $data,
+                verbose => $verbose,
+            };
+              
+            no strict "refs";                                                        ## no critic 'NoStrict'  
+            if($hparse{$OpMode} && defined &{$hparse{$OpMode}{fn}}) {
+                my $ret = q{};  
+                $ret    = &{$hparse{$OpMode}{fn}} ($params);
+                return if($ret);
+            }
+            use strict "refs";
   
-                # neuen HomeModeState abrufen   
-                getHomeModeState($hash);
-            
-            } elsif ($OpMode eq "gethomemodestate") {  
-                my $hmst = $data->{'data'}{'on'}; 
-                my $hmststr = ($hmst == 1)?"on":"off";
-
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-                if($lang eq "DE") {
-                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                } else {
-                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                }               
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"HomeModeState",$hmststr);
-                readingsBulkUpdate  ($hash,"LastUpdateTime",$update_time);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);
-            
-            } elsif ($OpMode eq "getsvslog") { 
-                my $lec = $data->{'data'}{'total'};    # abgerufene Anzahl von Log-Einträgen
-
-                my $log  = '<html>';
-                my $log0 = "";
-                my $i = 0;
-                while ($data->{'data'}->{'log'}->[$i]) {
-                    my $id = $data->{'data'}->{'log'}->[$i]{'id'};
-                    my $un = $data->{'data'}->{'log'}->[$i]{'user_name'};
-                    my $desc = $data->{'data'}->{'log'}->[$i]{'desc'};
-                    my $level = $data->{'data'}->{'log'}->[$i]{'type'};
-                    $level = ($level == 3)?"Error":($level == 2)?"Warning":"Information";
-                    my $time = $data->{'data'}->{'log'}->[$i]{'time'};
-                    $time = FmtDateTime($time);
-                    $log0 = $time." - ".$level." - ".$desc if($i == 0);
-                    $log .= "$time - $level - $desc<br>";
-                    $i++;
-                }   
-                $log = "<html><b>Surveillance Station Server \"$hash->{SERVERADDR}\" Log</b> ( $i/$lec entries are displayed )<br><br>$log</html>";
-                                
-                # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
-                # bzw. https://forum.fhem.de/index.php/topic,77310.0.html
-                # $log = "Too much log data were selected. Please reduce amount of data by specifying all or one of 'severity', 'limit', 'match'" if (length($log) >= 102400);              
+            if ($OpMode eq "ExpMode") {
+                Log3               ($name, 3, qq{$name - Camera $camname exposure mode is set to "$hash->{HELPER}{EXPMODE}"} );
+                setReadingErrorNone($hash, 1 );
                 
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"LastLogEntry",$log0) if(!$hash->{HELPER}{CL}{1});  # Datenabruf im Hintergrund;
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);
+                __getCamInfo       ($hash);
+            } 
+            elsif ($OpMode eq "setZoom") {   
+                Log3               ($name, 3, qq{$name - Zoom operation "$hash->{HELPER}{ZOOM}{DIR}:$hash->{HELPER}{ZOOM}{MOVETYPE}" of Camera $camname successfully done} );
+                setReadingErrorNone($hash, 1 ); 
+            }            
+            elsif ($OpMode eq "extevent") {
+                Log3               ($name, 3, qq{$name - External Event "$hash->{HELPER}{EVENTID}" successfully triggered} );          
+                setReadingErrorNone($hash, 1 );
+            } 
+            elsif ($OpMode eq "sethomemode") {              
+                Log3               ($name, 3, qq{$name - HomeMode was set to "$hash->{HELPER}{HOMEMODE}"} );
+                setReadingErrorNone($hash, 1 );
                 
-                # Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$log");
-                delete($hash->{HELPER}{CL});
-            
-            } elsif ($OpMode eq "getPresets") {  
-                my %ap = ();
-                my $i  = 0;
-                while ($data->{'data'}->{'preset'}->[$i]) {
-                    my $pname  = $data->{'data'}->{'preset'}->[$i]{'name'};
-                    my $ptype  = $data->{'data'}->{'preset'}->[$i]{'type'};
-                    my $ppos   = $data->{'data'}->{'preset'}->[$i]{'position'};
-                    my $pspeed = $data->{'data'}->{'preset'}->[$i]{'speed'};
-                    my $pextra = $data->{'data'}->{'preset'}->[$i]{'extra'};
-                    $ptype     = ($ptype == 1)?"Home":"Normal";
-                    $ap{$ppos} = "Name: $pname, Speed: $pspeed, Type: $ptype";
-                    $i++;
-                }   
-                
-                my $enum;
-                for my $key (sort{$a <=>$b}keys%ap) { 
-                    $enum .= $key." => ".$ap{$key}."<br>";                 
-                }
-                
-                $enum = "<html><b>Preset positions saved of camera \"$hash->{CAMNAME}\" </b> ".
-                        "(PresetNumber => Name: ..., Speed: ..., Type: ...) <br><br>$enum</html>";
-                                
-                # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
-                # bzw. https://forum.fhem.de/index.php/topic,77310.0.html               
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                
-                # Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
-                # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
-                asyncOutput($hash->{HELPER}{CL}{1},"$enum");
-                delete($hash->{HELPER}{CL});
-            
-            } elsif ($OpMode eq "setPreset") {              
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                
+                delActiveToken     ($hash);                                           # Token freigeben vor nächstem Kommando
+                __getHomeModeState ($hash);                                           # neuen HomeModeState abrufen   
+            } 
+            elsif ($OpMode eq "setPreset") {              
                 my $pnumber = delete($hash->{HELPER}{PNUMBER});
                 my $pname   = delete($hash->{HELPER}{PNAME});
                 my $pspeed  = delete($hash->{HELPER}{PSPEED});                
                 $pspeed     = $pspeed?$pspeed:"not set";
 
-                Log3($name, 3, "$name - Camera \"$camname\" preset \"$pname\" was saved to number $pnumber with speed $pspeed");
-                getPtzPresetList($hash);
-            
-            } elsif ($OpMode eq "delPreset") {              
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
+                Log3               ($name, 3, "$name - Camera $camname preset \"$pname\" was saved to number $pnumber with speed $pspeed");
+                setReadingErrorNone($hash, 1);
                 
+                __getPtzPresetList ($hash);
+            } 
+            elsif ($OpMode eq "delPreset") {                
                 my $dp = $hash->{HELPER}{DELPRESETNAME};
                 delete $hash->{HELPER}{ALLPRESETS}{$dp};                
-                Log3($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" has been deleted");
-                getPtzPresetList($hash);
-            
-            } elsif ($OpMode eq "piract") {              
-
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-       
-                my $piract = ($hash->{HELPER}{PIRACT} == 0)?"activated":"deactivated";
-                Log3($name, 3, "$name - PIR sensor $piract");
-            
-            } elsif ($OpMode eq "setHome") {              
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
                 
-                my $sh = $hash->{HELPER}{SETHOME};               
-                Log3($name, 3, "$name - Preset \"$sh\" of camera \"$camname\" was set as Home position");
-                getPtzPresetList($hash);
-            
-            } elsif ($OpMode eq "setoptpar") { 
-                my $rid  = $data->{'data'}{'id'};    # Cam ID return wenn i.O.
-                my $ropt = $rid == $hash->{CAMID}?"none":"error in operation";
+                Log3               ($name, 3, "$name - Preset \"$dp\" of camera \"$camname\" has been deleted");  
+                setReadingErrorNone($hash, 1);
+    
+                __getPtzPresetList ($hash);
+            } 
+            elsif ($OpMode eq "piract") {              
+                my $piract = ($hash->{HELPER}{PIRACT} == 0)?"activated":"deactivated";
+                
+                Log3               ($name, 3, "$name - PIR sensor $piract");
+                setReadingErrorNone($hash, 1);
+            } 
+            elsif ($OpMode eq "setHome") {    
+                my $sh = $hash->{HELPER}{SETHOME}; 
+                
+                Log3               ($name, 3, "$name - Preset \"$sh\" of camera \"$camname\" was set as Home position");
+                setReadingErrorNone($hash, 1);
+                
+                __getPtzPresetList ($hash);
+            } 
+            elsif ($OpMode eq "setoptpar") { 
+                my $rid  = $data->{'data'}{'id'};                                                       # Cam ID return wenn i.O.
+                my $ropt = $rid == $hash->{CAMID} ? "none" : "error in operation";
                 
                 delete($hash->{HELPER}{NTPSERV});
                 delete($hash->{HELPER}{MIRROR});
@@ -5844,1649 +5815,1625 @@ sub camOp_Parse {
                 readingsBulkUpdate  ($hash,"Error",$ropt);
                 readingsEndUpdate   ($hash, 1);
 
-                # Token freigeben vor Abruf caminfo
-                delActiveToken($hash);
-                RemoveInternalTimer($hash, "FHEM::SSCam::getCamInfo");
-                InternalTimer(gettimeofday()+0.5, "FHEM::SSCam::getCamInfo", $hash, 0);
-                
-            } elsif ($OpMode eq "MotDetSc") {              
-
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-       
-                my $sensitivity;
-                if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
-                    # Optionen für "SVS" sind gesetzt
-                    $sensitivity    = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
-                    my $threshold   = ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) ? ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) : "-";
-                    
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
-                
-                } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {
-                    # Optionen für "camera" sind gesetzt
-                    $sensitivity    = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
-                    my $objectSize  = ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) : "-";
-                    my $percentage  = ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) : "-";
-                    
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
- 
-                } else {
-                    # keine Optionen Bewegungserkennung wurden gesetzt
-                    Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" ");
-                }
-            
-            } elsif ($OpMode eq "Snap") {
-                # ein Schnapschuß wurde aufgenommen
-                # falls Aufnahme noch läuft -> state = on setzen
-                roomRefresh($hash,0,1,0);                   # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
-
-                my $tac = "";
-                if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) { 
-                    $tac = openOrgetTrans($hash);       # Transaktion starten oder vorhandenen Code holen
-                }
-                
-                $snapid = $data->{data}{'id'};
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                if ($snapid) {
-                    Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
-                } else {
-                    Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
-                }
-                
-                
-                my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
-                my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
-                if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
-                }
-                $ncount--;                                                           # wird vermindert je Snap
-                my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
-                my $emtxt   = $hash->{HELPER}{SMTPMSG}?$hash->{HELPER}{SMTPMSG}:"";  # Text für Email-Versand
-                my $teletxt = $hash->{HELPER}{TELEMSG}?$hash->{HELPER}{TELEMSG}:"";  # Text für TelegramBot-Versand
-                my $chattxt = $hash->{HELPER}{CHATMSG}?$hash->{HELPER}{CHATMSG}:"";  # Text für SSChatBot-Versand
-                if($ncount > 0) {
-                    InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
-                    if(!$tac) {
-                        delActiveToken($hash);                               # Token freigeben wenn keine Transaktion läuft
-                    }
-                    return;
-                }
-  
-                # Anzahl und Size für Schnappschußabruf bestimmen
-                my ($slim,$ssize) = snapLimSize($hash);
-                if (AttrVal($name,"debugactivetoken",0)) {
-                    Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
-                }
-
-                if(!$hash->{HELPER}{TRANSACTION}) {                  
-                    # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
-                    delActiveToken($hash);                        
-                }
-                
-                RemoveInternalTimer($hash, "FHEM::SSCam::getSnapInfo");                
-                InternalTimer(gettimeofday()+0.6, "FHEM::SSCam::getSnapInfo", "$name:$slim:$ssize:$tac", 0);
-                return;
-            
-            } elsif ($OpMode eq "getsnapinfo" || $OpMode eq "getsnapgallery" || ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ /snap/x)) {
-                my ($cache,@as,$g);
-                
-                Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
-                
-                # aktuellsten Snap zur Anzeige im streamDev "lastsnap" speichern
-                # $hash->{HELPER}{".LASTSNAP"} = $data->{data}{data}[0]{imageData};
-                $cache = cache($name, "c_init");                               # Cache initialisieren  
-                Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                if(!$cache || $cache eq "internal" ) {
-                    $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
-                } else {
-                    cache($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});                           
-                }                
-        
-                my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );  # Hilfshash 
-                my ($k,$l) = (0,0);              
-                if($data->{'data'}{'data'}[0]{'createdTm'}) {
-                    while ($data->{'data'}{'data'}[$k]) {
-                        if(!$data->{'data'}{'data'}[$k]{'camName'} || $data->{'data'}{'data'}[$k]{'camName'} ne $camname) {    # Forum:#97706
-                            $k += 1;
-                            next;
-                        }
-                        my @t = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
-                        my @d = split("-", $t[0]);
-                        my $createdTm;
-                        if($lang eq "DE") {
-                            $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-                        } else {
-                            $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
-                        }
-                        $snaps{$l}{createdTm} = $createdTm;
-                        $snaps{$l}{fileName}  = $data->{data}{data}[$k]{fileName};
-                        $snaps{$l}{snapid}    = $data->{data}{data}[$k]{id};
-                        Log3($name,4, "$name - Snap [$l]: ID => $data->{data}{data}[$k]{id}, File => $data->{data}{data}[$k]{fileName}, Created => $createdTm");
-                        $l += 1;
-                        $k += 1;
-                    }   
-                }
-                
-                my $rotnum = AttrVal($name,"snapReadingRotate",0);
-                my $o      = ReadingsVal($name,"LastSnapId","n.a."); 
-                if($rotnum && "$o" ne "$snaps{0}{snapid}") {
-                    @as = sort{$b<=>$a}keys%snaps;
-                    for my $key (@as) {
-                        rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
-                        rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
-                        rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
-                    }
-                } else {
-                    @as = sort{$a<=>$b}keys%snaps;
-                    rotateReading($hash,"LastSnapId",$snaps{$as[0]}{snapid},$rotnum,1);
-                    rotateReading($hash,"LastSnapFilename",$snaps{$as[0]}{fileName},$rotnum,1);
-                    rotateReading($hash,"LastSnapTime",$snaps{$as[0]}{createdTm},$rotnum,1);                  
-                }
-                    
-                #####  ein Schnapschuss soll als liveView angezeigt werden  #####
-                #################################################################
-                Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.") 
-                   if(exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/x && !exists($data->{'data'}{'data'}[0]{imageData}));
-                
-                if (exists($hash->{HELPER}{RUNVIEW}) && $hash->{HELPER}{RUNVIEW} =~ /snap/x && exists($data->{'data'}{'data'}[0]{imageData})) {
-                    delete $hash->{HELPER}{RUNVIEW};                    
-                    $hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};                  
-                }
-
-                #####  eine Schnapschussgalerie soll angezeigt oder als Bulk versendet werden  #####
-                ####################################################################################
-                my $tac = openOrgetTrans($hash);       # Transaktion vorhandenen Code holen
-                
-                if($OpMode eq "getsnapgallery") {
-                    if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-                        # es sollen die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
-                        my $i  = 0;
-                        my $sn = 0;
-
-                        # bestehende Schnappschußdaten im Cache auf OLD schreiben und löschen #
-                        #######################################################################
-                        $cache = cache($name, "c_init");           # Cache initialisieren  
-                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                        if(!$cache || $cache eq "internal" ) {
-                            if($data{SSCam}{$name}{SNAPHASH}) {
-                                for my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
-                                    $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
-                                }
-                            }
-                        } else {
-                            # alle keys aus vorhandenem SNAPHASH auslesen
-                            extractTIDfromCache ( { name  => $name,  
-                                                    media => "SNAPHASH",
-                                                    mode  => "readkeys",
-                                                    aref  => \@as
-                                                  } 
-                                                );                            
-                            my %seen;
-                            my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;
-                            for my $key (@unique) {
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{snapid}"          );          
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{snapid}",    $g) if(defined $g);    
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{snapid}"          );
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{createdTm}"       );
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{createdTm}", $g) if(defined $g); 
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{createdTm}"       );
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{fileName}"        );                               
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{fileName}",  $g) if(defined $g);  
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{fileName}"        );  
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{imageData}"       );
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{imageData}", $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{imageData}"       );                                                     
-                            }
-                        }
-                            
-                        while ($data->{'data'}{'data'}[$i]) {
-                            if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
-                                $i += 1;
-                                next;
-                            }
-                            $snapid = $data->{data}{data}[$i]{id};
-                            my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
-                            my @d = split("-", $t[0]);
-                            my $createdTm;
-                            if($lang eq "DE") {
-                                $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-                            } else {
-                                $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
-                            }
-                            my $fileName  = $data->{data}{data}[$i]{fileName};
-                            my $imageData = $data->{data}{data}[$i]{imageData};                      # Image data of snapshot in base64 format 
-                            
-                            # Schnappschuss Hash zum Versand wird erstellt
-                            ##############################################
-                            if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-                                $cache = cache($name, "c_init");                               # Cache initialisieren  
-                                Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                                if(!$cache || $cache eq "internal" ) {
-                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
-                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
-                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
-                                    $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
-                                } else {
-                                    cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{snapid}"    ,$snapid);
-                                    cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{createdTm}" ,$createdTm);
-                                    cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{fileName}"  ,$fileName); 
-                                    cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);                             
-                                }
-                                Log3($name,4, "$name - Snap '$sn' added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
-                            }
-                            
-                            # Snaphash erstellen für Galerie
-                            ################################
-                            $cache = cache($name, "c_init");           # Cache initialisieren  
-                            Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                            if(!$cache || $cache eq "internal" ) {
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
-                            } else {
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}"    ,$snapid);
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}" ,$createdTm);
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}"  ,$fileName);  
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}" ,$imageData);                                
-                            }
-                            Log3($name,4, "$name - Snap '$sn' added to gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");                                                                         
-                            
-                            $sn += 1;
-                            $i  += 1;
-                            
-                            undef $imageData;
-                            undef $fileName;
-                            undef $createdTm;
-                        }
-                        
-                        my $sgn = AttrVal($name,"snapGalleryNumber",3);
-                        my $ss  = $sn;
-                        $sn     = 0;
-                                                                                                         
-                        $cache = cache($name, "c_init");           # Cache initialisieren  
-                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                        if(!$cache || $cache eq "internal" ) {
-                            if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {                        
-                                for my $kn ($ss..($sgn-1)) {
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData}; 
-                                    $sn += 1;                            
-                                }
-                            }
-                        } else {
-                            for my $kn ($ss..($sgn-1)) {
-                                # next if $kn >= $hash->{HELPER}{SNAPLIMIT};                                                  
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{snapid}"    );                       
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{snapid}",    $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}"    );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{createdTm}" );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}" );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{fileName}"  );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{fileName}",  $g) if(defined $g);  
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}"  );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{imageData}" );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{imageData}", $g) if(defined $g);                                    
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}" );
-                                $sn += 1;                            
-                            }                            
-                        }
-                        
-                        # Schnappschüsse als Email / Telegram / SSChatBot versenden
-                        ###########################################################
-                        if(!$cache || $cache eq "internal" ) { 
-                            prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDSNAPS}{$tac});
-                        } else {
-                            prepareSendData ($hash, $OpMode, "{SENDSNAPS}{$tac}");
-                        }
-                        
-                    } else {
-                        # es soll eine Schnappschußgalerie bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
-                        # werden (Attr snapGalleryBoost=0) => kein Versand !!
-                        #################################################################################################
-                        my $i  = 0;
-                        my $sn = 0;
-                         
-                        $hash->{HELPER}{TOTALCNT} = $data->{data}{total};  # total Anzahl Schnappschüsse
-                        
-                        # bestehende Schnappschußdaten in OLD schieben und löschen #
-                        ############################################################
-                        $cache = cache($name, "c_init");             # Cache initialisieren  
-                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                        if(!$cache || $cache eq "internal" ) {
-                            if($data{SSCam}{$name}{SNAPHASH}) {
-                                for my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
-                                    $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
-                                }
-                            }
-                        } else {
-                            # alle keys aus vorhandenem SNAPHASH auslesen
-                            extractTIDfromCache ( { name  => $name,  
-                                                    media => "SNAPHASH",
-                                                    mode  => "readkeys",
-                                                    aref  => \@as
-                                                  } 
-                                                );                             
-                            my %seen;
-                            my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;
-                            for my $key (@unique) {
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{snapid}"          );          
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{snapid}",    $g) if(defined $g);    
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{snapid}"          );
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{createdTm}"       );
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{createdTm}", $g) if(defined $g); 
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{createdTm}"       );
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{fileName}"        );                               
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{fileName}",  $g) if(defined $g);  
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{fileName}"        );  
-                                $g = cache($name, "c_read",   "{SNAPHASH}{$key}{imageData}"       );
-                                cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{imageData}", $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPHASH}{$key}{imageData}"       );                                                      
-                            }
-                        }
-                        
-                        while ($data->{'data'}{'data'}[$i]) {
-                            if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
-                                $i += 1;
-                                next;
-                            }   
-                            $snapid = $data->{data}{data}[$i]{id};
-                            my $createdTm = $data->{data}{data}[$i]{createdTm};
-                            my $fileName  = $data->{data}{data}[$i]{fileName};
-                            my $imageData = $data->{data}{data}[$i]{imageData};  # Image data of snapshot in base64 format 
-                        
-                            my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
-                            my @d = split("-", $t[0]);
-                            if($lang eq "DE") {
-                                $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
-                            } else {
-                                $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
-                            }
-                            
-                            # Snaphash erstellen für Galerie #
-                            ##################################
-                            $cache = cache($name, "c_init");               # Cache initialisieren  
-                            Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                            if(!$cache || $cache eq "internal" ) {
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
-                                $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
-                            } else {
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}",    $snapid   );
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}", $createdTm);
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}",  $fileName );  
-                                cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}", $imageData);                                
-                            }
-                            Log3($name, 4, "$name - Snap '$sn' added to gallery hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
-                            
-                            $sn += 1;
-                            $i  += 1;
-                            
-                            undef $imageData;
-                            undef $fileName;
-                            undef $createdTm;
-                        }
-                        
-                        my $sgn = AttrVal($name,"snapGalleryNumber",3);
-                        my $ss  = $sn;
-                        $sn     = 0; 
-                        
-                        $cache = cache($name, "c_init");           # Cache initialisieren  
-                        Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
-                        if(!$cache || $cache eq "internal" ) {
-                            if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {                        
-                                for my $kn ($ss..($sgn-1)) {
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
-                                    $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData}; 
-                                    $sn += 1;                            
-                                }
-                            }
-                        } else {                            
-                            for my $kn ($ss..($sgn-1)) {                                                 
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{snapid}"    );                       
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{snapid}",    $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}"    );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{createdTm}" );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}" );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{fileName}"  );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{fileName}",  $g) if(defined $g);  
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}"  );
-                                $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{imageData}" );
-                                cache     ($name, "c_write",  "{SNAPHASH}{$kn}{imageData}", $g) if(defined $g);                                    
-                                cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}" );
-                                $sn += 1;                            
-                            }                            
-                        }
-                        
-                        # Direktausgabe Snaphash wenn nicht gepollt wird
-                        if(!AttrVal($name, "snapGalleryBoost",0)) {  
-                            my %pars = ( linkparent => $name,
-                                         linkname   => '',
-                                         ftui       => 0
-                                       );
-                            my $htmlCode = composeGallery(\%pars);
-                            
-                            for (my $c=1; (defined($hash->{HELPER}{CL}{$c})); $c++ ) {
-                                asyncOutput($hash->{HELPER}{CL}{$c},"$htmlCode");                       
-                            }
-                            delete($data{SSCam}{$name}{SNAPHASH});               # Snaphash Referenz löschen                            %allsnaps = ();
-                            delete($hash->{HELPER}{CL});
-                        }
-                    }
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);                
-                
-                undef %snaps;
-                undef $g;
-                delete $hash->{HELPER}{GETSNAPGALLERY};                         # Steuerbit getsnapgallery      
-                delete $data{SSCam}{$name}{SNAPOLDHASH};
-                closeTrans($hash);                                              # Transaktion beenden
-                
-                ########  fallabhängige Eventgenerierung  ########
-                if ($hash->{HELPER}{INFORM} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {
-                    # Snap durch SSCamSTRM-Device ausgelöst
-                    roomRefresh($hash,0,0,1);     # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
-                    delete $hash->{HELPER}{LSNAPBYSTRMDEV};
-                } elsif ($hash->{HELPER}{LSNAPBYDEV}) {
-                    roomRefresh($hash,0,1,0);     # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
-                    delete $hash->{HELPER}{LSNAPBYDEV};
-                } else {
-                    roomRefresh($hash,0,0,0);     # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-                } 
-            
-            } elsif ($OpMode eq "runliveview" && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/) {
-                # HLS Streaming wurde aktiviert
-                $hash->{HELPER}{HLSSTREAM} = "active";
-                # externe LivestreamURL setzen
-                my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-                $exturl .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-                readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1) if(AttrVal($name, "showStmInfoFull", undef));
-                
-                my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
-                # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
-                $hash->{HELPER}{LINK}      = $url;
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url") if(AttrVal($name,"verbose",3) == 4);
-                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated") if(AttrVal($name,"verbose",3) == 3);
-                
-                roomRefresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-                
-            } elsif ($OpMode eq "stopliveview_hls") {
-                # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
+                delActiveToken      ($hash);                                                            # Token freigeben vor Abruf caminfo
+                __getCamInfo        ($hash);
+            } 
+            elsif ($OpMode eq "stopliveview_hls") {                                                     # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
                 Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated");
                                
-                roomRefresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-                
-            } elsif ($OpMode eq "reactivate_hls") {
-                # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
+                roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+            } 
+            elsif ($OpMode eq "reactivate_hls") {                                                       # HLS Streaming wurde deaktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "inactive";
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" deactivated for streaming device");
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" deactivated for reactivation");
 
-                # Token freigeben vor hlsactivate
-                delActiveToken($hash);
-                activateHls($hash);
+                delActiveToken ($hash);                                                                 # Token freigeben vor hlsactivate
+                __activateHls  ($hash);
                 return;
-                
-            } elsif ($OpMode eq "activate_hls") {
-                # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
+            } 
+            elsif ($OpMode eq "activate_hls") {                                                         # HLS Streaming wurde aktiviert, Aktivitätsstatus speichern
                 $hash->{HELPER}{HLSSTREAM} = "active"; 
-                Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated for streaming device");
+                Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated");
                 
-                roomRefresh($hash,0,1,1);   # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
-                                
-            } elsif ($OpMode eq "getsnapfilename") {
-                # den Filenamen eines Schnapschusses ermitteln
-                $snapid = ReadingsVal("$name", "LastSnapId", "");
+                roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event                
+            } 
+            elsif ($OpMode eq "getsnapfilename") {                                                      # den Filenamen eines Schnapschusses ermitteln
+                my $snapid = ReadingsVal("$name", "LastSnapId", "");
 
                 if(!$snapid) {
-                   Log3($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved"); 
+                   Log3($name, 2, "$name - Snap-ID \"LastSnapId\" isn't set. Filename can't be retrieved");
+                   delActiveToken ($hash);                                                              # Token freigeben vor hlsactivate
                    return;
                 }               
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsBulkUpdate($hash,"LastSnapFilename", $data->{'data'}{'data'}[0]{'fileName'});
-                readingsEndUpdate($hash, 1);
 
                 Log3($name, 4, "$name - Filename of Snap-ID $snapid is \"$data->{'data'}{'data'}[0]{'fileName'}\"") if($data->{'data'}{'data'}[0]{'fileName'});
             
-            } elsif ($OpMode eq "getstreamformat") {
-                # aktuelles Streamformat abgefragt
+                readingsSingleUpdate($hash, "LastSnapFilename", $data->{'data'}{'data'}[0]{'fileName'}, 1);
+                setReadingErrorNone ($hash, 1);            
+            } 
+            elsif ($OpMode eq "getstreamformat") {                                                      # aktuelles Streamformat abgefragt
                 my $sformat = jboolmap($data->{'data'}->{'format'});
+                $sformat    = $sformat ? uc($sformat) : "no API";
                 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsBulkUpdate($hash,"CamStreamFormat", uc($sformat)) if($sformat);
-                readingsEndUpdate($hash, 1);                
-            
-            } elsif ($OpMode eq "gopreset") {
-                # eine Presetposition wurde angefahren
-                # falls Aufnahme noch läuft -> state = on setzen
-                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start")?"on":"off";    
-                readingsSingleUpdate($hash,"state", $st, 0); 
-                DoTrigger($name,"move stop");
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                # Logausgabe
-                Log3($name, 3, "$name - Camera $camname has been moved to position \"$hash->{HELPER}{GOPRESETNAME}\"");
-            
-            } elsif ($OpMode eq "runpatrol") {
-                # eine Tour wurde gestartet
-                # falls Aufnahme noch läuft -> state = on setzen
-                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start")?"on":"off";    
-                readingsSingleUpdate($hash,"state", $st, 0); 
+                readingsSingleUpdate($hash, "CamStreamFormat", $sformat, 1);
+                setReadingErrorNone ($hash, 1);                
+            } 
+            elsif ($OpMode eq "runpatrol") {                                                          # eine Tour wurde gestartet
+                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";          # falls Aufnahme noch läuft -> state = on setzen  
                 DoTrigger($name,"patrol started"); 
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Patrol \"$hash->{HELPER}{GOPATROLNAME}\" of camera $camname has been started successfully");
-            
-            } elsif ($OpMode eq "goabsptz") {
-                # eine absolute PTZ-Position wurde angefahren
-                # falls Aufnahme noch läuft -> state = on setzen
-                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start")?"on":"off";    
-                readingsSingleUpdate($hash,"state", $st, 0); 
+                               
+                Log3                ($name, 3, qq{$name - Patrol "$hash->{HELPER}{GOPATROLNAME}" of camera $camname has been started successfully} );
+                readingsSingleUpdate($hash,"state", $st, 0);
+                setReadingErrorNone ($hash, 1); 
+            } 
+            elsif ($OpMode eq "goabsptz") {                                                           # eine absolute PTZ-Position wurde angefahren
+                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";          # falls Aufnahme noch läuft -> state = on setzen   
                 DoTrigger($name,"move stop");
                 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Camera $camname has been moved to absolute position \"posX=$hash->{HELPER}{GOPTZPOSX}\" and \"posY=$hash->{HELPER}{GOPTZPOSY}\"");
-            
-            } elsif ($OpMode eq "startTrack") {
-                # Object Tracking wurde eingeschaltet
+                Log3                ($name, 3, qq{$name - Camera $camname has been moved to absolute position "posX=$hash->{HELPER}{GOPTZPOSX}" and "posY=$hash->{HELPER}{GOPTZPOSY}"} );
+                readingsSingleUpdate($hash,"state", $st, 0);
+                setReadingErrorNone ($hash, 1);
+            } 
+            elsif ($OpMode eq "startTrack") {                                                                     # Object Tracking wurde eingeschaltet                          
+                Log3               ($name, 3, qq{$name - Object tracking of Camera $camname has been switched on} );
+                setReadingErrorNone($hash, 1 );      
+            } 
+            elsif ($OpMode eq "stopTrack") {                                                                      # Object Tracking wurde eingeschaltet             
+                Log3               ($name, 3, qq{$name - Object tracking of Camera $camname has been stopped} );
+                setReadingErrorNone($hash, 1);           
+            } 
+            elsif ($OpMode eq "movestart") {                                                                      # ein "Move" in eine bestimmte Richtung wird durchgeführt                 
+                Log3               ($name, 3, qq{$name - Camera $camname started move to direction "$hash->{HELPER}{GOMOVEDIR}" with duration of $hash->{HELPER}{GOMOVETIME} s} );
+                setReadingErrorNone($hash, 1); 
                 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Object tracking of Camera $camname has been switched on");
-            
-            } elsif ($OpMode eq "stopTrack") {
-                # Object Tracking wurde eingeschaltet
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Object tracking of Camera $camname has been stopped");
-            
-            } elsif ($OpMode eq "movestart") {
-                # ein "Move" in eine bestimmte Richtung wird durchgeführt                 
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Camera $camname started move to direction \"$hash->{HELPER}{GOMOVEDIR}\" with duration of $hash->{HELPER}{GOMOVETIME} s");
-                
-                RemoveInternalTimer($hash, "FHEM::SSCam::moveStop");
-                InternalTimer(gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "FHEM::SSCam::moveStop", $hash);
-            
-            } elsif ($OpMode eq "movestop") {
-                # ein "Move" in eine bestimmte Richtung wurde durchgeführt 
-                # falls Aufnahme noch läuft -> state = on setzen
-                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start")?"on":"off";    
-                readingsSingleUpdate($hash,"state", $st, 0); 
+                RemoveInternalTimer($hash, "FHEM::SSCam::__moveStop" );
+                InternalTimer      (gettimeofday()+($hash->{HELPER}{GOMOVETIME}), "FHEM::SSCam::__moveStop", $hash );
+            } 
+            elsif ($OpMode eq "movestop") {                                                                       # ein "Move" in eine bestimmte Richtung wurde durchgeführt 
+                my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";                      # falls Aufnahme noch läuft -> state = on setzen    
                 DoTrigger($name,"move stop");
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                                
-                Log3($name, 3, "$name - Camera $camname stopped move to direction \"$hash->{HELPER}{GOMOVEDIR}\"");
-        
-            } elsif ($OpMode eq "Enable") {
-                # Kamera wurde aktiviert, sonst kann nichts laufen -> "off"                
-
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Availability","enabled");
-                readingsBulkUpdate($hash,"state","off");
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                   
-                # Logausgabe
+                         
+                Log3                ($name, 3, qq{$name - Camera $camname stopped move to direction "$hash->{HELPER}{GOMOVEDIR}"} );
+                readingsSingleUpdate($hash,"state", $st, 0);
+                setReadingErrorNone ($hash, 1); 
+            } 
+            elsif ($OpMode eq "Enable") {                                                                         # Kamera wurde aktiviert, sonst kann nichts laufen -> "off"                
                 Log3($name, 3, "$name - Camera $camname has been enabled successfully");
-            
-            } elsif ($OpMode eq "Disable") {
-                # Kamera wurde deaktiviert
-
+                
                 readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"Availability","disabled");
-                readingsBulkUpdate($hash,"state","disabled");
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-                   
+                readingsBulkUpdate ($hash, "Availability", "enabled");
+                readingsBulkUpdate ($hash, "state",        "off"    );
+                readingsEndUpdate  ($hash, 1); 
+ 
+                setReadingErrorNone ($hash, 1);  
+            } 
+            elsif ($OpMode eq "Disable") {                                                       # Kamera wurde deaktiviert
                 Log3($name, 3, "$name - Camera $camname has been disabled successfully");
-            
-            } elsif ($OpMode eq "getsvsinfo") {
-                # Parse SVS-Infos
-                $userPriv = $data->{'data'}{'userPriv'};
-                if (defined($userPriv)) {
-                    if ($userPriv eq "0") {
-                        $userPriv = "No Access";
-                    } elsif ($userPriv eq "1") {
-                        $userPriv = "Admin";
-                    } elsif ($userPriv eq "2") {
-                        $userPriv = "Manager";
-                    } elsif ($userPriv eq "4") {
-                        $userPriv = "Viewer";
-                    }
-                }                    
-
-                # Werte in $hash zur späteren Auswertung einfügen 
-                $hash->{HELPER}{SVSVERSION}{MAJOR} = $data->{'data'}{'version'}{'major'};
-                $hash->{HELPER}{SVSVERSION}{MINOR} = $data->{'data'}{'version'}{'minor'};
-                $hash->{HELPER}{SVSVERSION}{SMALL} = $data->{'data'}{'version'}{'small'};
-                $hash->{HELPER}{SVSVERSION}{BUILD} = $data->{'data'}{'version'}{'build'};
-
-                my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
-                my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
-                my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
-                my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
                 
-                # simulieren einer anderen SVS-Version
-                if (AttrVal($name, "simu_SVSversion", undef)) {
-                    Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
-                    #delete $version{"SMALL"} if ($version{"SMALL"});
-                    my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
-                    $major = $vl[0];
-                    $minor = $vl[1];
-                    $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
-                    $build = "xxxx-simu";
-                }
-                
-                # Kompatibilitätscheck
-                my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);
-                my $avcomp = $hash->{COMPATIBILITY};
-                $avcomp    =~ s/\.//gx;
-                
-                my $compstate;
-                if($avsc <= $avcomp) {
-                    $compstate = "true";
-                } else {
-                    $compstate = "false";
-                }
-                readingsSingleUpdate($hash, "compstate", $compstate, 1);
-                
-                if (!exists($data->{'data'}{'customizedPortHttp'})) {
-                    delete $defs{$name}{READINGS}{SVScustomPortHttp};
-                }             
-               
-                if (!exists($data->{'data'}{'customizedPortHttps'})) {
-                    delete $defs{$name}{READINGS}{SVScustomPortHttps};
-                }
-                                
-                readingsBeginUpdate ($hash);
-                
-                readingsBulkUpdate  ($hash, "SVScustomPortHttp",  $data->{'data'}{'customizedPortHttp'});
-                readingsBulkUpdate  ($hash, "SVScustomPortHttps", $data->{'data'}{'customizedPortHttps'});
-                readingsBulkUpdate  ($hash, "SVSlicenseNumber",   $data->{'data'}{'liscenseNumber'});
-                readingsBulkUpdate  ($hash, "SVSuserPriv",$userPriv);
-                if(defined($small)) {
-                    readingsBulkUpdate($hash, "SVSversion", $major.".".$minor.".".$small."-".$build);
-                } else {
-                    readingsBulkUpdate($hash, "SVSversion", $major.".".$minor."-".$build);
-                }
-                readingsBulkUpdate ($hash, "Errorcode", "none");
-                readingsBulkUpdate ($hash, "Error",     "none");
-                
+                readingsBeginUpdate($hash);
+                readingsBulkUpdate ($hash, "Availability", "disabled");
+                readingsBulkUpdate ($hash, "state",        "disabled");
                 readingsEndUpdate  ($hash, 1);
-                     
-                Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
-            
-            } elsif ($OpMode eq "getStmUrlPath") {
-                # Parse SVS-Infos
-                my($camforcemcast,$mjpegHttp,$multicst,$mxpegHttp,$unicastOverHttp,$unicastPath);
-                if($apicammaxver < 9) {
-                    $camforcemcast   = jboolmap($data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'});
-                    $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
-                    $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
-                    $mxpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mxpegHttpPath'};
-                    $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
-                    $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
-                }
-                if($apicammaxver >= 9) {
-                    $mjpegHttp        = $data->{'data'}[0]{'mjpegHttpPath'};
-                    $multicst         = $data->{'data'}[0]{'multicstPath'};
-                    $mxpegHttp        = $data->{'data'}[0]{'mxpegHttpPath'};
-                    $unicastOverHttp  = $data->{'data'}[0]{'rtspOverHttpPath'};
-                    $unicastPath      = $data->{'data'}[0]{'rtspPath'};
-                }       
-                
-                # Rewrite Url's falls livestreamprefix ist gesetzt                  
-                if (AttrVal($name, "livestreamprefix", undef)) {
-                    my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
-                    $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;
-                    my @mjh    = split(/\//x, $mjpegHttp, 4);
-                    $mjpegHttp = $exturl."/".$mjh[3];
-                    my @mxh    = split(/\//x, $mxpegHttp, 4);
-                    $mxpegHttp = $exturl."/".$mxh[3];
-                    if($unicastPath) {
-                        my @ucp      = split(/[@\|:]/x, $unicastPath);
-                        my @lspf     = split(/[\/\/\|:]/x, $exturl);
-                        $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
-                    }
-                }
-                
-                # StmKey extrahieren
-                my @sk     = split(/&StmKey=/x, $mjpegHttp);
-                my $stmkey = $sk[1];
-                
-                # Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
-                if(AttrVal($name, "noQuotesForSID",0)) {   # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
-                    $mjpegHttp =~ tr/"//d;
-                    $mxpegHttp =~ tr/"//d;
-                    $stmkey    =~ tr/"//d;
-                }
-                
-                # Streaminginfos in Helper speichern
-                $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp                     if($mjpegHttp);
-                $hash->{HELPER}{STMKEYMXPEGHTTP}      = $mxpegHttp                     if($mxpegHttp);
-                $hash->{HELPER}{STMKEYUNICSTOVERHTTP} = $unicastOverHttp               if($unicastOverHttp);
-                $hash->{HELPER}{STMKEYUNICST}         = $unicastPath                   if($unicastPath);
-                
-                readingsBeginUpdate($hash);
-                
-                readingsBulkUpdate($hash,"CamForceEnableMulticast", $camforcemcast)    if($camforcemcast);
-                readingsBulkUpdate($hash,"StmKey",                  $stmkey);
-                readingsBulkUpdate($hash,"StmKeymjpegHttp",         $mjpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
-                readingsBulkUpdate($hash,"StmKeymxpegHttp",         $mxpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
-                readingsBulkUpdate($hash,"StmKeyUnicstOverHttp",    $unicastOverHttp)  if(AttrVal($name,"showStmInfoFull",0) && $unicastOverHttp);
-                readingsBulkUpdate($hash,"StmKeyUnicst",            $unicastPath)      if(AttrVal($name,"showStmInfoFull",0) && $unicastPath);
-                readingsBulkUpdate($hash,"Errorcode",               "none");
-                readingsBulkUpdate($hash,"Error",                   "none");
-                
-                readingsEndUpdate($hash, 1);
 
-                Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getcaminfo") {
-                # Parse Caminfos
-                $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};
-                if ($camLiveMode eq "0") {
-                    $camLiveMode = "Liveview from DS";
-                } elsif ($camLiveMode eq "1") {
-                    $camLiveMode = "Liveview from Camera";
-                }
-                
-                ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-                if($lang eq "DE") {
-                    $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                } else {
-                    $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                }
-                
-                $deviceType = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};
-                if ($deviceType eq "1") {
-                    $deviceType = "Camera";
-                } elsif ($deviceType eq "2") {
-                    $deviceType = "Video_Server";
-                } elsif ($deviceType eq "4") {
-                    $deviceType = "PTZ";
-                } elsif ($deviceType eq "8") {
-                    $deviceType = "Fisheye"; 
-                }
-                
-                $camStatus = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});
-                if ($camStatus eq "1") {
-                    $camStatus = "enabled";
-                    
-                    # falls Aufnahme noch läuft -> STATE = on setzen
-                    if (ReadingsVal("$name", "Record", "Stop") eq "Start") {
-                        readingsSingleUpdate($hash,"state", "on", 0); 
-                    } else {
-                        readingsSingleUpdate($hash,"state", "off", 0); 
-                    }
-                
-                } elsif ($camStatus eq "3") {
-                    $camStatus = "disconnected";
-                    readingsSingleUpdate($hash,"state", "disconnected", 0);
-                } elsif ($camStatus eq "7") {
-                    $camStatus = "disabled";
-                    readingsSingleUpdate($hash,"state", "disabled", 0); 
-                } else {
-                    $camStatus = "other";
-                }
-               
-                $recStatus = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};
-                if ($recStatus ne "0") {
-                    $recStatus = "Start";
-                } else {
-                    $recStatus = "Stop";
-                }
-                
-                my $rotate = $data->{'data'}->{'cameras'}->[0]->{'video_rotation'};
-                $rotate    = $rotate == 1 ? "true" : "false";
-                
-                $exposuremode = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_mode'});
-                if ($exposuremode == 0) {
-                    $exposuremode = "Auto";
-                } elsif ($exposuremode == 1) {
-                    $exposuremode = "Day";
-                } elsif ($exposuremode == 2) {
-                    $exposuremode = "Night";
-                } elsif ($exposuremode == 3) {
-                    $exposuremode = "Schedule";
-                } elsif ($exposuremode == 4) {
-                    $exposuremode = "Unknown";
-                }
-                    
-                $exposurecontrol = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_control'});
-                if ($exposurecontrol == 0) {
-                    $exposurecontrol = "Auto";
-                } elsif ($exposurecontrol == 1) {
-                    $exposurecontrol = "50HZ";
-                } elsif ($exposurecontrol == 2) {
-                    $exposurecontrol = "60HZ";
-                } elsif ($exposurecontrol == 3) {
-                    $exposurecontrol = "Hold";
-                } elsif ($exposurecontrol == 4) {
-                    $exposurecontrol = "Outdoor";
-                } elsif ($exposurecontrol == 5) {
-                    $exposurecontrol = "None";
-                } elsif ($exposurecontrol == 6) {
-                    $exposurecontrol = "Unknown";
-                }
-                
-                my $camaudiotype = jboolmap($data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camAudioType'});
-                if ($camaudiotype == 0) {
-                    $camaudiotype = "Unknown";
-                } elsif ($camaudiotype == 1) {
-                    $camaudiotype = "PCM";
-                } elsif ($camaudiotype == 2) {
-                    $camaudiotype = "G711";
-                } elsif ($camaudiotype == 3) {
-                    $camaudiotype = "G726";
-                } elsif ($camaudiotype == 4) {
-                    $camaudiotype = "AAC";
-                } elsif ($camaudiotype == 5) {
-                    $camaudiotype = "AMR";
-                }            
-                    
-                my $pdcap = jboolmap($data->{'data'}->{'cameras'}->[0]->{'PDCap'});
-                if (!$pdcap || $pdcap == 0) {
-                    $pdcap = "false";
-                } else {
-                    $pdcap = "true";
-                }
-                
-                $data->{'data'}->{'cameras'}->[0]->{'video_flip'}    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_flip'});
-                $data->{'data'}->{'cameras'}->[0]->{'video_mirror'}  = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
-                $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'} = jboolmap($data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
-                
-                my $clstrmno = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveStreamNo'};
-                $clstrmno++ if($clstrmno == 0);
-                
-                my $fw = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camFirmware'};
-                
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash, "CamAudioType",       $camaudiotype);
-                readingsBulkUpdate($hash, "CamFirmware",        $fw) if($fw);
-                readingsBulkUpdate($hash, "CamLiveMode",        $camLiveMode);
-                readingsBulkUpdate($hash, "CamLiveFps",         $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveFps'});
-                readingsBulkUpdate($hash, "CamLiveResolution",  $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveResolution'});
-                readingsBulkUpdate($hash, "CamLiveQuality",     $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveQuality'});
-                readingsBulkUpdate($hash, "CamLiveStreamNo",    $clstrmno);
-                readingsBulkUpdate($hash, "CamExposureMode",    $exposuremode);
-                readingsBulkUpdate($hash, "CamExposureControl", $exposurecontrol);
-                readingsBulkUpdate($hash, "CamModel",           $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
-                readingsBulkUpdate($hash, "CamRecShare",        $data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
-                readingsBulkUpdate($hash, "CamRecVolume",       $data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
-                readingsBulkUpdate($hash, "CamIP",              $data->{'data'}->{'cameras'}->[0]->{'host'});
-                readingsBulkUpdate($hash, "CamNTPServer",       $data->{'data'}->{'cameras'}->[0]->{'time_server'}) if($data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
-                readingsBulkUpdate($hash, "CamVendor",          $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
-                readingsBulkUpdate($hash, "CamVideoType",       $data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
-                readingsBulkUpdate($hash, "CamPreRecTime",      $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
-                readingsBulkUpdate($hash, "CamPort",            $data->{'data'}->{'cameras'}->[0]->{'port'});
-                readingsBulkUpdate($hash, "CamPtSpeed",         $data->{'data'}->{'cameras'}->[0]->{'ptSpeed'}) if($deviceType =~ /PTZ/x);
-                readingsBulkUpdate($hash, "CamblPresetSpeed",   $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
-                readingsBulkUpdate($hash, "CamVideoMirror",     $data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
-                readingsBulkUpdate($hash, "CamVideoFlip",       $data->{'data'}->{'cameras'}->[0]->{'video_flip'});
-                readingsBulkUpdate($hash, "CamVideoRotate",     $rotate);
-                readingsBulkUpdate($hash, "CapPIR",             $pdcap);
-                readingsBulkUpdate($hash, "Availability",       $camStatus);
-                readingsBulkUpdate($hash, "DeviceType",         $deviceType);
-                readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
-                readingsBulkUpdate($hash, "Record",             $recStatus);
-                readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
-                readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
-                readingsBulkUpdate($hash, "Errorcode",          "none");
-                readingsBulkUpdate($hash, "Error",              "none");
-                readingsEndUpdate($hash, 1);
-                   
-                $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(IsModelCam($hash));                   
-                Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "geteventlist") {              
-                my $eventnum  = $data->{'data'}{'total'};
-                my $lrec      = $data->{'data'}{'events'}[0]{name};
-                my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
-                
-                my ($lastrecstarttime,$lastrecstoptime);
-                
-                if ($eventnum > 0) {
-                    $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
-                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
-                    if($lang eq "DE") {
-                        $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
-                    } else {
-                        $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
-                    }
-                    $lastrecstoptime = $data->{'data'}{'events'}[0]{stopTime};
-                    ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
-                    $lastrecstoptime = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
-                }
-                
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash,"CamEventNum",$eventnum);
-                readingsBulkUpdate  ($hash,"CamLastRec",$lrec) if($lrec); 
-                readingsBulkUpdate  ($hash,"CamLastRecId",$lrecid) if($lrecid);                 
-                readingsBulkUpdate  ($hash,"CamLastRecTime",$lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
-                readingsBulkUpdate  ($hash,"Errorcode","none");
-                readingsBulkUpdate  ($hash,"Error","none");
-                readingsEndUpdate   ($hash, 1);
-       
-                Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
-                
-                # Versand Aufnahme initiieren
-                if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
-                    getRec($hash);
-                }
-            
-            } elsif ($OpMode eq "getmotionenum") {              
-                
-                $motdetsc = $data->{'data'}{'MDParam'}{'source'};
-                
-                $sensitivity_camCap = $data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'};
-                $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
-                $sensitivity_ssCap  = $data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'};
-                
-                $threshold_camCap   = $data->{'data'}{'MDParam'}{'threshold'}{'camCap'};
-                $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
-                $threshold_ssCap    = $data->{'data'}{'MDParam'}{'threshold'}{'ssCap'};
-
-                $percentage_camCap  = $data->{'data'}{'MDParam'}{'percentage'}{'camCap'};
-                $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
-                $percentage_ssCap   = $data->{'data'}{'MDParam'}{'percentage'}{'ssCap'};
-                
-                $objectSize_camCap  = $data->{'data'}{'MDParam'}{'objectSize'}{'camCap'};
-                $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
-                $objectSize_ssCap   = $data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'};
-                
-                
-                if ($motdetsc == -1) {
-                    $motdetsc = "disabled";
-                }
-                elsif ($motdetsc == 0) {
-                    $motdetsc = "Camera";
-                    
-                    if ($sensitivity_camCap) {
-                        $motdetsc .= ", sensitivity: $sensitivity_value";
-                    }
-                    if ($threshold_camCap) {
-                        $motdetsc .= ", threshold: $threshold_value";
-                    }
-                    if ($percentage_camCap) {
-                        $motdetsc .= ", percentage: $percentage_value";
-                    }
-                    if ($objectSize_camCap) {
-                        $motdetsc .= ", objectSize: $objectSize_value";
-                    }
-                }
-                elsif ($motdetsc == 1) {
-                    $motdetsc = "SVS";
-                    
-                    if ($sensitivity_ssCap) {
-                        $motdetsc .= ", sensitivity: $sensitivity_value";
-                    }
-                    if ($threshold_ssCap) {
-                        $motdetsc .= ", threshold: $threshold_value";
-                    }
-                    if ($percentage_ssCap) {
-                        $motdetsc .= ", percentage: $percentage_value";
-                    }
-                    if ($objectSize_ssCap) {
-                        $motdetsc .= ", objectSize: $objectSize_value";
-                    }
-                }
-                
-                # Setreading 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate($hash,"CamMotDetSc",$motdetsc);
-                readingsBulkUpdate($hash,"Errorcode","none");
-                readingsBulkUpdate($hash,"Error","none");
-                readingsEndUpdate($hash, 1);
-       
-                Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getcapabilities") {
-                # Parse Infos
-                my $ptzfocus = $data->{'data'}{'ptzFocus'};
-                if ($ptzfocus eq "0") {
-                    $ptzfocus = "false";
-                    }
-                    elsif ($ptzfocus eq "1") {
-                    $ptzfocus = "support step operation";
-                    }
-                    elsif ($ptzfocus eq "2") {
-                    $ptzfocus = "support continuous operation";
-                    }
-                    
-                my $ptztilt = $data->{'data'}{'ptzTilt'};
-                if ($ptztilt eq "0") {
-                    $ptztilt = "false";
-                    }
-                    elsif ($ptztilt eq "1") {
-                    $ptztilt = "support step operation";
-                    }
-                    elsif ($ptztilt eq "2") {
-                    $ptztilt = "support continuous operation";
-                    }
-                    
-                my $ptzzoom = $data->{'data'}{'ptzZoom'};
-                if ($ptzzoom eq "0") {
-                    $ptzzoom = "false";
-                    }
-                    elsif ($ptzzoom eq "1") {
-                    $ptzzoom = "support step operation";
-                    }
-                    elsif ($ptzzoom eq "2") {
-                    $ptzzoom = "support continuous operation";
-                    }
-                    
-                my $ptzpan = $data->{'data'}{'ptzPan'};
-                if ($ptzpan eq "0") {
-                    $ptzpan = "false";
-                    }
-                    elsif ($ptzpan eq "1") {
-                    $ptzpan = "support step operation";
-                    }
-                    elsif ($ptzpan eq "2") {
-                    $ptzpan = "support continuous operation";
-                    }
-                
-                my $ptziris = $data->{'data'}{'ptzIris'};
-                if ($ptziris eq "0") {
-                    $ptziris = "false";
-                    }
-                    elsif ($ptziris eq "1") {
-                    $ptziris = "support step operation";
-                    }
-                    elsif ($ptziris eq "2") {
-                    $ptziris = "support continuous operation";
-                    }
-                
-                $data->{'data'}{'ptzHasObjTracking'} = jboolmap($data->{'data'}{'ptzHasObjTracking'});
-                $data->{'data'}{'audioOut'}          = jboolmap($data->{'data'}{'audioOut'});
-                $data->{'data'}{'ptzSpeed'}          = jboolmap($data->{'data'}{'ptzSpeed'});
-                $data->{'data'}{'ptzAbs'}            = jboolmap($data->{'data'}{'ptzAbs'});
-                $data->{'data'}{'ptzAutoFocus'}      = jboolmap($data->{'data'}{'ptzAutoFocus'});
-                $data->{'data'}{'ptzHome'}           = jboolmap($data->{'data'}{'ptzHome'});
-                
-                # Setreading 
-                readingsBeginUpdate($hash);
-                readingsBulkUpdate ($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
-                readingsBulkUpdate ($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
-                readingsBulkUpdate ($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
-                readingsBulkUpdate ($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
-                readingsBulkUpdate ($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
-                readingsBulkUpdate ($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
-                readingsBulkUpdate ($hash,"CapPTZFocus",        $ptzfocus                            );
-                readingsBulkUpdate ($hash,"CapPTZIris",         $ptziris                             );
-                readingsBulkUpdate ($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
-                readingsBulkUpdate ($hash,"CapPTZPan",          $ptzpan                              );
-                readingsBulkUpdate ($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
-                readingsBulkUpdate ($hash,"CapPTZTilt",         $ptztilt                             );
-                readingsBulkUpdate ($hash,"CapPTZZoom",         $ptzzoom                             );
-                readingsBulkUpdate ($hash,"Errorcode",          "none"                               );
-                readingsBulkUpdate ($hash,"Error",              "none"                               );
-                readingsEndUpdate  ($hash, 1);
-                  
-                Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getptzlistpreset") {                                    # Parse PTZ-ListPresets
-                my $presetcnt = $data->{'data'}->{'total'};
-                my $cnt       = 0;
-         
-                # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
-                delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
-                my $home = "not set";
-                while ($cnt < $presetcnt) {
-                    my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
-                    my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
-                    $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
-                    $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
-                    my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
-                    if ($ptype) {
-                        $home = $presname;
-                    }
-                    $cnt += 1;
-                }
-
-                my @preskeys   = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
-                my $presetlist = join(",",@preskeys);
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "Presets",    $presetlist);
-                readingsBulkUpdate  ($hash, "PresetHome", $home      );
-                readingsBulkUpdate  ($hash, "Errorcode",  "none"     );
-                readingsBulkUpdate  ($hash, "Error",      "none"     );
-                readingsEndUpdate   ($hash, 1);
-                
-                # spezifische Attribute für PTZ-Cams verfügbar machen
-                addptzattr($name);
-                             
-                Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
-            
-            } elsif ($OpMode eq "Getptzlistpatrol") {                                     # Parse PTZ-ListPatrols
-                $patrolcnt = $data->{'data'}->{'total'};
-                my $cnt    = 0;
-         
-                # alle Patrols der Kamera mit Id's in Assoziatives Array einlesen
-                delete $hash->{HELPER}{ALLPATROLS};
-                while ($cnt < $patrolcnt) {
-                    $patrolid   = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
-                    $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
-                    $patrolname =~ s/\s+/_/gx;                                            # Leerzeichen im Namen ersetzen falls vorhanden
-                    $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
-                    $cnt += 1;
-                }
-
-                @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
-                $patrollist = join(",",@patrolkeys);
-
-                readingsBeginUpdate ($hash);
-                readingsBulkUpdate  ($hash, "Patrols",   $patrollist);
-                readingsBulkUpdate  ($hash, "Errorcode", "none"     );
-                readingsBulkUpdate  ($hash, "Error",     "none"     );
-                readingsEndUpdate   ($hash, 1);
-                     
-                Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
-            }
-            
-       } else {                                                               # die API-Operation war fehlerhaft
-            # Errorcode aus JSON ermitteln
-            $errorcode = $data->{'error'}->{'code'};
-
-            # Fehlertext zum Errorcode ermitteln
-            $error = expErrors($hash,$errorcode);
+                setReadingErrorNone ($hash, 1);                 
+            }     
+       } 
+       else {                                                                 # die API-Operation war fehlerhaft
+            my $errorcode = $data->{'error'}->{'code'};                       # Errorcode aus JSON ermitteln
+            my $error     = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
             
             readingsBeginUpdate($hash);
-            readingsBulkUpdate ($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate ($hash,"Error",    $error    );
+            readingsBulkUpdate ($hash, "Errorcode", $errorcode);
+            readingsBulkUpdate ($hash, "Error",     $error    );
             readingsEndUpdate  ($hash, 1);
             
             if ($errorcode =~ /105/x) {
                Log3($name, 2, "$name - ERROR - $errorcode - $error in operation $OpMode -> try new login");
                undef $data;
                undef $myjson;
-               return login($hash,'getApiSites');
+               return login($hash, $hash->{HELPER}{API}, \&camOp);
             }
        
-            Log3($name, 2, "$name - ERROR - Operation $OpMode of Camera $camname was not successful. Errorcode: $errorcode - $error");
-       }
-                
+            Log3($name, 2, "$name - ERROR - Operation $OpMode not successful. Cause: $errorcode - $error");
+       }          
        undef $data;
        undef $myjson;
    }
-  
-  # Token freigeben   
-  delActiveToken($hash);
+
+   delActiveToken ($hash);                                                     # Token freigeben
 
 return;
-}
-
-#############################################################################################################################
-#########                                               Hilfsroutinen                                           #############
-#############################################################################################################################
-
-####################################################################################  
-#   Login in SVS wenn kein oder ungültige Session-ID vorhanden ist
-sub login {
-  my ($hash,$fret) = @_;
-  my $name          = $hash->{NAME};
-  my $serveraddr    = $hash->{SERVERADDR};
-  my $serverport    = $hash->{SERVERPORT};
-  my $apiauth       = $hash->{HELPER}{APIAUTH};
-  my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
-  my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
-  my $proto         = $hash->{PROTOCOL};
-  my $lrt = AttrVal($name,"loginRetries",3);
-  my ($url,$param);
-  
-  delete $hash->{HELPER}{SID};
-    
-  # Login und SID ermitteln
-  Log3($name, 4, "$name - --- Begin Function login ---");
-  
-  # Credentials abrufen
-  my ($success, $username, $password) = getCredentials($hash,0,"svs");
-  
-  unless ($success) {
-      Log3($name, 2, "$name - Credentials couldn't be retrieved successfully - make sure you've set it with \"set $name credentials <username> <password>\"");
-      delActiveToken($hash);      
-      return;
-  }
-  
-  if($hash->{HELPER}{LOGINRETRIES} >= $lrt) {
-      # login wird abgebrochen, Freigabe Funktionstoken
-      delActiveToken($hash);
-      Log3($name, 2, "$name - ERROR - Login or privilege of user $username unsuccessful"); 
-      return;
-  }
-
-  my $httptimeout = AttrVal($name,"httptimeout",60);
-  $httptimeout    = 60 if($httptimeout < 60);
-  Log3($name, 4, "$name - HTTP-Call login will be done with httptimeout-Value: $httptimeout s");
-  
-  my $urlwopw;      # nur zur Anzeige bei verbose >= 4 und "showPassInLog" == 0
-  
-  # sid in Quotes einschliessen oder nicht -> bei Problemen mit 402 - Permission denied
-  my $sid = AttrVal($name, "noQuotesForSID", "0") == 1 ? "sid" : "\"sid\"";
-  
-  if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&session=SurveillanceStation&format=$sid";
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&session=SurveillanceStation&format=$sid";
-  } else {
-      $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=$password&format=$sid"; 
-      $urlwopw = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Login&account=$username&passwd=*****&format=$sid";
-  }
-  
-  AttrVal($name, "showPassInLog", "0") == 1 ? Log3($name, 4, "$name - Call-Out now: $url") : Log3($name, 4, "$name - Call-Out now: $urlwopw");
-  $hash->{HELPER}{LOGINRETRIES}++;
-  
-  $param = {
-               url      => $url,
-               timeout  => $httptimeout,
-               hash     => $hash,
-               user     => $username,
-               funcret  => $fret,
-               method   => "GET",
-               header   => "Accept: application/json",
-               callback => \&loginReturn
-           };
-   HttpUtils_NonblockingGet ($param);
-   
-return;
-}
-
-sub loginReturn {
-  my ($param, $err, $myjson) = @_;
-  my $hash     = $param->{hash};
-  my $name     = $hash->{NAME};
-  my $username = $param->{user};
-  my $fret     = $param->{funcret};
-  my $subref   = \&$fret;
-  my $success; 
-
-  # Verarbeitung der asynchronen Rückkehrdaten aus sub "login_nonbl"
-  if ($err ne "") {
-      # ein Fehler bei der HTTP Abfrage ist aufgetreten
-      Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err");
-        
-      readingsSingleUpdate($hash, "Error", $err, 1);                               
-        
-      return login($hash,$fret);
-   
-   } elsif ($myjson ne "") {
-        # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)   
-        
-        # Evaluiere ob Daten im JSON-Format empfangen wurden
-        ($hash, $success) = evaljson($hash,$myjson);
-        unless ($success) {
-            Log3($name, 4, "$name - no JSON-Data returned: ".$myjson);
-            delActiveToken($hash);
-            return;
-        }
-        
-        my $data = decode_json($myjson);
-        
-        # Logausgabe decodierte JSON Daten
-        Log3($name, 5, "$name - JSON decoded: ". Dumper $data);
-   
-        $success = $data->{'success'};
-        
-        if ($success) {
-            # login war erfolgreich     
-            my $sid = $data->{'data'}->{'sid'};
-             
-            # Session ID in hash eintragen
-            $hash->{HELPER}{SID} = $sid;
-       
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode","none");
-            readingsBulkUpdate($hash,"Error","none");
-            readingsEndUpdate($hash, 1);
-       
-            Log3($name, 4, "$name - Login of User $username successful - SID: $sid");
-            
-            return &$subref($hash);
-        
-        } else {          
-            # Errorcode aus JSON ermitteln
-            my $errorcode = $data->{'error'}->{'code'};
-       
-            # Fehlertext zum Errorcode ermitteln
-            my $error = expErrorsAuth($hash,$errorcode);
-
-            readingsBeginUpdate($hash);
-            readingsBulkUpdate($hash,"Errorcode",$errorcode);
-            readingsBulkUpdate($hash,"Error",$error);
-            readingsEndUpdate($hash, 1);
-       
-            Log3($name, 3, "$name - Login of User $username unsuccessful. Code: $errorcode - $error - try again"); 
-             
-            return login($hash,$fret);
-       }
-   }
-   
-return login($hash,$fret);
-}
-
-###################################################################################  
-#      Funktion logout
-###################################################################################
-sub logout {
-   my $hash          = shift;
-   my $name          = $hash->{NAME};
-   my $serveraddr    = $hash->{SERVERADDR};
-   my $serverport    = $hash->{SERVERPORT};
-   my $apiauth       = $hash->{HELPER}{APIAUTH};
-   my $apiauthpath   = $hash->{HELPER}{APIAUTHPATH};
-   my $apiauthmaxver = $hash->{HELPER}{APIAUTHMAXVER};
-   my $sid           = $hash->{HELPER}{SID};
-   my $proto         = $hash->{PROTOCOL};
-   my $url;
-   my $param;
-   my $httptimeout;
-    
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
-   Log3($name, 4, "$name - ####################################################"); 
-   Log3($name, 4, "$name - --- Begin Function logout nonblocking ---");
-    
-   $httptimeout = AttrVal($name,"httptimeout",4);
-   Log3($name, 5, "$name - HTTP-Call will be done with httptimeout-Value: $httptimeout s");
-  
-   if (AttrVal($name,"session","DSM") eq "SurveillanceStation") {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&session=SurveillanceStation&_sid=$sid";
-   } else {
-       $url = "$proto://$serveraddr:$serverport/webapi/$apiauthpath?api=$apiauth&version=$apiauthmaxver&method=Logout&_sid=$sid";
-   }
-
-   $param = {
-            url      => $url,
-            timeout  => $httptimeout,
-            hash     => $hash,
-            method   => "GET",
-            header   => "Accept: application/json",
-            callback => \&logoutReturn
-            };
-   
-   HttpUtils_NonblockingGet ($param);
-
-return;
-}
-
-sub logoutReturn {  
-   my ($param, $err, $myjson) = @_;
-   my $hash                   = $param->{hash};
-   my $name                   = $hash->{NAME};
-   my $sid                    = $hash->{HELPER}{SID};
-   my ($success, $username)   = getCredentials($hash,0,"svs");
-   my $OpMode                 = $hash->{OPMODE};
-   my $data;
-   my $error;
-   my $errorcode;
-  
-   if ($err ne "") {
-       # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-       Log3($name, 2, "$name - error while requesting ".$param->{url}." - $err"); 
-       readingsSingleUpdate($hash, "Error", $err, 1);                                             
-   
-   } elsif ($myjson ne "") {
-       # wenn die Abfrage erfolgreich war ($data enthält die Ergebnisdaten des HTTP Aufrufes)
-       Log3($name, 4, "$name - URL-Call: ".$param->{url});
-        
-       # Evaluiere ob Daten im JSON-Format empfangen wurden
-       ($hash, $success) = evaljson($hash,$myjson);
-        
-       unless ($success) {
-           Log3($name, 4, "$name - Data returned: ".$myjson);
-           delActiveToken($hash);
-           return;
-       }
-        
-       $data = decode_json($myjson);
-        
-       # Logausgabe decodierte JSON Daten
-       Log3($name, 4, "$name - JSON returned: ". Dumper $data);
-   
-       $success = $data->{'success'};
-
-       if ($success) {
-           # die Logout-URL konnte erfolgreich aufgerufen werden                        
-           Log3($name, 2, "$name - Session of User \"$username\" terminated - session ID \"$sid\" deleted");
-             
-       } else {
-           # Errorcode aus JSON ermitteln
-           $errorcode = $data->{'error'}->{'code'};
-
-           # Fehlertext zum Errorcode ermitteln
-           $error = expErrorsAuth($hash,$errorcode);
-
-           Log3($name, 2, "$name - ERROR - Logout of User $username was not successful, however SID: \"$sid\" has been deleted. Errorcode: $errorcode - $error");
-       }
-   }   
-   # Session-ID aus Helper-hash löschen
-   delete $hash->{HELPER}{SID};
-   
-   # ausgeführte Funktion ist erledigt (auch wenn logout nicht erfolgreich), Freigabe Funktionstoken
-   delActiveToken($hash);
-   
-   CancelDelayedShutdown($name);
-   
-return;
-}
-
-#############################################################################################
-#                                   Autocreate für Kameras
-#                                   $sn = Name der Kamera in SVS
-#############################################################################################
-sub setAutocreate { 
-   my ($hash,$sn) = @_;
-   my $name = $hash->{NAME};
-   my $type = $hash->{TYPE};
-   
-   my ($cmd, $err, $camname, $camhash);
-   
-   my $dcn  = (devspec2array("TYPE=SSCam:FILTER=CAMNAME=$sn"))[0];  # ist das Device aus der SVS bereits angelegt ?
-   $camhash = $defs{$dcn} if($dcn);                                 # existiert ein Hash des Devices ?
-
-   if(!$camhash) {
-       $camname = "SSCam.".makeDeviceName($sn);                     # erlaubten Kameranamen für FHEM erzeugen
-       my $arg  = $hash->{SERVERADDR}." ".$hash->{SERVERPORT}." ".$hash->{PROTOCOL};
-       $cmd     = "$camname $type $sn $arg";
-       Log3($name, 2, "$name - Autocreate camera: define $cmd");
-       $err     = CommandDefine(undef, $cmd);
-       
-       if($err) {
-           Log3($name, 1, "ERROR: $err");
-       } else {
-           my $room    = AttrVal($name, "room", "SSCam");
-           my $session = AttrVal($name, "session", "DSM");
-           CommandAttr (undef,"$camname room $room");
-           CommandAttr (undef,"$camname session $session");
-           CommandAttr (undef,"$camname icon it_camera");
-           CommandAttr (undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
-           CommandAttr (undef,"$camname pollcaminfoall 210");
-           CommandAttr (undef,"$camname pollnologging 1");  
-           CommandAttr (undef,"$camname httptimeout 20");
-
-           # Credentials abrufen und setzen
-           my ($success, $username, $password) = getCredentials($hash,0,"svs");
-           if($success) {
-               CommandSet(undef, "$camname credentials $username $password");   
-           }
-       }
-       
-   } else {
-       Log3($name, 4, "$name - Autocreate - SVS camera \"$sn\" already defined by \"$dcn\" ");
-       $camname = "";
-   }  
-   
-return ($err,$camname);
 }
 
 ###############################################################################
-#   Test ob JSON-String empfangen wurde
+#               Parse OpMode Start
+# Die Aufnahmezeit setzen
+# wird "set <name> on [rectime]" verwendet -> dann [rectime] nutzen, 
+# sonst Attribut "rectime" wenn es gesetzt ist, falls nicht -> "RECTIME_DEF"
 ###############################################################################
-sub evaljson { 
-  my ($hash,$myjson) = @_;
-  my $OpMode  = $hash->{OPMODE};
-  my $name    = $hash->{NAME};
-  my $success = 1;
-  
-  eval {decode_json($myjson)} or do 
-  {
-      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || $OpMode =~ m/^.*_hls$/x ) {
-          # HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
-          Log3($name, 5, "$name - HLS-activation data return: $myjson");
-          if ($myjson =~ m/{"success":true}/x) {
-              $success = 1;
-              $myjson  = '{"success":true}';    
-          } 
-      } else {
-          $success = 0;
+sub _parseStart {                                       ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};  
+                               
+  my $rectime;
 
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash,"Errorcode","none");
-          readingsBulkUpdate($hash,"Error","malformed JSON string received");
-          readingsEndUpdate($hash, 1);  
-      }
-  };
-  
-return ($hash,$success,$myjson);
-}
-
-######################################################################################################
-#      Refresh eines Raumes
-#      $hash, $pload (1=Page reload), SSCam-state-Event(1=Event), SSCamSTRM-Event (1=Event)
-######################################################################################################
-sub roomRefresh { 
-  my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
-  my ($name,$st);
-  
-  if (ref $hash ne "HASH") {
-      ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
-      $hash = $defs{$name};
-  } else {
-      $name = $hash->{NAME};
-  }
-  
-  my $fpr  = 0;
-  
-  # SSCamSTRM-Device mit hinterlegter FUUID ($hash->{HELPER}{INFORM}) selektieren
-  my @spgs = devspec2array("TYPE=SSCamSTRM");                                      # alle Streaming Devices !
-  my @mstd = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL=master");                  # alle Streaming MODEL=master Devices
-  my $room = "";
- 
-  for my $sd (@spgs) {   
-      if($defs{$sd}{LINKPARENT} eq $name) {
-          next if(IsDisabled($defs{$sd}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sd}{FUUID});
-          $fpr  = AttrVal($defs{$sd}{NAME},"forcePageRefresh",0);
-          $room = AttrVal($defs{$sd}{NAME},"room","");
-          Log3($name, 4, qq{$name - roomRefresh - pagerefresh forced by $defs{$sd}{NAME}}) if($fpr);
-      }
-  }
-
-  # Page-Reload
-  if($pload && $room && !$fpr) {
-      # nur Räume mit dem SSCamSTRM-Device reloaden
-      my @rooms = split(",",$room);
-      for my $r (@rooms) {
-          { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }         ## no critic 'void context'
-      }
-  
-  } elsif ($pload || $fpr) {
-      # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
-      # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
-      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                               ## no critic 'void context'
+  if (defined($hash->{HELPER}{RECTIME_TEMP})) {
+      $rectime = delete $hash->{HELPER}{RECTIME_TEMP};
   } 
+  else {
+      $rectime = AttrVal($name, "rectime", $hash->{HELPER}{RECTIME_DEF});
+  }
+
+  if ($rectime == 0) {
+      Log3($name, 3, "$name - Camera $camname endless Recording started  - stop it by stop-command !");
+  } 
+  else {
+      if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                                        # Aufnahme läuft schon und wird verlängert
+          Log3($name, 3, "$name - running recording renewed to $rectime s");
+      } 
+      else {
+          Log3($name, 3, "$name - Camera $camname recording with recording time $rectime s started");
+      }
+  }
+       
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "Record",    "Start");
+  readingsBulkUpdate ($hash, "state",     "on"   );
+  readingsBulkUpdate ($hash, "Errorcode", "none" );
+  readingsBulkUpdate ($hash, "Error",     "none" );
+  readingsEndUpdate  ($hash, 1);
+
+  if ($rectime != 0) {                                                                                # Stop der Aufnahme nach Ablauf $rectime, wenn rectime = 0 -> endlose Aufnahme
+      my $emtxt   = $hash->{HELPER}{SMTPRECMSG} // "";
+      my $teletxt = $hash->{HELPER}{TELERECMSG} // "";
+    
+      RemoveInternalTimer ($hash, "FHEM::SSCam::__camStopRec");
+      InternalTimer       (gettimeofday()+$rectime, "FHEM::SSCam::__camStopRec", $hash);
+  }      
+
+  roomRefresh($hash,0,0,1);                                                                           # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event           
+        
+return;
+}
+
+###############################################################################
+#               Parse OpMode Stop
+###############################################################################
+sub _parseStop {                                        ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname}; 
+                               
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash, "Record",    "Stop");
+  readingsBulkUpdate ($hash, "state",     "off" );
+  readingsBulkUpdate ($hash, "Errorcode", "none");
+  readingsBulkUpdate ($hash, "Error"    , "none");
+  readingsEndUpdate  ($hash, 1);
+
+  Log3($name, 3, "$name - Camera $camname Recording stopped");
+
+  roomRefresh($hash,0,0,1);    # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+
+  # Aktualisierung Eventlist der letzten Aufnahme
+  __getEventList($hash);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode GetRec
+###############################################################################
+sub _parseGetRec {                                      ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};
+  my $OpMode  = $paref->{OpMode};
+  my $myjson  = $paref->{myjson};
+                               
+  my $recid            = ReadingsVal("$name", "CamLastRecId",   "");
+  my $createdTm        = ReadingsVal("$name", "CamLastRecTime", "");
+  my $lrec             = ReadingsVal("$name", "CamLastRec",     "");
+  my ($tdir,$fileName) = split("/",$lrec); 
+  my $sn               = 0;
+
+  my $tac = openOrgetTrans($hash);                                                                     # Transaktion starten             
+
+  my $cache;
+  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {
+      $cache = cache($name, "c_init");                                                                 # Cache initialisieren für Versandhash
+      Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);         
+      
+      if(!$cache || $cache eq "internal" ) {
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{recid}     = $recid;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{createdTm} = $createdTm;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{fileName}  = $fileName;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{tdir}      = $tdir;
+          $data{SSCam}{$name}{SENDRECS}{$tac}{$sn}{imageData} = $myjson;
+      } 
+      else {
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{recid}"     ,$recid);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{createdTm}" ,$createdTm);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{fileName}"  ,$fileName);
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{tdir}"      ,$tdir);                         
+          cache($name, "c_write", "{SENDRECS}{$tac}{$sn}{imageData}" ,$myjson);                         
+      }
+      
+      Log3($name, 4, "$name - Recording '$sn' added to send recording hash: ID => $recid, File => $fileName, Created => $createdTm");
+  }
+
+  # Recording als Email / Telegram / Chat versenden 
+  if(!$cache || $cache eq "internal" ) {                
+      prepareSendData ($hash, $OpMode, $data{SSCam}{$name}{SENDRECS}{$tac});
+  } 
+  else {
+      prepareSendData ($hash, $OpMode, "{SENDRECS}{$tac}");
+  }
+
+  closeTrans         ($hash);                                                                        # Transaktion beenden
+  setReadingErrorNone( $hash, 1 );
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode MotDetSc
+###############################################################################
+sub _parseMotDetSc {                                    ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};
+                               
+  my $sensitivity;
+  if ($hash->{HELPER}{MOTDETSC} eq "SVS" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {           # Optionen für "SVS" sind gesetzt
+      $sensitivity  = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+      my $threshold = ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) ? ($hash->{HELPER}{MOTDETOPTIONS}{THRESHOLD}) : "-";
+    
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, threshold: $threshold");
+
+  } elsif ($hash->{HELPER}{MOTDETSC} eq "camera" && keys %{$hash->{HELPER}{MOTDETOPTIONS}}) {   # Optionen für "camera" sind gesetzt
+      $sensitivity   = ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) ? ($hash->{HELPER}{MOTDETOPTIONS}{SENSITIVITY}) : "-";
+      my $objectSize = ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{OBJECTSIZE}) : "-";
+      my $percentage = ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) ? ($hash->{HELPER}{MOTDETOPTIONS}{PERCENTAGE}) : "-";
+    
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" with options sensitivity: $sensitivity, objectSize: $objectSize, percentage: $percentage");
+  } 
+  else {                                                                                      # keine Optionen Bewegungserkennung wurden gesetzt
+      Log3($name, 3, "$name - Camera $camname motion detection source set to \"$hash->{HELPER}{MOTDETSC}\" ");
+  }
+
+  setReadingErrorNone( $hash, 1 );
   
-  # Aufnahmestatus/Disabledstatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
-  $st = (ReadingsVal($name, "Availability", "enabled") eq "disabled")?"disabled":(ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
-  if($lpoll_scm) {
-      readingsSingleUpdate($hash,"state", $st, 1);
-  } else {
-      readingsSingleUpdate($hash,"state", $st, 0);  
+  __getMotionEnum    ($hash);                                                                   # neu gesetzte Parameter abrufen
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getsvslog
+###############################################################################
+sub _parsegetsvslog {                                   ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+                               
+  my $lec = $data->{'data'}{'total'};                                                    # abgerufene Anzahl von Log-Einträgen
+
+  my $log  = q{};
+  my $log0 = q{};
+  my $i    = 0;
+
+  while ($data->{'data'}->{'log'}->[$i]) {
+      my $id    = $data->{'data'}->{'log'}->[$i]{'id'};
+      my $un    = $data->{'data'}->{'log'}->[$i]{'user_name'};
+      my $desc  = $data->{'data'}->{'log'}->[$i]{'desc'};
+      my $level = $data->{'data'}->{'log'}->[$i]{'type'};
+      $level    = ($level == 3) ? "Error" : ($level == 2) ? "Warning" : "Information";
+      my $time  = FmtDateTime($data->{'data'}->{'log'}->[$i]{'time'});
+      $log0     = $time." - ".$level." - ".$desc if($i == 0);
+      $log     .= "$time - $level - $desc<br>";
+      $i++;
+  }   
+  
+  $log = "<html><b>Surveillance Station Server \"$hash->{SERVERADDR}\" Log</b> ( $i/$lec entries are displayed )<br><br>$log</html>";
+                
+  # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+  # bzw. https://forum.fhem.de/index.php/topic,77310.0.html
+  # $log = "Too much log data were selected. Please reduce amount of data by specifying all or one of 'severity', 'limit', 'match'" if (length($log) >= 102400);              
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash,"LastLogEntry",$log0) if(!$hash->{HELPER}{CL}{1});         # Datenabruf im Hintergrund;
+  readingsBulkUpdate  ($hash,"Errorcode","none");
+  readingsBulkUpdate  ($hash,"Error","none");
+  readingsEndUpdate   ($hash, 1);
+
+  # Ausgabe Popup der Log-Daten (nach readingsEndUpdate positionieren sonst "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput($hash->{HELPER}{CL}{1},"$log");
+  delClHash  ($name);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode SaveRec
+###############################################################################
+sub _parseSaveRec {                                     ## no critic "not used"
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $myjson = $paref->{myjson};
+         
+  my $err;
+  
+  my $lrec = ReadingsVal("$name", "CamLastRec", "");
+  $lrec    = (split("/",$lrec))[1]; 
+  my $sp   = $hash->{HELPER}{RECSAVEPATH} // $attr{global}{modpath};
+  my $file = $sp."/$lrec";
+  
+  delete $hash->{HELPER}{RECSAVEPATH};
+
+  open my $fh, '>', $file or do { $err = qq{Can't open file "$file": $!};
+                                  Log3($name, 2, "$name - $err");
+                                };       
+
+  if(!$err) {
+      $err = "none";      
+      binmode $fh;
+      print $fh $myjson;
+      close($fh);
+      Log3($name, 3, qq{$name - Recording was saved to local file "$file"});
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Errorcode", "none");
+  readingsBulkUpdate  ($hash, "Error",     $err  );
+  readingsEndUpdate   ($hash, 1);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode gethomemodestate
+###############################################################################
+sub _parsegethomemodestate {                            ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+         
+  my $lang    = AttrVal("global","language","EN");
+  my $hmst    = $data->{'data'}{'on'}; 
+  my $hmststr = $hmst == 1 ? "on" : "off";
+  
+  my $update_time;
+
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+  
+  if($lang eq "DE") {
+      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+  } 
+  else {
+      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+  }               
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "HomeModeState",  $hmststr     );
+  readingsBulkUpdate  ($hash, "LastUpdateTime", $update_time );
+  readingsBulkUpdate  ($hash, "Errorcode",      "none"       );
+  readingsBulkUpdate  ($hash, "Error",          "none"       );
+  readingsEndUpdate   ($hash, 1);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getPresets
+###############################################################################
+sub _parsegetPresets {                                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $data  = $paref->{data};
+         
+  my %ap = ();
+  my $i  = 0;
+  while ($data->{'data'}->{'preset'}->[$i]) {
+      my $pname  = $data->{'data'}->{'preset'}->[$i]{'name'};
+      my $ptype  = $data->{'data'}->{'preset'}->[$i]{'type'};
+      my $ppos   = $data->{'data'}->{'preset'}->[$i]{'position'};
+      my $pspeed = $data->{'data'}->{'preset'}->[$i]{'speed'};
+      my $pextra = $data->{'data'}->{'preset'}->[$i]{'extra'};
+      $ptype     = ($ptype == 1)?"Home":"Normal";
+      $ap{$ppos} = "Name: $pname, Speed: $pspeed, Type: $ptype";
+      $i++;
+  }   
+
+  my $enum;
+  for my $key (sort{$a <=>$b}keys%ap) { 
+      $enum .= $key." => ".$ap{$key}."<br>";                 
+  }
+
+  $enum = "<html><b>Preset positions saved of camera \"$hash->{CAMNAME}\" </b> ".
+          "(PresetNumber => Name: ..., Speed: ..., Type: ...) <br><br>$enum</html>";
+                
+  # asyncOutput kann normalerweise etwa 100k uebertragen (siehe fhem.pl/addToWritebuffer() fuer Details)
+  # bzw. https://forum.fhem.de/index.php/topic,77310.0.html               
+
+  setReadingErrorNone( $hash, 1 );
+
+  # Ausgabe Popup der Daten (nach readingsEndUpdate positionieren sonst 
+  # "Connection lost, trying reconnect every 5 seconds" wenn > 102400 Zeichen)        
+  asyncOutput($hash->{HELPER}{CL}{1},"$enum");
+  delClHash  ($name);
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Snap
+# ein Schnapschuß wurde aufgenommen, falls Aufnahme noch läuft -> 
+# state = on setzen
+###############################################################################
+sub _parseSnap {                                        ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $camname = $paref->{camname};
+         
+  roomRefresh($hash,0,1,0);                                            # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+
+  my $tac = "";
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) { 
+      $tac = openOrgetTrans($hash);                                    # Transaktion starten oder vorhandenen Code holen
+  }
+
+  my $snapid = $data->{data}{'id'};
+
+  setReadingErrorNone($hash, 1);
+                
+  if ($snapid) {
+      Log3($name, 3, "$name - Snapshot of Camera $camname created. ID: $snapid");
+  } 
+  else {
+      Log3($name, 1, "$name - Snapshot of Camera $camname probably not created. No ID was delivered.");
+      closeTrans    ($hash);                                           # Transaktion beenden falls gestartet
+      delActiveToken($hash);
+      return 1;
+  }
+
+  my $num     = $hash->{HELPER}{SNAPNUM};                              # Gesamtzahl der auszulösenden Schnappschüsse
+  my $ncount  = $hash->{HELPER}{SNAPNUMCOUNT};                         # Restzahl der auszulösenden Schnappschüsse 
+  
+  if (AttrVal($name,"debugactivetoken",0)) {
+      Log3($name, 1, "$name - Snapshot number ".($num-$ncount+1)." (ID: $snapid) of total $num snapshots with TA-code: $tac done");
+  }
+  $ncount--;                                                           # wird vermindert je Snap
+  
+  my $lag     = $hash->{HELPER}{SNAPLAG};                              # Zeitverzögerung zwischen zwei Schnappschüssen
+  my $emtxt   = $hash->{HELPER}{SMTPMSG} // "";                        # Text für Email-Versand
+  my $teletxt = $hash->{HELPER}{TELEMSG} // "";                        # Text für TelegramBot-Versand
+  my $chattxt = $hash->{HELPER}{CHATMSG} // "";                        # Text für SSChatBot-Versand
+  
+  if($ncount > 0) {
+      InternalTimer(gettimeofday()+$lag, "FHEM::SSCam::__camSnap", "$name!_!$num!_!$lag!_!$ncount!_!$emtxt!_!$teletxt!_!$chattxt!_!$tac", 0);
+      if(!$tac) {
+          delActiveToken($hash);                                       # Token freigeben wenn keine Transaktion läuft
+      }
+      return 1;
+  }
+
+  my ($slim,$ssize) = snapLimSize($hash);                              # Anzahl und Size für Schnappschußabruf bestimmen
+  
+  if (AttrVal($name,"debugactivetoken",0)) {
+      Log3($name, 1, "$name - start get snapinfo of last $slim snapshots with TA-code: $tac");
+  }
+
+  if(!$hash->{HELPER}{TRANSACTION}) {                                  # Token freigeben vor nächstem Kommando wenn keine Transaktion läuft
+      delActiveToken($hash);                        
+  }
+
+  __getSnapInfo ("$name:$slim:$ssize:$tac");
+                
+return 1;
+}
+
+###############################################################################
+#                       Parse OpMode getsvsinfo
+#                       Parse SVS-Infos
+###############################################################################
+sub _parsegetsvsinfo {                                  ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+         
+  my $userPriv = $data->{'data'}{'userPriv'};
+  if (defined($userPriv)) {
+      $userPriv = $hrkeys{userPriv}{$userPriv};
+  }                    
+
+  $hash->{HELPER}{SVSVERSION}{MAJOR} = $data->{'data'}{'version'}{'major'};         # Werte in $hash zur späteren Auswertung einfügen 
+  $hash->{HELPER}{SVSVERSION}{MINOR} = $data->{'data'}{'version'}{'minor'};
+  $hash->{HELPER}{SVSVERSION}{SMALL} = $data->{'data'}{'version'}{'small'};
+  $hash->{HELPER}{SVSVERSION}{BUILD} = $data->{'data'}{'version'}{'build'};
+
+  my $major = $hash->{HELPER}{SVSVERSION}{MAJOR};
+  my $minor = $hash->{HELPER}{SVSVERSION}{MINOR};
+  my $small = $hash->{HELPER}{SVSVERSION}{SMALL};
+  my $build = $hash->{HELPER}{SVSVERSION}{BUILD};
+
+  if (AttrVal($name, "simu_SVSversion", undef)) {                                  # simulieren einer anderen SVS-Version
+      Log3($name, 4, "$name - another SVS-version ".AttrVal($name, "simu_SVSversion", undef)." will be simulated");
+
+      my @vl = split (/\.|-/x,AttrVal($name, "simu_SVSversion", ""));
+      $major = $vl[0];
+      $minor = $vl[1];
+      $small = ($vl[2] =~ /\d/x) ? $vl[2] : '';
+      $build = "xxxx-simu";
+  }
+
+  my $avsc   = $major.$minor.(($small=~/\d/x) ? $small : 0);                      # Kompatibilitätscheck
+  my $avcomp = $hash->{COMPATIBILITY};
+  $avcomp    =~ s/\.//gx;
+
+  my $compstate = ($avsc <= $avcomp) ? "true" : "false";
+  readingsSingleUpdate($hash, "compstate", $compstate, 1);
+
+  if (!exists($data->{'data'}{'customizedPortHttp'})) {
+      delete $defs{$name}{READINGS}{SVScustomPortHttp};
+  }             
+
+  if (!exists($data->{'data'}{'customizedPortHttps'})) {
+      delete $defs{$name}{READINGS}{SVScustomPortHttps};
+  }
+                
+  readingsBeginUpdate ($hash);
+
+  readingsBulkUpdate  ($hash, "SVScustomPortHttp",  $data->{'data'}{'customizedPortHttp'});
+  readingsBulkUpdate  ($hash, "SVScustomPortHttps", $data->{'data'}{'customizedPortHttps'});
+  readingsBulkUpdate  ($hash, "SVSlicenseNumber",   $data->{'data'}{'liscenseNumber'});
+  readingsBulkUpdate  ($hash, "SVSuserPriv",$userPriv);
+
+  if(defined($small)) {
+      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor.".".$small."-".$build);
+  } 
+  else {
+      readingsBulkUpdate($hash, "SVSversion", $major.".".$minor."-".$build);
+  }
+
+  readingsBulkUpdate ($hash, "Errorcode", "none");
+  readingsBulkUpdate ($hash, "Error",     "none");
+
+  readingsEndUpdate  ($hash, 1);
+     
+  Log3($name, $verbose, "$name - Informations related to Surveillance Station retrieved");
+                
+return;
+}
+
+###############################################################################
+#                       Parse OpMode runliveview
+###############################################################################
+sub _parserunliveview {                                 ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+         
+  if($hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) {                           # HLS Streaming wurde aktiviert
+      __parserunliveviewHLS ($paref);
   }
   
-  # parentState des SSCamSTRM-Device updaten ($hash->{HELPER}{INFORM} des LINKPARENT Devices muss FUUID des Streaming Devices haben)
-  if($lpoll_strm) {
-      $st = ReadingsVal($name, "state", "initialized");  
-      for my $sp (@spgs) {                                           # $sp = ein Streaming Device aus allen Streaming Devices
-          if($defs{$sp}{LINKPARENT} eq $name) {
-              next if(IsDisabled($defs{$sp}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sp}{FUUID});
-              
-              readingsBeginUpdate($defs{$sp});
-              readingsBulkUpdate ($defs{$sp},"parentState", $st);
-              readingsBulkUpdate ($defs{$sp},"state", "updated");
-              readingsEndUpdate  ($defs{$sp}, 1);
-              
-              for my $sm (@mstd) {                                   # Wenn Streaming Device von Streaming Master adoptiert wurde auch den Master updaten 
-                  next if($defs{$sm}{LINKNAME} ne $sp);
-                  
-                  readingsBeginUpdate($defs{$sm});
-                  readingsBulkUpdate ($defs{$sm},"parentState", $st);
-                  readingsBulkUpdate ($defs{$sm},"state", "updated");
-                  readingsEndUpdate  ($defs{$sm}, 1);
-                  
-                  Log3($name, 4, "$name - roomRefresh - caller: $sp, Master: $sm updated");
-              }
-              
-              Log3($name, 4, "$name - roomRefresh - caller: $sp, FUUID: $hash->{HELPER}{INFORM}");
-              delete $hash->{HELPER}{INFORM};
+  if($hash->{HELPER}{RUNVIEW} =~ m/snap/x) {                                   # Anzeige Schnappschuß aktiviert
+      __parserunliveviewSNAP ($paref);
+  }
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode runliveview HLS
+###############################################################################
+sub __parserunliveviewHLS {                             ## no critic "not used"
+  my $paref            = shift;
+  my $hash             = $paref->{hash};
+  my $name             = $paref->{name};
+  
+  my $proto            = $hash->{PROTOCOL};
+  my $serveraddr       = $hash->{SERVERADDR};
+  my $serverport       = $hash->{SERVERPORT};
+  my $camid            = $hash->{CAMID};
+  my $apivideostms     = $hash->{HELPER}{API}{VIDEOSTMS}{NAME};
+  my $apivideostmspath = $hash->{HELPER}{API}{VIDEOSTMS}{PATH};
+  my $apivideostmsver  = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
+  my $sid              = $hash->{HELPER}{SID};
+         
+  $hash->{HELPER}{HLSSTREAM} = "active";
+
+  my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");    # externe LivestreamURL setzen
+  $exturl   .= "/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+  
+  if(AttrVal($name, "showStmInfoFull", 0)) {
+      readingsSingleUpdate($hash,"LiveStreamUrl", $exturl, 1);
+  }
+
+  my $url = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=hls&_sid=$sid"; 
+
+  $hash->{HELPER}{LINK} = $url;                                                           # Liveview-Link in Hash speichern und Aktivitätsstatus speichern
+
+  Log3($name, 4, "$name - HLS Streaming of camera \"$name\" activated, Streaming-URL: $url");
+  Log3($name, 3, "$name - HLS Streaming of camera \"$name\" activated");
+
+  roomRefresh($hash,0,1,1);                                                               # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode runliveview Snap
+#                       Schnapschuss liveView Anzeige
+###############################################################################
+sub __parserunliveviewSNAP {                            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my ($cache,@as);
+
+  Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");                
+
+  if (exists($data->{'data'}{'data'}[0]{imageData})) {
+      delete $hash->{HELPER}{RUNVIEW};                    
+      $hash->{HELPER}{LINK} = $data->{data}{data}[0]{imageData};                  
+  }
+  else {
+      Log3($name, 3, "$name - There is no snapshot of camera $camname to display ! Take one snapshot before.");
+  }
+
+  setReadingErrorNone($hash, 1);
+
+  __refreshAfterSnap ($hash);                       # fallabhängige Eventgenerierung
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getStmUrlPath
+###############################################################################
+sub _parsegetStmUrlPath {                               ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $proto      = $hash->{PROTOCOL};
+  my $serveraddr = $hash->{SERVERADDR};
+  my $serverport = $hash->{SERVERPORT};
+  my $apicamver  = $hash->{HELPER}{API}{CAM}{VER};
+         
+  my($camforcemcast,$mjpegHttp,$multicst,$mxpegHttp,$unicastOverHttp,$unicastPath);
+
+  if($apicamver < 9) {
+      $camforcemcast   = jboolmap($data->{'data'}{'pathInfos'}[0]{'forceEnableMulticast'});
+      $mjpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mjpegHttpPath'};
+      $multicst        = $data->{'data'}{'pathInfos'}[0]{'multicstPath'};
+      $mxpegHttp       = $data->{'data'}{'pathInfos'}[0]{'mxpegHttpPath'};
+      $unicastOverHttp = $data->{'data'}{'pathInfos'}[0]{'unicastOverHttpPath'};
+      $unicastPath     = $data->{'data'}{'pathInfos'}[0]{'unicastPath'};
+  }
+  
+  if($apicamver >= 9) {
+      $mjpegHttp        = $data->{'data'}[0]{'mjpegHttpPath'};
+      $multicst         = $data->{'data'}[0]{'multicstPath'};
+      $mxpegHttp        = $data->{'data'}[0]{'mxpegHttpPath'};
+      $unicastOverHttp  = $data->{'data'}[0]{'rtspOverHttpPath'};
+      $unicastPath      = $data->{'data'}[0]{'rtspPath'};
+  }       
+                
+  if (AttrVal($name, "livestreamprefix", undef)) {                                  # Rewrite Url's falls livestreamprefix ist gesetzt  
+      my $exturl = AttrVal($name, "livestreamprefix", "$proto://$serveraddr:$serverport");
+      $exturl    = ($exturl eq "DEF") ? "$proto://$serveraddr:$serverport" : $exturl;
+    
+      my @mjh    = split(/\//x, $mjpegHttp, 4);
+      $mjpegHttp = $exturl."/".$mjh[3];
+    
+      my @mxh    = split(/\//x, $mxpegHttp, 4);
+      $mxpegHttp = $exturl."/".$mxh[3];
+    
+      if($unicastPath) {
+          my @ucp      = split(/[@\|:]/x, $unicastPath);
+          my @lspf     = split(/[\/\/\|:]/x, $exturl);
+          $unicastPath = $ucp[0].":".$ucp[1].":".$ucp[2]."@".$lspf[3].":".$ucp[4];
+      }
+  }
+
+  my @sk     = split(/&StmKey=/x, $mjpegHttp);                                     # StmKey extrahieren
+  my $stmkey = $sk[1];
+
+  # Quotes in StmKey entfernen falls noQuotesForSID gesetzt 
+  if(AttrVal($name, "noQuotesForSID",0)) {                                         # Forum: https://forum.fhem.de/index.php/topic,45671.msg938236.html#msg938236
+      $mjpegHttp =~ tr/"//d;
+      $mxpegHttp =~ tr/"//d;
+      $stmkey    =~ tr/"//d;
+  }
+
+  # Streaminginfos in Helper speichern
+  $hash->{HELPER}{STMKEYMJPEGHTTP}      = $mjpegHttp                     if($mjpegHttp);
+  $hash->{HELPER}{STMKEYMXPEGHTTP}      = $mxpegHttp                     if($mxpegHttp);
+  $hash->{HELPER}{STMKEYUNICSTOVERHTTP} = $unicastOverHttp               if($unicastOverHttp);
+  $hash->{HELPER}{STMKEYUNICST}         = $unicastPath                   if($unicastPath);
+
+  readingsBeginUpdate($hash);
+
+  readingsBulkUpdate($hash,"CamForceEnableMulticast", $camforcemcast)    if($camforcemcast);
+  readingsBulkUpdate($hash,"StmKey",                  $stmkey);
+  readingsBulkUpdate($hash,"StmKeymjpegHttp",         $mjpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
+  readingsBulkUpdate($hash,"StmKeymxpegHttp",         $mxpegHttp)        if(AttrVal($name,"showStmInfoFull",0));
+  readingsBulkUpdate($hash,"StmKeyUnicstOverHttp",    $unicastOverHttp)  if(AttrVal($name,"showStmInfoFull",0) && $unicastOverHttp);
+  readingsBulkUpdate($hash,"StmKeyUnicst",            $unicastPath)      if(AttrVal($name,"showStmInfoFull",0) && $unicastPath);
+  readingsBulkUpdate($hash,"Errorcode",               "none");
+  readingsBulkUpdate($hash,"Error",                   "none");
+
+  readingsEndUpdate($hash, 1);
+
+  Log3($name, $verbose, "$name - Stream-URLs of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getcaminfo
+#                            Parse Caminfos    
+###############################################################################
+sub _parseGetcaminfo {                                  ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang    = AttrVal("global","language","EN");
+  
+  my $update_time;
+  
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
+
+  if($lang eq "DE") {
+      $update_time = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+  } 
+  else {
+      $update_time = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+  }
+
+  my $camLiveMode = $data->{'data'}->{'cameras'}->[0]->{'camLiveMode'};              
+  $camLiveMode    = $hrkeys{camLiveMode}{$camLiveMode};
+
+  my $deviceType  = $data->{'data'}->{'cameras'}->[0]->{'deviceType'};                
+  $deviceType     = $hrkeys{deviceType}{$deviceType};
+
+  my $camStatus   = jboolmap($data->{'data'}->{'cameras'}->[0]->{'camStatus'});                
+  $camStatus      = $hrkeys{camStatus}{$camStatus};
+
+  if ($camStatus eq "enabled") {                                   
+      if (ReadingsVal("$name", "Record", "Stop") eq "Start") {                 # falls Aufnahme noch läuft -> STATE = on setzen
+          readingsSingleUpdate($hash,"state", "on", 0); 
+      } 
+      else {
+          readingsSingleUpdate($hash,"state", "off", 0); 
+      }
+  }
+
+  my $recStatus       = $data->{'data'}->{'cameras'}->[0]->{'recStatus'};                
+  $recStatus          = $recStatus ne "0" ? "Start" : "Stop";
+
+  my $rotate          = $data->{'data'}->{'cameras'}->[0]->{'video_rotation'};
+  $rotate             = $rotate == 1 ? "true" : "false";
+
+  my $exposuremode    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_mode'});               
+  $exposuremode       = $hrkeys{exposure_mode}{$exposuremode};
+    
+  my $exposurecontrol = jboolmap($data->{'data'}->{'cameras'}->[0]->{'exposure_control'});
+  $exposurecontrol    = $hrkeys{exposure_control}{$exposurecontrol};
+
+  my $camaudiotype    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camAudioType'});
+  $camaudiotype       = $hrkeys{camAudioType}{$camaudiotype};
+    
+  my $pdcap           = jboolmap($data->{'data'}->{'cameras'}->[0]->{'PDCap'});
+
+  if (!$pdcap || $pdcap == 0) {
+      $pdcap = "false";
+  } 
+  else {
+      $pdcap = "true";
+  }
+
+  $data->{'data'}->{'cameras'}->[0]->{'video_flip'}    = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_flip'});
+  $data->{'data'}->{'cameras'}->[0]->{'video_mirror'}  = jboolmap($data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
+  $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'} = jboolmap($data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
+
+  my $clstrmno = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveStreamNo'};
+  $clstrmno++ if($clstrmno == 0);
+
+  my $fw = $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camFirmware'};
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "CamAudioType",       $camaudiotype);
+  readingsBulkUpdate($hash, "CamFirmware",        $fw) if($fw);
+  readingsBulkUpdate($hash, "CamLiveMode",        $camLiveMode);
+  readingsBulkUpdate($hash, "CamLiveFps",         $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveFps'});
+  readingsBulkUpdate($hash, "CamLiveResolution",  $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveResolution'});
+  readingsBulkUpdate($hash, "CamLiveQuality",     $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camLiveQuality'});
+  readingsBulkUpdate($hash, "CamLiveStreamNo",    $clstrmno);
+  readingsBulkUpdate($hash, "CamExposureMode",    $exposuremode);
+  readingsBulkUpdate($hash, "CamExposureControl", $exposurecontrol);
+  readingsBulkUpdate($hash, "CamModel",           $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camModel'});
+  readingsBulkUpdate($hash, "CamRecShare",        $data->{'data'}->{'cameras'}->[0]->{'camRecShare'});
+  readingsBulkUpdate($hash, "CamRecVolume",       $data->{'data'}->{'cameras'}->[0]->{'camRecVolume'});
+  readingsBulkUpdate($hash, "CamIP",              $data->{'data'}->{'cameras'}->[0]->{'host'});
+  readingsBulkUpdate($hash, "CamNTPServer",       $data->{'data'}->{'cameras'}->[0]->{'time_server'}); 
+  readingsBulkUpdate($hash, "CamVendor",          $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camVendor'});
+  readingsBulkUpdate($hash, "CamVideoType",       $data->{'data'}->{'cameras'}->[0]->{'camVideoType'});
+  readingsBulkUpdate($hash, "CamPreRecTime",      $data->{'data'}->{'cameras'}->[0]->{'detailInfo'}{'camPreRecTime'});
+  readingsBulkUpdate($hash, "CamPort",            $data->{'data'}->{'cameras'}->[0]->{'port'});
+  readingsBulkUpdate($hash, "CamPtSpeed",         $data->{'data'}->{'cameras'}->[0]->{'ptSpeed'}) if($deviceType =~ /PTZ/x);
+  readingsBulkUpdate($hash, "CamblPresetSpeed",   $data->{'data'}->{'cameras'}->[0]->{'blPresetSpeed'});
+  readingsBulkUpdate($hash, "CamVideoMirror",     $data->{'data'}->{'cameras'}->[0]->{'video_mirror'});
+  readingsBulkUpdate($hash, "CamVideoFlip",       $data->{'data'}->{'cameras'}->[0]->{'video_flip'});
+  readingsBulkUpdate($hash, "CamVideoRotate",     $rotate);
+  readingsBulkUpdate($hash, "CapPIR",             $pdcap);
+  readingsBulkUpdate($hash, "Availability",       $camStatus);
+  readingsBulkUpdate($hash, "DeviceType",         $deviceType);
+  readingsBulkUpdate($hash, "LastUpdateTime",     $update_time);
+  readingsBulkUpdate($hash, "Record",             $recStatus);
+  readingsBulkUpdate($hash, "UsedSpaceMB",        $data->{'data'}{'cameras'}[0]{'volume_space'});
+  readingsBulkUpdate($hash, "VideoFolder",        AttrVal($name, "videofolderMap", $data->{'data'}{'cameras'}[0]{'folder'}));
+  readingsBulkUpdate($hash, "Errorcode",          "none");
+  readingsBulkUpdate($hash, "Error",              "none");
+  readingsEndUpdate($hash, 1);
+   
+  $hash->{MODEL} = ReadingsVal($name,"CamVendor","")." - ".ReadingsVal($name,"CamModel","CAM") if(IsModelCam($hash));                   
+  Log3($name, $verbose, "$name - Informations of camera $camname retrieved");
+
+  __getPtzPresetList($hash);                               # Preset/Patrollisten in Hash einlesen zur PTZ-Steuerung
+  __getPtzPatrolList($hash);
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getptzlistpatrol
+#                            Parse PTZ-ListPatrols    
+###############################################################################
+sub _parseGetptzlistpatrol {                            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $patrolcnt = $data->{'data'}->{'total'};
+  my $cnt       = 0;
+
+  delete $hash->{HELPER}{ALLPATROLS};
+  
+  while ($cnt < $patrolcnt) {                                               # alle Patrols der Kamera mit Id's in Hash einlesen
+      my $patrolid   = $data->{'data'}->{'patrols'}->[$cnt]->{'id'};
+      my $patrolname = $data->{'data'}->{'patrols'}->[$cnt]->{'name'};
+      $patrolname    =~ s/\s+/_/gx;                                         # Leerzeichen im Namen ersetzen falls vorhanden
+    
+      $hash->{HELPER}{ALLPATROLS}{$patrolname} = $patrolid;
+      $cnt += 1;
+  }
+
+  my @patrolkeys = sort(keys(%{$hash->{HELPER}{ALLPATROLS}}));
+  my $patrollist = join ",", @patrolkeys;
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Patrols",   $patrollist);
+  readingsBulkUpdate  ($hash, "Errorcode", "none"     );
+  readingsBulkUpdate  ($hash, "Error",     "none"     );
+  readingsEndUpdate   ($hash, 1);
+
+  $hash->{".ptzhtml"} = "";                                                 # ptzPanel wird neu eingelesen in FWdetailFn
+     
+  Log3($name, $verbose, "$name - PTZ Patrols of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getptzlistpreset
+#                            Parse PTZ-ListPresets   
+###############################################################################
+sub _parseGetptzlistpreset {                            ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $presetcnt = $data->{'data'}->{'total'};
+  my $cnt       = 0;
+
+  # alle Presets der Kamera mit Id's in Assoziatives Array einlesen
+  delete $hash->{HELPER}{ALLPRESETS};                                      # besetehende Presets löschen und neu einlesen
+  my $home = "not set";
+  
+  while ($cnt < $presetcnt) {
+      my $presid   = $data->{'data'}->{'presets'}->[$cnt]->{'position'};
+      my $presname = $data->{'data'}->{'presets'}->[$cnt]->{'name'};
+      $presname    =~ s/\s+/_/gx;                                          # Leerzeichen im Namen ersetzen falls vorhanden  
+      $hash->{HELPER}{ALLPRESETS}{$presname} = "$presid";
+      my $ptype = $data->{'data'}->{'presets'}->[$cnt]->{'type'};
+      
+      if ($ptype) {
+          $home = $presname;
+      }
+      
+      $cnt += 1;
+  }
+
+  my @preskeys   = sort(keys(%{$hash->{HELPER}{ALLPRESETS}}));
+  my $presetlist = join(",", @preskeys);
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "Presets",    $presetlist);
+  readingsBulkUpdate  ($hash, "PresetHome", $home      );
+  readingsBulkUpdate  ($hash, "Errorcode",  "none"     );
+  readingsBulkUpdate  ($hash, "Error",      "none"     );
+  readingsEndUpdate   ($hash, 1);
+
+  addptzattr($name);                                                        # PTZ Panel neu erstellen
+             
+  Log3($name, $verbose, "$name - PTZ Presets of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode Getcapabilities 
+###############################################################################
+sub _parseGetcapabilities {                             ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $ptzfocus = $data->{'data'}{'ptzFocus'};
+  $ptzfocus    = $hrkeys{ptzFocus}{$ptzfocus};
+    
+  my $ptztilt  = $data->{'data'}{'ptzTilt'};
+  $ptztilt     = $hrkeys{ptzTilt}{$ptztilt};
+    
+  my $ptzzoom  = $data->{'data'}{'ptzZoom'};
+  $ptzzoom     = $hrkeys{ptzZoom}{$ptzzoom};
+    
+  my $ptzpan   = $data->{'data'}{'ptzPan'};
+  $ptzpan      = $hrkeys{ptzPan}{$ptzpan};                
+
+  my $ptziris  = $data->{'data'}{'ptzIris'};
+  $ptziris     = $hrkeys{ptzIris}{$ptziris};              
+
+  $data->{'data'}{'ptzHasObjTracking'} = jboolmap($data->{'data'}{'ptzHasObjTracking'});
+  $data->{'data'}{'audioOut'}          = jboolmap($data->{'data'}{'audioOut'});
+  $data->{'data'}{'ptzSpeed'}          = jboolmap($data->{'data'}{'ptzSpeed'});
+  $data->{'data'}{'ptzAbs'}            = jboolmap($data->{'data'}{'ptzAbs'});
+  $data->{'data'}{'ptzAutoFocus'}      = jboolmap($data->{'data'}{'ptzAutoFocus'});
+  $data->{'data'}{'ptzHome'}           = jboolmap($data->{'data'}{'ptzHome'});
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate ($hash,"CapPTZAutoFocus",    $data->{'data'}{'ptzAutoFocus'}      );
+  readingsBulkUpdate ($hash,"CapAudioOut",        $data->{'data'}{'audioOut'}          );
+  readingsBulkUpdate ($hash,"CapChangeSpeed",     $data->{'data'}{'ptzSpeed'}          );
+  readingsBulkUpdate ($hash,"CapPTZHome",         $data->{'data'}{'ptzHome'}           );
+  readingsBulkUpdate ($hash,"CapPTZAbs",          $data->{'data'}{'ptzAbs'}            );
+  readingsBulkUpdate ($hash,"CapPTZDirections",   $data->{'data'}{'ptzDirection'}      );
+  readingsBulkUpdate ($hash,"CapPTZFocus",        $ptzfocus                            );
+  readingsBulkUpdate ($hash,"CapPTZIris",         $ptziris                             );
+  readingsBulkUpdate ($hash,"CapPTZObjTracking",  $data->{'data'}{'ptzHasObjTracking'} );
+  readingsBulkUpdate ($hash,"CapPTZPan",          $ptzpan                              );
+  readingsBulkUpdate ($hash,"CapPTZPresetNumber", $data->{'data'}{'ptzPresetNumber'}   );
+  readingsBulkUpdate ($hash,"CapPTZTilt",         $ptztilt                             );
+  readingsBulkUpdate ($hash,"CapPTZZoom",         $ptzzoom                             );
+  readingsBulkUpdate ($hash,"Errorcode",          "none"                               );
+  readingsBulkUpdate ($hash,"Error",              "none"                               );
+  readingsEndUpdate  ($hash, 1);
+  
+  Log3($name, $verbose, "$name - Capabilities of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getmotionenum 
+###############################################################################
+sub _parsegetmotionenum {                               ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $motdetsc           = $data->{'data'}{'MDParam'}{'source'};
+  $motdetsc              = $hrkeys{source}{$motdetsc};
+
+  my $sensitivity_camCap = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'camCap'});
+  my $sensitivity_value  = $data->{'data'}{'MDParam'}{'sensitivity'}{'value'};
+  my $sensitivity_ssCap  = jboolmap($data->{'data'}{'MDParam'}{'sensitivity'}{'ssCap'});
+
+  my $threshold_camCap   = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'camCap'});
+  my $threshold_value    = $data->{'data'}{'MDParam'}{'threshold'}{'value'};
+  my $threshold_ssCap    = jboolmap($data->{'data'}{'MDParam'}{'threshold'}{'ssCap'});
+
+  my $percentage_camCap  = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'camCap'});
+  my $percentage_value   = $data->{'data'}{'MDParam'}{'percentage'}{'value'};
+  my $percentage_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'percentage'}{'ssCap'});
+
+  my $objectSize_camCap  = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'camCap'});
+  my $objectSize_value   = $data->{'data'}{'MDParam'}{'objectSize'}{'value'};
+  my $objectSize_ssCap   = jboolmap($data->{'data'}{'MDParam'}{'objectSize'}{'ssCap'});
+
+  if ($motdetsc eq "Camera") {                    
+      if ($sensitivity_camCap) {
+          $motdetsc .= ", sensitivity: $sensitivity_value";
+      }
+      if ($threshold_camCap) {
+          $motdetsc .= ", threshold: $threshold_value";
+      }
+      if ($percentage_camCap) {
+          $motdetsc .= ", percentage: $percentage_value";
+      }
+      if ($objectSize_camCap) {
+          $motdetsc .= ", objectSize: $objectSize_value";
+      }
+  } 
+
+  if ($motdetsc eq "SVS") {                    
+      if ($sensitivity_ssCap) {
+          $motdetsc .= ", sensitivity: $sensitivity_value";
+      }
+      if ($threshold_ssCap) {
+          $motdetsc .= ", threshold: $threshold_value";
+      }
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "CamMotDetSc", $motdetsc);
+  readingsBulkUpdate  ($hash, "Errorcode",   "none"   );
+  readingsBulkUpdate  ($hash, "Error",       "none"   );
+  readingsEndUpdate   ($hash, 1);
+
+  Log3($name, $verbose, "$name - Enumerate motion detection parameters of camera $camname retrieved");
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode geteventlist 
+###############################################################################
+sub _parsegeteventlist {                                ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang      = AttrVal("global","language","EN"); 
+  
+  my $eventnum  = $data->{'data'}{'total'};
+  my $lrec      = $data->{'data'}{'events'}[0]{name};
+  my $lrecid    = $data->{'data'}{'events'}[0]{'eventId'}; 
+
+  my ($lastrecstarttime,$lastrecstoptime);
+
+  if ($eventnum > 0) {
+      $lastrecstarttime = $data->{'data'}{'events'}[0]{startTime};
+      my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstarttime);
+      
+      if($lang eq "DE") {
+          $lastrecstarttime = sprintf "%02d.%02d.%04d / %02d:%02d:%02d" , $mday , $mon+=1 ,$year+=1900 , $hour , $min , $sec ;
+      } 
+      else {
+          $lastrecstarttime = sprintf "%04d-%02d-%02d / %02d:%02d:%02d" , $year+=1900 , $mon+=1 , $mday , $hour , $min , $sec ;
+      }
+      
+      $lastrecstoptime                                      = $data->{'data'}{'events'}[0]{stopTime};
+      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($lastrecstoptime);
+      $lastrecstoptime                                      = sprintf "%02d:%02d:%02d" , $hour , $min , $sec ;
+  }
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, "CamEventNum",    $eventnum);
+  readingsBulkUpdate  ($hash, "CamLastRec",     $lrec) if($lrec); 
+  readingsBulkUpdate  ($hash, "CamLastRecId",   $lrecid) if($lrecid);                 
+  readingsBulkUpdate  ($hash, "CamLastRecTime", $lastrecstarttime." - ". $lastrecstoptime) if($lastrecstarttime);                
+  readingsBulkUpdate  ($hash, "Errorcode",      "none");
+  readingsBulkUpdate  ($hash, "Error",          "none");
+  readingsEndUpdate   ($hash, 1);
+
+  Log3($name, $verbose, "$name - Query eventlist of camera $camname retrieved");
+
+  if($hash->{HELPER}{CANSENDREC} || $hash->{HELPER}{CANTELEREC} || $hash->{HELPER}{CANCHATREC}) {        # Versand Aufnahme initiieren
+      __getRec($hash);
+  }
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode gopreset 
+#               eine Presetposition wurde angefahren
+###############################################################################
+sub _parsegopreset {                                    ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $camname = $paref->{camname};
+  
+  my $st = (ReadingsVal("$name", "Record", "Stop") eq "Start") ? "on" : "off";           # falls Aufnahme noch läuft -> state = on setzen
+  readingsSingleUpdate($hash,"state", $st, 0); 
+  DoTrigger($name,"move stop");
+
+  setReadingErrorNone( $hash, 1 );            
+  Log3               ( $name, 3, qq{$name - Camera $camname was moved to the "$hash->{HELPER}{GOPRESETNAME}" position} );
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getsnapinfo 
+###############################################################################
+sub _parsegetsnapinfo {                                 ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang    = AttrVal("global","language","EN");
+  
+  my ($cache,@as);
+  
+  $paref->{aref} = \@as;
+
+  Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
+
+  __saveLastSnap   ($paref);                                                 # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern                
+  __doSnapRotation ($paref);                                                 # Rotationsfeature
+  
+  setReadingErrorNone($hash, 1);               
+
+  closeTrans         ($hash);                                                # Transaktion beenden falls gestartet
+  __refreshAfterSnap ($hash);                                                # fallabhängige Eventgenerierung 
+
+return;
+}
+
+###############################################################################
+#                       Parse OpMode getsnapgallery 
+###############################################################################
+sub _parsegetsnapgallery {                              ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};                                                                              # decodierte JSON Daten
+  my $verbose = $paref->{verbose};
+  my $camname = $paref->{camname};
+  
+  my $lang    = AttrVal("global","language","EN");
+  
+  my @as;
+  
+  $paref->{aref} = \@as;
+
+  Log3($name, $verbose, "$name - Snapinfos of camera $camname retrieved");
+  
+  __saveLastSnap      ($paref);                                                                              # aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern
+  __doSnapRotation    ($paref);                                                                              # Rotationsfeature
+  __moveSnapCacheToOld($paref);                                                                              # bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben und in SNAPHASH löschen
+       
+       
+  #####   transaktionaler Versand der erzeugten Schnappschüsse #####
+  ##################################################################                
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {         # es soll die Anzahl "$hash->{HELPER}{SNAPNUM}" Schnappschüsse versendet werden
+      my $tac = openOrgetTrans($hash);                                                                       # Transaktion vorhandenen Code holen
+      
+      $paref->{tac} = $tac;
+      my $sn = __insertSnapsToCache ($paref);                                                                # neu erzeugte Snaps in SNAPHASH eintragen
+
+      $paref->{sn} = $sn;
+      __copySnapsBackFromOld ($paref);                                                                       # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
+    
+      # Schnappschüsse als Email / Telegram / SSChatBot versenden
+      ###########################################################
+      my $cache = cache($name, "c_init");                                                                    # Cache initialisieren  
+      if(!$cache || $cache eq "internal" ) { 
+          prepareSendData ($hash, "getsnapgallery", $data{SSCam}{$name}{SENDSNAPS}{$tac});
+      } 
+      else {
+          prepareSendData ($hash, "getsnapgallery", "{SENDSNAPS}{$tac}");
+      }  
+  } 
+  else {
+      # Schnappschußgalerie wird bereitgestellt (Attr snapGalleryBoost=1) bzw. gleich angezeigt 
+      # (Attr snapGalleryBoost=0)         !!  kein Versand !!
+      #########################################################################################     
+      $hash->{HELPER}{TOTALCNT} = $data->{data}{total};                                                   # total Anzahl Schnappschüsse
+    
+      my $sn = __insertSnapsToCache ($paref);                                                             # neu erzeugte Snaps in SNAPHASH eintragen
+    
+      $paref->{sn} = $sn;
+      __copySnapsBackFromOld ($paref);                                                                    # gesicherte Schnappschußdaten aus SNAPOLDHASH an SNAPHASH anhängen
+    
+      # Direktausgabe Snaphash wenn nicht gepollt wird
+      if(!AttrVal($name, "snapGalleryBoost",0)) {  
+          my %pars = ( 
+              linkparent => $name,
+              linkname   => '',
+              ftui       => 0
+          );
+          
+          my $htmlCode = composeGallery(\%pars);
+        
+          for (my $c=1; (defined($hash->{HELPER}{CL}{$c})); $c++ ) {
+              asyncOutput($hash->{HELPER}{CL}{$c},"$htmlCode");                       
+          }
+          
+          delete($data{SSCam}{$name}{SNAPHASH});                        # Snaphash Referenz löschen
+          delClHash  ($name);
+      }
+  }
+
+  setReadingErrorNone( $hash, 1 );               
+
+  delete $hash->{HELPER}{GETSNAPGALLERY};                               # Steuerbit getsnapgallery      
+  delete $data{SSCam}{$name}{SNAPOLDHASH};
+  
+  closeTrans         ($hash);                                           # Transaktion beenden
+  __refreshAfterSnap ($hash);                                           # fallabhängige Eventgenerierung 
+
+return;
+}
+
+###############################################################################
+#  aktuellsten Snap in Cache zur Anzeige durch streamDev "lastsnap" speichern 
+###############################################################################
+sub __saveLastSnap {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};                                                                 # decodierte JSON Daten
+  
+  my $cache   = cache($name, "c_init");                                                         # Cache initialisieren  
+  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+
+  if(!$cache || $cache eq "internal" ) {
+      $data{SSCam}{$name}{LASTSNAP} = $data->{data}{data}[0]{imageData};
+  } 
+  else {
+      cache($name, "c_write", "{LASTSNAP}", $data->{data}{data}[0]{imageData});                           
+  }
+
+return;
+}
+
+###############################################################################
+#           Versionsverwaltung der Snapreadings (Rotationsfeature) 
+###############################################################################
+sub __doSnapRotation {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};                                                                                  # decodierte JSON Daten
+  my $camname = $paref->{camname};
+  my $aref    = $paref->{aref};
+  
+  my $lang    = AttrVal("global","language","EN");              
+
+  my %snaps  = ( 0 => {'createdTm' => 'n.a.', 'fileName' => 'n.a.','snapid' => 'n.a.'} );                        # Hilfshash 
+  my ($k,$l) = (0,0);              
+
+  if($data->{'data'}{'data'}[0]{'createdTm'}) {
+      while ($data->{'data'}{'data'}[$k]) {
+          
+          if(!$data->{'data'}{'data'}[$k]{'camName'} || $data->{'data'}{'data'}[$k]{'camName'} ne $camname) {    # Forum:#97706
+              $k += 1;
+              next;
+          }
+        
+          my @t = split(" ", FmtDateTime($data->{data}{data}[$k]{createdTm}));
+          my @d = split("-", $t[0]);
+          
+          my $createdTm;
+          if($lang eq "DE") {
+              $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+          } 
+          else {
+              $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+          }
+        
+          $snaps{$l}{createdTm} = $createdTm;
+          $snaps{$l}{fileName}  = $data->{data}{data}[$k]{fileName};
+          $snaps{$l}{snapid}    = $data->{data}{data}[$k]{id};
+        
+          Log3($name,4, "$name - Snap [$l]: ID => $data->{data}{data}[$k]{id}, File => $data->{data}{data}[$k]{fileName}, Created => $createdTm");
+        
+          $l += 1;
+          $k += 1;
+      }   
+  }
+ 
+  #####            Verwaltung Schnappschußrotation            #####
+  ################################################################# 
+  my $rotnum = AttrVal    ($name, "snapReadingRotate", 0     );
+  my $o      = ReadingsVal($name, "LastSnapId",        "n.a."); 
+
+  if($rotnum && "$o" ne "$snaps{0}{snapid}") {
+      @$aref = sort{$b<=>$a}keys %snaps;
+      for my $key (@$aref) {
+          rotateReading($hash,"LastSnapId",$snaps{$key}{snapid},$rotnum,1);
+          rotateReading($hash,"LastSnapFilename",$snaps{$key}{fileName},$rotnum,1);
+          rotateReading($hash,"LastSnapTime",$snaps{$key}{createdTm},$rotnum,1);                    
+      }
+  } 
+  else {
+      @$aref = sort{$a<=>$b}keys %snaps;
+      rotateReading($hash,"LastSnapId",$snaps{$$aref[0]}{snapid},$rotnum,1);
+      rotateReading($hash,"LastSnapFilename",$snaps{$$aref[0]}{fileName},$rotnum,1);
+      rotateReading($hash,"LastSnapTime",$snaps{$$aref[0]}{createdTm},$rotnum,1);                  
+  }      
+  
+  undef %snaps;
+
+return;
+}
+
+###############################################################################
+# bestehende Schnappschußdaten aus SNAPHASH Cache auf SNAPOLDHASH schreiben 
+# und in SNAPHASH löschen
+###############################################################################
+sub __moveSnapCacheToOld {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $aref  = $paref->{aref};
+
+  my $cache = cache($name, "c_init");                                                                    # Cache initialisieren  
+  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+  
+  if(!$cache || $cache eq "internal" ) {
+      if($data{SSCam}{$name}{SNAPHASH}) {
+          for my $key (sort(keys%{$data{SSCam}{$name}{SNAPHASH}})) {
+              $data{SSCam}{$name}{SNAPOLDHASH}{$key} = delete($data{SSCam}{$name}{SNAPHASH}{$key});
           }
       }
+  } 
+  else {              
+      extractTIDfromCache (                                                                              # alle keys aus vorhandenem SNAPHASH auslesen
+                            { name  => $name,                                                           
+                              media => "SNAPHASH",
+                              mode  => "readkeys",
+                              aref  => $aref
+                            } 
+                          );                            
+      
+      my (%seen,$g);
+      my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @$aref;
+      
+      for my $key (@unique) {
+          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{snapid}"          );          
+          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{snapid}",    $g) if(defined $g);    
+          cache     ($name, "c_remove", "{SNAPHASH}{$key}{snapid}"          );
+          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{createdTm}"       );
+          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{createdTm}", $g) if(defined $g); 
+          cache     ($name, "c_remove", "{SNAPHASH}{$key}{createdTm}"       );
+          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{fileName}"        );                               
+          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{fileName}",  $g) if(defined $g);  
+          cache     ($name, "c_remove", "{SNAPHASH}{$key}{fileName}"        );  
+          $g = cache($name, "c_read",   "{SNAPHASH}{$key}{imageData}"       );
+          cache     ($name, "c_write",  "{SNAPOLDHASH}{$key}{imageData}", $g) if(defined $g);
+          cache     ($name, "c_remove", "{SNAPHASH}{$key}{imageData}"       );                                                     
+      }
+  
+      undef $g;
   }
-        
+
+return;
+}
+
+###############################################################################
+#                neu erzeugte Snaps in Cache eintragen
+#                SNAPHASH  = Anzeigehash im Cache für Galerie
+#                SENDSNAPS = zu versendende Snaps im Cache Hash
+###############################################################################
+sub __insertSnapsToCache {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $data    = $paref->{data};                                                                              # decodierte JSON Daten
+  my $camname = $paref->{camname};
+  my $tac     = $paref->{tac} // q{};
+
+  my $lang    = AttrVal("global","language","EN");
+  
+  my $i  = 0;
+  my $sn = 0;
+  
+  my $cache;
+
+  while ($data->{'data'}{'data'}[$i]) {
+      
+      if(!$data->{'data'}{'data'}[$i]{'camName'} || $data->{'data'}{'data'}[$i]{'camName'} ne $camname) {    # Forum:#97706
+          $i += 1;
+          next;
+      }   
+      
+      my $snapid    = $data->{data}{data}[$i]{id};
+      my $fileName  = $data->{data}{data}[$i]{fileName};
+      my $imageData = $data->{data}{data}[$i]{imageData};                                                    # Image data of snapshot in base64 format 
+
+      my @t = split(" ", FmtDateTime($data->{data}{data}[$i]{createdTm}));
+      my @d = split("-", $t[0]);
+      
+      my $createdTm;
+      if($lang eq "DE") {
+          $createdTm = "$d[2].$d[1].$d[0] / $t[1]";
+      } 
+      else {
+          $createdTm = "$d[0]-$d[1]-$d[2] / $t[1]";
+      }
+      
+      # Schnappschuss Hash zum Versand wird erstellt
+      ##############################################
+      if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
+          if($tac) {
+              $cache = cache($name, "c_init");                                                               # Cache initialisieren  
+              
+              Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+              
+              if(!$cache || $cache eq "internal" ) {
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{snapid}    = $snapid;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{createdTm} = $createdTm;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{fileName}  = $fileName;
+                  $data{SSCam}{$name}{SENDSNAPS}{$tac}{$sn}{imageData} = $imageData;
+              } 
+              else {
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{snapid}"    ,$snapid);
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{createdTm}" ,$createdTm);
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{fileName}"  ,$fileName); 
+                  cache($name, "c_write", "{SENDSNAPS}{$tac}{$sn}{imageData}" ,$imageData);                             
+              }
+              
+              Log3($name,4, "$name - Snap '$sn' (tac: $tac) added to send gallery hash: ID => $snapid, File => $fileName, Created => $createdTm");
+          }
+          else {
+              Log3($name, 1, "$name - ERROR - try to send snapshots without transaction. Send process is discarded.");
+          }
+      }
+  
+      # Snaphash erstellen für Galerie
+      ################################  
+      $cache = cache($name, "c_init");                                                                      # Cache initialisieren  
+      
+      Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+      
+      if(!$cache || $cache eq "internal" ) {
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{snapid}    = $snapid;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{createdTm} = $createdTm;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{fileName}  = $fileName;
+          $data{SSCam}{$name}{SNAPHASH}{$sn}{imageData} = $imageData;
+      } 
+      else {
+          cache($name, "c_write", "{SNAPHASH}{$sn}{snapid}",    $snapid   );
+          cache($name, "c_write", "{SNAPHASH}{$sn}{createdTm}", $createdTm);
+          cache($name, "c_write", "{SNAPHASH}{$sn}{fileName}",  $fileName );  
+          cache($name, "c_write", "{SNAPHASH}{$sn}{imageData}", $imageData);                                
+      }
+      
+      Log3($name, 4, "$name - Snap '$sn' added to gallery view hash: SN => $sn, ID => $snapid, File => $fileName, Created => $createdTm");
+    
+      $sn += 1;
+      $i  += 1;
+    
+      undef $imageData;
+      undef $fileName;
+      undef $createdTm;
+  }
+
+return $sn;
+}
+
+###############################################################################
+#     gesicherte Schnappschußdaten aus Cache SNAPOLDHASH an 
+#     Cache SNAPHASH anhängen
+###############################################################################
+sub __copySnapsBackFromOld {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $sn    = $paref->{sn};                   # letzte lfd. Nummer aktueller Snaphash
+  
+  my $snapnum = $hash->{HELPER}{SNAPLIMIT} // $defSlim;
+  my $sgn     = AttrVal($name, "snapGalleryNumber", $snapnum);
+  my $ss      = $sn;
+  $sn         = 0; 
+
+  my $cache   = cache($name, "c_init");                                                                     # Cache initialisieren  
+  
+  Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+  
+  if(!$cache || $cache eq "internal" ) {
+      if($data{SSCam}{$name}{SNAPOLDHASH} && $sgn > $ss) {                        
+          for my $kn ($ss..($sgn-1)) {
+              $data{SSCam}{$name}{SNAPHASH}{$kn}{snapid}    = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{snapid};
+              $data{SSCam}{$name}{SNAPHASH}{$kn}{createdTm} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{createdTm};
+              $data{SSCam}{$name}{SNAPHASH}{$kn}{fileName}  = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{fileName};
+              $data{SSCam}{$name}{SNAPHASH}{$kn}{imageData} = delete $data{SSCam}{$name}{SNAPOLDHASH}{$sn}{imageData}; 
+              $sn += 1;                            
+          }
+      }
+  } 
+  else {
+      my $g;      
+      for my $kn ($ss..($sgn-1)) {                                                 
+          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{snapid}"    );                       
+          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{snapid}",    $g) if(defined $g);
+          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{snapid}"    );
+          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{createdTm}" );
+          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{createdTm}", $g) if(defined $g);
+          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{createdTm}" );
+          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{fileName}"  );
+          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{fileName}",  $g) if(defined $g);  
+          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{fileName}"  );
+          $g = cache($name, "c_read",   "{SNAPOLDHASH}{$sn}{imageData}" );
+          cache     ($name, "c_write",  "{SNAPHASH}{$kn}{imageData}", $g) if(defined $g);                                    
+          cache     ($name, "c_remove", "{SNAPOLDHASH}{$sn}{imageData}" );
+          $sn += 1;                            
+      }  
+
+      undef $g;      
+  }
+
+return;
+}
+
+###############################################################################
+#           fallabhängige Eventgenerierung nach Snap Erstellung 
+###############################################################################
+sub __refreshAfterSnap {
+  my $hash   = shift;
+  
+  if ($hash->{HELPER}{INFORM} || $hash->{HELPER}{LSNAPBYSTRMDEV}) {     # Snap durch SSCamSTRM-Device ausgelöst
+      roomRefresh($hash,0,0,1);                                         # kein Room-Refresh, kein SSCam-state-Event, SSCamSTRM-Event
+      delete $hash->{HELPER}{LSNAPBYSTRMDEV};
+  } 
+  elsif ($hash->{HELPER}{LSNAPBYDEV}) {
+      roomRefresh($hash,0,1,0);                                         # kein Room-Refresh, SSCam-state-Event, kein SSCamSTRM-Event
+      delete $hash->{HELPER}{LSNAPBYDEV};
+  } 
+  else {
+       roomRefresh($hash,0,0,0);                                        # kein Room-Refresh, SSCam-state-Event, SSCamSTRM-Event
+  }
+
 return;
 }
 
@@ -7505,7 +7452,7 @@ sub IsCapHLS {                                                            # HLS 
   my ($hash) = @_;
   my $name   = $hash->{NAME};
   my $cap    = 0;
-  my $api    = $hash->{HELPER}{APIVIDEOSTMSMAXVER};
+  my $api    = $hash->{HELPER}{API}{VIDEOSTMS}{VER};
   my $csf    = (ReadingsVal($name,"CamStreamFormat","MJPEG") eq "HLS")?1:0;
   
   $cap = 1 if($api && $csf);
@@ -7593,418 +7540,6 @@ sub IsModelMaster {                                                     # ist de
 return $mm;
 }
 
-###############################################################################
-#                       JSON Boolean Test und Mapping
-###############################################################################
-sub jboolmap { 
-  my ($bool)= @_;
-  
-  if(JSON::is_bool($bool)) {
-      $bool = $bool?"true":"false";
-  }
-  
-return $bool;
-}
-
-###############################################################################
-#      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
-#
-#      $force = wenn auf jeden Fall der/die letzten Snaps von der SVS
-#               abgerufen werden sollen unabhängig ob LastSnapId vorhanden ist
-###############################################################################
-sub snapLimSize {      
-  my ($hash,$force) = @_;
-  my $name  = $hash->{NAME};
-  my ($slim,$ssize);
-  
-  if(!AttrVal($name,"snapGalleryBoost",0)) {
-      $slim  = 1;
-      $ssize = 0;
-  } else {
-      $hash->{HELPER}{GETSNAPGALLERY} = 1;
-      $slim = AttrVal($name,"snapGalleryNumber",$defSlim);               # Anzahl der abzurufenden Snaps
-  }
-  
-  if(AttrVal($name,"snapGallerySize","Icon") eq "Full") {
-      $ssize = 2;                                                           # Full Size
-  } else {
-      $ssize = 1;                                                           # Icon Size
-  }
-
-  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
-      # Versand Schnappschuß darf erfolgen falls gewünscht 
-      $ssize = 2;                                                           # Full Size für EMail/Telegram/SSChatBot -Versand
-  }
-  
-  if($hash->{HELPER}{SNAPNUM}) {
-      $slim = delete $hash->{HELPER}{SNAPNUM};                              # enthält die Anzahl der ausgelösten Schnappschüsse
-      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                  # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
-  }
-  
-  my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
-  if(scalar(@strmdevs) >= 1) {
-      Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
-  }
-  
-  $hash->{HELPER}{GETSNAPGALLERY} = 1 if($force);                           # Bugfix 04.03.2019 Forum:https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685
-  
-return ($slim,$ssize);
-}
-
-###############################################################################
-#              Helper für listLog-Argumente extrahieren 
-###############################################################################
-sub extlogargs { 
-  my ($hash,$a) = @_;
-
-  $hash->{HELPER}{LISTLOGSEVERITY} = (split("severity:",$a))[1] if(lc($a) =~ m/^severity:/x);
-  $hash->{HELPER}{LISTLOGLIMIT}    = (split("limit:",$a))[1]    if(lc($a) =~ m/^limit:/x);
-  $hash->{HELPER}{LISTLOGMATCH}    = (split("match:",$a))[1]    if(lc($a) =~ m/^match:/x);
-  
-return;
-}
-
-###############################################################################
-#              Helper für optimizeParams-Argumente extrahieren 
-###############################################################################
-sub extoptpar { 
-  my ($hash,$a,$cpcl) = @_;
-
-  $hash->{HELPER}{MIRROR}   = (split("mirror:",$a))[1] if(lc($a) =~ m/^mirror:/x);
-  $hash->{HELPER}{FLIP}     = (split("flip:",$a))[1]   if(lc($a) =~ m/^flip:/x);
-  $hash->{HELPER}{ROTATE}   = (split("rotate:",$a))[1] if(lc($a) =~ m/^rotate:/x);
-  $hash->{HELPER}{NTPSERV}  = (split("ntp:",$a))[1]    if(lc($a) =~ m/^ntp:/x);
-  
-  $hash->{HELPER}{CHKLIST}  = ($hash->{HELPER}{NTPSERV}?$cpcl->{ntp}:0)+
-                              ($hash->{HELPER}{MIRROR}?$cpcl->{mirror}:0)+
-                              ($hash->{HELPER}{FLIP}?$cpcl->{flip}:0)+
-                              ($hash->{HELPER}{ROTATE}?$cpcl->{rotate}:0);
-  
-return;
-}
-
-###############################################################################
-# Clienthash übernehmen oder zusammenstellen
-# Identifikation ob über FHEMWEB ausgelöst oder nicht -> erstellen $hash->CL
-###############################################################################
-sub getClHash {      
-  my ($hash,$nobgd)= @_;
-  my $name  = $hash->{NAME};
-  my $ret;
-  
-  if($nobgd) {
-      # nur übergebenen CL-Hash speichern, 
-      # keine Hintergrundverarbeitung bzw. synthetische Erstellung CL-Hash
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-      return;
-  }
-
-  if (!defined($hash->{CL})) {
-      # Clienthash wurde nicht übergeben und wird erstellt (FHEMWEB Instanzen mit canAsyncOutput=1 analysiert)
-      my $outdev;
-      my @webdvs = devspec2array("TYPE=FHEMWEB:FILTER=canAsyncOutput=1:FILTER=STATE=Connected");
-      my $i = 1;
-      for (@webdvs) {
-          $outdev = $_;
-          next if(!$defs{$outdev});
-          $hash->{HELPER}{CL}{$i}->{NAME} = $defs{$outdev}{NAME};
-          $hash->{HELPER}{CL}{$i}->{NR}   = $defs{$outdev}{NR};
-          $hash->{HELPER}{CL}{$i}->{COMP} = 1;
-          $i++;               
-      }
-  } else {
-      # übergebenen CL-Hash in Helper eintragen
-      $hash->{HELPER}{CL}{1} = $hash->{CL};
-  }
-      
-  # Clienthash auflösen zur Fehlersuche (aufrufende FHEMWEB Instanz
-  if (defined($hash->{HELPER}{CL}{1})) {
-      for (my $k=1; (defined($hash->{HELPER}{CL}{$k})); $k++ ) {
-          Log3($name, 4, "$name - Clienthash number: $k");
-          while (my ($key,$val) = each(%{$hash->{HELPER}{CL}{$k}})) {
-              $val = $val?$val:" ";
-              Log3($name, 4, "$name - Clienthash: $key -> $val");
-          }
-      }
-  } else {
-      Log3($name, 2, "$name - Clienthash was neither delivered nor created !");
-      $ret = "Clienthash was neither delivered nor created. Can't use asynchronous output for function.";
-  }
-  
-return ($ret);
-}
-
-###############################################################################
-#     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
-#     das generierte Widget und das weblink-Device ptzPanel_$name
-###############################################################################
-sub ptzPanel {
-  my $paref       = shift;
-  my $name        = $paref->{linkparent}; 
-  my $ptzcdev     = $paref->{linkname}; 
-  my $ftui        = $paref->{ftui};  
-  
-  my $hash        = $defs{$name};
-  my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
-  my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
-  my $valPresets  = ReadingsVal("$name", "Presets",             ""                );
-  my $valPatrols  = ReadingsVal("$name", "Patrols",             ""                );
-  my $rowisset    = 0;
-  my ($pbs,$pbsf) = ("","");
-  my ($row,$ptz_ret);
-  
-  return "" if(myVersion($hash) <= 71);
-  
-  $pbs      = AttrVal($ptzcdev,"ptzButtonSize",     100);                                                 # Größe der Druckbuttons in %
-  $pbsf     = AttrVal($ptzcdev,"ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
- 
-  $ptz_ret  = "";
-  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
-  $ptz_ret .= "<style>TD.pcenter {text-align: center;} </style>"; 
-  $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
-  
-  ### PTZ-Elemente
-  #########################
-  $ptz_ret .= '<table class="rc_body defsize">';
-  $ptz_ret .= "<tr>";
-  $ptz_ret .= "<td style='text-align:center' colspan=10>PTZ Control</td>";
-  $ptz_ret .= "</tr>";
-  $ptz_ret .= "<tr>";
-  $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
-  $ptz_ret .= "</tr>";
-
-  for my $rownr (0..9) {
-      $rownr = sprintf("%2.2d",$rownr);
-      $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
-      next if (!$row);
-      $rowisset = 1;
-      $ptz_ret .= "<tr>";
-      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
-      
-      for my $btnnr (0..$#btn) {                 
-          $ptz_ret .= "<td class='ptzcontrol'>";
-          if ($btn[$btnnr] ne "") {
-              my ($cmd,$img);
-              
-              if ($btn[$btnnr] =~ /(.*?):(.*)/x) {                                                           # enthält Komando -> <command>:<image>
-                  $cmd = $1;
-                  $img = $2;
-              
-              } else {                                                                                       # button has format <command> or is empty
-                  $cmd = $btn[$btnnr];
-                  $img = $btn[$btnnr];
-              }
-              
-              if ($img =~ m/\.svg/x) {                                                                       # Verwendung für SVG's
-                  $img = FW_makeImage($img, $cmd, "rc-button");
-              
-              } else {                                                                                       # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
-                  if($ftui) {
-                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
-                  } else {
-                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbs%\" width=\"$pbs%\">";  
-                  }
-              }
-              
-              if ($cmd || $cmd eq "0") {
-                  my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                         # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
-                  $cmd1     = "ftui.setFhemStatus('set $name $cmd')" if($ftui); 
-                  $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
-              } else {
-                  $ptz_ret .= $img;
-              }
-          }
-          $ptz_ret .= "</td>";
-          $ptz_ret .= "\n";    
-      }
-      $ptz_ret .= "</tr>\n";  
-  }
-  
-  ### Zoom
-  ###############################
-  if(IsCapZoom($hash)) {                                                                               # wenn Zoom Eigenschaft
-      
-      $ptz_ret .= "<tr>";
-      $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
-      $ptz_ret .= "</tr>";
-      $ptz_ret .= "<tr>";
-
-      my @za  = qw(.++ + stop - --.);
-      
-      for my $cmd (@za) {                 
-          $ptz_ret .= "<td class='ptzcontrol'>";
-          
-          my $img = $zd{$cmd}{panimg};                                                      
-          if(!$img) {
-              $ptz_ret .= $cmd;
-              $ptz_ret .= "</td>"; 
-              next;
-          }
-          
-          if ($img =~ m/\.svg/x) {                                                                    # Verwendung für SVG's
-              $img = FW_makeImage($img, $cmd, "rc-button");
-          
-          } else {                                                                                    # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
-              my $iPath = FW_iconPath($img);                                                          # automatisches Suchen der Icons im FHEMWEB iconPath
-              if($iPath) {
-                  $iPath = "$FW_ME/$FW_icondir/$iPath";
-              } else {
-                  $iPath = "$FW_ME/$iconpath/$img";
-              }
-              
-              if($ftui) {
-                  $img = "<img src=\"$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
-              } else {
-                  $img = "<img src=\"$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
-              }
-          }
-          
-          my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name setZoom $cmd')";                  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
-          $cmd1     = "ftui.setFhemStatus('set $name setZoom $cmd')" if($ftui); 
-          
-          $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
-
-          $ptz_ret .= "</td>";  
-      }
-      
-      $ptz_ret .= "</tr>";
-  }
-  
-  $ptz_ret .= "</table>";
-  
-  ###  add Preset / Patrols
-  ###############################
-  if(!$ftui) {
-      my ($Presets,$Patrols);
-      my $cmdPreset = "goPreset";
-      my $cmdPatrol = "runPatrol";
-      
-      ## Presets
-      for my $fn (sort keys %{$data{webCmdFn}}) {
-          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
-          no strict "refs";                                                                    ## no critic 'NoStrict'  
-          $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
-          use strict "refs";
-          last if(defined($Presets));
-      }
-      if($Presets) {
-          $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,x;
-      } else {
-          $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
-      }
-
-      ## Patrols
-      for my $fn (sort keys %{$data{webCmdFn}}) {
-          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
-          no strict "refs";                                                                    ## no critic 'NoStrict'                     
-          $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
-          use strict "refs";
-          last if(defined($Patrols));
-      }
-      
-      if($Patrols) {
-          $Patrols =~ s,^<td[^>]*>(.*)</td>$,$1,x;
-      } else {
-          $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
-      }
-           
-      ## Ausgabe
-      $ptz_ret .= '<table class="rc_body defsize">';
-      
-      if($valPresets) {
-          $ptz_ret .= "<tr>";
-          $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
-          $ptz_ret .= "</tr>"; 
-      }
-      
-      if($valPatrols) {
-          $ptz_ret .= "<tr>";
-          $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
-          $ptz_ret .= "</tr>";
-      }
-
-      $ptz_ret .= "</table>";     
-  }
-  
-  if ($rowisset) {
-      return $ptz_ret;
-  } else {
-      return "";
-  }
-}
-
-###############################################################################
-#     spezielle Attribute für PTZ-ControlPanel verfügbar machen
-###############################################################################
-sub addptzattr {
-  my $name = shift;
-  my $hash = $defs{$name};
-  my $actvs;
-  
-  my @vl = split (/\.|-/x,ReadingsVal($name, "SVSversion", ""));
-  if(@vl) {
-      $actvs = $vl[0];
-      $actvs.= $vl[1];
-  }
-  return if(ReadingsVal($name,"DeviceType","Camera") ne "PTZ" || $actvs <= 71);
-  
-  for my $n (0..9) { 
-      $n = sprintf("%2.2d",$n);
-      addToDevAttrList($name, "ptzPanel_row$n");
-  }
-  
-  my $p = ReadingsVal("$name","Presets","");
-  if($p ne "") {
-      my @h;
-      my $arg = "ptzPanel_Home";
-      my @ua  = split(" ", $attr{$name}{userattr});
-      for (@ua) { 
-          push(@h,$_) if($_ !~ m/$arg.*/x);
-      }
-         
-      $attr{$name}{userattr} = join(' ',@h);
-      addToDevAttrList($name, "ptzPanel_Home:".$p);
-  }
-  addToDevAttrList($name, "ptzPanel_iconPrefix");
-  addToDevAttrList($name, "ptzPanel_iconPath");
-  addToDevAttrList($name, "ptzPanel_use:0,1");
-  
-  # PTZ Panel Widget initial generieren
-  my $upleftfast    = "move upleft";
-  my $upfast        = "move up";
-  my $uprightfast   = "move upright";
-  my $upleft        = "move upleft 0.5";
-  my $up            = "move up 0.5";
-  my $upright       = "move upright 0.5";
-  my $leftfast      = "move left";
-  my $leftslow      = "move left 0.5";
-  my $home          = "goPreset ".AttrVal($name,"ptzPanel_Home",ReadingsVal($name,"PresetHome",""));  
-  my $rightslow     = "move right 0.5";
-  my $rightfast     = "move right";
-  my $downleft      = "move downleft 0.5";                       
-  my $down          = "move down 0.5";
-  my $downright     = "move downright 0.5";
-  my $downleftfast  = "move downleft";
-  my $downfast      = "move down";
-  my $downrightfast = "move downright";
-  
-  $attr{$name}{ptzPanel_row00} = "$upleftfast:CAMUPLEFTFAST.png,:CAMBLANK.png,$upfast:CAMUPFAST.png,:CAMBLANK.png,$uprightfast:CAMUPRIGHTFAST.png" 
-      if(!AttrVal($name,"ptzPanel_row00",undef));
-  $attr{$name}{ptzPanel_row01} = ":CAMBLANK.png,$upleft:CAMUPLEFT.png,$up:CAMUP.png,$upright:CAMUPRIGHT.png"
-      if(!AttrVal($name,"ptzPanel_row01",undef));  
-  $attr{$name}{ptzPanel_row02} = "$leftfast:CAMLEFTFAST.png,$leftslow:CAMLEFT.png,$home:CAMHOME.png,$rightslow:CAMRIGHT.png,$rightfast:CAMRIGHTFAST.png"
-      if(!AttrVal($name,"ptzPanel_row02",undef) || $home ne $hash->{HELPER}{OLDPTZHOME});  
-  $attr{$name}{ptzPanel_row03} = ":CAMBLANK.png,$downleft:CAMDOWNLEFT.png,$down:CAMDOWN.png,$downright:CAMDOWNRIGHT.png"
-      if(!AttrVal($name,"ptzPanel_row03",undef));  
-  $attr{$name}{ptzPanel_row04} = "$downleftfast:CAMDOWNLEFTFAST.png,:CAMBLANK.png,$downfast:CAMDOWNFAST.png,:CAMBLANK.png,$downrightfast:CAMDOWNRIGHTFAST.png"
-      if(!AttrVal($name,"ptzPanel_row04",undef));
-      
-  $hash->{HELPER}{OLDPTZHOME} = $home;
-  $hash->{".ptzhtml"} = "";     # ptzPanel wird neu durchlaufen
-  
-return;
-}
-
 ######################################################################################
 #      Funktion für SSCamSTRM-Devices
 #
@@ -8077,9 +7612,7 @@ sub streamDev {                                               ## no critic 'comp
       $cmdrefresh    = "ftui.setFhemStatus('set $camname refresh STRM:$uuid')";      
   }
   
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
   my $calias = $hash->{CAMNAME};                                            # Alias der Kamera
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
   my ($ttrefresh, $ttrecstart, $ttrecstop, $ttsnap, $ttcmdstop, $tthlsreact);
   my ($ttmjpegrun, $tthlsrun, $ttlrrun, $tth264run, $ttlmjpegrun, $ttlsnaprun);
   
@@ -8097,7 +7630,8 @@ sub streamDev {                                               ## no critic 'comp
       $tth264run   = $ttips_en{"tth264run"};   $tth264run   =~ s/§NAME§/$calias/gx;     
       $ttlmjpegrun = $ttips_en{"ttlmjpegrun"}; $ttlmjpegrun =~ s/§NAME§/$calias/gx;
       $ttlsnaprun  = $ttips_en{"ttlsnaprun"};  $ttlsnaprun  =~ s/§NAME§/$calias/gx;
-  } else {
+  } 
+  else {
       $ttrefresh   = $ttips_de{"ttrefresh"};   $ttrefresh   =~ s/§NAME§/$calias/gx;
       $ttrecstart  = $ttips_de{"ttrecstart"};  $ttrecstart  =~ s/§NAME§/$calias/gx;
       $ttrecstop   = $ttips_de{"ttrecstop"};   $ttrecstop   =~ s/§NAME§/$calias/gx;
@@ -8140,15 +7674,15 @@ sub streamDev {                                               ## no critic 'comp
     pws                => $pws,
     serveraddr         => $hash->{SERVERADDR},
     serverport         => $hash->{SERVERPORT},
-    apivideostm        => $hash->{HELPER}{APIVIDEOSTM},
-    apivideostmpath    => $hash->{HELPER}{APIVIDEOSTMPATH},
-    apivideostmmaxver  => $hash->{HELPER}{APIVIDEOSTMMAXVER}, 
-    apiaudiostm        => $hash->{HELPER}{APIAUDIOSTM},
-    apiaudiostmpath    => $hash->{HELPER}{APIAUDIOSTMPATH},
-    apiaudiostmmaxver  => $hash->{HELPER}{APIAUDIOSTMMAXVER},
-    apivideostms       => $hash->{HELPER}{APIVIDEOSTMS},  
-    apivideostmspath   => $hash->{HELPER}{APIVIDEOSTMSPATH},
-    apivideostmsmaxver => $hash->{HELPER}{APIVIDEOSTMSMAXVER},
+    apivideostm        => $hash->{HELPER}{API}{VIDEOSTM}{NAME},
+    apivideostmpath    => $hash->{HELPER}{API}{VIDEOSTM}{PATH},
+    apivideostmver     => $hash->{HELPER}{API}{VIDEOSTM}{VER}, 
+    apiaudiostm        => $hash->{HELPER}{API}{AUDIOSTM}{NAME},
+    apiaudiostmpath    => $hash->{HELPER}{API}{AUDIOSTM}{PATH},
+    apiaudiostmver     => $hash->{HELPER}{API}{AUDIOSTM}{VER},
+    apivideostms       => $hash->{HELPER}{API}{VIDEOSTMS}{NAME},  
+    apivideostmspath   => $hash->{HELPER}{API}{VIDEOSTMS}{PATH},
+    apivideostmsver    => $hash->{HELPER}{API}{VIDEOSTMS}{VER},
     camid              => $hash->{CAMID},
     sid                => $hash->{HELPER}{SID},
     proto              => $hash->{PROTOCOL},
@@ -8191,12 +7725,12 @@ sub streamDev {                                               ## no critic 'comp
     ttlsnaprun         => $ttlsnaprun,
   );
   
-  $ret  = "";
-  $ret .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";               
+  $ret  = "";            
   $ret .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   if($ftui) {
       $ret .= "<span align=\"$hdrAlign\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
-  } else {
+  } 
+  else {
       $ret .= "<span align=\"$hdrAlign\">$dlink $show </span><br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
   }  
   $ret .= '<tbody>';
@@ -8221,7 +7755,8 @@ sub streamDev {                                               ## no critic 'comp
   no strict "refs";                                                        ## no critic 'NoStrict'  
   if($sdfn{$fmt}) {
       $ret .= &{$sdfn{$fmt}{fn}} (\%params) if(defined &{$sdfn{$fmt}{fn}});  
-  } else {
+  } 
+  else {
       $cause = qq{Streaming of format "$fmt" is not supported};
       $cause = qq{Select a Streaming client with the "adopt" command.} if($ismm);
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";      
@@ -8257,10 +7792,10 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my $serverport         = $params->{serverport};
   my $apivideostms       = $params->{apivideostms};
   my $apivideostmspath   = $params->{apivideostmspath};
-  my $apivideostmsmaxver = $params->{apivideostmsmaxver};
+  my $apivideostmsver = $params->{apivideostmsver};
   my $apiaudiostm        = $params->{apiaudiostm};
   my $apiaudiostmpath    = $params->{apiaudiostmpath};
-  my $apiaudiostmmaxver  = $params->{apiaudiostmmaxver};
+  my $apiaudiostmver  = $params->{apiaudiostmver};
   
   my $cmdrecendless      = $params->{cmdrecendless};
   my $ttrecstart         = $params->{ttrecstart};
@@ -8275,26 +7810,29 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   my ($link,$audiolink);
   my $ret = "";
   
-  if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
+  if(ReadingsVal($camname, "SVSversion", "") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {  
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot play back MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
       return $ret;
       
-  } else {
-      if($apivideostmsmaxver) {                                  
-          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsmaxver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+  } 
+  else {
+      if($apivideostmsver) {                                  
+          $link = "$proto://$serveraddr:$serverport/webapi/$apivideostmspath?api=$apivideostms&version=$apivideostmsver&method=Stream&cameraId=$camid&format=mjpeg&_sid=$sid"; 
+      
       } elsif ($hash->{HELPER}{STMKEYMJPEGHTTP}) {
           $link = $hash->{HELPER}{STMKEYMJPEGHTTP};
       }
       
       return $ret if(!$link);
       
-      if($apiaudiostmmaxver) {                                   
-          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmmaxver&method=Stream&cameraId=$camid&_sid=$sid"; 
+      if($apiaudiostmver) {                                   
+          $audiolink = "$proto://$serveraddr:$serverport/webapi/$apiaudiostmpath?api=$apiaudiostm&version=$apiaudiostmver&method=Stream&cameraId=$camid&_sid=$sid"; 
       }
       
       if(!$ftui) {
           $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>";
-      } else {
+      } 
+      else {
           $ret .= "<td><img src=$link $ha><br>";
       }
       
@@ -8303,14 +7841,13 @@ sub _streamDevMJPEG {                               ## no critic 'complexity not
   }
   
   if(!$hb) {
-      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {
-             # Aufnahmebutton endlos Start
-             $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-          } else {
-             # Aufnahmebutton Stop
-             $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+      if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {            # Aufnahmebutton endlos Start
+             $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
+          } 
+          else {                                                         # Aufnahmebutton Stop
+             $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
           }       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>"; 
   }    
   
   $ret .= "</td>"; 
@@ -8368,7 +7905,8 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
   
   if(!$cache || $cache eq "internal" ) {
       $link = $data{SSCam}{$camname}{LASTSNAP};
-  } else {
+  } 
+  else {
       $link = cache($camname, "c_read", "{LASTSNAP}");                           
   }
   
@@ -8377,20 +7915,21 @@ sub _streamDevLASTSNAP {                                       ## no critic 'not
   if($link) {
       if(!$ftui) {
           $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>";
-      } else {
+      } 
+      else {
           $ret .= "<td><img src='data:image/jpeg;base64,$link' $gattr><br>";
       }
       
       if(!$hb) {
-          $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+          $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
       }
       
       $ret .= "</td>";
       
       $streamHash->{HELPER}{STREAM}       = "<img src=data:image/jpeg;base64,$link $pws>";      # Stream für "get <SSCamSTRM-Device> popupStream" speichern
       $streamHash->{HELPER}{STREAMACTIVE} = 1 if($link);                                        # Statusbit wenn ein Stream aktiviert ist
-  
-  } else {
+  } 
+  else {
       $cause = "no snapshot available to display";
       $cause = "kein Schnappschuss zur Anzeige vorhanden" if(AttrVal("global","language","EN") =~ /DE/ix);
       $ret .= "<td> <br> <b> $cause </b> <br><br></td>";       
@@ -8445,20 +7984,15 @@ sub _streamDevGENERIC {                                        ## no critic 'not
 
   if(!$htag) {
       $ret .= "<td> <br> <b> Set attribute \"genericStrmHtmlTag\" in device <a href=\"/fhem?detail=$camname\">$camname</a> or in device <a href=\"/fhem?detail=$strmdev\">$strmdev</a></b> <br><br></td>";
-      $ret .= '</tr>';
-      $ret .= '</tbody>';
-      $ret .= '</table>';
-      $ret .= '</div>';
       return $ret; 
   }
   
   $ret .= "<td>";
   $ret .= "$htag";
   
-  if($htag) {
-      # Popup-Tag um den Popup-Teil bereinigen 
+  if($htag) {                                                             # Popup-Tag um den Popup-Teil bereinigen 
       my $ptag = $htag;
-      $ptag    =~ m/^\s+?(?<b><)\s+?(?<heart>.*?)\s+?onClick=.*?\s+?(?<e>>)\s+?$/s;
+      $ptag    =~ m/^\s+?(?<b><)\s+?(?<heart>.*?)\s+?onClick=.*?\s+?(?<e>>)\s+?$/xs;
       $ptag    = $+{heart} ? $+{b}.$+{heart}.$+{e} : $ptag;
       $streamHash->{HELPER}{STREAM}       = "$ptag";                      # Stream für "set <SSCamSTRM-Device> popupStream" speichern
       $streamHash->{HELPER}{STREAM}       =~ s/["']//gx;
@@ -8471,16 +8005,17 @@ sub _streamDevGENERIC {                                        ## no critic 'not
   Log3($strmdev, 4, "$strmdev - generic Stream params:\n$htag");
   
   if(!$hb) {
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
       $ret .= $imgblank;
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {            # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-      } else {                                                           # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
+      } 
+      else {                                                             # Aufnahmebutton Stop
+          $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
       }       
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   }      
   $ret .= "</td>";
   
@@ -8546,10 +8081,6 @@ sub _streamDevHLS {                                            ## no critic 'not
   if(!$m3u8) {
       $cause = "You have to specify attribute \"hlsStrmObject\" in Camera $cam !";
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";
-      $ret  .= '</tr>';
-      $ret  .= '</tbody>';
-      $ret  .= '</table>';
-      $ret  .= '</div>';
       return $ret; 
   }      
   
@@ -8560,16 +8091,17 @@ sub _streamDevHLS {                                            ## no critic 'not
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                      # Statusbit wenn ein Stream aktiviert ist
   
   if(!$hb) {
-      $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
+      $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
       $ret .= $imgblank;
       
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {                   # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-      } else {                                                                  # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
+      } 
+      else {                                                                    # Aufnahmebutton Stop
+          $ret .= "<a onClick=\"$cmdrecstop\"  title=\"$ttrecstop\">$imgrecstop </a>";
       }       
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>"; 
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>"; 
   }      
   
   $ret .= "</td>";      
@@ -8626,12 +8158,12 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
       my $cam = AttrVal($camname, "alias", $camname);
       $cause  = "Playback cam \"$cam\" switched off";
       $ret   .= "<td> <br> <b> $cause </b> <br><br>";
-      $ret   .= "<a onClick=\"$cmdmjpegrun\" onmouseover=\"Tip('$ttmjpegrun')\" onmouseout=\"UnTip()\">$imgmjpegrun </a>";
-      $ret   .= "<a onClick=\"$cmdhlsrun\" onmouseover=\"Tip('$tthlsrun')\" onmouseout=\"UnTip()\">$imghlsrun </a>" if(IsCapHLS($hash));  
-      $ret   .= "<a onClick=\"$cmdlrirun\" onmouseover=\"Tip('$ttlrrun')\" onmouseout=\"UnTip()\">$imglrirun </a>"; 
-      $ret   .= "<a onClick=\"$cmdlh264run\" onmouseover=\"Tip('$tth264run')\" onmouseout=\"UnTip()\">$imglh264run </a>";
-      $ret   .= "<a onClick=\"$cmdlmjpegrun\" onmouseover=\"Tip('$ttlmjpegrun')\" onmouseout=\"UnTip()\">$imglmjpegrun </a>";
-      $ret   .= "<a onClick=\"$cmdlsnaprun\" onmouseover=\"Tip('$ttlsnaprun')\" onmouseout=\"UnTip()\">$imglsnaprun </a>";            
+      $ret   .= "<a onClick=\"$cmdmjpegrun\" title=\"$ttmjpegrun\">$imgmjpegrun </a>";
+      $ret   .= "<a onClick=\"$cmdhlsrun\" title=\"$tthlsrun\">$imghlsrun </a>" if(IsCapHLS($hash));  
+      $ret   .= "<a onClick=\"$cmdlrirun\" title=\"$ttlrrun\">$imglrirun </a>"; 
+      $ret   .= "<a onClick=\"$cmdlh264run\" title=\"$tth264run\">$imglh264run </a>";
+      $ret   .= "<a onClick=\"$cmdlmjpegrun\" title=\"$ttlmjpegrun\">$imglmjpegrun </a>";
+      $ret   .= "<a onClick=\"$cmdlsnaprun\" title=\"$ttlsnaprun\">$imglsnaprun </a>";            
       $ret   .= "</td>";
       return $ret;      
   }
@@ -8640,7 +8172,8 @@ sub _streamDevSWITCHED {                                       ## no critic 'not
   no strict "refs";                                                        ## no critic 'NoStrict'  
   if($sdswfn{$wltype}) {
       $ret .= &{$sdswfn{$wltype}{fn}} ($params) if(defined &{$sdswfn{$wltype}{fn}});  
-  } else {
+  } 
+  else {
       $cause = qq{Streaming of format "$wltype" is not supported};
       $ret  .= "<td> <br> <b> $cause </b> <br><br></td>";      
   }      
@@ -8688,10 +8221,12 @@ sub __switchedIMAGE {                                          ## no critic 'not
   
   if(ReadingsVal($camname, "SVSversion", "8.2.3-5828") eq "8.2.3-5828" && ReadingsVal($camname, "CamVideoType", "") !~ /MJPEG/x) {             
       $ret .= "<td> <br> <b> Because SVS version 8.2.3-5828 is running you cannot see the MJPEG-Stream. Please upgrade to a higher SVS version ! </b> <br><br>";
-  } else {
+  } 
+  else {
       if(!$ftui) {
           $ret .= "<td><img src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"><br>" if($link);
-      } else {
+      } 
+      else {
           $ret .= "<td><img src=$link $ha><br>" if($link);
       }
       
@@ -8699,17 +8234,18 @@ sub __switchedIMAGE {                                          ## no critic 'not
       $streamHash->{HELPER}{STREAMACTIVE} = 1;                         # Statusbit wenn ein Stream aktiviert ist
   }  
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
   $ret .= $imgblank; 
   
   if($hash->{HELPER}{RUNVIEW} =~ /live_fw/x) {              
       if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {          # Aufnahmebutton endlos Start
-          $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-      } else {                                                         # Aufnahmebutton Stop
-          $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+          $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
+      } 
+      else {                                                           # Aufnahmebutton Stop
+          $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
       }  
       
-      $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+      $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   }   
   
   $ret .= "</td>";
@@ -8769,7 +8305,8 @@ sub __switchedIFRAME {                                         ## no critic 'not
       $ret .= "<td><iframe src=$link $ha controls autoplay onClick=\"FW_okDialog('<img src=$link $pws>')\">".
               "Iframes disabled".
               "</iframe><br>" if($link);
-  } else {
+  } 
+  else {
       $ret .= "<td><iframe src=$link $ha controls autoplay>".
               "Iframes disabled".
               "</iframe><br>" if($link);              
@@ -8779,8 +8316,8 @@ sub __switchedIFRAME {                                         ## no critic 'not
                                         "</iframe>";                # Stream für "set <SSCamSTRM-Device> popupStream" speichern
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                          # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";              
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";              
   $ret .= "</td>";
   
   if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
@@ -8833,7 +8370,7 @@ sub __switchedVIDEO {                                          ## no critic 'not
   
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                           # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>"; 
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>"; 
   $ret .= "</td>";
   
   if($hash->{HELPER}{AUDIOLINK} && ReadingsVal($camname, "CamAudioType", "Unknown") !~ /Unknown/x  && !$hau) {
@@ -8878,15 +8415,16 @@ sub __switchedBASE64IMG {                                      ## no critic 'not
   
   if(!$ftui) {
       $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$link $pws>')\"><br>" if($link);
-  } else {
+  } 
+  else {
       $ret .= "<td><img src='data:image/jpeg;base64,$link' $ha><br>" if($link);
   }
   $streamHash->{HELPER}{STREAM}       = "<img src=data:image/jpeg;base64,$link $pws>";    # Stream für "get <SSCamSTRM-Device> popupStream" speichern
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                                                # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
   $ret .= $imgblank;
-  $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";
+  $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";
   $ret .= "</td>";
 
 return $ret;
@@ -8911,7 +8449,8 @@ sub __switchedEMBED {                                          ## no critic 'not
   
   if(!$ftui) {
       $ret .= "<td><embed src=$link $ha onClick=\"FW_okDialog('<img src=$link $pws>')\"></td>" if($link);
-  } else {
+  } 
+  else {
       $ret .= "<td><embed src=$link $ha></td>" if($link);
   }
   $streamHash->{HELPER}{STREAM}       = "<embed src=$link $pws>";    # Stream für "set <SSCamSTRM-Device> popupStream" speichern
@@ -8973,18 +8512,19 @@ sub __switchedHLS {                                            ## no critic 'not
   
   $streamHash->{HELPER}{STREAMACTIVE} = 1;                   # Statusbit wenn ein Stream aktiviert ist
   
-  $ret .= "<a onClick=\"$cmdstop\" onmouseover=\"Tip('$ttcmdstop')\" onmouseout=\"UnTip()\">$imgstop </a>";
-  $ret .= "<a onClick=\"$cmdrefresh\" onmouseover=\"Tip('$ttrefresh')\" onmouseout=\"UnTip()\">$imgrefresh </a>";
-  $ret .= "<a onClick=\"$cmdhlsreact\" onmouseover=\"Tip('$tthlsreact')\" onmouseout=\"UnTip()\">$imghlsreact </a>";
+  $ret .= "<a onClick=\"$cmdstop\" title=\"$ttcmdstop\">$imgstop </a>";
+  $ret .= "<a onClick=\"$cmdrefresh\" title=\"$ttrefresh\">$imgrefresh </a>";
+  $ret .= "<a onClick=\"$cmdhlsreact\" title=\"$tthlsreact\">$imghlsreact </a>";
   $ret .= $imgblank;
   
   if(ReadingsVal($camname, "Record", "Stop") eq "Stop") {    # Aufnahmebutton endlos Start
-      $ret .= "<a onClick=\"$cmdrecendless\" onmouseover=\"Tip('$ttrecstart')\" onmouseout=\"UnTip()\">$imgrecendless </a>";
-  } else {                                                   # Aufnahmebutton Stop
-      $ret .= "<a onClick=\"$cmdrecstop\" onmouseover=\"Tip('$ttrecstop')\" onmouseout=\"UnTip()\">$imgrecstop </a>";
+      $ret .= "<a onClick=\"$cmdrecendless\" title=\"$ttrecstart\">$imgrecendless </a>";
+  } 
+  else {                                                     # Aufnahmebutton Stop
+      $ret .= "<a onClick=\"$cmdrecstop\" title=\"$ttrecstop\">$imgrecstop </a>";
   }     
   
-  $ret .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>";                   
+  $ret .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>";                   
   $ret .= "</td>";
   
   if(AttrVal($camname,"ptzPanel_use",1)) {
@@ -8999,6 +8539,145 @@ sub __switchedHLS {                                            ## no critic 'not
   } 
   
 return $ret;
+}
+
+#############################################################################################
+#                                   Autocreate für Kameras
+#                                   $sn = Name der Kamera in SVS
+#############################################################################################
+sub doAutocreate { 
+   my ($hash,$sn) = @_;
+   my $name = $hash->{NAME};
+   my $type = $hash->{TYPE};
+   
+   my ($camhash, $err, $camname);
+   
+   my $dcn  = (devspec2array("TYPE=SSCam:FILTER=CAMNAME=$sn"))[0];                    # ist das Device aus der SVS bereits angelegt ?
+   $camhash = $defs{$dcn} if($dcn);                                                   # existiert ein Hash des Devices ?
+
+   if(!$camhash) {
+       $camname = "SSCam.".makeDeviceName($sn);                                       # erlaubten Kameranamen für FHEM erzeugen
+       my $arg  = $hash->{SERVERADDR}." ".$hash->{SERVERPORT}." ".$hash->{PROTOCOL};
+       my $cmd  = "$camname $type $sn $arg";
+       
+       Log3($name, 2, "$name - Autocreate camera: define $cmd");
+       
+       $err = CommandDefine(undef, $cmd);
+       
+       if($err) {
+           Log3($name, 1, "ERROR: $err");
+       } 
+       else {
+           my $room    = AttrVal($name, "room",    "SSCam");
+           my $session = AttrVal($name, "session", "DSM"  );
+           
+           CommandAttr (undef,"$camname room $room");
+           CommandAttr (undef,"$camname session $session");
+           CommandAttr (undef,"$camname icon it_camera");
+           CommandAttr (undef,"$camname devStateIcon .*isable.*:set_off .*nap:li_wht_on");
+           CommandAttr (undef,"$camname pollcaminfoall 210");
+           CommandAttr (undef,"$camname pollnologging 1");  
+           CommandAttr (undef,"$camname httptimeout 20");
+
+           # Credentials abrufen und setzen
+           my ($success, $username, $password) = getCredentials($hash,0,"credentials");
+           if($success) {
+               CommandSet(undef, "$camname credentials $username $password");   
+           }
+       } 
+   } 
+   else {
+       Log3($name, 4, "$name - Autocreate - SVS camera \"$sn\" already defined by \"$dcn\" ");
+       $camname = "";
+   }  
+   
+return ($err,$camname);
+}
+
+######################################################################################################
+#      Refresh eines Raumes
+#      $hash, $pload (1=Page reload), SSCam-state-Event(1=Event), SSCamSTRM-Event (1=Event)
+######################################################################################################
+sub roomRefresh { 
+  my ($hash,$pload,$lpoll_scm,$lpoll_strm) = @_;
+  my ($name,$st);
+  
+  if (ref $hash ne "HASH") {
+      ($name,$pload,$lpoll_scm,$lpoll_strm) = split ",",$hash;
+      $hash = $defs{$name};
+  } 
+  else {
+      $name = $hash->{NAME};
+  }
+  
+  my $fpr  = 0;
+  
+  # SSCamSTRM-Device mit hinterlegter FUUID ($hash->{HELPER}{INFORM}) selektieren
+  my @spgs = devspec2array("TYPE=SSCamSTRM");                                      # alle Streaming Devices !
+  my @mstd = devspec2array("TYPE=SSCamSTRM:FILTER=MODEL=master");                  # alle Streaming MODEL=master Devices
+  my $room = "";
+ 
+  for my $sd (@spgs) {   
+      if($defs{$sd}{LINKPARENT} eq $name) {
+          next if(IsDisabled($defs{$sd}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sd}{FUUID});
+          $fpr  = AttrVal($defs{$sd}{NAME},"forcePageRefresh",0);
+          $room = AttrVal($defs{$sd}{NAME},"room","");
+          Log3($name, 4, qq{$name - roomRefresh - pagerefresh forced by $defs{$sd}{NAME}}) if($fpr);
+      }
+  }
+
+  # Page-Reload
+  if($pload && $room && !$fpr) {                                          # nur Räume mit dem SSCamSTRM-Device reloaden
+      my @rooms = split(",",$room);
+      for my $r (@rooms) {
+          { map { FW_directNotify("FILTER=room=$r", "#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }         ## no critic 'void context'
+      }
+  
+  } elsif ($pload || $fpr) {
+      # trifft zu bei Detailansicht oder im FLOORPLAN bzw. Dashboard oder wenn Seitenrefresh mit dem 
+      # SSCamSTRM-Attribut "forcePageRefresh" erzwungen wird
+      { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } devspec2array("TYPE=FHEMWEB") }                               ## no critic 'void context'
+  } 
+  
+  # Aufnahmestatus/Disabledstatus in state abbilden & SSCam-Device state setzen (mit/ohne Event)
+  $st = (ReadingsVal($name, "Availability", "enabled") eq "disabled")?"disabled":(ReadingsVal($name, "Record", "") eq "Start")?"on":"off";  
+  if($lpoll_scm) {
+      readingsSingleUpdate($hash,"state", $st, 1);
+  } 
+  else {
+      readingsSingleUpdate($hash,"state", $st, 0);  
+  }
+  
+  # parentState des SSCamSTRM-Device updaten ($hash->{HELPER}{INFORM} des LINKPARENT Devices muss FUUID des Streaming Devices haben)
+  if($lpoll_strm) {
+      $st = ReadingsVal($name, "state", "initialized");  
+      for my $sp (@spgs) {                                           # $sp = ein Streaming Device aus allen Streaming Devices
+          if($defs{$sp}{LINKPARENT} eq $name) {
+              next if(IsDisabled($defs{$sp}{NAME}) || !$hash->{HELPER}{INFORM} || $hash->{HELPER}{INFORM} ne $defs{$sp}{FUUID});
+              
+              readingsBeginUpdate($defs{$sp});
+              readingsBulkUpdate ($defs{$sp},"parentState", $st);
+              readingsBulkUpdate ($defs{$sp},"state", "updated");
+              readingsEndUpdate  ($defs{$sp}, 1);
+              
+              for my $sm (@mstd) {                                   # Wenn Streaming Device von Streaming Master adoptiert wurde auch den Master updaten 
+                  next if($defs{$sm}{LINKNAME} ne $sp);
+                  
+                  readingsBeginUpdate($defs{$sm});
+                  readingsBulkUpdate ($defs{$sm},"parentState", $st);
+                  readingsBulkUpdate ($defs{$sm},"state", "updated");
+                  readingsEndUpdate  ($defs{$sm}, 1);
+                  
+                  Log3($name, 4, "$name - roomRefresh - caller: $sp, Master: $sm updated");
+              }
+              
+              Log3($name, 4, "$name - roomRefresh - caller: $sp, FUUID: $hash->{HELPER}{INFORM}");
+              delete $hash->{HELPER}{INFORM};
+          }
+      }
+  }
+        
+return;
 }
 
 #############################################################################################
@@ -9022,7 +8701,8 @@ sub bindhlsjs {
        my $lib = "https://cdn.jsdelivr.net/npm/hls.js\@latest";
        $ret .= "<script src=\"$lib\"></script>";
        Log3($strmdev, 4, "$strmdev - HLS Streaming use net library \"$lib\" ");
-   } else {
+   } 
+   else {
        $ret .= "<script type=\"text/javascript\" src=\"/fhem/pgm2/$hlsjs\"></script>";
        Log3($strmdev, 4, "$strmdev - HLS Streaming use local file \"/fhem/pgm2/$hlsjs\" ");
    }
@@ -9063,18 +8743,21 @@ sub composeGallery {
   
   my $hash     = $defs{$name};
   my $camname  = $hash->{CAMNAME};                                      
-  my $sgc      = AttrVal     ($name,    "snapGalleryColumns", 3   );                          # Anzahl der Images in einer Tabellenzeile
-  my $lss      = ReadingsVal ($name,    "LastSnapTime",       ""  );                          # Zeitpunkt neueste Aufnahme
-  my $lang     = AttrVal     ("global", "language",           "EN");                          # Systemsprache       
-  my $limit    = $hash->{HELPER}{SNAPLIMIT} // AttrVal($name, "snapGalleryNumber", 3);        # abgerufene Anzahl Snaps
-  my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale Anzahl Snaps
-  $limit       = $totalcnt if ($limit > $totalcnt);                                           # wenn weniger Snaps vorhanden sind als $limit -> Text in Anzeige korrigieren
+  my $sgc      = AttrVal     ($name,    "snapGalleryColumns", $defColumns);                   # Anzahl der Images in einer Tabellenzeile
+  my $lss      = ReadingsVal ($name,    "LastSnapTime",       ""         );                   # Zeitpunkt neueste Aufnahme
+  my $lang     = AttrVal     ("global", "language",           "EN"       );                   # Systemsprache       
   my $uuid     = "";
   my $hdrAlign = "center";
+  
   my $lupt     = ((ReadingsTimestamp($name,"LastSnapTime"," ") gt ReadingsTimestamp($name,"LastUpdateTime"," ")) 
                  ? ReadingsTimestamp($name,"LastSnapTime"," ") 
-                 : ReadingsTimestamp($name,"LastUpdateTime"," "));  # letzte Aktualisierung
-  $lupt =~ s/ / \/ /;
+                 : ReadingsTimestamp($name,"LastUpdateTime"," "));                            # letzte Aktualisierung
+  $lupt        =~ s{ }{ / };
+  
+  my $totalcnt = $hash->{HELPER}{TOTALCNT};                                                   # totale in SVS vorhandene Anzahl Snaps 
+  my $limit    = AttrVal($name, "snapGalleryNumber", $hash->{HELPER}{SNAPLIMIT}) // $defSlim; # maximale Anzahl anzuzeigende Schnappschüsse
+  $limit       = $totalcnt < $limit ? $totalcnt : $limit;
+  
   my ($alias,$dlink,$hb) = ("","","");
   my ($cache,$imgdat,$imgTm);
   
@@ -9085,12 +8768,13 @@ sub composeGallery {
       $alias  = AttrVal($strmdev, "alias", $strmdev);                                         # Linktext als Aliasname oder Devicename setzen
       if(AttrVal($strmdev, "noLink", 0)) {      
           $dlink = $alias;                                                                    # keine Links im Stream-Dev generieren
-      } else {
+      } 
+      else {
           $dlink = "<a href=\"/fhem?detail=$strmdev\">$alias</a>"; 
       }
   }
   
-  my $cmddosnap = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";   # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
+  my $cmddosnap = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name snap 1 2 STRM:$uuid')";       # Snapshot auslösen mit Kennzeichnung "by STRM-Device"
   my $imgdosnap = "<img src=\"$FW_ME/www/images/sscam/black_btn_DOSNAP.png\">";
   
   # bei Aufruf durch FTUI Kommandosyntax anpassen
@@ -9115,12 +8799,9 @@ sub composeGallery {
   # wenn SSCamSTRM-device genutzt wird und attr "snapGalleryBoost" nicht gesetzt ist -> Warnung in Gallerie ausgeben
   my $sgbnote = " ";
   if($strmdev && !AttrVal($name,"snapGalleryBoost",0)) {
-      $sgbnote = "<b>CAUTION</b> - No snapshots can be retrieved. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "EN");
-      $sgbnote = "<b>ACHTUNG</b> - Es können keine Schnappschüsse abgerufen werden. Bitte setzen sie das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a>" if ($lang eq "DE");
+      $sgbnote = "<b>CAUTION</b> - The gallery is not updated automatically. Please set the attribute \"snapGalleryBoost=1\" in device <a href=\"/fhem?detail=$name\">$name</a>";
+      $sgbnote = "<b>ACHTUNG</b> - Die Galerie wird nicht automatisch aktualisiert. Dazu bitte das Attribut \"snapGalleryBoost=1\" im Device <a href=\"/fhem?detail=$name\">$name</a> setzen." if ($lang eq "DE");
   }
-  
-  # Javascript Bibliothek für Tooltips (http://www.walterzorn.de/tooltip/tooltip.htm#download) und Texte
-  my $ttjs   = "/fhem/pgm2/sscam_tooltip.js"; 
   
   my $ttsnap = $ttips_en{"ttsnap"}; $ttsnap =~ s/§NAME§/$camname/xg;
   if(AttrVal("global","language","EN") =~ /DE/x) {
@@ -9132,16 +8813,18 @@ sub composeGallery {
   if($strmdev) {                                                                             # Forum: https://forum.fhem.de/index.php/topic,45671.msg975610.html#msg975610
       if($ftui) {
           $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayNameFTUI",0));
-      } else {
+      } 
+      else {
           $header .= "$dlink <br>"  if(!AttrVal($strmdev,"hideDisplayName",0));
       } 
   } 
   
   if ($lang eq "EN") {
-      $header .= "Snapshots ($limit/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
+      $header .= "Snapshots (_LIMIT_/$totalcnt) of camera <b>$camname</b> - newest Snapshot: $lss<br>";
       $header .= " (Possibly another snapshots are available. Last recall: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
-  } else {
-      $header .= "Schnappschüsse ($limit/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
+  } 
+  else {
+      $header .= "Schnappschüsse (_LIMIT_/$totalcnt) von Kamera <b>$camname</b> - neueste Aufnahme: $lss <br>";
       $lupt    =~ /(\d+)-(\d\d)-(\d\d)\s+(.*)/x;
       $lupt    = "$3.$2.$1 $4";
       $header .= " (Eventuell sind neuere Aufnahmen verfügbar. Letzter Abruf: $lupt)<br>" if(AttrVal($name,"snapGalleryBoost",0));
@@ -9153,7 +8836,6 @@ sub composeGallery {
   # Ausgabetabelle erstellen
   my $htmlCode;
   $htmlCode  = "<html>";
-  $htmlCode .= "<script type=\"text/javascript\" src=\"$ttjs\"></script>";
   $htmlCode .= "<div class=\"makeTable wide\"; style=\"text-align:$hdrAlign\"> $header <br>";
   $htmlCode .= '<table class="block wide internals" style="margin-left:auto;margin-right:auto">';
   $htmlCode .= "<tbody>";
@@ -9162,10 +8844,24 @@ sub composeGallery {
   my $cell  = 1;
   my $idata = "";
 
-  $cache = cache($name, "c_init");                                                    # Cache initialisieren  
+  # Bildaten aus Cache abrufen
+  ############################
+  my $count;
+  $cache = cache($name, "c_init");                                                                   # Cache initialisieren  
+  
   Log3($name, 1, "$name - Fall back to internal Cache due to preceding failure.") if(!$cache);                                 
+  
   if(!$cache || $cache eq "internal" ) {
+      $count     = scalar keys %{$data{SSCam}{$name}{SNAPHASH}} // 0;                                # Anzahl Bilddaten im Cache
+      $htmlCode  =~ s{_LIMIT_}{$count}xms;                                                           # Platzhalter Snapanzahl im Header mit realem Wert ersetzen
+      my $i      = 1;
+      
       for my $key (sort{$a<=>$b}keys %{$data{SSCam}{$name}{SNAPHASH}}) {
+          if($i > $limit) {
+              $count = $limit;
+              last;
+          }
+          
           if(!$ftui) {
               $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData} $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
           }
@@ -9176,26 +8872,38 @@ sub composeGallery {
               $htmlCode .= "</tr>";
               $htmlCode .= "<tr class=\"odd\">";
               $cell = 1;
-          } else {
+          } 
+          else {
               $htmlCode .= sprintf("<td>$data{SSCam}{$name}{SNAPHASH}{$key}{createdTm}<br> <img src=\"data:image/jpeg;base64,$data{SSCam}{$name}{SNAPHASH}{$key}{imageData}\" $gattr $idata> </td>" );
           }
           
           $idata = "";
+          $i++;
       }
-  
-  } else {
+  } 
+  else {
       my @as;
       for my $ck (cache($name, "c_getkeys")) {                                                      # relevant keys aus allen vorkommenden selektieren
           next if $ck !~ /\{SNAPHASH\}\{\d+\}\{.*\}/x;
           $ck =~ s/\{SNAPHASH\}\{(\d+)\}\{.*\}/$1/x;
           push @as,$ck if($ck =~ /^\d+$/x);
-      }      
+      }
+      
       my %seen;
-      my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
+      my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                         # distinct / unique the keys 
+      $count     = scalar @unique // 0;                                                             # Anzahl Bilddaten im Cache
+      $htmlCode  =~ s{_LIMIT_}{$count}xms;                                                          # Platzhalter Snapanzahl im Header mit realem Wert ersetzen     
+      my $i      = 1;
       
       for my $key (@unique) {
+          if($i > $limit) {
+              $count = $limit;
+              last;
+          }
+          
           $imgdat = cache($name, "c_read", "{SNAPHASH}{$key}{imageData}");
           $imgTm  = cache($name, "c_read", "{SNAPHASH}{$key}{createdTm}");
+          
           if(!$ftui) {
               $idata = "onClick=\"FW_okDialog('<img src=data:image/jpeg;base64,$imgdat $pws>')\"" if(AttrVal($name,"snapGalleryBoost",0));
           }
@@ -9206,11 +8914,13 @@ sub composeGallery {
               $htmlCode .= "</tr>";
               $htmlCode .= "<tr class=\"odd\">";
               $cell = 1;
-          } else {
+          } 
+          else {
               $htmlCode .= sprintf("<td>$imgTm<br> <img src=\"data:image/jpeg;base64,$imgdat\" $gattr $idata> </td>" );
           }
           
           $idata = "";
+          $i++;
       }  
   }
 
@@ -9223,11 +8933,11 @@ sub composeGallery {
   if(!$hb) {
       $htmlCode .= "<tr>";
       $htmlCode .= "<td style=\"text-align:left\" colspan=10>";
-      $htmlCode .= "<a onClick=\"$cmddosnap\" onmouseover=\"Tip('$ttsnap')\" onmouseout=\"UnTip()\">$imgdosnap </a>" if($strmdev);
+      $htmlCode .= "<a onClick=\"$cmddosnap\" title=\"$ttsnap\">$imgdosnap </a>" if($strmdev);
       $htmlCode .= "</td>";
       $htmlCode .= "</tr>";
   }
-  
+    
   $htmlCode .= "</tbody>";
   $htmlCode .= "</table>";
   $htmlCode .= "</div>";
@@ -9240,63 +8950,343 @@ sub composeGallery {
 return $htmlCode;
 }
 
-##############################################################################
-#              Auflösung Errorcodes bei Login / Logout
-#              Übernahmewerte sind $hash, $errorcode
-##############################################################################
-sub expErrorsAuth {
-  my $hash      = shift;
-  my $errorcode = shift;
-  my $device    = $hash->{NAME};
-  my $error;
+###############################################################################
+#      Ermittlung Anzahl und Größe der abzurufenden Schnappschußdaten
+#
+#      $force = wenn auf jeden Fall der/die letzten Snaps von der SVS
+#               abgerufen werden sollen unabhängig ob LastSnapId vorhanden ist
+###############################################################################
+sub snapLimSize {      
+  my ($hash,$force) = @_;
+  my $name  = $hash->{NAME};
   
-  unless (exists($errauthlist{"$errorcode"})) {$error = qq{Message of errorcode "$errorcode" not found. Please turn to Synology Web API-Guide.}; return ($error);}
-
-  # Fehlertext aus Hash-Tabelle %errorauthlist ermitteln
-  $error = $errauthlist{"$errorcode"};
-
-return ($error);
-}
-
-##############################################################################
-#  Auflösung Errorcodes SVS API
-#  Übernahmewerte sind $hash, $errorcode
-##############################################################################
-sub expErrors {
-  my $hash      = shift;
-  my $errorcode = shift;
-  my $device = $hash->{NAME};
-  my $error;
+  my ($slim,$ssize);
   
-  unless (exists($errlist{"$errorcode"})) {$error = qq{Message of errorcode "$errorcode" not found. Please turn to Synology Web API-Guide.}; return ($error);}
-
-  # Fehlertext aus Hash-Tabelle %errorlist ermitteln
-  $error = $errlist{"$errorcode"};
-  
-return ($error);
-}
-
-################################################################
-# sortiert eine Liste von Versionsnummern x.x.x
-# Schwartzian Transform and the GRT transform
-# Übergabe: "asc | desc",<Liste von Versionsnummern>
-################################################################
-sub sortVersion {
-  my ($sseq,@versions) = @_;
-
-  my @sorted = map {$_->[0]}
-               sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./x]} @versions;
-             
-  @sorted = map {join ".", unpack "C*", $_}
-            sort
-            map {pack "C*", split /\./x} @versions;
-  
-  if($sseq eq "desc") {
-      @sorted = reverse @sorted;
+  if(!AttrVal($name,"snapGalleryBoost",0)) {
+      $slim  = 1;
+      $ssize = 0;
+  } 
+  else {
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;
+      $slim                           = AttrVal($name,"snapGalleryNumber",$defSlim);      # Anzahl der abzurufenden Snaps
   }
   
-return @sorted;
+  if(AttrVal($name,"snapGallerySize","Icon") eq "Full") {
+      $ssize = 2;                                                                         # Full Size
+  } 
+  else {
+      $ssize = 1;                                                                         # Icon Size
+  }
+
+  if($hash->{HELPER}{CANSENDSNAP} || $hash->{HELPER}{CANTELESNAP} || $hash->{HELPER}{CANCHATSNAP}) {
+      # Versand Schnappschuß darf erfolgen falls gewünscht 
+      $ssize = 2;                                                                         # Full Size für EMail/Telegram/SSChatBot -Versand
+  }
+  
+  if($hash->{HELPER}{SNAPNUM}) {
+      $slim                           = delete $hash->{HELPER}{SNAPNUM};                  # enthält die Anzahl der ausgelösten Schnappschüsse
+      $hash->{HELPER}{GETSNAPGALLERY} = 1;                                                # Steuerbit für Snap-Galerie bzw. Daten mehrerer Schnappschüsse abrufen
+  }
+  
+  my @strmdevs = devspec2array("TYPE=SSCamSTRM:FILTER=PARENT=$name:FILTER=MODEL=lastsnap");
+  if(scalar(@strmdevs) >= 1) {
+      Log3($name, 4, "$name - Streaming devs of type \"lastsnap\": @strmdevs");
+  }
+  
+  $hash->{HELPER}{GETSNAPGALLERY} = 1 if($force);                                         # Bugfix 04.03.2019 Forum:https://forum.fhem.de/index.php/topic,45671.msg914685.html#msg914685
+  
+return ($slim,$ssize);
+}
+
+###############################################################################
+#              Helper für listLog-Argumente extrahieren 
+###############################################################################
+sub extlogargs { 
+  my ($hash,$a) = @_;
+
+  $hash->{HELPER}{LISTLOGSEVERITY} = (split("severity:",$a))[1] if(lc($a) =~ m/^severity:/x);
+  $hash->{HELPER}{LISTLOGLIMIT}    = (split("limit:",$a))[1]    if(lc($a) =~ m/^limit:/x);
+  $hash->{HELPER}{LISTLOGMATCH}    = (split("match:",$a))[1]    if(lc($a) =~ m/^match:/x);
+  
+return;
+}
+
+###############################################################################
+#     konvertiere alle ptzPanel_rowXX-attribute zu html-Code für 
+#     das generierte Widget und das weblink-Device ptzPanel_$name
+###############################################################################
+sub ptzPanel {
+  my $paref       = shift;
+  my $name        = $paref->{linkparent}; 
+  my $ptzcdev     = $paref->{linkname}; 
+  my $ftui        = $paref->{ftui};  
+  
+  my $hash        = $defs{$name};
+  my $iconpath    = AttrVal    ("$name", "ptzPanel_iconPath",   "www/images/sscam");
+  my $iconprefix  = AttrVal    ("$name", "ptzPanel_iconPrefix", "black_btn_"      );
+  my $valPresets  = ReadingsVal("$name", "Presets",             ""                );
+  my $valPatrols  = ReadingsVal("$name", "Patrols",             ""                );
+  my $rowisset    = 0;
+  my ($pbs,$pbsf) = ("","");
+  my ($row,$ptz_ret);
+  
+  return "" if(myVersion($hash) <= 71);
+  
+  $pbs      = AttrVal($ptzcdev,"ptzButtonSize",     100);                                                 # Größe der Druckbuttons in %
+  $pbsf     = AttrVal($ptzcdev,"ptzButtonSizeFTUI", 100);                                                 # Größe der Druckbuttons im FTUI in %
+ 
+  $ptz_ret  = "";
+  $ptz_ret .= "<style>TD.ptzcontrol {padding: 5px 7px;}</style>";
+  $ptz_ret .= "<style>TD.pcenter {text-align: center;} </style>"; 
+  $ptz_ret .= "<style>.defsize { font-size:16px; } </style>";
+  
+  ### PTZ-Elemente
+  #########################
+  $ptz_ret .= '<table class="rc_body defsize">';
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= "<td style='text-align:center' colspan=10>PTZ Control</td>";
+  $ptz_ret .= "</tr>";
+  $ptz_ret .= "<tr>";
+  $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
+  $ptz_ret .= "</tr>";
+
+  for my $rownr (0..9) {
+      $rownr = sprintf("%2.2d",$rownr);
+      $row   = AttrVal("$name","ptzPanel_row$rownr",undef);
+      next if (!$row);
+      $rowisset = 1;
+      $ptz_ret .= "<tr>";
+      my @btn = split (",",$row);                                                                            # die Anzahl Buttons in einer Reihe
+      
+      for my $btnnr (0..$#btn) {                 
+          $ptz_ret .= "<td class='ptzcontrol'>";
+          if ($btn[$btnnr] ne "") {
+              my ($cmd,$img);
+              
+              if ($btn[$btnnr] =~ /(.*?):(.*)/x) {                                                           # enthält Komando -> <command>:<image>
+                  $cmd = $1;
+                  $img = $2;            
+              } 
+              else {                                                                                         # button has format <command> or is empty
+                  $cmd = $btn[$btnnr];
+                  $img = $btn[$btnnr];
+              }
+              
+              if ($img =~ m/\.svg/x) {                                                                       # Verwendung für SVG's
+                  $img = FW_makeImage($img, $cmd, "rc-button");
+              } 
+              else {                                                                                         # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem                                 
+                  if($ftui) {
+                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbsf%\" width=\"$pbsf%\">";
+                  } else {
+                      $img = "<img src=\"$FW_ME/$iconpath/$iconprefix$img\" height=\"$pbs%\" width=\"$pbs%\">";  
+                  }
+              }
+              
+              if ($cmd || $cmd eq "0") {
+                  my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $cmd')";                         # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+                  $cmd1     = "ftui.setFhemStatus('set $name $cmd')" if($ftui); 
+                  $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
+              } 
+              else {
+                  $ptz_ret .= $img;
+              }
+          }
+          $ptz_ret .= "</td>";
+          $ptz_ret .= "\n";    
+      }
+      $ptz_ret .= "</tr>\n";  
+  }
+  
+  ### Zoom
+  ###############################
+  if(IsCapZoom($hash)) {                                                                               # wenn Zoom Eigenschaft
+      
+      $ptz_ret .= "<tr>";
+      $ptz_ret .= "<td style='text-align:center' colspan=10><hr /></td>";
+      $ptz_ret .= "</tr>";
+      $ptz_ret .= "<tr>";
+
+      my @za  = qw(.++ + stop - --.);
+      
+      for my $cmd (@za) {                 
+          $ptz_ret .= "<td class='ptzcontrol'>";
+          
+          my $img = $zd{$cmd}{panimg};                                                      
+          if(!$img) {
+              $ptz_ret .= $cmd;
+              $ptz_ret .= "</td>"; 
+              next;
+          }
+          
+          if ($img =~ m/\.svg/x) {                                                                    # Verwendung für SVG's
+              $img = FW_makeImage($img, $cmd, "rc-button");
+          } 
+          else {                                                                                      # $FW_ME = URL-Pfad unter dem der FHEMWEB-Server via HTTP erreichbar ist, z.B. /fhem
+              my $iPath = FW_iconPath($img);                                                          # automatisches Suchen der Icons im FHEMWEB iconPath
+              if($iPath) {
+                  $iPath = "$FW_ME/$FW_icondir/$iPath";
+              } 
+              else {
+                  $iPath = "$FW_ME/$iconpath/$img";
+              }
+              
+              if($ftui) {
+                  $img = "<img src=\"$iPath\" height=\"$pbsf%\" width=\"$pbsf%\">";
+              } 
+              else {
+                  $img = "<img src=\"$iPath\" height=\"$pbs%\" width=\"$pbs%\">";  
+              }
+          }
+          
+          my $cmd1  = "FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name setZoom $cmd')";                  # $FW_subdir = Sub-path in URL, used by FLOORPLAN/weblink
+          $cmd1     = "ftui.setFhemStatus('set $name setZoom $cmd')" if($ftui); 
+          
+          $ptz_ret .= "<a onClick=\"$cmd1\">$img</a>";  
+
+          $ptz_ret .= "</td>";  
+      }
+      
+      $ptz_ret .= "</tr>";
+  }
+  
+  $ptz_ret .= "</table>";
+  
+  ###  add Preset / Patrols
+  ###############################
+  if(!$ftui) {
+      my ($Presets,$Patrols);
+      my $cmdPreset = "goPreset";
+      my $cmdPatrol = "runPatrol";
+      
+      ## Presets
+      for my $fn (sort keys %{$data{webCmdFn}}) {
+          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
+          no strict "refs";                                                                    ## no critic 'NoStrict'  
+          $Presets = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPreset,$valPresets);
+          use strict "refs";
+          last if(defined($Presets));
+      }
+      if($Presets) {
+          $Presets =~ s,^<td[^>]*>(.*)</td>$,$1,x;
+      } 
+      else {
+          $Presets = FW_pH "cmd.$name=set $name $cmdPreset", $cmdPreset, 0, "", 1, 1;
+      }
+
+      ## Patrols
+      for my $fn (sort keys %{$data{webCmdFn}}) {
+          next if($data{webCmdFn}{$fn} ne "FW_widgetFallbackFn");
+          no strict "refs";                                                                    ## no critic 'NoStrict'                     
+          $Patrols = &{$data{webCmdFn}{$fn}}($FW_wname,$name,"",$cmdPatrol,$valPatrols);
+          use strict "refs";
+          last if(defined($Patrols));
+      }
+      
+      if($Patrols) {
+          $Patrols =~ s,^<td[^>]*>(.*)</td>$,$1,x;
+      } 
+      else {
+          $Patrols = FW_pH "cmd.$name=set $name $cmdPatrol", $cmdPatrol, 0, "", 1, 1;
+      }
+           
+      ## Ausgabe
+      $ptz_ret .= '<table class="rc_body defsize">';
+      
+      if($valPresets) {
+          $ptz_ret .= "<tr>";
+          $ptz_ret .= "<td>Preset: </td><td>$Presets</td>";  
+          $ptz_ret .= "</tr>"; 
+      }
+      
+      if($valPatrols) {
+          $ptz_ret .= "<tr>";
+          $ptz_ret .= "<td>Patrol: </td><td>$Patrols</td>";
+          $ptz_ret .= "</tr>";
+      }
+
+      $ptz_ret .= "</table>";     
+  }
+  
+  if ($rowisset) {
+      return $ptz_ret;
+  } 
+  else {
+      return "";
+  }
+}
+
+###############################################################################
+#     spezielle Attribute für PTZ-ControlPanel verfügbar machen
+###############################################################################
+sub addptzattr {
+  my $name = shift;
+  my $hash = $defs{$name};
+  
+  my $actvs;
+  
+  my @vl = split (/\.|-/x,ReadingsVal($name, "SVSversion", ""));
+  if(@vl) {
+      $actvs = $vl[0];
+      $actvs.= $vl[1];
+  }
+  return if(ReadingsVal($name,"DeviceType","Camera") ne "PTZ" || $actvs <= 71);
+  
+  for my $n (0..9) { 
+      $n = sprintf("%2.2d",$n);
+      addToDevAttrList($name, "ptzPanel_row$n");
+  }
+  
+  my $p = ReadingsVal($name, "Presets", "");
+  if($p ne "") {
+      my @h;
+      my $arg = "ptzPanel_Home";
+      my @ua  = split " ", AttrVal($name, "userattr", "");
+      for my $part (@ua) { 
+          push(@h,$part) if($part !~ m/$arg.*/x);
+      }
+         
+      $attr{$name}{userattr} = join(' ',@h);
+      addToDevAttrList($name, "ptzPanel_Home:".$p);
+  }
+  addToDevAttrList($name, "ptzPanel_iconPrefix");
+  addToDevAttrList($name, "ptzPanel_iconPath");
+  addToDevAttrList($name, "ptzPanel_use:0,1");
+  
+  # PTZ Panel Widget initial generieren
+  my $upleftfast    = "move upleft";
+  my $upfast        = "move up";
+  my $uprightfast   = "move upright";
+  my $upleft        = "move upleft 0.5";
+  my $up            = "move up 0.5";
+  my $upright       = "move upright 0.5";
+  my $leftfast      = "move left";
+  my $leftslow      = "move left 0.5";
+  my $home          = "goPreset ".AttrVal($name, "ptzPanel_Home", ReadingsVal($name,"PresetHome",""));  
+  my $rightslow     = "move right 0.5";
+  my $rightfast     = "move right";
+  my $downleft      = "move downleft 0.5";                       
+  my $down          = "move down 0.5";
+  my $downright     = "move downright 0.5";
+  my $downleftfast  = "move downleft";
+  my $downfast      = "move down";
+  my $downrightfast = "move downright";
+  
+  $attr{$name}{ptzPanel_row00} = "$upleftfast:CAMUPLEFTFAST.png,:CAMBLANK.png,$upfast:CAMUPFAST.png,:CAMBLANK.png,$uprightfast:CAMUPRIGHTFAST.png" 
+      if(!AttrVal($name,"ptzPanel_row00",undef));
+  $attr{$name}{ptzPanel_row01} = ":CAMBLANK.png,$upleft:CAMUPLEFT.png,$up:CAMUP.png,$upright:CAMUPRIGHT.png"
+      if(!AttrVal($name,"ptzPanel_row01",undef));  
+  $attr{$name}{ptzPanel_row02} = "$leftfast:CAMLEFTFAST.png,$leftslow:CAMLEFT.png,$home:CAMHOME.png,$rightslow:CAMRIGHT.png,$rightfast:CAMRIGHTFAST.png"
+      if(!AttrVal($name,"ptzPanel_row02",undef) || $home ne $hash->{HELPER}{OLDPTZHOME});  
+  $attr{$name}{ptzPanel_row03} = ":CAMBLANK.png,$downleft:CAMDOWNLEFT.png,$down:CAMDOWN.png,$downright:CAMDOWNRIGHT.png"
+      if(!AttrVal($name,"ptzPanel_row03",undef));  
+  $attr{$name}{ptzPanel_row04} = "$downleftfast:CAMDOWNLEFTFAST.png,:CAMBLANK.png,$downfast:CAMDOWNFAST.png,:CAMBLANK.png,$downrightfast:CAMDOWNRIGHTFAST.png"
+      if(!AttrVal($name,"ptzPanel_row04",undef));
+      
+  $hash->{HELPER}{OLDPTZHOME} = $home;
+  $hash->{".ptzhtml"}         = "";                                          # ptzPanel wird neu eingelesen
+  
+return;
 }
 
 ##############################################################################
@@ -9315,11 +9305,14 @@ sub rotateReading {
           for (my $i=$rotnum;$i>0;$i--) {
               my $l = $i-1;
               my $g = ReadingsVal($name,$readingName.$i,"n.a.");
+              
               if($l) {
                   $l = ReadingsVal($name,$readingName.$l,"n.a.");
-              } else {
+              } 
+              else {
                   $l = ReadingsVal($name,$readingName,"n.a.");
               }
+              
               if("$l" ne "$g") {
                   readingsBulkUpdate($hash,$readingName.$i,$l);
                   Log3($name, 4, "$name - Rotate \"$readingName.$i\" to value: $l");
@@ -9350,361 +9343,332 @@ sub prepareSendData {
    # prüfen ob Schnappschnüsse aller Kameras durch ein SVS-Device angefordert wurde,
    # Bilddaten jeder Kamera werden nach Erstellung dem zentralen Schnappshußhash hinzugefügt
    # Bilddaten werden erst zum Versand weitergeleitet wenn Schnappshußhash komplett gefüllt ist
+   
    my $asref;
    my @allsvs = devspec2array("TYPE=SSCam:FILTER=MODEL=SVS");
-   for (@allsvs) {
+   
+   for my $svs (@allsvs) {
        my $svshash;
-       $svshash = $defs{$_} if($defs{$_});
-       next if(!$svshash || !AttrVal($_, "snapEmailTxt", "") || !$svshash->{HELPER}{CANSENDSNAP});  # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
-       if($svshash->{HELPER}{ALLSNAPREF}) { 
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                                          # Hashreferenz zum summarischen Snaphash
-           for my $key (keys%{$asref}) {
-               if($key eq $name) {                                                           # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
-                    if($type eq "internal") {
-                        for my $pkey (keys%{$dat}) {
-                            my $nkey = time()+int(rand(1000));
-                            $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
-                        }
-                    
-                    } else {
-                        # alle Serial Numbers "{$sn}" der Transaktion ermitteln
-                        # Muster: {SENDSNAPS}{2222}{0}{imageData} 
-                        extractTIDfromCache ( { name  => $name,  
-                                                media => "SENDSNAPS",
-                                                mode  => "serial",
-                                                aref  => \@as
-                                              } 
-                                            );      
-                        my %seen;
-                        my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys 
-
-                        for my $pkey (@unique) {
-                            next if(!cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
-                            my $nkey = time()+int(rand(1000));
-                            $asref->{$nkey.$pkey}{createdTm} = cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{imageData} = cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
-                            $asref->{$nkey.$pkey}{fileName}  = cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
-                            Log3($_, 4, "$_ - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
-                        }               
-                    }                    
-                    delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
-                    delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
-               }
-           }
-           $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
-           for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
-               if(!$asref->{$key}) {
-                   return;                                             # Bildhash noch nicht komplett                                 
-               }
-           }
+       $svshash = $defs{$svs} if($defs{$svs});
+       next if(!$svshash                          || 
+               !AttrVal($svs, "snapEmailTxt", "") ||
+               !$svshash->{HELPER}{ALLSNAPREF}    ||        
+               !$svshash->{HELPER}{CANSENDSNAP});                                                 # Sammel-Schnappschüsse nur senden wenn CANSENDSNAP und Attribut gesetzt ist
        
-           delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
-           $hash   = $svshash;                                         # Hash durch SVS-Hash ersetzt
-           $name   = $svshash->{NAME};                                 # Name des auslösenden SVS-Devices wird eingesetzt  
-           Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
-           
-           my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
-           if(!$cache || $cache eq "internal" ) {
-               delete $data{SSCam}{RS};           
-               for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
-                   $data{SSCam}{RS}{$key} = delete $asref->{$key};                     
-               }    
-               $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
-           } else {
-               cache($name, "c_clear"); 
-               for my $key (keys%{$asref}) {
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
-                   cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
-               }
-               $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
+       $asref = $svshash->{HELPER}{ALLSNAPREF};                                                   # Hashreferenz zum summarischen Snaphash
+       
+       for my $key (keys%{$asref}) {
+           if($key eq $name) {                                                                    # Kamera Key im Bildhash matcht -> Bilddaten übernehmen
+                if($type eq "internal") {
+                    
+                    for my $pkey (keys%{$dat}) {
+                        my $nkey = time()+int(rand(1000));
+                        
+                        $asref->{$nkey.$pkey}{createdTm} = $dat->{$pkey}{createdTm};              # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{imageData} = $dat->{$pkey}{imageData};              # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{fileName}  = $dat->{$pkey}{fileName};               # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                        
+                        Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                    }
+                } 
+                else {
+                    # alle Serial Numbers "{$sn}" der Transaktion ermitteln
+                    # Muster: {SENDSNAPS}{2222}{0}{imageData} 
+                    extractTIDfromCache ( { name  => $name,  
+                                            media => "SENDSNAPS",
+                                            mode  => "serial",
+                                            aref  => \@as
+                                          } 
+                                        );      
+                    my %seen;
+                    my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                           # distinct / unique the keys 
+
+                    for my $pkey (@unique) {
+                        next if(!cache($name, "c_isvalidkey", "$dat"."{$pkey}{imageData}")); 
+                        my $nkey = time()+int(rand(1000));
+                        
+                        $asref->{$nkey.$pkey}{createdTm} = cache($name, "c_read", "$dat"."{$pkey}{createdTm}");     # Aufnahmezeit der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{imageData} = cache($name, "c_read", "$dat"."{$pkey}{imageData}");     # Bilddaten der Kamera werden im summarischen Snaphash eingefügt
+                        $asref->{$nkey.$pkey}{fileName}  = cache($name, "c_read", "$dat"."{$pkey}{fileName}");      # Filenamen der Kamera werden im summarischen Snaphash eingefügt
+                        
+                        Log3($svs, 4, "$svs - Central Snaphash filled up with snapdata of cam \"$name\" and key [".$nkey.$pkey."]");  
+                    }               
+                }                    
+                
+                delete $hash->{HELPER}{CANSENDSNAP};               # Flag im Kamera-Device !! löschen
+                delete $asref->{$key};                             # ursprünglichen Key (Kameranamen) löschen
            }
-           
-           $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
-           $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
-           last;                                                       # Schleife verlassen und mit Senden weiter
        }
+       $asref = $svshash->{HELPER}{ALLSNAPREF};                    # Hashreferenz zum summarischen Snaphash
+       
+       for my $key (keys%{$asref}) {                               # prüfen ob Bildhash komplett ?
+           if(!$asref->{$key}) {
+               return;                                             # Bildhash noch nicht komplett                                 
+           }
+       }
+   
+       delete $svshash->{HELPER}{ALLSNAPREF};                      # ALLSNAPREF löschen -> gemeinsamer Versand beendet
+       $hash = $svshash;                                           # Hash durch SVS-Hash ersetzt
+       $name = $svshash->{NAME};                                   # Name des auslösenden SVS-Devices wird eingesetzt  
+       
+       Log3($name, 4, "$name - Central Snaphash fillup completed by all selected cams. Send it now ...");           
+       
+       my $cache = cache($name, "c_init");                         # Cache initialisieren (im SVS Device)
+       
+       if(!$cache || $cache eq "internal" ) {
+           delete $data{SSCam}{RS};           
+           for my $key (keys%{$asref}) {                           # Referenz zum summarischen Hash einsetzen        
+               $data{SSCam}{RS}{$key} = delete $asref->{$key};                     
+           }    
+           $dat = $data{SSCam}{RS};                                # Referenz zum summarischen Hash einsetzen
+       } 
+       else {
+           cache($name, "c_clear"); 
+           for my $key (keys%{$asref}) {
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{createdTm}", delete $asref->{$key}{createdTm});
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{imageData}", delete $asref->{$key}{imageData});
+               cache($name, "c_write", "{RS}{multiple_snapsend}{$key}{fileName}",  delete $asref->{$key}{fileName});  
+           }
+           $dat = "{RS}{multiple_snapsend}";                       # Referenz zum summarischen Hash einsetzen           
+       }
+       
+       $calias = AttrVal($name,"alias",$hash->{NAME});             # Alias des SVS-Devices 
+       $hash->{HELPER}{TRANSACTION} = "multiple_snapsend";         # fake Transaction im SVS Device setzen 
+       last;                                                       # Schleife verlassen und mit Senden weiter
    }
    
    my $sp       = AttrVal($name, "smtpPort", 25); 
    my $nousessl = AttrVal($name, "smtpNoUseSSL", 0); 
+   
    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime;
-   my $date = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
-   my $time = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
+   
+   my $date     = sprintf "%02d.%02d.%04d" , $mday , $mon+=1 ,$year+=1900; 
+   my $time     = sprintf "%02d:%02d:%02d" , $hour , $min , $sec;   
    
    my $sslfrominit = 0;
    my $smtpsslport = 465;
+   
    if(AttrVal($name,"smtpSSLPort",0)) {
        $sslfrominit = 1;
        $smtpsslport = AttrVal($name,"smtpSSLPort",0);
    }
    
-   $tac = $hash->{HELPER}{TRANSACTION};                               # Code der laufenden Transaktion
+   $tac                                 = $hash->{HELPER}{TRANSACTION};         # Code der laufenden Transaktion
    
-   $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                          # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
-                                                                      # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe closeTrans)
+   $data{SSCam}{$name}{SENDCOUNT}{$tac} = 0;                                    # Hilfszähler Senden, init -> +1 , done -> -1, keine Daten
+                                                                                # d. Transaktion werden gelöscht bis Zähler wieder 0 !! (siehe closeTrans)
+   
    Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
    
    ### Schnappschüsse als Email versenden wenn $hash->{HELPER}{CANSENDSNAP} definiert ist
+   ######################################################################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANSENDSNAP}) {     
        delete $hash->{HELPER}{CANSENDSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-       my $mt = delete $hash->{HELPER}{SMTPMSG};
-       $mt    =~ s/['"]//xg;   
        
-       my($subj,$body)   = split(",", $mt, 2);
-       my($subjk,$subjt) = split("=>", $subj);
-       my($bodyk,$bodyt) = split("=>", $body);
-       $subjk = trim($subjk);
-       $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
-       $bodyk = trim($bodyk);
-       $bodyt = trim($bodyt);
-       $bodyt =~ s/\$CAM/$calias/gx;
-       $bodyt =~ s/\$DATE/$date/gx;
-       $bodyt =~ s/\$TIME/$time/gx;
-       my %smtpmsg = ();
-       $smtpmsg{$subjk} = "$subjt";
-       $smtpmsg{$bodyk} = "$bodyt";
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
+       my $mt = delete $hash->{HELPER}{SMTPMSG};  
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $smtpmsg = _prepSendMail ($param);
            
-       $ret = sendEmail($hash, {'subject'      => $smtpmsg{subject},   
-                                'part1txt'     => $smtpmsg{body}, 
-                                'part2type'    => 'image/jpeg',
-                                'smtpport'     => $sp,
-                                'sdat'         => $dat,
-                                'opmode'       => $OpMode,
-                                'smtpnousessl' => $nousessl,
-                                'sslfrominit'  => $sslfrominit,
-                                'smtpsslport'  => $smtpsslport, 
-                                'tac'          => $tac,                                  
-                               }
-                             );
+       $ret = _sendEmail($hash, {
+                                 'subject'      => $smtpmsg->{subject},   
+                                 'part1txt'     => $smtpmsg->{body}, 
+                                 'part2type'    => 'image/jpeg',
+                                 'smtpport'     => $sp,
+                                 'sdat'         => $dat,
+                                 'opmode'       => $OpMode,
+                                 'smtpnousessl' => $nousessl,
+                                 'sslfrominit'  => $sslfrominit,
+                                 'smtpsslport'  => $smtpsslport, 
+                                 'tac'          => $tac,                                  
+                                }
+                        );
+                       
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
    
    ### Aufnahmen als Email versenden wenn $hash->{HELPER}{CANSENDREC} definiert ist
+   ################################################################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANSENDREC}) {     
        delete $hash->{HELPER}{CANSENDREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-       my $mt  = delete $hash->{HELPER}{SMTPRECMSG};
-       $mt     =~ s/['"]//gx;   
        
-       my($subj,$body)   = split(",", $mt, 2);
-       my($subjk,$subjt) = split("=>", $subj);
-       my($bodyk,$bodyt) = split("=>", $body);
-       $subjk = trim($subjk);
-       $subjt = trim($subjt);
-       $subjt =~ s/\$CAM/$calias/gx;
-       $subjt =~ s/\$DATE/$date/gx;
-       $subjt =~ s/\$TIME/$time/gx;
-       $bodyk = trim($bodyk);
-       $bodyt = trim($bodyt);
-       $bodyt =~ s/\$CAM/$calias/gx;
-       $bodyt =~ s/\$DATE/$date/gx;
-       $bodyt =~ s/\$TIME/$time/gx;
-       my %smtpmsg = ();
-       $smtpmsg{$subjk} = "$subjt";
-       $smtpmsg{$bodyk} = "$bodyt";
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
+       my $mt = delete $hash->{HELPER}{SMTPRECMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $smtpmsg = _prepSendMail ($param);
             
-       $ret = sendEmail($hash, {'subject'      => $smtpmsg{subject},   
-                                'part1txt'     => $smtpmsg{body}, 
-                                'part2type'    => 'video/mpeg',
-                                'smtpport'     => $sp,
-                                'vdat'         => $dat,
-                                'opmode'       => $OpMode,
-                                'smtpnousessl' => $nousessl,
-                                'sslfrominit'  => $sslfrominit,
-                                'smtpsslport'  => $smtpsslport,
-                                'tac'          => $tac,                                      
-                               }
-                             );
+       $ret = _sendEmail($hash, {
+                                 'subject'      => $smtpmsg->{subject},   
+                                 'part1txt'     => $smtpmsg->{body}, 
+                                 'part2type'    => 'video/mpeg',
+                                 'smtpport'     => $sp,
+                                 'vdat'         => $dat,
+                                 'opmode'       => $OpMode,
+                                 'smtpnousessl' => $nousessl,
+                                 'sslfrominit'  => $sslfrominit,
+                                 'smtpsslport'  => $smtpsslport,
+                                 'tac'          => $tac,                                      
+                                }
+                        );
+                       
        readingsSingleUpdate($hash, "sendEmailState", $ret, 1) if ($ret);
    }
 
    ### Schnappschüsse mit Telegram versenden
+   #########################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANTELESNAP}) {     
        # snapTelegramTxt aus $hash->{HELPER}{TELEMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELESNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-       my $mt = delete $hash->{HELPER}{TELEMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
-       my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
-       ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $tbotk = trim($tbotk) if($tbotk);
-       $tbott = trim($tbott) if($tbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
        
-       my %telemsg = ();
-       $telemsg{$tbotk} = "$tbott" if($tbott);
-       $telemsg{$peerk} = "$peert" if($peert);
-       $telemsg{$subjk} = "$subjt" if($subjt);
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
+       my $mt = delete $hash->{HELPER}{TELEMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $telemsg = _prepSendTelegram ($param);
         
-       $ret = sendTelegram($hash, {'subject'      => $telemsg{subject},
-                                   'part2type'    => 'image/jpeg',
-                                   'sdat'         => $dat,
-                                   'opmode'       => $OpMode,
-                                   'tac'          => $tac, 
-                                   'telebot'      => $telemsg{$tbotk}, 
-                                   'peers'        => $telemsg{$peerk},                                      
-                                   'MediaStream'  => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
-                                  }
-                                );
+       $ret = _sendTelegram($hash, {
+                                    'subject'     => $telemsg->{subject},
+                                    'part2type'   => 'image/jpeg',
+                                    'sdat'        => $dat,
+                                    'opmode'      => $OpMode,
+                                    'tac'         => $tac, 
+                                    'telebot'     => $telemsg->{tbot}, 
+                                    'peers'       => $telemsg->{peers},                                      
+                                    'MediaStream' => '-1',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
+                                   }
+                           );
+                          
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                
    }
 
    ### Aufnahmen mit Telegram versenden
+   ####################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANTELEREC}) {   
        # recTelegramTxt aus $hash->{HELPER}{TELERECMSG}
        # Format in $hash->{HELPER}{TELEMSG} muss sein: tbot => <teleBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANTELEREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-       my $mt = delete $hash->{HELPER}{TELERECMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($tbotk,$tbott,$peerk,$peert,$subjk,$subjt);
-       my ($telebot,$peers,$subj) = split(",",  $mt, 3  );
-       ($tbotk,$tbott)            = split("=>", $telebot) if($telebot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $tbotk = trim($tbotk) if($tbotk);
-       $tbott = trim($tbott) if($tbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
        
-       my %telemsg = ();
-       $telemsg{$tbotk} = "$tbott" if($tbott);
-       $telemsg{$peerk} = "$peert" if($peert);
-       $telemsg{$subjk} = "$subjt" if($subjt);
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
+       my $mt = delete $hash->{HELPER}{TELERECMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $telemsg = _prepSendTelegram ($param);
        
        $vdat = $dat;  
-       $ret  = sendTelegram($hash, {'subject'      => $telemsg{subject},
-                                    'vdat'         => $vdat,
-                                    'opmode'       => $OpMode, 
-                                    'telebot'      => $telemsg{$tbotk}, 
-                                    'peers'        => $telemsg{$peerk},
-                                    'tac'          => $tac,                                         
-                                    'MediaStream'  => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
-                                   }
-                                ); 
+       $ret  = _sendTelegram($hash, {
+                                     'subject'     => $telemsg->{subject},
+                                     'vdat'        => $vdat,
+                                     'opmode'      => $OpMode, 
+                                     'telebot'     => $telemsg->{tbot}, 
+                                     'peers'       => $telemsg->{peers},
+                                     'tac'         => $tac,                                         
+                                     'MediaStream' => '-30',                       # Code für MediaStream im TelegramBot (png/jpg = -1)
+                                    }
+                            );
+                           
        readingsSingleUpdate($hash, "sendTeleState", $ret, 1) if ($ret);                                  
    }
    
    ### Schnappschüsse mit Synology Chat versenden
+   ##############################################
    if($OpMode =~ /^getsnap/x && $hash->{HELPER}{CANCHATSNAP}) {     
        # snapChatTxt aus $hash->{HELPER}{CHATMSG}
        # Format in $hash->{HELPER}{CHATMSG} muss sein: snapChatTxt:"chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>"
        delete $hash->{HELPER}{CANCHATSNAP};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
-       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-       my $mt = delete $hash->{HELPER}{CHATMSG};
-       $mt    =~ s/['"]//gx;
-             
-       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt);
-       my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
-       ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $cbotk = trim($cbotk) if($cbotk);
-       $cbott = trim($cbott) if($cbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }       
        
-       my %chatmsg = ();
-       $chatmsg{$cbotk} = "$cbott" if($cbott);
-       $chatmsg{$peerk} = "$peert" if($peert);
-       $chatmsg{$subjk} = "$subjt" if($subjt);
+       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
+       my $mt = delete $hash->{HELPER}{CHATMSG};
+       
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $chatmsg = _prepSendChat ($param);
         
-       $ret = sendChat($hash, {'subject'        => $chatmsg{subject},
-                               'opmode'         => $OpMode,
-                               'tac'            => $tac,
-                               'sdat'           => $dat,                                     
-                               'chatbot'        => $chatmsg{$cbotk}, 
-                               'peers'          => $chatmsg{$peerk},
-                              }
-                            );
+       $ret = _sendChat($hash, {
+                                'subject' => $chatmsg->{subject},
+                                'opmode'  => $OpMode,
+                                'tac'     => $tac,
+                                'sdat'    => $dat,                                     
+                                'chatbot' => $chatmsg->{chatbot}, 
+                                'peers'   => $chatmsg->{peers},
+                               }
+                       );
+                      
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                
    }
    
    ### Aufnahmen mit Synology Chat versenden
+   #########################################
    if($OpMode =~ /^GetRec/x && $hash->{HELPER}{CANCHATREC}) {   
        # recChatTxt aus $hash->{HELPER}{CHATRECMSG}
        # Format in $hash->{HELPER}{CHATRECMSG} muss sein: chatbot => <SSChatBot Device>, peers => <peer1 peer2 ..>, subject => <Beschreibungstext>
        delete $hash->{HELPER}{CANCHATREC};
        $data{SSCam}{$name}{SENDCOUNT}{$tac}++;
+       
        Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
+       
        my $mt = delete $hash->{HELPER}{CHATRECMSG};
-       $mt    =~ s/['"]//gx;
-         
-       my ($cbotk,$cbott,$peerk,$peert,$subjk,$subjt);         
-       my ($chatbot,$peers,$subj) = split(",",  $mt, 3  );
-       ($cbotk,$cbott)            = split("=>", $chatbot) if($chatbot);
-       ($peerk,$peert)            = split("=>", $peers  ) if($peers);
-       ($subjk,$subjt)            = split("=>", $subj   ) if($subj);
-
-       $cbotk = trim($cbotk) if($cbotk);
-       $cbott = trim($cbott) if($cbott);
-       $peerk = trim($peerk) if($peerk);
-       $peert = trim($peert) if($peert);
-       $subjk = trim($subjk) if($subjk);
-       if($subjt) {
-           $subjt = trim($subjt);
-           $subjt =~ s/\$CAM/$calias/gx;
-           $subjt =~ s/\$DATE/$date/gx;
-           $subjt =~ s/\$TIME/$time/gx;
-       }     
        
-       my %chatmsg = ();
-       $chatmsg{$cbotk} = "$cbott" if($cbott);
-       $chatmsg{$peerk} = "$peert" if($peert);
-       $chatmsg{$subjk} = "$subjt" if($subjt);
+       my $param = {
+           hash   => $hash,
+           calias => $calias,
+           mt     => $mt,
+           date   => $date,
+           time   => $time,
+       };
+       my $chatmsg = _prepSendChat ($param);
        
-       $ret = sendChat($hash, {'subject' => $chatmsg{subject},
-                               'opmode'  => $OpMode, 
-                               'tac'     => $tac,  
-                               'vdat'    => $dat,
-                               'chatbot' => $chatmsg{$cbotk},
-                               'peers'   => $chatmsg{$peerk},                         
-                              }
-                            ); 
+       $ret = _sendChat($hash, {
+                                'subject' => $chatmsg->{subject},
+                                'opmode'  => $OpMode, 
+                                'tac'     => $tac,  
+                                'vdat'    => $dat,
+                                'chatbot' => $chatmsg->{chatbot},
+                                'peers'   => $chatmsg->{peers},                         
+                               }
+                       );
+                      
        readingsSingleUpdate($hash, "sendChatState", $ret, 1) if ($ret);                                  
    }
    
@@ -9713,10 +9677,49 @@ sub prepareSendData {
 return;
 }
 
+###############################################################################
+#                 Vorbereitung Versand Chatnachrichten
+###############################################################################
+sub _prepSendChat { 
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
+   my $name   = $hash->{NAME}; 
+
+   my ($cbott,$peert,$subjt);
+   
+   $mt =~ s/['"]//gx;
+   
+   my ($chatbot,$peers,$subj) =  split(",",  $mt, 3  );
+   $cbott                     = (split("=>", $chatbot))[1] if($chatbot);
+   $peert                     = (split("=>", $peers  ))[1] if($peers);
+   $subjt                     = (split("=>", $subj   ))[1] if($subj);
+
+   $cbott = trim($cbott) if($cbott);
+   $peert = trim($peert) if($peert);
+   
+   if($subjt) {
+       $subjt = trim($subjt);
+       $subjt =~ s/\$CAM/$calias/gx;
+       $subjt =~ s/\$DATE/$date/gx;
+       $subjt =~ s/\$TIME/$time/gx;
+   }     
+   
+   my %chatmsg       = ();
+   $chatmsg{chatbot} = "$cbott" if($cbott);
+   $chatmsg{peers}   = "$peert" if($peert);
+   $chatmsg{subject} = "$subjt" if($subjt);
+   
+return \%chatmsg;
+}
+
 #############################################################################################
 #                                   Synology Chat-Versand
 #############################################################################################
-sub sendChat { 
+sub _sendChat { 
    my ($hash, $extparamref) = @_;
    my $name  = $hash->{NAME};
    my $type  = AttrVal($name,"cacheType","internal");
@@ -9745,7 +9748,7 @@ sub sendChat {
                                                    if(exists $chatparams{$key}->{attr}); 
        if($chatparams{$key}->{set}) {     
            $data{SSCam}{$name}{PARAMS}{$tac}{$key} = $chatparams{$key}->{default} if (!$extparamref->{$key} && !$chatparams{$key}->{attr});    
-           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key} if(exists $extparamref->{$key});
+           $data{SSCam}{$name}{PARAMS}{$tac}{$key} = delete $extparamref->{$key}  if(exists $extparamref->{$key});
        }
 
        Log3($name, 4, "$name - param $key is set to \"".($data{SSCam}{$name}{PARAMS}{$tac}{$key} // "")."\" ") if($key !~ /[sv]dat/x);
@@ -9758,6 +9761,7 @@ sub sendChat {
    for my $key (keys(%chatparams)) {
        push(@err, $key) if ($chatparams{$key}->{required} && !$data{SSCam}{$name}{PARAMS}{$tac}{$key});
    }
+   
    if ($#err >= 0) {
        $ret = "Missing at least one required parameter or attribute: ".join(', ',@err);
        Log3($name, 2, "$name - $ret");
@@ -9791,7 +9795,8 @@ sub sendChat {
            $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
            return;       
        }
-   } else {
+   } 
+   else {
        $peers = join(",", split(" ", $peers));       
    }
 
@@ -9803,7 +9808,6 @@ sub sendChat {
        return;   
    } 
                                     
-  #no strict "refs";
   my ($subject,$fileUrl,$uid,$fname,@as,%seen,@unique);
   
   $cache = cache($name, "c_init");                                                           # Cache initialisieren        
@@ -9813,15 +9817,16 @@ sub sendChat {
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{sdat}};
           $mtype = "\@Snapshot";
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+      } 
+      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                       # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           @as    = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
           $mtype = $hash->{CAMNAME};
       }
+      
       for my $key (@as) {
-           ($subject,$fname) = extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           ($subject,$fname) = __extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
            
-           # User aufsplitten und zu jedem die ID ermitteln
-           my @ua = split(",", $peers);
+           my @ua = split(",", $peers);                                                     # User aufsplitten und zu jedem die ID ermitteln
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
@@ -9848,12 +9853,13 @@ sub sendChat {
                    channel    => "",
                    attachment => ""
                };
-               $ret = FHEM::SSChatBot::addQueue ($params); 
+               $ret = FHEM::SSChatBot::addSendqueue ($params); 
 
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 2, "$name - ERROR: $ret");
-               } else {
+               } 
+               else {
                    $ret = "Chat message [$key] of transaction \"$tac\" for \"$_\" added to \"$chatbot\" sendqueue";
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 3, "$name - $ret");
@@ -9861,9 +9867,9 @@ sub sendChat {
            }           
       }
       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
-      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
-      
-  } else {
+      Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0)); 
+  } 
+  else {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           extractTIDfromCache ( { name  => $name, 
@@ -9873,9 +9879,9 @@ sub sendChat {
                                   aref  => \@as
                                 } 
                               );
-          $mtype  = "\@Snapshot";
-          
-      } elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
+          $mtype  = "\@Snapshot";   
+      } 
+      elsif($data{SSCam}{$name}{PARAMS}{$tac}{vdat}) {                                     # Aufnahmen liegen in einem Hash-Ref in $vdat vor
           extractTIDfromCache ( { name  => $name, 
                                   tac   => $tac, 
                                   media => "SENDRECS",
@@ -9889,10 +9895,9 @@ sub sendChat {
       @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                     # distinct / unique the keys
       
       for my $key (@unique) {
-           ($subject,$fname) = extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           ($subject,$fname) = __extractForChat($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
            
-           # User aufsplitten und zu jedem die ID ermitteln
-           my @ua = split(/,/x, $peers);
+           my @ua = split(/,/x, $peers);                                                     # User aufsplitten und zu jedem die ID ermitteln
            for (@ua) {
                next if(!$_);
                $uid = $defs{$chatbot}{HELPER}{USERS}{$_}{id};
@@ -9919,12 +9924,13 @@ sub sendChat {
                    channel    => "",
                    attachment => ""
                };
-               $ret = FHEM::SSChatBot::addQueue ($params);
+               $ret = FHEM::SSChatBot::addSendqueue ($params);
            
                if($ret) {
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 2, "$name - ERROR: $ret");
-               } else {
+               } 
+               else {
                    $ret = "Chat message [$key] of transaction \"$tac\" for \"$_\" added to \"$chatbot\" sendqueue";
                    readingsSingleUpdate($hash, "sendChatState", $ret, 1);
                    Log3($name, 3, "$name - $ret");
@@ -9948,32 +9954,37 @@ return;
 ####################################################################################################
 #                            Daten extrahieren für SSChatBot Versand
 ####################################################################################################
-sub extractForChat {
-  my ($name,$key,$paref) = @_;
-  my $hash               = $defs{$name};
-  my $subject            = $paref->{subject};
-  my $sdat               = $paref->{sdat};                           # Hash von Imagedaten base64 codiert
-  my $vdat               = $paref->{vdat};                           # Hashref der Videodaten   
+sub __extractForChat {
+  my $name    = shift;
+  my $key     = shift;
+  my $paref   = shift;
+  my $hash    = $defs{$name};
+  my $subject = $paref->{subject};
+  my $sdat    = $paref->{sdat};                           # Hash von Imagedaten base64 codiert
+  my $vdat    = $paref->{vdat};                           # Hashref der Videodaten   
+  
   my ($fname,$tdir,$ct,$cache);
   
   if($sdat) {
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                    # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{sdat}{$key}{createdTm};
-          $fname = trim(delete $paref->{sdat}{$key}{fileName});      
-      } else {
+          $ct    = $paref->{sdat}{$key}{createdTm};
+          $fname = trim ($paref->{sdat}{$key}{fileName});      
+      } 
+      else {
           $ct    = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
           $fname = trim( cache($name, "c_read", "$sdat"."{$key}{fileName}") );        
       }
   } 
   
   if($vdat) {
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                    # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{vdat}{$key}{createdTm};
-          $fname = trim(delete $paref->{vdat}{$key}{fileName});
-          $tdir  = trim(delete $paref->{vdat}{$key}{tdir});
-      } else {
+          $ct    = $paref->{vdat}{$key}{createdTm};
+          $fname = trim ($paref->{vdat}{$key}{fileName});
+          $tdir  = trim ($paref->{vdat}{$key}{tdir});
+      } 
+      else {
           $ct    = cache($name, "c_read", "$vdat"."{$key}{createdTm}");  
           $fname = trim( cache($name, "c_read", "$vdat"."{$key}{fileName}") );
           $tdir  = trim( cache($name, "c_read", "$vdat"."{$key}{tdir}") );
@@ -9987,10 +9998,49 @@ sub extractForChat {
 return ($subject,$fname);
 }
 
+###############################################################################
+#                 Vorbereitung Versand Telegramnachrichten
+###############################################################################
+sub _prepSendTelegram { 
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
+   my $name   = $hash->{NAME};
+
+   my ($tbott,$peert,$subjt);
+   
+   $mt    =~ s/['"]//gx;
+   
+   my ($telebot,$peers,$subj) =  split(",",  $mt, 3  );
+   $tbott                     = (split("=>", $telebot))[1] if($telebot);
+   $peert                     = (split("=>", $peers  ))[1] if($peers);
+   $subjt                     = (split("=>", $subj   ))[1] if($subj);
+
+   $tbott = trim($tbott) if($tbott);
+   $peert = trim($peert) if($peert);
+   
+   if($subjt) {
+       $subjt = trim($subjt);
+       $subjt =~ s/\$CAM/$calias/gx;
+       $subjt =~ s/\$DATE/$date/gx;
+       $subjt =~ s/\$TIME/$time/gx;
+   }       
+   
+   my %telemsg       = ();
+   $telemsg{tbot}    = "$tbott" if($tbott);
+   $telemsg{peers}   = "$peert" if($peert);
+   $telemsg{subject} = "$subjt" if($subjt);
+   
+return \%telemsg;
+}
+
 #############################################################################################
 #                                   Telegram-Versand
 #############################################################################################
-sub sendTelegram { 
+sub _sendTelegram { 
    my ($hash, $extparamref) = @_;
    my $name = $hash->{NAME};
    my $type = AttrVal($name,"cacheType","internal");
@@ -10089,12 +10139,13 @@ sub sendTelegram {
           @as = sort{$b<=>$a}keys%{$data{SSCam}{$name}{PARAMS}{$tac}{vdat}};
       }
       for my $key (@as) {
-           ($msg,$subject,$MediaStream,$fname) = extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-           $ret = TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
            if($ret) {
                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
                Log3($name, 2, "$name - ERROR: $ret");
-           } else {
+           } 
+           else {
                $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
                Log3($name, 3, "$name - $ret");
@@ -10103,7 +10154,8 @@ sub sendTelegram {
       $data{SSCam}{$name}{SENDCOUNT}{$tac} -= 1;
       Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
       
-  } else {
+  } 
+  else {
       # alle Serial Numbers "{$sn}" der Transaktion ermitteln 
       if($data{SSCam}{$name}{PARAMS}{$tac}{sdat}) {                                          # Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
           extractTIDfromCache ( { name  => $name, 
@@ -10127,12 +10179,13 @@ sub sendTelegram {
       @unique = sort{$b<=>$a} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
       
       for my $key (@unique) {
-           ($msg,$subject,$MediaStream,$fname) = extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
-           $ret = TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
+           ($msg,$subject,$MediaStream,$fname) = __extractForTelegram($name,$key,$data{SSCam}{$name}{PARAMS}{$tac});
+           $ret = __TBotSendIt($defs{$telebot}, $name, $fname, $peers, $msg, $subject, $MediaStream, undef, "");
            if($ret) {
                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
                Log3($name, 2, "$name - ERROR: $ret");
-           } else {
+           } 
+           else {
                $ret = "Telegram message [$key] of transaction \"$tac\" sent to \"$peers\" by \"$telebot\" ";
                readingsSingleUpdate($hash, "sendTeleState", $ret, 1);
                Log3($name, 3, "$name - $ret");
@@ -10152,7 +10205,7 @@ return;
 ####################################################################################################
 #                                Bilddaten extrahieren für Telegram Versand
 ####################################################################################################
-sub extractForTelegram {
+sub __extractForTelegram {
   my ($name,$key,$paref) = @_;
   my $hash               = $defs{$name};
   my $subject            = $paref->{subject};
@@ -10164,14 +10217,15 @@ sub extractForTelegram {
   if($sdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct     = delete $paref->{sdat}{$key}{createdTm};
-          $img    = delete $paref->{sdat}{$key}{imageData};
-          $fname  = trim(delete $paref->{sdat}{$key}{fileName});
+          $ct     = $paref->{sdat}{$key}{createdTm};
+          $img    = $paref->{sdat}{$key}{imageData};
+          $fname  = trim ($paref->{sdat}{$key}{fileName});
           $data   = MIME::Base64::decode_base64($img); 
           Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for TelegramBot prepare");
           undef $img;
           
-      } else {
+      } 
+      else {
           $ct    = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
           $img   = cache($name, "c_read", "$sdat"."{$key}{imageData}");
           $fname = trim( cache($name, "c_read", "$sdat"."{$key}{fileName}") );
@@ -10183,11 +10237,12 @@ sub extractForTelegram {
   if($vdat) {
       $cache = cache($name, "c_init");              # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
-          $ct    = delete $paref->{vdat}{$key}{createdTm};
-          $data  = delete $paref->{vdat}{$key}{imageData};
-          $fname = trim(delete $paref->{vdat}{$key}{fileName});
+          $ct    = $paref->{vdat}{$key}{createdTm};
+          $data  = $paref->{vdat}{$key}{imageData};
+          $fname = trim ($paref->{vdat}{$key}{fileName});
           Log3($name, 4, "$name - Video data sequence [$key] got from internal Cache for TelegramBot prepare");
-      } else {
+      } 
+      else {
           $ct    = cache($name, "c_read", "$vdat"."{$key}{createdTm}");  
           $data  = cache($name, "c_read", "$vdat"."{$key}{imageData}");
           $fname = trim( cache($name, "c_read", "$vdat"."{$key}{fileName}") );      
@@ -10207,7 +10262,7 @@ return ($data,$subject,$MediaStream,$fname);
 #                  $hash    = Hash des verwendeten TelegramBot-Devices !
 #                  $isMedia = -1 wenn Foto, -30 wenn Aufnahme
 ####################################################################################################
-sub TBotSendIt {
+sub __TBotSendIt {
   my ($hash, $camname, $fname, @args) = @_;
   my ($peers, $msg, $addPar, $isMedia, $replyid, $options, $retryCount) = @args;
   my $name = $hash->{NAME};
@@ -10220,7 +10275,7 @@ sub TBotSendIt {
   # increase retrycount for next try
   $args[$TBotArgRetrycnt] = $retryCount+1;
   
-  Log3($camname, 5, "$camname - TBotSendIt: called ");
+  Log3($camname, 5, "$camname - __TBotSendIt: called ");
 
   # ignore all sends if disabled
   return if (AttrVal($name,"disable",0));
@@ -10230,7 +10285,7 @@ sub TBotSendIt {
 
   if ((defined( $hash->{sentMsgResult})) && ($hash->{sentMsgResult} =~ /^WAITING/x) && ($retryCount == 0) ){
       # add to queue
-      Log3($camname, 4, "$camname - TBotSendIt: add send to queue :$peers: -:".
+      Log3($camname, 4, "$camname - __TBotSendIt: add send to queue :$peers: -:".
           TelegramBot_MsgForLog($msg, ($isMedia<0)).": - :".(defined($addPar)?$addPar:"<undef>").":");
       push(@{$hash->{sentQueue}}, \@args);
       return;
@@ -10249,10 +10304,10 @@ sub TBotSendIt {
       # remove msgid from options and also replyid reset
       my $sepoptions = $options;
       $sepoptions    =~ s/-msgid-//x;
-      TBotSendIt($hash,$camname,$fname,$peers,$msg,$addPar,$isMedia,undef,$sepoptions);
+      __TBotSendIt($hash,$camname,$fname,$peers,$msg,$addPar,$isMedia,undef,$sepoptions);
   }
   
-  Log3($camname, 5, "$camname - TBotSendIt: try to send message to :$peer: -:".
+  Log3($camname, 5, "$camname - __TBotSendIt: try to send message to :$peer: -:".
       TelegramBot_MsgForLog($msg, ($isMedia<0) ).": - add :".(defined($addPar)?$addPar:"<undef>").
       ": - replyid :".(defined($replyid)?$replyid:"<undef>").
       ":".":    options :".$options.":");
@@ -10284,7 +10339,7 @@ sub TBotSendIt {
   # Start Versand
   if (!defined($ret)) {
       # add chat / user id (no file) --> this will also do init
-      $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "chat_id", undef, $peer2, 0 ) if ( $peer );
+      $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "chat_id", undef, $peer2, 0 ) if ( $peer );
       
       if (abs($isMedia) == 1) {
           # Foto send    
@@ -10296,16 +10351,17 @@ sub TBotSendIt {
               $addPar =~ s/(?<![\\])\\n/\x0A/gx;
               $addPar =~ s/(?<![\\])\\t/\x09/gx;
 
-              $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if (!defined($ret));
+              $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0 ) if (!defined($ret));
               $addPar = undef;
           }
       
           # add msg or file or stream
-          Log3($camname, 4, "$camname - TBotSendIt: Filename for image file :".
+          Log3($camname, 4, "$camname - __TBotSendIt: Filename for image file :".
             TelegramBot_MsgForLog($msg, ($isMedia<0) ).":");
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "photo", undef, $msg, $isMedia) if(!defined($ret));
       
-      } elsif ( abs($isMedia) == 30 ) {
+      } 
+      elsif ( abs($isMedia) == 30 ) {
           # Video send    
           $hash->{sentMsgText}         = "Image: ".TelegramBot_MsgForLog($msg,($isMedia<0)).((defined($addPar))?" - ".$addPar:"");
           $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendVideo";
@@ -10315,15 +10371,16 @@ sub TBotSendIt {
               $addPar =~ s/(?<![\\])\\n/\x0A/gx;
               $addPar =~ s/(?<![\\])\\t/\x09/gx;
 
-              $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0) if(!defined($ret));
+              $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "caption", undef, $addPar, 0) if(!defined($ret));
               $addPar = undef;
           }
       
           # add msg or file or stream
-          Log3($camname, 4, "$camname - TBotSendIt: Filename for image file :".$fname.":");
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "video", undef, $msg, $isMedia) if(!defined($ret));
+          Log3($camname, 4, "$camname - __TBotSendIt: Filename for image file :".$fname.":");
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "video", undef, $msg, $isMedia) if(!defined($ret));
       
-      } else {
+      } 
+      else {
           # nur Message senden
           $msg = "No media File was created by SSCam. Can't send it.";
           $hash->{HU_DO_PARAMS}->{url} = TelegramBot_getBaseURL($hash)."sendMessage";
@@ -10332,11 +10389,11 @@ sub TBotSendIt {
         
           if ($parseMode == 1) {
               $parseMode = "Markdown";
-        
-          } elsif ($parseMode == 2) {
+          } 
+          elsif ($parseMode == 2) {
               $parseMode = "HTML";
-        
-          } elsif ($parseMode == 3) {
+          } 
+          elsif ($parseMode == 3) {
               $parseMode = 0;
               if ($msg =~ /^markdown(.*)$/ix) {
                   $msg = $1;
@@ -10345,16 +10402,17 @@ sub TBotSendIt {
                   $msg = $1;
                   $parseMode = "HTML";
               }
-        
-          } else {
+          } 
+          else {
               $parseMode = 0;
           }
       
-          Log3($camname, 4, "$camname - TBotSendIt: parseMode $parseMode");
+          Log3($camname, 4, "$camname - __TBotSendIt: parseMode $parseMode");
     
           if (length($msg) > 1000) {
               $hash->{sentMsgText} = substr($msg, 0, 1000)."...";
-          } else {
+          } 
+          else {
               $hash->{sentMsgText} = $msg;
           }
         
@@ -10362,49 +10420,49 @@ sub TBotSendIt {
           $msg =~ s/(?<![\\])\\t/\x09/gx;
 
           # add msg (no file)
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "text", undef, $msg, 0) if(!defined($ret));
 
           # add parseMode
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0) if((!defined($ret)) && ($parseMode));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "parse_mode", undef, $parseMode, 0) if((!defined($ret)) && ($parseMode));
 
           # add disable_web_page_preview       
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_web_page_preview", undef, \1, 0) 
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_web_page_preview", undef, \1, 0) 
             if ((!defined($ret))&&(!AttrVal($name,'webPagePreview',1)));            
       }
 
       if (defined($replyid)) {
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_to_message_id", undef, $replyid, 0) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_to_message_id", undef, $replyid, 0) if(!defined($ret));
       }
 
       if (defined($addPar)) {
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, $addPar, 0) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, $addPar, 0) if(!defined($ret));
       } elsif ($options =~ /-force_reply-/x) {
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, "{\"force_reply\":true}", 0 ) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "reply_markup", undef, "{\"force_reply\":true}", 0 ) if(!defined($ret));
       }
 
       if ($options =~ /-silent-/x) {
-          $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_notification", undef, "true", 0) if(!defined($ret));
+          $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, "disable_notification", undef, "true", 0) if(!defined($ret));
       }
 
       # finalize multipart 
-      $ret = TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0) if(!defined($ret));
+      $ret = __TBotAddMultipart($hash, $fname, $hash->{HU_DO_PARAMS}, undef, undef, undef, 0) if(!defined($ret));
 
   }
   
   if (defined($ret)) {
-      Log3($camname, 3, "$camname - TBotSendIt: Failed with :$ret:");
+      Log3($camname, 3, "$camname - __TBotSendIt: Failed with :$ret:");
       TelegramBot_Callback($hash->{HU_DO_PARAMS}, $ret, "");
-
-  } else {
+  } 
+  else {
       $hash->{HU_DO_PARAMS}->{args} = \@args;
     
       # if utf8 is set on string this will lead to length wrongly calculated in HTTPUtils (char instead of bytes) for some installations
       if ((AttrVal($name,'utf8Special',0)) && (utf8::is_utf8($hash->{HU_DO_PARAMS}->{data}))) {
-          Log3 $camname, 4, "$camname - TBotSendIt: utf8 encoding for data in message ";
+          Log3 $camname, 4, "$camname - __TBotSendIt: utf8 encoding for data in message ";
           utf8::downgrade($hash->{HU_DO_PARAMS}->{data}); 
       }
     
-      Log3($camname, 4, "$camname - TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
+      Log3($camname, 4, "$camname - __TBotSendIt: timeout for sent :".$hash->{HU_DO_PARAMS}->{timeout}.": ");
       HttpUtils_NonblockingGet($hash->{HU_DO_PARAMS});
   }
   
@@ -10427,7 +10485,7 @@ return $ret;
 #     
 #   returns string in case of error or undef
 ####################################################################################################
-sub TBotAddMultipart {
+sub __TBotAddMultipart {
   my ($hash, $fname, $params, $parname, $parheader, $parcontent, $isMedia ) = @_;
   my $name = $hash->{NAME};
 
@@ -10468,19 +10526,19 @@ sub TBotAddMultipart {
           }
       
       } elsif ($isMedia < 0) {
-          my ($im, $ext)   = TBotIdentifyStream($hash, $parcontent);
+          my ($im, $ext)   = __TBotIdentifyStream($hash, $parcontent);
           $fname           =~ s/.mp4$/.$ext/x;
           $parheader       = "Content-Disposition: form-data; name=\"".$parname."\"; filename=\"".$fname."\"\r\n".$parheader."\r\n";
           $finalcontent    = $parcontent;
-      
-      } else {
+      } 
+      else {
           $parheader    = "Content-Disposition: form-data; name=\"".$parname."\"\r\n".$parheader."\r\n";
           $finalcontent = $parcontent;
       }
     
       $params->{data} .= $parheader.$finalcontent."\r\n";
-    
-  } else {
+  } 
+  else {
       return( "No content defined for multipart" ) if ( length( $params->{data} ) == 0 );
       $params->{data} .= "--".$params->{boundary}."--";     
   }
@@ -10493,7 +10551,7 @@ return;
 #                  Adaption der Sub "IdentifyStream" aus TelegramBot
 #                  $hash    = Hash des verwendeten TelegramBot-Devices !
 ####################################################################################################
-sub TBotIdentifyStream {
+sub __TBotIdentifyStream {
   my ($hash, $msg) = @_;
 
   # signatures for media files are documented here --> https://en.wikipedia.org/wiki/List_of_file_signatures
@@ -10506,10 +10564,45 @@ sub TBotIdentifyStream {
 return (0,undef);
 }
 
+###############################################################################
+#                 Vorbereitung Versand Mail Nachrichten
+###############################################################################
+sub _prepSendMail { 
+   my $paref  = shift;
+   my $hash   = $paref->{hash};
+   my $calias = $paref->{calias};
+   my $mt     = $paref->{mt};
+   my $date   = $paref->{date};
+   my $time   = $paref->{time};
+   my $name   = $hash->{NAME}; 
+   
+   $mt =~ s/['"]//gx;   
+   
+   my($subj,$body) =  split(",", $mt, 2);
+   my $subjt       = (split("=>", $subj))[1];
+   my $bodyt       = (split("=>", $body))[1];
+   
+   $subjt = trim($subjt);
+   $subjt =~ s/\$CAM/$calias/gx;
+   $subjt =~ s/\$DATE/$date/gx;
+   $subjt =~ s/\$TIME/$time/gx;
+   
+   $bodyt = trim($bodyt);
+   $bodyt =~ s/\$CAM/$calias/gx;
+   $bodyt =~ s/\$DATE/$date/gx;
+   $bodyt =~ s/\$TIME/$time/gx;
+   
+   my %smtpmsg       = ();
+   $smtpmsg{subject} = "$subjt";
+   $smtpmsg{body}    = "$bodyt";
+   
+return \%smtpmsg;
+}
+
 #############################################################################################
 #                                   SMTP EMail-Versand
 #############################################################################################
-sub sendEmail { 
+sub _sendEmail { 
    my ($hash, $extparamref) = @_;
    my $name = $hash->{NAME};
    my $timeout = 60;
@@ -10617,7 +10710,7 @@ sub sendEmail {
        return $ret;
    }
    
-   $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSCam::sendEmailblocking", $data{SSCam}{$name}{PARAMS}{$tac}, "FHEM::SSCam::sendEmaildone", $timeout, "FHEM::SSCam::sendEmailto", $hash);
+   $hash->{HELPER}{RUNNING_PID}           = BlockingCall("FHEM::SSCam::__sendEmailblocking", $data{SSCam}{$name}{PARAMS}{$tac}, "FHEM::SSCam::__sendEmaildone", $timeout, "FHEM::SSCam::__sendEmailto", $hash);
    $hash->{HELPER}{RUNNING_PID}{loglevel} = 5 if($hash->{HELPER}{RUNNING_PID});  # Forum #77057
       
    undef %mailparams;
@@ -10629,7 +10722,7 @@ return;
 ####################################################################################################
 #                                 nichtblockierendes Send EMail
 ####################################################################################################
-sub sendEmailblocking {
+sub __sendEmailblocking {                                                    ## no critic 'not used' 
   my ($paref)      = @_;                                        # der Referent wird in cleanData gelöscht
   my $name         = delete $paref->{name};
   my $cc           = delete $paref->{smtpCc};
@@ -10660,7 +10753,7 @@ sub sendEmailblocking {
   my ($err,$smtp,@as,$cache);
   
   # Credentials abrufen
-  my ($success, $username, $password) = getCredentials($hash,0,"smtp");
+  my ($success, $username, $password) = getCredentials($hash,0,"SMTPcredentials");
   
   unless ($success) {
       $err = "SMTP credentials couldn't be retrieved successfully - make sure you've set it with \"set $name smtpcredentials <username> <password>\"";
@@ -10695,7 +10788,6 @@ sub sendEmailblocking {
       );
   }
   
-  # no strict "refs";
   if($sdat) {
       ### Images liegen in einem Hash (Ref in $sdat) base64-codiert vor
       my ($ct,$img,$decoded);
@@ -10715,9 +10807,9 @@ sub sendEmailblocking {
               );
               Log3($name, 4, "$name - Image data sequence [$key] decoded from internal Cache for Email attachment") if($decoded); 
           }
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);
-          
-      } else {
+          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0); 
+      } 
+      else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln          
           extractTIDfromCache ( { name  => $name, 
                                   tac   => $tac, 
@@ -10729,8 +10821,7 @@ sub sendEmailblocking {
           my %seen;
           my @unique = sort{$a<=>$b} grep { !$seen{$_}++ } @as;                                 # distinct / unique the keys
 
-          # attach mail
-          for my $key (@unique) {
+          for my $key (@unique) {                                                               # attach mail
               next if(!cache($name, "c_isvalidkey", "$sdat"."{$key}{imageData}")); 
               $ct      = cache($name, "c_read", "$sdat"."{$key}{createdTm}");
               $img     = cache($name, "c_read", "$sdat"."{$key}{imageData}");
@@ -10748,10 +10839,9 @@ sub sendEmailblocking {
       }
   }
   
-  if($vdat) {
-      ### Videodaten (mp4) wurden geliefert
+  if($vdat) {                                                      # Videodaten (mp4) wurden geliefert
       my ($ct,$video);
-      $cache = cache($name, "c_init");              # Cache initialisieren        
+      $cache = cache($name, "c_init");                             # Cache initialisieren        
       if(!$cache || $cache eq "internal" ) {
           @as = sort{$a<=>$b}keys%{$vdat};
           for my $key (@as) {
@@ -10766,9 +10856,9 @@ sub sendEmailblocking {
               );
               Log3($name, 4, "$name - Video data sequence [$key] decoded from internal Cache for Email attachment"); 
           } 
-          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);          
-          
-      } else {
+          BlockingInformParent("FHEM::SSCam::subaddFromBlocking", [$name, "-", $tac], 0);              
+      } 
+      else {
           # alle Serial Numbers "{$sn}" der Transaktion ermitteln
           extractTIDfromCache ( { name  => $name, 
                                   tac   => $tac, 
@@ -10806,13 +10896,13 @@ sub sendEmailblocking {
       # Verwendung altes Net::SMTP::SSL <= 3.00 -> immer direkter SSL-Aufbau, Attribut "smtpNoUseSSL" wird ignoriert
       Log3($name, 3, "$name - Attribute \"smtpNoUseSSL\" will be ignored due to usage of Net::SMTP::SSL") if(AttrVal($name,"smtpNoUseSSL",0));
       $smtp = Net::SMTP::SSL->new(Host => $smtphost, Port => $smtpsslport, Debug => $smtpdebug);
-  } else {
+  } 
+  else {
       # Verwendung neues Net::SMTP::SSL > 3.00
-      if($sslfrominit) {
-          # sofortiger SSL connect
+      if($sslfrominit) {                                                        # sofortiger SSL connect
           $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpsslport, SSL => 1, Debug => $smtpdebug);
-      } else {
-          # erst unverschlüsselt, danach switch zu encrypted
+      } 
+      else {                                                                    # erst unverschlüsselt, danach switch zu encrypted
           $smtp = Net::SMTP->new(Host => $smtphost, Port => $smtpport, SSL => 0, Debug => $smtpdebug);
       }
   }
@@ -10824,8 +10914,7 @@ sub sendEmailblocking {
       return "$name|$err|''";   
   }
       
-  if(!$sslfb && !$sslfrominit) {  
-      # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
+  if(!$sslfb && !$sslfrominit) {                                               # Aufbau unverschlüsselt -> switch zu verschlüsselt wenn nicht untersagt  
       if($smtp->can_ssl() && !$smtpnousessl) {                      
           unless( $smtp->starttls ( SSL_verify_mode => 0, 
                                     SSL_version => "TLSv1_2:!TLSv1_1:!SSLv3:!SSLv23:!SSLv2", 
@@ -10838,10 +10927,12 @@ sub sendEmailblocking {
           
           $sslver = $smtp->get_sslversion();
           Log3($name, 3, "$name - SMTP-Host $smtphost switched to encrypted connection with SSL version: $sslver");
-      } else {
+      } 
+      else {
           Log3($name, 3, "$name - SMTP-Host $smtphost use unencrypted connection !");
       }
-  } else {
+  } 
+  else {
       eval { $sslver = $smtp->get_sslversion(); };        ## no critic 'eval not tested' # Forum: https://forum.fhem.de/index.php/topic,45671.msg880602.html#msg880602
       $sslver = $sslver ? $sslver : "n.a.";
       Log3($name, 3, "$name - SMTP-Host $smtphost use immediately encrypted connection with SSL version: $sslver");      
@@ -10910,8 +11001,6 @@ sub sendEmailblocking {
   my $ret = "Email transaction \"$tac\" successfully sent ".( $sslver?"encoded by $sslver":""  ); 
   Log3($name, 3, "$name - $ret To: $to".(($cc)?", CC: $cc":"") );
   
-  # use strict "refs";
-  
   # Daten müssen als Einzeiler zurückgegeben werden
   $ret = encode_base64($ret,"");
  
@@ -10921,17 +11010,18 @@ return "$name|''|$ret";
 ####################################################################################################
 #                   Auswertungsroutine nichtblockierendes Send EMail
 ####################################################################################################
-sub sendEmaildone {
-  my ($string) = @_;
-  my @a        = split("\\|",$string);
-  my $hash     = $defs{$a[0]};
-  my $err      = $a[1]?decode_base64($a[1]):undef;
-  my $ret      = $a[2]?decode_base64($a[2]):undef;
+sub __sendEmaildone {                                                        ## no critic 'not used'
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $hash   = $defs{$a[0]};
+  my $err    = $a[1] ? trim(decode_base64($a[1])) : undef;
+  my $ret    = $a[2] ? trim(decode_base64($a[2])) : undef;
   
   if ($err) {
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash,"sendEmailState",$err);
-      readingsEndUpdate($hash, 1);
+      readingsBulkUpdate ($hash,"sendEmailState",$err);
+      readingsEndUpdate  ($hash, 1);
+      
       delete($hash->{HELPER}{RUNNING_PID});
       return;
   } 
@@ -10948,7 +11038,7 @@ return;
 ####################################################################################################
 #                               Abbruchroutine Send EMail
 ####################################################################################################
-sub sendEmailto {
+sub __sendEmailto {                                                          ## no critic 'not used' 
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME}; 
   
@@ -10976,12 +11066,11 @@ return;
 #################################################################################################
 sub extractTIDfromCache { 
   my $params = shift;
-  
-  my $name  = $params->{name};
-  my $tac   = $params->{tac};
-  my $media = $params->{media};
-  my $mode  = $params->{mode};
-  my $aref  = $params->{aref};
+  my $name   = $params->{name};
+  my $tac    = $params->{tac};
+  my $media  = $params->{media};
+  my $mode   = $params->{mode};
+  my $aref   = $params->{aref};
   
   if($mode eq "serial") {                                                                # Serial Nummern auslesen
       for my $ck (cache($name, "c_getkeys")) {                                           
@@ -11006,36 +11095,6 @@ return;
 }
 
 #############################################################################################
-#                                   Token setzen
-#############################################################################################
-sub setActiveToken { 
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-               
-   $hash->{HELPER}{ACTIVE} = "on";
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token set by OPMODE: $hash->{OPMODE}");
-   } 
-   
-return;
-}
-
-#############################################################################################
-#                                   Token freigeben
-#############################################################################################
-sub delActiveToken { 
-   my ($hash) = @_;
-   my $name = $hash->{NAME};
-               
-   $hash->{HELPER}{ACTIVE} = "off";
-   if (AttrVal($name,"debugactivetoken",0)) {
-       Log3($name, 1, "$name - Active-Token deleted by OPMODE: $hash->{OPMODE}");
-   }  
-   
-return;
-}  
-
-#############################################################################################
 #              Transaktion starten oder vorhandenen TA Code zurück liefern
 #############################################################################################
 sub openOrgetTrans { 
@@ -11048,9 +11107,9 @@ sub openOrgetTrans {
        $hash->{HELPER}{TRANSACTION} = $tac;
        if (AttrVal($name,"debugactivetoken",0)) {
            Log3($name, 1, "$name - Transaction opened, TA-code: $tac");
-       } 
-       
-   } else {
+       }    
+   } 
+   else {
        $tac = $hash->{HELPER}{TRANSACTION};         # vorhandenen Transaktionscode zurück liefern
    }
    
@@ -11065,9 +11124,10 @@ sub closeTrans {
    my $name = $hash->{NAME};
    
    my $tac = delete $hash->{HELPER}{TRANSACTION};            # diese Transaktion beenden
-   $tac    = $tac?$tac:"";
-   cleanData("$name:$tac");                            # %data Hash & Cache bereinigen
+   $tac    = $tac // q{};
+   
    return if(!$tac); 
+   cleanData("$name:$tac");                                  # %data Hash & Cache bereinigen
       
    Log3($name, 1, "$name - Transaction \"$tac\" closed") if(AttrVal($name,"debugactivetoken",0));
    
@@ -11090,8 +11150,7 @@ sub cleanData {
       return;
   } 
   
-  if(AttrVal($name,"cacheType","internal") eq "internal") {
-      # internes Caching
+  if(AttrVal($name, "cacheType", "internal") eq "internal") {                                # internes Caching
       if($tac) {
           if($data{SSCam}{RS}{$tac}) {
               delete $data{SSCam}{RS}{$tac};
@@ -11112,8 +11171,8 @@ sub cleanData {
           if ($del && AttrVal($name,"debugactivetoken",0)) {
               Log3($name, 1, "$name - Data of Transaction \"$tac\" deleted");
           }
-      
-      } else {
+      } 
+      else {
           delete $data{SSCam}{RS};
           delete $data{SSCam}{$name}{SENDRECS};
           delete $data{SSCam}{$name}{SENDSNAPS};
@@ -11122,9 +11181,8 @@ sub cleanData {
               Log3($name, 1, "$name - Data of internal Cache removed");
           }      
       }
-      
-  } else {
-      # Caching mit CHI
+  } 
+  else {                                                                                   # Caching mit CHI
       my @as = cache($name, "c_getkeys");
       if($tac) {
           for my $k (@as) {
@@ -11137,7 +11195,8 @@ sub cleanData {
               Log3($name, 1, "$name - Data of Transaction \"$tac\" removed");
           }
       
-      } else {
+      } 
+      else {
           cache($name, "c_clear");
           if (AttrVal($name,"debugactivetoken",0)) {
               Log3($name, 1, "$name - Data of CHI-Cache removed");
@@ -11167,16 +11226,6 @@ sub subaddFromBlocking {
   Log3($name, 1, "$name - Send Counter transaction \"$tac\": ".$data{SSCam}{$name}{SENDCOUNT}{$tac}) if(AttrVal($name,"debugactivetoken",0));
 
 return;
-}
-
-#############################################################################################
-#             Leerzeichen am Anfang / Ende eines strings entfernen           
-#############################################################################################
-sub trim {
-  my $str = shift;
-  $str =~ s/^\s+|\s+$//gx;
-
-return ($str);
 }
 
 #############################################################################################
@@ -11292,7 +11341,8 @@ sub cache {
               $error = (split("at ./FHEM",$error))[0];
               Log3($name, 1, "$name - ERROR - $error");
               return 0;
-          } else {
+          } 
+          else {
               $hash->{HELPER}{REDISKEY} = $r;
           }
            
@@ -11343,7 +11393,8 @@ sub cache {
           $brt = tv_interval($bst);
           Log3($name, 1, "$name - Cache time to create \"$type\": ".$brt) if(AttrVal($name,"debugCachetime",0));
           return $type;
-      } else {
+      } 
+      else {
           Log3($name, 3, "$name - no cache \"$type\" available.");
       }
       return 0;
@@ -11354,7 +11405,8 @@ sub cache {
   
   if($hash->{HELPER}{CACHEKEY}) {
       $cache = $hash->{HELPER}{CACHEKEY};
-  } else {
+  } 
+  else {
       return 0;
   }
   
@@ -11369,7 +11421,8 @@ sub cache {
               delete $hash->{HELPER}{CACHEKEY}; 
               return 0;          
           }
-      } else {
+      } 
+      else {
           Log3($name, 1, "$name - ERROR - no constructor for Redis server is created");
           return 0;
       }
@@ -11389,12 +11442,14 @@ sub cache {
       if (!defined $dat) {
           Log3($name, 1, "$name - ERROR - No data for Cache with key: $key ");
       }
+      
       if($key) {
           $cache->set($key,$dat);
           $brt = tv_interval($bst);
           Log3($name, 1, "$name - Cache time write key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
           return 1;
-      } else {
+      } 
+      else {
           Log3($name, 1, "$name - ERROR - no key for \"$type\" cache !");
       }
   }
@@ -11404,9 +11459,11 @@ sub cache {
       my $g = $cache->get($key);
       $brt  = tv_interval($bst);
       Log3($name, 1, "$name - Cache time read key \"$key\": ".$brt) if(AttrVal($name,"debugCachetime",0));
+      
       if(!$g) {
           return "";     
-      } else {      
+      } 
+      else {      
           return $g;
       }
   }
@@ -11448,38 +11505,231 @@ sub cache {
 return 0;
 }
 
-#############################################################################################
-#                          Versionierungen des Moduls setzen
-#                  Die Verwendung von Meta.pm und Packages wird berücksichtigt
-#############################################################################################
-sub setVersionInfo {
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-
-  my $v                    = (sortVersion("desc",keys %vNotesIntern))[0];
-  my $type                 = $hash->{TYPE};
-  $hash->{HELPER}{PACKAGE} = __PACKAGE__;
-  $hash->{HELPER}{VERSION} = $v;
+######################################################################################
+#                   initiale Startroutinen nach Restart FHEM
+######################################################################################
+sub initOnBoot {
+  my $hash = shift;
+  my $name = $hash->{NAME};
   
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-      # META-Daten sind vorhanden
-      $modules{$type}{META}{version} = "v".$v;                                                  # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                    # {x_version} ( nur gesetzt wenn $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
-      } else {
-          $modules{$type}{META}{x_version} = $v; 
-      }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                       # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 49_SSCam.pm 22600 2020-08-14 19:22:36Z DS_Starter $ im Kopf komplett! vorhanden )
-      if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
-          # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
-          # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-          use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                 ## no critic 'VERSION'                                      
-      }
-  } else {
-      # herkömmliche Modulstruktur
-      $hash->{VERSION} = $v;
+  RemoveInternalTimer($hash, "FHEM::SSCam::initOnBoot");
+  
+  if($init_done == 1) {
+     RemoveInternalTimer($hash);                                                                     # alle Timer löschen
+     
+     delete($defs{$name}{READINGS}{LiveStreamUrl}) if($defs{$name}{READINGS}{LiveStreamUrl});        # LiveStream URL zurücksetzen
+     
+     if (ReadingsVal($hash->{NAME}, "Record", "Stop") eq "Start") {                                  # check ob alle Recordings = "Stop" nach Reboot -> sonst stoppen
+         Log3($name, 2, "$name - Recording of $hash->{CAMNAME} seems to be still active after FHEM restart - try to stop it now");
+         __camStopRec($hash);
+     }
+         
+     if (!$hash->{CREDENTIALS}) {                                                                    # Konfiguration der Synology Surveillance Station abrufen
+         Log3($name, 2, qq{$name - Credentials of $name are not set - make sure you've set it with "set $name credentials <username> <password>"});
+     } 
+     else {
+         readingsSingleUpdate($hash, "compstate", "true", 0);                                        # Anfangswert f. versionCheck setzen
+         __getCaminfoAll($hash,1);                                                                   # "1" ist Statusbit für manuelle Abfrage, kein Einstieg in Pollingroutine
+         versionCheck($hash);                                                                        # Einstieg in regelmäßigen Check Kompatibilität
+     }
+         
+     # Subroutine Watchdog-Timer starten (sollen Cam-Infos regelmäßig abgerufen werden ?), verzögerter zufälliger Start 0-30s 
+     RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
+     InternalTimer      (gettimeofday()+int(rand(30)), "FHEM::SSCam::wdpollcaminfo", $hash, 0);
+  
+  } 
+  else {
+      InternalTimer(gettimeofday()+3, "FHEM::SSCam::initOnBoot", $hash, 0);
   }
   
+return;
+}
+
+###############################################################################
+#          Dauerschleife Kompatibilitätscheck SSCam <-> SVS
+###############################################################################
+sub versionCheck {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $rc   = 21600;
+  
+  RemoveInternalTimer($hash, "FHEM::SSCam::versionCheck");
+  return if(IsDisabled($name));
+
+  my $cs = ReadingsVal($name, "compstate", "true");
+  if($cs eq "false") {
+      Log3($name, 2, "$name - WARNING - The current/simulated SVS-version ".ReadingsVal($name, "SVSversion", "").
+       " may be incompatible with SSCam version $hash->{HELPER}{VERSION}. ".
+       "For further information execute \"get $name versionNotes 4\".");
+  }
+  
+InternalTimer(gettimeofday()+$rc, "FHEM::SSCam::versionCheck", $hash, 0);
+
+return; 
+}
+
+################################################################
+#               return 0 - Startmeldung OpMode im Log 
+#               return 1 - wenn Shutdown läuft
+################################################################
+sub startOrShut {                      
+  my $name = shift;
+  my $hash = $defs{$name};
+  
+  if ($shutdownInProcess) {                                                             # shutdown in Proces -> keine weiteren Aktionen
+      Log3($name, 3, "$name - Shutdown in process. No more activities allowed.");
+      return 1;       
+  }
+  
+  Log3($name, 4, "$name - ####################################################"); 
+  Log3($name, 4, "$name - ###    start cam operation $hash->{OPMODE}          "); 
+  Log3($name, 4, "$name - ####################################################"); 
+          
+return 0;
+}
+
+###############################################################################
+# Err-Status / Log setzen wenn Device Verfügbarkeit disabled oder disconnected          
+###############################################################################
+sub exitOnDis { 
+  my $name = shift;
+  my $log  = shift;
+  my $hash = $defs{$name};
+  
+  my $exit = 0;
+  
+  my $errorcode = "000";
+  my $avail     = ReadingsVal($name, "Availability", "");
+  
+  if ($avail eq "disabled") {
+      $errorcode = "402";
+      $exit      = 1;
+  } elsif ($avail eq "disconnected") {
+      $errorcode = "502";
+      $exit      = 1;
+  }
+
+  if($exit) {
+      my $error = expErrors($hash,$errorcode);                      # Fehlertext zum Errorcode ermitteln
+
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "Errorcode", $errorcode);
+      readingsBulkUpdate  ($hash, "Error",     $error    );
+      readingsEndUpdate   ($hash, 1);
+      
+      Log3($name, 2, "$name - ERROR - $log - $error");
+  }
+  
+return $exit;
+}
+
+###########################################################################
+#    plant die aufrufende Funktion mit einem Delta Time aus dem Hash %hdt
+#    neu mit InternalTimer ein
+#    $arg = Argument für InternalTimer
+###########################################################################
+sub schedule {
+  my $name = shift;
+  my $arg  = shift;
+  
+  my $pack   = __PACKAGE__;
+  my $caller = (caller(1))[3];
+  my $sub    = (split /${pack}::/x, $caller)[1];
+  my $dt     = $hdt{$sub};
+
+  if(!$dt) {
+      $dt = 1;
+      Debug (qq{$pack - no delta time found for function "$sub", use default of $dt seconds instead})
+  }
+  
+  InternalTimer(gettimeofday()+$dt, $caller, $arg, 0);
+    
+  if (AttrVal($name,"debugactivetoken",0)) {
+      Log3($name, 1, "$name - Function $caller scheduled again with delta time $dt seconds");  
+  }
+    
+return;           
+}
+
+###############################################################################
+#          Liefert die bereinigte SVS-Version dreistellig xxx
+###############################################################################
+sub myVersion {
+  my $hash  = shift;
+  my $name  = $hash->{NAME};
+  my $actvs = 0; 
+
+  my @vl = split (/-/x,ReadingsVal($name, "SVSversion", ""),2);
+  if(@vl) {
+      $actvs = $vl[0];
+      $actvs =~ s/\.//gx;
+  }
+  
+return $actvs; 
+}
+
+######################################################################################
+#                              Polling Überwachung
+# Überwacht die Wert von Attribut "pollcaminfoall" und Reading "PollState"
+# wenn Attribut "pollcaminfoall" > 10 und "PollState"=Inactive -> start Polling
+######################################################################################
+sub wdpollcaminfo {
+    my ($hash)   = @_;
+    my $name     = $hash->{NAME};
+    my $camname  = $hash->{CAMNAME};
+    my $pcia     = AttrVal($name,"pollcaminfoall",0); 
+    my $pnl      = AttrVal($name,"pollnologging",0); 
+    my $watchdogtimer = 60+rand(30);
+    my $lang     = AttrVal("global","language","EN");
+    
+    RemoveInternalTimer($hash, "FHEM::SSCam::wdpollcaminfo");
+
+    if ($hash->{HELPER}{OLDVALPOLLNOLOGGING} != $pnl) {                                             # Poll-Logging prüfen
+        $hash->{HELPER}{OLDVALPOLLNOLOGGING} = $pnl;                                                # aktuellen pollnologging-Wert in $hash eintragen für späteren Vergleich
+        if ($pnl) {
+            Log3($name, 3, "$name - Polling-Log of $camname is deactivated");          
+        } 
+        else {
+            Log3($name, 3, "$name - Polling-Log of $camname is activated");
+        }
+    }    
+    
+    if ($pcia && !IsDisabled($name)) {                                                              # Polling prüfen
+        if(ReadingsVal($name, "PollState", "Active") eq "Inactive") {
+            readingsSingleUpdate($hash,"PollState","Active",1);                                     # Polling ist jetzt aktiv
+            readingsSingleUpdate($hash,"state","polling",1) if(!IsModelCam($hash));                 # Polling-state bei einem SVS-Device setzten
+            Log3($name, 3, "$name - Polling of $camname is activated - Pollinginterval: $pcia s");
+            $hash->{HELPER}{OLDVALPOLL} = $pcia;                                                    # in $hash eintragen für späteren Vergleich (Changes von pollcaminfoall)
+            __getCaminfoAll($hash,0);  
+        }
+        
+        my $lupd = ReadingsVal($name, "LastUpdateTime", "1970-01-01 / 01:00:00");
+        my ($year,$month,$mday,$hour,$min,$sec);
+        
+        if ($lupd =~ /(\d+)\.(\d+)\.(\d+)/x) {
+            ($mday, $month, $year, $hour, $min, $sec) = ($lupd =~ /(\d+)\.(\d+)\.(\d+)\s\/\s(\d+):(\d+):(\d+)/x);
+        } 
+        else {
+            ($year, $month, $mday, $hour, $min, $sec) = ($lupd =~ /(\d+)-(\d+)-(\d+)\s\/\s(\d+):(\d+):(\d+)/x);        
+        }
+        
+        $lupd = fhemTimeLocal($sec, $min, $hour, $mday, $month-=1, $year-=1900);
+        
+        if( gettimeofday() > ($lupd + $pcia + 20) ) {
+            __getCaminfoAll($hash,0);  
+        }
+        
+    }
+    
+    if (defined($hash->{HELPER}{OLDVALPOLL}) && $pcia) {
+        if ($hash->{HELPER}{OLDVALPOLL} != $pcia) {
+            Log3($name, 3, "$name - Pollinginterval of $camname has been changed to: $pcia s");
+            $hash->{HELPER}{OLDVALPOLL} = $pcia;
+        }
+    }
+
+    InternalTimer(gettimeofday()+$watchdogtimer, "FHEM::SSCam::wdpollcaminfo", $hash, 0);
+    
 return;
 }
 
@@ -11756,7 +12006,8 @@ return;
     
   <ul>  
     All functions of SSCam use HTTP-calls to SVS Web API. <br>
-    The default-value of HTTP-Timeout amounts 4 seconds. You can set the <a href="#SSCamattr">attribute</a> "httptimeout" > 0 to adjust the value as needed in your technical environment. <br>
+    You can set the attribute <a href="#httptimeout">httptimeout</a> &gt; 0 to adjust 
+    the value as needed in your technical environment. <br>
     
   </ul>
   <br><br><br>
@@ -12062,10 +12313,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc camera [sensitivity] [threshold] [percentage] </td><td># command pattern  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                </td><td># set the sensitivity to 89, percentage to 20  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                </td><td># keep old value for sensitivity, set threshold to 40, percentage to 10  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 30                                     </td><td># set the sensitivity to 30, other values keep unchanged  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera [sensitivity] [object size] [percentage] </td><td># command pattern  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                  </td><td># set the sensitivity to 89, percentage to 20  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                  </td><td># keep old value for sensitivity, set threshold to 40, percentage to 10  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 30                                       </td><td># set the sensitivity to 30, other values keep unchanged  </td></tr>
       </table>
   </ul>
   <br><br>
@@ -12466,6 +12717,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   With SSCam the properties of SVS and defined Cameras could be retrieved. <br>
   The specified get-commands are available for CAM/SVS-devices or only valid for CAM-devices or rather for SVS-Devices. 
   They can be selected in the drop-down-menu of the particular device. <br><br>
+  
+  <ul>
+  <a name="apiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Retrieves the API information of the Synology Surveillance Station and open a popup window with its data.
+  <br>
+  </li><br>
+  </ul>
 
   <ul>
   <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for CAM/SVS)</li> 
@@ -12497,33 +12757,35 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
 
   <ul>
-  <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS)</li> <br>
+    <a name="listLog"></a>
+    <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Number of lines&gt;] [match:&lt;Searchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(valid for SVS) <br>
   
-  Fetches the Surveillance Station Log from Synology server. Without any further options the whole log will be retrieved. <br>
-  You can specify all or any of the following options: <br><br>
+    Fetches the Surveillance Station Log from Synology server. Without any further options the whole log will be retrieved. <br>
+    You can specify all or any of the following options: <br><br>
   
-  <ul>
-  <li> &lt;Loglevel&gt; - Information, Warning or Error. Only datasets having this severity are retrieved (default: all) </li>
-  <li> &lt;Number of lines&gt; - the specified number of lines  (newest) of the log are retrieved (default: all) </li>
-  <li> &lt;Searchstring&gt; - only log entries containing the searchstring are retrieved (Note: no Regex possible, the searchstring will be given into the call to SVS) </li>
-  </ul>
-  <br>
+    <ul>
+      <li> &lt;Loglevel&gt; - Information, Warning or Error. Only datasets having this severity are retrieved (default: all) </li>
+      <li> &lt;Number of lines&gt; - the specified number of lines  (newest) of the log are retrieved (default: all) </li>
+      <li> &lt;Searchstring&gt; - only log entries containing the searchstring are retrieved (Note: no Regex possible, the searchstring will be given into the call to SVS) </li>
+    </ul>
+    <br>
+    </li>
   
-  <b>Examples</b> <br>
-  <ul>
-  <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
-  Reports the last 5 Log entries with severity "Error" <br>
-  <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
-  Reports all Log entries with severity "Information" and containing the string "Carport" <br>
-  <code>get &lt;name&gt; listLog severity:Warning </code> <br>
-  Reports all Log entries with severity "Warning" <br><br>
-  </ul>
+    <b>Examples</b> <br>
+    <ul>
+      <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
+      Reports the last 5 Log entries with severity "Error" <br>
+      <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
+      Reports all Log entries with severity "Information" and containing the string "Carport" <br>
+      <code>get &lt;name&gt; listLog severity:Warning </code> <br>
+      Reports all Log entries with severity "Warning" <br><br>
+    </ul>
   
   
-  If the polling of SVS is activated by setting the <a href="#SSCamattr">attribute</a> "pollcaminfoall", the <a href="#SSCamreadings">reading</a> 
-  "LastLogEntry" will be created. <br>
-  In the protocol-setup of the SVS you can adjust what data you want to log. For further informations please have a look at
-  <a href="https://www.synology.com/en-uk/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Help</a>.
+    If the polling of SVS is activated by setting the <a href="#SSCamattr">attribute</a> "pollcaminfoall", the <a href="#SSCamreadings">reading</a> 
+    "LastLogEntry" will be created. <br>
+    In the protocol-setup of the SVS you can adjust what data you want to log. For further informations please have a look at
+    <a href="https://www.synology.com/en-uk/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Help</a>.
   </ul>
   <br><br>  
 
@@ -12755,7 +13017,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   If polling is used, the interval should be adjusted only as short as needed due to the detected camera values are predominantly static. <br>
   A feasible guide value for attribute "pollcaminfoall" could be between 600 - 1800 (s). <br>
   Per polling call and camera approximately 10 - 20 Http-calls will are stepped against Surveillance Station. <br>
-  Because of that if HTTP-Timeout (pls. refer <a href="#SSCamattr">Attribut</a> "httptimeout") is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
+  Because of that if HTTP-Timeout (pls. refer attribute <a href="#httptimeout">httptimeout</a>) is set to 4 seconds, the theoretical processing time couldn't be higher than 80 seconds. <br>
   Considering a safety margin, in that example you shouldn't set the polling interval lower than 160 seconds. <br><br>
 
   If several Cameras are defined in SSCam, attribute "pollcaminfoall" of every Cameras shouldn't be set exactly to the same value to avoid processing bottlenecks <br>
@@ -12896,8 +13158,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
-    Timeout-Value of HTTP-Calls to Synology Surveillance Station, Default: 4 seconds (if httptimeout = "0" 
-    or not set) </li><br>
+    Timeout-Value of HTTP-Calls to Synology Surveillance Station. <br> 
+    (default: 20 seconds) </li><br>
   
   <a name="htmlattr"></a>
   <li><b>htmlattr</b><br>
@@ -12939,7 +13201,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
-    Interval of automatic polling the Camera properties (if <= 10: no polling, if &gt; 10: polling with interval) 
+    Interval of automatic polling the Camera properties (&lt;= 10: no polling, &gt; 10: polling with interval) 
   </li><br>
 
   <a name="pollnologging"></a>
@@ -13698,9 +13960,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
     
     <ul>
     Alle Funktionen dieses Moduls verwenden HTTP-Aufrufe gegenüber der SVS Web API. <br>
-    Der Standardwert für den HTTP-Timeout beträgt 4 Sekunden. Durch Setzen des 
-    <a href="#SSCamattr">Attributes</a> "httptimeout" > 0 kann dieser Wert bei Bedarf entsprechend den technischen 
-    Gegebenheiten angepasst werden. <br> 
+    Durch Setzen des Attributes <a href="#httptimeout">httptimeout</a> &gt; 0 kann dieser Wert bei Bedarf entsprechend 
+    den technischen Gegebenheiten angepasst werden. <br> 
     
   </ul>
   <br><br><br>
@@ -13905,37 +14166,42 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br>
   
   <ul>
-  <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+    <a name=goAbsPTZ></a>
+    <li><b> goAbsPTZ [ X Y | up | down | left | right ] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   
-  Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen Absolutposition in Richtung up/down/left/right. 
-  Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
-  <br><br>
+    Mit diesem Kommando wird eine PTZ-Kamera in Richtung einer wählbaren absoluten X/Y-Koordinate bewegt, oder zur maximalen 
+    Absolutposition in Richtung up/down/left/right. 
+    Die Option ist nur für Kameras verfügbar die das Reading "CapPTZAbs=true" (die Fähigkeit für PTZAbs-Aktionen) besitzen. Die 
+    Eigenschaften der Kamera kann mit "get &lt;name&gt; caminfoall" abgefragt werden.
+    <br><br>
 
-  Beispiel für Ansteuerung absoluter X/Y-Koordinaten: <br>
+    Beispiel für Ansteuerung absoluter X/Y-Koordinaten: <br>
 
-  <pre>
-    set &lt;name&gt; goAbsPTZ 120 450
-  </pre>
+    <pre>
+      set &lt;name&gt; goAbsPTZ 120 450
+    </pre>
  
-  Dieses Beispiel bewegt die Kameralinse in die Position X=120 und Y=450. <br>
-  Der Wertebereich ist dabei:
+    Dieses Beispiel bewegt die Kameralinse in die Position X=120 und Y=450. <br>
+    Der Wertebereich ist dabei:
 
-  <pre>
-    X = 0 - 640      (0 - 319 bewegt nach links, 321 - 640 bewegt nach rechts, 320 bewegt die Linse nicht)
-    Y = 0 - 480      (0 - 239 bewegt nach unten, 241 - 480 bewegt nach oben, 240 bewegt die Linse nicht) 
-  </pre>
+    <pre>
+      X = 0 - 640      (0 - 319 bewegt nach links, 321 - 640 bewegt nach rechts, 320 bewegt die Linse nicht)
+      Y = 0 - 480      (0 - 239 bewegt nach unten, 241 - 480 bewegt nach oben, 240 bewegt die Linse nicht) 
+    </pre>
 
-  Die Linse kann damit in kleinsten bis sehr großen Schritten in die gewünschte Richtung bewegt werden. 
-  Dieser Vorgang muß ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. <br><br>
+    Die Linse kann damit in kleinsten bis sehr großen Schritten in die gewünschte Richtung bewegt werden. 
+    Dieser Vorgang muß ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen. 
+    </li>
+    <br><br>
 
-  Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
+    Soll die Bewegung mit der maximalen Schrittweite erfolgen, kann zur Vereinfachung der Befehl:
 
-  <pre>
-   set &lt;name&gt; goAbsPTZ [up|down|left|right]
-  </pre>
+    <pre>
+      set &lt;name&gt; goAbsPTZ [up|down|left|right]
+    </pre>
 
-  verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
-  Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
+    verwendet werden. Die Optik wird in diesem Fall mit der größt möglichen Schrittweite zur Absolutposition in der angegebenen Richtung bewegt. 
+    Auch in diesem Fall muß der Vorgang ggf. mehrfach wiederholt werden um die Kameralinse in die gewünschte Position zu bringen.
   </ul>
   <br><br>
   
@@ -13984,21 +14250,25 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   </ul>
   
   <ul>
-  <li><b> motdetsc [camera|SVS|disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM)</li> <br>
+  <a name="motdetsc"></a>
+  <li><b> motdetsc [camera [&lt;options&gt;] | SVS [&lt;options&gt;] | disable] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br>
   
-  Der Befehl "motdetsc" (steht für motion detection source) schaltet die Bewegungserkennung in den gewünschten Modus. 
+  Der Befehl schaltet die Bewegungserkennung in den gewünschten Modus. 
   Wird die Bewegungserkennung durch die Kamera / SVS ohne weitere Optionen eingestellt, werden die momentan gültigen Bewegungserkennungsparameter der 
-  Kamera / SVS beibehalten. Die erfolgreiche Ausführung der Operation lässt sich u.a. anhand des Status von SVS -&gt; IP-Kamera -&gt; Ereigniserkennung -&gt; 
-  Bewegung nachvollziehen. <br><br>
-  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. Die verfügbaren Optionen bezüglich der Bewegungserkennung 
-  durch SVS sind "Empfindlichkeit" und "Schwellwert". <br><br>
+  Kamera / SVS beibehalten. Optionen können in einem Script verwendet werden.
+  </li>
+  <br><br>
+  
+  Für die Bewegungserkennung durch SVS bzw. durch Kamera können weitere Optionen angegeben werden. 
+  Die verfügbaren Optionen bezüglich der Bewegungserkennung durch SVS sind "Empfindlichkeit" und "Schwellenwert". <br><br>
+  
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc SVS [Empfindlichkeit] [Schwellwert]  </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 91 30                            </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 0 40                             </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc SVS 15                               </td><td># setzt die Empfindlichkeit auf 15, Schwellwert bleibt unverändert   </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS [Empfindlichkeit] [Schwellenwert]  </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 91 30                              </td><td># setzt die Empfindlichkeit auf 91 und den Schwellwert auf 30  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 0 40                               </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc SVS 15                                 </td><td># setzt die Empfindlichkeit auf 15, Schwellenwert bleibt unverändert   </td></tr>
   </table>
   </ul>
   <br><br>
@@ -14007,12 +14277,12 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <ul>
   <table>
   <colgroup> <col width=50%> <col width=50%> </colgroup>
-      <tr><td>set &lt;name&gt; motdetsc camera [Empfindlichkeit] [Schwellwert] [Prozentsatz] </td><td># Befehlsmuster  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                       </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                      </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
-      <tr><td>set &lt;name&gt; motdetsc camera 30                                            </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera [Empfindlichkeit] [Objektgröße] [Prozentsatz]   </td><td># Befehlsmuster  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 89 0 20                                         </td><td># setzt die Empfindlichkeit auf 89, Prozentsatz auf 20  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 0 40 10                                         </td><td># behält gesetzten Wert für Empfindlichkeit bei, setzt Schwellwert auf 40, Prozentsatz auf 10  </td></tr>
+      <tr><td>set &lt;name&gt; motdetsc camera 30                                              </td><td># setzt die Empfindlichkeit auf 30, andere Werte bleiben unverändert  </td></tr>
       </table>
-  </ul>
+  </ul> 
   <br><br>
 
   Es ist immer die Reihenfolge der Optionswerte zu beachten. Nicht gewünschte Optionen sind mit "0" zu besetzen sofern danach Optionen folgen 
@@ -14024,7 +14294,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Über den Befehl "get &lt;name&gt; caminfoall" wird auch das <a href="#SSCamreadings">Reading</a> "CamMotDetSc" aktualisiert welches die gegenwärtige Einstellung der Bewegungserkennung dokumentiert. 
   Es werden nur die Parameter und Parameterwerte angezeigt, welche die SVS aktiv unterstützt. Die Kamera selbst kann weiterführende Einstellmöglichkeiten besitzen. <br><br>
   
-  Beipiel:
+  <b>Beipiel:</b>
   <pre>
   CamMotDetSc    SVS, sensitivity: 76, threshold: 55
   </pre>
@@ -14427,6 +14697,15 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   Drop-Down-Menü des jeweiligen Devices zur Auswahl zur Verfügung. <br><br>
   
   <ul>
+  <a name="apiInfo"></a>
+  <li><b> apiInfo </b> <br>
+  
+  Ruft die API Informationen der Synology Surveillance Station ab und öffnet ein Popup mit diesen Informationen.
+  <br>
+  </li><br>
+  </ul>
+  
+  <ul>
   <li><b>  caminfoall </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM/SVS)</li>
       <b>  caminfo </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für CAM) <br><br>
   
@@ -14464,33 +14743,35 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   <br><br> 
   
   <ul>
-  <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS)</li> <br>
+    <a name="listLog"></a>
+    <li><b>  listLog [severity:&lt;Loglevel&gt;] [limit:&lt;Zeilenzahl&gt;] [match:&lt;Suchstring&gt;] </b> &nbsp;&nbsp;&nbsp;&nbsp;(gilt für SVS) <br>
   
-  Ruft das Surveillance Station Log vom Synology Server ab. Ohne Angabe der optionalen Zusätze wird das gesamte Log abgerufen. <br>
-  Es können alle oder eine Auswahl der folgenden Optionen angegeben werden: <br><br>
+    Ruft das Surveillance Station Log vom Synology Server ab. Ohne Angabe der optionalen Zusätze wird das gesamte Log abgerufen. <br>
+    Es können alle oder eine Auswahl der folgenden Optionen angegeben werden: <br><br>
+      
+    <ul>
+      <li> &lt;Loglevel&gt; - Information, Warning oder Error. Nur Sätze mit dem Schweregrad werden abgerufen (default: alle) </li>
+      <li> &lt;Zeilenzahl&gt; - die angegebene Anzahl der Logzeilen (neueste) wird abgerufen (default: alle) </li>
+      <li> &lt;Suchstring&gt; - nur Logeinträge mit dem angegeben String werden abgerufen (Achtung: kein Regex, der Suchstring wird im Call an die SVS mitgegeben) </li>
+    </ul>
+    <br>
+    </li>
   
-  <ul>
-  <li> &lt;Loglevel&gt; - Information, Warning oder Error. Nur Sätze mit dem Schweregrad werden abgerufen (default: alle) </li>
-  <li> &lt;Zeilenzahl&gt; - die angegebene Anzahl der Logzeilen (neueste) wird abgerufen (default: alle) </li>
-  <li> &lt;Suchstring&gt; - nur Logeinträge mit dem angegeben String werden abgerufen (Achtung: kein Regex, der Suchstring wird im Call an die SVS mitgegeben) </li>
-  </ul>
-  <br>
-  
-  <b>Beispiele</b> <br>
-  <ul>
-  <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
-  Zeigt die letzten 5 Logeinträge mit dem Schweregrad "Error" <br>  
-  <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
-  Zeigt alle Logeinträge mit dem Schweregrad "Information" die den String "Carport" enthalten <br>  
-  <code>get &lt;name&gt; listLog severity:Warning </code> <br>
-  Zeigt alle Logeinträge mit dem Schweregrad "Warning" <br><br>
-  </ul>
+    <b>Beispiele</b> <br>
+    <ul>
+      <code>get &lt;name&gt; listLog severity:Error limit:5 </code> <br>
+      Zeigt die letzten 5 Logeinträge mit dem Schweregrad "Error" <br>  
+      <code>get &lt;name&gt; listLog severity:Information match:Carport </code> <br>
+      Zeigt alle Logeinträge mit dem Schweregrad "Information" die den String "Carport" enthalten <br>  
+      <code>get &lt;name&gt; listLog severity:Warning </code> <br>
+      Zeigt alle Logeinträge mit dem Schweregrad "Warning" <br><br>
+    </ul>
   
   
-  Wurde mit dem <a href="#SSCamattr">Attribut</a> "pollcaminfoall" das Polling der SVS aktiviert, wird das <a href="#SSCamreadings">Reading</a> 
-  "LastLogEntry" erstellt. <br>
-  Im Protokoll-Setup der SVS kann man einstellen was protokolliert werden soll. Für weitere Informationen 
-  siehe <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Hlfe</a>.
+    Wurde mit dem Attribut <a href="#pollcaminfoall">pollcaminfoall</a> das Polling der SVS aktiviert, wird das <a href="#SSCamreadings">Reading</a> 
+    "LastLogEntry" erstellt. <br>
+    Im Protokoll-Setup der SVS kann man einstellen was protokolliert werden soll. Für weitere Informationen 
+    siehe <a href="https://www.synology.com/de-de/knowledgebase/Surveillance/help/SurveillanceStation/log_advanced">Synology Online-Hlfe</a>.
   </ul>
   <br><br> 
   
@@ -14846,8 +15127,8 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="httptimeout"></a>
   <li><b>httptimeout</b><br>
-    Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station, Default: 4 Sekunden (wenn 
-    httptimeout = "0" oder nicht gesetzt) </li><br>
+    Timeout-Wert für HTTP-Aufrufe zur Synology Surveillance Station. <br> 
+    (default: 20 Sekunden) </li><br>
     
   <a name="hlsNetScript"></a>
   <li><b>hlsNetScript</b> &nbsp;&nbsp;&nbsp;&nbsp;(setzbar in Device Model "SVS") <br>
@@ -14923,8 +15204,7 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
   
   <a name="pollcaminfoall"></a>
   <li><b>pollcaminfoall</b><br>
-    Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (kleiner/gleich 10: kein 
-    Polling, größer 10: Polling mit Intervall) </li><br>
+    Intervall der automatischen Eigenschaftsabfrage (Polling) einer Kamera (&lt;= 10: kein Polling, &gt; 10: Polling mit Intervall) </li><br>
   
   <a name="pollnologging"></a>
   <li><b>pollnologging</b><br>
@@ -15462,7 +15742,10 @@ attr &lt;name&gt; genericStrmHtmlTag &lt;img $HTMLATTR
         "GPUtils": 0,
         "HttpUtils": 0,
         "Blocking": 0,
-        "Encode": 0      
+        "Encode": 0,
+        "FHEM::SynoModules::API": 0,  
+        "FHEM::SynoModules::SMUtils": 0, 
+        "FHEM::SynoModules::ErrCodes": 0        
       },
       "recommends": {
         "FHEM::Meta": 0,
