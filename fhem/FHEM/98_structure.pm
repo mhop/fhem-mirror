@@ -122,7 +122,7 @@ structure_setDevs($;$)
   $def = "$hash->{NAME} structure $hash->{DEF}" if(!$def);
   my $c = $hash->{".memberHash"};
 
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split(/\s/, $def);
   my $devname = shift(@a);
   my $modname = shift(@a);
   my $stype   = shift(@a);
