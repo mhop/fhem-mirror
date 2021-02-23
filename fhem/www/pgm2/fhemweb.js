@@ -307,26 +307,35 @@ FW_jqueryReadyFn()
     if(!m)
       return;
     $("#devSpecHelp").remove();
-    var sel = this;
-    FW_getHelp(m[2], function(data) { // show either the next or the outer li
+    var sel=this, devName=m[2], selType=m[1];
+    FW_getHelp(devName, function(data) { // show either the next or the outer li
       $("#content")
         .append("<div id='workbench' style='display:none'></div>");
       $("#content > #workbench").html(data);
-      var mtype = $("#content > #workbench a[name]").attr("name"), aTag;
-      if(mtype) {
-        var mv = (""+mtype+val).replace(/[^a-z0-9_]/ig,'_');
-        aTag = $("#content > #workbench").find("a[name="+mv+"]");
+
+      var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
+      if(!mtype)
+        mtype = $("#content > #workbench a[name]").attr("name"), aTag;
+
+      if(mtype) {           // old style #1 syntax: MODULETYPEattrname
+        var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
+        aTag = $("#content > #workbench").find("a[id="+mv+"]");
+        if(!$(aTag).length) {
+          mv = (""+mtype+val).replace(/[^a-z0-9_]/ig,'_');
+          aTag = $("#content > #workbench").find("a[name="+mv+"]");
+        }
       }
-      if(!$(aTag).length) { // old style syntax without type
+      if(!$(aTag).length) { // old style #2 syntax without type
         var v = (val).replace(/[^a-z0-9_]/ig,'_');
         aTag = $("#content > #workbench").find("a[name="+v+"]");
       }
+
       if($(aTag).length) {
         var liTag = $(aTag).next("li");
         if(!$(liTag).length)
           liTag = $(aTag).parent("li");
         if($(liTag).length) {
-          $(sel).closest("div[cmd='"+m[1]+"']")
+          $(sel).closest("div[cmd='"+selType+"']")
              .after('<div class="makeTable" id="devSpecHelp"></div>')
           $("#devSpecHelp").html($(liTag).html());
         }

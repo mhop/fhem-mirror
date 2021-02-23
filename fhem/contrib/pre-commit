@@ -137,6 +137,7 @@ foreach my $row (split("\n", $fList)) {
       } elsif(!$skip) {
         $docCount++;
         $hasLink = ($l =~ m/<a name="$modName"/) if(!$hasLink);
+        $hasLink = ($l =~ m/<a id="$modName"/) if(!$hasLink);
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           if($l =~ m/<$tag ([^>]+)>/i) {

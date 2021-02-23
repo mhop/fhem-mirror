@@ -885,7 +885,7 @@ zigbee2mqtt_devStateIcon255($;$$)
 =item summary_DE &uuml;ber den MQTT2_SERVER oder MQTT2_CLIENT kommunizierende Ger&auml;te
 =begin html
 
-<a name="MQTT2_DEVICE"></a>
+<a id="MQTT2_DEVICE"></a>
 <h3>MQTT2_DEVICE</h3>
 <ul>
   MQTT2_DEVICE is used to represent single devices connected to the
@@ -893,7 +893,7 @@ zigbee2mqtt_devStateIcon255($;$$)
   connecting MQTT devices to FHEM.
   <br> <br>
 
-  <a name="MQTT2_DEVICEdefine"></a>
+  <a id="MQTT2_DEVICE-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; MQTT2_DEVICE</code>
@@ -903,32 +903,32 @@ zigbee2mqtt_devStateIcon255($;$$)
   </ul>
   <br>
 
-  <a name="MQTT2_DEVICEset"></a>
+  <a id="MQTT2_DEVICE-set"></a>
   <b>Set</b>
   <ul>
     see the setList attribute documentation below.
   </ul>
   <br>
 
-  <a name="MQTT2_DEVICEget"></a>
+  <a id="MQTT2_DEVICE-get"></a>
   <b>Get</b>
   <ul>
     see the getList attribute documentation below.
   </ul>
   <br>
 
-  <a name="MQTT2_DEVICEattr"></a>
+  <a id="MQTT2_DEVICE-attr"></a>
   <b>Attributes</b>
   <ul>
 
-    <a name="autocreate"></a>
+    <a id="MQTT2_DEVICE-attr-autocreate"></a>
     <li>autocreate {0|1}<br>
       if set to 0, disables extending the readingList, when the IODev
       autocreate is also set. Default is 1, i.e. new topics will be
       automatically added to the readingList. 
       </li>
 
-    <a name="bridgeRegexp"></a>
+    <a id="MQTT2_DEVICE-attr-bridgeRegexp"></a>
     <li>bridgeRegexp &lt;regexp&gt; newClientId ...<br>
       Used to automatically redirect some types of topics to different
       MQTT2_DEVICE instances. The regexp is checked against the
@@ -958,14 +958,14 @@ zigbee2mqtt_devStateIcon255($;$$)
       </ul>
       </li><br>
 
-    <a name="devicetopic"></a>
+    <a id="MQTT2_DEVICE-attr-devicetopic"></a>
     <li>devicetopic value<br>
       replace $DEVICETOPIC in the topic part of readingList, setList and
       getList with value. if not set, $DEVICETOPIC will be replaced with the
       name of the device.
       </li><br>
 
-    <a name="devPos"></a>
+    <a id="MQTT2_DEVICE-attr-devPos"></a>
     <li>devPos value<br>
       used internally by the "Show neighbor map" visualizer in FHEMWEB.
       This function is active if the graphviz and devices readings are set,
@@ -975,7 +975,7 @@ zigbee2mqtt_devStateIcon255($;$$)
     <li><a href="#disable">disable</a><br>
         <a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
-    <a name="getList"></a>
+    <a id="MQTT2_DEVICE-attr-getList"></a>
     <li>getList cmd reading [topic|perl-Expression] ...<br>
       When the FHEM command cmd is issued, publish the topic (and optional
       message, which is separated by space from the topic), wait for the answer
@@ -1006,13 +1006,13 @@ zigbee2mqtt_devStateIcon255($;$$)
       </li><br>
 
 
-    <a name="imageLink"></a>
+    <a id="MQTT2_DEVICE-attr-imageLink"></a>
     <li>imageLink href<br>
       sets the image to be shown. The "Show neighbor map" function initializes
       the value automatically.
       </li><br>
 
-    <a name="jsonMap"></a>
+    <a id="MQTT2_DEVICE-attr-jsonMap"></a>
     <li>jsonMap oldReading1:newReading1 oldReading2:newReading2...<br>
       space or newline separated list of oldReading:newReading pairs.<br>
       Used in the automatically generated readingList json2nameValue function
@@ -1025,7 +1025,7 @@ zigbee2mqtt_devStateIcon255($;$$)
       oldReading.
       </li><br>
 
-    <a name="periodicCmd"></a>
+    <a id="MQTT2_DEVICE-attr-periodicCmd"></a>
     <li>periodicCmd &lt;cmd1&gt;:&lt;period1&gt; &lt;cmd2&gt;:&lt;period2&gt;...
       <br>
       periodically execute the get or set command. The command will not take
@@ -1033,7 +1033,7 @@ zigbee2mqtt_devStateIcon255($;$$)
       period is measured in minutes, and it must be an integer.
       </li><br>
 
-    <a name="readingList"></a>
+    <a id="MQTT2_DEVICE-attr-readingList"></a>
     <li>readingList &lt;regexp&gt; [readingName|perl-Expression] ...
       <br>
       If the regexp matches topic:message or cid:topic:message either set
@@ -1070,11 +1070,12 @@ zigbee2mqtt_devStateIcon255($;$$)
       </ul>
       </li><br>
 
-    <li><a name="setExtensionsEvent">setExtensionsEvent</a><br>
+    <a id="MQTT2_DEVICE-attr-setExtensionsEvent"></a>
+    <li>setExtensionsEvent<br>
       If set, the event will contain the command implemented by SetExtensions
       (e.g. on-for-timer 10), else the executed command (e.g. on).</li><br>
 
-    <a name="setList"></a>
+    <a id="MQTT2_DEVICE-attr-setList"></a>
     <li>setList cmd [topic|perl-Expression] ...<br>
       When the FHEM command cmd is issued, publish the topic.
       Multiple tuples can be specified, each of them separated by newline, the
@@ -1102,7 +1103,7 @@ zigbee2mqtt_devStateIcon255($;$$)
       </ul>
       </li><br>
 
-    <a name="setStateList"></a>
+    <a id="MQTT2_DEVICE-attr-setStateList"></a>
     <li>setStateList command command ...<br>
       This attribute is used to get more detailed feedback when switching
       devices.  I.e. when the command on is contained in the list, state will

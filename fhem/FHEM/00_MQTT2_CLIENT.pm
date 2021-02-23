@@ -653,7 +653,7 @@ MQTT2_CLIENT_getStr($$)
 =item summary_DE Verbindung zu einem externen MQTT Server
 =begin html
 
-<a name="MQTT2_CLIENT"></a>
+<a id="MQTT2_CLIENT"></a>
 <h3>MQTT2_CLIENT</h3>
 <ul>
   MQTT2_CLIENT is a cleanroom implementation of an MQTT client (which connects
@@ -661,7 +661,7 @@ MQTT2_CLIENT_getStr($$)
   an IODev to MQTT2_DEVICES.
   <br> <br>
 
-  <a name="MQTT2_CLIENTdefine"></a>
+  <a id="MQTT2_CLIENT-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; MQTT2_CLIENT &lt;host&gt;:&lt;port&gt;</code>
@@ -676,7 +676,7 @@ MQTT2_CLIENT_getStr($$)
   </ul>
   <br>
 
-  <a name="MQTT2_CLIENTset"></a>
+  <a id="MQTT2_CLIENT-set"></a>
   <b>Set</b>
   <ul>
     <li>publish -r topic value<br>
@@ -694,15 +694,15 @@ MQTT2_CLIENT_getStr($$)
   </ul>
   <br>
 
-  <a name="MQTT2_CLIENTget"></a>
+  <a id="MQTT2_CLIENT-get"></a>
   <b>Get</b>
   <ul>N/A</ul><br>
 
-  <a name="MQTT2_CLIENTattr"></a>
+  <a id="MQTT2_CLIENT-attr"></a>
   <b>Attributes</b>
   <ul>
 
-    <a name="MQTT_CLIENTautocreate"></a>
+    <a id="MQTT2_CLIENT-autocreate"></a>
     <li>autocreate [no|simple|complex]<br>
       if set to simple/complex, at least one MQTT2_DEVICE will be created, and
       its readingsList will be expanded upon reception of published messages.
@@ -720,13 +720,13 @@ MQTT2_CLIENT_getStr($$)
       attribute it is not really useful.
       </li></br>
 
-    <a name="MQTT_CLIENTclientId"></a>
+    <a id="MQTT2_CLIENT-attr-clientId"></a>
     <li>clientId &lt;name&gt;<br>
       set the MQTT clientId. If not set, the name of the MQTT2_CLIENT instance
       is used, after deleting everything outside 0-9a-zA-Z
       </li></br>
 
-    <a name="MQTT2_CLIENTclientOrder"></a>
+    <a id="MQTT2_CLIENT-attr-clientOrder"></a>
     <li>clientOrder [MQTT2_DEVICE] [MQTT_GENERIC_BRIDGE]<br>
       set the notification order for client modules. This is 
       relevant when autocreate is active, and the default order
@@ -739,52 +739,52 @@ MQTT2_CLIENT_getStr($$)
       disable dispatching of messages.
       </li><br>
 
-    <a name="MQTT2_CLIENTdisconnectAfter"></a>
+    <a id="MQTT2_CLIENTdisconnectAfter"></a>
     <li>disconnectAfter &lt;seconds&gt;<br>
       if set, the connection will be closed after &lt;seconds&gt; of
       inactivity, and will be automatically reopened when sending a command.
       </li>
 
-    <a name="MQTT2_CLIENTignoreRegexp"></a>
+    <a id="MQTT2_CLIENTignoreRegexp"></a>
     <li>ignoreRegexp<br>
       if $topic:$message matches ignoreRegexp, then it will be silently ignored.
       </li>
 
-    <a name="MQTT_CLIENTlwt"></a>
+    <a id="MQTT2_CLIENT-attr-lwt"></a>
     <li>lwt &lt;topic&gt; &lt;message&gt; <br>
       set the LWT (last will and testament) topic and message, default is empty.
       </li></br>
 
-    <a name="MQTT_CLIENTkeepaliveTimeout"></a>
+    <a id="MQTT2_CLIENT-attr-keepaliveTimeout"></a>
     <li>keepaliveTimeout &lt;seconds;&gt;<br>
       number of seconds for sending keepalive messages, 0 disables it.
       The broker will disconnect, if there were no messages for
       1.5 * keepaliveTimeout seconds.
       </li></br>
 
-    <a name="MQTT_CLIENTlwtRetain"></a>
+    <a id="MQTT2_CLIENT-attr-lwtRetain"></a>
     <li>lwtRetain<br>
       if set, the lwt retain flag is set
       </li></br>
 
-    <a name="MQTT_CLIENTmqttVersion"></a>
+    <a id="MQTT2_CLIENT-attr-mqttVersion"></a>
     <li>mqttVersion 3.1,3.1.1<br>
       set the MQTT protocol version in the CONNECT header, default is 3.1
       </li></br>
 
-    <a name="MQTT_CLIENTmsgAfterConnect"></a>
+    <a id="MQTT2_CLIENT-attr-msgAfterConnect"></a>
     <li>msgAfterConnect [-r] topic message<br>
       publish the topic after each connect or reconnect.<br>
       If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
-    <a name="MQTT_CLIENTmsgBeforeDisconnect"></a>
+    <a id="MQTT2_CLIENT-attr-msgBeforeDisconnect"></a>
     <li>msgBeforeDisconnect [-r] topic message<br>
       publish the topic bofore each disconnect.<br>
       If the optional -r is specified, then the publish sets the retain flag.
       </li></br>
 
-    <a name="MQTT_CLIENTqosMaxQueueLength"></a>
+    <a id="MQTT2_CLIENT-attr-qosMaxQueueLength"></a>
     <li>qosMaxQueueLength &lt;number&gt;<br>
       if set to a nonzero value, messages are published with QoS=1, and are
       kept in a memory-only buffer until acknowledged by the server.
@@ -792,31 +792,31 @@ MQTT2_CLIENT_getStr($$)
       are queued, and resent when the connection is esablished.
       </li></br>
       
-    <a name="MQTT_CLIENTrawEvents"></a>
+    <a id="MQTT2_CLIENT-attr-rawEvents"></a>
     <li>rawEvents &lt;topic-regexp&gt;<br>
       send all messages as events attributed to this MQTT2_CLIENT instance.
       Should only be used, if there is no MQTT2_DEVICE to process the topic.
       </li><br>
 
-    <a name="MQTT_CLIENTsubscriptions"></a>
+    <a id="MQTT2_CLIENT-attr-subscriptions"></a>
     <li>subscriptions &lt;subscriptions&gt;<br>
       space separated list of MQTT subscriptions, default is #<br>
       Note: if the value is the literal setByTheProgram, then the value sent by
       the client (e.g. MQTT_GENERIC_BRIDGE) is used.
       </li><br>
 
-    <a name="MQTT_CLIENTSSL"></a>
+    <a id="MQTT2_CLIENT-attr-SSL"></a>
     <li>SSL<br>
       Enable SSL (i.e. TLS)
       </li><br>
 
-    <a name="MQTT_CLIENTsslargs"></a>
+    <a id="MQTT2_CLIENT-attr-sslargs"></a>
     <li>sslargs<br>
       a list of space separated tuples of key:value, where key is one of the
       possible options documented in perldoc IO::Socket::SSL
       </li><br>
 
-    <a name="MQTT_CLIENTusername"></a>
+    <a id="MQTT2_CLIENT-attr-username"></a>
     <li>username &lt;username&gt;<br>
       set the username. The password is set via the set command, and is stored
       separately, see above.
