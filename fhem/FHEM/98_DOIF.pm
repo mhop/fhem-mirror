@@ -4390,8 +4390,11 @@ sub bar
     $ic="" if (!defined($ic));
   }
 
-  
-  $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight,$size/100*$bwidth,$size/100*$bheight);
+   
+  my $svg_width=int($size/100*$bwidth);
+  my $svg_height=int($size/100*$bheight);
+ 
+  $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" width="%d" height="%d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight,$svg_width,$svg_height,$svg_width,$svg_height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbarfont" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:white;stop-opacity:0.3"/><stop offset="1" style="stop-color:rgb(255, 255, 255);stop-opacity:0.1"/></linearGradient>';
   $out.= '<linearGradient id="gradbackg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:rgb(255,255,255);stop-opacity:0.3"/><stop offset="1" style="stop-color:rgb(0, 0, 0);stop-opacity:0"/></linearGradient>';
@@ -4747,17 +4750,17 @@ sub ring
   if (defined $icon and $icon ne "") {
     $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
   }
-  
-  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58 " style="width:%dpx; height:%dpx;">',$size/100*63,$size/100*58);
+  my $width=int($size/100*63);
+  my $height=int($size/100*58);
+  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<linearGradient id="grad_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
   <stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
  
   $out.= '<linearGradient id="grad_stroke3" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.6"/>\
-  <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
+  <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/></linearGradient>';
   $out.='</defs>';
-  
   $out.='<circle cx="41" cy="30" r="26.5" fill="url(#gradbackring)" />';
   $out.='<g stroke="url(#grad_stroke3)" fill="none" stroke-width="4">';
   $out.=describeArc(41, 30, 28, 0, 280);
@@ -4898,8 +4901,9 @@ sub ring2
   if (defined $icon and $icon ne "") {
     $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
   }
-
-  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 57 " style="width:%dpx; height:%dpx;">',$size/100*63,$size/100*57);
+  my $width=int($size/100*63);
+  my $height=int($size/100*58);
+  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<linearGradient id="grad2_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
@@ -4909,7 +4913,7 @@ sub ring2
   <stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor2,$minColor2,(defined $lr ? $lr:0),$x12,$y12,$x22,$y22,color($currColor2,$lr),color($currColor2,$lr));
  
   $out.= '<linearGradient id="grad_stroke3" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.6"/>\
-  <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/><linearGradient>';
+  <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/></linearGradient>';
   $out.='</defs>';
   
   $out.='<circle cx="41" cy="30" r="26.5" fill="url(#gradbackring)" />';
@@ -5091,8 +5095,11 @@ sub cylinder_mode
   }
   
   my ($y,$val1,$null);
+  
+  my $svg_width=int($size/100*$bwidth);
+  my $svg_height=int($size/100*($bheight+40));
    
-  $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight+40,$size/100*$bwidth,$size/100*($bheight+40));
+  $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" width="%d" height="%d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight+40,$svg_width,$svg_height,$svg_width,$svg_height);
   $out.= '<defs>';
   $out.= '<linearGradient id="grad0" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:grey;stop-opacity:0.5"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.5"/></linearGradient>';
   $out.= '<linearGradient id="grad3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:grey;stop-opacity:0.2"/><stop offset="1" style="stop-color:rgb(0, 0, 0);stop-opacity:0.2"/></linearGradient>';
