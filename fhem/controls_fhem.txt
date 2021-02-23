@@ -1,4 +1,4 @@
-REV 23813
+REV 23815
 DIR unused
 UPD 2021-02-23_07:45:06 358149 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -716,7 +716,7 @@ UPD 2020-03-26_07:45:03 391 FHEM/myUtilsTemplate.pm
 UPD 2015-07-28_14:05:31 162 FHEM/template.layout
 UPD 2019-09-14_07:45:02 34993 FHEM/wundergroundAPI.pm
 UPD 2019-12-08_20:09:34 6739 contrib/commandref_join.pl
-UPD 2019-12-08_20:09:34 4931 contrib/commandref_modular.pl
+UPD 2021-02-23_22:34:10 5032 contrib/commandref_modular.pl
 UPD 2018-07-16_07:45:03 1242 demolog/LightScenes.dd.save
 UPD 2019-03-15_07:45:03 390 demolog/LightScenes.save
 UPD 2015-07-28_14:05:35 28600 demolog/cellar.log
@@ -736,8 +736,8 @@ UPD 2021-02-23_22:05:16 4468799 docs/commandref.html
 UPD 2021-02-23_07:45:13 2765322 docs/commandref_DE.html
 UPD 2021-02-23_22:05:11 81115 docs/commandref_frame.html
 UPD 2021-02-23_07:45:06 90770 docs/commandref_frame_DE.html
-UPD 2021-02-23_22:28:32 236329 docs/commandref_modular.html
-UPD 2021-02-23_22:28:34 247105 docs/commandref_modular_DE.html
+UPD 2021-02-23_22:34:09 236329 docs/commandref_modular.html
+UPD 2021-02-23_22:34:10 247105 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
