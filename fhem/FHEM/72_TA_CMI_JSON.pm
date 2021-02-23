@@ -250,9 +250,9 @@ sub ParseHttpResponse {
   if($err ne "") {
       Log3 $name, 0, "TA_CMI_JSON ($name) - error while requesting ".$param->{url}." - $err";
       readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, 'state', 'ERROR', 0);
-      readingsBulkUpdate($hash, 'error', $err, 0);
-      readingsEndUpdate($hash, 0);      
+      readingsBulkUpdate($hash, 'state', 'ERROR', 1);
+      readingsBulkUpdate($hash, 'error', $err, 1);
+      readingsEndUpdate($hash, 1);      
   } elsif($data ne "") {
     my $keyValues = json2nameValue($data);
 
@@ -264,7 +264,7 @@ sub ParseHttpResponse {
     readingsDelete($hash, "state");
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status});
+    readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status}, 1);
     if ( $keyValues->{Status} eq 'OK' ) {
       my $queryParams = $hash->{QUERYPARAM};
       $queryParams = '' unless defined $queryParams;
@@ -339,16 +339,16 @@ sub extractReadings {
     my $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_Value';
     my $readingValue = $keyValues->{$jsonKey};
     Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName, key: $jsonKey, value: $readingValue";
-    readingsBulkUpdateIfChanged($hash, $readingName, $readingValue);
+    readingsBulkUpdateIfChanged($hash, $readingName, $readingValue, 1);
 
     $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_RAS';
     my $readingRas = $keyValues->{$jsonKey};
     if (defined($readingRas)) {
-      readingsBulkUpdateIfChanged($hash, $readingName . '_RAS', $readingRas);
+      readingsBulkUpdateIfChanged($hash, $readingName . '_RAS', $readingRas, 1);
 
       if ($inclPrettyReadings) {
         my $ras = (defined($rasStates{$readingRas}) ? $rasStates{$readingRas} : undef);
-        readingsBulkUpdateIfChanged($hash, $readingName . '_RAS_Pretty', $ras) if ($ras);
+        readingsBulkUpdateIfChanged($hash, $readingName . '_RAS_Pretty', $ras, 1) if ($ras);
       }
     }
 
@@ -359,11 +359,11 @@ sub extractReadings {
       $unit = (defined($units{$readingUnit}) ? $units{$readingUnit} : 'unknown: ' . $readingUnit);
       Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName . '_Unit', key: $jsonKey, value: $readingUnit, unit: $unit";
 
-      readingsBulkUpdateIfChanged($hash, $readingName . '_Unit', $unit) if ($inclUnitReadings);
+      readingsBulkUpdateIfChanged($hash, $readingName . '_Unit', $unit, 1) if ($inclUnitReadings);
     }
 
     if ($inclPrettyReadings) {
-      readingsBulkUpdateIfChanged($hash, $readingName . '_Pretty', $readingValue . ' ' . $unit);
+      readingsBulkUpdateIfChanged($hash, $readingName . '_Pretty', $readingValue . ' ' . $unit, 1);
     }
   }
 
@@ -424,7 +424,7 @@ sub ParseOutputStateResponse {
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, 'state', 'ERROR', 0);
       readingsBulkUpdate($hash, 'error', $err, 0);
-      readingsEndUpdate($hash, 0);      
+      readingsEndUpdate($hash, 1);      
   } elsif($data ne "") {
      readingsDelete($hash, "error");
      readingsDelete($hash, "state");
@@ -447,15 +447,15 @@ sub ParseOutputStateResponse {
 
        $readingName = makeReadingName($readingName);
        my $readingValue = $values[$i];
-       readingsBulkUpdateIfChanged($hash, $readingName.'_State', $readingValue);
+       readingsBulkUpdateIfChanged($hash, $readingName.'_State', $readingValue, 1);
        if ($prettyOutputStates eq '1') {
          
          my $prettyValue = (defined($outputStates{$readingValue}) ? $outputStates{$readingValue} : '?:'.$readingValue);
-         readingsBulkUpdateIfChanged($hash, $readingName.'_State_Pretty', $prettyValue);
+         readingsBulkUpdateIfChanged($hash, $readingName.'_State_Pretty', $prettyValue, 1);
        }
        Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName, readingNameIndex: $readingNameIndex, valueIndex: $i, value: $readingValue";
      }
-     readingsEndUpdate($hash, 0);
+     readingsEndUpdate($hash, 1);
 
      Log3 $name, 5, "TA_CMI_JSON ($name) - Output Data $nrValues: $data";
   }
