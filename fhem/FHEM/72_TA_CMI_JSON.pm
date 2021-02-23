@@ -122,10 +122,10 @@ BEGIN {
         readingsBulkUpdateIfChanged
         readingsBeginUpdate
         readingsEndUpdate
+        readingsDelete
         Log3
         HttpUtils_Close
         HttpUtils_NonblockingGet
-        CommandDeleteReading
         RemoveInternalTimer
         InternalTimer
         makeReadingName
@@ -156,7 +156,7 @@ sub Define {
   $hash->{NODEID} = $nodeId;
   $hash->{QUERYPARAM} = $queryParams;
 
-  Log3 $name, 0, "TA_CMI_JSON ($name) - Define ... module=$module, CMI-URL=$cmiUrl, nodeId=$nodeId";
+  Log3 $name, 3, "TA_CMI_JSON ($name) - Define ... module=$module, CMI-URL=$cmiUrl, nodeId=$nodeId";
   readingsSingleUpdate($hash, 'state', 'defined', 1);
 
   SetupIntervals($hash) if ($main::init_done);
@@ -248,7 +248,7 @@ sub ParseHttpResponse {
   my $return;
 
   if($err ne "") {
-      Log3 $name, 0, "error while requesting ".$param->{url}." - $err";
+      Log3 $name, 0, "TA_CMI_JSON ($name) - error while requesting ".$param->{url}." - $err";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, 'state', 'ERROR', 0);
       readingsBulkUpdate($hash, 'error', $err, 0);
@@ -260,7 +260,8 @@ sub ParseHttpResponse {
     $hash->{CAN_DEVICE} = $canDevice;
     $hash->{model} = $canDevice;
     $hash->{CMI_API_VERSION} = extractVersion($keyValues->{Header_Version});
-    CommandDeleteReading(undef, "$name error");
+    readingsDelete($hash, "error");
+    readingsDelete($hash, "state");
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged($hash, 'state', $keyValues->{Status});
@@ -337,7 +338,7 @@ sub extractReadings {
 
     my $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_Value';
     my $readingValue = $keyValues->{$jsonKey};
-    Log3 $name, 5, "readingName: $readingName, key: $jsonKey, value: $readingValue";
+    Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName, key: $jsonKey, value: $readingValue";
     readingsBulkUpdateIfChanged($hash, $readingName, $readingValue);
 
     $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_RAS';
@@ -356,7 +357,7 @@ sub extractReadings {
       $jsonKey = 'Data_'.$dataKey.'_'.$idx.'_Value_Unit';
       my $readingUnit = $keyValues->{$jsonKey};
       $unit = (defined($units{$readingUnit}) ? $units{$readingUnit} : 'unknown: ' . $readingUnit);
-      Log3 $name, 5, "readingName: $readingName . '_Unit', key: $jsonKey, value: $readingUnit, unit: $unit";
+      Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName . '_Unit', key: $jsonKey, value: $readingUnit, unit: $unit";
 
       readingsBulkUpdateIfChanged($hash, $readingName . '_Unit', $unit) if ($inclUnitReadings);
     }
@@ -419,12 +420,14 @@ sub ParseOutputStateResponse {
   my $return;
 
   if($err ne "") {
-      Log3 $name, 0, "error while requesting output data ".$param->{url}." - $err";
+      Log3 $name, 0, "TA_CMI_JSON ($name) - error while requesting output data ".$param->{url}." - $err";
       readingsBeginUpdate($hash);
       readingsBulkUpdate($hash, 'state', 'ERROR', 0);
       readingsBulkUpdate($hash, 'error', $err, 0);
       readingsEndUpdate($hash, 0);      
   } elsif($data ne "") {
+     readingsDelete($hash, "error");
+     readingsDelete($hash, "state");
 
      my @values = split(';', $data);
      my $nrValues = @values -2;
@@ -450,7 +453,7 @@ sub ParseOutputStateResponse {
          my $prettyValue = (defined($outputStates{$readingValue}) ? $outputStates{$readingValue} : '?:'.$readingValue);
          readingsBulkUpdateIfChanged($hash, $readingName.'_State_Pretty', $prettyValue);
        }
-       Log3 $name, 5, "readingName: $readingName, readingNameIndex: $readingNameIndex, valueIndex: $i, value: $readingValue";
+       Log3 $name, 5, "TA_CMI_JSON ($name) - readingName: $readingName, readingNameIndex: $readingNameIndex, valueIndex: $i, value: $readingValue";
      }
      readingsEndUpdate($hash, 0);
 
