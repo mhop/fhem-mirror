@@ -25,18 +25,29 @@ filter:TYPE=MQTT_GENERIC_BRIDGE
 desc:This template is proposal to fullfill requirements for the rest of the s some basic configuration on the MQTT_GENERIC_BRIDGE side itself, especially <b>different topic structures for sending readings values and receiving commands and/or reading values.</b><br>Note: All outgoing messages will be sent without retain flag; change this to 1, if you absulutely need values stored on your MQTT server (e.g. if your clients are not always connected).
 order:000001
 par:IODEVNAME;Name of the IO-Device; { AttrVal("DEVICE","IODev",undef) }
+par:SUBSCRIPTIONS;Current subscription attribute value of the IO-Device, defaults to 'setByTheProgram';{ AttrVal("DEVICE",'subscriptions','setByTheProgram') }
 par:RADIO_SETCLIENTODERMGB_M2D;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE MQTT2_DEVICE" (recommended);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,"TYPE","MQTT") eq "MQTT"; AttrVal($io,"clientOrder",undef) }
 par:RADIO_SETCLIENTODERMGB_ONLY;Set clientOrder on IODev to "MQTT_GENERIC_BRIDGE" (MGB only mode);{ my $io = AttrVal("DEVICE",'IODev',""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,"clientOrder",undef) }
 par:RADIO_SETCLIENTODERM2D_MGB;Set clientOrder on IODev to "MQTT2_DEVICE MQTT_GENERIC_BRIDGE" (default, may cause unintended autocreates);{ my $io = AttrVal('DEVICE','IODev',""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
 par:RADIO_DONTSETCLIENTODER;Leave clientOrder on IODev (default is "MQTT2_DEVICE MQTT_GENERIC_BRIDGE", may cause unintended autocreates);{ my $io = AttrVal("DEVICE","IODev",""); return 0 if InternalVal($io,'TYPE','MQTT') eq 'MQTT'; AttrVal($io,'clientOrder',undef) }
+par:ATTRTVERSION;Version of attrTemplate;{ '20210222' }
 attr DEVICE globalDefaults sub:base=DEVICE/set pub:base=DEVICE
+setreading DEVICE attrTemplateVersion ATTRTVERSION_MQTT
 option:{ RADIO_SETCLIENTODERMGB_M2D }
 attr IODEVNAME clientOrder MQTT_GENERIC_BRIDGE MQTT2_\DEVICE
+attr IODEVNAME subscriptions SUBSCRIPTIONS
+setreading DEVICE attrTemplateVersion ATTRTVERSION_MGB_M2D
 option:{ RADIO_SETCLIENTODERM2D_MGB }
 attr IODEVNAME clientOrder MQTT2_\DEVICE MQTT_GENERIC_BRIDGE
+attr IODEVNAME subscriptions SUBSCRIPTIONS
+setreading DEVICE attrTemplateVersion ATTRTVERSION_M2D_MGB
 option:{ RADIO_SETCLIENTODERMGB_ONLY }
 attr IODEVNAME clientOrder MQTT_GENERIC_BRIDGE
+attr IODEVNAME subscriptions SUBSCRIPTIONS
+setreading DEVICE attrTemplateVersion ATTRTVERSION_MGB_only
 farewell:Configuring MQTT_GENERIC_BRIDGE has been successful, now you can start to configure your devices to send and receive messages over MQTT!
+option:global
+
 
 ##########
 ## subordintated devices section

@@ -542,18 +542,19 @@ par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devi
 par:ICON;ICON as set, defaults to fts_shutter_100;{ AttrVal("DEVICE","icon","fts_shutter_100") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon 0:fts_shutter_100 100:fts_shutter_10 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 0\d.*:fts_shutter_100
-attr DEVICE webCmd open:close:pct
+attr DEVICE webCmd open:close:pct:speed
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE jsonMap position:pct
+attr DEVICE jsonMap position:pct motor_speed:speed
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   open:noArg $\DEVICETOPIC/set {"state":"OPEN"}\
   close:noArg $\DEVICETOPIC/set {"state":"CLOSE"}\
-  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}
+  pct:slider,0,1,100 $\DEVICETOPIC/set {"position":"$EVTPART1"}\
+  speed:colorpicker,BRI,0,1,255 $\DEVICETOPIC/set {"options": {"motor_speed":"$EVTPART1"}}
 attr DEVICE stateFormat pct
 set DEVICE attrTemplate speechcontrol_type_blind
 attr DEVICE model zigbee2mqtt_blind_drive
-setreading DEVICE attrTemplateVersion 20210221
+setreading DEVICE attrTemplateVersion 20210222
 
 
 name:zigbee2mqtt_ContactSensor
