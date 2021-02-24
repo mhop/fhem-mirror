@@ -33,6 +33,7 @@ alexa_Initialize($)
 
   $hash->{DefFn}    = "alexa_Define";
   $hash->{NotifyFn} = "alexa_Notify";
+  $hash->{RenameFn} = "alexa_Rename";
   $hash->{UndefFn}  = "alexa_Undefine";
   $hash->{DelayedShutdownFn} = "alexa_DelayedShutdownFn";
   $hash->{ShutdownFn} = "alexa_Shutdown";
@@ -197,6 +198,15 @@ alexa_Notify($$)
   }
 
   return undef;
+}
+
+sub
+alexa_Rename($$)
+{
+  my ($new_name, $old_name) = @_;
+  my $hash = $defs{$new_name};
+
+  alexa_Set($hash, $new_name, 'restart' );
 }
 
 sub
