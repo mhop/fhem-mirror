@@ -1957,13 +1957,15 @@ HUEDevice_Attr($$$;$)
     The device status will be updated every &lt;interval&gt; seconds. 0 means no updates.
     The default and minimum is 60 if the IODev has not set pollDevices to 1.
     The default ist 0 if the IODev has set pollDevices to 1.
-    Groups are updated only on definition and statusRequest<br><br>
+    Groups are updated only on definition and statusRequest, but see createGroupReadings<br>
+    Sensor devices will not be autocreated. Use <code>get &lt;bridge&gt; sensors</code> will provide the sensor id vor manual definition.<br><br>
 
     Examples:
     <ul>
       <code>define bulb HUEDevice 1</code><br>
       <code>define LC HUEDevice 2</code><br>
-      <code>define allLights HUEDevice group 0</code><br>
+      <code>define allLights HUEDevice group 0</code>
+      <code>define motion HUEDevice sensor 1</code><br>
     </ul>
   </ul><br>
 
