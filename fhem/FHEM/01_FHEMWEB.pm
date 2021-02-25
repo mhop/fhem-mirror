@@ -796,6 +796,18 @@ FW_serveSpecial($$$$)
 }
 
 sub
+FW_setStylesheet()
+{
+  $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "f18");
+  $FW_sp = "" if($FW_sp eq "default");
+  $FW_sp =~ s/^f11//; # Compatibility, #90983
+  $FW_ss = ($FW_sp =~ m/smallscreen/);
+  $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
+  @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
+                              "${FW_sp}:fhemSVG:openautomation:default"));
+}
+
+sub
 FW_answerCall($)
 {
   my ($arg) = @_;
@@ -805,12 +817,7 @@ FW_answerCall($)
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
 
   $MW_dir = "$attr{global}{modpath}/FHEM";
-  $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "f18");
-  $FW_ss = ($FW_sp =~ m/smallscreen/);
-  $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
-  my $spDir = ($FW_sp eq "default" ? "" : "$FW_sp:");
-  @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
-                                "${spDir}fhemSVG:openautomation:default"));
+  FW_setStylesheet();
   @FW_fhemwebjs = ("fhemweb.js");
   push(@FW_fhemwebjs, "$FW_sp.js") if(-r "$FW_dir/pgm2/$FW_sp.js");
 
@@ -2418,18 +2425,21 @@ FW_style($$)
     FW_pO $end;
 
   } elsif($a[1] eq "select") {
-    my @fl = grep { $_ !~ m/(floorplan|dashboard)/ }
-                        FW_fileList("$FW_cssdir/.*style.css");
+    my %smap= ( ""=>"f11", "touchpad"=>"f11touchpad",
+                "smallscreen"=>"f11smallscreen");
+    my @fl = map { $_ =~ s/style.css//; $smap{$_} ? $smap{$_} : $_ }
+             grep { $_ !~ m/(svg_|floorplan|dashboard)/ }
+             FW_fileList("$FW_cssdir/.*style.css");
     FW_addContent($start);
     FW_pO "<div class='fileList styles'>Styles</div>";
     FW_pO "<table class='block wide fileList'>";
+    my $sp = $FW_sp eq "default" ? "" : $FW_sp;;
+    $sp = $smap{$sp} if($smap{$sp});
     my $row = 0;
-    foreach my $file (@fl) {
-      next if($file =~ m/svg_/);
-      $file =~ s/style.css//;
-      $file = "default" if($file eq "");
+    foreach my $file (sort @fl) {
       FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      FW_pH "cmd=style set $file", "$file", 1;
+      FW_pH "cmd=style set $file", "$file", 1,
+        "style$file ".($sp eq $file ? "changed":"");
       FW_pO "</tr>";
       $row = ($row+1)%2;
     }
@@ -3100,13 +3110,7 @@ FW_Notify($$)
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
     $FW_subdir = ($h->{iconPath} ? "/floorplan/$h->{iconPath}" : ""); # 47864
-    $FW_sp = AttrVal($FW_wname, "stylesheetPrefix", "f18");
-    $FW_sp = "" if($FW_sp eq "default");
-    $FW_ss = ($FW_sp =~ m/smallscreen/);
-    $FW_tp = ($FW_sp =~ m/smallscreen|touchpad/);
-    my $spDir = ($FW_sp eq "default" ? "" : "$FW_sp:");
-    @FW_iconDirs = grep { $_ } split(":", AttrVal($FW_wname, "iconPath",
-                                "${spDir}fhemSVG:openautomation:default"));
+    FW_setStylesheet();
     if($h->{iconPath}) {
       unshift @FW_iconDirs, $h->{iconPath};
       FW_readIcons($h->{iconPath});

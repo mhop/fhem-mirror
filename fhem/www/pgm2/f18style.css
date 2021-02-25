@@ -292,3 +292,4 @@ body.commandref div#menu br { display:none; }
 body.commandref div#menu h3 { display:none; }
 
 .SVGplot { position:relative;} 
+div.stylef18.changed a { color:red!important }
