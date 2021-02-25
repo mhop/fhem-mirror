@@ -1,6 +1,6 @@
 ##############################################
-# $Id: 99_sonos2mqttUtils.pm 
-# from myUtilsTemplate.pm 21509 2020-03-25 11:20:51Z rudolfkoenig $
+# $Id$ 
+# from myUtilsTemplate.pm 21509 2020-03-25 11:20:51Z rudolfkoenig
 # utils for sonos2mqtt Implementation
 # They are then available in every Perl expression.
 
