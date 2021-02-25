@@ -617,6 +617,7 @@ contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         Sonstiges
 contrib/AttrTemplate/*       Beta-User            (depends on attrTemplate)
+contrib/AttrTemplate/99_sonos2mqttUtils.pm Otto123 https://forum.fhem.de/index.php/topic,111711
 contrib/commandref*          rudolfkoenig         Sonstiges
 contrib/pre-commit           rudolfkoenig         Sonstiges
 contrib/DEBIAN/*             betateilchen         Sonstiges
