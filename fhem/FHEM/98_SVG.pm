@@ -1673,7 +1673,7 @@ SVG_render($$$$$$$$$$)
     }
 
   } else { # times
-    $initoffset = int(($tstep/2)/86400)*86400 if($aligntics);
+    $initoffset = int(($tstep/2)/86400)*86400 if($aligntics == 1);
     for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $tstep) {
       $i = SVG_time_align($i,$aligntics);
       $off1 = int($x+($i-$fromsec)*$tmul);
@@ -1730,7 +1730,7 @@ SVG_render($$$$$$$$$$)
     }
 
   } else { # times
-    $initoffset = int(($step/2)/86400)*86400 if($aligntext);
+    $initoffset = int(($step/2)/86400)*86400 if($aligntext == 1);
     for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $step) {
       $i = SVG_time_align($i,$aligntext);
       $off1 = int($x+($i-$fromsec)*$tmul);
