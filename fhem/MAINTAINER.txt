@@ -260,7 +260,7 @@ FHEM/46_TRX_WEATHER.pm       KernSani             RFXTRX
 FHEM/47_OBIS.pm              gvzdus               Sonstige Systeme
 FHEM/48_MieleAtHome.pm       choenig              Sonstige Systeme
 FHEM/49_Arlo.pm              maluk                Sonstige Systeme
-FHEM/49_IPCAM.pm             mfr69bs              Sonstiges
+FHEM/49_IPCAM.pm             delmar               Sonstiges
 FHEM/49_SSCam.pm             DS_Starter           Sonstiges
 FHEM/49_SSCamSTRM.pm         DS_Starter           Sonstiges
 FHEM/49_TBot_List.pm         viegener             Unterstützende Dienste

@@ -3,6 +3,7 @@
 ################################################################
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
+#      2021            Martin Gutenbrunner
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -26,9 +27,36 @@ package main;
 use strict;
 use warnings;
 
-sub IPCAM_getSnapshot($);
-sub IPCAM_guessFileFormat($);
-sub IPCAM_getScheme($);
+#####################################
+sub
+IPCAM_Initialize($$)
+{
+  my ($hash) = @_;
+
+  $hash->{DefFn}    = "IPCAM::Define";
+  $hash->{UndefFn}  = "IPCAM::Undef";
+  $hash->{GetFn}    = "IPCAM::Get";
+  $hash->{SetFn}    = "IPCAM::Set";
+  $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage timestamp:0,1 ".
+                      "cmdPanLeft cmdPanRight cmdTiltUp cmdTiltDown cmdStep ".
+                      "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
+                      "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
+                      "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
+                      "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
+                      "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
+                      "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
+                      $readingFnAttributes;
+}
+
+package IPCAM;
+use strict;
+use warnings;
+use SetExtensions;
+use GPUtils qw(:all);
+
+sub getSnapshot($);
+sub guessFileFormat($);
+sub getScheme($);
 
 my %gets = (
   "image"     => "",
@@ -44,30 +72,32 @@ my %sets = (
   "raw"   => "",
 );
 
+## Import der FHEM Funktionen
+BEGIN {
+    GP_Import(qw(
+        readingsSingleUpdate
+        readingsBulkUpdate
+        readingsBulkUpdateIfChanged
+        readingsBeginUpdate
+        readingsEndUpdate
+        readingsDelete
+        Log3
+        RemoveInternalTimer
+        InternalTimer
+        makeReadingName
+        AttrVal
+        gettimeofday
+        attr
+        TimeNow
+        GetFileFromURLQuiet
+        SetExtensions
+        AttrTemplate_Set
+    ))
+};
+
 #####################################
 sub
-IPCAM_Initialize($$)
-{
-  my ($hash) = @_;
-
-  $hash->{DefFn}    = "IPCAM_Define";
-  $hash->{UndefFn}  = "IPCAM_Undef";
-  $hash->{GetFn}    = "IPCAM_Get";
-  $hash->{SetFn}    = "IPCAM_Set";
-  $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage timestamp:0,1 ".
-                      "cmdPanLeft cmdPanRight cmdTiltUp cmdTiltDown cmdStep ".
-                      "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
-                      "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
-                      "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
-                      "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
-                      "do_not_notify:1,0 showtime:1,0 scheme:http,https ".
-                      "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
-                      $readingFnAttributes;
-}
-
-#####################################
-sub
-IPCAM_Define($$) {
+Define($$) {
   my ($hash, $def) = @_;
 
   # define <name> IPCAM <camip:port>
@@ -90,10 +120,10 @@ IPCAM_Define($$) {
 
 #####################################
 sub
-IPCAM_Undef($$) {
+Undef($$) {
   my ($hash, $name) = @_;
 
-  delete($modules{IPCAM}{defptr}{$hash->{NAME}});
+  delete($main::modules{IPCAM}{defptr}{$hash->{NAME}});
   RemoveInternalTimer($hash);
 
   return undef;
@@ -101,19 +131,17 @@ IPCAM_Undef($$) {
 
 #####################################
 sub
-IPCAM_Set($@) {
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
+Set($$$@) {
+  my ($hash, $name, $cmd, @args) = @_;
   my @camCmd;
 
-  # check argument
-  return "Unknown argument $a[1], choose one of ".join(" ", sort keys %sets)
-    if(!defined($sets{$a[1]}));
+  my $list = join(' ', sort keys %sets);
 
-  shift @a;
-  my $cmd = $a[0];
-  shift @a;
-  my @args = @a;
+  Log3 $name, 4, "IPCAM ($name) - set: name:$name cmd:$cmd list:$list";
+
+  # check argument
+  return AttrTemplate_Set($hash, $list, $name, $cmd, @args)
+    if(!defined($sets{$cmd}));
 
   if($cmd eq "pan" || $cmd eq "tilt") {
 
@@ -135,8 +163,8 @@ IPCAM_Set($@) {
            "'attr $name cmdStep <your_camera_command>'"
       if(defined($args[1]) && !defined(AttrVal($name,"cmdStep",undef)));
 
-    push(@camCmd,$attr{$name}{"cmd".ucfirst($cmd).ucfirst($args[0])});
-    push(@camCmd,$attr{$name}{"cmdStep"}."=".$args[1])
+    push(@camCmd,AttrVal($name,"cmd".ucfirst($cmd).ucfirst($args[0]), undef));
+    push(@camCmd,AttrVal($name,"cmdStep", undef)."=".$args[1])
       if(defined($args[1]));
 
   } elsif($cmd eq "pos") {
@@ -151,9 +179,9 @@ IPCAM_Set($@) {
     my $arg = ($args[0] =~ /\d+/) ? sprintf("cmdPos%02d",$args[0]) : "cmdPosHome";
     return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
            "'attr $name $arg <your_camera_command>'"
-      if(!defined($attr{$name}{$arg}));
+      if(!defined(AttrVal($name,$arg,undef)));
 
-    push(@camCmd,$attr{$name}{$arg});
+    push(@camCmd,AttrVal($name,$arg, undef));
 
   } elsif($cmd eq "cmd") {
 
@@ -167,9 +195,9 @@ IPCAM_Set($@) {
     my $arg = sprintf("cmd%02d",$args[0]);
     return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
            "'attr $name $arg <your_camera_command>'"
-      if(!defined($attr{$name}{$arg}));
+      if(!defined(AttrVal($name,$arg,undef)));
 
-    push(@camCmd,$attr{$name}{$arg});
+    push(@camCmd,AttrVal($name,$arg, undef));
 
   } elsif($cmd eq "raw") {
 
@@ -184,9 +212,9 @@ IPCAM_Set($@) {
   
   if(@camCmd) {
     my $camAuth = $hash->{AUTHORITY};
-    my $basicauth = (defined($attr{$name}{basicauth}) ? $attr{$name}{basicauth} : undef);
+    my $basicauth = AttrVal($name,'basicauth', undef);
     my $camURI;
-    my $camPath = (defined($attr{$name}{path}) ? $attr{$name}{path} : undef);
+    my $camPath = AttrVal($name, 'path', undef);
     my $camQuery = join("&",@camCmd);
 
     if(($cmd eq "pan" || $cmd eq "tilt" || $cmd =~ /pos/) && 
@@ -203,7 +231,7 @@ IPCAM_Set($@) {
     return "Missing a path value for camURI. Please set attribute 'path', 'pathCmd' and/or 'pathPanTilt' first."
       if(!$camPath && $cmd ne "raw");
 
-    my $scheme = IPCAM_getScheme($hash);
+    my $scheme = getScheme($hash);
 
     if($basicauth) {
       $camURI  = "$scheme://$basicauth" . "@" . "$camAuth/$camPath";
@@ -221,7 +249,7 @@ IPCAM_Set($@) {
 
       if(defined($attr{$name}{credentials})) {
         if(!open(CFG, $attr{$name}{credentials})) {
-          Log 1, "IPCAM $name Cannot open credentials file: $attr{$name}{credentials}";
+          Log3 $name, 0, "IPCAM ($name) - Cannot open credentials file: $attr{$name}{credentials}";
           return undef; 
         }
         my @cfg = <CFG>;
@@ -232,10 +260,10 @@ IPCAM_Set($@) {
         $camURI =~ s/{PASSWORD}/$credentials{$name}{password}/g;
       }
     }
-      
-    my $camret = GetFileFromURLQuiet($camURI);
-    Log 5, "ipcam return:$camret";
 
+    Log3 $name, 4, "IPCAM ($name) - set $cmd requesting $camURI";
+    my $camret = GetFileFromURLQuiet($camURI);
+    Log3 $name, 5, "IPCAM ($name) - return:$camret";
   }
 
   return undef;
@@ -243,14 +271,14 @@ IPCAM_Set($@) {
 
 #####################################
 sub
-IPCAM_Get($@) {
+Get($@) {
   my ($hash, @a) = @_;
   my $modpath = $attr{global}{modpath};
   my $name = $hash->{NAME};
   my $seqImages;
   my $seqDelay;
   my $seqWait;
-  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "$modpath/www/snapshots");
+  my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
 
   # check syntax
   return "argument is missing @a"
@@ -274,7 +302,7 @@ IPCAM_Get($@) {
   if(! -d $storage) {
     my $ret = mkdir "$storage";
     if($ret == 0) {
-      Log 1, "ipcam Error while creating: $storage: $!";
+      Log3 $name, 0, "IPCAM ($name) - Error while creating: $storage: $!";
       return "Error while creating storagepath $storage: $!";
     }
   }
@@ -284,8 +312,8 @@ IPCAM_Get($@) {
 
   if($arg eq "image") {
 
-    $seqImages = int(defined($attr{$name}{snapshots}) ? $attr{$name}{snapshots} : 1);
-    $seqDelay  = int(defined($attr{$name}{delay}) ? $attr{$name}{delay} : 0);
+    $seqImages = int(AttrVal($name,'snapshots',1));
+    $seqDelay  = int(AttrVal($name,'delay',0));
     $seqWait   = 0;
 
     # housekeeping after number of sequence has changed
@@ -295,13 +323,13 @@ IPCAM_Get($@) {
         my $n = $r;
         $n =~ s/snapshot//;
         delete $readings->{$r} if( $r =~ m/snapshot/ && int($n) > $seqImages);
-        Log 5, "IPCAM $name remove old reading: $r";
+        Log3 $name, 5, "IPCAM ($name) - remove old reading: $r";
         
       }
     }
     $hash->{READINGS}{snapshots}{VAL} = 0;
     for (my $i=0;$i<$seqImages;$i++) {
-      InternalTimer(gettimeofday()+$seqWait, "IPCAM_getSnapshot", $hash, 0);
+      InternalTimer(gettimeofday()+$seqWait, "IPCAM::getSnapshot", $hash, 0);
       $seqWait = $seqWait + $seqDelay;
     }
     return undef;
@@ -320,7 +348,7 @@ IPCAM_Get($@) {
 
 #####################################
 sub
-IPCAM_getSnapshot($) {
+getSnapshot($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
   my $camAuth = $hash->{AUTHORITY};
@@ -335,11 +363,11 @@ IPCAM_getSnapshot($) {
   my $dateTime;
   my $modpath = $attr{global}{modpath};
   my $seq = int(defined($hash->{SEQ}) ? $hash->{SEQ} : 0);
-  my $seqImages = int(defined($attr{$name}{snapshots}) ? $attr{$name}{snapshots} : 1);
+  my $seqImages = int(AttrVal($name,'snapshots',1));
   my $seqF;
   my $seqL = length($seqImages);
-  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "$modpath/www/snapshots");
-  my $basicauth = (defined($attr{$name}{basicauth}) ? $attr{$name}{basicauth} : undef);
+  my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
+  my $basicauth = AttrVal($name,'basicauth', undef);
   my $timestamp;
 
   #if(!$storage) {
@@ -351,11 +379,11 @@ IPCAM_getSnapshot($) {
   $camQuery = $attr{$name}{query}
     if(defined($attr{$name}{query}) && $attr{$name}{query} ne "");
 
-  my $scheme = IPCAM_getScheme($hash);
+  my $uriScheme = getScheme($hash);
   if($basicauth) {
-    $camURI  = "$scheme://$basicauth" . "@" . "$camAuth/$camPath";
+    $camURI  = "$uriScheme://$basicauth" . "@" . "$camAuth/$camPath";
   } else {
-    $camURI  = "$scheme://$camAuth/$camPath";
+    $camURI  = "$uriScheme://$camAuth/$camPath";
   }
   $camURI .= "?$camQuery" if($camQuery);
 
@@ -363,7 +391,7 @@ IPCAM_getSnapshot($) {
 
     if(defined($attr{$name}{credentials})) {
       if(!open(CFG, $attr{$name}{credentials})) {
-        Log 1, "IPCAM $name Cannot open credentials file: $attr{$name}{credentials}";
+        Log3 $name, 0, "IPCAM ($name) - Cannot open credentials file: $attr{$name}{credentials}";
         RemoveInternalTimer($hash);
         return undef; 
       }
@@ -381,19 +409,21 @@ IPCAM_getSnapshot($) {
   $timestamp =~ s/ /_/g;
   $timestamp =~ s/(:|-)//g;
 
+  Log3 $name, 3, "IPCAM ($name) - getSnapshot URI: $camURI";
   $snapshot = GetFileFromURLQuiet($camURI);
+#  Log3 $name, 5, "IPCAM ($name) - getSnapshot snapshot: $snapshot";
 
-  $imageFormat = IPCAM_guessFileFormat(\$snapshot);
+  $imageFormat = guessFileFormat(\$snapshot);
 
   my @imageTypes = qw(JPEG PNG GIF TIFF BMP ICO PPM XPM XBM SVG);
 
   if( ! grep { $_ eq "$imageFormat"} @imageTypes) {
-    Log 1, "IPCAM $name Wrong or not supported image format: $imageFormat";
+    Log3 $name, 1, "IPCAM ($name) - Wrong or not supported image format: $imageFormat";
     RemoveInternalTimer($hash);
     return undef;
   }
 
-  Log GetLogLevel($name,5), "IPCAM $name Image Format: $imageFormat";
+  Log3 $name, 4, "IPCAM ($name) - Image Format: $imageFormat";
 
   readingsBeginUpdate($hash);
   if($seq < $seqImages) {
@@ -408,33 +438,33 @@ IPCAM_getSnapshot($) {
       $imageFile = $name."_snapshot_".$seqF.".".lc($imageFormat);
     }
     if(!open(FH, ">$storage/$lastSnapshot")) {
-      Log 1, "IPCAM $name Can't write $storage/$lastSnapshot: $!";
+      Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$lastSnapshot: $!";
       RemoveInternalTimer($hash);
       readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
       return undef;
     }
     print FH $snapshot;
     close(FH);
-    Log 5, "IPCAM $name snapshot $storage/$lastSnapshot written.";
+    Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$lastSnapshot written.";
     if(!open(FH, ">$storage/$imageFile")) {
-      Log 1, "IPCAM $name Can't write $storage/$imageFile: $!";
+      Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$imageFile: $!";
       RemoveInternalTimer($hash);
       readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
       return undef;
     }
     print FH $snapshot;
     close(FH);
-    Log 5, "IPCAM $name snapshot $storage/$imageFile written.";
-    readingsBulkUpdate($hash,"last",$lastSnapshot);
+    Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$imageFile written.";
+    readingsBulkUpdate($hash,"last",$lastSnapshot, 1);
     $hash->{STATE} = "last: $dateTime";
     $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
     $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
   }
 
-  Log GetLogLevel($name,4), "IPCAM $name image: $imageFile";
+  Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
 
   if($seq == $seqImages) {
-    readingsBulkUpdate($hash,"snapshots",$seq);
+    readingsBulkUpdate($hash,"snapshots",$seq,1 );
     $seq = 0;
   }
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
@@ -445,7 +475,7 @@ IPCAM_getSnapshot($) {
 
 #####################################
 sub
-IPCAM_getScheme($) {
+getScheme($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
@@ -454,7 +484,7 @@ IPCAM_getScheme($) {
 
 #####################################
 sub
-IPCAM_guessFileFormat($) {
+guessFileFormat($) {
   my ($src) = shift;
   my $header;
   my $srcHeader;
