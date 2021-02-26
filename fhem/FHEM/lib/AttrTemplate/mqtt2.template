@@ -778,10 +778,12 @@ par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ 
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 attr DEVICE stateFormat Action: action
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
+attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model zigbee2mqtt_aqara_cube
-setreading DEVICE attrTemplateVersion 20200904
+setreading DEVICE attrTemplateVersion 20210226
 
 #source post: https://forum.fhem.de/index.php/topic,94494.msg983905.html#msg983905
 name:zigbee2mqtt_AlarmSensor
@@ -2693,12 +2695,32 @@ set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model shellyduo
 setreading DEVICE attrTemplateVersion 20200831
 
+#contributed by MrTom, https://forum.fhem.de/index.php/topic,94060.msg1135513.html#msg1135513
+name:shellymotion
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
+desc:shellymotion using original firmware.
+order:A_16
+par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
+par:ICON;ICON as set, defaults to motion_detector;{ AttrVal("DEVICE","icon","motion_detector") }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; \
+my $moti = ReadingsVal($name,"motion","false") eq "true"?"people_sensor ":"message_presence"; \
+"<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($moti)."</a>"}
+attr DEVICE readingList shellies/DEVNAME/online:.* online\
+  shellies/DEVNAME/sensor/status:.* { json2nameValue($EVENT) }\
+  shellies/DEVNAME/announce:.* { json2nameValue($EVENT) }\
+  shellies/announce:.* { $EVENT =~ m,..id...DEVNAME...mac.*, ? json2nameValue($EVENT) : return }
+attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
+  x_mqttcom shellies/DEVNAME/command $EVTPART1
+attr DEVICE model shellymotion
+setreading DEVICE attrTemplateVersion 20210226
+
 
 # shellyht using original firmware
 name:shellyht
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*shellies.*
 desc:shellyht using original firmware <br>Just adds stateFormat and icon
-order:A_16
+order:A_161
 par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shellies/([^/]+)/, ? $1 : undef }
 par:ICON;ICON as set, defaults to temperature_humidity;{ AttrVal("DEVICE","icon","temperature_humidity") }
 attr DEVICE icon ICON
