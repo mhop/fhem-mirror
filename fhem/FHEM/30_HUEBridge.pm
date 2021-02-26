@@ -1315,7 +1315,8 @@ HUEBridge_updateGroups($$)
     foreach my $light ( split(',', $chash->{lights}) ) {
       next if( !$light );
       next if( !defined($modules{HUEDevice}{defptr}{"$name-$light"}) );
-      my $current = $modules{HUEDevice}{defptr}{"$name-$light"}{helper};
+      my $lhash = $modules{HUEDevice}{defptr}{"$name-$light"};
+      my $current = $lhash->{helper};
       next if( !$current );
       #next if( !$current->{on} );
       next if( $current->{helper}{devtype} );
@@ -1367,7 +1368,10 @@ HUEBridge_updateGroups($$)
       $readings{sat} += $current->{sat} if( defined($current->{sat}) );
 
       $readings{on} |= ($current->{on}?'1':'0');
-      $readings{reachable} |= ($current->{reachable}?'1':'0');
+
+      if( !AttrVal($lhash->{NAME}, 'ignoreReachable', 0) ) {
+        $readings{reachable} |= ($current->{reachable}?'1':'0');
+      }
 
       if( !defined($readings{alert}) ) {
         $readings{alert} = $current->{alert};
