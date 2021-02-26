@@ -62,8 +62,7 @@ use Data::Dumper;
 use File::Spec::Functions ':ALL';
 
 ###START###### Initialize module ##############################################################################START####
-sub DoorBird_Initialize($)
-{
+sub DoorBird_Initialize($) {
     my ($hash)  = @_;
 
     $hash->{STATE}           = "Init";
@@ -84,8 +83,11 @@ sub DoorBird_Initialize($)
 							   "KeepAliveTimeout " .
 							   "UdpPort:6524,35344 " .
 							   "ImageFileDir " .
+							   "ImageFileDirMaxSize " .
 							   "AudioFileDir " .
+							   "AudioFileDirMaxSize " .
 							   "VideoFileDir " .
+							   "VideoFileDirMaxSize " .
 							   "VideoFileFormat:mpeg,mpg,mp4,avi,mov,dvd,vob,ogg,ogv,mkv,flv,webm " .
 							   "VideoDurationDoorbell " .
 							   "VideoDurationMotion " .
@@ -104,8 +106,7 @@ sub DoorBird_Initialize($)
 
 
 ###START######  Activate module after module has been used via fhem command "define" ##########################START####
-sub DoorBird_Define($$)
-{
+sub DoorBird_Define($$) {
 	my ($hash, $def)		= @_;
 	my @a					= split("[ \t][ \t]*", $def);
 	my $name				= $a[0];
@@ -181,8 +182,11 @@ sub DoorBird_Define($$)
 	  $hash->{helper}{UdpPort}							= AttrVal($name, "UdpPort", 6524);
 	  $hash->{helper}{SessionIdSec}						= AttrVal($name, "SessionIdSec", 540);
 	  $hash->{helper}{ImageFileDir}						= AttrVal($name, "ImageFileDir", "");
+	  $hash->{helper}{ImageFileDirMaxSize}				= AttrVal($name, "ImageFileDirMaxSize", 50);
 	  $hash->{helper}{AudioFileDir}						= AttrVal($name, "AudioFileDir", "");
+	  $hash->{helper}{AudioFileDirMaxSize}				= AttrVal($name, "AudioFileDirMaxSize", 50);
 	  $hash->{helper}{VideoFileDir}						= AttrVal($name, "VideoFileDir", "");
+	  $hash->{helper}{VideoFileDirMaxSize}				= AttrVal($name, "VideoFileDirMaxSize", 50);
 	  $hash->{helper}{VideoFileFormat}					= AttrVal($name, "VideoFileFormat","mpeg");
 	  $hash->{helper}{VideoDurationDoorbell}			= AttrVal($name, "VideoDurationDoorbell", 0);
 	  $hash->{helper}{VideoDurationMotion}				= AttrVal($name, "VideoDurationMotion", 0);
@@ -229,8 +233,7 @@ sub DoorBird_Define($$)
 
 
 ###START###### Handle Notifications received by this module  ##################################################START####
-sub DoorBird_Notify($$)
-{
+sub DoorBird_Notify($$) {
 	my ($hash, $dev) = @_;
 	my $name    = $hash->{NAME};
 	my $devName = $dev->{NAME}; # Device that created the events
@@ -259,8 +262,7 @@ sub DoorBird_Notify($$)
 
 
 ##START###### Initialize the device when all attributes are available ########################################START####
-sub DoorBird_InitializeDevice($)
-{
+sub DoorBird_InitializeDevice($) {
 	my($hash) = @_;
 	my $name    = $hash->{NAME};
 
@@ -292,8 +294,7 @@ sub DoorBird_InitializeDevice($)
 
 
 ###START###### Deactivate module module after "undefine" command by fhem ######################################START####
-sub DoorBird_Undefine($$)
-{
+sub DoorBird_Undefine($$) {
 	my ($hash, $def)  = @_;
 	my $name = $hash->{NAME};	
 	my $url  = $hash->{URL};
@@ -317,8 +318,7 @@ sub DoorBird_Undefine($$)
 
 
 ###START###### Handle attributes after changes via fhem GUI ###################################################START####
-sub DoorBird_Attr(@)
-{
+sub DoorBird_Attr(@) {
 	my @a                      = @_;
 	my $name                   = $a[1];
 	my $hash                   = $defs{$name};
@@ -469,7 +469,7 @@ sub DoorBird_Attr(@)
 			InternalTimer(gettimeofday()+$hash->{helper}{SessionIdSec}, "DoorBird_RenewSessionID", $hash, 0);
 		}
 	}
-	### Check whether ImageFileSave attribute has been provided
+	### Check whether ImageFileDir attribute has been provided
 	elsif ($a[2] eq "ImageFileDir") {
 		### Check whether ImageFileSave is defined
 		if (defined($a[3])) {
@@ -480,6 +480,34 @@ sub DoorBird_Attr(@)
 			### Set helper in hash
 			$hash->{helper}{ImageFileDir} = "";
 		}
+	}
+	### Check whether ImageFileDirMaxSize attribute has been provided
+	elsif ($a[2] eq "ImageFileDirMaxSize") {	
+
+		### If the attribute has not been deleted entirely
+		if (defined $a[3]) {
+			### Check whether ImageFileDirMaxSize is 0 = disabled
+			if ($a[3] == int($a[3]) && ($a[3] <= 50)) {
+				### Save standard value
+				$hash->{helper}{ImageFileDirMaxSize} = 50;
+			}
+			### If ImageFileDirMaxSize is numeric and greater than 50
+			elsif ($a[3] == int($a[3]) &&  ($a[3] > 50)) {
+
+				### Save attribute as internal
+				$hash->{helper}{ImageFileDirMaxSize} = $a[3];
+			}
+			### If KeepAliveTimeout is NOT numeric or smaller than 50
+			else{
+				### Save standard interval as internal
+				$hash->{helper}{ImageFileDirMaxSize} = 50;
+			}
+		}
+		### If the attribute has been deleted entirely
+		else {
+			### Save standard interval as internal
+			$hash->{helper}{ImageFileDirMaxSize} = 50;
+		}	
 	}
 	### Check whether AudioFileDir attribute has been provided
 	elsif ($a[2] eq "AudioFileDir") {
@@ -493,6 +521,34 @@ sub DoorBird_Attr(@)
 			$hash->{helper}{AudioFileDir} = "";
 		}
 	}
+	### Check whether AudioFileDirMaxSize attribute has been provided
+	elsif ($a[2] eq "AudioFileDirMaxSize") {	
+
+		### If the attribute has not been deleted entirely
+		if (defined $a[3]) {
+			### Check whether AudioFileDirMaxSize is 0 = disabled
+			if ($a[3] == int($a[3]) && ($a[3] <= 50)) {
+				### Save standard value
+				$hash->{helper}{AudioFileDirMaxSize} = 50;
+			}
+			### If AudioFileDirMaxSize is numeric and greater than 50
+			elsif ($a[3] == int($a[3]) &&  ($a[3] > 50)) {
+
+				### Save attribute as internal
+				$hash->{helper}{AudioFileDirMaxSize} = $a[3];
+			}
+			### If KeepAliveTimeout is NOT numeric or smaller than 50
+			else{
+				### Save standard interval as internal
+				$hash->{helper}{AudioFileDirMaxSize} = 50;
+			}
+		}
+		### If the attribute has been deleted entirely
+		else {
+			### Save standard interval as internal
+			$hash->{helper}{AudioFileDirMaxSize} = 50;
+		}	
+	}
 	### Check whether VideoFileDir attribute has been provided
 	elsif ($a[2] eq "VideoFileDir") {
 		### Check whether VideoFileSave is defined
@@ -505,6 +561,34 @@ sub DoorBird_Attr(@)
 			$hash->{helper}{VideoFileDir} = "";
 		}
 	}
+	### Check whether VideoFileDirMaxSize attribute has been provided
+	elsif ($a[2] eq "VideoFileDirMaxSize") {	
+
+		### If the attribute has not been deleted entirely
+		if (defined $a[3]) {
+			### Check whether VideoFileDirMaxSize is 0 = disabled
+			if ($a[3] == int($a[3]) && ($a[3] <= 50)) {
+				### Save standard value
+				$hash->{helper}{VideoFileDirMaxSize} = 50;
+			}
+			### If VideoFileDirMaxSize is numeric and greater than 50
+			elsif ($a[3] == int($a[3]) &&  ($a[3] > 50)) {
+
+				### Save attribute as internal
+				$hash->{helper}{VideoFileDirMaxSize} = $a[3];
+			}
+			### If KeepAliveTimeout is NOT numeric or smaller than 50
+			else{
+				### Save standard interval as internal
+				$hash->{helper}{VideoFileDirMaxSize} = 50;
+			}
+		}
+		### If the attribute has been deleted entirely
+		else {
+			### Save standard interval as internal
+			$hash->{helper}{VideoFileDirMaxSize} = 50;
+		}	
+	}	
 	### Check whether VideoDurationDoorbell attribute has been provided
 	elsif ($a[2] eq "VideoDurationDoorbell") {
 		### Check whether VideoDurationDoorbell is defined
@@ -644,8 +728,7 @@ sub DoorBird_Attr(@)
 ####END####### Handle attributes after changes via fhem GUI ####################################################END#####
 
 ###START###### Obtain value after "get" command by fhem #######################################################START####
-sub DoorBird_Get($@)
-{
+sub DoorBird_Get($@) {
 	my ( $hash, @a ) = @_;
 	
 	### If not enough arguments have been provided
@@ -742,8 +825,7 @@ sub DoorBird_Get($@)
 
 
 ###START###### Manipulate service after "set" command by fhem #################################################START####
-sub DoorBird_Set($@)
-{
+sub DoorBird_Set($@) {
 	my ( $hash, @a ) = @_;
 	
 	### If not enough arguments have been provided
@@ -2514,6 +2596,7 @@ sub DoorBird_Image_Request($$) {
 
 		### Get current working directory
 		my $cwd = getcwd();
+		my $ImageFileDir;
 
 		### Log Entry for debugging purposes
 		Log3 $name, 5, $name. " : DoorBird_Image_Request - working directory        : " . $cwd;
@@ -2534,9 +2617,17 @@ sub DoorBird_Image_Request($$) {
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{ImageFileDir} =~ /\/\z/) {
+				### Save directory
+				$ImageFileDir = $ImageFileName;
+				
+				### Create full datapath
 				$ImageFileName .=       $ImageFileTimeStamp . "_snapshot.jpg";
 			}
 			else {
+				### Save directory
+				$ImageFileDir = $ImageFileName . "/";
+				
+				### Create full datapath
 				$ImageFileName .= "/" . $ImageFileTimeStamp . "_snapshot.jpg";
 			}
 		}
@@ -2553,12 +2644,23 @@ sub DoorBird_Image_Request($$) {
 			else {
 				$ImageFileName = $hash->{helper}{ImageFileDir};						
 			}
+			
+			### Save directory
+			$ImageFileDir = $ImageFileName;
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{ImageFileDir} =~ /\\\z/) {
+				### Save directory
+				$ImageFileDir = $ImageFileName;
+				
+				### Create full datapath
 				$ImageFileName .=       $ImageFileTimeStamp . "_snapshot.jpg";
 			}
 			else {
+				### Save directory
+				$ImageFileDir = $ImageFileName . "\\";
+				
+				### Create full datapath
 				$ImageFileName .= "\\" . $ImageFileTimeStamp . "_snapshot.jpg";
 			}
 		}
@@ -2588,8 +2690,12 @@ sub DoorBird_Image_Request($$) {
 		close $fh or do {
 			### Log Entry 
 			Log3 $name, 2, $name. " : DoorBird_Image_Request - close file error          : " . $! . " - ". $ImageFileName;
-		}
+		};
+	
+		### Free FileDirSpace if exxeeds maximum
+		DoorBird_FileSpace($hash, $ImageFileDir, "jpg", $hash->{helper}{ImageFileDirMaxSize});
 	}
+	
 	
 	### Log Entry for debugging purposes
 	Log3 $name, 5, $name. " : DoorBird_Image_Request - ImageData size           : " . length($ImageData);
@@ -3955,6 +4061,7 @@ sub DoorBird_Video_Request($$$$) {
 
 		### Get current working directory
 		my $cwd = getcwd();
+		my $VideoFileDir;
 
 		### Log Entry for debugging purposes
 		Log3 $name, 5, $name. " : DoorBird_Video_Request - working directory        : " . $cwd;
@@ -3975,9 +4082,17 @@ sub DoorBird_Video_Request($$$$) {
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{VideoFileDir} =~ /\/\z/) {
+				### Save directory
+				$VideoFileDir = $VideoFileName;
+				
+				### Create complete datapath
 				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			else {
+				### Save directory
+				$VideoFileDir = $VideoFileName . "/";
+				
+				### Create complete datapath
 				$VideoFileName .= "/" . $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			
@@ -4018,15 +4133,26 @@ sub DoorBird_Video_Request($$$$) {
 
 			### Check whether the last "/" at the end of the path has been given otherwise add it an create complete path
 			if ($hash->{helper}{VideoFileDir} =~ /\\\z/) {
+				### Save directory
+				$VideoFileDir = $VideoFileName;
+				
+				### Create full datapath
 				$VideoFileName .=       $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			else {
+				### Save directory
+				$VideoFileDir = $VideoFileName . "\\";
+
+				### Create full datapath
 				$VideoFileName .= "\\" . $VideoFileTimeStamp . "_" . $event . "." . $hash->{helper}{VideoFileFormat};
 			}
 			
 			### Log Entry for debugging purposes
 			Log3 $name, 2, $name. " : DoorBird_Video_Request - Video-Request ha not been implemented for Windows file system. Contact fhem forum and WIKI.";
 		}
+		
+		### Free FileDirSpace if exxeeds maximum
+		DoorBird_FileSpace($hash, $VideoFileDir, $hash->{helper}{VideoFileFormat}, $hash->{helper}{VideoFileDirMaxSize});
 		
 		### Update the history list for images and videos after the video has been taken
 		InternalTimer(gettimeofday()+$duration+3,"DoorBird_History_List", $hash, 0);
@@ -4509,8 +4635,7 @@ sub DoorBird_Rel_Path($$) {
 # this means that still multiple versions matching a single product could be in the hash, 
 # e. g. for different prefixes all matching the final product name.
 
-sub DoorBird_parseChangelog($$)
-{
+sub DoorBird_parseChangelog($$) {
 	my ($hash, $data) = @_;
 	my $name = $hash->{NAME};
 
@@ -4553,8 +4678,7 @@ sub DoorBird_parseChangelog($$)
 				undef $version;
 			}
 			### If version cannot be found
-			else
-			{
+			else {
 				### Log Entry for debugging purposes
 				Log3 $name, 3, $name. " : DoorBird_parseChangelog - Products without version found in changelog, ignored.";
 			}
@@ -4565,8 +4689,7 @@ sub DoorBird_parseChangelog($$)
 
 # Find newest firmware version for this device by name or prefix.
 # The versions hash ref expected as second argument should match the format returned from DoorBird_parseChangelog().
-sub DoorBird_findNewestFWVersion($$$)
-{
+sub DoorBird_findNewestFWVersion($$$) {
 	my ($hash, $versions, $product_name) = @_;
 	my $name	 = $hash->{NAME};
 	my $newest = 0;
@@ -4587,6 +4710,94 @@ sub DoorBird_findNewestFWVersion($$$)
 	return $newest;
 }
 ####END####### Processing Change Log ###########################################################################END#####
+
+###START###### Limit File Space ###############################################################################START####
+sub DoorBird_FileSpace($$$$) {
+	my ($hash, $FileDir, $FileExt, $FileDirMaxSize) = @_;
+	my $name	                   = $hash->{NAME};	
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_FileSpace - __________________________________________________________";
+	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileDir                      : " . $FileDir;
+	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileExt                      : " . $FileExt;
+	Log3 $name, 5, $name. " : DoorBird_FileSpace - FileDirMaxSize               : " . $FileDirMaxSize . " MByte";
+	
+
+
+
+	my $SizeOfFiles = 0;
+	my @FileList;
+	opendir( my $dh, $FileDir )	or die "Cannot opendir '$FileDir': $!\n";
+
+	### Search for files of specified extension (FileExt) in specified directory (FileDir)
+	for my $i ( readdir( $dh ) ) {
+		if ($i =~ m/$FileExt/) {
+			
+			push(@FileList, $FileDir . $i);
+			my $s = -s $FileDir . $i;
+			
+			$SizeOfFiles += $s;
+			$SizeOfFiles += getdirsize( $FileDir . $i ) if -d $FileDir . $i && $i !~ /^\.\.?$/;
+		}
+	}
+	
+	### Sort list of files by name => timestamp
+	@FileList = sort(@FileList);
+	
+	### Log Entry for debugging purposes
+	#Log3 $name, 5, $name. " : DoorBird_FileSpace - FileList sorted              : \n" . Dumper(@FileList);	
+	
+	### Transform Byte in MByte
+	$SizeOfFiles = int($SizeOfFiles / 1024 / 1024);
+
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : DoorBird_FileSpace - Dirsize                      : " . $SizeOfFiles . " MByte";
+
+	if ($SizeOfFiles > $FileDirMaxSize) {
+
+		### Calculate Delta Volume to be deleted
+		my $DeltaVol = $SizeOfFiles - $FileDirMaxSize;
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_FileSpace - MaxDirSize exceeded       dV : " . $DeltaVol . " MByte";
+
+		my $CountVol = 0;
+		my @FileListToBeDeleted;
+		
+		### If there are files available at all which could be deleted
+		if (@FileList > 0) {
+			my $i = 0;		
+			
+			### As long their need more files to be deleted
+			while (($CountVol / 1024 / 1024) < $DeltaVol) {
+				
+				### Add to the list of deleted files
+				push (@FileListToBeDeleted, $FileList[$i]);
+				
+				### Sum up the volume freed if file is deleted
+				$CountVol += -s $FileList[$i];
+
+				### Log Entry for debugging purposes
+				Log3 $name, 5, $name. " : DoorBird_FileSpace - CountVol collected so far    : " . int($CountVol/1024/1024) . " MByte";
+
+				$i++
+			}
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_FileSpace - FileListToBeDeleted          : \n" . Dumper(@FileListToBeDeleted);
+		}
+
+		### Delete oldestFile
+		my $NoOfDeletedFiles = unlink @FileListToBeDeleted;
+	
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DoorBird_FileSpace - NumberOfDeletedFiles         : " . $NoOfDeletedFiles;
+	}
+
+	### Close directory
+	closedir( $dh );
+}
+####END####### Limit File Space ################################################################################END#####
 
 1;
 
@@ -4662,8 +4873,11 @@ sub DoorBird_findNewestFWVersion($$$)
 		<tr><td><ul><ul><a name="UdpPort"               ></a><li><b><u><code>UdpPort                         </code></u></b> : Port number to be used to receice UDP datagrams. Ports are pre-defined by firmware.<BR>The default value is port 6524                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="SessionIdSec"          ></a><li><b><u><code>SessionIdSec                    </code></u></b> : Time in seconds for how long the session Id shall be valid, which is required for secure Video and Audio transmission. The DoorBird kills the session Id after 10min = 600s automatically. In case of use with CCTV recording units, this function must be disabled by setting to 0.<BR>The default value is 540s = 9min.  <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="AudioFileDir"          ></a><li><b><u><code>AudioFileDir                    </code></u></b> : The relative (e.g. "audio") or absolute (e.g. "/mnt/NAS/audio") with or without trailing "/" directory path to which the audio files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                             <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="AudioFileDirMaxSize"   ></a><li><b><u><code>AudioFileDirmaxSize             </code></u></b> : The maximum size of the AudioFileDir in Megabyte [MB]. If the maximum Size has been reached with audio files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="ImageFileDir"          ></a><li><b><u><code>ImageFileDir                    </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the image files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ImageFileDirMaxSize"   ></a><li><b><u><code>ImageFileDirmaxSize             </code></u></b> : The maximum size of the ImageFileDir in Megabyte [MB]. If the maximum Size has been reached with Image files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoFileDir"          ></a><li><b><u><code>VideoFileDir                    </code></u></b> : The relative (e.g. "images") or absolute (e.g. "/mnt/NAS/images") with or without trailing "/" directory path to which the video files supposed to be stored.<BR>The default value is <code>""</code> = disabled                                                                                                           <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="VideoFileDirMaxSize"   ></a><li><b><u><code>VideoFileDirmaxSize             </code></u></b> : The maximum size of the VideoFileDir in Megabyte [MB]. If the maximum Size has been reached with Video files, the oldest files are deleted automatically<BR>The default value is <code>50</code> = 50MB                                                                                                                    <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoFileFormat"       ></a><li><b><u><code>VideoFileFormat                 </code></u></b> : The file format for the video file to be stored<BR>The default value is <code>"mpeg"</code>                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoDurationDoorbell" ></a><li><b><u><code>VideoDurationDoorbell           </code></u></b> : Time in seconds for how long the video shall be recorded in case of an doorbbell event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoDurationMotion"   ></a><li><b><u><code>VideoDurationMotion             </code></u></b> : Time in seconds for how long the video shall be recorded in case of an motion sensor event.<BR>The default value is <code>0</code> = disabled                                                                                                                                                                              <BR></li></ul></ul></td></tr>
@@ -4742,8 +4956,11 @@ sub DoorBird_findNewestFWVersion($$$)
 		<tr><td><ul><ul><a name="UdpPort"               ></a><li><b><u><code>UdpPort                         </code></u></b> : Port Nummer auf welcher das DoorBird - Modul nach den UDP Datagrammen der DoorBird - Anlage h&ouml;ren soll. Die Ports sind von der Firmware vorgegeben.<BR>Der Default Port ist 6524                                                                                                                                                                                                                                                                                <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="SessionIdSec"          ></a><li><b><u><code>SessionIdSec                    </code></u></b> : Zeit in Sekunden nach welcher die Session Id erneuert werden soll. Diese ist f&uuml;r die sichere &Uuml;bertragung der Video und Audio Verbindungsdaten notwendig. Die DoorBird-Unit devalidiert die Session Id automatisch nach 10min. F&uuml;r den Fall, dass die DoorBird Kamera an ein &Uuml;berwachungssystem angebunden werden soll, muss diese Funktion ausser Betrieb genommen werden indem man den Wert auf 0 setzt 0.<BR>Der Default Wert ist 540s = 9min. <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="AudioFileDir"          ></a><li><b><u><code>AudioFileDir                    </code></u></b> : Der relative (z.B. "audio") oder absolute (z.B. "/mnt/NAS/audio") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Audio-Dateien abgelegt sind.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="AudioFileDirMaxSize"   ></a><li><b><u><code>AudioFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Audio-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="ImageFileDir"          ></a><li><b><u><code>ImageFileDir                    </code></u></b> : Das Dateiformat f&uuml;r die Videodatei<BR>Der Default Wert ist <code>"mpeg"</code>                                                                                                                                                                                                                                                                                                                                                                                  <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="ImageFileDirMaxSize"   ></a><li><b><u><code>ImageFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Image-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoFileDir"          ></a><li><b><u><code>VideoFileDir                    </code></u></b> : Der relative (z.B. "images") oder absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Bild-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a name="VideoFileDirMaxSize"   ></a><li><b><u><code>VideoFileDirMaxSize             </code></u></b> : Die maximale Gr&ouml;&szlig;e des Unterverzeichnisses f&uuml;r die Video-Dateien in Megabyte (MB). Beim Erreichen dieses Wertes, werden die &auml;ltesten Dateien automatisch gel&ouml;scht.<BR>Der Default Wert ist <code>50</code> = 50MB                                                                                                                                                                                                                          <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoFileFormat"       ></a><li><b><u><code>VideoFileFormat                 </code></u></b> : Der relative (z.B. "images") oderr absolute (z.B. "/mnt/NAS/images") Verzeichnispfad mit oder ohne nachfolgendem Pfadzeichen "/"  in welchen die Video-Dateien gespeichert werden sollen.<BR>Der Default Wert ist <code>""</code> = deaktiviert                                                                                                                                                                                                                      <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoDurationDoorbell" ></a><li><b><u><code>VideoDurationDoorbell           </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Klingel Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                                 <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a name="VideoDurationMotion"   ></a><li><b><u><code>VideoDurationMotion             </code></u></b> : Zeit in Sekunden für wie lange das Video im Falle eines Bewegungssensor Events aufgenommen werden soll.<BR>Der Default Wert ist <code>0</code> = deaktiviert                                                                                                                                                                                                                                                                                                         <BR></li></ul></ul></td></tr>
