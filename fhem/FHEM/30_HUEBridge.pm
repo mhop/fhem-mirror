@@ -1369,7 +1369,9 @@ HUEBridge_updateGroups($$)
 
       $readings{on} |= ($current->{on}?'1':'0');
 
-      if( !AttrVal($lhash->{NAME}, 'ignoreReachable', 0) ) {
+      if( AttrVal($lhash->{NAME}, 'ignoreReachable', 0) ) {
+        $readings{reachable} |= 1;
+      } else {
         $readings{reachable} |= ($current->{reachable}?'1':'0');
       }
 
@@ -1390,6 +1392,10 @@ HUEBridge_updateGroups($$)
       }
 
       ++$count;
+    }
+
+    if( AttrVal($name, 'ignoreReachable', 0) ) {
+      delete $readings{reachable};
     }
 
     if( defined($hue) && $readings{colormode} && $readings{colormode} ne "ct" ) {
