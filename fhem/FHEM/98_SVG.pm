@@ -214,6 +214,14 @@ SVG_exp10($)
   return 10**$n;
 }
 
+sub
+SVG_stylesheetPrefix()
+{
+  my $sp = AttrVal($FW_wname,"stylesheetPrefix","");
+  $sp =~ s/^f11//;
+  $sp = "" if($sp eq "default");
+  return $sp;
+}
 
 ##################
 sub
@@ -449,8 +457,7 @@ SVG_PEdit($$$$)
                      "get example data and correct parameter choice";
 
   my @lineStyles;
-  if(SVG_openFile($FW_cssdir,
-                  AttrVal($FW_wname,"stylesheetPrefix",""), "svg_style.css")) {
+  if(SVG_openFile($FW_cssdir, SVG_stylesheetPrefix(), "svg_style.css")) {
     map { push(@lineStyles,$1) if($_ =~ m/^\.SVGplot.(l[^{ ]*)/) } <FH>; # }
     close(FH);
   }
@@ -1424,7 +1431,7 @@ SVG_render($$$$$$$$$$)
     SVG_pO "<svg $svghdr $style>";
   }
 
-  my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
+  my $prf = SVG_stylesheetPrefix();
   SVG_pO "<style type=\"text/css\"><![CDATA[";
   if(SVG_openFile($parent_dir, $prf, "svg_style.css")) {
     SVG_pO join("", <FH>);
