@@ -1,8 +1,8 @@
-REV 23820
+REV 23826
 DIR unused
 UPD 2021-02-23_07:45:06 358149 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2021-02-09_07:45:33 42936 ./MAINTAINER.txt
+UPD 2021-02-26_07:45:03 43040 ./MAINTAINER.txt
 UPD 2020-12-24_07:45:04 41434 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2021-02-23_07:45:15 166862 ./fhem.pl
@@ -39,7 +39,7 @@ UPD 2020-12-03_07:45:02 143896 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2021-02-13_09:02:50 45791 FHEM/00_ZWDongle.pm
-UPD 2021-02-13_09:02:50 165119 FHEM/01_FHEMWEB.pm
+UPD 2021-02-26_07:45:03 165033 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2020-10-03_07:45:14 43003 FHEM/02_FTUISRV.pm
 UPD 2019-09-06_07:45:02 7946 FHEM/02_HTTPSRV.pm
@@ -640,7 +640,7 @@ UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2021-01-09_07:45:04 70537 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-02-23_07:45:06 305575 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-02-26_07:45:03 307065 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -736,8 +736,8 @@ UPD 2021-02-25_07:45:07 4469022 docs/commandref.html
 UPD 2021-02-23_07:45:13 2765322 docs/commandref_DE.html
 UPD 2021-02-23_22:05:11 81115 docs/commandref_frame.html
 UPD 2021-02-23_07:45:06 90770 docs/commandref_frame_DE.html
-UPD 2021-02-25_07:45:11 236329 docs/commandref_modular.html
-UPD 2021-02-25_07:45:12 247105 docs/commandref_modular_DE.html
+UPD 2021-02-26_07:45:10 236329 docs/commandref_modular.html
+UPD 2021-02-26_07:45:12 247105 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2292,7 +2292,7 @@ UPD 2020-01-27_07:45:02 5941 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2021-02-13_09:02:50 31176 www/pgm2/f18.js
-UPD 2020-10-01_07:45:03 10057 www/pgm2/f18style.css
+UPD 2021-02-26_07:45:03 10104 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
 UPD 2021-02-23_22:05:11 63960 www/pgm2/fhemweb.js
 UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
