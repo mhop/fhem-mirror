@@ -1,0 +1,105 @@
+###########################################
+# $Id$
+#
+# Comments start with #. Empty lines are ignored.
+# Syntax of one entry: name: line, one optional filter: line, zero or more par: lines,  FHEM-Commands
+# filter:INTERNAL=VALUE (optional)
+# par: name of the parameter; comment; perl_code (optional)
+# perl_code returns a value for the parameter, or undef.
+# If undef, the user has to specify them (the comment is shown to the user)
+
+###########################################
+name:General_Info
+filter:TYPE=IPCAM
+desc: Forum <a href='https://forum.fhem.de/index.php/topic,10772.msg1135359.html' target='_blank'>link</a> for suggestions or bug reports on ipcam-template
+order:00000000
+
+#########################
+# Camera entries
+name:Reolink
+filter:TYPE=IPCAM
+desc: Tested with Reolink E1 Zoom, RLC-410
+order:reolink01
+par:WIDTH;Capture width
+par:HEIGHT;Capture height
+par:USERNAME;Username
+par:PASSWORD;Password
+attr DEVICE path cgi-bin/api.cgi?cmd=Snap&width=WIDTH&height=HEIGHT&channel=0&rs=3454&user=USERNAME&password=PASSWORD
+attr DEVICE model Reolink
+
+############################################
+name:Hikvision
+filter:TYPE=IPCAM
+desc: Tested with Hikvision DS-2CD2032-I
+order:hikvision01
+par:USERNAME;Username for camera authentication;
+par:PASSWORD;Password for camera authentication;
+attr DEVICE basicauth USERNAME:USERNAME
+attr DEVICE delay 0
+attr DEVICE icon it_camera
+attr DEVICE path Streaming/channels/1/picture?snapShotImageType=JPEG
+attr DEVICE model Hikvision
+
+############################################
+name:Foscam
+filter:TYPE=IPCAM
+desc: Tested with Foscam FI9831P
+order:foscam01
+par:USERNAME;Username
+par:PASSWORD;Password
+PAR:POS1;Name Position 1
+attr DEVICE cmd01 cmd=ptzStopRun&usr=USERNAME&pwd=PASSWORD
+attr DEVICE cmdPanLeft cmd=ptzMoveLeft&usr=USERNAME&pwd=PASSWORD
+attr DEVICE cmdPanRight cmd=ptzMoveRight&usr=USERNAME&pwd=PASSWORD
+attr DEVICE cmdPos01 cmd=ptzGotoPresetPoint&name=POS1&usr=USERNAME&pwd=USERNAME
+attr DEVICE cmdTiltDown cmd=ptzMoveDown&usr=USERNAME&pwd=PASSWORD
+attr DEVICE cmdTiltUp cmd=ptzMoveUp&usr=USERNAME&pwd=PASSWORD
+attr DEVICE path cgi-bin/CGIProxy.fcgi?usr=USERNAME&pwd=PASSWORD&cmd=snapPicture2
+attr DEVICE pathCmd cgi-bin/CGIProxy.fcgi
+attr DEVICE pathPanTilt cgi-bin/CGIProxy.fcgi?usr=USERNAME&pwd=PASSWORD
+attr DEVICE model Foscam
+
+###########################################
+name:Mobotix
+filter:TYPE=IPCAM
+desc: Mobotix
+order:mobotix01
+attr DEVICE path record/current.jpg
+attr DEVICE model Mobotix
+
+###########################################
+name:INSTAR
+filter:TYPE=IPCAM
+desc: Information taken from here: <a href="https://wiki.instar.com/de/Erweitert/FHEM_auf_Raspberry_Pi/#das-ipcam-modul" target="_blank">https://wiki.instar.com/de/Erweitert/FHEM_auf_Raspberry_Pi/#das-ipcam-modul</a>
+order:instar01
+par:USERNAME;Username
+par:PASSWORD;Password
+attr DEVICE basicauth USERNAME:PASSWORD
+attr DEVICE cmd01 cmd=setinfrared&-infraredstat=auto
+attr DEVICE cmd02 cmd=setinfrared&-infraredstat=close
+attr DEVICE cmd03 cmd=setinfrared&-infraredstat=open
+attr DEVICE cmd04 cmd=setmdalarm&-aname=ftprec&-switch=on
+attr DEVICE cmd05 cmd=setmdalarm&-aname=ftprec&-switch=off
+attr DEVICE cmd06 cmd=setplanrecattr&-planrec_enable=0
+attr DEVICE cmd07 cmd=setplanrecattr&-planrec_enable=1
+attr DEVICE cmd08 cmd=setplanrecattr&-planrec_chn=11
+attr DEVICE cmd09 cmd=setplanrecattr&-planrec_chn=12
+attr DEVICE cmd10 cmd=manualrec&-act=on
+attr DEVICE cmd11 cmd=manualrec&-act=off
+attr DEVICE cmd12 cmd=sdfrmt
+attr DEVICE cmd13 cmd=preset&-act=goto&-number=0
+attr DEVICE cmd14 cmd=preset&-act=goto&-number=1
+attr DEVICE cmd15 cmd=preset&-act=goto&-number=2
+attr DEVICE cmdPanLeft -act=left
+attr DEVICE cmdPanRight -act=right
+attr DEVICE cmdPos15 -act=stop
+attr DEVICE cmdTiltDown -act=down
+attr DEVICE cmdTiltUp -act=up
+attr DEVICE eventMap /pos 15:MOVE-STOP/pan left:MOVE-LEFT/pan right:MOVE-RIGHT/tilt up:MOVE-UP/tilt down:MOVE-DOWN/cmd 1:IR-LED-auto/cmd 2:IR-LED-off/cmd 3:IR-LED-on/cmd 4:FTP-rec-on/cmd 5:FTP-rec-off/cmd 6:REC-SD-DISABLE/cmd 7:REC-SD-ENABLE/cmd 8:REC-SD-QUAL-HIGH/cmd 9:REC-SD-QUAL-MID/cmd 10:MAN-REC-Start/cmd 11:MAN-REC-Stop/cmd 12:FORMAT-SD-CARD/cmd 13:POS-WZ/cmd 14:POS-Flur/cmd 15:POS-Park/
+attr DEVICE path tmpfs/snap.jpg
+attr DEVICE pathCmd param.cgi
+attr DEVICE pathPanTilt ptzctrl.cgi?-step=
+attr DEVICE scheme https
+attr DEVICE model INSTAR Full HD
+
+
