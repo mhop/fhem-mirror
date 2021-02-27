@@ -1,5 +1,5 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 23214 2020-11-22 15:56:42Z DS_Starter $
+# $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
@@ -57,6 +57,10 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
+  "8.42.6"  => "25.02.2021  fix commandref ",
+  "8.42.5"  => "02.02.2021  correct possible values for attr seqDoubletsVariance ",
+  "8.42.4"  => "30.01.2021  fix commandref ",
   "8.42.3"  => "03.01.2021  set fastStart as default for TYPE Client ",
   "8.42.2"  => "03.01.2021  sumValue - create 0 instaed of '-' if value of DS is 0, Forum:#index.php/topic,53584.msg1116910.html#msg1116910 ",
   "8.42.1"  => "22.11.2020  fix delete \$hash->{HELPER}{REDUCELOG} Forum:#116057 ",
@@ -256,7 +260,7 @@ my %DbRep_vHintsExt_en = (
          "If the sum of 200 is exceeded in spring, the sustainable vegetation start is reached. The background is the ".
          " nitrogen uptake and processing of the soil, which is dependent on this temperature sum. In middle latitudes ".
          "this is usually achieved in the course of March, at the turn from early spring to mid-spring. <br>".
-         "(see also <a href=\"https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
+         "(see also <a href=\"https://de.wikipedia.org/wiki/Grünlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
   "4" => "The attribute 'valueFilter' can specify a REGEXP expression that is used for additional field selection as described in set-function. "
          ."If you need more assistance please to the manual of your used database. For example the overview about REGEXP for "
          ."MariaDB refer to <a href=\"https://mariadb.com/kb/en/library/regular-expressions-overview\">Regular Expressions "
@@ -283,7 +287,7 @@ my %DbRep_vHintsExt_de = (
          "Wird im Frühjahr die Summe von 200 überschritten, ist der nachhaltige Vegetationsbeginn erreicht. Hintergrund ist die ".
          "Stickstoffaufnahme und -verarbeitung des Bodens, welcher von dieser Temperatursumme abhängig ist. In mittleren Breiten ".
          "wird das meist im Laufe des März, an der Wende von Vorfrühling zu Mittfrühling erreicht. <br>".
-         "(siehe auch <a href=\"https://de.wikipedia.org/wiki/Gr%C3%BCnlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
+         "(siehe auch <a href=\"https://de.wikipedia.org/wiki/Grünlandtemperatursumme\">Grünlandtemperatursumme in Wikipedia</a>) ",
   "4" => "Im Attribut 'valueFilter' können REGEXP zur erweiterten Feldselektion angegeben werden. Welche Felder berücksichtigt ".
          "werden, ist in der jeweiligen set-Funktion beschrieben. Für weitere Hilfe bitte die REGEXP-Dokumentation ihrer ".
          "verwendeten Datenbank konsultieren. Ein Überblick über REGEXP mit MariaDB ist zum Beispiel hier verfügbar:<br>".
@@ -300,9 +304,6 @@ my %DbRep_vHintsExt_de = (
          "Siehe dazu auch die Informationen zu <a href='https://www.dwd.de/DE/leistungen/klimadatendeutschland/beschreibung_tagesmonatswerte.html'>Regularien</a> des deutschen Wetterdienstes zur Berechnung von Durchschnittstemperaturen. ",
   "1" => "Hilfreiche Hinweise zu DbRep im <a href=\"https://wiki.fhem.de/wiki/DbRep_-_Reporting_und_Management_von_DbLog-Datenbankinhalten#Praxisbeispiele_.2F_Hinweise_und_L.C3.B6sungsans.C3.A4tze_f.C3.BCr_verschiedene_Aufgaben\">FHEM-Wiki</a>."
 );
-
-# foreward declaration
-sub DbLog_cutCol($$$$$$$);           # DbLog-Funktion nutzen um Daten auf maximale Länge beschneiden
 
 # Standard Feldbreiten falls noch nicht getInitData ausgeführt
 my %dbrep_col = ("DEVICE"  => 64,
@@ -1295,7 +1296,7 @@ sub DbRep_Attr {
             my $edge = "";
             if($aVal =~ /EDGE=/) {
                 ($aVal,$edge) = split("EDGE=", $aVal);
-                unless ($edge =~ /^balanced$|^negative$/i) { return " The parameter EDGE can only be \"balanced\" or \"negative\" !";}
+                unless ($edge =~ /^positive$|^negative$/i) { return qq{The parameter EDGE can only be "positive" or "negative" !}; }
             }            
             my ($varpos,$varneg) = split(" ", $aVal);
             $varpos = DbRep_trim($varpos);
@@ -5706,18 +5707,20 @@ sub delseqdoubl_DoParse {
              push (@sel,$oor) if($oor);
              push (@sel,$or) if($or);
              push (@sel,$nr);
-         
-         } elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
+         } 
+         elsif ($i>=2 && ($ooval eq $oval && $oval eq $nval) || 
                  ($i>=2 && $varo && $varu && ($ooval <= $varo) && ($varu <= $ooval) && ($nval <= $varo) && ($varu <= $nval)) ) {
              if ($edge =~ /negative/i && ($ooval > $oval)) {              
                  push (@sel,$oor);                                  # negative Flanke -> der fallende DS und desssen Vorgänger 
                  push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
                  push (@sel,$nr);                                                     
-             } elsif ($edge =~ /positive/i && ($ooval < $oval)) {              
+             } 
+             elsif ($edge =~ /positive/i && ($ooval < $oval)) {              
                  push (@sel,$oor);                                  # positive Flanke -> der steigende DS und desssen Vorgänger 
                  push (@sel,$or);                                   # werden behalten obwohl im Löschkorridor
                  push (@sel,$nr);                                                     
-             } else {
+             } 
+             else {
                  push (@sel,$oor);                                  # Array der zu behaltenden Datensätze
                  push (@sel,$nr);                                   # Array der zu behaltenden Datensätze
                  push (@warp,$or);                                  # Array der zu löschenden Datensätze                         
@@ -5747,7 +5750,8 @@ sub delseqdoubl_DoParse {
                      
                  $rt = $rt+tv_interval($st);
              }       
-         } else {
+         } 
+         else {
              push (@sel,$oor) if($oor);
              push (@sel,$or) if($or);
              push (@sel,$nr);
@@ -5775,11 +5779,14 @@ sub delseqdoubl_DoParse {
 
  my @retarray = ($opt =~ /adviceRemain/)?@remain:($opt =~ /adviceDelete/)?@todel:" ";
  s/\|/_E#S#C_/g for @retarray;         # escape Pipe "|" 
+ 
  if ($utf8 && @retarray) {
      $rowlist = Encode::encode_utf8(join('|', @retarray));
- } elsif(@retarray) {
+ } 
+ elsif(@retarray) {
      $rowlist = join('|', @retarray);
- } else {
+ } 
+ else {
      $rowlist = 0;
  }
  
@@ -11667,12 +11674,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 23214 2020-11-22 15:56:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 23214 2020-11-22 15:56:42Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 23639 2021-01-30 08:29:42Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -11704,7 +11711,7 @@ sub DbRep_sqlCmdBlocking {
   my $srs        = AttrVal($name, "sqlResultFieldSep", "|"  );
   my $to         = AttrVal($name, "timeout",           10   );
   
-  my ($err,$ret,$dbh);
+  my ($err,$ret,$dbh,@pms);
   
   readingsDelete            ($hash, "errortext");
   ReadingsSingleUpdateValue ($hash, "state", "running", 1);
@@ -11731,6 +11738,24 @@ sub DbRep_sqlCmdBlocking {
   Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
   Log3 ($name, 4, "DbRep $name - Command: sqlCmdBlocking");  
   Log3 ($name, 4, "DbRep $name - SQL execute: $sql"); 
+  
+  # Set Session Variablen "SET" oder PRAGMA aus Attribut "sqlCmdVars"
+  my $vars = AttrVal($name, "sqlCmdVars", "");
+  if ($vars) {
+      @pms = split(";",$vars); 
+      
+      for my $pm (@pms) {
+          if($pm !~ /PRAGMA|SET/i) {
+              next;
+          }
+          $pm = ltrim($pm).";";
+          Log3($name, 4, "DbRep $name - Set VARIABLE or PRAGMA: $pm");    
+          eval {$dbh->do($pm);} or do { Log3 ($name, 2, "DbRep $name - ERROR - $@");
+                                        $dbh->disconnect;
+                                        return $@;
+                                      }    
+      }  
+  } 
   
   my $set;
   if($cmd =~ /^SET.*;/i) {                                                         # split SQL-Parameter Statement falls mitgegeben ->
@@ -13474,9 +13499,9 @@ return;
                                    <ul>
                                    <table>  
                                    <colgroup> <col width=10%> <col width=90%> </colgroup>
-                                      <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an evaluation period </td></tr>
-                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an evaluation period </td></tr>
+                                      <tr><td> <b>writeToDB</b>         </td><td>: writes one value each with the time stamps XX:XX:01 and XX:XX:59 within the respective aggregation period </td></tr>
+                                      <tr><td> <b>writeToDBSingle</b>   </td><td>: writes only one value with the time stamp XX:XX:59 at the end of an aggregation period </td></tr>
+                                      <tr><td> <b>writeToDBInTime</b>   </td><td>: writes a value at the beginning and end of the time limits of an aggregation period </td></tr>
                                    </table>
                                    </ul>
                                    <br>
