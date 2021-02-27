@@ -46,6 +46,8 @@ use Math::Polygon::Calc;
 use Math::ConvexHull qw/convex_hull/;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 
+my $version = "1.0";
+
 my %roombaerrs_en = (
         0 => "None",
         1 => "Left wheel off floor",
@@ -203,11 +205,12 @@ my %roombastates_de = ("charge" => "Wird geladen",
 sub command($$@){
   my ($name,$cmd,@evt) = @_;
   my $hash = $main::defs{$name};
+  $hash->{Version} = $version;
   if( $cmd eq "start"){
     my $hash = $main::defs{$name};
     my $iodev= $hash->{IODev}->{NAME};
     main::fhem("attr $iodev disconnectAfter 300");
-    if(main::Value($iodev) ne "opened"{
+    if(main::Value($iodev) ne "opened"){
       main::fhem("set $iodev connect");
     }
   }
@@ -266,7 +269,19 @@ sub setsched($$$){
 
 #############################################################################
 #
-#  getList
+#  helper
+#
+#############################################################################
+
+sub numtobool($){
+  my ($num) = @_;
+  my $ret = (($num==1)?"true":"false");
+  return $ret;
+}
+
+#############################################################################
+#
+#  status - does not work yet
 #
 #############################################################################
 
@@ -287,28 +302,104 @@ sub reading($$){
   my ($name,$evt) = @_;
   
   #main::Log 1,"============> $evt";
+  
+  #-- signal and pose come every second or so, keep it short
   if( $evt =~ /state....reported....signal/){
     return signale($evt);
   }elsif( $evt =~ /state....reported....pose/){
     return pose($name,$evt);
-  #}elsif( $evt =~ /bbrun/){
+  }
+  
+  #-- all the other stuff might come much less often
+  my $dec   = decode_json($evt);
+  my $staterep = $dec->{'state'}->{'reported'};
+  my %ret  = ();
+  my $hash = $main::defs{$name};
+  my $key  = $hash->{helper}{setting};
+  
+  #if( $evt =~ /bbrun/){
   #  main::Log 1,"[RoombaUtils] bbrun ".$evt;
-  }elsif( $evt =~ /cleanMissionStatus/){
-    return mission($name,$evt);
-  }elsif( $evt =~ /cleanSchedule/){
+  
+  if( $evt =~ /cleanMissionStatus/){
+    #main::Log 1,"[RoombaUtils] mission event ".$evt;
+    my %mission = %{$staterep->{'cleanMissionStatus'}};
+    mission($name,\%mission,\%ret);
+  }
+  
+  if( $evt =~ /cleanSchedule/){
     #main::Log 1,"[RoombaUtils] schedule event ".$evt;
-    return schedule($evt);
-  }elsif( $evt =~ /(vacHigh)|(openOnly)|(binPause)|(carpetBoost)|(twoPass)|(schedHold)|(lastCommand)/){
-    return settings($name,$evt);
-  }elsif( $evt =~ /state....reported....batPct/){
-    return battery($evt);
-  }elsif( $evt =~ /state....reported....dock/){
-    return dock($evt);
-  }elsif( $evt =~ /state....reported....audio/){
-    return audio($evt);
-   }elsif( $evt =~ /state....reported....bin/){
-    return bin($evt);
-  }elsif( $evt =~ /(connected)|(dock)|(country)|(cloudEnv)|(svcEndpoints)|(mapUpload)|(localtimeoffset)|(mac)|(wlcfg)|(wifistat)|(netinfo)|(langs)|(bbmssn)|(cap)|(navSwVer)|(tz)|(bbsys)|(bbchg)|(bbrun)|(bbnav)|(bbpanic)/){
+    my %cleans = %{$staterep->{'cleanSchedule'}};
+    schedule(\%cleans,\%ret);
+  }
+
+  #-- getting events of the type
+  # {"state":{"reported":{"vacHigh":false,"binPause":true,"carpetBoost":false,"openOnly":false,"twoPass":false,"schedHold":false,"lastCommand":{"command":"stop","time":1,"initiator":"localApp"}}}}
+  if( $evt =~ /(vacHigh)|(openOnly)|(binPause)|(carpetBoost)|(twoPass)|(schedHold)|(lastCommand)/){
+    my $vacH  = $staterep->{'vacHigh'};
+    $ret{"sVacHigh"} = numtobool($vacH)
+      if(defined($vacH));
+    my $bin   = $staterep->{'binPause'};
+    $ret{"sBinPause"} = numtobool($bin)
+      if(defined($bin));
+    my $carp  = $staterep->{'carpetBoost'};
+    $ret{"sCarpetBoost"} = numtobool($carp)
+      if(defined($carp));
+    my $oo    = $staterep->{'openOnly'};
+    $ret{"sOpenOnly"} = numtobool($oo)
+      if(defined($oo));
+    my $twop  = $staterep->{'twoPass'};
+    $ret{"sTwoPass"} = numtobool($twop)
+      if(defined($twop));
+    my $naup  = $staterep->{'noAutoPasses'};
+    $ret{"sNoAutoPasses"} = numtobool($naup)
+      if(defined($naup));
+    my $nopp  = $staterep->{'noPP'};
+    $ret{"sNoPP"} = numtobool($nopp)
+      if(defined($nopp));
+    my $schH  = $staterep->{'schedHold'};
+    $ret{"sSchedHold"} = numtobool($schH)
+      if(defined($schH));
+    my $cmd   = $staterep->{'lastCommand'}->{'command'};
+    my $time  = $staterep->{'lastCommand'}->{'time'};
+    my $init  = $staterep->{'lastCommand'}->{'initiator'};
+    $ret{"lastCommand"} = $cmd
+      if(defined($cmd));
+    $ret{"lastCommandInitiator"} = $init
+      if(defined($init));
+    #-- extra function
+    if( defined($key) && $key =~ /^local\:(.*)=(.*)/ ){
+      #main::Log 1,"========> $1 = evaluation of $2 as ".eval($2);
+      $ret{"$1"}=eval($2);
+      $hash->{helper}{setting}="done";
+    }
+  }
+  
+  #-- getting events of the type
+  # {"state":{"reported":{"batPct":100}}}
+  my $bat   = $staterep->{'batPct'};
+  $ret{"battery"} = $bat
+    if(defined($bat));
+  
+  #-- getting events of the type
+  # {"state":{"reported":{"dock":{"known":false}}}}
+  my $dock  = $staterep->{'dock'}->{'known'};
+  $ret{"dockKnown"} = numtobool($dock)
+    if(defined($dock));
+
+  #-- getting events of the type
+  # {"state":{"reported":{"audio":{"active":false}}}}
+  my $audio = $staterep->{'audio'}->{'active'};
+  $ret{"audioActive"} = numtobool($audio)
+    if(defined($audio));
+
+  #-- getting events of the type
+  # {"state":{"reported":{"bin":{"present":true,"full":false}}}}
+  my $binp  = $staterep->{'bin'}->{'present'};
+  my $binf  = $staterep->{'bin'}->{'full'};
+  $ret{"cmBinFull"} = numtobool($binf)
+    if(defined($binf));
+
+  if( $evt =~ /(connected)|(dock)|(country)|(cloudEnv)|(svcEndpoints)|(mapUpload)|(localtimeoffset)|(mac)|(wlcfg)|(wifistat)|(netinfo)|(langs)|(bbmssn)|(cap)|(navSwVer)|(tz)|(bbsys)|(bbchg)|(bbrun)|(bbnav)|(bbpanic)/){
     #-- do nothing
     # {"state":{"reported":{"langs":[{"en-UK":0},{"fr-FR":1},{"es-ES":2},{"it-IT":3},{"de-DE":4},{"ru-RU":5}],"bbnav":{"aMtrack":16,"nGoodLmrks":6,"aGain":4,"aExpo":102},"bbpanic":{"panics":[6,8,9,8,6]},"bbpause":{"pauses":[17,17,16,1,0,0,0,0,0,0]}}}}
     # {"state":{"reported":{"bbmssn":{"nMssn":30,"nMssnOk":2,"nMssnC":26,"nMssnF":2,"aMssnM":13,"aCycleM":13},"bbrstinfo":{"nNavRst":5,"nMobRst":0,"causes":"0000"}}}}
@@ -329,36 +420,56 @@ sub reading($$){
     # {"state":{"reported":{"localtimeoffset":120,"utctime":1600424239,"pose":{"theta":-46,"point":{"x":318,"y":82}}}}}
     # {"state":{"reported":{"bbsys":{"hr":2583,"min":21}}}}
 
-  }else{
-    my ($evt) = @_;
+  }elsif(int(%ret)==0){
+  #  my ($evt) = @_;
     main::Log 1,"[RoombaUtils] uncaught event ".$evt
-      if( $evt ne "$name" );
-    return
+       if( $evt ne "$name" );
   }
+  return {%ret}
 }
-  
+
+#############################################################################
+#
+#  signal data
+#  getting events of the type
+#  {"state":{"reported":{"signal":{"rssi":-55,"snr":34}}}}
+#
+#############################################################################
+
 sub signale($){
   my ($evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"signal":{"rssi":-55,"snr":34}}}}
+
   my $dec  = decode_json($evt);
   my $rssi = $dec->{'state'}->{'reported'}->{'signal'}->{'rssi'};
   my %ret  = ("signalRSSI",$rssi);
   return {%ret};
 }
 
+#############################################################################
+#
+#  position data
+#  getting events of the type
+#  {"state":{"reported":{"pose":{"theta":0,"point":{"x":311,"y":-21}}}}}
+#
+#############################################################################
+
 sub pose($$){
   my ($name,$evt) = @_;
   
   my $hash = $main::defs{$name};
-  
-  #-- getting events of the type
-  # {"state":{"reported":{"pose":{"theta":0,"point":{"x":311,"y":-21}}}}}
   my $dec   = decode_json($evt);
-  my $theta = $dec->{'state'}->{'reported'}->{'pose'}->{'theta'};
-  my $px    = $dec->{'state'}->{'reported'}->{'pose'}->{'point'}->{'x'};
-  my $py    = $dec->{'state'}->{'reported'}->{'pose'}->{'point'}->{'y'};
-  
+  my $pose  = $dec->{'state'}->{'reported'}->{'pose'};
+  my $theta = $pose->{'theta'};
+  my $px    = $pose->{'point'}->{'x'};
+  my $py    = $pose->{'point'}->{'y'};
+
+  #-- fast return if mappinge disabled
+  if( main::AttrVal($name,"noMap","") eq "true" ){
+      my %ret   = ("positionTheta",$theta,"position","(".$px.",".$py.")");
+      return {%ret};
+  }
+    
+  my ($pxp,$pyp);
   if($hash->{helper}{initmap}==1){
     $hash->{helper}{startx} = $px;
     $hash->{helper}{starty} = $py;
@@ -368,7 +479,7 @@ sub pose($$){
   $py -= $hash->{helper}{starty};
   
   my $dir = main::AttrVal($name,"startdir","north");
-  my ($pxp,$pyp);
+
   if($dir eq "north"){
     $pxp = -$py;
     $pyp =  $px;
@@ -388,6 +499,7 @@ sub pose($$){
   #-- Reduction not useful
   push(@{$hash->{helper}{theta}},$theta);
   push(@{$hash->{helper}{path}},$pxp,$pyp);
+    
   my $count = $hash->{helper}{pcount};
   $count++;
   $hash->{helper}{pcount}=$count;
@@ -396,177 +508,82 @@ sub pose($$){
   return {%ret};
 }
 
-sub mission($$){
-  my ($name,$evt) = @_;
-  my $hash = $main::defs{$name};
-  my $oldphase = main::ReadingsVal($name,"cmPhase","");
-  #-- getting events of the type
-  # {"state":{"reported":{"dock":{"known":true},"cleanMissionStatus":{"cycle":"quick","phase":"run","expireM":0,"rechrgM":0,"error":0,"notReady":0,"mssnM":0,"sqft":0,"initiator":"localApp","nmain::Log 1,"[RoombaUtils] Device $name phase transition $oldphase -> $phase";Mssn":30}}}}
-  my $dec   = decode_json($evt);
-  my $cyc   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'cycle'};
-  my $phase = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'phase'}; 
-  my $number= $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'nMssn'};
-  my $exp   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'expireM'};
-  my $rech  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'rechrgM'};
-  #-- Manage mission
-  missionmanager($hash,$oldphase,$phase);  
-  $exp = ($exp == 0)?"Never":$exp." min";
-  my $time   = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'mssnM'};
-  $time = $time." min";
-  my $error = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'error'};
-  my $eemsg = $roombaerrs_en{$error};
-  my $demsg = $roombaerrs_de{$error};
-  my $notr  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'notReady'};
-  my $sqm   = int($dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'sqft'}*10/10.7639)/10;
-  my $init  = $dec->{'state'}->{'reported'}->{'cleanMissionStatus'}->{'initiator'};
-  
-  if( $oldphase ne "stuck" && $phase eq "stuck"){
-    main::Log 1,"[RoombaUtils] $name stuck with error $error, message $eemsg";
-  }
-  
-  my %ret   = ("cmCycle",$cyc,"cmTime",$time,"cmPhase",$phase,"cmPhaseE",$roombastates_en{$phase},
-               "cmPhaseD",$roombastates_de{$phase},"cmArea",$sqm." m²","cmExpire",$exp,"cmError",$eemsg,"cmErrorD",$demsg,"cmInitiator",$init);
-  $ret{"cmNotReady"} = numtobool($notr)
-    if(defined($notr));
-  my $bat   = $dec->{'state'}->{'reported'}->{'batPct'};
-  $ret{"battery"} = $bat
-    if(defined($bat));
-  
-  return {%ret};
-}
+#############################################################################
+#
+#  schedule data
+#
+#############################################################################
 
-sub schedule($){
-  my ($evt) = @_;
+sub schedule($$){
+  my ($evtptr,$retptr) = @_;
   my @weekdays = ("Sun","Mon","Tue","Wed","Thu","Fri","Sat");
   #-- getting events of the type
   # {"state":{"reported":{"cleanSchedule":{"cycle":["none","none","none","none","none","none","none"],"h":[9,9,9,9,9,9,9],"m":[0,0,0,0,0,0,0]},"bbchg3":{"avgMin":374,"hOnDock":199,"nAvail":32,"estCap":12311,"nLithChrg":8,"nNimhChrg":0,"nDocks":35}}}}
-  my $dec    = decode_json($evt);
-  my @acyc   = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'cycle'}};
-  my @ahours = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'h'}};
-  my @amin   = @{$dec->{'state'}->{'reported'}->{'cleanSchedule'}->{'m'}};
+  my @acyc   = @{$evtptr->{'cycle'}};
+  my @ahours = @{$evtptr->{'h'}};
+  my @amin   = @{$evtptr->{'m'}};
   my $sched  = "[";
   for (my $i=0;$i<7;$i++){
     $sched .= $weekdays[$i].":".(($acyc[$i] eq "none")?"none":sprintf("%d:%02d",$ahours[$i],$amin[$i]));
     $sched .= ($i<6)?",":"]";
   }
-  my %ret = ("progWeek",$sched);
-  return {%ret}; 
+  $retptr->{"progWeek"} = $sched;
+  return
 }
 
-sub settings($$){
-  my ($name,$evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"vacHigh":false,"binPause":true,"carpetBoost":false,"openOnly":false,"twoPass":false,"schedHold":false,"lastCommand":{"command":"stop","time":1,"initiator":"localApp"}}}}
-  my $dec   = decode_json($evt);
+#############################################################################
+#
+#  mission data
+#
+#############################################################################
+
+#-- getting events of the type
+# {"state":{"reported":{"dock":{"known":true},"cleanMissionStatus":{"cycle":"quick","phase":"run","expireM":0,"rechrgM":0,"error":0,"notReady":0,"mssnM":0,"sqft":0,"initiator":"localApp","nmain::Log 1,"[RoombaUtils] Device $name phase transition $oldphase -> $phase";Mssn":30}}}}
+sub mission($$$){
+  my ($name,$evtptr,$retptr) = @_;
   my $hash = $main::defs{$name};
-  my $key  = $hash->{helper}{setting};
-  my %ret   = ();
-  my $vacH  = $dec->{'state'}->{'reported'}->{'vacHigh'};
-  $ret{"sVacHigh"} = numtobool($vacH)
-    if(defined($vacH));
-  my $bin   = $dec->{'state'}->{'reported'}->{'binPause'};
-  $ret{"sBinPause"} = numtobool($bin)
-    if(defined($bin));
-  my $carp  = $dec->{'state'}->{'reported'}->{'carpetBoost'};
-  $ret{"sCarpetBoost"} = numtobool($carp)
-    if(defined($carp));
-  my $oo    = $dec->{'state'}->{'reported'}->{'openOnly'};
-  $ret{"sOpenOnly"} = numtobool($oo)
-    if(defined($oo));
-  my $twop  = $dec->{'state'}->{'reported'}->{'twoPass'};
-  $ret{"sTwoPass"} = numtobool($twop)
-    if(defined($twop));
-  my $naup  = $dec->{'state'}->{'reported'}->{'noAutoPasses'};
-  $ret{"sNoAutoPasses"} = numtobool($naup)
-    if(defined($naup));
-  my $nopp  = $dec->{'state'}->{'reported'}->{'noPP'};
-  $ret{"sNoPP"} = numtobool($nopp)
-    if(defined($nopp));
-  my $schH  = $dec->{'state'}->{'reported'}->{'schedHold'};
-  $ret{"sSchedHold"} = numtobool($schH)
-    if(defined($schH));
-  my $cmd   = $dec->{'state'}->{'reported'}->{'lastCommand'}->{'command'};
-  my $time  = $dec->{'state'}->{'reported'}->{'lastCommand'}->{'time'};
-  my $init  = $dec->{'state'}->{'reported'}->{'lastCommand'}->{'initiator'};
-  $ret{"lastCommand"} = $cmd
-    if(defined($cmd));
-  $ret{"lastCommandInitiator"} = $init
-    if(defined($init));
-  #-- extra function
-  if( defined($key) && $key =~ /^local\:(.*)=(.*)/ ){
-    #main::Log 1,"========> $1 = evaluation of $2 as ".eval($2);
-    $ret{"$1"}=eval($2);
-    $hash->{helper}{setting}="done";
+  my $oldphase = main::ReadingsVal($name,"cmPhase","");
+  $retptr->{"cmCycle"} = $evtptr->{'cycle'};
+  my $phase = $evtptr->{'phase'}; 
+  $retptr->{"cmPhase"} = $phase;
+  $retptr->{"cmPhaseE"} = $roombastates_en{$phase};
+  $retptr->{"cmPhaseD"} = $roombastates_de{$phase};
+
+  #-- Manage mission
+  missionmanager($hash,$oldphase,$phase);  
+  
+  my $number= $evtptr->{'nMssn'};
+  my $rech  = $evtptr->{'rechrgM'};
+ 
+  my $exp   = $evtptr->{'expireM'};
+  $exp = ($exp == 0)?"Never":$exp." min";
+  $retptr->{"cmExpire"} =  $exp;
+  
+  $retptr->{"cmTime"} = ($evtptr->{'mssnM'})." min";
+  
+  my $error = $evtptr->{'error'};
+  my $eemsg = $roombaerrs_en{$error};
+  my $demsg = $roombaerrs_de{$error};
+  $retptr->{"cmError"}  = $eemsg;
+  $retptr->{"cmErrorD"} = $demsg;
+  if( $oldphase ne "stuck" && $phase eq "stuck"){
+    main::Log 1,"[RoombaUtils] $name stuck with error $error, message $eemsg";
   }
-  return {%ret};
-}
+  
+  my $notr  = $evtptr->{'notReady'};
+  $retptr->{"cmNotReady"} = numtobool($notr)
+    if(defined($notr));
 
-sub dock($){
-  my ($evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"dock":{"known":false}}}}
-  my $dec   = decode_json($evt);
-  my $dock  = $dec->{'state'}->{'reported'}->{'dock'}->{'known'};
-  my %ret   = ("dockKnown",$dock);
-  $ret{"dockKnown"} = numtobool($dock)
-    if(defined($dock));
-  return {%ret};
-}
-    
-sub battery($){
-  my ($evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"batPct":100,"dock":{"known":true},"bin":{"present":true,"full":false},"audio":{"active":false}}}}
-  my $dec   = decode_json($evt);
-  my $bat   = $dec->{'state'}->{'reported'}->{'batPct'};
-  my $dock  = $dec->{'state'}->{'reported'}->{'dock'}->{'known'};
-  my $binp  = $dec->{'state'}->{'reported'}->{'bin'}->{'present'};
-  my $binf  = $dec->{'state'}->{'reported'}->{'bin'}->{'full'};
-  my $audio = $dec->{'state'}->{'reported'}->{'audio'}->{'active'};
-  my %ret   = ("battery",$bat);
-  $ret{"cmBinFull"} = numtobool($binf)
-    if(defined($binf));
-  $ret{"audioActive"} = numtobool($audio)
-    if(defined($audio));
-  $ret{"dockKnown"} = numtobool($dock)
-    if(defined($dock));
-  return {%ret};
-}
-
-sub audio($){
-  my ($evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"audio":{"active":false}}}}
-  my $dec   = decode_json($evt);
-  my $audio = $dec->{'state'}->{'reported'}->{'audio'}->{'active'};
-  my %ret;
-  $ret{"audioActive"} = numtobool($audio)
-    if(defined($audio));
-  return {%ret};
-}
-
-sub bin($){
-  my ($evt) = @_;
-  #-- getting events of the type
-  # {"state":{"reported":{"bin":{"present":true,"full":false}}}}
-  my $dec   = decode_json($evt);
-  my $binp  = $dec->{'state'}->{'reported'}->{'bin'}->{'present'};
-  my $binf  = $dec->{'state'}->{'reported'}->{'bin'}->{'full'};
-  my %ret;
-  $ret{"cmBinFull"} = numtobool($binf)
-    if(defined($binf));
-  return {%ret};
-}
-    
-sub numtobool($){
-  my ($num) = @_;
-  my $ret = (($num==1)?"true":"false");
-  return $ret;
-}
+  my $sqm   = int($evtptr->{'sqft'}*10/10.7639)/10;
+  $retptr->{"cmArea"}      = $sqm." m²";
+  
+  $retptr->{"cmInitiator"} = $evtptr->{'initiator'};
+  return
+  }
  
 #############################################################################
 #
-#  missionmanager
+#  mission management
 #
 #############################################################################
 
@@ -596,8 +613,9 @@ sub missionmanager($$$){
       $oldphase.$phase eq "chargerun" ||
       $oldphase.$phase eq "hmUsrDockrun" ){
     main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
-    initmap($hash);
-    main::fhem("attr $iodev disconnectAfter 60");
+    initmap($hash)
+      if( main::AttrVal($name,"noMap","") ne "true" );
+    main::fhem("attr $iodev disconnectAfter 300");
   }elsif( $oldphase.$phase eq "runstop" ){
     main::Log 1,"[RoombaUtils] Device $name pausing $oldphase -> $phase";
   }elsif( $oldphase.$phase eq "stoprun" ){
@@ -609,7 +627,8 @@ sub missionmanager($$$){
           $oldphase.$phase eq "hmUsrDockstop" ||
           $oldphase.$phase eq "stophmUsrDock" ){
     main::Log 1,"[RoombaUtils] Device $name $oldphase -> $phase should start intialization";
-    finalizemap($hash);
+    finalizemap($hash)
+      if( main::AttrVal($name,"noMap","") ne "true" );
     main::fhem("attr $iodev disconnectAfter 7");
   }elsif(
           $oldphase.$phase eq "hmUsrDockhmUsrDock"){
@@ -1068,6 +1087,7 @@ sub finalizemap($){
       <li><code><b>startx</b> <number></code>&nbsp;&nbsp;-&nbsp;&nbsp; docking station x coordinate in cm from the leftmost (western) wall</li>
       <li><code><b>starty</b> <number></code>&nbsp;&nbsp;-&nbsp;&nbsp; docking station y coordinate in cm from the bottommost (southern) wall</li>
       <li><code><b>startdir</b> east|south|west|north </code>&nbsp;&nbsp;-&nbsp;&nbsp; starting direction away from docking station</li>
+      <li><code><b>noMap</b> true|false</code>&nbsp;&nbsp;-&nbsp;&nbsp; if set to true, no map data will be collected</li>
       <li><code><b>LOG_dir</b> <directory name> </code>&nbsp;&nbsp;-&nbsp;&nbsp; directory for writing a log file (in perl format!) of each cleaning mission.
          If this attribute is omitted, no such file will be written</li>
       <li><code><b>SVG_dir</b> <directory name> </code>&nbsp;&nbsp;-&nbsp;&nbsp; directory for reading a graphical room map in SVG format and reading/writing intermediate XML files of each cleaning mission.
