@@ -187,6 +187,7 @@ generateModuleCommandref($$;$$)
         $docCount++;
         next if($noWarnings);
         $hasLink = ($l =~ m/<a name="$mod"/) if(!$hasLink);
+        $hasLink = ($l =~ m/<a id="$mod"/) if(!$hasLink);
         foreach $tag (TAGS) {
           if($l =~ m/<$tag ([^>]+)>/i) {
             my $attr = $1;

@@ -614,7 +614,6 @@ MQTT2_SERVER_ReadDebug($$)
 =begin html
 
 <a id="MQTT2_SERVER"></a>
-<a name="MQTT2_SERVER"></a>
 <h3>MQTT2_SERVER</h3>
 <ul>
   MQTT2_SERVER is a builtin/cleanroom implementation of an MQTT server using no

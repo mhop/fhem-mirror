@@ -886,7 +886,6 @@ zigbee2mqtt_devStateIcon255($;$$)
 =begin html
 
 <a id="MQTT2_DEVICE"></a>
-<a name="MQTT2_DEVICE"></a>
 <h3>MQTT2_DEVICE</h3>
 <ul>
   MQTT2_DEVICE is used to represent single devices connected to the
