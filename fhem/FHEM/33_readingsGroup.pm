@@ -1227,11 +1227,10 @@ readingsGroup_Update($$$)
   } else {
     foreach my $ntfy (values(%defs)) {
       next if(!$ntfy->{TYPE} ||
-              $ntfy->{TYPE} ne "FHEMWEB" ||
+               $ntfy->{TYPE} ne "FHEMWEB" ||
               !$ntfy->{inform} ||
               !$ntfy->{inform}{devices}{$name} ||
               $ntfy->{inform}{type} ne "status");
-      next if( !$ntfy->{inform}{devices}{$name} );
       if(!FW_addToWritebuffer($ntfy,
           FW_longpollInfo($ntfy->{inform}{fmt}, "$name-$item", $value, $value ) ."\n" )) {
         my $name = $ntfy->{NAME};
