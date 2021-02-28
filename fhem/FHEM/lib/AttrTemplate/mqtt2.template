@@ -2743,16 +2743,21 @@ attr DEVICE icon ICON
 attr DEVICE setList \
   x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
-attr DEVICE readingList \
-  shellies/DEVNAME/online:.* online\
-  shellies/DEVNAME/sensor/temperature:.* temperature\
-  shellies/DEVNAME/sensor/flood:.* flood\
-  shellies/DEVNAME/sensor/battery:.* batteryPercent
+attr DEVICE  readingList shellies/DEVICE/online:.* online\
+  shellies/DEVICE/announce:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  shellies/DEVICE/sensor/temperature:.* temperature\
+  shellies/DEVICE/sensor/flood:.* flood\
+  shellies/DEVICE/sensor/battery:.* batteryPercent\
+  shellies/DEVICE/sensor/error:.* error\
+  shellies/DEVICE/sensor/act_reasons:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap 1:report
 attr DEVICE stateFormat flood (bat batteryPercent%)
 deletereading -q DEVICE (?!associatedWith).*
 set DEVICE x_mqttcom announce
 attr DEVICE model shellyflood
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 202010228
+
+
 
 # shellygas using original firmware
 name:shellygas
