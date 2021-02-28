@@ -183,4 +183,19 @@ if ($NAME eq 'global'){
    }
 }
 
+# setplayFav, setjoinGroup not working well from inside setList Bridge
+# from commandline could used like {sonos2mqtt_bridge('SonosBridge','setplayFav')}
+# joinGroup does'nt working with spaces in "Player Rooms"
+sub sonos2mqtt_bridge
+{
+my ($NAME,$EVENT)=@_;
+my @arr = split(' ',$EVENT);
+my $cmd = $arr[0];
+
+if($cmd eq 'Favorites') {return q(sonos/).ReadingsVal((devspec2array('a:model=sonos2mqtt_speaker'))[0],'uuid','').q(/control {"command": "adv-command","input": {"cmd": "GetFavorites","reply": "Favorites"}})}
+if($cmd eq 'setplayFav') {sonos2mqtt_mod_list('a:model=sonos2mqtt_speaker','setList','playFav:'.ReadingsVal($NAME,'favlist','').' {sonos2mqtt($NAME,$EVENT)}')}
+if($cmd eq 'setjoinGroup') {sonos2mqtt_mod_list('a:model=sonos2mqtt_speaker','setList','joinGroup:'.ReadingsVal($NAME,'grouplist','').' {sonos2mqtt($NAME,$EVENT)}')}
+return undef
+}
+
 1;
