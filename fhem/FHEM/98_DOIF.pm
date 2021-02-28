@@ -728,13 +728,13 @@ sub DOIF_RegisterEvalAll
 sub DOIF_tablePopUp {
   my ($pn,$d,$icon,$table) = @_;
   $table = $table ? $table : "uiTable";
+  my ($ic,$itext,$iclass)=split(",",$icon);
   if ($defs{$d} && AttrVal($d,$table,"")) {
-    my $ret = "<a href=\"#\" onclick=\"doifTablePopUp('$defs{$d}','$d','$pn','$table')\">".FW_makeImage($icon)."</a>";
+    my $ret = "<a href=\"#\" onclick=\"doifTablePopUp('$defs{$d}','$d','$pn','$table')\">".FW_makeImage($ic,$itext,$iclass)."</a>";
   } else {
     return "no device $d or attribut $table";
   }
 }
-
 sub DOIF_summaryFn ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
@@ -4151,6 +4151,13 @@ sub FW_makeImage {
  
 
 # Widgets
+
+ 
+sub widget { 
+  my ($value,$widget,$set)=@_;
+  $set="" if (!defined $set);
+  return ($value,"",$widget,$set)
+} 
  
  sub temp_knob {
     my ($value,$color,$set)=@_;
