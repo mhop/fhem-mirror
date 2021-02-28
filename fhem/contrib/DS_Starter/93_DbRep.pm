@@ -494,7 +494,8 @@ sub DbRep_Set {
   my $cj = @bkps?join(",",reverse(sort @bkps)):" ";
   
   # Drop-Down Liste bisherige Befehle in "sqlCmd" erstellen
-  my $hl = $hash->{HELPER}{SQLHIST}.",___purge_historylist___" if($hash->{HELPER}{SQLHIST});
+  my $hl;
+  $hl = $hash->{HELPER}{SQLHIST}.",___purge_historylist___" if($hash->{HELPER}{SQLHIST});
   
   my $setlist = "Unknown argument $opt, choose one of ".
                 "eraseReadings:noArg ".
@@ -714,14 +715,14 @@ sub DbRep_Set {
   if ($opt =~ /countEntries/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
-      DbRep_Main($hash,$opt,$table);
-      
-  } elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
+      DbRep_Main($hash,$opt,$table);  
+  } 
+  elsif ($opt =~ /fetchrows/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $table = $prop?$prop:"history";
-      DbRep_Main($hash,$opt,$table);
-      
-  } elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
+      DbRep_Main($hash,$opt,$table);    
+  } 
+  elsif ($opt =~ m/(max|min|sum|average|diff)Value/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       if (!AttrVal($hash->{NAME}, "reading", "")) {
           return " The attribute reading to analyze is not set !";
@@ -737,9 +738,9 @@ sub DbRep_Set {
           }
       }
       DbRep_beforeproc($hash, "$hash->{LASTCMD}"); 
-      DbRep_Main($hash,$opt,$prop);
-      
-  } elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
+      DbRep_Main($hash,$opt,$prop);    
+  } 
+  elsif ($opt =~ m/delEntries|tableCurrentPurge/ && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       delete $hash->{HELPER}{DELENTRIES};
       
@@ -752,8 +753,8 @@ sub DbRep_Set {
       $hash->{HELPER}{DELENTRIES} = \@a if(@a);
       DbRep_beforeproc($hash, "delEntries");      
       DbRep_Main($hash,$opt);
-      
-  } elsif ($opt eq "deviceRename") {
+  } 
+  elsif ($opt eq "deviceRename") {
       shift @a;
       shift @a;
       $prop = join(" ",@a);                                                     # Device Name kann Leerzeichen enthalten
@@ -764,8 +765,8 @@ sub DbRep_Set {
       $hash->{HELPER}{NEWDEV}  = $newdev;
       $hash->{HELPER}{RENMODE} = "devren";
       DbRep_Main($hash,$opt);
-      
-  } elsif ($opt eq "readingRename") {
+  } 
+  elsif ($opt eq "readingRename") {
       shift @a;
       shift @a;
       $prop = join(" ",@a);                                                     # Readingname kann Leerzeichen enthalten
@@ -775,9 +776,9 @@ sub DbRep_Set {
       $hash->{HELPER}{OLDREAD} = $oldread;
       $hash->{HELPER}{NEWREAD} = $newread;
       $hash->{HELPER}{RENMODE} = "readren";
-      DbRep_Main($hash,$opt);
-      
-  } elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") {
+      DbRep_Main($hash,$opt);    
+  } 
+  elsif ($opt eq "insert" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";  
       if ($prop) {
           if (!AttrVal($hash->{NAME}, "device", "") || !AttrVal($hash->{NAME}, "reading", "") ) {
@@ -823,12 +824,13 @@ sub DbRep_Set {
           $hash->{HELPER}{I_TYPE}      = my $i_type = "manual";
           $hash->{HELPER}{I_EVENT}     = my $i_event = "manual";          
           
-      } else {
+      } 
+      else {
           return "Data to insert to table 'history' are needed like this pattern: 'Date,Time,Value,[Unit]'. \"Unit\" is optional. Spaces are not allowed !";
       }
-      DbRep_Main($hash,$opt);
-      
-  } elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
+      DbRep_Main($hash,$opt);  
+  } 
+  elsif ($opt eq "exportToFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
       my $f = ($prop && $prop !~ /MAXLINES=/)?$prop:AttrVal($name,"expimpfile","");
       my $e = $prop1?" $prop1":"";
@@ -836,16 +838,17 @@ sub DbRep_Set {
           return "\"$opt\" needs a file as argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
       DbRep_Main($hash,$opt,$f.$e);
-      
-  } elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
+  } 
+  elsif ($opt eq "importFromFile" && $hash->{ROLE} ne "Agent") {
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt";
-      my $f = $prop if($prop);
+      my $f;
+      $f = $prop if($prop);
       if (!AttrVal($hash->{NAME}, "expimpfile", "") && !$f) {
           return "\"$opt\" needs a file as an argument or the attribute \"expimpfile\" (path and filename) to be set !";
       }
-      DbRep_Main($hash,$opt,$f);
-      
-  } elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
+      DbRep_Main($hash,$opt,$f);  
+  } 
+  elsif ($opt =~ /sqlCmd|sqlSpecial|sqlCmdHistory/) {
       return "\"set $opt\" needs at least an argument" if ( @a < 3 );
       my $sqlcmd;
       if($opt eq "sqlSpecial") {
@@ -876,10 +879,10 @@ sub DbRep_Set {
       if ($sqlcmd =~ m/^\s*delete/is && !AttrVal($hash->{NAME}, "allowDeletion", undef)) {
           return "Attribute 'allowDeletion = 1' is needed for command '$sqlcmd'. Use it with care !";
       }  
-      DbRep_beforeproc($hash, "sqlCmd");
-      DbRep_Main($hash,$opt,$sqlcmd);
-     
-  } elsif ($opt =~ /changeValue/) {
+      DbRep_beforeproc ($hash, "sqlCmd");
+      DbRep_Main       ($hash,$opt,$sqlcmd);   
+  } 
+  elsif ($opt =~ /changeValue/) {
       shift @a;
       shift @a;
       $prop = join(" ", @a);
@@ -905,19 +908,19 @@ sub DbRep_Set {
       $hash->{HELPER}{OLDVAL}  = $oldval;
       $hash->{HELPER}{NEWVAL}  = $newval;
       $hash->{HELPER}{RENMODE} = "changeval";
-      DbRep_beforeproc($hash, "changeval");
-      DbRep_Main($hash,$opt);
-     
-  }  elsif ($opt =~ m/syncStandby/ && $hash->{ROLE} ne "Agent") {   
+      DbRep_beforeproc ($hash, "changeval");
+      DbRep_Main       ($hash,$opt);   
+  }  
+  elsif ($opt =~ m/syncStandby/ && $hash->{ROLE} ne "Agent") {   
       unless($prop) {return "A DbLog-device (standby) is needed to sync. Use \"set $name syncStandby <DbLog-standby name>\" ";}
       if(!exists($defs{$prop}) || $defs{$prop}->{TYPE} ne "DbLog") {
           return "The device \"$prop\" doesn't exist or is not a DbLog-device. ";
       }
       $hash->{LASTCMD} = $prop?"$opt $prop":"$opt"; 
-      DbRep_beforeproc($hash, "syncStandby");     
-      DbRep_Main($hash,$opt,$prop);
-      
-  } else {
+      DbRep_beforeproc ($hash, "syncStandby");     
+      DbRep_Main       ($hash,$opt,$prop);    
+  } 
+  else {
       return "$setlist";
   }  
   
@@ -1737,9 +1740,12 @@ sub DbRep_getInitDataDone {
   my $err            = $a[3]?decode_base64($a[3]):undef;
   my $opt            = $a[4];
   my $prop           = $a[5];
-  my $fret           = \&{$a[6]} if($a[6]);
-  my $idxstate       = $a[7]?decode_base64($a[7]):"";
-  my $grants         = $a[8]?decode_base64($a[8]):"";
+  my $fret;
+  $fret              = \&{$a[6]} if($a[6]);
+  
+  my ($idxstate,$grants);
+  $idxstate          = $a[7]?decode_base64($a[7]):"";
+  $grants            = $a[8]?decode_base64($a[8]):"";
   my $dbloghash      = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbconn         = $dbloghash->{dbconn};
   
@@ -2430,7 +2436,8 @@ sub DbRep_createTimeArray {
  my ($timeolderthan,$timedifftonow,$fdopt) = DbRep_normRelTime($hash);                                   # relative Zeit normieren  
  
  ### relative Auswertungszeit Beginn berücksichtigen, Umwandeln in Epochesekunden Beginn ###
- my $epoch_seconds_begin = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
+ my $epoch_seconds_begin;
+ $epoch_seconds_begin = fhemTimeLocal($sec1, $min1, $hh1, $dd1, $mm1-1, $yyyy1-1900) if($tsbegin);
  if($timedifftonow) {
      $epoch_seconds_begin = time() - $timedifftonow;
      Log3 ($name, 4, "DbRep $name - Time difference to current time for calculating Timestamp begin: $timedifftonow sec"); 
@@ -2481,6 +2488,8 @@ sub DbRep_createTimeArray {
  my $runtime_string_first;                                              # Datum/Zeit Auswertungsbeginn im SQL-Format für SQL-Statement
  my $runtime_string_next;                                               # Datum/Zeit + Periode (Granularität) für Auswertungsende im SQL-Format 
  my $reading_runtime_string;                                            # zusammengesetzter Readingname+Aggregation für Update
+ my $wdadd;
+ 
  my $tsstr   = strftime "%H:%M:%S", localtime($runtime);                # für Berechnung Tagesverschieber / Stundenverschieber
  my $testr   = strftime "%H:%M:%S", localtime($epoch_seconds_end);      # für Berechnung Tagesverschieber / Stundenverschieber
  my $dsstr   = strftime "%Y-%m-%d", localtime($runtime);                # für Berechnung Tagesverschieber / Stundenverschieber
@@ -2490,8 +2499,8 @@ sub DbRep_createTimeArray {
  my $ysstr   = strftime "%Y",       localtime($runtime);                # Startjahr für Berechnung Monatsverschieber
  my $yestr   = strftime "%Y",       localtime($epoch_seconds_end);      # Endejahr für Berechnung Monatsverschieber
  
- my $wd = strftime "%a", localtime($runtime);                           # Wochentag des aktuellen Startdatum/Zeit
- my $wdadd = 604800 if($wd eq "Mo");                                    # wenn Start am "Mo" dann nächste Grenze +7 Tage
+ my $wd    = strftime "%a", localtime($runtime);                        # Wochentag des aktuellen Startdatum/Zeit
+ $wdadd    = 604800 if($wd eq "Mo");                                    # wenn Start am "Mo" dann nächste Grenze +7 Tage
  $wdadd    = 518400 if($wd eq "Di");                                    # wenn Start am "Di" dann nächste Grenze +6 Tage
  $wdadd    = 432000 if($wd eq "Mi");                                    # wenn Start am "Mi" dann nächste Grenze +5 Tage
  $wdadd    = 345600 if($wd eq "Do");                                    # wenn Start am "Do" dann nächste Grenze +4 Tage
@@ -3207,14 +3216,15 @@ sub averval_ParseDone {
   readingsBeginUpdate($hash);                                                 # Readings für Grünlandtemperatursumme
   my @agts = split("\\|", $gtsstr);
   for my $gts (@agts) {
-      my @ay        = split("#", $gts);
-      my $rt_string = $ay[0];
-      my $val       = $ay[1];
-      my $rtf       = $ay[2]."__";
+      my @ay                = split("#", $gts);
+      my $rt_string         = $ay[0];
+      my $val               = $ay[1];
+      my $rtf               = $ay[2]."__";
       
-      my $dev                 = $device."__"  if ($device);
-      my $rdg                 = $reading."__" if ($reading);
-      my $reading_rt_string   = $rtf.$dev.$rdg."GrasslandTemperatureSum";
+      my ($dev,$rdg)        = ("","");
+      $dev                  = $device."__"  if ($device);
+      $rdg                  = $reading."__" if ($reading);
+      my $reading_rt_string = $rtf.$dev.$rdg."GrasslandTemperatureSum";
 
       ReadingsBulkUpdateValue ($hash, $reading_rt_string, sprintf("%.1f",$val));
   }
@@ -3233,8 +3243,9 @@ sub averval_ParseDone {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } 
       else {
-          my $ds                  = $device."__"  if ($device);
-          my $rds                 = $reading."__" if ($reading);
+          my ($ds,$rds)           = ("","");      
+          $ds                     = $device."__"  if ($device);
+          $rds                    = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."AVG".$acf."__".$runtime_string;
       }
       if($acf eq "DMGWS") {
@@ -3411,9 +3422,11 @@ sub count_ParseDone {
          
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
-      } else {
-          my $ds  = $device."__" if ($device);
-          my $rds = $reading."__" if ($reading);
+      } 
+      else {
+          my ($ds,$rds) = ("","");
+          $ds           = $device."__" if ($device);
+          $rds          = $reading."__" if ($reading);
           if(AttrVal($name,"countEntriesDetail",0)) {
               # $reading_runtime_string = $rsf.$ds.$rds."COUNT_".$table."__".$runtime_string;
               $reading_runtime_string = $rsf.$rds."COUNT_".$table."__".$runtime_string;
@@ -3656,15 +3669,18 @@ sub maxval_ParseDone {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
  
-  foreach my $key (sort(keys(%rh))) {
-      my @k    = split("\\|",$rh{$key});
-      my $rsf  = $k[2]."__" if($k[2]);
+  for my $key (sort(keys(%rh))) {
+      my @k   = split("\\|",$rh{$key});
+      my $rsf = "";
+      $rsf    = $k[2]."__" if($k[2]);
       
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
-      } else {
-          my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);
+      } 
+      else {
+          my ($ds,$rds) = ("","");
+          $ds           = $device."__"  if ($device);
+          $rds          = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."MAX__".$k[0];
       }
       my $rv = $k[1];
@@ -3904,15 +3920,18 @@ sub minval_ParseDone {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
  
-  foreach my $key (sort(keys(%rh))) {
-      my @k = split("\\|",$rh{$key});
-      my $rsf  = $k[2]."__" if($k[2]);
+  for my $key (sort(keys(%rh))) {
+      my @k   = split("\\|",$rh{$key});
+      my $rsf = "";
+      $rsf    = $k[2]."__" if($k[2]);
       
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
-      } else {
-          my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);
+      } 
+      else {
+          my ($ds,$rds)           = ("","");
+          $ds                     = $device."__" if ($device);
+          $rds                    = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."MIN__".$k[0];
       }
       my $rv = $k[1];
@@ -4158,7 +4177,7 @@ sub diffval_DoParse {
  my ($ncps,$ncpslist);
  if(%$ncp) {
      Log3 ($name, 3, "DbRep $name - time/aggregation periods containing only one dataset -> no diffValue calc was possible in period:");
-     foreach my $key (sort(keys%{$ncp})) {
+     for my $key (sort(keys%{$ncp})) {
          Log3 ($name, 3, $key) ;
      }
  $ncps     = join('§', %$ncp);  
@@ -4167,7 +4186,8 @@ sub diffval_DoParse {
   
  # Ergebnishash als Einzeiler zurückgeben
  # ignorierte Zeilen ($diff > $difflimit)
- my $rowsrej = encode_base64($rejectstr,"") if($rejectstr);
+ my $rowsrej;
+ $rowsrej = encode_base64($rejectstr,"") if($rejectstr);
  
  # Ergebnishash  
  my $rows = join('§', %rh);
@@ -4264,9 +4284,11 @@ sub diffval_ParseDone {
   
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rts.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
-      } else {
-          my $ds   = $device."__" if ($device);
-          my $rds  = $reading."__" if ($reading);                                   
+      } 
+      else {
+          my ($ds,$rds)           = ("","");
+          $ds                     = $device."__"  if ($device);
+          $rds                    = $reading."__" if ($reading);                                   
           $reading_runtime_string = $rts.$ds.$rds."DIFF__".$k[0];
       }
       my $rv = $k[1];
@@ -4450,8 +4472,9 @@ sub sumval_ParseDone {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
       } 
       else {
-          my $ds                  = $device. "__" if ($device);
-          my $rds                 = $reading."__" if ($reading);
+          my ($ds,$rds)           = ("","");
+          $ds                     = $device. "__" if ($device);
+          $rds                    = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."SUM__".$runtime_string;
       }
 
@@ -4639,11 +4662,14 @@ sub insert_Push {
  # insert history mit/ohne primary key
  if ($usepkh && $dbloghash->{MODEL} eq 'MYSQL') {
      eval { $sth = $dbh->prepare("INSERT IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
+ } 
+ elsif ($usepkh && $dbloghash->{MODEL} eq 'SQLITE') {
      eval { $sth = $dbh->prepare("INSERT OR IGNORE INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
- } elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
+ } 
+ elsif ($usepkh && $dbloghash->{MODEL} eq 'POSTGRESQL') {
      eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
- } else {
+ } 
+ else {
      eval { $sth = $dbh->prepare("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
  }
  if ($@) {
@@ -6054,8 +6080,9 @@ sub expfile_ParseDone {
   # only for this block because of warnings if details of readings are not set
   no warnings 'uninitialized'; 
   
-  my $ds            = $device." -- " if ($device);
-  my $rds           = $reading." -- " if ($reading);
+  my ($ds,$rds)     = ("","");
+  $ds               = $device." -- "  if ($device);
+  $rds              = $reading." -- " if ($reading);
   my $export_string = $ds.$rds." -- ROWS EXPORTED TO FILE(S) -- ";
   my $state         = $erread?$erread:"done";
   
@@ -6638,10 +6665,11 @@ sub dbmeta_DoParse {
  no warnings 'uninitialized'; 
   
  # Liste der anzuzeigenden Parameter erzeugen, sonst alle ("%"), abhängig von $opt
- my $param = AttrVal($name, "showVariables", "%") if($opt eq "dbvars");
+ my $param;
+ $param = AttrVal($name, "showVariables", "%")    if($opt eq "dbvars");
  $param = AttrVal($name, "showSvrInfo", "[A-Z_]") if($opt eq "svrinfo");
- $param = AttrVal($name, "showStatus", "%") if($opt eq "dbstatus");
- $param = "1" if($opt =~ /tableinfo|procinfo/);    # Dummy-Eintrag für einen Schleifendurchlauf
+ $param = AttrVal($name, "showStatus", "%")       if($opt eq "dbstatus");
+ $param = "1" if($opt =~ /tableinfo|procinfo/);                              # Dummy-Eintrag für einen Schleifendurchlauf
  my @parlist = split(",",$param); 
  
  # SQL-Startzeit
@@ -6750,7 +6778,8 @@ sub dbmeta_DoParse {
          } 
          $sth->finish;
      }
- } else {
+ } 
+ else {
      $param =~ s/,/\|/g;
      $param =~ tr/%//d;
      # Log3 ($name, 5, "DbRep $name - showDbInfo: $param");
@@ -6768,7 +6797,8 @@ sub dbmeta_DoParse {
              my $key = "SQLITE_DB_FILENAME";
              push(@row_array, $key." ".$sf) if($key =~ m/($param)/i);
          }
-         my @a = split(' ',qx(du -m $hash->{DATABASE})) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+         my @a;
+         @a      = split(' ',qx(du -m $hash->{DATABASE})) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
          my $key = "SQLITE_FILE_SIZE_MB";
          push(@row_array, $key." ".$a[0]) if($key =~ m/($param)/i);
      }
@@ -8082,7 +8112,8 @@ sub DbRep_sqliteDoDump {
  }
 
  # Größe Dumpfile ermitteln
- my @a = split(' ',qx(du $dump_path$bfile)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+ my @a;
+ @a = split(' ',qx(du $dump_path$bfile)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
  
  my $filesize = ($a[0])?($a[0]*1024):"n.a.";
  my $fsize    = DbRep_byteOutput($filesize);
@@ -9193,7 +9224,8 @@ sub DbRep_reduceLogDone {
   my $name      = $a[0];
   my $hash      = $defs{$name};
   my $ret       = decode_base64($a[1]);
-  my $err       = decode_base64($a[2]) if ($a[2]);
+  my $err;
+  $err          = decode_base64($a[2]) if ($a[2]);
   my $brt       = $a[3];
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $erread;  
@@ -10481,8 +10513,11 @@ sub DbRep_delread {
      }
      WriteStatefile() if($do == 1);
      return undef;
- } 
- my @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
+ }
+
+ my @rdpfdel;
+ @rdpfdel = split(",", $hash->{HELPER}{RDPFDEL}) if($hash->{HELPER}{RDPFDEL});
+ 
  if(@rdpfdel) {
      foreach my $key(@allrds) {
          # Log3 ($name, 1, "DbRep $name - Reading Schlüssel: $key");
@@ -10885,7 +10920,8 @@ sub DbRep_dumpUnCompress {
   Log3($name, 3, "DbRep $name - file uncompressed to output file: $output");
   
   # Größe dekomprimiertes File ermitteln
-  my @a = split(' ',qx(du $output)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
+  my @a;
+  @a = split(' ',qx(du $output)) if ($^O =~ m/linux/i || $^O =~ m/unix/i);
  
   my $filesize = ($a[0])?($a[0]*1024):undef;
   my $fsize    = DbRep_byteOutput($filesize);
