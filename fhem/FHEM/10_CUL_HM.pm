@@ -4802,6 +4802,12 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
   elsif($cmd eq "deviceRename") { #############################################
     my $newName = $a[2];
     my @chLst = ("device");# entry 00 is unsed
+
+    my $result = CommandRename(undef,$name.' '.$newName);#and the device itself
+    if ($result){
+      return $result;
+    }
+ 
     if ($roleV){
       foreach(1..50){
         push @chLst,$newName."_Btn".$_;
@@ -4821,13 +4827,14 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         }
       }
     }
-
+    my @results;
     foreach my $cd (grep /^channel_/,keys %{$hash}){
-      my $cName = InternalVal($name,$cd,"");
+      my $cName = InternalVal($newName,$cd,"");
       my $no = hex(substr($cd,8));
-      CommandRename(undef,$cName.' '.$chLst[$no]);
+      $result = CommandRename(undef,$cName.' '.$chLst[$no]);
+      push @results,"rename $cName failed: $result" if ($result);
     }
-    CommandRename(undef,$name.' '.$newName);#and the device itself
+    return "channel rename failed:\n".join("\n",@results) if (scalar @results);
   }
   elsif($cmd eq "tempListTmpl") { #############################################
     my $action = "verify";#defaults
