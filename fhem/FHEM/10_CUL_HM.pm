@@ -5036,6 +5036,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     foreach my $channel (@chnIdList){
       my $chnNo = substr($channel,6,2);
       CUL_HM_PushCmdStack($hash,"++".$flag.'01'.$id.$dst.$chnNo.'0E');
+      CUL_HM_stateUpdatDly($name,20);
     }
     $state = "";
   }
@@ -5406,7 +5407,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         $duration = $a[3];
         $tval = CUL_HM_encodeTime16($duration);# onTime 0.05..85825945.6, 0=forever
       }
-      $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
+      $rval = CUL_HM_encodeTime16($a[4]);# rampTime 0.0..85825945.6, 0=immediate
       $hash->{helper}{stateUpdatDly} = ($duration>120)?$duration:120;
     }
     # store desiredLevel in and its Cmd in case we have to repeat
@@ -9024,7 +9025,7 @@ sub CUL_HM_decodeTime8($) {#####################
 }
 sub CUL_HM_encodeTime16($) {####################
   my $v = shift;
-  return "0000" if($v < 0.05 || $v !~ m/^[+-]?\d+(\.\d+)?$/);
+  return "0000" if($v !~ m/^[+-]?\d+(\.\d+)?$/ || $v < 0.05);
 
   my $ret = "FFFF";
   my $mul = 10;
