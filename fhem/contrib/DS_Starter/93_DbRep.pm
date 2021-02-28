@@ -57,7 +57,6 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.42.8"  => "28.02.2021  sqlCmdBlocking accept multiple SQL Statements ",
   "8.42.7"  => "27.02.2021  fix attribute sqlCmdVars is not working in sqlCmdBlocking Forum: /topic,53584.msg1135528.html#msg1135528",
   "8.42.6"  => "25.02.2021  fix commandref ",
   "8.42.5"  => "02.02.2021  correct possible values for attr seqDoubletsVariance ",
@@ -11733,8 +11732,7 @@ sub DbRep_sqlCmdBlocking {
       ReadingsSingleUpdateValue ($hash, "state",     "error", 1);
       return $err;  
   } 
-  
-  $cmd    =~ s/\;\;/ESC_ESC_ESC/gx;                                                # ersetzen von escapeten ";" (;;)
+
   my $sql = ($cmd =~ m/\;$/xs) ? $cmd : $cmd.";";
   
   Log3 ($name, 4, "DbRep $name - -------- New selection --------- "); 
@@ -11765,8 +11763,6 @@ sub DbRep_sqlCmdBlocking {
       $set = $1;
       $sql = $2;
   }
-  
-  $sql =~ s/ESC_ESC_ESC/;/gx;                                                      # wiederherstellen von escapeten ";" -> umwandeln von ";;" in ";"
   
   if($set) {
       Log3($name, 4, "DbRep $name - Set SQL session variables: $set");    
