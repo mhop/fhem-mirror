@@ -604,7 +604,8 @@ sub DbLog_Set {
         push @logs,$file;
     }
     closedir(DIR);
-    my $cj = join(",",reverse(sort @logs)) if (@logs);
+    my $cj = "";
+    $cj    = join(",",reverse(sort @logs)) if (@logs);
     
     if (@logs) {
         $usage .= "importCachefile:".$cj." ";
@@ -5736,9 +5737,11 @@ sub DbLog_reduceLogNbl_finished {
   my $name   = $a[0];
   my $hash   = $defs{$name};
   my $ret    = decode_base64($a[1]);
-  my $err    = decode_base64($a[2]) if ($a[2]);
+  my $err;
+  $err       = decode_base64($a[2]) if ($a[2]);
   
-  readingsSingleUpdate($hash,"reduceLogState",$err?$err:$ret,1);
+  readingsSingleUpdate($hash,"reduceLogState", $err // $ret, 1);
+  
   delete $hash->{HELPER}{REDUCELOG_PID};
   
 return;
@@ -5783,14 +5786,15 @@ return "$name|$cc|$hc|0|$rt";
 # DBLog - count non-blocking Rückkehrfunktion
 #########################################################################################
 sub DbLog_countNbl_finished {
-  my ($string) = @_;
-  my @a        = split("\\|",$string);
-  my $name     = $a[0];
-  my $hash     = $defs{$name};
-  my $cc       = $a[1];
-  my $hc       = $a[2];
-  my $err      = decode_base64($a[3]) if ($a[3]);
-  my $bt       = $a[4] if($a[4]);  
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $name   = $a[0];
+  my $hash   = $defs{$name};
+  my $cc     = $a[1];
+  my $hc     = $a[2];
+  my ($err,$bt);
+  $err       = decode_base64($a[3]) if($a[3]);
+  $bt        = $a[4]                if($a[4]);  
 
   DbLog_setReadingstate ($hash, $err) if($err);
   readingsSingleUpdate  ($hash,"countHistory",$hc,1) if ($hc);
@@ -5798,11 +5802,12 @@ sub DbLog_countNbl_finished {
   
   if(AttrVal($name, "showproctime", undef) && $bt) {
       my ($rt,$brt)  = split(",", $bt);
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
-      readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
-      readingsEndUpdate($hash, 1);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "background_processing_time", sprintf("%.4f",$brt));     
+      readingsBulkUpdate  ($hash, "sql_processing_time",        sprintf("%.4f",$rt) );
+      readingsEndUpdate   ($hash, 1);
   }
+  
   delete $hash->{HELPER}{COUNT_PID};
   
 return;
@@ -5888,11 +5893,9 @@ sub DbLog_deldaysNbl {
      $dbh->disconnect;
  } 
 
- # SQL-Laufzeit ermitteln
- $rt = tv_interval($st);
+ $rt = tv_interval($st);                                # SQL-Laufzeit ermitteln
 
- # Background-Laufzeit ermitteln
- $brt = tv_interval($bst);
+ $brt = tv_interval($bst);                              # Background-Laufzeit ermitteln
  $rt = $rt.",".$brt;
   
   Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl finished");
@@ -5903,13 +5906,14 @@ return "$name|$rows|$rt|0";
 # DBLog - deleteOldDays non-blocking Rückkehrfunktion
 #########################################################################################
 sub DbLog_deldaysNbl_done {
-  my ($string) = @_;
-  my @a        = split("\\|",$string);
-  my $name     = $a[0];
-  my $hash     = $defs{$name};
-  my $rows     = $a[1];
-  my $bt       = $a[2] if($a[2]); 
-  my $err      = decode_base64($a[3]) if ($a[3]);
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $name   = $a[0];
+  my $hash   = $defs{$name};
+  my $rows   = $a[1];
+  my($bt,$err);
+  $bt        = $a[2]                if ($a[2]); 
+  $err       = decode_base64($a[3]) if ($a[3]);
  
   Log3 ($name, 5, "DbLog $name -> Start DbLog_deldaysNbl_done");
   
