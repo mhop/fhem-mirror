@@ -155,7 +155,7 @@ UnifiVideo_2html($;$$)
     next if( $entry->{state} eq 'DISCONNECTED' );
     if( defined($cams) ) {
       foreach my $cam (@cams) {
-        if( ( $cam =~ m/[0-9]+/ && int($cam) == $i )
+        if( ( $cam =~ m/^[0-9]+$/ && int($cam) == $i )
             || $entry->{_id} eq $cam
             || $entry->{name} =~ m/$cam/ ) {
           $html .= "\n" if( $html );
@@ -202,7 +202,7 @@ UnifiVideo_Set($$@)
     foreach my $entry (@{$json->{data}}) {
       next if( $entry->{deleted} );
       next if( $entry->{state} eq 'DISCONNECTED' );
-      if( ( $cam =~ m/[0-9]+/ && int($cam) == $i )
+      if( ( $cam =~ m/^[0-9]+$/ && int($cam) == $i )
           || $entry->{_id} eq $cam
           || $entry->{name} =~ m/$cam/ ) {
         $cam = $entry->{_id};
