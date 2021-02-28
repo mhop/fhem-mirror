@@ -11041,7 +11041,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           configuration for additional peers.  <br> The command is a shortcut
           for a selection of other commands.
         </li>
-        <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]&lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
+        <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6|List7]&lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
         
             Read registerset in raw format. Description of the registers is beyond
             the scope of this documentation.<br>
@@ -12513,7 +12513,7 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
           zugeordneten Kan&auml;le. Ausgeschlossen davon sind Konfigurationen zus&auml;tzlicher Peers.
           <br> Der Befehl ist eine Abk&uuml;rzung f&uuml;r eine Reihe anderer Befehle.
         </li>
-        <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]&lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
+        <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6|List7]&lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
           Auslesen der Rohdaten des Registersatzes. Eine Beschreibung der Register sprengt
           den Rahmen dieses Dokuments.<br>
           
