@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
   "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
   "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
   "0.4.0"  => "24.01.2021  setter moduleDirection, add Area factor to calcPVforecast, add reset pvCorrection ",
@@ -327,6 +328,7 @@ sub Initialize {
   $hash->{FW_summaryFn}       = \&FwFn;
   $hash->{FW_detailFn}        = \&FwFn;
   $hash->{ShutdownFn}         = \&Shutdown;
+  $hash->{DbLog_splitFn}      = \&DbLogSplit;
   $hash->{AttrFn}             = \&Attr;
   $hash->{NotifyFn}           = \&Notify;
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
@@ -919,6 +921,27 @@ sub Notify {
   return if(!$events);
  
 return;
+}
+
+###############################################################
+#                  DbLog_splitFn
+###############################################################
+sub DbLogSplit {
+  my $event  = shift;
+  my $device = shift;
+  my ($reading, $value, $unit) = ("","","");
+
+  if($event =~ /\sk?Wh?$/xs) {
+      my @parts = split(/\s/x, $event, 3);
+      $reading  = $parts[0];
+      $reading  =~ tr/://d;
+      $value    = $parts[1];
+      $unit     = $parts[2];
+  }
+  
+  Log3 ($device, 5, qq{$device - Split for DbLog done -> Reading: $reading, Value: $value, Unit: $unit});
+
+return ($reading, $value, $unit);
 }
 
 ################################################################
