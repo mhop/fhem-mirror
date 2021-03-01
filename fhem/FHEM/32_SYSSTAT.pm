@@ -68,7 +68,8 @@ SYSSTAT_Define($$)
   if( $interval_fs < $interval ) { $interval_fs = $interval; }
   if( $interval_fs == $interval ) { $interval_fs = undef; }
 
-  my $host = $a[4] if(int(@a)>=5);;
+  my $host;
+     $host = $a[4] if(int(@a)>=5);;
 
   delete( $hash->{INTERVAL_FS} );
   delete( $hash->{HOST} );
