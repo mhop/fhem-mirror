@@ -4322,14 +4322,14 @@ farewell:template has been applied successfully. <br>Note: webCmd and eventMap a
 attr DEVICE model wled_controller
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+
 ###########################################
-# sonos2mqtt
 # The sonos2mqtt bridge device (entire hex id of devices as bridgeRegexp)
 name:sonos2mqtt_bridge
-desc:The sonos2mqtt bridge device
+desc:The sonos2mqtt bridge device, Forum #111711 and Wiki 
 filter:TYPE=MQTT2_DEVICE
 order:M_05
-par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",'sonos') }
 par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_bridge_2") }
 attr DEVICE icon ICON
 attr DEVICE bridgeRegexp\
@@ -4342,40 +4342,40 @@ attr DEVICE readingList\
 attr DEVICE model sonos2mqtt_bridge
 attr DEVICE devStateIcon 0:10px-kreis-rot 1:10px-kreis-gelb 2:10px-kreis-gruen
 attr DEVICE stateFormat connected
-setreading DEVICE attrTemplateVersion 20200729
+attr DEVICE devicetopic BASE_TOPIC
+setreading DEVICE attrTemplateVersion 20210301
 
 name:sonos2mqtt_bridge_comfort
-desc:The sonos2mqtt bridge including automated setup for speaker devices (adds 2 notify devices)
+desc:The sonos2mqtt bridge adds 1 notify device for setup speakers, Forum #111711 and Wiki 
 filter:TYPE=MQTT2_DEVICE
 order:M_05c
+{ Svn_GetFile("contrib/AttrTemplate/99_sonos2mqttUtils.pm", "FHEM/99_sonos2mqttUtils.pm", sub(){ CommandReload(undef, "99_sonos2mqttUtils") }) }
 set DEVICE attrTemplate sonos2mqtt_bridge
-attr DEVICE setList PauseAll:noArg sonos/cmd/pauseall\
-CheckSubscription:noArg sonos/cmd/check-subscriptions
-defmod n_configSonos1 notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+ sleep 1;\
-  set $EVTPART1 attrTemplate sonos2mqtt_speaker;\
-  set $EVTPART1 x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
-defmod n_configSonos2 notify MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {\
-  my @tv = ("S14","S11","S9");\
-  my @line = ("S5","Z90","ZP120");\
-  my $url="http://$EVTPART1:1400";\
-  my $xmltext = GetFileFromURL("$url/xml/device_description.xml");\
-  my ($mn)=$xmltext =~ /<modelNumber>([SZ]P?[0-9]{1,3})/;\
-  my ($img)=$xmltext =~ /<url>(.*)<\/url>/;\
-  my $icon="Sonos2mqtt_icon-$mn";\
-  my $setList=AttrVal($NAME,'setList','');\
-  fhem("setreading $NAME modelNumber $mn");\
-  fhem("\"wget -qO ./www/images/default/$icon.png $url$img\"");\
-  fhem("attr $NAME icon $icon;sleep 4 WI;set WEB rereadicons");\
-  if (grep(/$mn/, @tv)) {$setList=~s/input:Queue \{/input:Queue,TV \{/};\
-  if (grep(/$mn/, @line)) {$setList=~s/input:Queue \{/input:Queue,Line_In \{/};\
-  $setList=~s/;/;;/g;\
-  fhem("attr $NAME setList $setList")\
-}
-setreading DEVICE attrTemplateVersion 20201103
+attr DEVICE getList Favorites:noArg Favorites {sonos2mqtt($NAME,$EVENT)}
+attr DEVICE setList PauseAll:noArg $\DEVICETOPIC/cmd/pauseall\
+CheckSubscription:noArg $\DEVICETOPIC/cmd/check-subscriptions
+attr SonosBridge userReadings favlist:Favorites.* {\
+  use JSON;use HTML::Entities;use Encode qw(encode decode);\
+  my $enc = 'UTF8';\
+  my @out;\
+  my $decoded = decode_json(ReadingsVal($name,'Favorites',''));\
+  my @arr  = @{$decoded->{'Result'}};;\
+  foreach (@arr) {\
+     my $dec = encode($enc, decode_entities($_->{'Title'}));\
+     $dec =~ s/\s/./g;\
+     push @out,$dec}\
+  return join ',', sort @out},\
+grouplist:Favorites.* {\
+     my @out;\
+     foreach (devspec2array('a:model=sonos2mqtt_speaker')) {if (ReadingsVal($_,'isMaster','')) {push @out,ReadingsVal($_,'name','')}}\
+  return join(',', sort @out)}
+{sonos2mqtt_mod_list('a:model=sonos2mqtt_bridge','readingList',AttrVal("DEVICE","devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Favorites:.* Favorites')}
+{sonos2mqtt_mod_list('a:model=sonos2mqtt_bridge','readingList',AttrVal("DEVICE","devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Reply:.* Reply')}
+defmod n_configSonos notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+|MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {sonos2mqtt_nty($NAME,$EVENT)}
+setreading DEVICE attrTemplateVersion 20210301
 
-  
 name:sonos2mqtt_speaker
-desc:A basic sonos2mqtt speaker device
+desc:A basic sonos2mqtt speaker device, Forum #111711 and Wiki 
 filter:TYPE=MQTT2_DEVICE
 order:M_05b
 par:BASE_TOPIC;base topic set in configuration.yaml of the sonos2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^\/:]+)[\/].+, ? $1 : undef }
@@ -4387,28 +4387,14 @@ attr DEVICE icon ICON
 attr DEVICE jsonMap volume_Master:volume mute_Master:mute
 attr DEVICE stateFormat transportState
 attr DEVICE readingList\
-  BASE_TOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  $\DEVICETOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  $\DEVICETOPIC/DEV_ID/ZoneInfo:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
-  stop:noArg BASE_TOPIC/DEV_ID/control { "command": "stop" }\
-  play:noArg BASE_TOPIC/DEV_ID/control { "command": "play" }\
-  pause:noArg BASE_TOPIC/DEV_ID/control { "command": "pause" }\
-  toggle:noArg BASE_TOPIC/DEV_ID/control { "command": "toggle" }\
-  volumeUp:noArg BASE_TOPIC/DEV_ID/control { "command": "volumeup" }\
-  volumeDown:noArg BASE_TOPIC/DEV_ID/control { "command": "volumedown" }\
-  volume:slider,0,1,100 BASE_TOPIC/DEV_ID/control { "command": "volume", "input": $EVTPART1 }\
-  mute:true,false { my $value = $EVTPART1 eq "true" ? "mute" : "unmute"; qq(BASE_TOPIC/DEV_ID/control { "command": "$value" } ) }\
-  next:noArg BASE_TOPIC/DEV_ID/control { "command": "next" }\
-  previous:noArg BASE_TOPIC/DEV_ID/control { "command": "previous" }\
-  joinGroup:textField BASE_TOPIC/DEV_ID/control { "command": "joingroup",  "input": "$EVTPART1"}\
-  leaveGroup:noArg { my $value = ReadingsVal("DEV_ID","groupName","all"); qq(BASE_TOPIC/DEV_ID/control { "command": "leavegroup",  "input": "$value" } ) }\
-  setAVTUri:textField BASE_TOPIC/DEV_ID/control { "command": "setavtransporturi",  "input": "$EVTPART1"}\
-  playUri:textField {fhem("set $NAME setAVTUri $EVTPART1; sleep 1; set $NAME play")}\
-  input:Queue { my $value = $EVTPART1 eq "TV" ? "tv" : $EVTPART1 eq "Line_In" ? "line" : "queue"; qq(BASE_TOPIC/DEV_ID/control { "command": "switchto$value" } ) }\
-  notify:textField BASE_TOPIC/DEV_ID/control { "command":"notify","input":{"trackUri":"$EVTPART2","onlyWhenPlaying":false,"timeout":10,"volume":$EVTPART1,"delayMs":700}}\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/control $payload)}
 attr DEVICE devStateIcon (STOPPED|PAUSED_PLAYBACK):rc_PLAY:toggle PLAYING:rc_PAUSE:pause .*:refresh:play
 attr DEVICE alias ALIAS
 attr DEVICE model sonos2mqtt_speaker
+attr DEVICE devicetopic BASE_TOPIC
 attr DEVICE userReadings Master:groupName.* {(split(' +',ReadingsVal($name,'groupName','')))[0]},\
 isMaster:coordinatorUuid.* {ReadingsVal($name,'coordinatorUuid','') eq ReadingsVal($name,'uuid','')?1:0},\
 inGroup:groupName.* {ReadingsVal($name,'groupName','') =~ / \+ /?1:0},\
@@ -4418,9 +4404,7 @@ Input:currentTrack_TrackUri.* {my $currentTrack_TrackUri = ReadingsVal($name,'cu
       ? 'LineIn': $currentTrack_TrackUri =~ 'spdif'\
       ? 'TV'    : ReadingsVal($name,'enqueuedMetadata_UpnpClass','') eq 'object.item.audioItem.audioBroadcast'\
       ? 'Radio' : 'Playlist'}
-# to initiate setting the userReadings
-set DEVICE volume {(ReadingsVal($DEV,'volume',''))}
-setreading DEVICE attrTemplateVersion 20210220
+setreading DEVICE attrTemplateVersion 20210301
 
 
 ###########################################
