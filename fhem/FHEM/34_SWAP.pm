@@ -642,7 +642,8 @@ Log 3, $value;
     }
 
   } elsif( $cmd eq "readDeviceXML" ) {
-    my $productcode = $attr{$name}{ProductCode} if( defined($attr{$name}{ProductCode} ) );
+    my $productcode;
+       $productcode = $attr{$name}{ProductCode} if( defined($attr{$name}{ProductCode} ) );
     if( defined($products->{$productcode} ) ) {
       SWAP_readDeviceXML( $hash, $productcode );
       $hash->{product} = $products->{$productcode} if( defined($productcode) && defined($products->{$productcode} ) );
@@ -1171,7 +1172,8 @@ SWAP_ProcessCmdStack($)
   my $sent;
   if($hash->{cmdStack}) {
     if(@{$hash->{cmdStack}}) {
-      my $params = shift @{$hash->{cmdStack}};
+      my $params;
+         $params = shift @{$hash->{cmdStack}};
       SWAP_Send($hash, $params->[0], $params->[1], $params->[2], $params->[3]);
       $sent = 1;
       $hash->{SWAP_CMDsPending} = scalar @{$hash->{cmdStack}}." CMDs_pending";
@@ -1232,8 +1234,10 @@ SWAP_Attr(@)
         my $i = 0;
         foreach my $endpoint ( @{$register->{endpoints}} ) {
           if( $endpoint->{units} ) {
-            my $factor = $endpoint->{units}->[0]->{factor} if( defined($endpoint->{units}->[0]->{factor}) );
-            my $offset = $endpoint->{units}->[0]->{offset} if( defined($endpoint->{units}->[0]->{offset}) );
+            my $factor;
+               $factor = $endpoint->{units}->[0]->{factor} if( defined($endpoint->{units}->[0]->{factor}) );
+            my $offset;
+               $offset = $endpoint->{units}->[0]->{offset} if( defined($endpoint->{units}->[0]->{offset}) );
             my $func = "";
             $func .= "*$factor" if( defined($factor) && $factor != 1 );
             $func .= "+$offset" if( defined($offset) && $offset > 0 );
