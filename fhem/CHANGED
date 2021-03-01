@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 93_Log2Syslog: don't use CRLF as end of data packet if EOF is used
  - feature: 49_IPCAM: added templates, improved logging
  - feature: 73_DoorBird: Maximum Size of files stored for Image, Video & Audio
  - bugfix:  49_SSCam: solve JS error, remove sscam_tooltip.js
