@@ -140,7 +140,7 @@ sub sonos2mqtt_setup
 my $devspec = shift @_ // 'a:model=sonos2mqtt_speaker';
 my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
 fhem("attr $devspec".q( devStateIcon {sonos2mqtt($name,'devStateIcon')}));
-sonos2mqtt_mod_list('a:model=sonos2mqtt_bridge','readingList','sonos/RINCON_([0-9A-Z]+)/Reply:.* Reply');
+#sonos2mqtt_mod_list('a:model=sonos2mqtt_bridge','readingList','sonos/RINCON_([0-9A-Z]+)/Reply:.* Reply');
 for ('stop:noArg','play:noArg','pause:noArg','toggle:noArg','volume:slider,0,1,100','volumeUp:noArg','volumeDown:noArg',
      'mute:true,false','next:noArg','previous:noArg','leaveGroup:noArg','setAVTUri:textField','playUri:textField',
      'notify:textField','x_raw_payload:textField','sayText:textField','speak:textField','input:Queue') {
