@@ -120,7 +120,8 @@ UnifiVideo_2html($;$$)
   $width = 200 if( !$width );
   my $name = $hash->{NAME};
 
-  my @cams = split(',', $cams) if( defined($cams) );
+  my @cams;
+     @cams = split(',', $cams) if( defined($cams) );
 
   my $apiKey = AttrVal($name, 'apiKey', undef);
   return undef if( !$apiKey );
