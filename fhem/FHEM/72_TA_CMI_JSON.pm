@@ -511,20 +511,13 @@ sub DetailFn {
 	width:11px;
 	height:7px;
 }
-.headagshow.hand{
-	background:url("../images/hand.png") no-repeat scroll 0px 19px / 9px 5px;
-}
-.headagshow.on{
+.Auto-On,.Manual-On{
 	background:#00f000;
 	border:#000 solid 1px;
 	border-radius:2px;
 }
-.headagshow.hand.on{
-	background:#00f000 url("../images/hand.png") no-repeat scroll 0 19px / 9px 5px;
-}
-.headag.headagshow.dom{
-	border:1px solid red;
-	border-radius:2px;
+.Manual-Off{
+        background-color:lightgray;
 }
 </style>';
 
