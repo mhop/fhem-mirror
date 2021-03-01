@@ -934,7 +934,8 @@ LIGHTIFY_Parse($$)
         $json = LIGHTIFY_toJson($hash, $chash, $id, $reachable, $onoff, $dim, $ct, $r, $g, $b);
 
       }
-    my $changed = HUEDevice_Parse( $chash, $json ) if( $chash );
+    my $changed;
+       $changed = HUEDevice_Parse( $chash, $json ) if( $chash );
     if( $changed || $chash->{helper}{transitiontime} ) {
       RemoveInternalTimer($chash);
       InternalTimer(gettimeofday()+1, "HUEDevice_GetUpdate", $chash, 0);
