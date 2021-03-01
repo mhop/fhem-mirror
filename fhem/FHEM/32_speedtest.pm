@@ -45,7 +45,8 @@ speedtest_Define($$)
   $interval = $a[2] if(int(@a)>=3);
   $interval = 30*60 if( $interval < 30*60 );
 
-  my $server = $a[3] if(int(@a)>=4);
+  my $server;
+     $server = $a[3] if(int(@a)>=4);
 
   delete( $hash->{SERVER} );
 
