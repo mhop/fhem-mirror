@@ -564,15 +564,14 @@ order:L_06
 par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
 par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
 attr DEVICE devStateIcon open:fts_window_1w_open@red close:fts_window_1w@green
-#attr DEVICE genericDeviceType contact
 attr DEVICE eventMap true:close false:open
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap contact:state
 deletereading -q DEVICE (?!associatedWith).*
-set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=contact HOMEBRIDGEMAPPING="ContactSensorState=state,values=closed:CONTACT_DETECTED;;open:CONTACT_NOT_DETECTED"
+set DEVICE attrTemplate speechcontrol_gdt_and_mapping GENERICDEVTYPE=ContactSensor HOMEBRIDGEMAPPING=ContactSensorState=state,values=true:CONTACT_DETECTED;false:CONTACT_NOT_DETECTED
 attr DEVICE model zigbee2mqtt_ContactSensor
-setreading DEVICE attrTemplateVersion 20200904
+setreading DEVICE attrTemplateVersion 20210301
 
 name:zigbee2mqtt_TempHumHpaSensor
 desc: Temp/hum/hpa sensor via zigbee2mqtt <br>Tested with: Xiaomi Aqara WSDCGQ11LM Temperature Humidity Sensor
