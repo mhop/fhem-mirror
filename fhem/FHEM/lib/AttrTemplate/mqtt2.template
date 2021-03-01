@@ -4387,7 +4387,7 @@ attr DEVICE icon ICON
 attr DEVICE jsonMap volume_Master:volume mute_Master:mute
 attr DEVICE stateFormat transportState
 attr DEVICE readingList\
-  $\DEVICETOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }
+  $\DEVICETOPIC/DEV_ID:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   $\DEVICETOPIC/DEV_ID/ZoneInfo:.* { json2nameValue($EVENT) }
 attr DEVICE setList\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/control $payload)}
