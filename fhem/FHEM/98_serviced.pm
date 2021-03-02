@@ -16,7 +16,7 @@ use Blocking;
 use Time::HiRes;
 use vars qw{%defs};
 
-my $servicedVersion = "1.2.6";
+my $servicedVersion = "1.2.7";
 
 sub serviced_shutdownwait($);
 
@@ -77,8 +77,11 @@ sub serviced_Define($$)
                                         "StatusJammed=state,values=/error|failed/:JAMMED;/.*/:NOT_JAMMED";
     }
   }
-  readingsSingleUpdate($hash,"state","Initialized",1) if ($init_done);
-  serviced_GetUpdate($hash);
+  if ($init_done)
+  {
+    readingsSingleUpdate($hash,"state","Initialized",1) ;
+    serviced_GetUpdate($hash);
+  }
   return undef;
 }
 
@@ -273,7 +276,7 @@ sub serviced_ExecCmd($)
   Log3 $name,5,"$name: serviced_ExecCmd com: $com, line: $line";
   my @ret;
   my $re = "";
-  foreach (@qx)
+  for (@qx)
   {
     chomp;
     $_ =~ s/[\s\t ]{1,}/ /g;
