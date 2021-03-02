@@ -6,7 +6,6 @@
 # so only the read, write and internal pull-up commands are implemented.
 
 package main;
-
 use strict;
 use warnings;
 
@@ -53,14 +52,17 @@ sub PIFACE_Define($$) {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
   $hash->{NOTIFYDEV} = "global";
-  Log3($name, 3, "PIFACE $name active");
+  $hash->{helper}{timer}{poll} = {hash => $hash, param => 'PIFACE_GetUpdate'};
+  $hash->{helper}{timer}{watchdog} = {hash => $hash, param => 'PIFACE_Watchdog'};
+  Log3($name, 2, "PIFACE $name active");
   readingsSingleUpdate($hash, "state", "active",1);
   return;
 }
 
 sub PIFACE_Undefine($$) {
   my($hash, $name) = @_;
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash->{helper}{timer}{poll});
+  RemoveInternalTimer($hash->{helper}{timer}{watchdog});
   return;
 }
 
@@ -71,20 +73,25 @@ sub PIFACE_Set($@) {
           Log3 $name, 4, "PIFACE $name set commands disabled.";
           return;
         }
-	my $port = $a[1];
-	my $val  = $a[2];
+        shift @a;
+        my $port = '';
+        $port = shift @a if (defined $a[0]);
+	my $val = shift @a if (defined $a[0]);
+	my $all = ReadingsVal($name, 'all', 0);
 	my ($adr, $cmd, $i, $j, $k);
-	my $usage = "Unknown argument $port, choose one of all 0:0,1 1:0,1 2:0,1 3:0,1 4:0,1 5:0,1 6:0,1 7:0,1 ";
-	return $usage if ($port eq "?");
+	my $usage = "Unknown argument $port, choose one of all:bitfield,8,255 0:0,1 1:0,1 2:0,1 3:0,1 4:0,1 5:0,1 6:0,1 7:0,1 ";
+	return $usage if ($port eq '' || $port eq "?" || !defined($val));
+	readingsBeginUpdate($hash);
 	if ($port ne "all") {
 		$adr = $base + $port;
 		Log3($name, 3, "PIFACE $name set port $port $val");
 		$cmd = "$gpioCmd -x mcp23s17:$base:0:0 write $adr $val";
 		$cmd = `$cmd`;
-		readingsSingleUpdate($hash, 'out'.$port, $val, 1);
+		readingsBulkUpdate($hash, 'out' . $port, $val);
+		$all = $val == 1 ? $all | 2 ** $port : $all & (2 ** $port ^ 255);
+		readingsBulkUpdate($hash, 'all', $all);
 	} else {
-		Log3($name, 3, "PIFACE $name set ports $val");
-		readingsBeginUpdate($hash);
+		readingsBulkUpdateIfChanged($hash, 'all', $val);
 		for($i = 0; $i < 8; $i ++) {
 			$j = 2**$i;
 			$k = $val & $j;
@@ -93,10 +100,10 @@ sub PIFACE_Set($@) {
 			$adr = $base + $i;
 			$cmd = "$gpioCmd -x mcp23s17:$base:0:0 write $adr $k";
 			$cmd = `$cmd`;
-			readingsBulkUpdate($hash, 'out'.$i, $k);
+			readingsBulkUpdate($hash, 'out' . $i, $k);
 		}
-		readingsEndUpdate($hash, 1);
 	}
+	readingsEndUpdate($hash, 1);
 	return;
 }
 
@@ -104,12 +111,14 @@ sub PIFACE_Get($@) {
   my ($hash, @a)	= @_;
   my $name = $hash->{NAME};
   return undef if (IsDisabled($name));
-  my $port = $a[1];
+  shift @a;
+  my $port = '';
+  $port = shift @a if (defined $a[0]);
   my ($adr, $cmd, $pin, $portMode, $val);
   my $usage = "Unknown argument $port, choose one of all:noArg in:noArg out:noArg ".
 		"0:noArg 1:noArg  2:noArg  3:noArg  4:noArg ".
 		"5:noArg  6:noArg  7:noArg";
-  return $usage if $port eq "?";
+  return $usage if ($port eq '' || $port eq "?");
   if ($port eq "all") {
     PIFACE_Read_Inports(1, $hash);
     PIFACE_Read_Outports(1, $hash);
@@ -139,12 +148,12 @@ sub PIFACE_Attr(@) {
   return undef if (!$init_done);
   if ($attrName eq "pollInterval") {
     if (!defined $attrVal) {
-      #RemoveInternalTimer($hash);
+      RemoveInternalTimer($hash->{helper}{timer}{poll}, $hash->{helper}{timer}{poll}{param});
     } elsif ($attrVal eq "off" || ($attrVal =~ m/^\d+(\.\d+)?$/ && $attrVal > 0.5 && $attrVal <= 10)) {
-      PIFACE_GetUpdate($hash);
+      PIFACE_GetUpdate($hash->{helper}{timer}{poll});
     } else {
-      #RemoveInternalTimer($hash);
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      RemoveInternalTimer($hash->{helper}{timer}{poll}, $hash->{helper}{timer}{poll}{param});
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name pollInterval");
     }
 
@@ -152,7 +161,7 @@ sub PIFACE_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^last|off|[01]$/) {
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name defaultState");
     }
 
@@ -165,7 +174,7 @@ sub PIFACE_Attr(@) {
     $portMode = "tri" if (!defined $attrVal);
     if ($attrVal !~ m/^tri|up$/) {
       $portMode = "tri" ;
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name portMode$port");
     }
     $cmd = "$gpioCmd -x mcp23s17:$base:0:0 mode $adr $portMode";
@@ -180,28 +189,29 @@ sub PIFACE_Attr(@) {
     if (!defined $attrVal){
 
     } elsif ($attrVal !~ m/^no|yes$/) {
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name defaultState");
     }
 
   } elsif ($attrName eq "watchdog") {
     if (!defined $attrVal) {
       $attrVal = "off" ;
-      CommandDeleteReading(undef, "$name watchdog");
+      readingsDelete($hash, "watchdog");
     }
     if ($attrVal !~ m/^on|off|silent$/) {
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name watchdog");
     }
     if ($attrVal =~ m/^on|silent$/) {
       readingsSingleUpdate($hash, 'watchdog', 'start', 1);
       $attr{$name}{$attrName} = $attrVal;
-      PIFACE_Watchdog($hash);
+      $hash->{helper}{timer}{watchdog} = {hash => $hash, param => 'PIFACE_Watchdog'};
+      PIFACE_Watchdog($hash->{helper}{timer}{watchdog});
     }
 
   } elsif ($attrName eq "watchdogInterval") {
     if ($attrVal !~ m/^\d+$/ || $attrVal < 10) {
-      Log3($name, 3, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
+      Log3($name, 2, "PIFACE $name attribute-value [$attrName] = $attrVal wrong");
       CommandDeleteAttr(undef, "$name watchdogInterval");
     }
   }
@@ -215,9 +225,9 @@ sub PIFACE_Notify(@) {
   if ($dev->{NAME} eq "global" && grep (m/^INITIALIZED|REREADCFG$/,@{$dev->{CHANGED}})){
     PIFACE_Restore_Inports_Mode($hash);
     PIFACE_Restore_Outports_State($hash);
-    PIFACE_GetUpdate($hash);
-    PIFACE_Watchdog($hash);
-    Log3($name, 3, "PIFACE $name initialized");
+    PIFACE_GetUpdate($hash->{helper}{timer}{poll});
+    PIFACE_Watchdog($hash->{helper}{timer}{watchdog});
+    Log3($name, 2, "PIFACE $name initialized");
   }
   return undef;
 }
@@ -225,7 +235,8 @@ sub PIFACE_Notify(@) {
 sub PIFACE_Read_Outports($$) {
 	my ($updateMode, $hash) = @_;
         my $name = $hash->{NAME};
-	my ($cmd, $i, $port, $val);
+	my ($all, $cmd, $i, $j, $port, $val);
+	$all = 0;
 	readingsBeginUpdate($hash);
 	for($i = 0; $i < 8; $i++){
 		$port = $base + $i;
@@ -233,12 +244,15 @@ sub PIFACE_Read_Outports($$) {
 		$val = `$cmd`;
 		$val =~ s/\n//g;
 		$val =~ s/\r//g;
+		$j = 2**$i;
+		$all |= $j if ($val == 1);
 		if ($updateMode == 1){
 		  readingsBulkUpdate($hash, 'out'.$i, $val);
 		} else {
 		  readingsBulkUpdateIfChanged($hash, 'out'.$i, $val);
 		}
 	}
+	readingsBulkUpdateIfChanged($hash, 'all', $all);
 	readingsEndUpdate($hash, 1);
 	return;
 }
@@ -271,7 +285,7 @@ sub PIFACE_Restore_Outports_State($) {
   my $defaultState = AttrVal($name, "defaultState", "off");
   my ($adr, $cmd, $valOut);
   if ($defaultState ne "off") {
-    for(my $port = 0; $port < 8; $port ++){
+    for (my $port = 0; $port < 8; $port ++) {
       $cmd[1] = $port;
       $adr = $base + $port;
       $cmd = "$gpioCmd -x mcp23s17:$base:0:0 mode $adr out";
@@ -307,11 +321,15 @@ sub PIFACE_Restore_Inports_Mode($) {
 }
 
 sub PIFACE_GetUpdate($) {
-  my ($hash) = @_;
+  #my ($hash) = @_;
+  my ($functionHash) = @_;
+  my $hash = $functionHash->{hash};
+  my $param = $functionHash->{param};
   my $name = $hash->{NAME};
   my $pollInterval = AttrVal($name, "pollInterval", "off");
   if ($pollInterval ne "off") {
-    InternalTimer(gettimeofday() + $pollInterval, "PIFACE_GetUpdate", $hash, 1);
+    RemoveInternalTimer($hash->{helper}{timer}{poll}, $param);
+    InternalTimer(gettimeofday() + $pollInterval, $param, $hash->{helper}{timer}{poll}, 0);
     PIFACE_Read_Inports(0, $hash);
     PIFACE_Read_Outports(0, $hash);
   }
@@ -319,7 +337,10 @@ sub PIFACE_GetUpdate($) {
 }
 
 sub PIFACE_Watchdog($) {
-  my ($hash) = @_;
+  #my ($hash) = @_;
+  my ($functionHash) = @_;
+  my $hash = $functionHash->{hash};
+  my $param = $functionHash->{param};
   my $name = $hash->{NAME};
   return undef if (IsDisabled($name));
   my ($cmd, $port, $portMode, $valIn, $valOut0, $valOut1);
@@ -328,10 +349,11 @@ sub PIFACE_Watchdog($) {
   $watchdogInterval = 10 if ($watchdogInterval !~ m/^\d+$/ || $watchdogInterval < 10);
 
   if (!defined $watchdog) {
-    CommandDeleteReading(undef, "$name watchdog");
+    readingsDelete($hash, "watchdog");
 
   } elsif ($watchdog =~ m/^on|silent$/) {
-    InternalTimer(gettimeofday() + $watchdogInterval, "PIFACE_Watchdog", $hash, 1);
+    RemoveInternalTimer($hash->{helper}{timer}{watchdog}, $param);
+    InternalTimer(gettimeofday() + $watchdogInterval, $param, $hash->{helper}{timer}{watchdog}, 0);
     for (my $i = 0; $i < 7; $i++) {
      $port = $base + 8 + $i;
      $portMode = AttrVal($name, "portMode" . $i, "tri");
@@ -361,37 +383,38 @@ sub PIFACE_Watchdog($) {
       readingsSingleUpdate($hash, "state", "active", 1) if (ReadingsVal($name, "state", '') ne "active");
       readingsSingleUpdate($hash, ".watchdogRestart", 0, 1);
       if ($watchdog eq "on") {
-        Log3($name, 3, "PIFACE $name Watchdog active");
+        Log3($name, 2, "PIFACE $name Watchdog active");
         readingsSingleUpdate($hash, "watchdog", "ok", 1);
       } elsif ($watchdog eq "silent") {
         readingsSingleUpdate($hash, "watchdog", "ok", 1) if (ReadingsVal($name, "watchdog", '') ne "ok");
       }
     } else {
       if ($watchdog eq "on") {
-        Log3($name, 3, "PIFACE $name Watchdog error");
+        Log3($name, 2, "PIFACE $name Watchdog error");
         readingsSingleUpdate($hash, "watchdog", "error", 1);
       } elsif ($watchdog eq "silent") {
         my $watchdogRestart = ReadingsVal($name, ".watchdogRestart", undef);
         if (!defined($watchdogRestart) || $watchdogRestart == 0) {
-          Log3($name, 3, "PIFACE $name Watchdog Fhem restart");
+          Log3($name, 2, "PIFACE $name Watchdog Fhem restart");
           readingsSingleUpdate($hash, "watchdog", "restart", 1);
           readingsSingleUpdate($hash, ".watchdogRestart", 1, 1);
           CommandSave(undef, undef);
           CommandShutdown(undef, "restart");
         } elsif ($watchdogRestart == 1) {
-          Log3($name, 3, "PIFACE $name Watchdog OS restart");
+          Log3($name, 2, "PIFACE $name Watchdog OS restart");
           readingsSingleUpdate($hash, "watchdog", "restart", 1);
           readingsSingleUpdate($hash, ".watchdogRestart", 2, 1);
           CommandSave(undef, undef);
+          $cmd = '/sbin/shutdown -a -r now';
           #$cmd = 'shutdown -r now';
-          $cmd = 'sudo /sbin/shutdown -r now';
+          #$cmd = 'sudo /sbin/shutdown -r now';
           #$cmd = 'sudo /sbin/shutdown -r now > /dev/null 2>&1';
 	  $cmd = `$cmd`;
         } elsif ($watchdogRestart == 2) {
           $attr{$name}{watchdog} = "off";
-          Log3($name, 3, "PIFACE $name Watchdog error");
-          Log3($name, 3, "PIFACE $name Watchdog deactivated");
-          CommandDeleteReading(undef, "$name .watchdogRestart");
+          Log3($name, 2, "PIFACE $name Watchdog error");
+          Log3($name, 2, "PIFACE $name Watchdog deactivated");
+          readingsDelete($hash, ".watchdogRestart");
           readingsSingleUpdate($hash, "watchdog", "error", 1);
           readingsSingleUpdate($hash, "state", "error",1);
           CommandSave(undef, undef);
@@ -399,7 +422,7 @@ sub PIFACE_Watchdog($) {
       }
     }
   } else {
-    Log3($name, 3, "PIFACE $name Watchdog off");
+    Log3($name, 2, "PIFACE $name Watchdog off");
     readingsSingleUpdate($hash, "watchdog", "off", 1);
   }
   return;
@@ -428,7 +451,7 @@ sub PIFACE_Shutdown($) {
 =item summary_DE Raspberry PiFace Digital Schnittstellenerweiterung
 =begin html
 
-<a name="PIFACE"></a>
+<a id="PIFACE"></a>
 <h3>PIFACE</h3>
 <ul>
   The PIFACE module managed the <a href=http://www.raspberrypi.org/>Raspberry Pi</a> extension board <a href=http://www.piface.org.uk/products/piface_digital/>PiFace Digital</a>.<br>
@@ -487,20 +510,22 @@ sub PIFACE_Shutdown($) {
     <li>The watchdog function monitors the input port 7 and the output port 7.<br>
       If the watchdog is enabled, this ports can not be used for other tasks.
       In order to monitor the input port 7, it must be connected to the ground!<br>
-      The OS command "shutdown" must be enable for fhem if an OS restart is to
-      be executed in case of malfunction. For example, with <code>chmod +s /sbin/shutdown</code>
-      or <code>sudo chmod +s /sbin/shutdown</code>.<br>
+      The OS command "shutdown" must be enable for Fhem if an OS restart is to
+      be executed in case of malfunction. For example, with the help of the shutdown ACLs (Access Control Lists).
+      This allows you to privilege a maximum of 32 users to boot the computer. To do this, edit the file
+      <code>/etc/shutdown.allow</code> and insert the authorized user <code>fhem</code> there (each the login name per line).
+      Now Fhem can reboot the operating system with <code>/sbin/shutdown -a -r now</code>.<br>
     </li>
   </ul>
   <br>
 
-  <a name="PIFACEdefine"></a>
+  <a id="PIFACE-define"></a>
   <b>Define</b>
     <ul><br>
        <code>define &lt;name&gt; PIFACE</code><br>
     </ul><br>
 
-	<a name="PIFACEset"></a>
+	<a id="PIFACE-set"></a>
 	<b>Set</b><br/>
 	<ul>
 
@@ -528,7 +553,7 @@ sub PIFACE_Shutdown($) {
 	</ul>
 	<br>
 
-	<a name="PIFACEget"></a>
+	<a id="PIFACE-get"></a>
 	<b>Get</b><br/>
 	<ul>
 
@@ -560,10 +585,10 @@ sub PIFACE_Shutdown($) {
 	</ul>
 	<br>
 
-	<a name="PIFACEattr"></a>
+	<a id="PIFACE-attr"></a>
 	<b>Attributes</b><br/><br/>
 	<ul>
-          <li><a name="PIFACE_defaultState">defaultState</a> last|off|0|1,
+          <li><a id="PIFACE-attr-defaultState">defaultState</a> last|off|0|1,
             [defaultState] = off is default.<br>
             Restoration of the status of the output port after a Fhem reboot.
           </li>
@@ -579,21 +604,21 @@ sub PIFACE_Shutdown($) {
               23:00-24:00 00:00-01:00
             </ul>
           </li>
-          <li><a name="PIFACE_pollInterval">pollInterval</a> off|0.5|0.75|1,1.5,2,...,9,10,
+          <li><a id="PIFACE-attr-pollInterval">pollInterval</a> off|0.5|0.75|1,1.5,2,...,9,10,
             [pollInterval] = off is default.<br>
             Define the polling interval of the input ports in seconds.
           </li>
-          <li><a name="PIFACE_portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
+          <li><a id="PIFACE-attr-portMode&lt;0..7&gt;">portMode&lt;0..7&gt;</a> tri|up,
             [portMode&lt;0..7&gt;] = tri is default.<br>
             This enables (up) or disables (tri) the internal pull-up resistor on the given input port.
             You need to enable the pull-up if you want to read any of the on-board switches on the PiFace board.
           </li>
 	  <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-          <li><a name="PIFACE_shutdownClearIO">shutdownClearIO</a> no|yes,
+          <li><a id="PIFACE-attr-shutdownClearIO">shutdownClearIO</a> no|yes,
             [shutdownClearIO] = no is default.<br>
             Clear IO ports during shutdown.
           </li>
-          <li><a name="PIFACE_watchdog">watchdog</a> off|on|silent,
+          <li><a id="PIFACE-attr-watchdog">watchdog</a> off|on|silent,
             [watchdog] = off is default.<br>
             The function of the PiFace extension can be monitored periodically.
             The watchdog module checks the function of ports in7 and out7.
@@ -604,16 +629,19 @@ sub PIFACE_Shutdown($) {
             If the error could not be eliminated, then the Raspberry operating system is restarted.
             If the error is not corrected as well, the monitoring function is disabled and the error is logged.
           </li>
-          <li><a name="PIFACE_watchdogInterval">watchdogInterval</a> 10..65535,
+          <li><a id="PIFACE-attr-watchdogInterval">watchdogInterval</a> 10..65535,
             [watchdogInterval] = 60 is default.<br>
             Interval between two monitoring tests in seconds.
           </li>
 	</ul>
 	<br>
 
-	<b>Generated Readings/Events:</b>
+        <a id="PIFACE-events"></a>
+	<b>Generated Events:</b>
 	<br/><br/>
 	<ul>
+		<li>&lt;all&gt;: 0...255<br>
+		state of all output port as bitmap</li>
 		<li>&lt;out0..out7&gt;: 0|1<br>
 		state of output port 0..7</li>
 		<li>&lt;in0..in7&gt;: 0|1<br>
