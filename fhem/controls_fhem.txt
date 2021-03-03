@@ -1,4 +1,4 @@
-REV 23877
+REV 23881
 DIR unused
 UPD 2021-03-02_07:45:03 358363 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -295,7 +295,7 @@ UPD 2016-07-11_07:45:14 12508 FHEM/52_I2C_SHT3x.pm
 UPD 2019-06-05_07:45:02 29777 FHEM/53_GHoma.pm
 UPD 2021-02-22_07:45:02 119278 FHEM/55_DWD_OpenData.pm
 UPD 2021-02-05_07:45:04 65913 FHEM/55_InfoPanel.pm
-UPD 2019-07-10_07:45:02 22166 FHEM/55_PIFACE.pm
+UPD 2021-03-03_07:45:09 23946 FHEM/55_PIFACE.pm
 UPD 2015-07-28_14:05:31 17091 FHEM/56_POKEYS.pm
 UPD 2018-10-24_07:45:03 27668 FHEM/57_CALVIEW.pm
 UPD 2021-01-17_07:45:02 169485 FHEM/57_Calendar.pm
@@ -543,7 +543,7 @@ UPD 2020-05-04_07:45:02 26583 FHEM/98_readingsWatcher.pm
 UPD 2018-03-18_07:45:02 4017 FHEM/98_restore.pm
 UPD 2017-01-16_07:45:02 44459 FHEM/98_rssFeed.pm
 UPD 2019-03-24_07:45:02 2965 FHEM/98_search.pm
-UPD 2021-02-17_07:45:03 24303 FHEM/98_serviced.pm
+UPD 2021-03-03_07:45:09 24314 FHEM/98_serviced.pm
 UPD 2019-12-24_07:45:11 60214 FHEM/98_statistics.pm
 UPD 2021-02-25_07:45:03 34730 FHEM/98_structure.pm
 UPD 2020-12-18_07:45:02 11456 FHEM/98_systemd_watchdog.pm
@@ -641,7 +641,7 @@ UPD 2021-01-09_07:45:04 70537 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-02-28_07:45:19 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-03-02_07:45:03 305932 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-03-03_07:45:09 306034 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -733,12 +733,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-03-02_07:45:07 4470489 docs/commandref.html
+UPD 2021-03-03_07:45:13 4470890 docs/commandref.html
 UPD 2021-03-02_07:45:09 2767201 docs/commandref_DE.html
 UPD 2021-02-23_22:05:11 81115 docs/commandref_frame.html
 UPD 2021-02-23_07:45:06 90770 docs/commandref_frame_DE.html
-UPD 2021-03-02_07:45:11 236329 docs/commandref_modular.html
-UPD 2021-03-02_07:45:12 247105 docs/commandref_modular_DE.html
+UPD 2021-03-03_07:45:17 236377 docs/commandref_modular.html
+UPD 2021-03-03_07:45:18 247153 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
