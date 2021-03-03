@@ -77,11 +77,7 @@ sub serviced_Define($$)
                                         "StatusJammed=state,values=/error|failed/:JAMMED;/.*/:NOT_JAMMED";
     }
   }
-  if ($init_done)
-  {
-    readingsSingleUpdate($hash,"state","Initialized",1) ;
-    serviced_GetUpdate($hash);
-  }
+  readingsSingleUpdate($hash,"state","Initialized",1) if ($init_done);
   return undef;
 }
 
@@ -391,10 +387,10 @@ sub serviced_GetUpdate(@)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+  RemoveInternalTimer($hash);
+  return if (IsDisabled($name) || !$init_done);
   my $sec = defined $hash->{helper}{interval} ? $hash->{helper}{interval} : AttrNum($name,"serviceStatusInterval",undef);
   delete $hash->{helper}{interval} if (defined $hash->{helper}{interval});
-  RemoveInternalTimer($hash);
-  return if (IsDisabled($name));
   serviced_Set($hash,$name,"status");
   return if (!$sec);
   InternalTimer(gettimeofday() + $sec,"serviced_GetUpdate",$hash);
