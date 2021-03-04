@@ -113,7 +113,7 @@ return '';
 ####### devStateIcon
 sub sonos2mqtt_devStateIcon
 {
-my ($name) = @_;
+my $name = shift // return'';
 my $wpix = '210px';
 my $master = ReadingsVal($name,'Master',$name);
 my $inGroup = ReadingsNum($name,'inGroup','0');
@@ -173,7 +173,7 @@ return ''
 #### Setup some additional features in speaker and bridge
 sub sonos2mqtt_setup
 {
-my $devspec = shift @_ // 'a:model=sonos2mqtt_speaker';
+my $devspec = shift || 'a:model=sonos2mqtt_speaker';
 my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
 
 if ($devspec eq 'a:model=sonos2mqtt_bridge'){
@@ -197,11 +197,11 @@ my @line = ("S5","Z90","ZP120");
 if (!ReadingsVal($bridge,'favlist',0)) {my $fav = fhem("get $bridge Favorites")}
 for (devspec2array($devspec)) {
     my $mn = ReadingsVal($_,'modelNumber','');
-    fhem("set $_ volume ".ReadingsVal($_,'volume','10')); # trick to initiate the userReadings 
     if (grep {/$mn/} @tv) {sonos2mqtt_mod_list($_,'setList','input:Queue,TV'.q( {sonos2mqtt($NAME,$EVENT)}))}
     if (grep {/$mn/} @line) {sonos2mqtt_mod_list($_,'setList','input:Queue,Line_In'.q( {sonos2mqtt($NAME,$EVENT)}))}
     sonos2mqtt_mod_list($_,'setList','joinGroup:'.ReadingsVal($bridge,'grouplist','').q( {sonos2mqtt($NAME,$EVENT)}));
     sonos2mqtt_mod_list($_,'setList','playFav:'.ReadingsVal($bridge,'favlist','').q( {sonos2mqtt($NAME,$EVENT)}));
+    fhem("set $_ volumeUp; set $_ volumeDown"); # trick to initiate the userReadings 
   }
 return ''
 }
@@ -236,8 +236,8 @@ return ''
 #
 sub sonos2mqtt_ur
 {
-my $name = shift @_ // 'name';
-my $reading = shift @_ // 'reading';
+my $name = shift // return '';
+my $reading = shift || 'reading';
 my @out;
 
 if ($reading eq 'grouplist'){
