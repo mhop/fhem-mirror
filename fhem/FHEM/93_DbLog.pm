@@ -8,7 +8,7 @@
 # modified and maintained by Tobias Faust since 2012-06-26 until 2016
 # e-mail: tobias dot faust at online dot de
 #
-# redesigned and maintained 2016-2020 by DS_Starter with credits by: JoeAllb, DeeSpe
+# redesigned and maintained 2016-2021 by DS_Starter with credits by: JoeAllb, DeeSpe
 # e-mail: heiko dot maaz at t-online dot de
 #
 # reduceLog() created by Claudiu Schuster (rapster)
@@ -18,7 +18,7 @@
 package main;
 use strict;
 use warnings;
-eval "use DBI;1" or my $DbLogMMDBI = "DBI";
+eval "use DBI;1"        or my $DbLogMMDBI    = "DBI";
 eval "use FHEM::Meta;1" or my $modMetaAbsent = 1;
 use Data::Dumper;
 use Blocking;
@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
+                           "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
   "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
   "4.10.1"  => "22.06.2020 configCheck changed for SQLite ",
   "4.10.0"  => "22.05.2020 improve configCheck, new vars \$LASTTIMESTAMP and \$LASTVALUE in valueFn / DbLogValueFn, Forum:#111423 ",
@@ -237,6 +239,7 @@ my %DbLog_vNotesIntern = (
   "1.7.1"   => "15.12.2016 attr procedure of \"disabled\" changed"
 );
 
+# Defaultwerte
 my %columns = ("DEVICE"  => 64,
                "TYPE"    => 64,
                "EVENT"   => 512,
@@ -244,13 +247,12 @@ my %columns = ("DEVICE"  => 64,
                "VALUE"   => 128,
                "UNIT"    => 32
               );
-                     
-sub DbLog_dbReadings($@);
-sub DbLog_showChildHandles($$$$);
+              
+my $dblog_cachedef = 500;                       # default Größe cacheLimit bei asynchronen Betrieb
 
 ################################################################
-sub DbLog_Initialize($) {
-  my ($hash) = @_;
+sub DbLog_Initialize {
+  my $hash = shift;
 
   $hash->{DefFn}             = "DbLog_Define";
   $hash->{UndefFn}           = "DbLog_Undef";
@@ -266,6 +268,7 @@ sub DbLog_Initialize($) {
                                "commitMode:basic_ta:on,basic_ta:off,ac:on_ta:on,ac:on_ta:off,ac:off_ta:on ".
                                "cacheEvents:2,1,0 ".
                                "cacheLimit ".
+                               "cacheOverflowThreshold ".
                                "colEvent ".
                                "colReading ".
                                "colValue ".
@@ -307,18 +310,17 @@ return;
 }
 
 ###############################################################
-sub DbLog_Define($@) {
+sub DbLog_Define {
   my ($hash, $def) = @_;
   my $name         = $hash->{NAME};
-  my @a            = split("[ \t][ \t]*", $def);
+  my @a            = split "[ \t][ \t]*", $def;
   
   if($DbLogMMDBI) {
       Log3($name, 1, "DbLog $name - ERROR - Perl module ".$DbLogMMDBI." is missing. DbLog module is not loaded ! On Debian systems you can install it with \"sudo apt-get install libdbi-perl\" ");
       return "Error: Perl module ".$DbLogMMDBI." is missing. Install it on Debian with: sudo apt-get install libdbi-perl";
   }        
 
-  return "wrong syntax: define <name> DbLog configuration regexp"
-    if(int(@a) != 4);
+  return "wrong syntax: define <name> DbLog configuration regexp" if(int(@a) != 4);
   
   $hash->{CONFIGURATION} = $a[2];
   my $regexp             = $a[3];
@@ -362,22 +364,26 @@ sub DbLog_Define($@) {
   # initial execution of DbLog_execmemcache
   DbLog_execmemcache($hash);
   
-return undef;
+return;
 }
 
 ################################################################
-sub DbLog_Undef($$) {
-  my ($hash, $name) = @_;
-  my $dbh= $hash->{DBHP};
+sub DbLog_Undef {
+  my $hash = shift;
+  my $name = shift;
+  my $dbh  = $hash->{DBHP};
+  
   BlockingKill($hash->{HELPER}{".RUNNING_PID"}) if($hash->{HELPER}{".RUNNING_PID"});
   BlockingKill($hash->{HELPER}{REDUCELOG_PID}) if($hash->{HELPER}{REDUCELOG_PID});
   BlockingKill($hash->{HELPER}{COUNT_PID}) if($hash->{HELPER}{COUNT_PID});
   BlockingKill($hash->{HELPER}{DELDAYS_PID}) if($hash->{HELPER}{DELDAYS_PID});
+  
   $dbh->disconnect() if(defined($dbh));
+  
   RemoveInternalTimer($hash);
   delete $data{DbLog}{$name};
   
-return undef;
+return;
 }
 
 #######################################################################################################
@@ -387,8 +393,8 @@ return undef;
 # Sobald alle nötigen Maßnahmen erledigt sind, muss der Abschluss mit CancelDelayedShutdown($name) an 
 # FHEM zurückgemeldet werden. 
 #######################################################################################################
-sub DbLog_DelayedShutdown($) {
-  my ($hash) = @_;
+sub DbLog_DelayedShutdown {
+  my $hash   = shift;
   my $name   = $hash->{NAME};
   my $async  = AttrVal($name, "asyncMode", "");
   
@@ -408,15 +414,15 @@ return 1;
 # DbLog-Instanz aufgerufen
 #
 ################################################################
-sub DbLog_Attr(@) {
+sub DbLog_Attr {
   my($cmd,$name,$aName,$aVal) = @_;
-  my $hash = $defs{$name};
-  my $dbh  = $hash->{DBHP};
-  my $do = 0;
+  my $hash                    = $defs{$name};
+  my $dbh                     = $hash->{DBHP};
+  my $do                      = 0;
 
   if($cmd eq "set") {
-      if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "timeout") {
-          unless ($aVal =~ /^[0-9]+$/) { return " The Value of $aName is not valid. Use only figures 0-9 !";}
+      if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "cacheOverflowThreshold" || $aName eq "timeout") {   
+          if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
       }
       
       if ($hash->{MODEL} !~ /MYSQL|POSTGRESQL/ && $aName =~ /dbSchema/) {
@@ -457,10 +463,14 @@ sub DbLog_Attr(@) {
       if ($cmd eq "set" && $aVal) {
           $hash->{MODE} = "asynchronous";
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0);
-      } else {
+      } 
+      else {
           $hash->{MODE} = "synchronous";
           delete($defs{$name}{READINGS}{NextSync});
           delete($defs{$name}{READINGS}{CacheUsage});
+          delete($defs{$name}{READINGS}{CacheOverflowLastNum});
+          delete($defs{$name}{READINGS}{CacheOverflowLastState});
+          delete($defs{$name}{READINGS}{background_processing_time});
           InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
       }
   }
@@ -489,7 +499,8 @@ sub DbLog_Attr(@) {
       my $regexp = $hash->{REGEXP};
       if ($cmd eq "set" && $aVal) {
           delete($hash->{NOTIFYDEV});
-      } else {
+      } 
+      else {
           notifyRegexpChanged($hash, $regexp);  
       }
   }
@@ -505,8 +516,7 @@ sub DbLog_Attr(@) {
       # letzter CacheSync vor disablen
       DbLog_execmemcache($hash) if($do == 1);
       
-      readingsSingleUpdate($hash, "state", $val, 1);
-      $hash->{HELPER}{OLDSTATE} = $val;
+      DbLog_setReadingstate ($hash, $val);
         
       if ($do == 0) {
           InternalTimer(gettimeofday()+2, "DbLog_execmemcache", $hash, 0) if($async);
@@ -537,43 +547,46 @@ sub DbLog_Attr(@) {
       if ($do == 1) {
           $hash->{HELPER}{TH}       = $aVal.".history";         
           $hash->{HELPER}{TC}       = $aVal.".current";         
-
-      } else {
+      } 
+      else {
           $hash->{HELPER}{TH}       = "history";         
           $hash->{HELPER}{TC}       = "current";         
       }
   }
 
-return undef;
+return;
 }
 
 ################################################################
-sub DbLog_Set($@) {
+sub DbLog_Set {
     my ($hash, @a) = @_;
-    my $name  = $hash->{NAME};
-    my $async = AttrVal($name, "asyncMode", undef);
-    my $usage = "Unknown argument, choose one of ".
-                "reduceLog ".
-                "reduceLogNbl ".
-                "reopen ".
-                "rereadcfg:noArg ".
-                "count:noArg ".
-                "configCheck:noArg ".
-                "countNbl:noArg ".
-                "deleteOldDays ".
-                "deleteOldDaysNbl ".
-                "userCommand ".
-                "clearReadings:noArg ". 
-                "eraseReadings:noArg ".
-                "addLog "
-                ;
-                
-    $usage .= "listCache:noArg ".
-              "addCacheLine ".
-              "purgeCache:noArg ".
-              "commitCache:noArg ".
-              "exportCache:nopurge,purgecache " 
-              if (AttrVal($name, "asyncMode", undef));
+    my $name       = $hash->{NAME};
+    my $async      = AttrVal($name, "asyncMode", undef);
+    
+    my $usage      = "Unknown argument, choose one of ".
+                     "reduceLog ".
+                     "reduceLogNbl ".
+                     "reopen ".
+                     "rereadcfg:noArg ".
+                     "count:noArg ".
+                     "configCheck:noArg ".
+                     "countNbl:noArg ".
+                     "deleteOldDays ".
+                     "deleteOldDaysNbl ".
+                     "userCommand ".
+                     "clearReadings:noArg ". 
+                     "eraseReadings:noArg ".
+                     "addLog "
+                     ;
+           
+    if (AttrVal($name, "asyncMode", undef)) {           
+        $usage    .= "listCache:noArg ".
+                     "addCacheLine ".
+                     "purgeCache:noArg ".
+                     "commitCache:noArg ".
+                     "exportCache:nopurge,purgecache " 
+                     ;
+    }
     
     my $history = $hash->{HELPER}{TH};
     my $current = $hash->{HELPER}{TC};
@@ -591,11 +604,13 @@ sub DbLog_Set($@) {
         push @logs,$file;
     }
     closedir(DIR);
-    my $cj = join(",",reverse(sort @logs)) if (@logs);
+    my $cj = "";
+    $cj    = join(",",reverse(sort @logs)) if (@logs);
     
     if (@logs) {
         $usage .= "importCachefile:".$cj." ";
-    } else {
+    } 
+    else {
         $usage .= "importCachefile ";
     }
     
@@ -613,7 +628,8 @@ sub DbLog_Set($@) {
         if (defined $a[2] && $a[2] =~ /(^\d+$)|(^\d+:\d+$)/) {
             $ret = DbLog_reduceLog($hash,@a);
             InternalTimer(gettimeofday()+5, "DbLog_execmemcache", $hash, 0);
-        } else {
+        } 
+        else {
             Log3($name, 1, "DbLog $name: reduceLog error, no <days> given.");
             $ret = "reduceLog error, no <days> given.";
         }
@@ -627,7 +643,8 @@ sub DbLog_Set($@) {
         if (defined $a[2] && $a[2] =~ /(^\d+$)|(^\d+:\d+$)/) {
             if ($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} !~ m/DEAD/) {  
                 $ret = "reduceLogNbl already in progress. Please wait until the running process is finished.";
-            } else {
+            } 
+            else {
                 delete $hash->{HELPER}{REDUCELOG_PID};
                 my @b = @a;
                 shift(@b);
@@ -636,7 +653,8 @@ sub DbLog_Set($@) {
                 $hash->{HELPER}{REDUCELOG_PID} = BlockingCall("DbLog_reduceLogNbl","$name","DbLog_reduceLogNbl_finished");
                 return;
             }
-        } else {
+        } 
+        else {
             Log3($name, 1, "DbLog $name: reduceLogNbl syntax error, no <days>[:<days>] given.");
             $ret = "reduceLogNbl error, no <days> given.";
         }
@@ -687,7 +705,8 @@ sub DbLog_Set($@) {
             }
             DbLog_execmemcache($hash) if($async);
             $ret = "Reopen executed.";
-        } else {
+        } 
+        else {
             unless ($a[2] =~ /^[0-9]+$/) { return " The Value of $a[1]-time is not valid. Use only figures 0-9 !";}
             # Statusbit "Kein Schreiben in DB erlauben" wenn reopen mit Zeitangabe
             $hash->{HELPER}{REOPEN_RUNS} = $a[2];
@@ -770,30 +789,31 @@ sub DbLog_Set($@) {
     elsif ($a[1] eq 'exportCache') {
         my $cln;
         my $crows = 0;
+        my $now   = strftime('%Y-%m-%d_%H-%M-%S',localtime);
+        
         my ($out,$outfile,$error);
-        my $now = strftime('%Y-%m-%d_%H-%M-%S',localtime);
         
-        # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled, nicht im asynch-Mode
-        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
-        return if(!AttrVal($name, "asyncMode", undef));
+        return "device is disabled"                if(IsDisabled($name));   
+        return "device not in asynch working mode" if(!AttrVal($name, "asyncMode", undef));
         
-        if(@logs && AttrVal($name, "exportCacheAppend", 0)) {
-            # exportiertes Cachefile existiert und es soll an das neueste angehängt werden
+        if(@logs && AttrVal($name, "exportCacheAppend", 0)) {            # exportiertes Cachefile existiert und es soll an das neueste angehängt werden
             $outfile = $dir.pop(@logs);
             $out     = ">>$outfile";
-        } else {
+        } 
+        else {
             $outfile = $dir."cache_".$name."_".$now;
             $out     = ">$outfile";
         }
         if(open(FH, $out)) {
             binmode (FH);
-        } else {
+        } 
+        else {
             readingsSingleUpdate($hash, "lastCachefile", $outfile." - Error - ".$!, 1);
             $error = "could not open ".$outfile.": ".$!;
         }
         
         if(!$error) {
-            foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+            for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
                 $cln = $data{DbLog}{$name}{cache}{memcache}{$key}."\n";
                 print FH $cln ;
                 $crows++;           
@@ -802,12 +822,10 @@ sub DbLog_Set($@) {
             readingsSingleUpdate($hash, "lastCachefile", $outfile." (".$crows." cache rows exported)", 1);
         }
         
-        # readingsSingleUpdate($hash, "state", $crows." cache rows exported to ".$outfile, 1);
+        my $state  = $error // $hash->{HELPER}{OLDSTATE};
+        DbLog_setReadingstate ($hash, $state);
         
-        my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-        my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-        readingsSingleUpdate($hash, "state", $state, $evt);
-        $hash->{HELPER}{OLDSTATE} = $state;
+        return $error if($error);
         
         Log3($name, 3, "DbLog $name: $crows cache rows exported to $outfile.");
         
@@ -825,20 +843,22 @@ sub DbLog_Set($@) {
         my @row_array;
         readingsSingleUpdate($hash, "lastCachefile", "", 0);
         
-        # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
-        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});
+        return if(IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS});                   # return wenn "reopen" mit Ablaufzeit gestartet ist oder disabled
         
         if (!$a[2]) {
             return "Wrong function-call. Use set <name> importCachefile <file> without directory (see attr expimpdir)." ;
-        } else {
+        } 
+        else {
             $infile = $dir.$a[2];
         }
         
         if (open(FH, "$infile")) {
             binmode (FH);
-        } else {
+        } 
+        else {
             return "could not open ".$infile.": ".$!;
         }
+        
         while (<FH>) {
             my $row = $_;
             $row = DbLog_charfilter($row) if(AttrVal($name, "useCharfilter",0));
@@ -850,19 +870,21 @@ sub DbLog_Set($@) {
         if(@row_array) {
             my $error = DbLog_Push($hash, 1, @row_array);
             if($error) {
-                readingsSingleUpdate($hash, "lastCachefile", $infile." - Error - ".$!, 1);
-                readingsSingleUpdate($hash, "state", $error, 1);
+                readingsSingleUpdate  ($hash, "lastCachefile", $infile." - Error - ".$!, 1);
+                DbLog_setReadingstate ($hash, $error);
                 Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
-            } else {
+            } 
+            else {
                 unless(rename($dir.$a[2], $dir."impdone_".$a[2])) {
                     Log3($name, 2, "DbLog $name: cachefile $infile couldn't be renamed after import !");
                 }
-                readingsSingleUpdate($hash, "lastCachefile", $infile." import successful", 1);
-                readingsSingleUpdate($hash, "state", $crows." cache rows processed from ".$infile, 1);
+                readingsSingleUpdate  ($hash, "lastCachefile", $infile." import successful", 1);
+                DbLog_setReadingstate ($hash, $crows." cache rows processed from ".$infile);
                 Log3($name, 3, "DbLog $name: $crows cache rows processed from $infile.");
             }
-        } else {
-            readingsSingleUpdate($hash, "state", "no rows in ".$infile, 1);
+        } 
+        else {
+            DbLog_setReadingstate ($hash, "no rows in ".$infile);
             Log3($name, 3, "DbLog $name: $infile doesn't contain any rows - no imports done.");
         }
         
@@ -873,7 +895,8 @@ sub DbLog_Set($@) {
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
             return;
-        } else {
+        } 
+        else {
             Log3($name, 4, "DbLog $name: Records count requested.");
             my $c = $dbh->selectrow_array("SELECT count(*) FROM $history");
             readingsSingleUpdate($hash, 'countHistory', $c ,1);
@@ -887,7 +910,8 @@ sub DbLog_Set($@) {
     elsif ($a[1] eq 'countNbl') {
         if ($hash->{HELPER}{COUNT_PID} && $hash->{HELPER}{COUNT_PID}{pid} !~ m/DEAD/){  
             $ret = "DbLog count already in progress. Please wait until the running process is finished.";
-        } else {
+        } 
+        else {
             delete $hash->{HELPER}{COUNT_PID};
             $hash->{HELPER}{COUNT_PID} = BlockingCall("DbLog_countNbl","$name","DbLog_countNbl_finished");
             return;
@@ -901,13 +925,14 @@ sub DbLog_Set($@) {
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - deleteOldDays - DB connect not possible");
             return;
-        } else {
+        } 
+        else {
             $cmd = "delete from $history where TIMESTAMP < ";
         
             if ($hash->{MODEL} eq 'SQLITE')        { $cmd .= "datetime('now', '-$a[2] days')"; }
             elsif ($hash->{MODEL} eq 'MYSQL')      { $cmd .= "DATE_SUB(CURDATE(),INTERVAL $a[2] DAY)"; }
             elsif ($hash->{MODEL} eq 'POSTGRESQL') { $cmd .= "NOW() - INTERVAL '$a[2]' DAY"; }
-            else { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
+            else  { $cmd = undef; $ret = 'Unknown database type. Maybe you can try userCommand anyway.'; }
 
             if(defined($cmd)) {
                 $c = $dbh->do($cmd);
@@ -932,7 +957,8 @@ sub DbLog_Set($@) {
                 $hash->{HELPER}{DELDAYS_PID} = BlockingCall("DbLog_deldaysNbl","$name","DbLog_deldaysNbl_done");
                 return;
             }
-        } else {
+        } 
+        else {
             Log3($name, 1, "DbLog $name: deleteOldDaysNbl error, no <days> given.");
             $ret = "deleteOldDaysNbl error, no <days> given.";
         }
@@ -942,7 +968,8 @@ sub DbLog_Set($@) {
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - userCommand - DB connect not possible");
             return;
-        } else {
+        } 
+        else {
             Log3($name, 4, "DbLog $name: userCommand execution requested.");
             my ($c, @cmd, $sql);
             @cmd = @a;
@@ -982,7 +1009,7 @@ return $ret;
 # Parameter: Quell-Instanz-Name, und alle FileLog-Parameter, die diese Instanz betreffen.
 # Quelle: http://forum.fhem.de/index.php/topic,40176.msg325200.html#msg325200
 ###############################################################################################
-sub DbLog_regexpFn($$) {                            
+sub DbLog_regexpFn {                            
   my ($name, $filter) = @_;
   my $ret;
  
@@ -1002,7 +1029,7 @@ return $ret;
 ################################################################
 # Parsefunktion, abhaengig vom Devicetyp
 ################################################################
-sub DbLog_ParseEvent($$$$) {
+sub DbLog_ParseEvent {
   my ($name,$device, $type, $event)= @_;
   my (@result,$reading,$value,$unit);
 
@@ -1020,7 +1047,8 @@ sub DbLog_ParseEvent($$$$) {
   if(@parts == 2) { 
     $value = $parts[0];
     $unit  = $parts[1];
-  } else {
+  } 
+  else {
     $value = join(": ", @parts);
     $unit  = "";
   } 
@@ -1033,7 +1061,8 @@ sub DbLog_ParseEvent($$$$) {
   if($value eq "") {                                                     # Default Splitting geändert 04.01.20 Forum: #106992
       if($event =~ /^.*:\s$/) {                                          # und 21.01.20 Forum: #106769
           $reading = (split(":", $event))[0];
-      } else {
+      } 
+      else {
           $reading = "state";
           $value   = $event;
       } 
@@ -1056,7 +1085,8 @@ sub DbLog_ParseEvent($$$$) {
       if(int(@parts) > 1) {
           $reading = "data";
           $value   = $event;
-      } else {
+      } 
+      else {
           @parts = split(/\|/, AttrVal($device, $reading."VUnit", ""));
           $unit  = $parts[1] if($parts[1]);
           if(lc($reading) =~ m/temp/) {
@@ -1074,7 +1104,8 @@ sub DbLog_ParseEvent($$$$) {
       if(int(@parts)>1) {
         $reading = "data";
         $value   = $event;
-      } else {
+      } 
+      else {
         @parts = split(/\|/, AttrVal($device, $reading."Unit", ""));
         $unit  = $parts[1] if($parts[1]);
       }
@@ -1152,7 +1183,8 @@ sub DbLog_ParseEvent($$$$) {
           } elsif($value eq "pair") {
               $reading = "actuator-pair";
               undef $value;
-          } else {
+          } 
+          else {
               $value =~ s/%//; $value = $value*1.; $unit = "%";
           }
       }
@@ -1221,7 +1253,8 @@ sub DbLog_ParseEvent($$$$) {
       } elsif($reading eq "battery") {
           if ($value =~ m/(\d+)\%/) { 
               $value = $1; 
-          } else {
+          } 
+          else {
               $value = ($value eq "ok");
           }
       }
@@ -1281,15 +1314,15 @@ sub DbLog_ParseEvent($$$$) {
 # $hash->{NOTIFYDEV} = "global";
 # $hash->{NOTIFYDEV} = "global,Definition_A,Definition_B";
 
-sub DbLog_Log($$) {
+sub DbLog_Log {
   # $hash is my entry, $dev_hash is the entry of the changed device
   my ($hash, $dev_hash) = @_;
-  my $name     = $hash->{NAME};
-  my $dev_name = $dev_hash->{NAME};
-  my $dev_type = uc($dev_hash->{TYPE});
-  my $async    = AttrVal($name, "asyncMode", undef);
-  my $clim     = AttrVal($name, "cacheLimit", 500);
-  my $ce       = AttrVal($name, "cacheEvents", 0);
+  my $name              = $hash->{NAME};
+  my $dev_name          = $dev_hash->{NAME};
+  my $dev_type          = uc($dev_hash->{TYPE});
+  my $async             = AttrVal($name, "asyncMode",   0               );
+  my $clim              = AttrVal($name, "cacheLimit",  $dblog_cachedef );
+  my $ce                = AttrVal($name, "cacheEvents", 0               );
   my ($net,$force);
 
   return if(IsDisabled($name) || !$hash->{HELPER}{COLSET} || $init_done != 1);
@@ -1307,7 +1340,8 @@ sub DbLog_Log($$) {
   my @vb4devs  = split(",", AttrVal($name, "verbose4Devs", ""));
   if (!@vb4devs) {
       $vb4show = 1;
-  } else {
+  } 
+  else {
       foreach (@vb4devs) {
           if($dev_name =~ m/$_/i) {
               $vb4show = 1;
@@ -1320,7 +1354,7 @@ sub DbLog_Log($$) {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> number of events received: $max for device: $dev_name";
+      Log3 $name, 4, "DbLog $name -> number of events received: $max of device: $dev_name";
   }
     
   my $re                 = $hash->{REGEXP};
@@ -1337,24 +1371,26 @@ sub DbLog_Log($$) {
   # Funktion aus Device spezifischer DbLogValueFn validieren
   if( $DbLogValueFn =~ m/^\s*(\{.*\})\s*$/s ) {
       $DbLogValueFn = $1;
-  } else {
+  } 
+  else {
       $DbLogValueFn = '';
   }
   
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
       $value_fn = $1;
-  } else {
+  } 
+  else {
       $value_fn = '';
   }
     
   #one Transaction
   eval {  
       for (my $i = 0; $i < $max; $i++) {
-          my $next = 0;
+          my $next  = 0;
           my $event = $events->[$i];
-          $event = "" if(!defined($event));
-          $event = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
+          $event    = "" if(!defined($event));
+          $event    = DbLog_charfilter($event) if(AttrVal($name, "useCharfilter",0));
           Log3 $name, 4, "DbLog $name -> check Device: $dev_name , Event: $event" if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});  
       
           if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
@@ -1390,7 +1426,8 @@ sub DbLog_Log($$) {
                                       Log3 $name, 4, "DbLog $name -> Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                                       $next = 1;
                                   }
-                              } else {
+                              } 
+                              else {
                                   if($dev_name =~ m/^$_$/) {
                                       Log3 $name, 4, "DbLog $name -> Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                                       $next = 1;
@@ -1503,7 +1540,8 @@ sub DbLog_Log($$) {
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
-                      } else {
+                      } 
+                      else {
                           Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
                       }
                       $reading   = $READING  if($READING ne '');
@@ -1540,7 +1578,8 @@ sub DbLog_Log($$) {
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
-                      } else {
+                      } 
+                      else {
                           Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
                       }
                       $dev_name  = $DEVICE     if($DEVICE ne '');
@@ -1557,33 +1596,28 @@ sub DbLog_Log($$) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}); 
                   
-                  if($async) {
-                      # asynchoner non-blocking Mode
-                      # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
-                      $data{DbLog}{$name}{cache}{index}++;
+                  if($async) {                                             # asynchoner non-blocking Mode                                                  
+                      $data{DbLog}{$name}{cache}{index}++;                 # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
                       my $index = $data{DbLog}{$name}{cache}{index};
                       $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
                       
-                      my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
-                      if($ce == 1) {
-                          readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
-                      } else {
-                          readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
-                      }
-                      # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
-                      if($memcount >= $clim) {
+                      my $memcount = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
+                      my $mce      = $ce == 1 ? 1 : 0;
+
+                      readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
+
+                      if($memcount >= $clim) {                             # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
                           my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
                           my $syncival = AttrVal($name, "syncInterval", 30);
                           if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
                               Log3 $hash->{NAME}, 4, "DbLog $name -> Number of cache entries reached cachelimit $clim - start database sync.";
-                              DbLog_execmemcache($hash);
+                              DbLog_execmemcache ($hash);
                               $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
                           }
                       }
-                      # Notify-Routine Laufzeit ermitteln
-                      $net = tv_interval($nst);
-                  } else {
-                      # synchoner Mode
+                      $net = tv_interval($nst);                 # Notify-Routine Laufzeit ermitteln
+                  } 
+                  else {                                        # synchoner Mode
                       push(@row_array, $row);       
                   }  
               }       
@@ -1602,9 +1636,7 @@ sub DbLog_Log($$) {
           Log3 ($name, 2, "DbLog $name - Last database write cycle done") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
           
           my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
-          my $evt   = ($state eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
-          readingsSingleUpdate($hash, "state", $state, $evt);
-          $hash->{HELPER}{OLDSTATE} = $state;
+          DbLog_setReadingstate ($hash, $state);
           
           # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
@@ -1628,7 +1660,7 @@ return;
 # (kein Überschreiben spezifischer Angaben von DbLogExclude / DbLogInclude in den Quelldevices)
 #
 #################################################################################################
-sub DbLog_checkDefMinInt ($$$$$){
+sub DbLog_checkDefMinInt {
   my ($name,$dev_name,$now,$reading,$value) = @_;
   my $force;
   my $DoIt = 1;
@@ -1690,7 +1722,7 @@ return $DoIt;
 #################################################################################################
 # Schreibroutine Einfügen Werte in DB im Synchronmode 
 #################################################################################################
-sub DbLog_Push(@) {
+sub DbLog_Push {
   my ($hash, $vb4show, @row_array) = @_;
   my $name      = $hash->{NAME};
   my $DbLogType = AttrVal($name, "DbLogType", "History");
@@ -1711,7 +1743,8 @@ sub DbLog_Push(@) {
   if ($nh) {
       $dbh = DbLog_ConnectNewDBH($hash);
       return if(!$dbh);
-  } else {
+  } 
+  else {
       $dbh = $hash->{DBHP};
       eval {
           if ( !$dbh || not $dbh->ping ) {
@@ -1722,7 +1755,8 @@ sub DbLog_Push(@) {
       if ($@) {
           Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
           return $@;
-      } else {
+      } 
+      else {
           $dbh = $hash->{DBHP};
       }
   } 
@@ -1750,7 +1784,8 @@ sub DbLog_Push(@) {
   my ($usepkh,$usepkc,$pkh,$pkc);
   if (!$supk) {
       ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK($hash,$dbh);
-  } else {
+  } 
+  else {
       Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
   }
   
@@ -1789,11 +1824,14 @@ sub DbLog_Push(@) {
           # insert history mit/ohne primary key
           if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
               $sqlins = "INSERT IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
               $sqlins = "INSERT OR IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } else {
+          } 
+          else {
               # ohne PK
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
           } 
@@ -1833,20 +1871,24 @@ sub DbLog_Push(@) {
                  
                  if($ins_hist == $ceti) {
                      Log3 $hash->{NAME}, 4, "DbLog $name -> $ins_hist of $ceti events inserted into table $history".($usepkh?" using PK on columns $pkh":"");
-                 } else {
+                 } 
+                 else {
                      if($usepkh) {
                          Log3 $hash->{NAME}, 3, "DbLog $name -> INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh";                 
-                     } else {
+                     } 
+                     else {
                          Log3 $hash->{NAME}, 2, "DbLog $name -> WARNING - only ".$ins_hist." of $ceti events inserted into table $history";               
                      }
                  }               
                  eval {$dbh->commit() if(!$dbh->{AutoCommit});};          # Data commit
                  if ($@) {
                      Log3($name, 2, "DbLog $name -> Error commit $history - $@");
-                 } else {
+                 } 
+                 else {
                      if(!$dbh->{AutoCommit}) {
                          Log3($name, 4, "DbLog $name -> insert table $history committed");
-                     } else {
+                     } 
+                     else {
                          Log3($name, 4, "DbLog $name -> insert table $history committed by autocommit");
                      }
                  }               
@@ -1858,7 +1900,8 @@ sub DbLog_Push(@) {
               eval {$dbh->rollback() if(!$dbh->{AutoCommit});};  # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error rollback $history - $@");
-              } else {
+              } 
+              else {
                   Log3($name, 4, "DbLog $name -> insert $history rolled back");
               }
           } 
@@ -1871,11 +1914,14 @@ sub DbLog_Push(@) {
           # die nicht upgedateten Sätze nicht identifiziert werden können          
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };     
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -1891,7 +1937,8 @@ sub DbLog_Push(@) {
               $sth_uc = $dbh->prepare("INSERT INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
                                        DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
                                        VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-          } else {    
+          } 
+          else {    
               $sth_uc = $dbh->prepare("UPDATE $current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
           }
           
@@ -1932,7 +1979,8 @@ sub DbLog_Push(@) {
               }
               if(!$nupd_cur) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events updated in table $current".($usepkc?" using PK on columns $pkc":"");
-              } else {
+              } 
+              else {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc?" using PK on columns $pkc":"");
                   $doins = 1;
               }
@@ -1958,24 +2006,27 @@ sub DbLog_Push(@) {
                   }
                   if(!$nins_cur) {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc?" using PK on columns $pkc":"");
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc?" using PK on columns $pkc":"");
                   }
               }
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit table $current - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed by autocommit");
                   }
               }
           };      
-      }
-      
-  } else {
+      }    
+  } 
+  else {
       #######################
       # Array-Insert
       #######################   
@@ -1987,11 +2038,14 @@ sub DbLog_Push(@) {
           # insert history mit/ohne primary key
           if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ih = $dbh->prepare("INSERT IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ih = $dbh->prepare("INSERT OR IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ih = $dbh->prepare("INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ih = $dbh->prepare("INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -2029,20 +2083,24 @@ sub DbLog_Push(@) {
               }
               if(!$nins_hist) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events inserted into table $history".($usepkh?" using PK on columns $pkh":"");
-              } else {
+              } 
+              else {
                   if($usepkh) {
                       Log3 $hash->{NAME}, 3, "DbLog $name -> INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table $history due to PK on columns $pkh";               
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 2, "DbLog $name -> WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history";                 
                   }               
               }
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};          # Data commit
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit $history - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert table $history committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert table $history committed by autocommit");
                   }
               }
@@ -2054,7 +2112,8 @@ sub DbLog_Push(@) {
               eval {$dbh->rollback() if(!$dbh->{AutoCommit});};  # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error rollback $history - $@");
-              } else {
+              } 
+              else {
                   Log3($name, 4, "DbLog $name -> insert $history rolled back");
               }
           }          
@@ -2065,11 +2124,14 @@ sub DbLog_Push(@) {
           # insert current mit/ohne primary key      
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };     
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -2079,13 +2141,16 @@ sub DbLog_Push(@) {
           
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               $sth_uc = $dbh->prepare("REPLACE INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
               $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
               $sth_uc = $dbh->prepare("INSERT INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
                                        DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
                                        VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-          } else {    
+          } 
+          else {    
               $sth_uc = $dbh->prepare("UPDATE $current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
           }
           
@@ -2126,7 +2191,8 @@ sub DbLog_Push(@) {
               }
               if(!$nupd_cur) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events updated in table $current".($usepkc?" using PK on columns $pkc":"");
-              } else {
+              } 
+              else {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc?" using PK on columns $pkc":"");
                   $doins = 1;
               }
@@ -2152,17 +2218,20 @@ sub DbLog_Push(@) {
                   }
                   if(!$nins_cur) {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc?" using PK on columns $pkc":"");
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc?" using PK on columns $pkc":"");
                   }
               }
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit table $current - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed by autocommit");
                   }
               }
@@ -2196,25 +2265,24 @@ return Encode::encode_utf8($error);
 }
 
 #################################################################################################
-#
 # MemCache auswerten und Schreibroutine asynchron und non-blocking aufrufen
-#
 #################################################################################################
-sub DbLog_execmemcache ($) {
-  my ($hash) = @_;
+sub DbLog_execmemcache {
+  my $hash       = shift;
   my $name       = $hash->{NAME}; 
-  my $syncival   = AttrVal($name, "syncInterval", 30);
-  my $clim       = AttrVal($name, "cacheLimit", 500);
-  my $async      = AttrVal($name, "asyncMode", undef);
-  my $ce         = AttrVal($name, "cacheEvents", 0);
-  my $timeout    = AttrVal($name, "timeout", 86400);
-  my $DbLogType  = AttrVal($name, "DbLogType", "History");
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  my $dolog      = 1;
-  my $error      = 0;  
-  my (@row_array,$memcount,$dbh);
+  my $syncival   = AttrVal($name, "syncInterval",           30              );
+  my $clim       = AttrVal($name, "cacheLimit",             $dblog_cachedef );
+  my $async      = AttrVal($name, "asyncMode",              0               );
+  my $ce         = AttrVal($name, "cacheEvents",            0               );
+  my $timeout    = AttrVal($name, "timeout",                86400           );
+  my $DbLogType  = AttrVal($name, "DbLogType",              "History"       );
+  
+  my $dbconn        = $hash->{dbconn};
+  my $dbuser        = $hash->{dbuser};
+  my $dbpassword    = $attr{"sec$name"}{secret};
+  my $dolog         = 1;
+  
+  my (@row_array,$dbh,$error);
   
   RemoveInternalTimer($hash, "DbLog_execmemcache");
     
@@ -2223,13 +2291,19 @@ sub DbLog_execmemcache ($) {
       return;
   }
   
-  # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchroner Mode oder wenn disabled
-  if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {
+  my $memcount = $data{DbLog}{$name}{cache}{memcache} ? scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}) : 0;
+  my $params   = {
+      hash          => $hash,
+      clim          => $clim,
+      memcount      => $memcount
+  };
+  
+  if(!$async || IsDisabled($name) || $hash->{HELPER}{REOPEN_RUNS}) {                         # return wenn "reopen" mit Zeitangabe läuft, oder kein asynchroner Mode oder wenn disabled
+      DbLog_writeFileIfCacheOverflow ($params);                                              # Cache exportieren bei Overflow
       return;
   }
     
-  # tote PID's löschen
-  if($hash->{HELPER}{".RUNNING_PID"} && $hash->{HELPER}{".RUNNING_PID"}{pid} =~ m/DEAD/) {
+  if($hash->{HELPER}{".RUNNING_PID"} && $hash->{HELPER}{".RUNNING_PID"}{pid} =~ m/DEAD/) {   # tote PID's löschen
       delete $hash->{HELPER}{".RUNNING_PID"};
   }
   if($hash->{HELPER}{REDUCELOG_PID} && $hash->{HELPER}{REDUCELOG_PID}{pid} =~ m/DEAD/) {
@@ -2239,8 +2313,7 @@ sub DbLog_execmemcache ($) {
       delete $hash->{HELPER}{DELDAYS_PID};
   }
   
-  # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
-  if($hash->{MODEL} eq "SQLITE") {
+  if($hash->{MODEL} eq "SQLITE") {                                                           # bei SQLite Sperrverwaltung Logging wenn andere schreibende Zugriffe laufen
       if($hash->{HELPER}{DELDAYS_PID}) {
           $error = "deleteOldDaysNbl is running - resync at NextSync";
           $dolog = 0;
@@ -2255,41 +2328,48 @@ sub DbLog_execmemcache ($) {
       }
   }
   
-  $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
-  if($ce == 2) {
-      readingsSingleUpdate($hash, "CacheUsage", $memcount, 1);
-  } else {
-      readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0);
-  }
+  my $mce = $ce == 2 ? 1 : 0;
+
+  readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
     
   if($memcount && $dolog && !$hash->{HELPER}{".RUNNING_PID"}) {     
-      Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###";
-      Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> MemCache contains $memcount entries to process";
-      Log3 $name, 4, "DbLog $name -> DbLogType is: $DbLogType"; 
+      Log3 ($name, 4, "DbLog $name -> ################################################################");
+      Log3 ($name, 4, "DbLog $name -> ###      New database processing cycle - asynchronous        ###");
+      Log3 ($name, 4, "DbLog $name -> ################################################################");
+      Log3 ($name, 4, "DbLog $name -> MemCache contains $memcount entries to process");
+      Log3 ($name, 4, "DbLog $name -> DbLogType is: $DbLogType");
+
+      my $wrotefile = DbLog_writeFileIfCacheOverflow ($params);                             # Cache exportieren bei Overflow
+      return if($wrotefile);
           
-      foreach my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
-          Log3 $hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key};
-          push(@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
+      for my $key (sort(keys %{$data{DbLog}{$name}{cache}{memcache}})) {
+          Log3 ($hash->{NAME}, 5, "DbLog $name -> MemCache contains: ".$data{DbLog}{$name}{cache}{memcache}{$key});
+          push (@row_array, delete($data{DbLog}{$name}{cache}{memcache}{$key})); 
       }  
-      delete $data{DbLog}{$name}{cache}{memcache};            # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
+      
+      delete $data{DbLog}{$name}{cache}{memcache};                                          # sicherheitshalber Memory freigeben: https://perlmaven.com/undef-on-perl-arrays-and-hashes , bzw. https://www.effectiveperlprogramming.com/2018/09/undef-a-scalar-to-release-its-memory/
 
       my $rowlist = join('§', @row_array);
-      $rowlist = encode_base64($rowlist,"");
+      $rowlist    = encode_base64($rowlist,"");
+      
       $hash->{HELPER}{".RUNNING_PID"} = BlockingCall (
-                                     "DbLog_PushAsync", 
-                                     "$name|$rowlist", 
-                                     "DbLog_PushAsyncDone", 
-                                     $timeout, 
-                                     "DbLog_PushAsyncAborted", 
-                                     $hash );
+                                            "DbLog_PushAsync", 
+                                            "$name|$rowlist", 
+                                            "DbLog_PushAsyncDone", 
+                                            $timeout, 
+                                            "DbLog_PushAsyncAborted", 
+                                            $hash 
+                                        );
+                                        
       $hash->{HELPER}{".RUNNING_PID"}{loglevel} = 4;
-      Log3 $hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout";
-  } else {
+      Log3 ($hash->{NAME}, 5, "DbLog $name -> DbLog_PushAsync called with timeout: $timeout");
+  } 
+  else {
       if($dolog && $hash->{HELPER}{".RUNNING_PID"}) {
           $error = "Commit already running - resync at NextSync";
-      } else {
+          DbLog_writeFileIfCacheOverflow ($params);                                        # Cache exportieren bei Overflow
+      } 
+      else {
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
           Log3 ($name, 2, "DbLog $name - no data for last database write cycle") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
       }
@@ -2297,20 +2377,79 @@ sub DbLog_execmemcache ($) {
   
   my $nextsync = gettimeofday()+$syncival;
   my $nsdt     = FmtDateTime($nextsync);
-      
-  if(AttrVal($name, "syncEvents", undef)) {
-      readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", 1); 
-  } else {
-      readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", 0); 
-  }
+  my $se       = AttrVal($name, "syncEvents", undef) ? 1 : 0;
   
-  my $state = $error?$error:$hash->{HELPER}{OLDSTATE};
-  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-  readingsSingleUpdate($hash, "state", $state, $evt);
-  $hash->{HELPER}{OLDSTATE} = $state;
+  readingsSingleUpdate($hash, "NextSync", $nsdt. " or if CacheUsage ".$clim." reached", $se);
+  
+  DbLog_setReadingstate ($hash, $error);
   
   InternalTimer($nextsync, "DbLog_execmemcache", $hash, 0);
 
+return;
+}
+
+################################################################
+#     wenn Cache Overflow vorhanden ist und die Behandlung mit
+#     dem Attr "cacheOverflowThreshold" eingeschaltet ist,
+#     wirde der Cache in ein File weggeschrieben
+#     Gibt "1" zurück wenn File geschrieben wurde
+################################################################
+sub DbLog_writeFileIfCacheOverflow {
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $clim     = $paref->{clim};
+  my $memcount = $paref->{memcount};
+  
+  my $name    = $hash->{NAME};
+  my $success = 0;
+  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);              # Steuerung exportCache statt schreiben in DB
+  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                 # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
+  
+  my $overflowstate = "normal";
+  my $overflownum; 
+  
+  if($coft) {
+      $overflownum = $memcount >= $coft ? $memcount-$coft : 0;
+  }
+  else {
+      $overflownum = $memcount >= $clim ? $memcount-$clim : 0;
+  }
+  
+  $overflowstate = "exceeded" if($overflownum);
+  
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate          ($hash, "CacheOverflowLastNum",   $overflownum     );
+  readingsBulkUpdateIfChanged ($hash, "CacheOverflowLastState", $overflowstate, 1);
+  readingsEndUpdate($hash, 1);
+
+  if($coft && $memcount >= $coft) {
+      Log3 ($name, 2, "DbLog $name -> WARNING - Cache is exported to file instead of logging it to database");
+      my $error = CommandSet (undef, qq{$name exportCache purgecache});
+      
+      if($error) {                                                       # Fehler beim Export Cachefile
+          DbLog_setReadingstate ($hash, $error);                   
+          return $success;
+      }
+      
+      DbLog_setReadingstate ($hash, qq{Cache exported to "lastCachefile" due to Cache overflow});
+      delete $hash->{HELPER}{LASTLIMITRUNTIME};
+      $success = 1;
+  }
+    
+return $success;
+}
+
+################################################################
+#             Reading state setzen
+################################################################
+sub DbLog_setReadingstate {
+  my $hash = shift; 
+  my $val  = shift // $hash->{HELPER}{OLDSTATE};
+
+  my $evt   = ($val eq $hash->{HELPER}{OLDSTATE}) ? 0 : 1;
+  readingsSingleUpdate($hash, "state", $val, $evt);
+  $hash->{HELPER}{OLDSTATE} = $val;
+  
 return;
 }
 
@@ -2319,7 +2458,7 @@ return;
 # Schreibroutine Einfügen Werte in DB asynchron non-blocking
 #
 #################################################################################################
-sub DbLog_PushAsync(@) {
+sub DbLog_PushAsync {
   my ($string) = @_;
   my ($name,$rowlist) = split("\\|", $string);
   my $hash        = $defs{$name};
@@ -2350,9 +2489,11 @@ sub DbLog_PushAsync(@) {
   eval {
       if(!$useac) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } elsif($useac == 1) {
+      } 
+      elsif($useac == 1) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } else {
+      } 
+      else {
           # Server default
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       }
@@ -2378,7 +2519,8 @@ sub DbLog_PushAsync(@) {
   my ($usepkh,$usepkc,$pkh,$pkc);
   if (!$supk) {
       ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK($hash,$dbh);
-  } else {
+  } 
+  else {
       Log3 $hash->{NAME}, 5, "DbLog $name -> Primary Key usage suppressed by attribute noSupportPK";
   }
   
@@ -2417,11 +2559,14 @@ sub DbLog_PushAsync(@) {
           # insert history mit/ohne primary key
           if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
               $sqlins = "INSERT IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
               $sqlins = "INSERT OR IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
-          } else {
+          } 
+          else {
               # ohne PK
               $sqlins = "INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES ";
           } 
@@ -2460,20 +2605,24 @@ sub DbLog_PushAsync(@) {
                  
                  if($ins_hist == $ceti) {
                      Log3 $hash->{NAME}, 4, "DbLog $name -> $ins_hist of $ceti events inserted into table $history".($usepkh?" using PK on columns $pkh":"");
-                 } else {
+                 } 
+                 else {
                      if($usepkh) {
                          Log3 $hash->{NAME}, 3, "DbLog $name -> INFO - ".$ins_hist." of $ceti events inserted into table $history due to PK on columns $pkh";                 
-                     } else {
+                     } 
+                     else {
                          Log3 $hash->{NAME}, 2, "DbLog $name -> WARNING - only ".$ins_hist." of $ceti events inserted into table $history";               
                      }
                  }               
                  eval {$dbh->commit() if(!$dbh->{AutoCommit});};          # Data commit
                  if ($@) {
                      Log3($name, 2, "DbLog $name -> Error commit $history - $@");
-                 } else {
+                 } 
+                 else {
                      if(!$dbh->{AutoCommit}) {
                          Log3($name, 4, "DbLog $name -> insert table $history committed");
-                     } else {
+                     } 
+                     else {
                          Log3($name, 4, "DbLog $name -> insert table $history committed by autocommit");
                      }
                  }               
@@ -2494,11 +2643,14 @@ sub DbLog_PushAsync(@) {
           # die nicht upgedateten Sätze nicht identifiziert werden können          
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };     
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -2512,13 +2664,16 @@ sub DbLog_PushAsync(@) {
           
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               $sth_uc = $dbh->prepare("REPLACE INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)"); 
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {  
               $sth_uc = $dbh->prepare("INSERT OR REPLACE INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?)");
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {  
               $sth_uc = $dbh->prepare("INSERT INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
                                        DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
                                        VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-          } else {    
+          } 
+          else {    
               $sth_uc = $dbh->prepare("UPDATE $current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
           }
           
@@ -2559,7 +2714,8 @@ sub DbLog_PushAsync(@) {
               }
               if(!$nupd_cur) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events updated in table $current".($usepkc?" using PK on columns $pkc":"");
-              } else {
+              } 
+              else {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc?" using PK on columns $pkc":"");
                   $doins = 1;
               }
@@ -2585,24 +2741,27 @@ sub DbLog_PushAsync(@) {
                   }
                   if(!$nins_cur) {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc?" using PK on columns $pkc":"");
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc?" using PK on columns $pkc":"");
                   }
               }
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit table $current - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed by autocommit");
                   }
               }
           };      
-      }
-      
-  } else {
+      }    
+  } 
+  else {
       #######################
       # Array-Insert
       #######################   
@@ -2614,11 +2773,14 @@ sub DbLog_PushAsync(@) {
           # insert history mit/ohne primary key
           if ($usepkh && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ih = $dbh->prepare("INSERT IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ih = $dbh->prepare("INSERT OR IGNORE INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkh && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ih = $dbh->prepare("INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ih = $dbh->prepare("INSERT INTO $history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -2663,10 +2825,12 @@ sub DbLog_PushAsync(@) {
               }
               if(!$nins_hist) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events inserted into table $history".($usepkh?" using PK on columns $pkh":"");
-              } else {
+              } 
+              else {
                   if($usepkh) {
                       Log3 $hash->{NAME}, 3, "DbLog $name -> INFO - ".($ceti-$nins_hist)." of $ceti events inserted into table history due to PK on columns $pkh";                
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 2, "DbLog $name -> WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history";                 
                   }
                   s/\|/_ESC_/g for @n2hist;       # escape Pipe "|"
@@ -2676,10 +2840,12 @@ sub DbLog_PushAsync(@) {
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};          # Data commit
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit $history - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert table $history committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert table $history committed by autocommit");
                   }
               }
@@ -2698,11 +2864,14 @@ sub DbLog_PushAsync(@) {
           # insert current mit/ohne primary key      
           if ($usepkc && $hash->{MODEL} eq 'MYSQL') {
               eval { $sth_ic = $dbh->prepare("INSERT IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };     
-          } elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'SQLITE') {
               eval { $sth_ic = $dbh->prepare("INSERT OR IGNORE INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
-          } elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
+          } 
+          elsif ($usepkc && $hash->{MODEL} eq 'POSTGRESQL') {
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING"); };
-          } else {
+          } 
+          else {
               # ohne PK
               eval { $sth_ic = $dbh->prepare("INSERT INTO $current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)"); };
           }
@@ -2723,7 +2892,8 @@ sub DbLog_PushAsync(@) {
               $sth_uc = $dbh->prepare("INSERT INTO $current (TIMESTAMP, TYPE, EVENT, VALUE, UNIT, DEVICE, READING) VALUES (?,?,?,?,?,?,?) ON CONFLICT ($pkc) 
                                        DO UPDATE SET TIMESTAMP=EXCLUDED.TIMESTAMP, DEVICE=EXCLUDED.DEVICE, TYPE=EXCLUDED.TYPE, EVENT=EXCLUDED.EVENT, READING=EXCLUDED.READING, 
                                        VALUE=EXCLUDED.VALUE, UNIT=EXCLUDED.UNIT");
-          } else {    
+          } 
+          else {    
               $sth_uc = $dbh->prepare("UPDATE $current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)");
           }
           
@@ -2764,7 +2934,8 @@ sub DbLog_PushAsync(@) {
               }
               if(!$nupd_cur) {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $ceti of $ceti events updated in table $current".($usepkc?" using PK on columns $pkc":"");
-              } else {
+              } 
+              else {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> $nupd_cur of $ceti events not updated and try to insert into table $current".($usepkc?" using PK on columns $pkc":"");
                   $doins = 1;
               }
@@ -2790,17 +2961,20 @@ sub DbLog_PushAsync(@) {
                   }
                   if(!$nins_cur) {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1)." of ".($#device_cur+1)." events inserted into table $current ".($usepkc?" using PK on columns $pkc":"");
-                  } else {
+                  } 
+                  else {
                       Log3 $hash->{NAME}, 4, "DbLog $name -> ".($#device_cur+1-$nins_cur)." of ".($#device_cur+1)." events inserted into table $current".($usepkc?" using PK on columns $pkc":"");
                   }
               }
               eval {$dbh->commit() if(!$dbh->{AutoCommit});};    # issue Turning on AutoCommit failed
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit table $current - $@");
-              } else {
+              } 
+              else {
                   if(!$dbh->{AutoCommit}) {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed");
-                  } else {
+                  } 
+                  else {
                       Log3($name, 4, "DbLog $name -> insert / update table $current committed by autocommit");
                   }
               }
@@ -2826,12 +3000,12 @@ return "$name|$error|$rt|$rowlback";
 #############################################################################################
 #         Auswertung non-blocking asynchron DbLog_PushAsync
 #############################################################################################
-sub DbLog_PushAsyncDone ($) {
+sub DbLog_PushAsyncDone {
  my ($string)   = @_;
  my @a          = split("\\|",$string);
  my $name       = $a[0];
  my $hash       = $defs{$name};
- my $error      = $a[1]?decode_base64($a[1]):0;
+ my $error      = $a[1] ? decode_base64($a[1]) : 0;
  my $bt         = $a[2];
  my $rowlist    = $a[3];
  my $asyncmode  = AttrVal($name, "asyncMode", undef);
@@ -2845,8 +3019,7 @@ sub DbLog_PushAsyncDone ($) {
      
      #one Transaction
      eval { 
-       foreach my $row (@row_array) {
-           # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+       for my $row (@row_array) {                               # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
            $data{DbLog}{$name}{cache}{index}++;
            my $index = $data{DbLog}{$name}{cache}{index};
            $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
@@ -2866,10 +3039,8 @@ sub DbLog_PushAsyncDone ($) {
       readingsEndUpdate($hash, 1);
   }
   
-  my $state = $error?$error:(IsDisabled($name))?"disabled":"connected";
-  my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-  readingsSingleUpdate($hash, "state", $state, $evt);
-  $hash->{HELPER}{OLDSTATE} = $state;
+  my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
+  DbLog_setReadingstate ($hash, $state);  
  
   if(!$asyncmode) {
       delete($defs{$name}{READINGS}{NextSync});
@@ -2890,13 +3061,14 @@ return;
 #############################################################################################
 #           Abbruchroutine Timeout non-blocking asynchron DbLog_PushAsync
 #############################################################################################
-sub DbLog_PushAsyncAborted(@) {
+sub DbLog_PushAsyncAborted {
   my ($hash,$cause) = @_;
   my $name = $hash->{NAME};
   $cause = $cause?$cause:"Timeout: process terminated";
   
   Log3 ($name, 2, "DbLog $name -> ".$hash->{HELPER}{".RUNNING_PID"}{fn}." ".$cause) if(!$hash->{HELPER}{SHUTDOWNSEQ});
-  readingsSingleUpdate($hash,"state",$cause, 1);
+  DbLog_setReadingstate ($hash, $cause); 
+  
   delete $hash->{HELPER}{".RUNNING_PID"};
   delete $hash->{HELPER}{LASTLIMITRUNTIME};
   
@@ -2913,7 +3085,7 @@ return;
 # uebergebenes SQL-Format: YYYY-MM-DD HH24:MI:SS
 #
 ################################################################
-sub DbLog_explode_datetime($%) {
+sub DbLog_explode_datetime {
   my ($t, %def) = @_;
   my %retv;
   
@@ -2945,7 +3117,7 @@ return $retv;
 ###################################################################################
 #                            Verbindungen zur DB aufbauen
 ###################################################################################
-sub DbLog_readCfg($){
+sub DbLog_readCfg {
   my ($hash)= @_;
   my $name = $hash->{NAME};
 
@@ -2968,13 +3140,17 @@ sub DbLog_readCfg($){
   #check the database model
   if($hash->{dbconn} =~ m/pg:/i) {
     $hash->{MODEL}="POSTGRESQL";
-  } elsif ($hash->{dbconn} =~ m/mysql:/i) {
+  } 
+  elsif ($hash->{dbconn} =~ m/mysql:/i) {
     $hash->{MODEL}="MYSQL";
-  } elsif ($hash->{dbconn} =~ m/oracle:/i) {
+  } 
+  elsif ($hash->{dbconn} =~ m/oracle:/i) {
     $hash->{MODEL}="ORACLE";
-  } elsif ($hash->{dbconn} =~ m/sqlite:/i) {
+  } 
+  elsif ($hash->{dbconn} =~ m/sqlite:/i) {
     $hash->{MODEL}="SQLITE";
-  } else {
+  } 
+  else {
     $hash->{MODEL}="unknown";
     Log3 $hash->{NAME}, 1, "Unknown database model found in configuration file $configfilename.";
     Log3 $hash->{NAME}, 1, "Only MySQL/MariaDB, PostgreSQL, Oracle, SQLite are fully supported.";
@@ -2988,14 +3164,15 @@ sub DbLog_readCfg($){
 return;
 }
 
-sub DbLog_ConnectPush($;$$) {
+sub DbLog_ConnectPush {
   # own $dbhp for synchronous logging and dblog_get 
-  my ($hash,$get)= @_;
-  my $name = $hash->{NAME};
-  my $dbconn     = $hash->{dbconn};
-  my $dbuser     = $hash->{dbuser};
-  my $dbpassword = $attr{"sec$name"}{secret};
-  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my ($hash,$get) = @_;
+  my $name        = $hash->{NAME};
+  my $dbconn      = $hash->{dbconn};
+  my $dbuser      = $hash->{dbuser};
+  my $dbpassword  = $attr{"sec$name"}{secret};
+  my $utf8        = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  
   my ($dbhp,$state,$evt,$err);
   
   return 0 if(IsDisabled($name));
@@ -3011,9 +3188,11 @@ sub DbLog_ConnectPush($;$$) {
   eval {
       if(!$useac) {
           $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } elsif($useac == 1) {
+      } 
+      elsif($useac == 1) {
           $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } else {
+      } 
+      else {
           # Server default
           $dbhp = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       }
@@ -3028,10 +3207,8 @@ sub DbLog_ConnectPush($;$$) {
     RemoveInternalTimer($hash, "DbLog_ConnectPush");
     Log3 $hash->{NAME}, 4, "DbLog $name - Trying to connect to database";
     
-    $state = $err?$err:(IsDisabled($name))?"disabled":"disconnected";
-    $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-    readingsSingleUpdate($hash, "state", $state, $evt);
-    $hash->{HELPER}{OLDSTATE} = $state;  
+    $state = $err ? $err : (IsDisabled($name)) ? "disabled" : "disconnected";
+    DbLog_setReadingstate ($hash, $state);   
     
     InternalTimer(gettimeofday()+5, 'DbLog_ConnectPush', $hash, 0);
     Log3 $hash->{NAME}, 4, "DbLog $name - Waiting for database connection";
@@ -3045,9 +3222,7 @@ sub DbLog_ConnectPush($;$$) {
   Log3 $hash->{NAME}, 3, "DbLog $name - UTF8 support enabled" if($utf8 && $hash->{MODEL} eq "MYSQL" && !$get);
   if(!$get) {
       $state = "connected";
-      $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-      readingsSingleUpdate($hash, "state", $state, $evt);
-      $hash->{HELPER}{OLDSTATE} = $state;
+      DbLog_setReadingstate ($hash, $state);
   }
 
   $hash->{DBHP}= $dbhp;
@@ -3064,7 +3239,7 @@ sub DbLog_ConnectPush($;$$) {
   return 1;
 }
 
-sub DbLog_ConnectNewDBH($) {
+sub DbLog_ConnectNewDBH {
   # new dbh for common use (except DbLog_Push and get-function)
   my ($hash)     = @_;
   my $name       = $hash->{NAME};
@@ -3078,9 +3253,11 @@ sub DbLog_ConnectNewDBH($) {
   eval {
       if(!$useac) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } elsif($useac == 1) {
+      } 
+      elsif($useac == 1) {
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
-      } else {
+      } 
+      else {
           # Server default
           $dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, mysql_enable_utf8 => $utf8 });
       } 
@@ -3088,17 +3265,16 @@ sub DbLog_ConnectNewDBH($) {
       
   if($@) {
     Log3($name, 2, "DbLog $name - $@");
-    my $state = $@?$@:(IsDisabled($name))?"disabled":"disconnected";
-    my $evt   = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-    readingsSingleUpdate($hash, "state", $state, $evt);
-    $hash->{HELPER}{OLDSTATE} = $state;
+    my $state = $@ ? $@ : (IsDisabled($name)) ? "disabled" : "disconnected";
+    DbLog_setReadingstate ($hash, $state);
   }
   
   if($dbh) {
       $dbh->{RaiseError} = 0; 
       $dbh->{PrintError} = 1;
       return $dbh;
-  } else {
+  } 
+  else {
       return 0;
   }
 }
@@ -3111,10 +3287,10 @@ sub DbLog_ConnectNewDBH($) {
 # param2: SQL-Statement
 #
 ##########################################################################
-sub DbLog_ExecSQL($$) {
-  my ($hash,$sql)= @_;
-  my $name = $hash->{NAME};
-  my $dbh  = DbLog_ConnectNewDBH($hash);
+sub DbLog_ExecSQL {
+  my ($hash,$sql) = @_;
+  my $name        = $hash->{NAME};
+  my $dbh         = DbLog_ConnectNewDBH($hash);
   
   Log3($name, 4, "DbLog $name - Backdoor executing: $sql");
   
@@ -3141,7 +3317,7 @@ sub DbLog_ExecSQL($$) {
 return $sth;
 }
 
-sub DbLog_ExecSQL1($$$) {
+sub DbLog_ExecSQL1 {
   my ($hash,$dbh,$sql)= @_;
   my $name = $hash->{NAME};
   
@@ -3166,12 +3342,12 @@ return $sth;
 # outfile: [-|ALL|INT|WEBCHART]
 #
 ################################################################
-sub DbLog_Get($@) {
+sub DbLog_Get {
   my ($hash, @a) = @_;
-  my $name    = $hash->{NAME};
-  my $utf8    = defined($hash->{UTF8})?$hash->{UTF8}:0;
-  my $history = $hash->{HELPER}{TH};
-  my $current = $hash->{HELPER}{TC};
+  my $name       = $hash->{NAME};
+  my $utf8       = defined($hash->{UTF8})?$hash->{UTF8}:0;
+  my $history    = $hash->{HELPER}{TH};
+  my $current    = $hash->{HELPER}{TC};
   my ($dbh,$err);
   
   return DbLog_dbReadings($hash,@a) if $a[1] =~ m/^Readings/;
@@ -3274,8 +3450,8 @@ sub DbLog_Get($@) {
   if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
       $dbh = DbLog_ConnectNewDBH($hash);
       return "Can't connect to database." if(!$dbh);
-  
-  } else {
+  } 
+  else {
       $dbh = $hash->{DBHP};
       eval {
           if ( !$dbh || not $dbh->ping ) {
@@ -3286,7 +3462,8 @@ sub DbLog_Get($@) {
       if ($@) {
           Log3($name, 1, "DbLog $name: DBLog_Push - DB Session dead! - $@");
           return $@;
-      } else {
+      } 
+      else {
           $dbh = $hash->{DBHP};
       }
   } 
@@ -3300,28 +3477,32 @@ sub DbLog_Get($@) {
       $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
       $sqlspec{max_value}      = "MAX(VALUE)";
       $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
-  } elsif ($hash->{MODEL} eq "ORACLE") {
+  } 
+  elsif ($hash->{MODEL} eq "ORACLE") {
       $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
       $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
       $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
       $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
       $sqlspec{max_value}      = "MAX(VALUE)";
       $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  } elsif ($hash->{MODEL} eq "MYSQL") {
+  } 
+  elsif ($hash->{MODEL} eq "MYSQL") {
       $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
       $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
       $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
       $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
       $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
       $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  } elsif ($hash->{MODEL} eq "SQLITE") {
+  } 
+  elsif ($hash->{MODEL} eq "SQLITE") {
       $sqlspec{get_timestamp}  = "TIMESTAMP";
       $sqlspec{from_timestamp} = "'$from'";
       $sqlspec{to_timestamp}   = "'$to'";
       $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
       $sqlspec{max_value}      = "MAX(VALUE)";
       $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
-  } else {
+  } 
+  else {
       $sqlspec{get_timestamp}  = "TIMESTAMP";
       $sqlspec{from_timestamp} = "'$from'";
       $sqlspec{to_timestamp}   = "'$to'";
@@ -3333,7 +3514,8 @@ sub DbLog_Get($@) {
   if($outf =~ m/(all|array)/) {
       $sqlspec{all}      = ",TYPE,EVENT,UNIT";
       $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
-  } else {
+  } 
+  else {
       $sqlspec{all}      = "";
       $sqlspec{all_max}  = "";
   }
@@ -3412,8 +3594,8 @@ sub DbLog_Get($@) {
 
           $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
           $stm .= "ORDER BY TIMESTAMP";
-
-      } else {
+      } 
+      else {
           # kein deltacalc
           $stm =  "SELECT
                       $sqlspec{get_timestamp},
@@ -3445,7 +3627,8 @@ sub DbLog_Get($@) {
 
       if($outf =~ m/(all|array)/) {
           $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
-      } else {
+      } 
+      else {
           $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
       }
 
@@ -3492,8 +3675,8 @@ sub DbLog_Get($@) {
                   $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019      
                   $lastv[$i] = $sql_value;
               }
-          
-          } else {
+          } 
+          else {
               $writeout    = 0;
               $out_value   = "";
               $out_tstamp  = "";
@@ -3529,7 +3712,8 @@ sub DbLog_Get($@) {
               
                   if(lc($sql_value) =~ m(hide)) {
                       $writeout = 0;
-                  } else {
+                  } 
+                  else {
                       $writeout = 1;
                   }
 
@@ -3538,7 +3722,8 @@ sub DbLog_Get($@) {
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
                       $lasttstamp{hour} = "00";
-                  } else {
+                  } 
+                  else {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
                   #    04                   01
@@ -3561,8 +3746,8 @@ sub DbLog_Get($@) {
                   
                               } elsif ($outf =~ m/(array)/) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-                 
-                              } else {
+                              } 
+                              else {
                                   $out_tstamp   =~ s/\ /_/g; #needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
@@ -3576,12 +3761,15 @@ sub DbLog_Get($@) {
                               $hour       = '0'.$j if $j<10;
                               $cnt[$i]++;
                               $out_tstamp = DbLog_implode_datetime($tstamp{year}, $tstamp{month}, $tstamp{day}, $hour, "30", "00");
+                              
                               if ($outf =~ m/(all)/) {
                                   # Timestamp: Device, Type, Event, Reading, Value, Unit
                                   $retvaldummy .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-                              } elsif ($outf =~ m/(array)/) {
+                              } 
+                              elsif ($outf =~ m/(array)/) {
                                   push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-                              } else {
+                              } 
+                              else {
                                   $out_tstamp =~ s/\ /_/g;                               # needed by generating plots
                                   $retvaldummy .= "$out_tstamp $out_value\n";
                               }
@@ -3602,7 +3790,8 @@ sub DbLog_Get($@) {
                 
                   if($lastd[$i] eq "undef") {
                       %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-                  } else {
+                  } 
+                  else {
                       %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
                   }
               
@@ -3616,8 +3805,8 @@ sub DbLog_Get($@) {
                       $minval     = $maxval;
                       Log3 ($name, 5, "$name - Output delta-d -> TS: $tstamp{day}, LASTTS: $lasttstamp{day}, OUTTS: $out_tstamp, OUTVAL: $out_value, WRITEOUT: $writeout");
                   }
-            
-              } else {
+              } 
+              else {
                   $out_value  = $sql_value;
                   $out_tstamp = $sql_timestamp;
                   $writeout   = 1;  
@@ -3635,8 +3824,8 @@ sub DbLog_Get($@) {
                 
                   } elsif ($outf =~ m/(array)/) {
                       push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-                  
-                  } else {                                                       # generating plots
+                  } 
+                  else {                                                         # generating plots
                       $out_tstamp =~ s/\ /_/g;                                   # needed by generating plots
                       $retval .= "$out_tstamp $out_value\n";
                       $retval .= $retvaldummy;
@@ -3657,8 +3846,8 @@ sub DbLog_Get($@) {
                           }
                       }
                       $maxval = $sql_value;
-              
-                  } else {
+                  } 
+                  else {
                       if($sql_value < $min[$i]) {
                           $min[$i] = $sql_value;
                           $mind[$i] = $sql_timestamp;
@@ -3671,8 +3860,8 @@ sub DbLog_Get($@) {
                       $minval = $sql_value if($sql_value < $minval);
                       $maxval = $sql_value if($sql_value > $maxval);
                   }
-            
-              } else {
+              } 
+              else {
                   $min[$i] = 0;
                   $max[$i] = 0;
                   $sum[$i] = 0;
@@ -3683,7 +3872,8 @@ sub DbLog_Get($@) {
               if(!$deltacalc) {
                   $cnt[$i]++;
                   $lastv[$i] = $sql_value;
-              } else {
+              } 
+              else {
                   $lastv[$i] = $out_value if($out_value);
               }
               $lastd[$i] = $sql_timestamp;
@@ -3697,7 +3887,8 @@ sub DbLog_Get($@) {
               $out_value  = "0";
               $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, $from_datetime{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
               $out_tstamp = DbLog_implode_datetime($from_datetime{year}, $from_datetime{month}, $from_datetime{day}, "12", "00", "00") if($readings[$i]->[3] eq "delta-d");
-          } else {
+          } 
+          else {
               %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
               $out_value  = sprintf("%g", $maxval - $minval);
               $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
@@ -3707,11 +3898,11 @@ sub DbLog_Get($@) {
           $cnt[$i]++;
           if($outf =~ m/(all)/) {
               $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_device, $type, $event, $sql_reading, $out_value, $unit);
-      
-          } elsif ($outf =~ m/(array)/) {
+          } 
+          elsif ($outf =~ m/(array)/) {
               push(@ReturnArray, {"tstamp" => $out_tstamp, "device" => $sql_device, "type" => $type, "event" => $event, "reading" => $sql_reading, "value" => $out_value, "unit" => $unit});
-          
-          } else {
+          }
+          else {
              $out_tstamp =~ s/\ /_/g; #needed by generating plots
              $retval    .= "$out_tstamp $out_value\n";
           }
@@ -3758,8 +3949,8 @@ sub DbLog_Get($@) {
 
   } elsif($outf =~ m/(array)/) {
       return @ReturnArray;
-  
-  } else {
+  } 
+  else {
       $retval = Encode::encode_utf8($retval) if($utf8);
       # Log3 $name, 5, "DbLog $name -> Result of get:\n$retval";
       return $retval;
@@ -3771,14 +3962,15 @@ sub DbLog_Get($@) {
 #        Konfigurationscheck DbLog <-> Datenbank
 #
 ##########################################################################
-sub DbLog_configcheck($) {
-  my ($hash)= @_;
-  my $name = $hash->{NAME};
+sub DbLog_configcheck {
+  my $hash    = shift;
+  my $name    = $hash->{NAME};
   my $dbmodel = $hash->{MODEL};
   my $dbconn  = $hash->{dbconn};
   my $dbname  = (split(/;|=/, $dbconn))[1];
   my $history = $hash->{HELPER}{TH};
   my $current = $hash->{HELPER}{TC};
+  
   my ($check, $rec,%dbconfig);
   
   ### Version check
@@ -3803,10 +3995,12 @@ sub DbLog_configcheck($) {
       if($dbdver < 4.032) {
           $dbdhint = "<b>Caution:</b> Your DBD version doesn't support UTF8. ";
           $dbdupd  = 1;
-      } elsif ($dbdver < 4.042) {
+      } 
+      elsif ($dbdver < 4.042) {
           $dbdhint = "<b>Caution:</b> Full UTF-8 support exists from DBD version 4.032, but installing DBD version 4.042 is highly suggested. ";          
           $dbdupd  = 1;
-      } else {
+      } 
+      else {
           $dbdhint = "Your DBD version fulfills UTF8 support, no need to update DBD.";
       }
   }
@@ -3824,7 +4018,8 @@ sub DbLog_configcheck($) {
   if($supd) {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
       $check .= "<b>Recommendation:</b> You should update FHEM to get the recent DbLog version from repository ! $dbdhint <br><br>";
-  } else {
+  } 
+  else {
       $check .= "Used DbLog version: $hash->{HELPER}{VERSION}.<br>$uptb <br>";
       $check .= "<b>Recommendation:</b> No update of DbLog is needed. $dbdhint <br><br>";  
   }
@@ -3844,7 +4039,8 @@ sub DbLog_configcheck($) {
       $rec .= "User -> ".$dbconfig{user}.", " if (defined $dbconfig{user});
       $rec .= "Password -> could not read " if (!defined $dbconfig{password});
       $rec .= "Password -> read o.k. " if (defined $dbconfig{password});
-  } else {
+  } 
+  else {
       $rec = $err;
   }
   $check .= "Connection $rec <br><br>";
@@ -3861,13 +4057,15 @@ sub DbLog_configcheck($) {
       
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
-      } else {
+      } 
+      else {
           $rec = "Both encodings should be identical. You can adjust the usage of UTF8 connection by setting the UTF8 parameter in file '$hash->{CONFIGURATION}' to the right value. ";
       }
 
       if(uc($chutf8mod) ne "UTF8" && uc($chutf8dat) ne "UTF8") {
           $dbdhint = "";
-      } else {
+      } 
+      else {
           $dbdhint .= " If you want use UTF8 database option, you must update DBD (Database driver) to at least version 4.032. " if($dbdupd);
       }
       
@@ -3877,9 +4075,11 @@ sub DbLog_configcheck($) {
       $chutf8mod = @ce ? uc($ce[0]) : "no result";
       @se = DbLog_sqlget($hash,"select character_set_name from information_schema.character_sets");
       $chutf8dat = @se ? uc($se[0]) : "no result";
+      
       if($chutf8mod eq $chutf8dat) {
           $rec = "settings o.k.";
-      } else {
+      } 
+      else {
           $rec = "This is only an information. PostgreSQL supports automatic character set conversion between server and client for certain character set combinations. The conversion information is stored in the pg_conversion system catalog. PostgreSQL comes with some predefined conversions.";
       }
   }  
@@ -3921,11 +4121,13 @@ sub DbLog_configcheck($) {
       my $max = AttrVal("global", "blockingCallMax", 0);
       if(!$max || $max >= 6) {
           $rec = "settings o.k.";
-      } else {
+      } 
+      else {
           $rec = "WARNING - you are running asynchronous mode that is recommended, but the value of global device attribute \"blockingCallMax\" is set quite small. <br>";
           $rec .= "This may cause problems in operation. It is recommended to <b>increase</b> the <b>global blockingCallMax</b> attribute."; 
       } 
-  } else {
+  } 
+  else {
       $rec  = "Switch $name to the asynchronous logmode by setting the 'asyncMode' attribute. The advantage of this mode is to log events non-blocking. <br>";
       $rec .= "There are attributes 'syncInterval' and 'cacheLimit' relevant for this working mode. <br>";
       $rec .= "Please refer to commandref for further information about these attributes.";
@@ -3938,7 +4140,8 @@ sub DbLog_configcheck($) {
       $check .= "Insert mode of DbLog-device $name is: $bi <br>";
       $rec    = "Setting attribute \"bulkInsert\" to \"1\" may result a higher write performance in most cases. ";
       $rec   .= "Feel free to try this mode.";
-  } else {
+  } 
+  else {
       $bi     = "Bulk";
       $check .= "Insert mode of DbLog-device $name is: $bi <br>"; 
       $rec    = "settings o.k.";   
@@ -3959,7 +4162,8 @@ sub DbLog_configcheck($) {
           $emb    = 0 if($pe =~ /[01]/);
           if(!$pf || $pe =~ /[01]/) {
               $wall  .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe."</b><br>";
-          } else {
+          } 
+          else {
               $wall  .= $web.": plotfork=".$pf." / plotEmbed=".$pe."<br>";
           }
       }
@@ -3969,7 +4173,8 @@ sub DbLog_configcheck($) {
           $rec    = "You should set attribute \"plotfork = 1\" and \"plotEmbed = 2\" in relevant devices. ".
                     "If these attributes are not set, blocking situations may occure when creating plots. ".
                     "<b>Note:</b> Your system must have sufficient memory to handle parallel running Perl processes. See also global attribute \"blockingCallMax\". <br>"
-      } else {
+      } 
+      else {
           $check .= $wall;
           $rec    = "settings o.k.";
       }          
@@ -4000,7 +4205,8 @@ sub DbLog_configcheck($) {
           @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='reading'");
           @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='value'");
           @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and table_schema='$sch' and column_name='unit'");
-      } else {
+      } 
+      else {
           @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='device'");
           @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='type'");
           @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$h' and column_name='event'");
@@ -4044,7 +4250,8 @@ sub DbLog_configcheck($) {
   
   if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
       $rec = "settings o.k.";
-  } else {
+  } 
+  else {
       if ($dbmodel !~ /SQLITE/)  {
           $rec  = "The relation between column width in table $history and the field width used in device $name don't meet the requirements. ";
           $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
@@ -4058,7 +4265,8 @@ sub DbLog_configcheck($) {
           $rec .= "You can change the column width in database by a statement like <b>'alter table $history modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
           $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
           $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
-      } else {
+      } 
+      else {
           $rec  = "WARNING - The relation between column width in table $history and the field width used by device $name should be equal but it differs.";
           $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
           $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
@@ -4091,7 +4299,8 @@ sub DbLog_configcheck($) {
           @sr_rdg = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='reading'");
           @sr_val = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='value'");
           @sr_unt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and table_schema='$sch' and column_name='unit'");
-      } else {
+      } 
+      else {
           @sr_dev = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='device'");
           @sr_typ = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='type'");
           @sr_evt = DbLog_sqlget($hash,"select column_name,character_maximum_length from information_schema.columns where table_name='$c' and column_name='event'");
@@ -4135,7 +4344,8 @@ sub DbLog_configcheck($) {
   
       if($cdat_dev >= $cmod_dev && $cdat_typ >= $cmod_typ && $cdat_evt >= $cmod_evt && $cdat_rdg >= $cmod_rdg && $cdat_val >= $cmod_val && $cdat_unt >= $cmod_unt) {
           $rec = "settings o.k.";
-      } else {
+      } 
+      else {
           if ($dbmodel !~ /SQLITE/)  {
               $rec  = "The relation between column width in table $current and the field width used in device $name don't meet the requirements. ";
               $rec .= "Please make sure that the width of database field definition is equal or larger than the field width used by the module. Compare the given results.<br>";
@@ -4149,7 +4359,8 @@ sub DbLog_configcheck($) {
               $rec .= "You can change the column width in database by a statement like <b>'alter table $current modify VALUE varchar(128);</b>' (example for changing field 'VALUE'). ";
               $rec .= "You can do it for example by executing 'sqlCmd' in DbRep or in a SQL-Editor of your choice. (switch $name to asynchron mode for non-blocking). <br>";
               $rec .= "Alternatively the field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
-          } else {
+          } 
+          else {
               $rec  = "WARNING - The relation between column width in table $current and the field width used by device $name should be equal but it differs. ";
               $rec .= "The field width used by $name can be adjusted by setting attributes 'colEvent', 'colReading', 'colValue'. (pls. refer to commandref)";
               $rec .= "Because you use SQLite this is only a warning. Normally the database can handle these differences. ";
@@ -4176,14 +4387,16 @@ sub DbLog_configcheck($) {
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
-      } else {
+      } 
+      else {
           @six_dev = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='DEVICE'");
           @six_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='READING'");
           @six_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Search_Idx' and Column_name='TIMESTAMP'");
           if (@six_dev && @six_rdg && @six_tsp) {
               $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'TIMESTAMP', 'READING'. <br>";
               $rec    = "settings o.k.";
-          } else {  
+          } 
+          else {  
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!@six_dev);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@six_rdg);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@six_tsp);
@@ -4202,7 +4415,8 @@ sub DbLog_configcheck($) {
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
-      } else {
+      } 
+      else {
           $idef     = $six[4];
           $idef_dev = 1 if($idef =~ /device/);
           $idef_rdg = 1 if($idef =~ /reading/);
@@ -4210,7 +4424,8 @@ sub DbLog_configcheck($) {
           if ($idef_dev && $idef_rdg && $idef_tsp) {
               $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
               $rec    = "settings o.k.";
-          } else {  
+          } 
+          else {  
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!$idef_dev);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$idef_rdg);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$idef_tsp);
@@ -4229,7 +4444,8 @@ sub DbLog_configcheck($) {
           $rec   .= "Depending on your database size this command may running a long time. <br>";
           $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
           $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
-      } else {
+      } 
+      else {
           $idef     = $six[1];
           $idef_dev = 1 if(lc($idef) =~ /device/);
           $idef_rdg = 1 if(lc($idef) =~ /reading/);
@@ -4237,7 +4453,8 @@ sub DbLog_configcheck($) {
           if ($idef_dev && $idef_rdg && $idef_tsp) {
               $check .= "Index 'Search_Idx' exists and contains recommended fields 'DEVICE', 'READING', 'TIMESTAMP'. <br>";
               $rec    = "settings o.k.";
-          } else {  
+          } 
+          else {  
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'DEVICE'. <br>" if (!$idef_dev);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$idef_rdg);
               $check .= "Index 'Search_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$idef_tsp);
@@ -4280,14 +4497,16 @@ sub DbLog_configcheck($) {
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
-          } else {
+          } 
+          else {
               @dix_rdg = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='READING'");
               @dix_tsp = DbLog_sqlget($hash,"SHOW INDEX FROM $history where Key_name='Report_Idx' and Column_name='TIMESTAMP'");
               if (@dix_rdg && @dix_tsp) {
                   $check .= "At least one DbRep-device assigned to $name is used. ";
                   $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
-              } else {  
+              } 
+              else {  
                   $check .= "You use at least one DbRep-device assigned to $name. ";
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!@dix_rdg);
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!@dix_tsp);
@@ -4306,14 +4525,16 @@ sub DbLog_configcheck($) {
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Report_Idx' as well ! <br>";
-          } else {
+          } 
+          else {
               $irep     = $dix[4];
               $irep_rdg = 1 if($irep =~ /reading/);
               $irep_tsp = 1 if($irep =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
                   $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
-              } else {  
+              } 
+              else {  
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
                   $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
@@ -4331,14 +4552,16 @@ sub DbLog_configcheck($) {
               $rec   .= "Depending on your database size this command may running a long time. <br>";
               $rec   .= "Please make sure the device '$name' is operating in asynchronous mode to avoid FHEM from blocking when creating the index. <br>";
               $rec   .= "<b>Note:</b> If you have just created another index which covers the same fields and order as suggested (e.g. a primary key) you don't need to create the 'Search_Idx' as well ! <br>";
-          } else {
+          } 
+          else {
               $irep     = $dix[1];
               $irep_rdg = 1 if(lc($irep) =~ /reading/);
               $irep_tsp = 1 if(lc($irep) =~ /timestamp/);
               if ($irep_rdg && $irep_tsp) {
                   $check .= "Index 'Report_Idx' exists and contains recommended fields 'TIMESTAMP', 'READING'. <br>";
                   $rec    = "settings o.k.";
-              } else {
+              } 
+              else {
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'READING'. <br>" if (!$irep_rdg);
                   $check .= "Index 'Report_Idx' exists but doesn't contain recommended field 'TIMESTAMP'. <br>" if (!$irep_tsp);
                   $rec    = "The index should contain the fields 'TIMESTAMP', 'READING'. ";
@@ -4349,7 +4572,8 @@ sub DbLog_configcheck($) {
           }
       }
       
-  } else {
+  } 
+  else {
       $check .= "No DbRep-device assigned to $name is used. Hence an index for DbRep isn't needed. <br>";
       $rec    = "settings o.k.";
   }
@@ -4363,9 +4587,9 @@ return $check;
 #########################################################################################
 #                  check Modul Aktualität fhem.de <-> local
 #########################################################################################
-sub DbLog_checkModVer($) {
-  my ($name) = @_;
-  my $src    = "http://fhem.de/fhemupdate/controls_fhem.txt";
+sub DbLog_checkModVer {
+  my $name = shift;
+  my $src  = "http://fhem.de/fhemupdate/controls_fhem.txt";
 
   if($src !~ m,^(.*)/([^/]*)$,) {
     Log3 $name, 1, "DbLog $name -> configCheck: Cannot parse $src, probably not a valid http control file";
@@ -4393,7 +4617,8 @@ sub DbLog_checkModVer($) {
       @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
       close(FD);
       Log3 $name, 4, "DbLog $name -> configCheck: Got local $ctrlFileName with ".int(@locList)." entries.";
-  } else {
+  } 
+  else {
       Log3 $name, 1, "DbLog $name -> configCheck: can't open $root/FHEM/$ctrlFileName: $!";
       return ("check of new DbLog version not possible, see logfile.");  
   }
@@ -4408,7 +4633,8 @@ sub DbLog_checkModVer($) {
   }
   
   my $noSzCheck = AttrVal("global", "updateNoFileCheck", configDBUsed());
-  foreach my $rem (@remList) {
+  
+  for my $rem (@remList) {
       my @r = split(" ", $rem, 4);
       next if($r[0] ne "UPD" || $r[3] !~ /93_DbLog/);
       my $fName  = $r[3];
@@ -4432,11 +4658,13 @@ return ("",0,"Your local DbLog module is up to date.");
 }
 
 ###################################
-sub DbLog_updGetUrl($$) {
+sub DbLog_updGetUrl {
   my ($name,$url) = @_;
+  
   my %upd_connecthash;
-  $url =~ s/%/%25/g;
-  $upd_connecthash{url} = $url;
+  
+  $url                        =~ s/%/%25/g;
+  $upd_connecthash{url}       = $url;
   $upd_connecthash{keepalive} = ($url =~ m/localUpdate/ ? 0 : 1); # Forum #49798
   
   my ($err, $data) = HttpUtils_BlockingGet(\%upd_connecthash);
@@ -4456,9 +4684,10 @@ return ($data,"");
 #########################################################################################
 #                  Einen (einfachen) Datensatz aus DB lesen
 #########################################################################################
-sub DbLog_sqlget($$) {
-  my ($hash,$sql)= @_;
-  my $name = $hash->{NAME};
+sub DbLog_sqlget {
+  my ($hash,$sql) = @_;
+  my $name        = $hash->{NAME};
+  
   my ($dbh,$sth,@sr);
   
   Log3 ($name, 4, "DbLog $name - Executing SQL: $sql");
@@ -4491,12 +4720,13 @@ return @sr;
 # Addlog - einfügen des Readingwertes eines gegebenen Devices
 #
 #########################################################################################
-sub DbLog_AddLog($$$$$) {
-  my ($hash,$devrdspec,$value,$nce,$cn)= @_;
-  my $name     = $hash->{NAME};
-  my $async    = AttrVal($name, "asyncMode", undef);
-  my $value_fn = AttrVal( $name, "valueFn", "" );
-  my $ce       = AttrVal($name, "cacheEvents", 0);
+sub DbLog_AddLog {
+  my ($hash,$devrdspec,$value,$nce,$cn) = @_;
+  my $name                              = $hash->{NAME};
+  my $async                             = AttrVal($name, "asyncMode", undef);
+  my $value_fn                          = AttrVal( $name, "valueFn", "" );
+  my $ce                                = AttrVal($name, "cacheEvents", 0);
+  
   my ($dev_type,$dev_name,$dev_reading,$read_val,$event,$ut);  
   my @row_array;  
   my $ts;
@@ -4506,7 +4736,8 @@ sub DbLog_AddLog($$$$$) {
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
       $value_fn = $1;
-  } else {
+  } 
+  else {
       $value_fn = '';
   }
   
@@ -4560,9 +4791,11 @@ sub DbLog_AddLog($$$$$) {
           if(goodReadingName($rdspec) && defined($value)) {
               Log3 $name, 3, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> Reading '$rdspec' not found - add it as new reading.";
               push @exrds,$rdspec;
-          } elsif (goodReadingName($rdspec) && !defined($value)) {
+          } 
+          elsif (goodReadingName($rdspec) && !defined($value)) {
               Log3 $name, 2, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> new Reading '$rdspec' has no value - can't add it !";
-          } else {
+          } 
+          else {
               Log3 $name, 2, "DbLog $name -> addLog WARNING - Device: '$dev_name' -> Readingname '$rdspec' is no valid or regexp - can't add regexp as new reading !";
           }
       }
@@ -4620,7 +4853,8 @@ sub DbLog_AddLog($$$$$) {
               eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
               if (!$@) {
                   $ts = $TIMESTAMP;
-              } else {
+              } 
+              else {
                   Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
               }
               $dev_name     = $DEVICE     if($DEVICE ne '');
@@ -4651,10 +4885,12 @@ sub DbLog_AddLog($$$$$) {
               my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
               if($ce == 1) {
                   readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
-              } else {
+              } 
+              else {
                   readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
               }
-          } else {
+          } 
+          else {
               # synchoner Mode  
               push(@row_array, $row);
           }
@@ -4668,10 +4904,8 @@ sub DbLog_AddLog($$$$$) {
           return if($hash->{HELPER}{REOPEN_RUNS});    
           my $error = DbLog_Push($hash, 1, @row_array);
 
-          my $state  = $error?$error:(IsDisabled($name))?"disabled":"connected";
-          my $evt    = ($state eq $hash->{HELPER}{OLDSTATE})?0:1;
-          readingsSingleUpdate($hash, "state", $state, $evt);
-          $hash->{HELPER}{OLDSTATE} = $state;
+          my $state = $error ? $error : (IsDisabled($name)) ? "disabled" : "connected";
+          DbLog_setReadingstate ($hash, $state);
           
           Log3 $name, 5, "DbLog $name -> DbLog_Push Returncode: $error";
       }
@@ -4684,7 +4918,7 @@ return;
 # Subroutine addCacheLine - einen Datensatz zum Cache hinzufügen
 #
 #########################################################################################
-sub DbLog_addCacheLine($$$$$$$$) {
+sub DbLog_addCacheLine {
   my ($hash,$i_timestamp,$i_dev,$i_type,$i_evt,$i_reading,$i_val,$i_unit) = @_;
   my $name     = $hash->{NAME};
   my $ce       = AttrVal($name, "cacheEvents", 0);
@@ -4693,7 +4927,8 @@ sub DbLog_addCacheLine($$$$$$$$) {
   # Funktion aus Attr valueFn validieren
   if( $value_fn =~ m/^\s*(\{.*\})\s*$/s ) {
       $value_fn = $1;
-  } else {
+  } 
+  else {
       $value_fn = '';
   }
   
@@ -4731,7 +4966,8 @@ sub DbLog_addCacheLine($$$$$$$$) {
       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
       if (!$@) {
           $i_timestamp = $TIMESTAMP;
-      } else {
+      } 
+      else {
           Log3 ($name, 2, "DbLog $name -> Parameter TIMESTAMP got from valueFn is invalid: $TIMESTAMP");
       }
 
@@ -4759,7 +4995,8 @@ sub DbLog_addCacheLine($$$$$$$$) {
       my $memcount = $data{DbLog}{$name}{cache}{memcache}?scalar(keys %{$data{DbLog}{$name}{cache}{memcache}}):0;
       if($ce == 1) {
           readingsSingleUpdate($hash, "CacheUsage", $memcount, 1); 
-      } else {
+      } 
+      else {
           readingsSingleUpdate($hash, 'CacheUsage', $memcount, 0); 
       }
   };
@@ -4772,8 +5009,8 @@ return;
 # Subroutine cutCol - Daten auf maximale Länge beschneiden
 #
 #########################################################################################
-sub DbLog_cutCol($$$$$$$) {
-  my ($hash,$dn,$dt,$evt,$rd,$val,$unit)= @_;
+sub DbLog_cutCol {
+  my ($hash,$dn,$dt,$evt,$rd,$val,$unit) = @_;
   my $name       = $hash->{NAME};  
   my $colevent   = AttrVal($name, 'colEvent', undef);
   my $colreading = AttrVal($name, 'colReading', undef);
@@ -4803,8 +5040,8 @@ return ($dn,$dt,$evt,$rd,$val,$unit);
 #   Autocommit:   0/1/2 = aus/ein/Servereinstellung
 #   Transaktion:  0/1   = aus/ein
 ###############################################################################
-sub DbLog_commitMode ($) { 
-  my ($hash) = @_;
+sub DbLog_commitMode { 
+  my $hash   = shift;
   my $name   = $hash->{NAME};
   my $useac  = 2;      # default Servereinstellung
   my $useta  = 1;      # default Transaktion ein
@@ -4820,8 +5057,9 @@ return($useac,$useta);
 ###############################################################################
 #              Zeichen von Feldevents filtern 
 ###############################################################################
-sub DbLog_charfilter ($) { 
-  my ($txt) = @_;
+sub DbLog_charfilter { 
+  my $txt = shift;
+  
   my ($p,$a);
 
   # nur erwünschte Zeichen ASCII %d32-126 und Sonderzeichen
@@ -4845,7 +5083,7 @@ return($txt);
 #########################################################################################
 ### DBLog - Historische Werte ausduennen (alte blockiernde Variante) > Forum #41089
 #########################################################################################
-sub DbLog_reduceLog($@) {
+sub DbLog_reduceLog {
     my ($hash,@a) = @_;
     my $history   = $hash->{HELPER}{TH};
     my $current   = $hash->{HELPER}{TC};
@@ -4877,13 +5115,16 @@ sub DbLog_reduceLog($@) {
     if ($hash->{MODEL} eq 'SQLITE') { 
         $ots = "datetime('now', '-$od days')";
         $nts = "datetime('now', '-$nd days')" if($nd);
-    } elsif ($hash->{MODEL} eq 'MYSQL') { 
+    } 
+    elsif ($hash->{MODEL} eq 'MYSQL') { 
         $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)"; 
         $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd); 
-    } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
+    } 
+    elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
         $ots = "NOW() - INTERVAL '$od' DAY"; 
         $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
-    } else { 
+    } 
+    else { 
         $ret = 'Unknown database type.'; 
     }
     
@@ -4941,7 +5182,8 @@ sub DbLog_reduceLog($@) {
                                 Log3($hash->{NAME}, 3, "DbLog $name: reduceLog ! FAILED ! for day $processingDay");
                                 eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                                 $ret = 0;
-                            } else {
+                            } 
+                            else {
                                 eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                             }
                             $dbh->{RaiseError} = 0; 
@@ -4988,7 +5230,8 @@ sub DbLog_reduceLog($@) {
                                                 $k++;
                                             } 
                                             push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        } else {
+                                        } 
+                                        else {
                                             push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
                                         }
                                     } 
@@ -5000,7 +5243,8 @@ sub DbLog_reduceLog($@) {
                             Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
                             @averageUpdD = ();
-                        } else {
+                        } 
+                        else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                         }
                         $dbh->{RaiseError} = 0; 
@@ -5023,7 +5267,8 @@ sub DbLog_reduceLog($@) {
                             for (keys %averageHash) {
                                 if(scalar @{$averageHash{$_}->{tedr}} == 1) {
                                     delete $averageHash{$_};
-                                } else {
+                                } 
+                                else {
                                     $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
                                 }
                             }
@@ -5066,7 +5311,8 @@ sub DbLog_reduceLog($@) {
                             $err = $@;
                             Log3($hash->{NAME}, 2, "DbLog $name - reduceLogNbl ! FAILED ! for day $processingDay: $err");
                             eval {$dbh->rollback() if(!$dbh->{AutoCommit});};
-                        } else {
+                        } 
+                        else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                         }
                         $dbh->{RaiseError} = 0; 
@@ -5095,14 +5341,16 @@ sub DbLog_reduceLog($@) {
                         push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
                     }
                 }
-            } else {
+            } 
+            else {
                 $exclude = 0;
                 for (@excludeRegex) {
                     $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
                 }
                 if ($exclude) {
                     $excludeCount++ if($day != 00);
-                } else {
+                } 
+                else {
                     $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
                 }
             }
@@ -5124,7 +5372,7 @@ sub DbLog_reduceLog($@) {
 #########################################################################################
 ### DBLog - Historische Werte ausduennen non-blocking > Forum #41089
 #########################################################################################
-sub DbLog_reduceLogNbl($) {
+sub DbLog_reduceLogNbl {
     my ($name)     = @_;
     my $hash       = $defs{$name};
     my $dbconn     = $hash->{dbconn};
@@ -5144,9 +5392,11 @@ sub DbLog_reduceLogNbl($) {
     my ($useac,$useta) = DbLog_commitMode($hash);
     if(!$useac) {
         eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 0 });};
-    } elsif($useac == 1) {
+    } 
+    elsif($useac == 1) {
         eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1, AutoCommit => 1 });};
-    } else {
+    } 
+    else {
         # Server default
         eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
     }
@@ -5177,16 +5427,20 @@ sub DbLog_reduceLogNbl($) {
 
     my ($od,$nd) = split(":",$a[2]);         # $od - Tage älter als , $nd - Tage neuer als
     my ($ots,$nts);
+    
     if ($hash->{MODEL} eq 'SQLITE') { 
         $ots = "datetime('now', '-$od days')";
         $nts = "datetime('now', '-$nd days')" if($nd);
-    } elsif ($hash->{MODEL} eq 'MYSQL') { 
+    } 
+    elsif ($hash->{MODEL} eq 'MYSQL') { 
         $ots = "DATE_SUB(CURDATE(),INTERVAL $od DAY)"; 
         $nts = "DATE_SUB(CURDATE(),INTERVAL $nd DAY)" if($nd); 
-    } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
+    } 
+    elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
         $ots = "NOW() - INTERVAL '$od' DAY"; 
         $nts = "NOW() - INTERVAL '$nd' DAY" if($nd);
-    } else { 
+    } 
+    else { 
         $ret = 'Unknown database type.'; 
     }
     
@@ -5263,7 +5517,8 @@ sub DbLog_reduceLogNbl($) {
                                     Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
                                 }
                                 $ret = 0;
-                            } else {
+                            } 
+                            else {
                                 eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                                 if ($@) {
                                     Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -5316,7 +5571,8 @@ sub DbLog_reduceLogNbl($) {
                                                 $k++;
                                             } 
                                             push(@averageUpdD, ["$updDate $updHour:30:00", 'rl_av_h', $average, $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
-                                        } else {
+                                        } 
+                                        else {
                                             push(@averageUpdD, [$hourHash->{$hourKey}->[0], $hourHash->{$hourKey}->[2], $hourHash->{$hourKey}->[4]->[0], $hourHash->{$hourKey}->[1], $hourHash->{$hourKey}->[3], $updDate]) if (defined($a[3]) && $a[3] =~ /average=day/i);
                                         }
                                     }                                                       
@@ -5331,7 +5587,8 @@ sub DbLog_reduceLogNbl($) {
                                 Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
                             }
                             @averageUpdD = ();
-                        } else {
+                        } 
+                        else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                             if ($@) {
                                 Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -5360,7 +5617,8 @@ sub DbLog_reduceLogNbl($) {
                             for (keys %averageHash) {
                                 if(scalar @{$averageHash{$_}->{tedr}} == 1) {
                                     delete $averageHash{$_};
-                                } else {
+                                } 
+                                else {
                                     $c += (scalar(@{$averageHash{$_}->{tedr}}) - 1);
                                 }
                             }
@@ -5405,7 +5663,8 @@ sub DbLog_reduceLogNbl($) {
                             if ($@) {
                                 Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
                             }
-                        } else {
+                        } 
+                        else {
                             eval {$dbh->commit() if(!$dbh->{AutoCommit});};
                             if ($@) {
                                 Log3 ($name, 2, "DbLog $name -> DbLog_reduceLogNbl - $@");
@@ -5437,14 +5696,16 @@ sub DbLog_reduceLogNbl($) {
                         push(@{$hourlyKnown{$row->[1].$row->[3]}->[4]}, $row->[4]);
                     }
                 }
-            } else {
+            } 
+            else {
                 $exclude = 0;
                 for (@excludeRegex) {
                     $exclude = 1 if("$row->[1]:$row->[3]" =~ /^$_$/);
                 }
                 if ($exclude) {
                     $excludeCount++ if($day != 00);
-                } else {
+                } 
+                else {
                     $hourlyKnown{$row->[1].$row->[3]} = (defined($row->[4]) && $row->[4] =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/) ? [$row->[0],$row->[1],$row->[2],$row->[3],[$row->[4]]] : [0];
                 }
             }
@@ -5470,23 +5731,26 @@ return "$name|$ret|0";
 #########################################################################################
 # DBLog - reduceLogNbl non-blocking Rückkehrfunktion
 #########################################################################################
-sub DbLog_reduceLogNbl_finished($) {
-  my ($string)    = @_;
-  my @a           = split("\\|",$string);
-  my $name        = $a[0];
-  my $hash        = $defs{$name};
-  my $ret         = decode_base64($a[1]);
-  my $err         = decode_base64($a[2]) if ($a[2]);
+sub DbLog_reduceLogNbl_finished {
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $name   = $a[0];
+  my $hash   = $defs{$name};
+  my $ret    = decode_base64($a[1]);
+  my $err;
+  $err       = decode_base64($a[2]) if ($a[2]);
   
-  readingsSingleUpdate($hash,"reduceLogState",$err?$err:$ret,1);
+  readingsSingleUpdate($hash,"reduceLogState", $err // $ret, 1);
+  
   delete $hash->{HELPER}{REDUCELOG_PID};
+  
 return;
 }
 
 #########################################################################################
 # DBLog - count non-blocking
 #########################################################################################
-sub DbLog_countNbl($) {
+sub DbLog_countNbl {
   my ($name)  = @_;
   my $hash    = $defs{$name};
   my $history = $hash->{HELPER}{TH};
@@ -5500,7 +5764,8 @@ sub DbLog_countNbl($) {
   if (!$dbh) {
     my $err = encode_base64("DbLog $name: DBLog_Set - count - DB connect not possible","");
     return "$name|0|0|$err|0";
-  } else {
+  } 
+  else {
     Log3 $name,4,"DbLog $name: Records count requested.";
     # SQL-Startzeit
     $st = [gettimeofday];
@@ -5520,27 +5785,29 @@ return "$name|$cc|$hc|0|$rt";
 #########################################################################################
 # DBLog - count non-blocking Rückkehrfunktion
 #########################################################################################
-sub DbLog_countNbl_finished($) {
-  my ($string) = @_;
-  my @a        = split("\\|",$string);
-  my $name     = $a[0];
-  my $hash     = $defs{$name};
-  my $cc       = $a[1];
-  my $hc       = $a[2];
-  my $err      = decode_base64($a[3]) if ($a[3]);
-  my $bt       = $a[4] if($a[4]);  
+sub DbLog_countNbl_finished {
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $name   = $a[0];
+  my $hash   = $defs{$name};
+  my $cc     = $a[1];
+  my $hc     = $a[2];
+  my ($err,$bt);
+  $err       = decode_base64($a[3]) if($a[3]);
+  $bt        = $a[4]                if($a[4]);  
 
-  readingsSingleUpdate($hash,"state",$err,1) if($err);
-  readingsSingleUpdate($hash,"countHistory",$hc,1) if ($hc);
-  readingsSingleUpdate($hash,"countCurrent",$cc,1) if ($cc);
+  DbLog_setReadingstate ($hash, $err) if($err);
+  readingsSingleUpdate  ($hash,"countHistory",$hc,1) if ($hc);
+  readingsSingleUpdate  ($hash,"countCurrent",$cc,1) if ($cc);
   
   if(AttrVal($name, "showproctime", undef) && $bt) {
       my ($rt,$brt)  = split(",", $bt);
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
-      readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
-      readingsEndUpdate($hash, 1);
+      readingsBeginUpdate ($hash);
+      readingsBulkUpdate  ($hash, "background_processing_time", sprintf("%.4f",$brt));     
+      readingsBulkUpdate  ($hash, "sql_processing_time",        sprintf("%.4f",$rt) );
+      readingsEndUpdate   ($hash, 1);
   }
+  
   delete $hash->{HELPER}{COUNT_PID};
   
 return;
@@ -5549,7 +5816,7 @@ return;
 #########################################################################################
 # DBLog - deleteOldDays non-blocking
 #########################################################################################
-sub DbLog_deldaysNbl($) {
+sub DbLog_deldaysNbl {
   my ($name)     = @_;
   my $hash       = $defs{$name};
   my $dbconn     = $hash->{dbconn};
@@ -5568,9 +5835,11 @@ sub DbLog_deldaysNbl($) {
   my ($useac,$useta) = DbLog_commitMode($hash);
   if(!$useac) {
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 0, AutoInactiveDestroy => 1 });};
-  } elsif($useac == 1) {
+  } 
+  elsif($useac == 1) {
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoCommit => 1, AutoInactiveDestroy => 1 });};
-  } else {
+  } 
+  else {
       # Server default
       eval {$dbh = DBI->connect("dbi:$dbconn", $dbuser, $dbpassword, { PrintError => 0, RaiseError => 1, AutoInactiveDestroy => 1 });};
   }
@@ -5588,11 +5857,14 @@ sub DbLog_deldaysNbl($) {
   $cmd = "delete from $history where TIMESTAMP < ";
   if ($hash->{MODEL} eq 'SQLITE') { 
       $cmd .= "datetime('now', '-$days days')"; 
-  } elsif ($hash->{MODEL} eq 'MYSQL') { 
+  } 
+  elsif ($hash->{MODEL} eq 'MYSQL') { 
       $cmd .= "DATE_SUB(CURDATE(),INTERVAL $days DAY)"; 
-  } elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
+  } 
+  elsif ($hash->{MODEL} eq 'POSTGRESQL') { 
       $cmd .= "NOW() - INTERVAL '$days' DAY"; 
-  } else {  
+  } 
+  else {  
       $ret = 'Unknown database type. Maybe you can try userCommand anyway.';
       $error = encode_base64($ret,"");
       Log3 ($name, 2, "DbLog $name - Error: $ret");
@@ -5614,17 +5886,16 @@ sub DbLog_deldaysNbl($) {
       $dbh->disconnect;
       Log3 ($name, 4, "DbLog $name -> BlockingCall DbLog_deldaysNbl finished");
       return "$name|0|0|$error"; 
- } else {
+ } 
+ else {
      $rows = $sth->rows;
      $dbh->commit() if(!$dbh->{AutoCommit});
      $dbh->disconnect;
  } 
 
- # SQL-Laufzeit ermitteln
- $rt = tv_interval($st);
+ $rt = tv_interval($st);                                # SQL-Laufzeit ermitteln
 
- # Background-Laufzeit ermitteln
- $brt = tv_interval($bst);
+ $brt = tv_interval($bst);                              # Background-Laufzeit ermitteln
  $rt = $rt.",".$brt;
   
   Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl finished");
@@ -5634,29 +5905,31 @@ return "$name|$rows|$rt|0";
 #########################################################################################
 # DBLog - deleteOldDays non-blocking Rückkehrfunktion
 #########################################################################################
-sub DbLog_deldaysNbl_done($) {
-  my ($string) = @_;
-  my @a        = split("\\|",$string);
-  my $name     = $a[0];
-  my $hash     = $defs{$name};
-  my $rows     = $a[1];
-  my $bt       = $a[2] if($a[2]); 
-  my $err      = decode_base64($a[3]) if ($a[3]);
+sub DbLog_deldaysNbl_done {
+  my $string = shift;
+  my @a      = split("\\|",$string);
+  my $name   = $a[0];
+  my $hash   = $defs{$name};
+  my $rows   = $a[1];
+  my($bt,$err);
+  $bt        = $a[2]                if ($a[2]); 
+  $err       = decode_base64($a[3]) if ($a[3]);
  
   Log3 ($name, 5, "DbLog $name -> Start DbLog_deldaysNbl_done");
   
   if ($err) {
-      readingsSingleUpdate($hash,"state",$err,1);
+      DbLog_setReadingstate ($hash, $err);
       delete $hash->{HELPER}{DELDAYS_PID};
       Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl_done finished");
       return;
-  } else {
+  } 
+  else {
       if(AttrVal($name, "showproctime", undef) && $bt) {
           my ($rt,$brt)  = split(",", $bt);
           readingsBeginUpdate($hash);
-          readingsBulkUpdate($hash, "background_processing_time", sprintf("%.4f",$brt));     
-          readingsBulkUpdate($hash, "sql_processing_time", sprintf("%.4f",$rt));
-          readingsEndUpdate($hash, 1);
+          readingsBulkUpdate ($hash, "background_processing_time", sprintf("%.4f",$brt));     
+          readingsBulkUpdate ($hash, "sql_processing_time", sprintf("%.4f",$rt));
+          readingsEndUpdate  ($hash, 1);
       }
       readingsSingleUpdate($hash, "lastRowsDeleted", $rows ,1);
   }
@@ -5664,14 +5937,15 @@ sub DbLog_deldaysNbl_done($) {
   Log3 ($name, 3, "DbLog $name -> deleteOldDaysNbl finished. $rows entries of database $db deleted.");
   delete $hash->{HELPER}{DELDAYS_PID};
   Log3 ($name, 5, "DbLog $name -> DbLog_deldaysNbl_done finished");
+  
 return;
 }
 
 ################################################################
 # benutzte DB-Feldlängen in Helper und Internals setzen
 ################################################################
-sub DbLog_setinternalcols ($){
-  my ($hash)= @_;
+sub DbLog_setinternalcols {
+  my $hash = shift;
   my $name = $hash->{NAME};
 
   $hash->{HELPER}{DEVICECOL}   = $columns{DEVICE};
@@ -5692,10 +5966,10 @@ return;
 ################################################################
 # reopen DB-Connection nach Ablauf set ... reopen [n] seconds
 ################################################################
-sub DbLog_reopen ($){
-  my ($hash) = @_;
-  my $name   = $hash->{NAME};
-  my $async  = AttrVal($name, "asyncMode", undef);
+sub DbLog_reopen {
+  my $hash  = shift;
+  my $name  = $hash->{NAME};
+  my $async = AttrVal($name, "asyncMode", undef);
   
   RemoveInternalTimer($hash, "DbLog_reopen");
   
@@ -5704,10 +5978,11 @@ sub DbLog_reopen ($){
       my $delay = delete $hash->{HELPER}{REOPEN_RUNS};
       delete $hash->{HELPER}{REOPEN_RUNS_UNTIL};
       Log3($name, 2, "DbLog $name: Database connection reopened (it was $delay seconds closed).") if($delay);
-      readingsSingleUpdate($hash, "state", "reopened", 1);
-      $hash->{HELPER}{OLDSTATE} = "reopened";
-      DbLog_execmemcache($hash) if($async);
-  } else {
+
+      DbLog_setReadingstate ($hash, "reopened");
+      DbLog_execmemcache    ($hash) if($async);
+  } 
+  else {
       InternalTimer(gettimeofday()+30, "DbLog_reopen", $hash, 0);       
   }
   
@@ -5717,7 +5992,7 @@ return;
 ################################################################
 # check ob primary key genutzt wird
 ################################################################
-sub DbLog_checkUsePK ($$){
+sub DbLog_checkUsePK {
   my ($hash,$dbh) = @_;
   my $name    = $hash->{NAME};
   my $dbconn  = $hash->{dbconn};
@@ -5745,7 +6020,7 @@ return ($upkh,$upkc,$pkh,$pkc);
 ################################################################
 #  Routine für FHEMWEB Detailanzeige
 ################################################################
-sub DbLog_fhemwebFn($$$$) {
+sub DbLog_fhemwebFn {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
 
   my $ret;
@@ -5763,15 +6038,17 @@ return $ret;
 ################################################################
 #  Dropdown-Menü cuurent-Tabelle SVG-Editor
 ################################################################
-sub DbLog_sampleDataFn($$$$$) {
+sub DbLog_sampleDataFn {
   my ($dlName, $dlog, $max, $conf, $wName) = @_;
   my $desc    = "Device:Reading";
   my $hash    = $defs{$dlName};
   my $current = $hash->{HELPER}{TC};
+  
   my @htmlArr;
   my @example;
   my @colregs;
   my $counter;
+  
   my $currentPresent = AttrVal($dlName,'DbLogType','History');  
   
   my $dbhf = DbLog_ConnectNewDBH($defs{$dlName});
@@ -5806,7 +6083,8 @@ sub DbLog_sampleDataFn($$$$$) {
       push @htmlArr, $ret;
     }
 
-  } else {
+  } 
+  else {
   # Table Current not present, so create an empty input field
     push @example, "No sample data due to missing table '$current'";
 
@@ -5831,7 +6109,7 @@ return ($desc, \@htmlArr, join("<br>", @example));
 ################################################################
 #           Error handling, returns a JSON String
 ################################################################
-sub DbLog_jsonError($) {
+sub DbLog_jsonError {
   my $errormsg = $_[0]; 
   my $json = '{"success": "false", "msg":"'.$errormsg.'"}';
   
@@ -5842,7 +6120,7 @@ return $json;
 #              Check Zeitformat
 #              Zeitformat: YYYY-MM-DD HH:MI:SS
 ################################################################
-sub DbLog_checkTimeformat ($) {  
+sub DbLog_checkTimeformat {  
   my ($t) = @_;
   
   my (@datetime, @date, @time);
@@ -5863,7 +6141,7 @@ return;
 ################################################################
 #                Prepare the SQL String
 ################################################################
-sub DbLog_prepareSql(@) {
+sub DbLog_prepareSql {
     my ($hash, @a) = @_;
     my $starttime       = $_[5];
     $starttime          =~ s/_/ /;
@@ -5979,50 +6257,66 @@ sub DbLog_prepareSql(@) {
         $yearstats .= "FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
         $yearstats .= "AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
 
-    } else {
+    } 
+    else {
         $sql = "errordb";
     }
 
     if($userquery eq "getreadings") {
         $sql = "SELECT distinct(reading) FROM $history WHERE device = '".$device."'";
-    } elsif($userquery eq "getdevices") {
+    } 
+    elsif($userquery eq "getdevices") {
         $sql = "SELECT distinct(device) FROM $history";
-    } elsif($userquery eq "timerange") {
+    } 
+    elsif($userquery eq "timerange") {
         $sql = "SELECT ".$xaxis.", VALUE FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' ORDER BY TIMESTAMP;";
-    } elsif($userquery eq "hourstats") {
+    } 
+    elsif($userquery eq "hourstats") {
         $sql = $hourstats;
-    } elsif($userquery eq "daystats") {
+    } 
+    elsif($userquery eq "daystats") {
         $sql = $daystats;
-    } elsif($userquery eq "weekstats") {
+    } 
+    elsif($userquery eq "weekstats") {
         $sql = $weekstats;
-    } elsif($userquery eq "monthstats") {
+    } 
+    elsif($userquery eq "monthstats") {
         $sql = $monthstats;
-    } elsif($userquery eq "yearstats") {
+    } 
+    elsif($userquery eq "yearstats") {
         $sql = $yearstats;
-    } elsif($userquery eq "savechart") {
+    } 
+    elsif($userquery eq "savechart") {
         $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
-    } elsif($userquery eq "renamechart") {
+    } 
+    elsif($userquery eq "renamechart") {
         $sql = "UPDATE frontend SET NAME = '$savename' WHERE ID = '$jsonChartConfig'";
-    } elsif($userquery eq "deletechart") {
+    } 
+    elsif($userquery eq "deletechart") {
         $sql = "DELETE FROM frontend WHERE TYPE = 'savedchart' AND ID = '".$savename."'";
-    } elsif($userquery eq "updatechart") {
+    } 
+    elsif($userquery eq "updatechart") {
         $sql = "UPDATE frontend SET VALUE = '$jsonChartConfig' WHERE ID = '".$savename."'";
-    } elsif($userquery eq "getcharts") {
+    } 
+    elsif($userquery eq "getcharts") {
         $sql = "SELECT * FROM frontend WHERE TYPE = 'savedchart'";
-    } elsif($userquery eq "getTableData") {
+    } 
+    elsif($userquery eq "getTableData") {
         if ($device ne '""' && $yaxis ne '""') {
             $sql = "SELECT * FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' ";
             $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
             $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'"; 
             $countsql = "SELECT count(*) FROM $history WHERE READING = '$yaxis' AND DEVICE = '$device' "; 
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'"; 
-        } elsif($device ne '""' && $yaxis eq '""') {  
+        } 
+        elsif($device ne '""' && $yaxis eq '""') {  
             $sql = "SELECT * FROM $history WHERE DEVICE = '$device' ";
             $sql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
             $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
             $countsql = "SELECT count(*) FROM $history WHERE DEVICE = '$device' ";
             $countsql .= "AND TIMESTAMP Between '$starttime' AND '$endtime'";
-        } else {
+        } 
+        else {
             $sql = "SELECT * FROM $history";
             $sql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'"; 
             $sql .= " LIMIT '$paginglimit' OFFSET '$pagingstart'";
@@ -6030,11 +6324,12 @@ sub DbLog_prepareSql(@) {
             $countsql .= " WHERE TIMESTAMP Between '$starttime' AND '$endtime'"; 
         }
         return ($sql, $countsql);
-    } else {
+    } 
+    else {
         $sql = "error";
     }
 
-    return $sql;
+return $sql;
 }
 
 ################################################################
@@ -6042,7 +6337,7 @@ sub DbLog_prepareSql(@) {
 # Do the query
 #
 ################################################################
-sub DbLog_chartQuery($@) {
+sub DbLog_chartQuery {
 
     my ($sql, $countsql) = DbLog_prepareSql(@_);
 
@@ -6084,7 +6379,8 @@ sub DbLog_chartQuery($@) {
     # When columns are empty but execution was successful, we have done a successful INSERT, UPDATE or DELETE
     if($columns) {
         $columncnt = scalar @$columns;
-    } else {
+    } 
+    else {
         return '{"success": "true", "msg":"All ok"}';
     }
 
@@ -6095,7 +6391,8 @@ sub DbLog_chartQuery($@) {
 
         if($i == 0) {
             $jsonstring .= '{';
-        } else {
+        } 
+        else {
             $jsonstring .= ',{';
         } 
  
@@ -6108,10 +6405,12 @@ sub DbLog_chartQuery($@) {
                 my $fragment =  substr($data[$i],0,1);
                 if ($fragment eq "{") {
                     $jsonstring .= $data[$i];
-                } else {
+                } 
+                else {
                     $jsonstring .= '"'.$data[$i].'"';
                 }
-            } else {
+            } 
+            else {
                 $jsonstring .= '""'
             }
             
@@ -6125,9 +6424,11 @@ sub DbLog_chartQuery($@) {
     $jsonstring .= ']';
     if (defined $totalcount && $totalcount ne "") {
         $jsonstring .= ',"totalCount": '.$totalcount.'}';
-    } else {
+    } 
+    else {
         $jsonstring .= '}';
     }
+    
 return $jsonstring;
 }
 
@@ -6135,7 +6436,7 @@ return $jsonstring;
 # get <dbLog> ReadingsVal       <device> <reading> <default>
 # get <dbLog> ReadingsTimestamp <device> <reading> <default>
 ################################################################
-sub DbLog_dbReadings($@) {
+sub DbLog_dbReadings {
   my($hash,@a) = @_;
   my $history  = $hash->{HELPER}{TH};
   my $current  = $hash->{HELPER}{TC};
@@ -6148,14 +6449,16 @@ sub DbLog_dbReadings($@) {
   my $query;
   if (lc($DbLogType) =~ m(current) ) {
     $query = "select VALUE,TIMESTAMP from $current where DEVICE= '$a[2]' and READING= '$a[3]'";
-  } else {
+  } 
+  else {
     $query = "select VALUE,TIMESTAMP from $history where DEVICE= '$a[2]' and READING= '$a[3]' order by TIMESTAMP desc limit 1";
   }
   my ($reading,$timestamp) = $dbhf->selectrow_array($query);
   $dbhf->disconnect(); 
   
-  $reading = (defined($reading)) ? $reading : $a[4];
+  $reading   = (defined($reading)) ? $reading : $a[4];
   $timestamp = (defined($timestamp)) ? $timestamp : $a[4];
+  
   return $reading   if $a[1] eq 'ReadingsVal';
   return $timestamp if $a[1] eq 'ReadingsTimestamp';
   return "Syntax error: $a[1]";
@@ -6165,7 +6468,7 @@ sub DbLog_dbReadings($@) {
 #               Versionierungen des Moduls setzen
 #  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 ################################################################
-sub DbLog_setVersionInfo($) {
+sub DbLog_setVersionInfo {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
 
@@ -6179,7 +6482,8 @@ sub DbLog_setVersionInfo($) {
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
       if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
-      } else {
+      } 
+      else {
           $modules{$type}{META}{x_version} = $v; 
       }
       return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
@@ -6188,7 +6492,8 @@ sub DbLog_setVersionInfo($) {
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
           use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );                                          
       }
-  } else {
+  } 
+  else {
       # herkömmliche Modulstruktur
       $hash->{VERSION} = $v;
   }
@@ -6203,7 +6508,7 @@ return;
 # drh    Driver handle object (rarely seen or used in applications)
 # h      Any of the handle types above ($dbh, $sth, or $drh)
 #########################################################################
-sub DbLog_startShowChildhandles ($) {
+sub DbLog_startShowChildhandles {
     my ($str)       = @_;
     my ($name,$sub) = split(":",$str);
     my $hash        = $defs{$name};
@@ -6219,7 +6524,7 @@ sub DbLog_startShowChildhandles ($) {
 return;
 }
       
-sub DbLog_showChildHandles ($$$$) {
+sub DbLog_showChildHandles {
     my ($name,$h, $level, $key) = @_;
     
     my $t = $h->{Type}."h";
@@ -6932,6 +7237,29 @@ sub DbLog_showChildHandles ($$$$) {
        In asynchronous logging mode the content of cache will be written into the database and cleared if the number &lt;n&gt; datasets
        in cache has reached (default: 500). Thereby the timer of asynchronous logging mode will be set new to the value of 
        attribute "syncInterval". In case of error the next write attempt will be started at the earliest after syncInterval/2. <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a name="cacheOverflowThreshold"></a>
+     <li><b>cacheOverflowThreshold</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt; 
+       </code><br>
+     
+       In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a file 
+       instead of writing the data to the database. <br>
+       The function corresponds to the "exportCache purgecache" set command and uses its settings. <br>    
+       With this attribute an overload of the server memory can be prevented if the database is not available for a longer period of time. 
+       time (e.g. in case of error or maintenance). If the attribute value is smaller or equal to the value of the 
+       attribute "cacheLimit", the value of "cacheLimit" is used for "cacheOverflowThreshold". <br>
+       In this case, the cache will <b>always</b> be written to a file instead of to the database if the threshold value
+       has been reached. <br>
+       Thus, the data can be specifically written to one or more files with this setting, in order to import them into the 
+       database at a later time with the set command "importCachefile".
      </ul>
      </li>
   </ul>
@@ -8320,8 +8648,32 @@ attr SMA_Energymeter DbLogValueFn
        </code><br>
      
        Im asynchronen Logmodus wird der Cache in die Datenbank weggeschrieben und geleert wenn die Anzahl &lt;n&gt; Datensätze
-       im Cache erreicht ist (Default: 500). Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
+       im Cache erreicht ist (default: 500). <br>
+       Der Timer des asynchronen Logmodus wird dabei neu auf den Wert des Attributs "syncInterval" 
        gesetzt. Im Fehlerfall wird ein erneuter Schreibversuch frühestens nach syncInterval/2 gestartet. <br>
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
+     <a name="cacheOverflowThreshold"></a>
+     <li><b>cacheOverflowThreshold</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt; 
+       </code><br>
+     
+       Legt im asynchronen Logmodus den Schwellenwert von &lt;n&gt; Datensätzen fest, ab dem der Cacheinhalt in ein File 
+       exportiert wird anstatt die Daten in die Datenbank zu schreiben. <br>
+       Die Funktion entspricht dem Set-Kommando "exportCache purgecache" und verwendet dessen Einstellungen. <br>    
+       Mit diesem Attribut kann eine Überlastung des Serverspeichers verhindert werden falls die Datenbank für eine längere 
+       Zeit nicht verfügbar ist (z.B. im Fehler- oder Wartungsfall). Ist der Attributwert kleiner oder gleich dem Wert des 
+       Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
+       In diesem Fall wird der Cache <b>immer</b> in ein File geschrieben anstatt in die Datenbank sofern der Schwellenwert
+       erreicht wurde. <br>
+       So können die Daten mit dieser Einstellung gezielt in ein oder mehrere Dateien geschreiben werden, um sie zu einem 
+       späteren Zeitpunkt mit dem Set-Befehl "importCachefile" in die Datenbank zu importieren.
      </ul>
      </li>
   </ul>
