@@ -639,7 +639,7 @@ UnifiVideo_Attr($$$)
   <ul>
     <li>JSON has to be installed on the FHEM host.</li>
     <li>create nvr api key: admin-&gt;my account-&gt;api access</li>
-    <li><code>define <name> webLink htmlCode {UnifiVideo_2html('&lt;nvr&gt;','&lt;cam&gt;[,&lt;cam2&gt;,..]'[,&lt;width&gt;])}</code></li>
+    <li><code>define &lt;name&gt; webLink htmlCode {UnifiVideo_2html('&lt;nvr&gt;','&lt;cam&gt;[,&lt;cam2&gt;,..]'[,&lt;width&gt;])}</code></li>
   </ul><br>
 
   <a name="UnifiVideo_Set"></a>
