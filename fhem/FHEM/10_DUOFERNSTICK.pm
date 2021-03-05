@@ -5,6 +5,7 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 
 sub DUOFERNSTICK_Read($);
 sub DUOFERNSTICK_Ready($);
@@ -32,14 +33,12 @@ my $duoStartPair        = "04000000000000000000000000000000000000000000";
 my $duoStopPair         = "05000000000000000000000000000000000000000000";
 my $duoStartUnpair      = "07000000000000000000000000000000000000000000";
 my $duoStopUnpair       = "08000000000000000000000000000000000000000000";
-my $duoRemotePair       = "0D0006010000000000000000000000000000yyyyyy01";
+my $duoRemotePair       = "0D0106010000000000000000000000000000yyyyyy00";
 
 sub DUOFERNSTICK_Initialize($)
 {
   my ($hash) = @_;
-  
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
-  
+   
   $hash->{ReadFn}  = "DUOFERNSTICK_Read";
   $hash->{ReadyFn} = "DUOFERNSTICK_Ready";
   $hash->{WriteFn} = "DUOFERNSTICK_Write";
@@ -449,7 +448,7 @@ DUOFERNSTICK_SimpleWrite(@)
 
 #####################################
 sub
-DUOFERNSTICK_ReadAnswer($$$$)
+DUOFERNSTICK_ReadAnswer($$)
 {
   my ($hash, $arg) = @_;
   my $ohash = $hash;
