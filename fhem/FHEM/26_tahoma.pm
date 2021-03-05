@@ -57,6 +57,7 @@
 # 2019-02-08 V 0221 new Attribute devName to set personal name instead of 'iPhone'
 # 2019-05-26 V 0222 correct parse of result in EnduserAPISetupGateways
 # 2019-06-15 V 0222 new Attribute levelRound
+# 2021-03-05 V 0223 new Attributes intervalLoginMin and intervalLoginMax
 
 package main;
 
@@ -97,6 +98,8 @@ sub tahoma_Initialize($)
                       "intervalRefresh ".
                       "intervalEvents ".
                       "intervalStates ".
+                      "intervalLoginMin ".
+                      "intervalLoginMax ".
                       "logfile ".
                       "url ".
                       "placeClasses ".
@@ -134,7 +137,7 @@ sub tahoma_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  my $ModuleVersion = "0221";
+  my $ModuleVersion = "0223";
   
   my $subtype;
   my $name = $a[0];
@@ -218,6 +221,8 @@ sub tahoma_Define($$)
     $hash->{getEventsInterval} = 2;
     $hash->{refreshStatesInterval} = 120;
     $hash->{getStatesInterval} = 0;
+    $hash->{getLoginIntervalMin} = 5;
+    $hash->{getLoginIntervalMax} = 160;
 
   } else {
     return "Usage: define <name> tahoma device\
@@ -303,8 +308,9 @@ sub tahoma_login($)
   $hash->{userAgent} = $attr{$name}{userAgent} if (defined $attr{$name}{userAgent});
   $hash->{timeout} = 10;
   $hash->{HTTPCookies} = undef;
-  $hash->{loginRetryTimer} = 5 if (!defined $hash->{loginRetryTimer});
-  $hash->{loginRetryTimer} *= 2 if ($hash->{loginRetryTimer} < 160);
+  $hash->{loginRetryTimer} = $hash->{getLoginIntervalMin} if (!defined $hash->{loginRetryTimer});
+  $hash->{loginRetryTimer} *= 2 if ($hash->{loginRetryTimer} < $hash->{getLoginIntervalMax});
+  $hash->{loginRetryTimer} = $hash->{getLoginIntervalMax} if ($hash->{loginRetryTimer} > $hash->{getLoginIntervalMax});
   $hash->{eventId} = undef;
   
   Log3 $name, 2, "$name: login start";
@@ -1119,7 +1125,7 @@ sub tahoma_parseLogin($$)
   } else {
     $hash->{inVersion} = $json->{version};
     $hash->{logged_in} = 1;
-    $hash->{loginRetryTimer} = 5;
+    $hash->{loginRetryTimer} = $hash->{getLoginIntervalMin};
   }
   Log3 $name, 2, "$name: login end, logged_in=".$hash->{logged_in};
 }
@@ -1598,6 +1604,20 @@ sub tahoma_Attr($$$)
     $attrVal = int($attrVal);
     $attrVal = 2 if ($attrVal < 2 && $attrVal != 0);
     $hash->{getEventsInterval} = $attrVal;
+  } elsif( $attrName eq "intervalLoginMin" ) {
+    my $hash = $defs{$name};
+    return "Attribute 'intervalLoginMin' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    $attrVal = defined $attrVal ? int($attrVal) : 2;
+    $attrVal = int($attrVal);
+    $attrVal = 2 if ($attrVal < 2 && $attrVal != 0);
+    $hash->{getLoginIntervalMin} = $attrVal;
+  } elsif( $attrName eq "intervalLoginMax" ) {
+    my $hash = $defs{$name};
+    return "Attribute 'intervalLoginMax' only usable for type ACCOUNT" if $hash->{SUBTYPE} ne "ACCOUNT";
+    $attrVal = defined $attrVal ? int($attrVal) : 2;
+    $attrVal = int($attrVal);
+    $attrVal = 160 if ($attrVal < 160 && $attrVal != 0);
+    $hash->{getLoginIntervalMax} = $attrVal;
   } elsif( $attrName eq "disable" ) {
     my $hash = $defs{$name};
     RemoveInternalTimer($hash);
@@ -1855,7 +1875,17 @@ sub tahoma_decrypt($)
     <ul>
       The interval [seconds] for fetching new events can be changed:<br>
       The default is 2s, allowed minimum is 2s.<br>
-      <code>attr tahoma1 intervalEvents 300</code><br>
+      <code>attr tahoma1 intervalEvents 10</code><br><br>
+    </ul>
+    <ul>
+      The minimal interval [seconds] for first retry of login can be changed:<br>
+      The default is 5s, allowed minimum is 5s.<br>
+      <code>attr tahoma1 intervalLoginMin 30</code><br><br>
+    </ul>
+    <ul>
+      The maximal interval [seconds] for cyclic retry of login can be changed:<br>
+      The default is 160s, allowed minimum is 160s.<br>
+      <code>attr tahoma1 intervalLoginMax 300</code><br><br>
     </ul>
     <br>
     <b>local Attributes for DEVICE:</b>
