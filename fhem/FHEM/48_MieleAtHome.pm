@@ -35,7 +35,7 @@ use Encode qw(encode_utf8);
 use List::Util qw[min max];
 use JSON;
 
-my $version = "1.0.1";
+my $version = "1.0.2";
 
 my $MAH_hasMimeBase64 = 1;
 
@@ -61,12 +61,11 @@ use constant VENTILATION_STEPS => {
 		0x04 => "Step4",  # 4 Step4
 };
 
-# TODO
-# <option value="programId">programId</option>
-# <option value="targetTemperature">targetTemperature</option>
-# <option value="deviceName">deviceName</option>
-# <option value="colors">colors</option>
-# <option value="modes">modes</option>
+# TODO: <option value="programId">programId</option>
+# TODO: <option value="targetTemperature">targetTemperature</option>
+# TODO: <option value="deviceName">deviceName</option>
+# TODO: <option value="colors">colors</option>
+# TODO: <option value="modes">modes</option>
 
 use constant COUNTRIES => {
 		"Miele-Deutschland"          => "de-DE",
@@ -388,13 +387,9 @@ sub MAH_SetFn($$@)
 		return undef;
 	}
 	elsif( $cmd eq 'autocreate' ) {
+		return "autocreate needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) == "");
 		return "use $cmd without arguments" if(@args != 0);
 		InternalTimer(gettimeofday()+0, "MAH_autocreate", $hash);
-		return undef;
-	}
-	elsif( $cmd eq 'update' ) {
-		return "use $cmd without arguments" if(@args != 0);
-		InternalTimer(gettimeofday()+0, "MAH_updateValues", $hash);
 		return undef;
 	}
 	elsif( $cmd eq 'on' || $cmd eq 'off' ) {
@@ -407,21 +402,26 @@ sub MAH_SetFn($$@)
 		return "use $cmd without arguments" if(@args != 0);
 		return MAH_setProcessAction($hash, $cmd)
 	}
-	elsif( $cmd eq 'light') {
-		return "usage: light enable|disable" if(@args != 1);
-		return MAH_setLight($hash, $args[0])
+	elsif( $cmd eq 'startTime') {
+		return "usage: startTime <OFFSET_H:MM>" if(@args != 1);
+		return MAH_setStartTime($hash, $args[0])
+	}
+	elsif( $cmd eq 'update' ) {
+		return "use $cmd without arguments" if(@args != 0);
+		InternalTimer(gettimeofday()+0, "MAH_updateValues", $hash);
+		return undef;
 	}
 	elsif( $cmd eq 'ventilationStep') {
 		return "usage: ventilationStep <step>" if(@args != 1);
 		return MAH_setVentilationStep($hash, $args[0])
 	}
-	elsif( $cmd eq 'startTime') {
-		return "usage: startTime <offset_as_h:mm>" if(@args != 1);
-		return MAH_setStartTime($hash, $args[0])
+	elsif( $cmd eq 'light') {
+		return "usage: light enable|disable" if(@args != 1);
+		return MAH_setLight($hash, $args[0])
 	}
 	else
 	{
-		$list   .= "autocreate:noArg " if (!defined($hash->{IODevName}) && MAH_getAccessToken($hash) ne "");
+		$list   .= "autocreate:noArg " if (!defined($hash->{IODevName}));
 		$list   .= "update:noArg "     if (defined($hash->{DEVICE_ID}));
 
 		$list   .= "on:noArg "   if (defined($hash->{DEVICE_ID}) && ReadingsNum($name, "actions_powerOn",  0) == 1);
@@ -472,10 +472,11 @@ sub MAH_GetFn($$@)
 	my $list = "";
 
 	if ($opt eq "?") {
-		return "Unknown argument $opt, choose one of $list" if MAH_isDisabled($hash);
+		return "Unknown argument $opt, choose one of $list" if (MAH_isDisabled($hash));
 	}
 
 	if( $opt eq 'listDevices' ) {
+		return "listDevices needs a valid ACCESS_TOKEN, please try again" if (MAH_getAccessToken($hash) eq "");
 		my $devices = MAH_blockingGetAllDevicesRequest($hash);
 		if(ref($devices) ne 'ARRAY') {
 			readingsSingleUpdate($hash, "lastError", "listDevices failed: $devices", 1);
@@ -491,7 +492,7 @@ sub MAH_GetFn($$@)
 	else
 	{
 		# these are only allowed when MAH is not 'disabled'
-		$list   .= "listDevices:noArg " if (MAH_getAccessToken($hash) ne "");
+		$list   .= "listDevices:noArg " if (!defined($hash->{IODevName}) && !MAH_isDisabled($hash));
 		return "Unknown argument $opt, choose one of $list";
 	}
 }
@@ -796,6 +797,12 @@ sub MAH_doThirdpartyTokenRequest($$$)
 	} else {
 		MAH_Log($hash, 1, "ERROR: called with neither bearerCode nor refreshToken, this is a bug. plz report!");
 		return;
+	}
+
+	if ($bearerCode ne "") {
+		readingsSingleUpdate($hash, "tokenRefreshCount_withBearer",       ReadingsNum($name, "tokenRefreshCount_withBearer", 0) + 1, 1);
+	} else {
+		readingsSingleUpdate($hash, "tokenRefreshCount_withRefreshToken", ReadingsNum($name, "tokenRefreshCount_withRefreshToken", 0) + 1, 1);
 	}
 
 	my ($err, $reply) = HttpUtils_NonblockingGet({
@@ -1375,7 +1382,7 @@ sub MAH_setStartTime($$)
 	my $name = $hash->{NAME};
 
 	if ($startTimeString =~ m/$[0-9]+:[0-9]+]^/) {
-		return "invalid startTime format: '${startTimeString}', must be [h]h:mm";
+		return "invalid startTime format: '${startTimeString}', offset must be [h]h:mm";
 	}
 
 	if (ReadingsNum($name, "actions_startTime", 0) != 1) {
@@ -1536,7 +1543,7 @@ sub MAH_getAccessToken($)
 {
 	my ($hash) = @_;
 
-	# try to find local token
+	# try to find token
 	my $accessToken = MAH_getAccessTokenPrivate($hash);
 	if ($accessToken ne "") {
 		my $secs = MAH_getRemainingTokenLifetime($hash);
@@ -1545,11 +1552,9 @@ sub MAH_getAccessToken($)
 		return $accessToken           if ($secs > 0);
 	}
 
-	# try to find token in IODev
-	my $iohash = MAH_getIODevHash($hash);
-	return MAH_getAccessToken($iohash) if (defined($iohash));
+	# if we could not find a token, refrehs it async
+	MAH_refreshAccessToken($hash);
 
-	#MAH_refreshAccessToken($hash);
 	return "";
 }
 sub MAH_getAccessTokenPrivate($); # workaround for perl warning
@@ -1830,7 +1835,7 @@ sub MAH_Log($$$)
 #------------------------------------------------------------------------------------------------------
 # Util: returns a stacktrace as a string (for debbugging)
 #------------------------------------------------------------------------------------------------------
-sub MAH_getStacktrace($$$)
+sub MAH_getStacktrace()
 {
 	my ($package, $filename, $line, $subroutine, $hasargs, $wantarray, $evaltext, $is_require, $hints, $bitmask, $hinthash);
 	my $i = 2; # skip MAH_getStacktrace() and MAH_Log()
@@ -1968,6 +1973,10 @@ sub MAH_getStacktrace($$$)
 		<li><a name="start"></a>
 			<dt><code><b>start</b></code></dt>
 			start your device. only available depending on the type and state of your appliance.
+		</li>
+		<li><a name="startTime"></a>
+			<dt><code><b>startTime &lt;[H]H:MM&gt;</b></code></dt>
+			modify the start time of your device relative from current time. only available depending on the type and state of your appliance.
 		</li>
 		<li><a name="stop"></a>
 			<dt><code><b>stop</b></code></dt>
