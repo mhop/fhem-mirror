@@ -2477,10 +2477,10 @@ plotAsPng(@)
 =item summary_DE malt ein SVG-Plot aus FileLog oder DbLog Daten
 =begin html
 
-<a name="SVG"></a>
+<a id="SVG"></a>
 <h3>SVG</h3>
 <ul>
-  <a name="SVGlinkdefine"></a>
+  <a id="SVG-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; SVG
@@ -2507,7 +2507,7 @@ plotAsPng(@)
     </ul>
   </ul>
 
-  <a name="SVGset"></a>
+  <a id="SVG-set"></a>
   <b>Set</b>
   <ul>
     <li>copyGplotFile<br>
@@ -2520,22 +2520,33 @@ plotAsPng(@)
     </li>
   </ul><br>
 
-  <a name="SVGget"></a>
+  <a id="SVG-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="SVGattr"></a>
+  <a id="SVG-attr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#endPlotNow">endPlotNow</a></li><br>
-    <li><a href="#endPlotToday">endPlotToday</a></li><br>
+    <a id="SVG-attr-endPlotNow"></a>
+    <li>endPlotNow<br>
+        If this attribute is set to 1, then day and hour plots will
+        end at current time. Else the whole day, the 6 hour period starting at
+        0, 6, 12 or 18 hour or the whole hour will be shown. This attribute
+        is not used if the SVG has the attribute startDate defined.
+        </li><br>
 
-    <a name="captionLeft"></a>
+    <a id="SVG-attr-endPlotToday"></a>
+    <li>endPlotToday<br>
+        If this attribute is set to 1, then week and month plots will
+        end today. Else the current week or the current month will be shown.
+        </li><br>
+
+    <a id="SVG-attr-captionLeft"></a>
     <li>captionLeft<br>
       Show the legend on the left side (deprecated, will be autoconverted to
       captionPos)
       </li><br>
 
-    <a name="captionPos"></a>
+    <a id="SVG-attr-captionPos"></a>
     <li>captionPos<br>
       right - Show the legend on the right side (default)<br>
       left - Show the legend on the left side<br>
@@ -2543,7 +2554,7 @@ plotAsPng(@)
       on the axis it belongs to<br>
       </li><br>
 
-    <a name="fixedrange"></a>
+    <a id="SVG-attr-fixedrange"></a>
     <li>fixedrange [offset]<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll(-svg) or SVG the given time-range will be
@@ -2562,12 +2573,12 @@ plotAsPng(@)
 
         </li><br>
 
-    <a name="fixedoffset"></a>
+    <a id="SVG-attr-fixedoffset"></a>
     <li>fixedoffset &lt;nDays&gt;<br>
         Set an fixed offset (in days) for the plot.
         </li><br>
 
-    <a name="label"></a>
+    <a id="SVG-attr-label"></a>
     <li>label<br>
       Double-Colon separated list of values. The values will be used to replace
       &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
@@ -2601,9 +2612,16 @@ plotAsPng(@)
       <br>Deprecated, see plotReplace.
       </li><br>
 
-    <li><a href="#nrAxis">nrAxis</a></li><br>
+    <a id="SVG-attr-nrAxis"></a>
+    <li>nrAxis<br>
+        the number of axis for which space should be reserved  on the left and
+        right sides of a plot and optionaly how many axes should realy be used
+        on each side, separated by comma: left,right[,useLeft,useRight].  You
+        can set individual numbers by setting the nrAxis of the SVG. Default is
+        1,1.
+        </li><br>
 
-    <a name="plotfunction"></a>
+    <a id="SVG-attr-plotfunction"></a>
     <li>plotfunction<br>
       Space value separated list of values. The value will be used to replace
       &lt;SPEC#&gt; type of strings in the .gplot file, with # beginning at 1
@@ -2625,9 +2643,23 @@ plotAsPng(@)
       Deprecated, see plotReplace.
       </li><br>
 
-    <li><a href="#plotmode">plotmode</a></li><br>
+    <a id="SVG-attr-plotmode"></a>
+    <li>plotmode<br>
+        Specifies how to generate the plots:
+        <ul>
+          <li>SVG<br>
+              The plots are created with the <a href="#SVG">SVG</a> module.
+              This is the default.</li>
+          <li>gnuplot-scroll<br>
+              The plots are created with the gnuplot program. The gnuplot
+              output terminal PNG is assumed. Scrolling to historical values
+              is also possible, just like with SVG.</li>
+          <li>gnuplot-scroll-svg<br>
+              Like gnuplot-scroll, but the output terminal SVG is assumed.</li>
+        </ul>
+        </li><br>
 
-    <a name="plotReplace"></a>
+    <a id="SVG-attr-plotReplace"></a>
     <li>plotReplace<br>
       space separated list of key=value pairs. value may contain spaces if
       enclosed in "" or {}. value will be evaluated as a perl expression, if it
@@ -2639,15 +2671,27 @@ plotAsPng(@)
       %key% will be repaced before the input file is processed, this expression
       can be used to replace parameters for the input processing.  </li><br>
 
-    <li><a href="#plotsize">plotsize</a></li><br>
-    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
+    <a id="SVG-attr-plotsize"></a>
+    <li>plotsize<br>
+        the default size of the plot, in pixels, separated by comma:
+        width,height. You can set individual sizes by setting the plotsize of
+        the SVG. Default is 800,160 for desktop, and 480,160 for
+        smallscreen.
+        </li><br>
 
-    <a name="startDate"></a>
+    <a id="SVG-attr-plotWeekStartDay"></a>
+    <li>plotWeekStartDay<br>
+        Start the week-zoom of the SVG plots with this day.
+        0 is Sunday, 1 is Monday, etc.<br>
+    </li><br>
+
+
+    <a id="SVG-attr-startDate"></a>
     <li>startDate<br>
         Set the start date for the plot. Used for demo installations.
         </li><br>
 
-    <a name="title"></a>
+    <a id="SVG-attr-title"></a>
     <li>title<br>
       A special form of label (see above), which replaces the string &lt;TL&gt;
       in the .gplot file. It defaults to the filename of the logfile.
@@ -2657,7 +2701,7 @@ plotAsPng(@)
   </ul>
   <br>
 
-  <a name="plotEditor"></a>
+  <a id="SVG-plotEditor"></a>
   <b>Plot-Editor</b>
   <br>
     This editor is visible on the detail screen of the SVG instance.
@@ -2682,7 +2726,7 @@ plotAsPng(@)
       </li>
   </ul>
   The visibility of the ploteditor can be configured with the FHEMWEB attribute
-  <a href="#ploteditor">ploteditor</a>.
+  ploteditor.
   <br>
 </ul>
 
@@ -2690,10 +2734,10 @@ plotAsPng(@)
 
 =begin html_DE
 
-<a name="SVG"></a>
+<a id="SVG"></a>
 <h3>SVG</h3>
 <ul>
-  <a name="SVGlinkdefine"></a>
+  <a id="SVG-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; SVG &lt;logDevice&gt;:&lt;gplotfile&gt;:&lt;logfile&gt;</code>
@@ -2728,7 +2772,7 @@ plotAsPng(@)
   </ul>
   <br>
 
-  <a name="SVGset"></a>
+  <a id="SVG-set"></a>
   <b>Set</b>
   <ul>
     <li>copyGplotFile<br>
@@ -2742,19 +2786,19 @@ plotAsPng(@)
 
   </ul><br>
 
-  <a name="SVGget"></a>
+  <a id="SVG-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="SVGattr"></a>
+  <a id="SVG-attr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="captionLeft"></a>
+    <a id="SVG-attr-captionLeft"></a>
     <li>captionLeft<br>
       Anzeigen der Legende auf der linken Seite. &Uuml;berholt, wird
       automatisch nach captionPos konvertiert.
       </li><br>
 
-    <a name="captionPos"></a>
+    <a id="SVG-attr-captionPos"></a>
     <li>captionPos<br>
       right - Anzeigen der Legende auf der rechten Seite (default)<br>
       left - Anzeigen der Legende auf der linken Seite<br>
@@ -2762,15 +2806,29 @@ plotAsPng(@)
       je nach Achsenzugeh&ouml;rigkeit<br>
       </li><br>
 
-    <li><a href="#endPlotNow">endPlotNow</a></li><br>
-    <li><a href="#endPlotToday">endPlotToday</a></li><br>
+    <a id="SVG-attr-endPlotNow"></a>
+    <li>endPlotNow<br>
+        Wenn Sie dieses Attribut auf 1 setzen, werden Tages und
+        Stunden-Plots zur aktuellen Zeit beendet. (&Auml;hnlich wie
+        endPlotToday, nur eben min&uuml;tlich).
+        Ansonsten wird der gesamte Tag oder eine 6 Stunden Periode (0, 6, 12,
+        18 Stunde) gezeigt. Dieses Attribut wird nicht verwendet, wenn das SVG
+        Attribut startDate benutzt wird.<br>
+        </li><br>
 
-    <a name="fixedoffset"></a>
+    <a id="SVG-id-endPlotToday"></a>
+    <li>endPlotToday<br>
+        Wird dieses Attribut gesetzt, so enden Wochen- bzw. Monatsplots
+        am aktuellen Tag, sonst wird die aktuelle Woche/Monat angezeigt.
+        </li><br>
+
+
+    <a id="SVG-attr-fixedoffset"></a>
     <li>fixedoffset &lt;nTage&gt;<br>
       Verschiebt den Plot-Offset um einen festen Wert (in Tagen). 
       </li><br>
 
-    <a name="fixedrange"></a>
+    <a id="SVG-attr-fixedrange"></a>
     <li>fixedrange [offset]<br>
       Erste Alternative:<br>
       Enth&auml;lt zwei Zeit-Spezifikationen in der Schreibweise YYYY-MM-DD,
@@ -2791,7 +2849,7 @@ plotAsPng(@)
 
       </li><br>
 
-    <a name="label"></a>
+    <a id="SVG-attr-label"></a>
     <li>label<br>
       Eine Liste, bei der die einzelnen Werte mit einem zweifachen Doppelpunkt
       voneinander getrennt werden. Diese Liste wird verwendet um die &lt;L#&gt;
@@ -2832,9 +2890,16 @@ plotAsPng(@)
       <br>&Uuml;berholt, wird durch das plotReplace Attribut abgel&ouml;st.
       </li><br>
 
-    <li><a href="#nrAxis">nrAxis</a></li><br>
+    <a id="SVG-attr-nrAxis"></a>
+    <li>nrAxis<br>
+        (bei mehrfach-Y-Achsen im SVG-Plot) Die Darstellung der Y Achsen
+        ben&ouml;tigt Platz. Hierdurch geben Sie an wie viele Achsen Sie
+        links,rechts [useLeft,useRight] ben&ouml;tigen. Default ist 1,1 (also 1
+        Achse links, 1 Achse rechts).
+        </li><br>
 
-    <a name="plotfunction"></a>
+
+    <a id="SVG-attr-plotfunction"></a>
     <li>plotfunction<br>
       Eine Liste, deren Werte durch Leerzeichen voneinander getrennt sind.
       Diese Liste wird verwendet um die &lt;SPEC#&gt; Zeichenfolgen in der
@@ -2862,9 +2927,28 @@ plotAsPng(@)
       &Uuml;berholt, wird durch das plotReplace Attribut abgel&ouml;st.
     </li><br>
 
-    <li><a href="#plotmode">plotmode</a></li><br>
+    <a id="SVG-attr-plotmode"></a>
+    <li>plotmode<br>
+        Spezifiziert, wie Plots erzeugt werden sollen:
+        <ul>
+          <li>SVG<br>
+          Die Plots werden mit Hilfe des <a href="#SVG">SVG</a> Moduls als SVG
+          Grafik gerendert. Das ist die Standardeinstellung.</li>
 
-    <a name="plotReplace"></a>
+          <li>gnuplot-scroll<br>
+          Die plots werden mit dem Programm gnuplot erstellt. Das output
+          terminal ist PNG. Der einfache Zugriff auf historische Daten
+          ist m&ouml;glich (analog SVG).
+          </li>
+
+          <li>gnuplot-scroll-svg<br>
+          Wie gnuplot-scroll, aber als output terminal wird SVG angenommen.
+          </li>
+        </ul>
+        </li><br>
+
+
+    <a id="SVG-attr-plotReplace"></a>
     <li>plotReplace<br>
       Leerzeichen getrennte Liste von Name=Wert Paaren. Wert kann Leerzeichen
       enthalten, falls es in "" oder {} eingeschlossen ist. Wert wird als
@@ -2876,16 +2960,28 @@ plotAsPng(@)
       kann, und %Name% davor, damit man die Regeln in der .gplot Datei f&uuml;r
       die Extraktion anpassen kann.</li><br>
 
-    <li><a href="#plotsize">plotsize</a></li><br>
-    <li><a href="#plotWeekStartDay">plotWeekStartDay</a></li><br>
+    <a id="SVG-attr-plotsize"></a>
+    <li>plotsize<br>
+        gibt die Standardbildgr&ouml;&szlig;e aller erzeugten Plots an als
+        Breite,H&ouml;he an. Um einem individuellen Plot die Gr&ouml;&szlig;e
+        zu &auml;ndern muss dieses Attribut bei der entsprechenden SVG Instanz
+        gesetzt werden.  Default sind 800,160 f&uuml;r Desktop und 480,160
+        f&uuml;r Smallscreen
+        </li><br>
 
-    <a name="startDate"></a>
+    <a id="SVG-attr-plotWeekStartDay"></a>
+    <li>plotWeekStartDay<br>
+        Starte das Plot in der Wochen-Ansicht mit diesem Tag.
+        0 ist Sonntag, 1 ist Montag, usw.
+    </li><br>
+
+    <a id="SVG-attr-startDate"></a>
     <li>startDate<br>
       Setzt das Startdatum f&uuml;r den Plot. Wird f&uuml;r Demo-Installationen
       verwendet.
       </li><br>
 
-    <a name="title"></a>
+    <a id="SVG-attr-title"></a>
     <li>title<br>
       Eine besondere Form der &Uuml;berschrift (siehe oben), bei der die
       Zeichenfolge &lt;TL&gt; in der .gplot-Datei ersetzt wird.
@@ -2897,7 +2993,7 @@ plotAsPng(@)
   </ul> 
   <br>
 
-  <a name="plotEditor"></a>
+  <a id="SVG-plotEditor"></a>
   <b>Plot-Editor</b>
    <br>
     Dieser Editor ist in der Detailansicht der SVG-Instanz zu sehen. Die
@@ -2927,8 +3023,8 @@ plotAsPng(@)
       Expression ausgewertet. Das Ergebnis muss in der Form [min:max] sein.
       </li>
   </ul>
-  Die Sichtbarkeit des  Plot-Editors kann mit dem FHEMWEB Attribut <a
-  href="#ploteditor">ploteditor</a> konfiguriert werden.
+  Die Sichtbarkeit des  Plot-Editors kann mit dem FHEMWEB Attribut
+  ploteditor konfiguriert werden.
   <br>
 </ul>
 

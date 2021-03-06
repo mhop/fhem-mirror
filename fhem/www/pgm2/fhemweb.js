@@ -308,40 +308,7 @@ FW_jqueryReadyFn()
       return;
     $("#devSpecHelp").remove();
     var sel=this, devName=m[2], selType=m[1];
-    FW_getHelp(devName, function(data) { // show either the next or the outer li
-      $("#content")
-        .append("<div id='workbench' style='display:none'></div>");
-      $("#content > #workbench").html(data);
-
-      var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
-      if(!mtype)
-        mtype = $("#content > #workbench a[name]").attr("name"), aTag;
-
-      if(mtype) {           // old style #1 syntax: MODULETYPEattrname
-        var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
-        aTag = $("#content > #workbench").find("a[id="+mv+"]");
-        if(!$(aTag).length) {
-          mv = (""+mtype+val).replace(/[^a-z0-9_]/ig,'_');
-          aTag = $("#content > #workbench").find("a[name="+mv+"]");
-        }
-      }
-      if(!$(aTag).length) { // old style #2 syntax without type
-        var v = (val).replace(/[^a-z0-9_]/ig,'_');
-        aTag = $("#content > #workbench").find("a[name="+v+"]");
-      }
-
-      if($(aTag).length) {
-        var liTag = $(aTag).next("li");
-        if(!$(liTag).length)
-          liTag = $(aTag).parent("li");
-        if($(liTag).length) {
-          $(sel).closest("div[cmd='"+selType+"']")
-             .after('<div class="makeTable" id="devSpecHelp"></div>')
-          $("#devSpecHelp").html($(liTag).html());
-        }
-      }
-      $("#content > #workbench").remove();
-    });
+    FW_displayHelp(devName, sel, selType, val, 1);
   });
 
   FW_smallScreenCommands();
@@ -365,18 +332,85 @@ FW_jqueryReadyFn()
 
 }
 
-var FW_helpData;
+function
+FW_displayHelp(devName, sel, selType, val, level)
+{
+  FW_getHelp(devName, function(data) { // show either the next or the outer li
+    $("#content")
+      .append("<div id='workbench' style='display:none'></div>");
+    $("#content > #workbench").html(data);
+
+    var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
+    if(!mtype)
+      mtype = $("#content > #workbench a[name]").attr("name"), aTag;
+    if(level == 3) // commandref
+      mtype = "";
+
+    if(mtype) {           // old style #1 syntax: MODULETYPEattrname
+      var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
+      aTag = $("#content > #workbench").find("a[id="+mv+"]");
+      if(!$(aTag).length) {
+        mv = (""+mtype+val).replace(/[^a-z0-9_-]/ig,'_');
+        aTag = $("#content > #workbench").find("a[name="+mv+"]");
+      }
+    }
+    if(!$(aTag).length) { // old style #2 syntax without type
+      var v = (val).replace(/[^a-z0-9_-]/ig,'_');
+      aTag = $("#content > #workbench").find("a[name="+v+"]");
+    }
+
+    if($(aTag).length) {
+      var liTag = $(aTag).next("li");
+      if(!$(liTag).length)
+        liTag = $(aTag).parent("li");
+      if(!$(liTag).length)
+        liTag = $(aTag).parent().next("li");
+      if($(liTag).length) {
+        $(sel).closest("div[cmd='"+selType+"']")
+           .after('<div class="makeTable" id="devSpecHelp"></div>')
+        $("#devSpecHelp").html($(liTag).html());
+      }
+    }
+    $("#content > #workbench").remove();
+
+    if(!$(aTag).length) {
+      if(devName != "FHEMWEB" && level == 1)
+        return FW_displayHelp("FHEMWEB", sel, selType, val, 2);
+      if(devName != "commandref" && level < 3)
+        return FW_displayHelp("commandref", sel, selType, val, 3);
+    }
+  });
+}
+
+var FW_helpData={};
 function
 FW_getHelp(dev, fn)
 {
-  if(FW_helpData)
-    return fn(FW_helpData);
+  if(FW_helpData[dev])
+    return fn(FW_helpData[dev]);
+
+  if(dev == "commandref") {
+    var lang = $("body").attr("data-language");
+    var url = FW_root+"/docs/commandref_frame"+
+                (lang == "EN" ? "" : "_"+lang)+".html";
+log(url);
+    $.ajax({
+      url:url, headers: { "cache-control": "no-cache" },
+      success: function(data, textStatus, req){
+        FW_helpData[dev] = data;
+        return fn(data);
+      },
+      error:function(xhr, status, err) { log("E:"+err+"/"+status); }
+    });
+    return;
+  }
+
   FW_cmd(FW_root+"?cmd=help "+dev+"&XHR=1", function(data) {
     if(data.match(/^<html>No help found/) &&
        !dev.match(" DE")) // for our german only friends
       return FW_getHelp(dev+" DE", fn);
-    FW_helpData = data;
-    return fn(FW_helpData);
+    FW_helpData[dev] = data;
+    return fn(data);
   });
 }
 

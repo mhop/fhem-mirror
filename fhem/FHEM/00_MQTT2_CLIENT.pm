@@ -702,7 +702,7 @@ MQTT2_CLIENT_getStr($$)
   <b>Attributes</b>
   <ul>
 
-    <a id="MQTT2_CLIENT-autocreate"></a>
+    <a id="MQTT2_CLIENT-attr-autocreate"></a>
     <li>autocreate [no|simple|complex]<br>
       if set to simple/complex, at least one MQTT2_DEVICE will be created, and
       its readingsList will be expanded upon reception of published messages.
@@ -739,13 +739,13 @@ MQTT2_CLIENT_getStr($$)
       disable dispatching of messages.
       </li><br>
 
-    <a id="MQTT2_CLIENTdisconnectAfter"></a>
+    <a id="MQTT2_CLIENT-attr-disconnectAfter"></a>
     <li>disconnectAfter &lt;seconds&gt;<br>
       if set, the connection will be closed after &lt;seconds&gt; of
       inactivity, and will be automatically reopened when sending a command.
       </li>
 
-    <a id="MQTT2_CLIENTignoreRegexp"></a>
+    <a id="MQTT2_CLIENT-attr-ignoreRegexp"></a>
     <li>ignoreRegexp<br>
       if $topic:$message matches ignoreRegexp, then it will be silently ignored.
       </li>

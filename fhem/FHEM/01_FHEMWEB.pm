@@ -1198,21 +1198,22 @@ sub
 FW_dataAttr()
 {
   sub
-  addParam($$)
+  addParam($$$)
   {
-    my ($p, $default) = @_;
-    my $val = AttrVal($FW_wname,$p, $default);
+    my ($dev, $p, $default) = @_;
+    my $val = AttrVal($dev, $p, $default);
     $val =~ s/&/&amp;/g;
     $val =~ s/'/&#39;/g;
     return "data-$p='$val' ";
   }
 
   return
-    addParam("jsLog", 0).
-    addParam("confirmDelete", 1).
-    addParam("confirmJSError", 1).
-    addParam("addHtmlTitle", 1).
-    addParam("styleData", "").
+    addParam($FW_wname, "jsLog", 0).
+    addParam($FW_wname, "confirmDelete", 1).
+    addParam($FW_wname, "confirmJSError", 1).
+    addParam($FW_wname, "addHtmlTitle", 1).
+    addParam($FW_wname, "styleData", "").
+    addParam("global",  "language", "EN").
     "data-availableJs='$FW_fhemwebjs' ".
     "data-webName='$FW_wname '";
 }
