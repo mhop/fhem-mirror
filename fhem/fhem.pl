@@ -125,7 +125,7 @@ sub fhem($@);
 sub fhemTimeGm($$$$$$);
 sub fhemTimeLocal($$$$$$);
 sub fhemTzOffset($);
-sub getAllAttr($;$);
+sub getAllAttr($;$$);
 sub getAllGets($;$);
 sub getAllSets($;$);
 sub getPawList($);
@@ -282,7 +282,7 @@ $cvsid = '$Id$';
 
 my $AttrList = "alias comment:textField-long eventMap:textField-long ".
                "group room suppressReading userReadings:textField-long ".
-               "verbose:0,1,2,3,4,5";
+               "verbose:0,1,2,3,4,5 userattr";
 
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
@@ -2735,28 +2735,37 @@ CommandRename($$)
 
 #####################################
 sub
-getAllAttr($;$)
+getAllAttr($;$$)
 {
-  my ($d, $cl) = @_;
+  my ($d, $cl, $typeHash) = @_;
   return "" if(!$defs{$d});
+  my $list = "";
 
-  my $list = $AttrList; # Global values
+  my $add = sub($$)
+  {
+    my ($v,$type) = @_;
+    return if(!defined($v));
+    $list .= " " if($list);
+    $list .= $v;
+    map { s/:.*//; $typeHash->{$_} = $type } split(" ",$v) if($typeHash);
+  };
+
+  &$add($AttrList, "global");
   if($defs{$d}{".AttrList"}) {
-    $list .= " " . $defs{$d}{".AttrList"};
-  } elsif($modules{$defs{$d}{TYPE}}{AttrList}) {
-    $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList};
+    &$add($defs{$d}{".AttrList"}, "Module");
+  } else {
+    &$add($modules{$defs{$d}{TYPE}}{AttrList}, "Module");
   }
 
-  my $nl2space = sub($)
+  my $nl2space = sub($$)
   {
-    my $v = $_[0];
+    my ($v,$type) = @_;
     return if(!defined($v));
     $v =~ s/\n/ /g;
-    $list .= " $v";
+    &$add($v, $type);
   };
-  $nl2space->($attr{global}{userattr});
-  $nl2space->($attr{$d}{userattr}) if($attr{$d});
-  $list .= " userattr";
+  $nl2space->($attr{global}{userattr}, "Global userattr");
+  $nl2space->($attr{$d}{userattr}, "Device userattr") if($attr{$d});
   return $list;
 }
 

@@ -1438,10 +1438,9 @@ FW_makeTable($$$@)
 sub
 FW_detailSelect(@)
 {
-  my ($d, $cmd, $list, $param) = @_;
+  my ($d, $cmd, $list, $param, $typeHash) = @_;
   return "" if(!$list || $FW_hiddenroom{input});
-  my %al = map { s/:.*//;$_ => 1 } split(" ", $list);
-  my @al = sort keys %al; # remove duplicate items in list
+  my @al = map { s/:.*//; $_ } split(" ", $list);
 
   my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
@@ -1458,7 +1457,7 @@ FW_detailSelect(@)
   $ret .= FW_submit("cmd.$cmd$d", $cmd, $cmd.($psc?" psc":""));
   $ret .= "<div class=\"$cmd downText\">&nbsp;$d&nbsp;".
                 ($param ? "&nbsp;$param":"")."</div>";
-  $ret .= FW_select("sel_$cmd$d","arg.$cmd$d",\@al, $selEl, $cmd);
+  $ret .= FW_select("sel_$cmd$d","arg.$cmd$d",\@al,$selEl,$cmd,undef,$typeHash);
   $ret .= FW_textfield("val.$cmd$d", 30, $cmd);
   $ret .= "</form></div>";
   return $ret;
@@ -1542,7 +1541,8 @@ FW_doDetail($)
   FW_makeTable("Internals", $d, $h);
   FW_makeTable("Readings", $d, $h->{READINGS});
 
-  my $attrList = getAllAttr($d);
+  my %attrTypeHash;
+  my $attrList = getAllAttr($d, undef, \%attrTypeHash);
   my $roomList = "multiple,".join(",",
                 sort map { $_ =~ s/ /#/g ;$_} keys %FW_rooms);
   my $groupList = "multiple,".join(",",
@@ -1553,7 +1553,7 @@ FW_doDetail($)
   $attrList = FW_widgetOverride($d, $attrList);
   $attrList =~ s/\\/\\\\/g;
   $attrList =~ s/'/\\'/g;
-  FW_pO FW_detailSelect($d, "attr", $attrList);
+  FW_pO FW_detailSelect($d, "attr", $attrList, undef, \%attrTypeHash);
 
   FW_makeTable("Attributes", $d, $attr{$d}, "deleteattr");
   FW_makeTableFromArray("Probably associated with", "assoc", getPawList($d));
@@ -2273,18 +2273,31 @@ FW_hidden($$)
 sub
 FW_select($$$$$@)
 {
-  my ($id, $name, $valueArray, $selected, $class, $jSelFn) = @_;
+  my ($id, $name, $valueArray, $selected, $class, $jSelFn, $typeHash) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
   $id =~ s/\./_/g if($id);      # to avoid problems in JS DOM Search
   $id = ($id ? "id=\"$id\" informId=\"$id\"" : "");
   my $s = "<select $jSelFn $id name=\"$name\" class=\"$class\">";
+  my $oldType="";
+  my %processed;
   foreach my $v (@{$valueArray}) {
+    next if($processed{$v});
+    if($typeHash) {
+      my $newType = $typeHash->{$v};
+      if($newType ne $oldType) {
+        $s .= "</optgroup>" if($oldType);
+        $s .= "<optgroup label='$newType'>" if($newType);
+      }
+      $oldType = $newType;
+    }
     if(defined($selected) && $v eq $selected) {
       $s .= "<option selected=\"selected\" value='$v'>$v</option>\n";
     } else {
       $s .= "<option value='$v'>$v</option>\n";
     }
+    $processed{$v} = 1;
   }
+  $s .= "</optgroup>" if($oldType);
   $s .= "</select>";
   return $s;
 }
