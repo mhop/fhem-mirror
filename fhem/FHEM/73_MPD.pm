@@ -1386,10 +1386,11 @@ sub MPD_watch_idle($)
   return if (!defined($hash->{IPID}));
 
   my $waits  = AttrVal($name, "waits", 60);
-  my $cmd    = "ps -e | grep '".$hash->{IPID}." '";
-  my $result = qx($cmd); 
+  #my $cmd    = "ps -e | grep '".$hash->{IPID}." '";
+  #my $result = qx($cmd); 
 
-  if  (index($result,"perl") == -1)
+  #if  (index($result,"perl") == -1) # https://forum.fhem.de/index.php/topic,119322.msg1137693.html#msg1137693
+  unless (kill 0, $hash->{IPID})
   {
    Log3 $name, 2 , $name.", cant find idle PID ".$hash->{IPID}." in process list !";
    BlockingKill($hash->{helper}{RUNNING_PID});
@@ -1398,8 +1399,8 @@ sub MPD_watch_idle($)
    InternalTimer(gettimeofday()+2, "MPD_try_idle", $hash, 0);
    return;
   }
-  else 
-  { 
+  #else 
+  #{ 
     Log3 $name, 5 , $name.", idle PID ".$hash->{IPID}." found";
     if ((ReadingsVal($name,"presence","") eq "present") && 
         ($hash->{STATE} eq "play") &&
@@ -1410,7 +1411,7 @@ sub MPD_watch_idle($)
      mpd_cmd($hash, "status");
      readingsSingleUpdate($hash,"playlistname",$hash->{".playlist"},1) if ($hash->{READINGS}{"playlistname"}{VAL} ne $hash->{".playlist"});
     }
-  }
+  #}
 
   InternalTimer(gettimeofday()+$waits, "MPD_watch_idle", $hash, 0);
   return;
