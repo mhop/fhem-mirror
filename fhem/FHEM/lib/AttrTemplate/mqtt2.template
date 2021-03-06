@@ -39,14 +39,15 @@ attr DEVICE bridgeRegexp \
   go-eCharger/([^/]+)/.*:.* "go_eCharger_$1"\
   owntracks/[^/]+/([^/:]+).* "owntracks_$1"\
   home/(O[^/]*M[^/]*G[^/]*)/LWT:.* "$1"\
-  homeassistant/.*/config:.* ""
+  homeassistant/.*/config:.* ""\
+  instar/([^/]+)/.*:.* "instar_$1"
 attr DEVICE setList clear_all:noArg {fhem("deleteattr $NAME readingList; deletereading -q $NAME (?!associatedWith).*");return undef}
 attr DEVICE autocreate 1
 attr DEVICE comment Do not use very open bridgeRegexp expressions! This might lead to irritating results... Especially make sure to not have two regexpes that may both match!
 attr DEVICE setStateList on off
 farewell:template has been applied successfully. Be carefull when extending the brigeRegexp!
 attr DEVICE model MQTT2_CLIENT_general_bridge
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20210305
 
 ###############
 #MQTT2 IO ignoreRegexp
@@ -1226,7 +1227,7 @@ order:A_02
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
-par:SETCHANNELINFO;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 } 
 set DEVICE attrTemplate tasmota_basic_state_power1 \CALLSPEECHRECOGN=0
 copy DEVICE DEVICE_CH2
 deleteattr DEVICE_CH2 alias
@@ -1362,7 +1363,35 @@ attr DEVICE_CH2 readingList \
 attr DEVICE,DEVICE_CH2 model tasmota_4ch_two_shutters_invert_0
 setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20201221
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
- 
+
+# based on a proposal by twdotnet, https://forum.fhem.de/index.php/topic,94495.msg1137400.html#msg1137400
+# shelly i3 3 channel input switches
+name:tasmota_3channel_split
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
+desc:shelly i3 3 channel device flashed with Tasmota. <br>NOTE: a second and third device will be created for the second and third channel
+order:A_03
+par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
+par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
+par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
+set DEVICE attrTemplate tasmota_2channel_split \CALLSPEECHRECOGN=0 \SETCHANNELINFO=0
+#create device for CH3
+copy DEVICE_CH2 DEVICE_CH3
+attr DEVICE_CH3 setList \
+  off:noArg    CMNDTOPIC/POWER3 0\
+  on:noArg     CMNDTOPIC/POWER3 1\
+  toggle:noArg CMNDTOPIC/POWER3 2
+attr DEVICE_CH3 setStateList on off toggle
+attr DEVICE_CH3 readingList \
+  STATTOPIC/POWER3:.* state
+option:{SETCHANNELINFO}
+set DEVICE attrTemplate set_associatedWith \CHANNELS=3
+option:{ CALLSPEECHRECOGN }
+set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
+option:global
+attr DEVICE,DEVICE_CH2,DEVICE_CH3 model tasmota_3channel_split
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210305
+
 
 # sonoff 4 channel device flashed with Tasmota.
 # contributed by Blauhorn, https://forum.fhem.de/index.php/topic,94495.msg976113.html#msg976113
