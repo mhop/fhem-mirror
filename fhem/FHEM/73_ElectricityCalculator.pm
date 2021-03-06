@@ -1230,7 +1230,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 				The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>
-				It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic electricity meter.<BR>
+				It is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the continously increasing counter value of one or more mechanical or electronic electricity meter.<BR>
 				<BR>
 				As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>
 				<BR>
@@ -1342,7 +1342,7 @@ sub ElectricityCalculator_Notify($$)
 		<tr>
 			<td>
 				Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>
-				Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>
+				Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit dem kontinuierlich wachsenden Z&auml;hlerstand von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>
 				<BR>
 				Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>
 				<BR>
@@ -1445,11 +1445,11 @@ sub ElectricityCalculator_Notify($$)
 =for :application/json;q=META.json 73_ElectricityCalculator.pm
 {
   "abstract": "Calculates the electrical energy consumption and costs.",
-  "description": "The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>Tt is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the counting ticks of one or more mechanical or electronic electricity meter.<BR>As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>The ElectricityCalculator module provides several current, historical, statistical values around with respect to one or more electricity meter and creates respective readings.<BR>",
+  "description": "The ElectricityCalculator Module calculates the electrical energy consumption and costs of one ore more electricity meters.<BR>Tt is not a counter module itself but it requires a regular expression (regex or regexp) in order to know where to retrieve the continously increasing counter value of one or more mechanical or electronic electricity meter.<BR>As soon the module has been defined within the fhem.cfg, the module reacts on every event of the specified counter like myOWDEVICE:counter.* etc.<BR>The ElectricityCalculator module provides several current, historical, statistical values around with respect to one or more electricity meter and creates respective readings.<BR>",
   "x_lang": {
     "de": {
       "abstract": "Berechnet den Energieverbrauch und verbundene Kosten",
-      "description": "Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit den Z&auml;hlimpulse von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>Das ElectricityCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Elektrizit&auml;tsz&auml;hlern und erstellt die entsprechenden Readings.<BR>"
+      "description": "Das ElectricityCalculator Modul berechnet den Verbrauch an elektrischer Energie (Stromverbrauch) und den verbundenen Kosten von einem oder mehreren Elektrizit&auml;tsz&auml;hlern.<BR>Es ist kein eigenes Z&auml;hlermodul sondern ben&ouml;tigt eine Regular Expression (regex or regexp) um das Reading mit dem kontinuierlich wachsenden Z&auml;hlerstand von einem oder mehreren Electrizit&auml;tsz&auml;hlern zu finden.<BR>Sobald das Modul in der fhem.cfg definiert wurde, reagiert das Modul auf jedes durch das regex definierte event wie beispielsweise ein myOWDEVICE:counter.* etc.<BR>Das ElectricityCalculator Modul berechnet augenblickliche, historische statistische und vorhersehbare Werte von einem oder mehreren Elektrizit&auml;tsz&auml;hlern und erstellt die entsprechenden Readings.<BR>"
     }
   },
   "author": [
