@@ -1442,8 +1442,8 @@ FW_detailSelect(@)
   my ($d, $cmd, $list, $param, $typeHash) = @_;
   return "" if(!$list || $FW_hiddenroom{input});
   my @al = sort { 
-             my $ta = $typeHash->{$a} ? $typeHash->{$a}.$a : $a;
-             my $tb = $typeHash->{$b} ? $typeHash->{$b}.$b : $b;
+             my $ta = $typeHash && $typeHash->{$a} ? $typeHash->{$a}.$a : $a;
+             my $tb = $typeHash && $typeHash->{$b} ? $typeHash->{$b}.$b : $b;
              $ta cmp $tb;
            } map { s/:.*//; $_ } split(" ", $list);
 
