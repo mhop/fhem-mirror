@@ -37,6 +37,7 @@ IPCAM_Initialize($$)
   $hash->{UndefFn}  = "IPCAM::Undef";
   $hash->{GetFn}    = "IPCAM::Get";
   $hash->{SetFn}    = "IPCAM::Set";
+#  $hash->{FW_detailFn} = "IPCAM::DetailFn";
   $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage timestamp:0,1 ".
                       "cmdPanLeft cmdPanRight cmdTiltUp cmdTiltDown cmdStep ".
                       "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
@@ -44,7 +45,7 @@ IPCAM_Initialize($$)
                       "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
                       "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
                       "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
-                      "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
+                      "disable:0,1 ".
                       $readingFnAttributes;
 }
 
@@ -53,10 +54,6 @@ use strict;
 use warnings;
 use SetExtensions;
 use GPUtils qw(:all);
-
-sub getSnapshot($);
-sub guessFileFormat($);
-sub getScheme($);
 
 my %gets = (
   "image"     => "",
@@ -89,9 +86,10 @@ BEGIN {
         gettimeofday
         attr
         TimeNow
-        GetFileFromURLQuiet
+        HttpUtils_NonblockingGet
         SetExtensions
         AttrTemplate_Set
+        urlEncode
     ))
 };
 
@@ -262,11 +260,42 @@ Set($$$@) {
     }
 
     Log3 $name, 4, "IPCAM ($name) - set $cmd requesting $camURI";
-    my $camret = GetFileFromURLQuiet($camURI);
-    Log3 $name, 5, "IPCAM ($name) - return:$camret";
+    #my $camret = GetFileFromURLQuiet($camURI);
+    SendCommand( $hash, $camURI );
+    #Log3 $name, 5, "IPCAM ($name) - return:$camret";
   }
 
   return undef;
+}
+
+sub SendCommand {
+  my ($hash, $camUrl) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 3, "IPCAM ($name) - sending command: $camUrl";
+  my $apiParam = {
+    url => $camUrl,
+    method => "GET",
+    callback => \&IPCAM::SendCommand_Callback,
+    hash => $hash
+  };
+  HttpUtils_NonblockingGet($apiParam);
+  
+  return undef;
+}
+
+sub SendCommand_Callback {
+  my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  if($err ne "") {
+    Log3 $name, 0, "IPCAM ($name) - error while sending command ".$param->{url}." - $err";
+
+  } elsif($data ne "") {
+    Log3 $name, 3, "IPCAM ($name) - command response: $data";
+  }
+
 }
 
 #####################################
@@ -356,19 +385,8 @@ getSnapshot($) {
   my $camPath;
   my $camQuery;
   my $camCredentials;
-  my $imageFile;
-  my $imageFormat;
-  my $lastSnapshot;
-  my $snapshot;
-  my $dateTime;
   my $modpath = $attr{global}{modpath};
-  my $seq = int(defined($hash->{SEQ}) ? $hash->{SEQ} : 0);
-  my $seqImages = int(AttrVal($name,'snapshots',1));
-  my $seqF;
-  my $seqL = length($seqImages);
-  my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
   my $basicauth = AttrVal($name,'basicauth', undef);
-  my $timestamp;
 
   #if(!$storage) {
   #  RemoveInternalTimer($hash);
@@ -403,75 +421,123 @@ getSnapshot($) {
       $camURI =~ s/{PASSWORD}/$credentials{$name}{password}/;
     }
   }
-
-  $dateTime = TimeNow();
-  $timestamp = $dateTime;
-  $timestamp =~ s/ /_/g;
-  $timestamp =~ s/(:|-)//g;
+  $camURI = $camURI;
 
   Log3 $name, 3, "IPCAM ($name) - getSnapshot URI: $camURI";
-  $snapshot = GetFileFromURLQuiet($camURI);
+#  while ($camURI =~ m/(\[.*:.*\])/) {
+#    Log3 $name, 3, "IPCAM ($name) - found reading: $1";
+#  }
+
+  GetSnapshot($hash, $camURI);
 #  Log3 $name, 5, "IPCAM ($name) - getSnapshot snapshot: $snapshot";
-
-  $imageFormat = guessFileFormat(\$snapshot);
-
-  my @imageTypes = qw(JPEG PNG GIF TIFF BMP ICO PPM XPM XBM SVG);
-
-  if( ! grep { $_ eq "$imageFormat"} @imageTypes) {
-    Log3 $name, 1, "IPCAM ($name) - Wrong or not supported image format: $imageFormat";
-    RemoveInternalTimer($hash);
-    return undef;
-  }
-
-  Log3 $name, 4, "IPCAM ($name) - Image Format: $imageFormat";
-
-  readingsBeginUpdate($hash);
-  if($seq < $seqImages) {
-    $seq++;
-    $seqF = sprintf("%0${seqL}d",$seq);
-    $imageFormat = "JPG" if($imageFormat eq "JPEG");
-    
-    $lastSnapshot = $name."_snapshot.".lc($imageFormat);
-    if(defined($attr{$name}{timestamp}) && $attr{$name}{timestamp} == 1) {
-      $imageFile = $name."_".$timestamp.".".lc($imageFormat);
-    } else {
-      $imageFile = $name."_snapshot_".$seqF.".".lc($imageFormat);
-    }
-    if(!open(FH, ">$storage/$lastSnapshot")) {
-      Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$lastSnapshot: $!";
-      RemoveInternalTimer($hash);
-      readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
-      return undef;
-    }
-    print FH $snapshot;
-    close(FH);
-    Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$lastSnapshot written.";
-    if(!open(FH, ">$storage/$imageFile")) {
-      Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$imageFile: $!";
-      RemoveInternalTimer($hash);
-      readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
-      return undef;
-    }
-    print FH $snapshot;
-    close(FH);
-    Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$imageFile written.";
-    readingsBulkUpdate($hash,"last",$lastSnapshot, 1);
-    $hash->{STATE} = "last: $dateTime";
-    $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
-    $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
-  }
-
-  Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
-
-  if($seq == $seqImages) {
-    readingsBulkUpdate($hash,"snapshots",$seq,1 );
-    $seq = 0;
-  }
-  readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
-  $hash->{SEQ}  = $seq;
 
   return undef;
 }
+
+sub GetSnapshot {
+  my ($hash, $camUrl) = @_;
+  my $name = $hash->{NAME};
+
+  my $apiParam = {
+    url => $camUrl,
+    method => "GET",
+    callback => \&IPCAM::GetSnapshot_Callback,
+    hash => $hash
+  };
+  HttpUtils_NonblockingGet($apiParam);
+  
+  return undef;
+}
+
+sub GetSnapshot_Callback {
+  my ($param, $err, $snapshot) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  if($err ne "") {
+    Log3 $name, 0, "IPCAM ($name) - error while getting snapshot ".$param->{url}." - $err";
+
+  } elsif($snapshot ne "") {
+#    Log3 $name, 3, "IPCAM ($name) - snapshot response: $data";
+
+    my $imageFormat = guessFileFormat(\$snapshot);
+
+    my @imageTypes = qw(JPEG PNG GIF TIFF BMP ICO PPM XPM XBM SVG);
+
+    if( ! grep { $_ eq "$imageFormat"} @imageTypes) {
+      Log3 $name, 1, "IPCAM ($name) - Wrong or not supported image format: $imageFormat";
+      RemoveInternalTimer($hash);
+      return undef;
+    }
+
+    Log3 $name, 3, "IPCAM ($name) - Snapshot Image Format: $imageFormat";
+
+    readingsBeginUpdate($hash);
+    
+    my $seq = int(defined($hash->{SEQ}) ? $hash->{SEQ} : 0);
+    my $seqImages = int(AttrVal($name,'snapshots',1));
+
+    if($seq < $seqImages) {
+      $seq++;
+
+      my $seqL = length($seqImages);
+      my $seqF = sprintf("%0${seqL}d", $seq);
+      $imageFormat = "JPG" if($imageFormat eq "JPEG");
+    
+      my $lastSnapshot = $name."_snapshot.".lc($imageFormat);
+      my $dateTime = TimeNow();
+      my $timestamp = $dateTime;
+      $timestamp =~ s/ /_/g;
+      $timestamp =~ s/(:|-)//g;
+
+      my $imageFile;
+      if(defined($attr{$name}{timestamp}) && $attr{$name}{timestamp} == 1) {
+        $imageFile = $name."_".$timestamp.".".lc($imageFormat);
+      } else {
+        $imageFile = $name."_snapshot_".$seqF.".".lc($imageFormat);
+      }
+
+      my $modpath = $attr{global}{modpath};
+      my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
+      if(!open(FH, ">$storage/$lastSnapshot")) {
+        Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$lastSnapshot: $!";
+        RemoveInternalTimer($hash);
+        readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
+        return undef;
+      }
+      print FH $snapshot;
+      close(FH);
+
+      Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$lastSnapshot written.";
+      if(!open(FH, ">$storage/$imageFile")) {
+        Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$imageFile: $!";
+        RemoveInternalTimer($hash);
+        readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
+        return undef;
+      }
+      print FH $snapshot;
+      close(FH);
+
+      Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$imageFile written.";
+      readingsBulkUpdate($hash, "last", $lastSnapshot, 1);
+      $hash->{STATE} = "last: $dateTime";
+      $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
+      $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
+
+      Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
+    }
+
+
+    if($seq == $seqImages) {
+      readingsBulkUpdate($hash, "snapshots", $seq, 1);
+      $seq = 0;
+    }
+    readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
+    $hash->{SEQ}  = $seq;
+  }
+}
+
+
 
 #####################################
 sub
@@ -508,6 +574,20 @@ guessFileFormat($) {
   return "XBM"  if /^(?:\/\*.*\*\/\n)?#define\s/;
   return "SVG"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
   return "unknown";
+}
+
+sub
+DetailFn {
+  my ( $FW_wname, $deviceName, $FW_room ) = @_;
+
+  my $hash = $main::defs{$deviceName};
+  my $name = $hash->{NAME};
+
+  my $scheme = getScheme($hash);
+  my $ip = $hash->{AUTHORITY};
+  my $cameraUri = "$scheme://$ip";
+
+  return "<div><a href='$cameraUri' target='_blank'>Go to Camera Web UI</a></div>";  
 }
 
 # vim: ts=2:et
@@ -744,7 +824,6 @@ guessFileFormat($) {
     </li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li>
       path<br>
