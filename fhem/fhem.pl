@@ -388,11 +388,11 @@ my @attrList = qw(
   timestamp-on-change-reading
 );
 $readingFnAttributes = join(" ", @attrList);
-my %framework_attrList = map { $_ => 1 } @attrList;
-map { $framework_attrList{$_} = 1 } (
-  "ignore",
-  "disable",
-  "disabledForIntervals"
+my %framework_attrList = map { s/:.*//; $_ => 1 } @attrList;
+map { $framework_attrList{$_} = 1 } qw(
+  ignore
+  disable
+  disabledForIntervals
 );
 
 my %ra = (
@@ -2758,7 +2758,7 @@ getAllAttr($;$$)
         split(" ",$v) if($typeHash);
   };
 
-  &$add($AttrList, "global");
+  &$add($AttrList, "framework");
   if($defs{$d}{".AttrList"}) {
     &$add($defs{$d}{".AttrList"}, "Module");
   } else {
@@ -2773,7 +2773,7 @@ getAllAttr($;$$)
     &$add($v, $type);
   };
   $nl2space->($attr{global}{userattr}, "global userattr");
-  $nl2space->($attr{$d}{userattr}, "Device userattr") if($attr{$d});
+  $nl2space->($attr{$d}{userattr}, "device userattr") if($attr{$d});
   return $list;
 }
 
