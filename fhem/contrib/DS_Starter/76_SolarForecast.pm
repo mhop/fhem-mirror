@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350  ",
   "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
   "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
   "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
@@ -1037,7 +1038,7 @@ sub centralTask {
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen 
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
-      
+
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
@@ -1231,6 +1232,7 @@ sub _transferDWDForecastValues {
       }
       
       my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
+      $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;                       # Hilfshash Wert PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
       
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
@@ -1371,6 +1373,7 @@ sub _transferInverterValues {
           $ethishour = 0;
       }
       push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:".$ethishour." Wh";
+      $data{$hash->{TYPE}}{$name}{pvreal}{sprintf("%02d",$chour)} = $ethishour;               # Hilfshash Wert PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
       setPVhistory ($paref);
