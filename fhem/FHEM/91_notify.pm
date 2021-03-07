@@ -554,7 +554,7 @@ END
     <a name="ignoreRegexp"></a>
     <li>ignoreRegexp regexp<br>
         It is hard to create a regexp which is _not_ matching something, this
-        attribute helps in this case, as the event is ignored if matches the
+        attribute helps in this case, as the event is ignored if it matches the
         argument. The syntax is the same as for the original regexp.
         </li>
 
@@ -784,8 +784,8 @@ END
     <a name="ignoreRegexp"></a>
     <li>ignoreRegexp regexp<br>
         Es ist nicht immer einfach ein Regexp zu bauen, was etwas _nicht_
-        matcht. Dieses Attribu hilft in diesen F&auml;llen: das Event wird
-        ignoriert, falls den angegebenen Regexp matcht. Syntax ist gleich wie
+        matcht. Dieses Attribut hilft in diesen F&auml;llen: das Event wird
+        ignoriert, falls es den angegebenen Regexp matcht. Syntax ist gleich wie
         in der Definition.
         </li>
 
