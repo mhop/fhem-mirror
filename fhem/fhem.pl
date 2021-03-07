@@ -281,8 +281,8 @@ $selectTimestamp = gettimeofday();
 $cvsid = '$Id$';
 
 my $AttrList = "alias comment:textField-long eventMap:textField-long ".
-               "group room suppressReading userReadings:textField-long ".
-               "verbose:0,1,2,3,4,5 userattr";
+               "group room suppressReading userattr ".
+               "userReadings:textField-long verbose:0,1,2,3,4,5 ";
 
 my $currcfgfile="";             # current config/include file
 my $currlogfile;                # logfile, without wildcards
@@ -388,6 +388,12 @@ my @attrList = qw(
   timestamp-on-change-reading
 );
 $readingFnAttributes = join(" ", @attrList);
+my %framework_attrList = map { $_ => 1 } @attrList;
+map { $framework_attrList{$_} = 1 } (
+  "ignore",
+  "disable",
+  "disabledForIntervals"
+);
 
 my %ra = (
   "suppressReading"            => { s=>"\n" },
@@ -2747,7 +2753,9 @@ getAllAttr($;$$)
     return if(!defined($v));
     $list .= " " if($list);
     $list .= $v;
-    map { s/:.*//; $typeHash->{$_} = $type } split(" ",$v) if($typeHash);
+    map { s/:.*//; 
+          $typeHash->{$_} = $framework_attrList{$_} ? "framework" : $type }
+        split(" ",$v) if($typeHash);
   };
 
   &$add($AttrList, "global");
@@ -2764,7 +2772,7 @@ getAllAttr($;$$)
     $v =~ s/\n/ /g;
     &$add($v, $type);
   };
-  $nl2space->($attr{global}{userattr}, "Global userattr");
+  $nl2space->($attr{global}{userattr}, "global userattr");
   $nl2space->($attr{$d}{userattr}, "Device userattr") if($attr{$d});
   return $list;
 }

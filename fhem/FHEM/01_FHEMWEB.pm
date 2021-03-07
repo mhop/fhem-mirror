@@ -1441,7 +1441,11 @@ FW_detailSelect(@)
 {
   my ($d, $cmd, $list, $param, $typeHash) = @_;
   return "" if(!$list || $FW_hiddenroom{input});
-  my @al = map { s/:.*//; $_ } split(" ", $list);
+  my @al = sort { 
+             my $ta = $typeHash->{$a} ? $typeHash->{$a}.$a : $a;
+             my $tb = $typeHash->{$b} ? $typeHash->{$b}.$b : $b;
+             $ta cmp $tb;
+           } map { s/:.*//; $_ } split(" ", $list);
 
   my $selEl = (defined($al[0]) ? $al[0] : " ");
   $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
