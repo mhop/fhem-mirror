@@ -397,7 +397,7 @@ HUEDevice_Define($$) {
 
   my ($name, $type, $id, $interval) = @args;
 
-  $hash->{STATE} = 'Initialized';
+  $hash->{STATE} = 'Initialized' if($init_done);
 
   $hash->{ID} = $hash->{helper}->{devtype}.$id;
 
@@ -910,6 +910,7 @@ HUEDevice_Set($@)
       foreach my $entry (@{$entries}) {
         $list .= ' ';
         $list .= (split( ' ', $entry->{regex} ))[0];
+        $list .= ":$entry->{opts}" if( $entry->{opts} );
       }
     }
     $list .= ' '. join( ':noArg ', keys %{$hash->{helper}{configList}{cmds}} ) if( $hash->{helper}{configList}{cmds} );
@@ -918,6 +919,7 @@ HUEDevice_Set($@)
       foreach my $entry (@{$entries}) {
         $list .= ' ';
         $list .= (split( ' ', $entry->{regex} ))[0];
+        $list .= ":$entry->{opts}" if( $entry->{opts} );
       }
     }
 
@@ -1907,11 +1909,17 @@ HUEDevice_Attr($$$;$)
     #return "$name is not a CLIP sensor device" if( $hash->{type} && $hash->{type} !~ m/^CLIP/ );
     if( $cmd eq "set" && $attrVal ) {
       foreach my $line ( split( "\n", $attrVal ) ) {
-        my($cmd,$json) = split( ":", $line,2 );
+        my ($cmd,$opts,$json);
+        if (scalar split(':',$line) > 3 && (split(':',$line))[1] !~ /^perl/){
+          ($cmd,$opts,$json) = split( ':', $line,3 );
+        } else {
+          ($cmd,$json) = split( ':', $line,2 );
+          $opts = '';
+        }
         if( $cmd =~ m'^/(.*)/$' ) {
           my $regex = $1;
           $hash->{helper}{$attrName}{'regex'} = [] if( !$hash->{helper}{$attrName}{'regex'} );
-          push @{$hash->{helper}{$attrName}{'regex'}}, { regex => $regex, json => $json };
+          push @{$hash->{helper}{$attrName}{'regex'}}, { regex => $regex, opts => $opts, json => $json };
         } else {
           $hash->{helper}{$attrName}{cmds}{$cmd} = $json;
         }
@@ -2100,7 +2108,8 @@ absent:{&lt;json&gt;}</code></li>
     <li>configList<br>
       The list of know config commands for sensor type devices. one command per line, eg.: <code><br>
 attr mySensor mode:{&lt;json&gt;}\<br>
-/heatsetpoint (.*)/:perl:{'{"heatsetpoint":'. $VALUE1 * 100 .'}'}</code></li>
+/heatsetpoint (.*)/:perl:{'{"heatsetpoint":'. $VALUE1 * 100 .'}'}<br>
+/sensitivity (.*)/:0,1,2,3:{"sensitivity":$1}</code></li>
     <li>readingList<br>
       The list of readings that should be created from the sensor state object. Space or comma separated.</li>
     <li>subType<br>
