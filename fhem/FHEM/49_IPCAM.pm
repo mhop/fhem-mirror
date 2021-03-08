@@ -43,7 +43,7 @@ IPCAM_Initialize($$)
                       "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
                       "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
                       "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
-                      "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
+                      "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15  ".
                       "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
                       "disable:0,1 ".
                       $readingFnAttributes;
@@ -57,6 +57,7 @@ use GPUtils qw(:all);
 
 my %gets = (
   "image"     => "",
+  "imageWithCallback" => "",
   "last"      => "",
   "snapshots" => "",
 );
@@ -90,6 +91,7 @@ BEGIN {
         SetExtensions
         AttrTemplate_Set
         urlEncode
+        AnalyzeCommand
     ))
 };
 
@@ -311,7 +313,7 @@ Get($@) {
 
   # check syntax
   return "argument is missing @a"
-    if(int(@a) != 2);
+    if(int(@a) < 2);
   # check argument
   return "Unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
     if(!defined($gets{$a[1]}));
@@ -337,7 +339,8 @@ Get($@) {
   }
  
   # get argument
-  my $arg = $a[1];
+  shift @a;
+  my $arg = shift @a;
 
   if($arg eq "image") {
 
@@ -363,6 +366,23 @@ Get($@) {
     }
     return undef;
 
+  } elsif($arg eq "imageWithCallback") {
+    
+    my $callbackCommand = join(" ", @a);
+    Log3 $name, 0, "IPCAM ($name) - imageWithCallback command: $callbackCommand";
+    my $error = AnalyzeCommand(undef, $callbackCommand);
+    if (defined $error) {
+      Log3 $name, 0, "IPCAM ($name) - imageWithCallback command invalid: $error";
+      return undef;
+    }
+
+    my $camUri = getSnapshot($hash, 1);
+    Log3 $name, 0, "IPCAM ($name) - imageWithCallback camUri: $camUri";
+  
+    RequestSnapshotWithCallback($hash, $camUri, $callbackCommand);
+
+    return undef;    
+
   } elsif(defined($hash->{READINGS}{$arg})) {
 
     if(defined($hash->{READINGS}{$arg}{VAL})) {
@@ -377,8 +397,8 @@ Get($@) {
 
 #####################################
 sub
-getSnapshot($) {
-  my ($hash) = @_;
+getSnapshot($$) {
+  my ($hash, $skipRequest) = @_;
   my $name = $hash->{NAME};
   my $camAuth = $hash->{AUTHORITY};
   my $camURI;
@@ -428,28 +448,39 @@ getSnapshot($) {
 #    Log3 $name, 3, "IPCAM ($name) - found reading: $1";
 #  }
 
-  GetSnapshot($hash, $camURI);
+  if (defined $skipRequest) {
+    return $camURI;
+  } else {
+    RequestSnapshot($hash, $camURI);
+  }
 #  Log3 $name, 5, "IPCAM ($name) - getSnapshot snapshot: $snapshot";
 
   return undef;
 }
 
-sub GetSnapshot {
+sub RequestSnapshot {
   my ($hash, $camUrl) = @_;
+
+  return RequestSnapshotWithCallback($hash, $camUrl, undef);
+}
+
+sub RequestSnapshotWithCallback {
+  my ($hash, $camUrl, $callbackCommand) = @_;
   my $name = $hash->{NAME};
 
   my $apiParam = {
     url => $camUrl,
     method => "GET",
-    callback => \&IPCAM::GetSnapshot_Callback,
-    hash => $hash
+    callback => \&IPCAM::RequestSnapshot_Callback,
+    hash => $hash,
+    callbackCommand => $callbackCommand
   };
   HttpUtils_NonblockingGet($apiParam);
   
   return undef;
 }
 
-sub GetSnapshot_Callback {
+sub RequestSnapshot_Callback {
   my ($param, $err, $snapshot) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
@@ -527,13 +558,17 @@ sub GetSnapshot_Callback {
       Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
     }
 
-
     if($seq == $seqImages) {
       readingsBulkUpdate($hash, "snapshots", $seq, 1);
       $seq = 0;
     }
     readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
     $hash->{SEQ}  = $seq;
+  }
+  
+  my $callbackCommand = $param->{callbackCommand};
+  if (defined $callbackCommand) {
+    Log3 $name, 0, "IPCAM ($name) - RequestSnapshotWithCallback would execute $callbackCommand";
   }
 }
 
@@ -742,6 +777,15 @@ DetailFn {
         and the time interval between images can be specified using the<br>
         attributes <code>snapshots</code> and <code>delay</code>.
       </li>
+      <li><code>imageWithCallback</code><br>
+        Like <code>get image</code>, but allows you to provide a command<br>
+        that's executed as soon as the picture is taken.<br>
+        This is one-time trigger only, not for intervals and more images.<br>
+        Allows you to eg send pictures immediately and <br>
+        without creating a dedicated notify.<br>
+        Example:<br>
+        <code>get ipcam3 imageWithCallback set pushmsg msg Frontdoor Ding Dong! expire=3600 attachment='www/snapshot/ipcam3_snapshot.jpg'</code>
+      </li>
       <li><code>last</code><br>
         Show the name of the last snapshot.
       </li>
@@ -851,6 +895,12 @@ DetailFn {
       if it is necessary.<br>
       Example:<br>
       <code>attr ipcam3 pathPanTilt decoder_control.cgi?user={USERNAME}&amp;pwd={PASSWORD}</code>
+    </li>
+    <li>
+      query<br>
+      query string parameters that will be attached to all commands. Without leading ? or &amp;<br>
+      Example:<br>
+      <code>attr ipcam3 query user={USERNAME}&amp;pwd={PASSWORD}</code>
     </li>
     <li><a href="#showtime">showtime</a></li>
     <li>
