@@ -4315,10 +4315,10 @@ sub bar
   my ($ic,$iscale,$ix,$iy,$rotate);
   my $minCol=$minColor;
   
-  my ($dec,$fontformat);
-  
-  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  my ($dec,$fontformat,$unitformat);
+  ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
   $fontformat="" if (!defined $fontformat);
+  $unitformat="" if (!defined $unitformat);
  
   
   if (defined $lr) {
@@ -4449,11 +4449,11 @@ sub bar
   my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
   
   if (defined $valDec) {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unitformat,$unit);
   } else {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unit);
+    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
+           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unitformat,$unit);
   }
   $out.= '</g>';
  	$out.= '</svg>';
@@ -4687,10 +4687,10 @@ sub ring
   my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$lr,$ln,$icon) = @_;
   my $out;
   
-  my ($dec,$fontformat);
-  
-  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  my ($dec,$fontformat,$unitformat);
+  ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
   $fontformat="" if (!defined $fontformat);
+  $unitformat="" if (!defined $unitformat);
   
   my ($ic,$iscale,$ix,$iy,$rotate)=();
   
@@ -4796,8 +4796,8 @@ sub ring
     $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
                    ($icflag ? 43:34),color($currColor,$ln),(defined ($icon) ? 14:20),$fontformat,$valInt);
   }
-  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;">%s</text>',
-                 ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unit) if (defined $unit);
+  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;%s">%s</text>',
+                 ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unitformat,$unit) if (defined $unit);
   $out.= '</svg>';
   return ($out);
 }
@@ -4809,16 +4809,15 @@ sub ring2
   my ($format,$value);
   my ($format2,$value2);
   
-  my ($dec,$fontformat);
-  
-  ($dec,$fontformat)=split (/,/,$decfont) if (defined $decfont);
+  my ($dec,$fontformat,$unitformat);
+  ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
   $fontformat="" if (!defined $fontformat);
-
-  my ($dec2,$fontformat2);
+  $unitformat="" if (!defined $unitformat);
   
-  ($dec2,$fontformat2)=split (/,/,$decfont2) if (defined $decfont2);
+  my ($dec2,$fontformat2,$unitformat2);
+  ($dec2,$fontformat2,$unitformat2)=split (/,/,$decfont2) if (defined $decfont2);
   $fontformat2="" if (!defined $fontformat2);
-
+  $unitformat2="" if (!defined $unitformat2);
   
    my ($ic,$iscale,$ix,$iy,$rotate)=();
   
@@ -4960,7 +4959,7 @@ sub ring2
     $out.= sprintf('<text text-anchor="middle" x="%s" y="29" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
                    ($icflag ? 50:41),color($currColor,$ln),(defined ($icon) ? 13:16),$fontformat,$valInt);
   }
-  $out.= sprintf('<text text-anchor="middle" x="41" y="16" style="fill:%s;font-size:9px;">%s</text>',color($currColor,$ln),$unit) if (defined $unit);
+  $out.= sprintf('<text text-anchor="middle" x="41" y="16" style="fill:%s;font-size:9px;%s">%s</text>',color($currColor,$ln),$unitformat,$unit) if (defined $unit);
   
   my ($valInt2,$valDec2)=split(/\./,sprintf($format2,$val2));  
   
@@ -4971,7 +4970,7 @@ sub ring2
     $out.= sprintf('<text text-anchor="middle" x="%s" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
                    ($icflag ? 50:41),($icflag ? 41:42.5),color($currColor2,$ln),(defined ($icon) ? 12:14),$fontformat2,$valInt2);
   }
-  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:9px;">%s</text>',($icflag ? 51:52),color($currColor2,$ln),$unit2) if (defined $unit2);
+  $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:9px;%s">%s</text>',($icflag ? 51:52),color($currColor2,$ln),$unitformat2,$unit2) if (defined $unit2);
   
   $out.= '</svg>';
   return ($out);
