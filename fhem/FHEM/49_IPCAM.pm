@@ -92,6 +92,7 @@ BEGIN {
         AttrTemplate_Set
         urlEncode
         AnalyzeCommand
+        ReplaceSetMagic
     ))
 };
 
@@ -371,7 +372,7 @@ Get($@) {
     my $callbackCommand = join(" ", @a);
     Log3 $name, 3, "IPCAM ($name) - imageWithCallback command: $callbackCommand";
 
-    my $camUri = getSnapshot($hash, 1);
+    my $camUri = createSnapshotUrl($hash);
     Log3 $name, 3, "IPCAM ($name) - imageWithCallback camUri: $camUri";
   
     RequestSnapshotWithCallback($hash, $camUri, $callbackCommand);
@@ -387,13 +388,18 @@ Get($@) {
     }
 
   }
+}
 
+sub getSnapshot($$) {
+  my ($hash) = @_;
+  my $snapshotUrl = createSnapshotUrl($hash);
+  RequestSnapshot($hash, $snapshotUrl);
 }
 
 #####################################
 sub
-getSnapshot($$) {
-  my ($hash, $skipRequest) = @_;
+createSnapshotUrl($) {
+  my ($hash) = @_;
   my $name = $hash->{NAME};
   my $camAuth = $hash->{AUTHORITY};
   my $camURI;
@@ -443,15 +449,16 @@ getSnapshot($$) {
 #    Log3 $name, 3, "IPCAM ($name) - found reading: $1";
 #  }
 
-  if (defined $skipRequest) {
-    return $camURI;
-  } else {
-    RequestSnapshot($hash, $camURI);
-  }
+#  if (defined $skipRequest) {
+#    return $camURI;
+#  } else {
+#    RequestSnapshot($hash, $camURI);
+#  }
 #  Log3 $name, 5, "IPCAM ($name) - getSnapshot snapshot: $snapshot";
 
-  return undef;
+  return $camURI;
 }
+
 
 sub RequestSnapshot {
   my ($hash, $camUrl) = @_;
@@ -563,6 +570,14 @@ sub RequestSnapshot_Callback {
   
   my $callbackCommand = $param->{callbackCommand};
   if (defined $callbackCommand) {
+    my %dummy; 
+    my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $callbackCommand ) );
+    if ( $err ) {
+      Log3 $name, 0, "IPCAM ($name) - parse cmd failed on ReplaceSetmagic with :$err: on  :$callbackCommand:";
+    } else {
+      $callbackCommand = join(" ", @a);
+    } 
+
     Log3 $name, 3, "IPCAM ($name) - RequestSnapshotWithCallback executing $callbackCommand";
 
     my $error = AnalyzeCommand(undef, $callbackCommand);
@@ -786,7 +801,9 @@ DetailFn {
         Allows you to eg send pictures immediately and <br>
         without creating a dedicated notify.<br>
         Example:<br>
-        <code>get ipcam3 imageWithCallback set pushmsg msg Frontdoor Ding Dong! expire=3600 attachment='www/snapshot/ipcam3_snapshot.jpg'</code>
+        <code>get ipcam3 imageWithCallback set pushmsg msg Frontdoor Ding Dong! expire=3600 attachment='www/snapshot/ipcam3_snapshot.jpg'</code><br>
+        The callback command can also hold references to other readings, internals, etc. The following example will lead to the same command as the first one:<br>
+        <code>get ipcam3 imageWithCallback set pushmsg msg Frontdoor Ding Dong! expire=3600 attachment='www/snapshot/[ipcam3:latest]'</code>
       </li>
       <li><code>last</code><br>
         Show the name of the last snapshot.
