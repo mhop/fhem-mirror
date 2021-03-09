@@ -369,10 +369,10 @@ Get($@) {
   } elsif($arg eq "imageWithCallback") {
     
     my $callbackCommand = join(" ", @a);
-    Log3 $name, 0, "IPCAM ($name) - imageWithCallback command: $callbackCommand";
+    Log3 $name, 3, "IPCAM ($name) - imageWithCallback command: $callbackCommand";
 
     my $camUri = getSnapshot($hash, 1);
-    Log3 $name, 0, "IPCAM ($name) - imageWithCallback camUri: $camUri";
+    Log3 $name, 3, "IPCAM ($name) - imageWithCallback camUri: $camUri";
   
     RequestSnapshotWithCallback($hash, $camUri, $callbackCommand);
 
@@ -563,7 +563,7 @@ sub RequestSnapshot_Callback {
   
   my $callbackCommand = $param->{callbackCommand};
   if (defined $callbackCommand) {
-    Log3 $name, 0, "IPCAM ($name) - RequestSnapshotWithCallback executing $callbackCommand";
+    Log3 $name, 3, "IPCAM ($name) - RequestSnapshotWithCallback executing $callbackCommand";
 
     my $error = AnalyzeCommand(undef, $callbackCommand);
     if (defined $error) {
