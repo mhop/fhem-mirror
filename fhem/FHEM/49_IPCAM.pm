@@ -44,6 +44,8 @@ IPCAM_Initialize($$)
                       "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
                       "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
                       "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15  ".
+                      "cmd01data cmd02data cmd03data cmd04data cmd05data cmd06data cmd07data ".
+                      "cmd08data cmd09data cmd10data cmd11data cmd12data cmd13data cmd14data cmd15data ".
                       "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
                       "disable:0,1 ".
                       $readingFnAttributes;
@@ -144,6 +146,7 @@ Set($$$@) {
   return AttrTemplate_Set($hash, $list, $name, $cmd, @args)
     if(!defined($sets{$cmd}));
 
+  my $arg;
   if($cmd eq "pan" || $cmd eq "tilt") {
 
     # check syntax
@@ -177,7 +180,7 @@ Set($$$@) {
     return "Wrong argument $args[0], only digits from 1 to 15 or home are allowed"
       if(defined($args[0]) && $args[0] !~ /^([1-9]|1[0-5])$/ && $args[0] ne "home");
     
-    my $arg = ($args[0] =~ /\d+/) ? sprintf("cmdPos%02d",$args[0]) : "cmdPosHome";
+    $arg = ($args[0] =~ /\d+/) ? sprintf("cmdPos%02d",$args[0]) : "cmdPosHome";
     return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
            "'attr $name $arg <your_camera_command>'"
       if(!defined(AttrVal($name,$arg,undef)));
@@ -193,7 +196,7 @@ Set($$$@) {
     return "Wrong argument $args[0], only digits from 1 to 15 are allowed"
       if(defined($args[0]) && $args[0] !~ /^([1-9]|1[0-5])$/);
     
-    my $arg = sprintf("cmd%02d",$args[0]);
+    $arg = sprintf("cmd%02d",$args[0]);
     return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
            "'attr $name $arg <your_camera_command>'"
       if(!defined(AttrVal($name,$arg,undef)));
@@ -206,7 +209,7 @@ Set($$$@) {
     return "argument is missing for $cmd"
       if(int(@args) < 1);
 
-    my $arg = "@args";
+    $arg = "@args";
     push(@camCmd,$arg);
 
   }
@@ -264,7 +267,7 @@ Set($$$@) {
 
     Log3 $name, 4, "IPCAM ($name) - set $cmd requesting $camURI";
     #my $camret = GetFileFromURLQuiet($camURI);
-    SendCommand( $hash, $camURI );
+    SendCommand( $hash, $camURI, $arg );
     #Log3 $name, 5, "IPCAM ($name) - return:$camret";
   }
 
@@ -272,16 +275,25 @@ Set($$$@) {
 }
 
 sub SendCommand {
-  my ($hash, $camUrl) = @_;
+  my ($hash, $camUrl, $commandId) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 3, "IPCAM ($name) - sending command: $camUrl";
+
   my $apiParam = {
     url => $camUrl,
     method => "GET",
     callback => \&IPCAM::SendCommand_Callback,
     hash => $hash
   };
+
+  Log3 $name, 3, "IPCAM ($name) - sending command $commandId: $camUrl";
+  my $postData = AttrVal($name, $commandId.'data', undef);
+  if (defined $postData) {
+    $apiParam->{data} = $postData;
+    $apiParam->{method} = 'POST';
+    Log3 $name, 3, "IPCAM ($name) - post data for $commandId: $postData";
+  }
+
   HttpUtils_NonblockingGet($apiParam);
   
   return undef;
@@ -296,7 +308,7 @@ sub SendCommand_Callback {
     Log3 $name, 0, "IPCAM ($name) - error while sending command ".$param->{url}." - $err";
 
   } elsif($data ne "") {
-    Log3 $name, 3, "IPCAM ($name) - command response: $data";
+    Log3 $name, 4, "IPCAM ($name) - command response: $data";
   }
 
 }
@@ -448,13 +460,6 @@ createSnapshotUrl($) {
 #  while ($camURI =~ m/(\[.*:.*\])/) {
 #    Log3 $name, 3, "IPCAM ($name) - found reading: $1";
 #  }
-
-#  if (defined $skipRequest) {
-#    return $camURI;
-#  } else {
-#    RequestSnapshot($hash, $camURI);
-#  }
-#  Log3 $name, 5, "IPCAM ($name) - getSnapshot snapshot: $snapshot";
 
   return $camURI;
 }
@@ -834,6 +839,11 @@ DetailFn {
       <code>attr ipcam cmd01 led_mode=0</code><br>
       <code>attr ipcam cmd02 resolution=8</code><br>
     </li>
+      cmd01data, cmd02data, ...<br>
+      You can define the POST data that is to be sent with the according cmd.<br>
+      If this is defined, the request will be POST instead of GET.<br>
+      Example:<br>
+      <code>attr ipcam cmd01data [{"cmd":"Login"},{"cmd":"SetOSD"}]</code>
     <li>
       cmdPanLeft, cmdPanRight, cmdTiltUp, cmdTiltDown, cmdStep<br>
       Depending of the camera model, are different commands necessary.<br>
