@@ -839,11 +839,13 @@ DetailFn {
       <code>attr ipcam cmd01 led_mode=0</code><br>
       <code>attr ipcam cmd02 resolution=8</code><br>
     </li>
+    <li>
       cmd01data, cmd02data, ...<br>
       You can define the POST data that is to be sent with the according cmd.<br>
       If this is defined, the request will be POST instead of GET.<br>
       Example:<br>
       <code>attr ipcam cmd01data [{"cmd":"Login"},{"cmd":"SetOSD"}]</code>
+    </li>
     <li>
       cmdPanLeft, cmdPanRight, cmdTiltUp, cmdTiltDown, cmdStep<br>
       Depending of the camera model, are different commands necessary.<br>
