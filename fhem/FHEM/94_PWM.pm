@@ -38,6 +38,9 @@
 # 26.05.20 GA fix division by zero if minRoomsOn is >0  and roomsCounted is zero
 # 22.12.20 GA fix maxOffTime for P calculation never activated
 # 28.12.20 GA fix maxOffTime; maxOffTimeApply is now only set if no heating is required
+# 31.01.21 GA add attribute maxOffTimeMode (max, 1, 2, 3)
+# 01.02.21 GA fix move reading maxOffTimeCalculation into an attribute and internal values
+# 11.03.21 GA fix prevent parallel InternalTimer calls
 
 ##############################################
 # $Id$
@@ -92,7 +95,7 @@ PWM_Initialize($)
   $hash->{AttrFn}    = "PWM_Attr";
 
   $hash->{AttrList}  = "disable:1,0 valveProtectIdlePeriod overallHeatingSwitchRef:pulseMax,pulseSum,pulseAvg,pulseAvg2,pulseAvg3,avgPulseRoomsOn".
-		       " overallHeatingSwitchThresholdTemp ".$readingFnAttributes;
+		       " overallHeatingSwitchThresholdTemp maxOffTimeCalculation:on,off maxOffTimeMode:max,1,2,3 ".$readingFnAttributes;
 
   #$hash->{GetList}   = "status timers";
 
@@ -105,24 +108,27 @@ PWM_Calculate($)
   my ($hash) = @_;
 
   my $name = $hash->{NAME};
-  my %RoomsToSwitchOn            = ();
-  my %RoomsToSwitchOff           = ();
-  my %RoomsToStayOn              = ();
-  my %RoomsToStayOff             = ();
-  my %RoomsValveProtect          = ();
-  my %RoomsMaxOffTimeProtect     = ();
-  my %RoomsPulses                = ();
-  my $roomsActive                = 0;
-  my $newpulseMax                = 0;
-  my $newpulseSum                = 0;
-  my $newpulseAvg                = 0;
-  my $newpulseAvg2               = 0;
-  my $newpulseAvg3               = 0;
-  my $RoomsMaxOffTimeProtect_on  = 0;
+  my %RoomsToSwitchOn                 = ();
+  my %RoomsToSwitchOff                = ();
+  my %RoomsToStayOn                   = ();
+  my %RoomsToStayOff                  = ();
+  my %RoomsValveProtect               = ();
+  my %RoomsMaxOffTimeProtect          = ();
+  my %RoomsPulses                     = ();
+  my $roomsActive                     = 0;
+  my $newpulseMax                     = 0;
+  my $newpulseSum                     = 0;
+  my $newpulseAvg                     = 0;
+  my $newpulseAvg2                    = 0;
+  my $newpulseAvg3                    = 0;
+  my $RoomsMaxOffTimeProtect_on       = 0;
+  my $RoomsMaxOffTimeProtect_off      = 0;
+  my $RoomsMaxOffTimeProtect_stay_on  = 0;
 
   my $wkey                       = "";
 
   if($hash->{INTERVAL} > 0) {
+    RemoveInternalTimer($hash, "PWM_Calculate");
     InternalTimer(gettimeofday() + $hash->{INTERVAL}, "PWM_Calculate", $hash, 0);
   }
 
@@ -142,6 +148,16 @@ PWM_Calculate($)
 
   readingsBulkUpdate ($hash,  "lastrun", "calculating");
   readingsBulkUpdate ($hash,  "state", "lastrun: ".$hash->{READINGS}{lastrun}{TIME});
+
+  # migrate reading maxOffTimeCalculate to attribute, added 01.02.2021, will be deleted later
+  if (defined($hash->{READINGS}{maxOffTimeCalculation})) {
+    $hash->{c_maxOffTimeCalculation} = $hash->{READINGS}{maxOffTimeCalculation}{VAL};
+    $attr{$name}{maxOffTimeCalculation} = $hash->{READINGS}{maxOffTimeCalculation}{VAL};
+
+    $hash->{c_maxOffTimeMode} = 999 unless defined ($hash->{c_maxOffTimeMode});
+
+    delete($hash->{READINGS}{maxOffTimeCalculation});
+  }
 
   # loop over all devices
   #  fetch all PWMR devices
@@ -177,7 +193,7 @@ PWM_Calculate($)
 	    $RoomsValveProtect{$d} = "on";
           } elsif ($newstate eq "off_vp") {
 	    $RoomsValveProtect{$d} = "off";
-          } else {
+          } elsif ($newstate =~ /mop/) {
 
             ##############################
             ##### maxOffTimeProtect
@@ -187,17 +203,19 @@ PWM_Calculate($)
 	      $RoomsMaxOffTimeProtect{$d} = $newstate;
 	      $newstate = "on";
             } elsif ($newstate eq "on_mop_stay") {
-	      $RoomsMaxOffTimeProtect_on++;
+	      $RoomsMaxOffTimeProtect_stay_on++;
 	      $RoomsMaxOffTimeProtect{$d} = $newstate;
 	      $newstate = "";
             } elsif ($newstate eq "on_mop_maybe") {
 	      $RoomsMaxOffTimeProtect{$d} = $newstate;
 	      $newstate = "";
             } elsif ($newstate eq "off_mop") {
+	      $RoomsMaxOffTimeProtect_off++;
 	      $RoomsMaxOffTimeProtect{$d} = $newstate;
 	      $newstate = "off";
             } 
      
+          } else {
   
             ##############################
             ##### regular calculation
@@ -266,15 +284,30 @@ PWM_Calculate($)
 
 
   # maxOffTimeProtect handling
-  foreach my $d (keys %RoomsMaxOffTimeProtect) {
+  my $maxOffTimeCnt = $RoomsMaxOffTimeProtect_stay_on;
+  my $maxOffTimeMode = $hash->{c_maxOffTimeMode};
+
+  if (defined($hash->{c_maxOffTimeCalculation}) and ($hash->{c_maxOffTimeCalculation} eq "on")) {
+    Log3 ($hash, 3, "PWM_Calculate $name: checkpoint maxOffTime (param $maxOffTimeMode) (cur $maxOffTimeCnt)");
+  }
+  
+  foreach my $d (sort keys %RoomsMaxOffTimeProtect) { # sort: off_mop; on_mop; on_mop_maybe; on_mop_stay
 
     if ($RoomsMaxOffTimeProtect{$d}      eq "off_mop") {
       $RoomsToSwitchOff{$d} = 1;
       $RoomsPulses{$d}      = 0;
 
     } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop") {
-      $RoomsToSwitchOn{$d} = 1;
-      $RoomsPulses{$d}     = $hash->{MaxPulse};
+
+      if ($maxOffTimeCnt < int($maxOffTimeMode)) {
+        $RoomsToSwitchOn{$d} = 1;
+        $RoomsPulses{$d}     = $hash->{MaxPulse};
+	$maxOffTimeCnt++;
+      } else {
+        Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F19 maxOffTime protection stay off (Max $maxOffTimeMode)");
+        $RoomsToStayOff{$d}  = 1;
+        $RoomsPulses{$d}     = 0;
+      }
 
     } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_stay") {
       $RoomsToStayOn{$d}  = 1;
@@ -282,9 +315,13 @@ PWM_Calculate($)
 
     } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_maybe") {
 
-      if ($RoomsMaxOffTimeProtect_on > 0) {
+      # on_mop_maybe may only be set if c_maxOffTimeMode > 1
+      if (($RoomsMaxOffTimeProtect_on + $RoomsMaxOffTimeProtect_stay_on > 0) 
+	  and ($maxOffTimeCnt < int($maxOffTimeMode))) {
+        Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F20 maxOffTime protection pulled on with another room");
         $RoomsToSwitchOn{$d} = 1;
         $RoomsPulses{$d}     = $hash->{MaxPulse};
+	$maxOffTimeCnt++;
 
       } else {
         $RoomsToStayOff{$d}  = 1;
@@ -381,14 +418,6 @@ PWM_Calculate($)
   # 11 * 0.8 = 8.8 ... 8 is ok ... 9, 10, 11 is not (laraEG!)
 
   my $roomsOn = (scalar keys %RoomsToStayOn) - (scalar keys %RoomsToSwitchOff);
-
-  # treat less than 8 active rooms as 8 (more can get active)
-  # 16.01.2015
-  #my $maxRoomsOn = $roomsActive * 0.7;
-
-  # 23.09.2015
-  #my $maxRoomsOn = $roomsActive * 0.6;  # 11 rooms -> max 6 active
-  #$maxRoomsOn = (8 * 0.7)  if ($roomsActive < 8);
 
   my $maxRoomsOn = $roomsActive - $hash->{NoRoomsToStayOff};
 
@@ -551,27 +580,6 @@ PWM_Calculate($)
 
   }
 
-if (0) {
-  foreach my $roomMOP (sort keys %RoomsMaxOffTimeProtect) {
-
-        my $wkey = $name."-".$roomMOP;
-        $roomsWaitOffset{$wkey} = 0;
-
-        if ( $RoomsMaxOffTimeProtect{$roomMOP} eq "on") {
-
-	  PWMR_SetRoom ($defs{$roomMOP}, "on"); 
-          $cntRoomsOn++;
-          $pulseRoomsOn += $RoomsPulses{$roomMOP};
-
-	} else {
-
-	  PWMR_SetRoom ($defs{$roomMOP}, "off"); 
-          $cntRoomsOff++;
-          $pulseRoomsOff += $RoomsPulses{$roomMOP};
-        }
-
-  }
-}
 
   foreach my $roomVP (sort keys %RoomsValveProtect) {
 
@@ -776,11 +784,6 @@ if (0) {
  
   readingsEndUpdate($hash, 1);
   Log3 ($hash, 3, "PWM_Calculate $name done");
-
-#  if(!$hash->{LOCAL}) {
-#    DoTrigger($name, undef) if($init_done);
-#  }
-
 }
 
 ###################################
@@ -907,7 +910,7 @@ PWM_CalcRoom(@)
     # check if maxOffTime protection is activated (attribute maxOffTimeIdlePeriod is set)
     # $maxOffTImeApply will only be set if no heating is required
 
-    if ($maxOffTimeApply > 0 and ReadingsVal($name, "maxOffTimeCalculation", "off") eq "on") {
+    if ($maxOffTimeApply > 0 and defined($hash->{c_maxOffTimeCalculation}) and ($hash->{c_maxOffTimeCalculation} eq "on")) {
 
       ## wz > 2:00
       if ($maxOffTimeAct >= $maxOffTime) {
@@ -917,10 +920,12 @@ PWM_CalcRoom(@)
       }
 
       ## wz > 2:00 / 2
-      if ($maxOffTimeAct >= $maxOffTime / 2) {
+      if ($hash->{c_maxOffTimeMode} > 1) {
+        if ($maxOffTimeAct >= $maxOffTime / 2) {
 
-        Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F18 maxOffTime protection (possible)");
-        return ("on_mop_maybe", $newpulse, $cycletime, $actorV); 
+          Log3 ($hash, 3, "PWM_CalcRoom $room->{NAME}: F18 maxOffTime protection (possible)");
+          return ("on_mop_maybe", $newpulse, $cycletime, $actorV); 
+        }
       }
     }
 
@@ -1050,6 +1055,7 @@ PWM_Set($@)
 {
   my ($hash, @a) = @_;
 
+  my $name = $hash->{NAME};
   my $u = "Unknown argument $a[1], choose one of recalc interval cycletime maxOffTimeCalculation:on,off";
 
 
@@ -1068,7 +1074,10 @@ PWM_Set($@)
 
   } elsif ( $a[1] =~ /^maxOffTimeCalculation$/ ) {
 
-    readingsSingleUpdate ($hash,  "maxOffTimeCalculation", $a[2], 1);
+    $hash->{c_maxOffTimeCalculation} = $a[2];
+    $attr{$name}{maxOffTimeCalculation} = $a[2];
+
+    $hash->{c_maxOffTimeMode} = 999 unless defined ($hash->{c_maxOffTimeMode});
 
   } else {
   
@@ -1203,6 +1212,7 @@ PWM_Define($$)
   #AssignIoPort($hash);
 
   if($hash->{INTERVAL} > 0) {
+    RemoveInternalTimer($hash, "PWM_Calculate");
     InternalTimer(gettimeofday() + 10, "PWM_Calculate", $hash, 0);
   }
 
@@ -1247,6 +1257,13 @@ PWM_Attr(@)
       delete ($hash->{OverallHeatingSwitchTT_t_regexp}      ) if defined ($hash->{OverallHeatingSwitchTT_t_regexp});
       delete ($hash->{OverallHeatingSwitchTT_maxTemp}       ) if defined ($hash->{OverallHeatingSwitchTT_maxTemp});
       delete ($hash->{READINGS}{OverallHeatingSwitchTT_Off} ) if defined ($hash->{READINGS}{OverallHeatingSwitchTT_Off});
+
+    } elsif ($attrname eq "maxOffTimeCalculation") {
+      delete ($hash->{c_maxOffTimeCalculation}) if defined ($hash->{c_maxOffTimeCalculation});
+      delete ($hash->{c_maxOffTimeMode}) if defined ($hash->{c_maxOffTimeMode});
+
+    } elsif ($attrname eq "maxOffTimeMode") {
+      $hash->{c_maxOffTimeMode} = 999;
     }
 
     if (defined $attr{$name}{$attrname}) {
@@ -1292,6 +1309,18 @@ PWM_Attr(@)
         Log3 ($hash, 2, "invalid value for attribute overallHeatingSwitchThresholdTemp");
         return "$name: invalid value for attribute $attrname ($attrval)";
       }
+
+    } elsif ($attrname eq "maxOffTimeCalculation") {
+      $hash->{c_maxOffTimeCalculation} = $attrval;
+      $hash->{c_maxOffTimeMode} = 999 unless defined ($hash->{c_maxOffTimeMode});
+
+    } elsif ($attrname eq "maxOffTimeMode") {
+      if ($attrval eq "max") {
+        $hash->{c_maxOffTimeMode} = 999;
+      } else {
+        $hash->{c_maxOffTimeMode} = $attrval;
+      }
+      $hash->{c_maxOffTimeCalculation} = "off" unless defined ($hash->{c_maxOffTimeCalculation});
 
     }
   }
@@ -1414,8 +1443,8 @@ PWM_Attr(@)
         </li><br>
 
     <li>maxOffTimeCalculation<br>
-        Defines if parameter maxOffTime for rooms (PWMR objects) is evaluated or not. Possible Values are "on" or "off". Sets reading maxOffTimeCalculation.<br>
-    </li>
+        Defines whether parameter maxOffTime for rooms (PWMR objects) is evaluated or not. Possible Values are "on" or "off". Sets attribute maxOffTimeCalculation and internal values c_maxOffTimeCalculation and c_maxOffTimeMode.<br>
+    </li><br>
 
   </ul>
 
@@ -1465,7 +1494,17 @@ PWM_Attr(@)
         The reading OverallHeatingSwitchTT_Off will be set to 1 if temperature from tsensor prevents <i>overallHeatingSwitch</i> from switching to "on".<br>
         Please be aware that temperatures raising to high will seriously harm your heating system and this parameter should not be used as the only protection feature.<br>
         Using this parameter is on your own risk. Please test your settings very carefully.<br>
-    </li>
+    </li><br>
+
+    <li>maxOffTimeCalculation<br>
+        Defines whether parameter maxOffTime for rooms (PWMR objects) is evaluated or not. Possible Values are "on" or "off". Sets internal values c_maxOffTimeCalculation and c_maxOffTimeMode.<br>
+    </li><br>
+
+    <li>maxOffTimeMode<br>
+        Defines the strategy for maxOffTime handling if maxOffTimeCalculation is set. Sets internal value c_maxOffTimeMode.<br>
+        <i>max</i>: try to activate as many rooms as possible. If one room switches to on and a second waited half of his maxOffTime, the second will be switched on as well.<br>
+        <i>1</i>, <i>2</i>, <i>3</i>: defines how many rooms can be switched on at the same time.<br>
+    </li><br>
 
   </ul>
   <br>
