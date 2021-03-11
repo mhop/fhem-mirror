@@ -289,6 +289,13 @@ sub SendCommand {
   Log3 $name, 3, "IPCAM ($name) - sending command $commandId: $camUrl";
   my $postData = AttrVal($name, $commandId.'data', undef);
   if (defined $postData) {
+    my %dummy;
+    my ($err, @a) = ReplaceSetMagic(\%dummy, 0, ( $postData ) );
+    if ( $err ) {
+      Log3 $name, 0, "IPCAM ($name) - parse post data failed on ReplaceSetMagic with :$err: on  :$postData:";
+    } else {
+      $postData = join(" ", @a);
+    }
     $apiParam->{data} = $postData;
     $apiParam->{method} = 'POST';
     Log3 $name, 3, "IPCAM ($name) - post data for $commandId: $postData";
@@ -844,7 +851,10 @@ DetailFn {
       You can define the POST data that is to be sent with the according cmd.<br>
       If this is defined, the request will be POST instead of GET.<br>
       Example:<br>
-      <code>attr ipcam cmd01data [{"cmd":"Login"},{"cmd":"SetOSD"}]</code>
+      <code>attr ipcam cmd01data [{"cmd":"Login"},{"cmd":"SetOSD"}]</code><br>
+      You can provide references to readings and internals easliy like this:<br>
+      <code>attr ipcam cmd01data [{"cmd":"Login"},{"cmd":"SetOSD"},{"key":"[devicename:reading]"}]</code><br>
+      will be resolved into <code>[{"cmd":"Login"},{"key":"value-from-reading"}]</code>
     </li>
     <li>
       cmdPanLeft, cmdPanRight, cmdTiltUp, cmdTiltDown, cmdStep<br>
