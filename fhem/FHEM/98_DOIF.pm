@@ -4905,7 +4905,13 @@ sub ring2
   }    
 
   if (defined $icon and $icon ne "") {
-    $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
+    if ($icon !~ /@/) {
+      $ic="$icon\@".color($currColor,$ln);
+    } elsif ($icon =~ /^(.*\@)colorVal1/) {
+      $ic="$1".color($currColor,$ln);
+    } elsif ($icon =~ /^(.*\@)colorVal2/) {
+      $ic="$1".color($currColor2,$ln);
+    }
   }
   my $width=int($size/100*63);
   my $height=int($size/100*58);
