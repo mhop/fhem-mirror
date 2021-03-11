@@ -61,6 +61,8 @@
 #             fix remove attribute loglevel
 #             fix reading actorState to correct when non default regex is used
 #             add clear PID helper structure when PWM or PWMR object gets disabled
+# 31.01.21 GA fix wrong time logged for "desired-temp was manualy set until"
+# 02.02.21 GA fix handle access to not yet defined iodev on startup
 
 # module for PWM (Pulse Width Modulation) calculation
 # this module defines a room for calculation 
@@ -330,7 +332,7 @@ PWMR_CalcDesiredTemp($)
       if ($hash->{READINGS}{"desired-temp-until"}{VAL} gt TimeNow()) {
 
         Log3 ($hash, 4, "PWMR_CalcDesiredTemp $name: desired-temp was manualy set until ".
-          $hash->{READINGS}{"desired-temp"}{TIME});
+          $hash->{READINGS}{"desired-temp-until"}{VAL});
         return undef;
       }
       else
@@ -614,6 +616,7 @@ PWMR_Define($$)
 
   $hash->{c_desiredTempFrom}  = "";
 
+
   $hash->{p_factor}           = $factor;
   $hash->{p_tsensor}          = $tsensor;
   $hash->{p_actor}            = $actor;
@@ -626,7 +629,7 @@ PWMR_Define($$)
     return "unknown device $iodevname" if ($init_done == 1);
   }
 
-  if ( $defs{$iodevname}->{TYPE} ne "PWM" ) {
+  if ( defined($defs{$iodevname}) and $defs{$iodevname}->{TYPE} ne "PWM" ) {
     return "wrong type of $iodevname (not PWM)" if ($init_done == 1);
   }
 
@@ -879,6 +882,7 @@ PWMR_Define($$)
   $hash->{c_tempRule3}        = "";
   $hash->{c_tempRule4}        = "";
   $hash->{c_tempRule5}        = "";
+  $hash->{c_tempRuleS}        = "D" unless defined($hash->{c_tempRuleS});
 
   $hash->{INTERVAL}           = 300;
 
