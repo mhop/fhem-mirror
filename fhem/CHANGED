@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - new:     SYSSTAT: umstellung auf non-blocking
  - new:     49_IPCAM: set-magic for POST data (eg resolving [device:reading]) 
  - new:     49_IPCAM: added POST for custom commands cmd01-cmd15 
  - new:     49_IPCAM: imageWithCallback now also interprets [device:reading]
