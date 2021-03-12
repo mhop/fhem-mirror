@@ -192,7 +192,7 @@ DevIo_DecodeWS($$)
     $i += 2;
   } elsif( $len == 127 ) {
     return "" if(length($data) < 10);
-    $len = unpack( 'q', substr($hash->{".WSBUF"},$i,8) );
+    $len = unpack( 'Q>', substr($hash->{".WSBUF"},$i,8) );
     $i += 8;
   }
 

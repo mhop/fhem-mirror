@@ -405,7 +405,7 @@ FW_Read($$)
       $len = unpack( 'n', substr($hash->{BUF},$i,2) );
       $i += 2;
     } elsif( $len == 127 ) {
-      $len = unpack( 'q', substr($hash->{BUF},$i,8) );
+      $len = unpack( 'Q>', substr($hash->{BUF},$i,8) );
       $i += 8;
     }
 
