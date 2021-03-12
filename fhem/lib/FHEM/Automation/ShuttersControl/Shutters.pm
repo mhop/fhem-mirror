@@ -878,10 +878,11 @@ sub setShadingStatus {
     my $self  = shift;
     my $value = shift; ### Werte für value = in, out, in reserved, out reserved
 
-    return
-      if ( defined($value)
-        && exists( $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} )
-        && $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} eq $value );
+# Es wird durch das return die ShadingWaitingTime nicht mehr beachtet, Bugmeldung von Bernd Griemsmann
+#     return
+#       if ( defined($value)
+#         && exists( $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} )
+#         && $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} eq $value );
 
     $FHEM::Automation::ShuttersControl::shutters->setShadingLastStatus(
         ( $value eq 'in' ? 'out' : 'in' ) )
