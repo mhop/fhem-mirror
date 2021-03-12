@@ -294,7 +294,7 @@ SYSSTAT_Read($)
     delete $hash->{PID};
 
     Log3 $name, 3, "$name: read: error during sysread: $!" if(!defined($ret));
-    Log3 $name, 3, "$name: read: end of file reached while sysread" if( $ret <= 0);
+    Log3 $name, 3, "$name: read: end of file reached while sysread" if(defined($ret) && $ret <= 0);
 
     InternalTimer(gettimeofday()+10, "SYSSTAT_Connect", $hash, 0);
     return undef;
