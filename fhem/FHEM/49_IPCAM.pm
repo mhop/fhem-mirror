@@ -566,8 +566,7 @@ sub RequestSnapshot_Callback {
       Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$imageFile written.";
       readingsBulkUpdate($hash, "last", $lastSnapshot, 1);
       $hash->{STATE} = "last: $dateTime";
-      $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
-      $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
+      readingsBulkUpdate($hash, "snapshot$seqF", $imageFile, 1);
 
       Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
     }
