@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350  ",
+  "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ",
+  "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
   "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
   "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
   "0.5.0"  => "25.01.2021  add multistring support, add reset inverterStrings ",
@@ -1033,12 +1034,18 @@ sub centralTask {
       Log3 ($name, 5, "$name - ################################################################");
       Log3 ($name, 5, "$name - ###                New data collection cycle                 ###");
       Log3 ($name, 5, "$name - ################################################################");
+      Log3 ($name, 5, "$name - current hour: $chour");
       
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen 
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen 
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
 
+      #Log3($name, 1, "$name - PV forecast Hash: ".      Dumper $data{$hash->{TYPE}}{$name}{pvfc});
+      #Log3($name, 1, "$name - Weather forecast Hash: ". Dumper $data{$hash->{TYPE}}{$name}{weather});
+      #Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
+      #Log3($name, 1, "$name - current values Hash: ".   Dumper $data{$hash->{TYPE}}{$name}{current});
+      
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
@@ -1318,6 +1325,11 @@ sub _transferWeatherValues {
       $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
       $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
       $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
+      
+      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;           # Hilfshash Wert Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
+      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
+      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
   }
       
 return;
@@ -1356,6 +1368,7 @@ sub _transferInverterValues {
   my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
       
   push @$daref, "Current_PV:". $pv." W";                                          
+  $data{$hash->{TYPE}}{$name}{current}{generation} = $pv;                                     # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   
   my $eduf   = $edunit =~ /^kWh$/xi ? 1000 : 1;
   my $etoday = ReadingsNum ($indev, $edread, 0) * $eduf;                                      # aktuelle Erzeugung (W) 
@@ -1393,7 +1406,7 @@ sub _transferMeterValues {
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};  
 
-  my $medev  = ReadingsVal($name, "currentMeterDev", "");                              # aktuelles Meter device
+  my $medev  = ReadingsVal($name, "currentMeterDev", "");                                 # aktuelles Meter device
   my ($a,$h) = parseParams ($medev);
   $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
@@ -1408,6 +1421,7 @@ sub _transferMeterValues {
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                        # aktueller Bezug (-) oder Einspeisung
   
   push @$daref, "Current_GridConsumption:".$co." W";
+  $data{$hash->{TYPE}}{$name}{current}{consumption} = $co;                                # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       
 return;
 }
