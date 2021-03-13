@@ -2691,17 +2691,17 @@ sub setPVhistory {
   my $paref     = shift;
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
-  my $t         = $paref->{t};                                                                  # aktuelle Unix-Zeit
+  my $t         = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $chour     = $paref->{chour};
   my $nhour     = $paref->{nhour};
   my $ethishour = $paref->{ethishour} // 0;
   my $calcpv    = $paref->{calcpv}    // 0;
   
   my $type = $hash->{TYPE};  
-  my $day  = strftime "%d", localtime($t);                                                      # aktueller Tag 
+  my $day  = strftime "%d", localtime($t);                                                        # aktueller Tag 
   
-  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if(defined $ethishour);          # realer Energieertrag
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);             # prognostizierter Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($nhour && defined $ethishour);  # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($chour && defined $calcpv);     # prognostizierter Energieertrag
   
   Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
     
