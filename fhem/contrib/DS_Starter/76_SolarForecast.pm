@@ -1240,7 +1240,7 @@ sub writeCacheToFile {
   
   my @pvh;
   
-  my $json  = encode_json $data{$type}{$name}{$cachename};
+  my $json  = encode_json ($data{$type}{$name}{$cachename});
   push @pvh, $json;
   
   my $error = FileWrite($file, @pvh);
@@ -1315,8 +1315,10 @@ sub _transferDWDForecastValues {
       }
       
       if($fd == 0 && sprintf("%02d",$fh) eq $chour) {
-          $paref->{calcpv} = $calcpv;
+          $paref->{calcpv}   = $calcpv;
+          $paref->{histname} = "pvfc";
           setPVhistory ($paref); 
+          delete $paref->{histname};
       }
   }
       
@@ -1455,8 +1457,9 @@ sub _transferInverterValues {
       
       $paref->{ethishour} = $ethishour;
       $paref->{nhour}     = $nhour;
+      $paref->{histname}  = "pvrl";
       setPVhistory ($paref);
-      delete $paref->{nhour};
+      delete $paref->{histname};
   }  
     
 return;
@@ -2697,14 +2700,15 @@ sub setPVhistory {
   my $t         = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $chour     = $paref->{chour};
   my $nhour     = $paref->{nhour};
+  my $histname  = $paref->{histname}  // qq{};
   my $ethishour = $paref->{ethishour} // 0;
   my $calcpv    = $paref->{calcpv}    // 0;
   
   my $type = $hash->{TYPE};  
   my $day  = strftime "%d", localtime($t);                                                        # aktueller Tag 
   
-  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($nhour);                        # realer Energieertrag
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($chour);                        # prognostizierter Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($histname eq "pvrl");           # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($histname eq "pvfc");           # prognostizierter Energieertrag
   
   Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
     
