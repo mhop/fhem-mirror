@@ -700,10 +700,19 @@ SYSSTAT_Set($@)
     SYSSTAT_Write( $hash, $arg. ' '. join(' ', @params )  );
     return;
 
+  } elsif( $cmd eq "snmpDebug" ) {
+    if( defined($hash->{session}) ) {
+      $hash->{session}->debug($arg eq 'on' ? 0xff : 0x00 );
+    } else {
+      return 'no snmp session';
+    }
+
+    return;
   }
 
   my $list = '';
   $list .= 'raw:noArg reconnect:noArg' if( $hash->{HOST} );
+  $list .= ' snmpDebug:on,off,' if( $SYSSTAT_hasSNMP );
 
   return "Unknown argument $cmd, choose one of $list";
 }
