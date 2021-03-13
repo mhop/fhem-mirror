@@ -301,7 +301,10 @@ my $definve     = 98.3;                                                         
 my $kJtokWh     = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
 my $defmaxvar   = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval = 70;                                                            # Standard Abfrageintervall
+
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
+my $pvrcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVR_SolarForecast_";   # Filename-Fragment für PV Real (wird mit Devicename ergänzt)
+
 my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
@@ -401,26 +404,51 @@ sub Define {
 
   createNotifyDev ($hash);
   
-  my $file              = $pvhcache.$name;
-  my ($error, @content) = FileRead ($file);                                        # Cache File der PV History lesen wenn vorhanden
+  my $file              = $pvhcache.$name;                                         # Cache File PV History lesen wenn vorhanden
+  my $cachename         = "pvhist";
+  $params->{file}       = $file;
+  $params->{cachename}  = $cachename;
+  _readCacheFile ($params);                                                       
+  
+  $file                 = $pvrcache.$name;                                         # Cache File PV Real lesen wenn vorhanden
+  $cachename            = "pvreal";
+  $params->{file}       = $file;
+  $params->{cachename}  = $cachename;
+  _readCacheFile ($params);                                                       
+    
+  readingsSingleUpdate($hash, "state", "initialized", 1); 
+
+  centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
+  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0); # Einstieg periodisches Schreiben historische Daten
+  
+return;
+}
+
+################################################################
+#                   Cachefile lesen
+################################################################
+sub _readCacheFile {               
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $file      = $paref->{file};
+  my $cachename = $paref->{cachename};
+  
+  my $name      = $hash->{NAME};
+
+  my ($error, @content) = FileRead ($file);                                        # Cache File lesen wenn vorhanden
   
   if(!$error) {
       my $json    = join "", @content;
       my $success = evaljson ($hash, $json);                               
       
       if($success) {
-           $data{$type}{$name}{pvhist} = decode_json ($json);
+           $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
       }
       else {
           Log3($name, 2, qq{$name - WARNING - the content of file "$file" is not readable and may be corrupt});
       }
   }
-  
-  readingsSingleUpdate($hash, "state", "initialized", 1); 
-
-  centralTask   ($hash);                                                                                 # Einstieg in Abfrage 
-  InternalTimer (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteHistFile", $hash, 0);   # Einstieg periodisches Schreiben historische Daten
-  
+      
 return;
 }
 
@@ -770,8 +798,11 @@ return;
 sub _setwriteHistory {                   ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
-
-  my $ret = periodicWriteHistFile ($hash);
+  my $name  = $paref->{name};
+  
+  my $ret = writeCacheToFile ($hash, "pvhist", $pvhcache.$name);     # Cache File für PV History schreiben
+  
+  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
 
 return $ret;
 }
@@ -955,7 +986,8 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  writeHistoryToFile ($hash);                                # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "pvhist", $pvhcache.$name);               # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
   
 return; 
 }
@@ -1043,7 +1075,7 @@ sub centralTask {
 
       #Log3($name, 1, "$name - PV forecast Hash: ".      Dumper $data{$hash->{TYPE}}{$name}{pvfc});
       #Log3($name, 1, "$name - Weather forecast Hash: ". Dumper $data{$hash->{TYPE}}{$name}{weather});
-      #Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
+      # Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
       #Log3($name, 1, "$name - current values Hash: ".   Dumper $data{$hash->{TYPE}}{$name}{current});
       
       if(@da) {
@@ -1148,16 +1180,17 @@ return $interval;
 ################################################################
 #        Timer für historische Daten schreiben
 ################################################################
-sub periodicWriteHistFile {
+sub periodicWriteCachefiles {
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteHistFile");
-  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteHistFile", $hash, 0);
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
+  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
   
   return if(IsDisabled($name));
   
-  writeHistoryToFile ($hash);         # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "pvhist", $pvhcache.$name);               # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
   
 return;
 }
@@ -1165,32 +1198,31 @@ return;
 ################################################################
 #       historische Daten in File wegschreiben
 ################################################################
-sub writeHistoryToFile {  
-  my $hash = shift;
+sub writeCacheToFile {  
+  my $hash      = shift;
+  my $cachename = shift;
+  my $file      = shift;
 
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  if($data{$type}{$name}{pvhist}) {
-      my @pvh;
-      
-      my $json  = encode_json ($data{$type}{$name}{pvhist});
-      push @pvh, $json;
-      
-      my $file  = $pvhcache.$name;
-      my $error = FileWrite($file, @pvh);
-      
-      if ($error) {
-          my $err = qq{ERROR writing cache file "$file": $error};
-          Log3 ($name, 2, "$name - $err");
-          return $err;          
-      }
-      else {
-          my $lw = gettimeofday(); 
-          $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file";
-      }
-  }  
+  my @pvh;
   
+  my $json  = encode_json ($data{$type}{$name}{$cachename});
+  push @pvh, $json;
+  
+  my $error = FileWrite($file, @pvh);
+  
+  if ($error) {
+      my $err = qq{ERROR writing cache file "$file": $error};
+      Log3 ($name, 2, "$name - $err");
+      return $err;          
+  }
+  else {
+      my $lw = gettimeofday(); 
+      $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
+  }
+   
 return; 
 }
 
@@ -1379,7 +1411,7 @@ sub _transferInverterValues {
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
   }
   
-  my $ethishour  = int ($etoday - $edaypast);
+  my $ethishour = int ($etoday - $edaypast);
   
   if($chour !~ /^($tlim)$/x) {                                                                # nicht setzen wenn Stunde 23 des Tages
       if($ethishour < 0) {
