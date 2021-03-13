@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.10.0" => "13.03.2021  hour shifter in sub _transferMeterValues ",
   "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ".
                            "cachefile pvhist is persistent ",
   "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
@@ -328,6 +329,7 @@ sub Initialize {
   my $cda = join ",", @consdays;
   
   $hash->{DefFn}              = \&Define;
+  $hash->{UndefFn}            = \&Undef;
   $hash->{GetFn}              = \&Get;
   $hash->{SetFn}              = \&Set;
   $hash->{DeleteFn}           = \&Delete;
@@ -993,6 +995,24 @@ sub Shutdown {
 return; 
 }
 
+################################################################
+# Die Undef-Funktion wird aufgerufen wenn ein Gerät mit delete 
+# gelöscht wird oder bei der Abarbeitung des Befehls rereadcfg, 
+# der ebenfalls alle Geräte löscht und danach das 
+# Konfigurationsfile neu einliest. Entsprechend müssen in der 
+# Funktion typische Aufräumarbeiten durchgeführt werden wie das 
+# saubere Schließen von Verbindungen oder das Entfernen von 
+# internen Timern.
+################################################################
+sub Undef {
+ my $hash = shift;
+ my $arg  = shift;
+ 
+ RemoveInternalTimer($hash);
+    
+return;
+}
+
 #################################################################
 # Wenn ein Gerät in FHEM gelöscht wird, wird zuerst die Funktion 
 # X_Undef aufgerufen um offene Verbindungen zu schließen, 
@@ -1427,10 +1447,12 @@ sub _transferInverterValues {
       if($ethishour < 0) {
           $ethishour = 0;
       }
-      push @$daref, "Today_Hour".sprintf("%02d",$chour)."_PVreal:".$ethishour." Wh";
-      $data{$hash->{TYPE}}{$name}{pvreal}{sprintf("%02d",$chour)} = $ethishour;               # Hilfshash Wert PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      my $nhour = $chour+1;
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal:".$ethishour." Wh";
+      $data{$hash->{TYPE}}{$name}{pvreal}{sprintf("%02d",$nhour)} = $ethishour;               # Hilfshash Wert PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
+      $paref->{nhour}     = $nhour;
       setPVhistory ($paref);
   }  
     
@@ -2671,13 +2693,14 @@ sub setPVhistory {
   my $name      = $paref->{name};
   my $t         = $paref->{t};                                                                  # aktuelle Unix-Zeit
   my $chour     = $paref->{chour};
+  my $nhour     = $paref->{nhour};
   my $ethishour = $paref->{ethishour} // 0;
   my $calcpv    = $paref->{calcpv}    // 0;
   
   my $type = $hash->{TYPE};  
   my $day  = strftime "%d", localtime($t);                                                      # aktueller Tag 
   
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvrl} = $ethishour if(defined $ethishour);          # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if(defined $ethishour);          # realer Energieertrag
   $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if(defined $calcpv);             # prognostizierter Energieertrag
   
   Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
