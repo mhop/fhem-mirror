@@ -539,9 +539,29 @@ sub Initialize {
             Please note that this does not create an additional interval timer. 
             Instead the normal interval timer defined by the interval of the define command will check if this reading is due or not yet. 
             So the effective interval will always be a multiple of the interval of the define.<br>
-            If this attribute is set to "once" then the object will only be requested once after a restart.
-            <br>
-            
+            If this attribute is set to "once" then the object will only be requested once after a restart.<br>
+        <li><b>obj-[cdih][1-9][0-9]*-group</b></li> 
+            Allows control over the way how objects are combined in one request and in which order they are processed when the response comes in.<br>
+            example:<br>
+            <pre>            
+            attr MyMaster obj-h100-reading Temp
+            attr MyMaster obj-h100-unpack f>
+            attr MyMaster obj-h100-len 2
+            attr MyMaster obj-h100-format %.2f
+            attr MyMaster obj-h100-poll 1
+            attr MyMaster obj-h100-expr ReadingsVal($name, 'TempMultiplyer', 1) * $val
+            attr MyMaster obj-h100-group 1-2
+            attr MyMaster obj-h102-reading TempMultiplyer
+            attr MyMaster obj-h102-unpack f>
+            attr MyMaster obj-h102-len 2
+            attr MyMaster obj-h102-poll 1
+            attr MyMaster obj-h102-group 1-1
+            attr MyMaster dev-h-combine 8
+            </pre><br>
+            this will cause the holding registers 100 and 102 to be read together. When the response is received, 
+            register 102 will be processed first so when register 100 is processed, its value can be multipied with the already updated reading for register 102.<br>
+            This is helpful for devices where readings need to be computed out of several registers that need to be requested together and where the order of processing is important.
+           
         <li><b>dev-([cdih]-)*read</b></li> 
             specifies the function code to use for reading this type of object in master mode.
             The default is 3 for holding registers, 1 for coils, 2 for discrete inputs and 4 for input registers.<br>

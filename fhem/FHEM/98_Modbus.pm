@@ -174,15 +174,15 @@
 # Exprs und Maps
 # --------------
 #
-# Fhem Master       Expr    Register in externem Gerät (read)   Readings in Fhem                # implemented in ParseObj
-# Fhem Slave        Expr    Werte von externem Gerät (write)    Readings in Fhem                # implemented in ParseObj
+# Fhem Master       Expr    Register in externem Gerät (read)   Readings in Fhem                # implemented in ParseDataString
+# Fhem Slave        Expr    Werte von externem Gerät (write)    Readings in Fhem                # implemented in ParseDataString
 #
 # Fhem Master    setexpr    Benutzereingabe (set->write)        Register in externem Gerät      # implemented in Set
 # Fhem Slave     setexpr    Readings in Fhem (read)             Register zu externem Gerät      # implemented in PackObj
 #                
 #
-# Fhem Master       Map     Registerdarstellung extern (read)   Readings in Fhem                # implemented in ParseObj
-# Fhem Slave        Map     Werte von externem Gerät (write)    Readings in Fhem                # implemented in ParseObj
+# Fhem Master       Map     Registerdarstellung extern (read)   Readings in Fhem                # implemented in ParseDataString
+# Fhem Slave        Map     Werte von externem Gerät (write)    Readings in Fhem                # implemented in ParseDataString
 #
 # Fhem Master     revMap    Benutzereingabe (set->write)        Register in externem Gerät      # implemented in Set
 # Fhem Slave      revMap    Readings in Fhem (read)             Register in externem Gerät      # implemented in PackObj
@@ -277,7 +277,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.3.15 - 23.1.2021';
+my $Module_Version = '4.4.00 - 7.2.2021';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -338,9 +338,9 @@ my $ObjAttrs = join (' ',
         'obj-[ih][0-9]+-type',
         'obj-[cdih][0-9]+-showGet',
         'obj-[cdih][0-9]+-allowWrite',
+        'obj-[cdih][0-9]+-group',
         'obj-[cdih][0-9]+-poll',
         'obj-[cdih][0-9]+-polldelay');
-        #'(get|set)([0-9]+)request([0-9]+) '
         
 my $DevAttrs = join (' ',
         'dev-([cdih]-)?read',
@@ -1484,52 +1484,6 @@ sub ScanIds {
 }
 
 
-##########################################
-# called via expr
-sub ScanFormat {
-    my $hash = shift;
-    my $val  = shift;
-    my $name = $hash->{NAME};
-    use bytes;
-    my $len = length($val);
-    my $i   = unpack('s', $val);
-    my $n   = unpack('S', $val);
-    my $h   = unpack('H*', $val);
-    Log3 $name, 5, "$name: ScanFormat hex=$h, bytes=$len";
-    
-    my $ret = "hex=$h, string=";
-        for my $c (split //, $val) {
-            if ($c =~ /[[:graph:]]/) {
-                $ret .= $c;
-            } else {
-                $ret .= '.';
-            }
-        }
-                
-        $ret .= ', s=' . unpack('s', $val) .
-        ', s>=' . unpack('s>', $val) .
-        ', S=' . unpack('S', $val) .
-        ', S>=' . unpack('S>', $val);
-    if ($len > 2) {         
-        $ret .= ', i=' . unpack('s', $val) .
-        ', i>=' . unpack('s>', $val) .
-        ', I=' . unpack('S', $val) .
-        ', I>=' . unpack('S>', $val);
-
-        $ret .= ', f=' . unpack('f', $val) .
-        ', f>=' . unpack('f>', $val);
-
-        #my $r1 = substr($h, 0, 4);
-        #my $r2 = substr($h, 4, 4);
-        #my $rev = pack ('H*', $r2 . $r1);
-        #$ret .= ', revf=' . unpack('f', $rev) .
-        #', revf>=' . unpack('f>', $rev);
-    }
-    return $ret;
-}
-
-
-
 ####################################################################################
 # Notify for INITIALIZED -> Open defined physical / logical (tcp) device
 # both for physical and logical tcp connected devices
@@ -1933,7 +1887,7 @@ sub ReadFn {
         if ($hash->{EXPECT} eq 'request') {             # --- REQUEST ---
             return if (!HandleRequest($hash)) ;         # check for valid PDU, parse, return if frame not complete (yet)
             # ERROR is only set by Checksum Check or unsupported fCode here.
-            if ($hash->{FRAME}{CHECKSUMERROR} && $hash->{MODE} eq 'passive') {
+            if ($hash->{FRAME}{CHECKSUMERROR} && $hash->{MODE} eq 'passive') {      
                 Log3 $name, 5, "$name: no valid request -> try interpretation as response instead";
                 delete $hash->{REQUEST};                # this one would be invalid anyway
                 delete $hash->{FRAME}{ERROR};
@@ -1943,7 +1897,7 @@ sub ReadFn {
         } 
         elsif ($hash->{EXPECT} eq 'response') {         # --- RESPONSE ---
             return if (!HandleResponse($hash));         # check PDU, CRC, parse, log, return if frame not complete (yet)
-            if ($hash->{FRAME}{CHECKSUMERROR} && $hash->{MODE} eq 'passive') {
+            if ($hash->{FRAME}{CHECKSUMERROR} && $hash->{MODE} ne 'master') {
                 Log3 $name, 5, "$name: no valid response -> try interpretation as request instead";
                 delete $hash->{FRAME}{ERROR};
                 return if (!HandleRequest($hash));      # try as response PDU, CRC, parse, log, return if frame not complete (yet)
@@ -2089,7 +2043,11 @@ sub SkipGarbageCheck {
     my $skipMode  = AttrVal ($name, 'skipGarbage', 0);
     my $start     = 0;
 
-    return $hash->{READ}{BUFFER} if (!defined($startByte) && !$skipMode);       # old behavior if skipMode was not set and no startByte passed
+    if ($hash->{MODE} ne 'master' && $hash->{PROTOCOL} ne 'ASCII' && !$skipMode) {
+        # always check for start byte when protocol is ASCII or mode is Master.
+        # otherwise depend on the skipMode attribute
+        return $hash->{READ}{BUFFER};
+    }
     use bytes;
 
     if (!$startByte && $hash->{PROTOCOL} eq 'RTU') {
@@ -2136,7 +2094,6 @@ sub ParseFrameStart {
     my $expectId;
     $expectId = $hash->{REQUEST}{MODBUSID} if ($hash->{REQUEST} && $hash->{REQUEST}{MODBUSID}); 
     # todo: should be removed in passive mode when the last request was not valid
-    # todo: somehow slave reception already has a wrong request / id in scanning ...
     
     Log3 $name, 5, "$name: ParseFrameStart called from " . FhemCaller() .
         ($expectId ? " protocol $proto expecting id $expectId" : '');
@@ -2179,7 +2136,7 @@ sub ParseFrameStart {
 #############################################################################
 # called after ParseFrameStart by read / readAnswer if we are master
 # check that response fits our request_method, call parseResponse
-# validate checksums, call parseObj to set readings
+# validate checksums, call ParseDataString to set readings
 # return undef if need more data or 1 if final success or error.
 # cleans up at the end.
 #
@@ -2235,7 +2192,7 @@ sub HandleResponse {
         #Log3 $name, 5, "$name: prefill reponse hash with request " . RequestText($request);
         $response->{ADR}        = $request->{ADR};          # prefill so we don't need $request in ParseResponse and it gets shorter
         $response->{LEN}        = $request->{LEN};
-        $response->{OPERATION}  = $request->{OPERATION};    # for later call to parseObj
+        $response->{OPERATION}  = $request->{OPERATION};    # for later call to ParseDataString
         $response->{MASTERHASH} = $masterHash if ($masterHash);    
         $response->{RELAYHASH}  = $request->{RELAYHASH} if ($request->{RELAYHASH});    # not $relayHash!
     }   # if no request known, we will skip most of the part below
@@ -2259,8 +2216,8 @@ sub HandleResponse {
                 Log3 $name, 5, "$name: now parsing response data objects, master is " . 
                     ($masterHash ? $masterHash->{NAME} : 'undefined') . " relay is " .
                     ($relayHash ? $relayHash->{NAME} : 'undefined');
-                ParseObj($masterHash, $response) if ($masterHash);
-                ParseObj($relayHash, $response) if ($relayHash);
+                ParseDataString($masterHash, $response) if ($masterHash);
+                ParseDataString($relayHash, $response) if ($relayHash);
             }
         }
         RelayResponse($hash, $request, $response) if ($relayHash && $request);       # add to {ERROR} if relay device is unavailable
@@ -2367,7 +2324,7 @@ sub ParseResponse {
         return if ($dataLength) < 2;
         $response->{TYPE} = ($fCode == 15 ? 'c' : 'c');     # coils / holding registers
         $frame->{PDULEXP} = 5;                              # 1 byte fCode + 2 byte adr + 2 bytes len   
-        # response to fc 15 / 16 does not contain data -> nothing to be done, parseObj will not be called    
+        # response to fc 15 / 16 does not contain data -> nothing to be done, ParseDataString will not be called    
     } 
     elsif ($fCode >= 128) {
         # error fCode                                       pdu: fCode, data
@@ -2401,14 +2358,13 @@ sub ParseResponse {
 }
 
 
-##########################################
-# handle scanning for ParseObj
-sub handleScanResults {
+#####################################################
+# create a reading name for objects while scanning
+sub ScanReadingName {
     my $logHash  = shift;
     my $reading  = shift;
     my $type     = shift;
     my $startAdr = shift;
-    my $rest     = shift;
     my $op       = shift;
     my $name     = $logHash->{NAME};
     my $key      = $type . $startAdr;
@@ -2416,33 +2372,66 @@ sub handleScanResults {
     if ($op =~ /scanid([0-9]+)/) {          # scanning for Modbus ID
         $reading = 'scanId-' . $1 . "-Response-$key";
         $logHash->{MODBUSID} = $1;
-        Log3 $name, 3, "$name: ParseObj scanIds got response from Id $1 - set internal MODBUSID to $1";
+        Log3 $name, 3, "$name: ScanReadingName scanIds got response from Id $1 - set internal MODBUSID to $1";
+        return $reading;
     } 
-    elsif ($op eq 'scanobj') {              # scan Modbus objects
-        Log3 $name, 5, "$name: ParseObj scanobj reading=$reading";
-        if (!$reading) {
-            my $fKey = $type . sprintf ('%05d', $startAdr);
-            $reading = "scan-$fKey";
-            Log3 $name, 5, "$name: ParseObj scanobj sets reading=$reading";
-            CommandAttr(undef, "$name obj-${fKey}-reading $reading");
-        }
-        if ($type =~ '[hi]') {
-            my $l = length($rest) / 2;
-            $l = 1 if ($l < 1);
-            CommandAttr(undef, "$name dev-h-defLen $l")                           
-                if (AttrVal($name, 'dev-h-defLen', '') ne "$l");
-            CommandAttr(undef, "$name dev-h-defUnpack a" . $l*2)                    
-                if (AttrVal($name, 'dev-h-defUnpack', '') ne ('a'.$l*2));
-            CommandAttr(undef, "$name dev-h-defExpr Modbus::ScanFormat(\$hash, \$val)")        
-                if (AttrVal($name, 'dev-h-defExpr', '') ne "Modbus::ScanFormat(\$hash, \$val)");
-        }
+    # scan Modbus objects
+    Log3 $name, 5, "$name: ScanReadingName scanobj reading=$reading";
+    if (!$reading) {
+        my $fKey = $type . sprintf ('%05d', $startAdr);     # objcombi with leading zeros
+        $reading = "scan-$fKey";
+        Log3 $name, 5, "$name: ScanReadingName scanobj sets reading=$reading";
+        CommandAttr(undef, "$name obj-${fKey}-reading $reading");
     }
     return $reading;
 }
 
 
+#################################################
+# called from CreateDataObjects to format 
+# responses with different types while scanning
+sub ScanFormat {
+    my $hash = shift;
+    my $val  = shift;
+    my $name = $hash->{NAME};
+    use bytes;
+    my $len = length($val);
+    my $i   = unpack('s', $val);
+    my $n   = unpack('S', $val);
+    my $h   = unpack('H*', $val);
+    Log3 $name, 5, "$name: ScanFormat hex=$h, bytes=$len";
+    
+    my $ret = "hex=$h, string=";
+        for my $c (split //, $val) {
+            $ret .= $c =~ /[[:graph:]]/ ? $c : '.';
+        }
+                
+        $ret .= ', s=' . unpack('s', $val) .
+        ', s>=' . unpack('s>', $val) .
+        ', S=' . unpack('S', $val) .
+        ', S>=' . unpack('S>', $val);
+    if ($len > 2) {         
+        $ret .= ', i=' . unpack('s', $val) .
+        ', i>=' . unpack('s>', $val) .
+        ', I=' . unpack('S', $val) .
+        ', I>=' . unpack('S>', $val);
+
+        $ret .= ', f=' . unpack('f', $val) .
+        ', f>=' . unpack('f>', $val);
+
+        #my $r1 = substr($h, 0, 4);
+        #my $r2 = substr($h, 4, 4);
+        #my $rev = pack ('H*', $r2 . $r1);
+        #$ret .= ', revf=' . unpack('f', $rev) .
+        #', revf>=' . unpack('f>', $rev);
+    }
+    return $ret;
+}
+
+
 #####################################################################
 # decode and then encode all array elements
+# called from CreateDataObjects
 sub arrayEncoding {
     my $hash   = shift;
     my $aRef   = shift;
@@ -2460,143 +2449,215 @@ sub arrayEncoding {
 }
 
 
-#
-# Daten aufbereiten:
-# Modul ist Master, gelesene Daten von einem Gerät zu Readings expr, format, map, ...
-#                   set von Fhem, Daten an Gerät senden, kein Format, aber setexpr
-#
-# Modul ist Slave, angefragte Daten an einen anderen Master liefern, setexpr, inverse map
-#                   geschriebene Daten von einem anderen Master in Readings, map, expr, format, ...
-#
-#
+##################################################
+# slave got data to write from its master
+sub WriteObject {
+    my $hash     = shift;
+    my $transPtr = shift;
+    my $type     = shift;
+    my $adr      = shift;
+    my $val      = shift;
+    my $name     = $hash->{NAME};
+    my $objCombi = $type . $adr;   
+    my $reading  = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
+    if (!$reading) {                        # no parse information -> skip to next object
+        Log3 $name, 5, "$name: WriteObject has no information about handling $objCombi";
+        $transPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2);
+        return;
+    }
+    if (!ObjInfo($hash, $objCombi, 'allowWrite', 'defAllowWrite', 0)) { # write allowed. 
+        Log3 $name, 4, "$name: WriteObject refuses to set reading $reading (allowWrite not set)";
+        $transPtr->{ERRCODE} = DevInfo($hash, $type, 'notAllowedErrCode', 1);
+        return;
+    }
+    
+    my $device = $name;                                 # default device is myself
+    my $rname  = $reading;                              # given name as reading name
+    my $dev    = $hash;
+    if ($rname =~ /^([^\:]+):(.+)$/) {                  # can we split given name to device:reading?
+        $device = $1;
+        $rname  = $2;
+        $dev    = $defs{$device};
+    }
+            
+    if (!CheckRange($hash, {val => $val, min => ObjInfo($hash, $objCombi, 'min'), max => ObjInfo($hash, $objCombi, 'max')} ) ) {
+        Log3 $name, 4, "$name: WriteObject ignores value $val because it is out of bounds for reading $rname of device $device";
+        $transPtr->{ERRCODE} = DevInfo($hash, $type, 'valueErrCode', 1);    # for slave write processing
+        next OBJLOOP;
+    }
+    if (!TryCall($hash, 'ModbusReadingsFn', $reading, $val)) {    
+        Log3 $name, 4, "$name: ParseDataString assigns value $val to reading $rname of device $device";
+        if ($dev eq $hash) {
+            readingsBulkUpdate($dev, $rname, $val);         # assign value to one of this devices readings 
+        } else {
+            readingsSingleUpdate($dev, $rname, $val, 1);    # assign value to reading - another Fhem device
+        }
+    }
+    $hash->{gotReadings}{$reading} = $val;
+    return;
+}
+
+
+#####################################################
+# split data part in a response or write request 
+# into objects that later can be assigned to readings
+sub SplitDataString {
+    my $hash      = shift;
+    my $transPtr  = shift;                      # $transPtr can be response (mode master) or request (mode slave and write request)
+    my $name      = $hash->{NAME};
+    my $type      = $transPtr->{TYPE};
+    my $startAdr  = $transPtr->{ADR};
+    my $valuesLen = $transPtr->{LEN};           # valuesLen is only used for coils / discrete inputs
+    my $op        = $transPtr->{OPERATION} // '';
+    my $dataStr   = $transPtr->{VALUES};
+    my $lastAdr   = ($valuesLen ? $startAdr + $valuesLen -1 : 0);
+    my @objList;                                # result array of object hashes
+
+    Log3 $name, 5, "$name: SplitDataString called from " . FhemCaller() . " with data hex " . unpack ('H*', $transPtr->{VALUES}) . 
+                ", type $type, adr $startAdr" .  ($valuesLen ? ", valuesLen $valuesLen" : '') .  ($op ? ", op $op" : '');
+
+    if ($type =~ '[cd]') {
+        $valuesLen = 1 if (!$valuesLen);
+        $dataStr   = unpack ("b$valuesLen", $transPtr->{VALUES});   # convert binary data to bit string
+        # for fc5 responses paresResponse already converts ff00 to 1. For requests the above unpack will also work for 0000 / ff00
+        Log3 $name, 5, "$name: SplitDataString shortened coil / input bit string to " . $dataStr . ", start adr $startAdr, valuesLen $valuesLen";
+    }
+
+    use bytes;
+    my ($reading, $unpack, $objLen, $expr);
+    OBJLOOP:
+    while (length($dataStr) > 0) {              # parse every field / object passed in $transPtr structure
+        my $objCombi  = $type . $startAdr;
+        $reading = ObjInfo($hash, $objCombi, 'reading');     # '' if nothing specified
+        if ($type =~ '[cd]') {                  # coils or digital inputs
+            $unpack = 'a';                      # for coils just take the next byte with 0/1 from the string. 
+            $objLen = 1;                        # to be used in continue block (go to next coil/input in unpacked bit string)
+        } 
+        else {                                  # holding / input register
+            if ($op =~ /^scan/) {               # special handling / presentation if scanning
+                $objLen  = length($dataStr) / 2;   # length of rest as number of registers when scanning
+                $objLen  = 1 if ($objLen < 1);  # just to be sure
+                $unpack  = 'a' . $objLen*2;     # for Modbus::ScanFormat
+                $reading = ScanReadingName ($hash, $reading, $type, $startAdr, $op);
+            }
+            else {                              # not scanning - use unpack, len and expr from attributes
+                $objLen  = ObjInfo($hash, $objCombi, 'len');             # default to 1 (1 Reg / 2 Bytes) with global attrDefaults
+                $unpack  = ObjInfo($hash, $objCombi, 'unpack'); 
+            }
+        }
+        if (!$reading) {                        # no parse information -> skip to next object
+            Log3 $name, 5, "$name: SplitDataString has no information about handling $objCombi";
+            $transPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2) if ($hash->{MODE} eq 'slave');
+            next OBJLOOP;
+        }
+        my %obj;
+        $obj{objCombi}   = $objCombi;
+        $obj{reading}    = $reading;
+        $obj{unpack}     = $unpack;
+        $obj{adr}        = $startAdr;
+        $obj{len}        = $objLen;
+        $obj{data}       = substr($dataStr, 0, $objLen * 2);
+        $obj{group}      = ObjInfo($hash, $objCombi, 'group');
+        push @objList, \%obj;
+    }
+    continue {                                                      # take next object in data string
+        if ($type =~ '[cd]') {
+            $startAdr++;
+            $dataStr = (length($dataStr) > 1 ? substr($dataStr, 1) : '');
+            last OBJLOOP if ($lastAdr && $startAdr > $lastAdr);     # only set for unpacked coil / input bit string
+        } 
+        else {
+            $startAdr += $objLen;            
+            $dataStr = (length($dataStr) > ($objLen*2) ? substr($dataStr, $objLen * 2) : '');
+        }
+        #Log3 $name, 5, "$name: SplitDataString moves to next object, skip $objLen to $type$startAdr" if ($dataStr);
+    }
+    return \@objList;
+}
+
+
+#######################################################
+# create readings from a hash containing all data parts
+# with unpack, map, format and so on
+sub CreateDataObjects {
+    my $hash     = shift;
+    my $objList  = shift;
+    my $transPtr = shift;                       # $transPtr can be response (mode master) or request (mode slave and write request)
+    my $name     = $hash->{NAME};
+
+    Log3 $name, 5, "$name: CreateDataObjects called from " . FhemCaller() . " with objList " 
+        . join ',', map {$_->{objCombi}} @{$objList};
+    my @sortedList = sort compObjGroups @{$objList};        # sorted by group and pos in group, then type / adr
+    Log3 $name, 5, "$name: CreateDataObjects sortedList " 
+        . join ',', map {$_->{objCombi}} @sortedList;
+
+    readingsBeginUpdate($hash);
+    OBJLOOP:
+    foreach my $obj (@sortedList) {
+        my $objCombi = $obj->{objCombi};
+        my @val = unpack ($obj->{unpack}, $obj->{data});      # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
+        if (!defined($val[0])) {                # undefined value as result of unpack -> skip to next object
+            my $logLvl = AttrVal($name, 'timeoutLogLevel', 3);
+            Log3 $name, $logLvl, "$name: CreateDataObjects unpack of " . unpack ('H*', $obj->{data}) . " with $obj->{unpack} for $obj->{reading} resulted in undefined value";
+            next OBJLOOP;
+        } 
+        Log3 $name, 5, "$name: CreateDataObjects unpacked " . unpack ('H*', $obj->{data}) . " with $obj->{unpack} to " . ReadableArray(\@val);
+        arrayEncoding($hash, \@val, ObjInfo($hash, $objCombi, 'decode'), ObjInfo($hash, $objCombi, 'encode'));
+        my $val = $val[0];
+
+        next OBJLOOP if (EvalExpr($hash,        # ignore exp results true -> skip to next object
+            {expr => ObjInfo($hash, $objCombi, 'ignoreExpr'), val => $val,, '@val' => \@val, 
+             nullIfNoExp => 1, action => "ignoreExpr for $obj->{reading}"}));
+
+        if ($transPtr->{OPERATION} && $transPtr->{OPERATION} =~ /^scan/) {
+            $val = ScanFormat($hash, $val);     # interpretations with diferent unpack codes
+        } 
+        else {
+            $val = EvalExpr($hash,   {val => $val, expr => ObjInfo($hash, $objCombi, 'expr'), '%val' => \@val});   
+            $val = MapConvert($hash, {val => $val, map => ObjInfo($hash, $objCombi, 'map'),  undefIfNoMatch => 0});
+            $val = FormatVal($hash,  {val => $val, format => ObjInfo($hash, $objCombi, 'format')});
+        }
+
+        if ($hash->{MODE} eq 'slave') {
+            WriteObject($hash, $transPtr, $transPtr->{TYPE}, $obj->{adr}, $val);     # do slave write
+        }
+        else {
+            if (!TryCall($hash, 'ModbusReadingsFn', $obj->{reading}, $val)) {    
+                Log3 $name, 4, "$name: CreateDataObjects assigns value $val to $obj->{reading}";
+                readingsBulkUpdate($hash, $obj->{reading}, $val);
+            }
+            $hash->{gotReadings}{$obj->{reading}} = $val;
+            $hash->{lastRead}{$objCombi} = gettimeofday();     # used for pollDelay checking by getUpdate (mode master)
+        }
+    }
+    readingsEndUpdate($hash, 1);
+    return;
+}
+
 
 #################################################
 # Parse holding / input register / coil Data
 # called from ParseResponse which is only called from HandleResponse
 # or from HandleRequest (for write requests as slave)
 # with logical device hash, data string and the object type/adr to start with
-sub ParseObj {
-    my $hash      = shift;
-    my $dataPtr   = shift;                      # $dataPtr can be response (mode master) or request (mode slave and write request)
-    my $name      = $hash->{NAME};
-    my $type      = $dataPtr->{TYPE};
-    my $startAdr  = $dataPtr->{ADR};
-    my $valuesLen = $dataPtr->{LEN};            # valuesLen is only used for coils / discrete inputs
-    my $op        = $dataPtr->{OPERATION};
-    my $rest      = $dataPtr->{VALUES};
-    my $lastAdr   = ($valuesLen ? $startAdr + $valuesLen -1 : 0);
-    my ($unpack, $map, $objLen);
-    $op = '' if (!$op);
-    Log3 $name, 4, "$name: ParseObj called from " . FhemCaller() . " with data hex " . unpack ('H*', $dataPtr->{VALUES}) . 
-                ", type $type, adr $startAdr" .  ($valuesLen ? ", valuesLen $valuesLen" : '') .  ($op ? ", op $op" : '');
-    delete $hash->{gotReadings};             # will be filled later and queried by caller. Used for logging and return value in get-command
+sub ParseDataString {
+    my $hash     = shift;
+    my $transPtr = shift;                       # $transPtr can be response (mode master) or request (mode slave and write request)
+    my $name     = $hash->{NAME};
 
-    if ($type =~ '[cd]') {
-        $valuesLen = 1 if (!$valuesLen);
-        $rest = unpack ("b$valuesLen", $dataPtr->{VALUES});   # convert binary data to bit string
-        # for fc5 responses paresResponse already converts ff00 to 1. For requests the above unpack will also work for 0000 / ff00
-        Log3 $name, 5, "$name: ParseObj shortened coil / input bit string: " . $rest . ", start adr $startAdr, valuesLen $valuesLen";
+    Log3 $name, 5, "$name: ParseDataString called from " . FhemCaller() . " with data hex " . unpack ('H*', $transPtr->{VALUES}) . 
+                ", type $transPtr->{TYPE}, adr $transPtr->{ADR}" . ($transPtr->{OPERATION} ? ", op $transPtr->{OPERATION}" : '');
+    delete $hash->{gotReadings};                # will be filled later and queried by caller. Used for logging and return value in get-command
+
+    my $obj = SplitDataString($hash, $transPtr);    # split value string into objects in a new hash with its parameters from attrs
+    if ($transPtr->{ERRCODE}) {
+        Log3 $name, 5, "$name: ParseDataString returns because ERRCODE was set while splitting objects";
+        return;
     }
 
-    use bytes;
-    readingsBeginUpdate($hash);
-    OBJLOOP:
-    while (length($rest) > 0) {                 # parse every field / object passed in $dataPtr structure
-        my $key     = $type . $startAdr;
-        my $reading = ObjInfo($hash, $key, 'reading');  # '' if nothing specified
-        $objLen     = 1;                        # to be used in continue block
-        
-        $reading = handleScanResults ($hash, $reading, $type, $startAdr, $rest, $op) if ($op =~ /^scan/);
-        if (!$reading) {                        # no parse information -> skip to next object
-            Log3 $name, 5, "$name: ParseObj has no information about handling $key";
-            $dataPtr->{ERRCODE} = DevInfo($hash, $type, 'addressErrCode', 2) if ($hash->{MODE} eq 'slave');
-            next OBJLOOP;
-        }
+    CreateDataObjects($hash, $obj, $transPtr);
 
-        if ($type =~ '[cd]') {                  # coils or digital inputs
-            $unpack = 'a';                      # for coils just take the next byte with 0/1 from the string. 
-        } 
-        else {                                  # holding / input register
-            $unpack = ObjInfo($hash, $key, 'unpack'); 
-            $objLen = ObjInfo($hash, $key, 'len');          # default to 1 Reg / 2 Bytes
-            $rest   = ReverseWordOrder($hash, $rest, $objLen) if (ObjInfo($hash, $key, 'revRegs'));
-            $rest   = SwapByteOrder($hash, $rest, $objLen) if (ObjInfo($hash, $key, 'bswapRegs'));
-        };
-                
-        my @val = unpack ($unpack, $rest);      # fill @val array in case $unpack contains codes for more fields, other elements can be used in expr later.
-        if (!defined($val[0])) {                # undefined value as result of unpack -> skip to next object
-            my $logLvl = AttrVal($name, 'timeoutLogLevel', 3);
-            Log3 $name, $logLvl, "$name: ParseObj unpack of " . unpack ('H*', $rest) . " with $unpack for $reading resulted in undefined value";
-            next OBJLOOP;
-        } 
-        Log3 $name, 5, "$name: ParseObj unpacked " . unpack ('H*', $rest) . " with $unpack to " . ReadableArray(\@val);
-        arrayEncoding($hash, \@val, ObjInfo($hash, $key, 'decode'), ObjInfo($hash, $key, 'encode'));
-        my $val = $val[0];
-
-        next OBJLOOP if (EvalExpr($hash,       # ignore exp results true -> skip to next object
-            {expr => ObjInfo($hash, $key, 'ignoreExpr'), val => $val,, '@val' => \@val, 
-             nullIfNoExp => 1, action => "ignoreExpr for $reading"}));
-
-        $val = EvalExpr($hash, {expr => ObjInfo($hash, $key, 'expr'), val => $val, '%val' => \@val});   # expression?
-        $val = MapConvert ($hash, {map => ObjInfo($hash, $key, 'map'), val => $val, undefIfNoMatch => 0});     # Map zur Nachbereitung der Werte?
-        $val = FormatVal ($hash, {val => $val, format => ObjInfo($hash, $key, 'format')});              # Format string?
-
-        if ($hash->{MODE} ne 'slave') {      # slave is handled afterwards
-            if (!TryCall($hash, 'ModbusReadingsFn', $reading, $val)) {    
-                Log3 $name, 4, "$name: ParseObj assigns value $val to $reading";
-                readingsBulkUpdate($hash, $reading, $val);
-            }
-            $hash->{gotReadings}{$reading} = $val;
-            $hash->{lastRead}{$key}        = gettimeofday();     # used for pollDelay checking by getUpdate (mode master)
-            next OBJLOOP;
-        }
-        # slave got data to write from its master
-        if (!ObjInfo($hash, $key, 'allowWrite', 'defAllowWrite', 0)) { # write allowed. 
-            Log3 $name, 4, "$name: ParseObj refuses to set reading $reading (allowWrite not set)";
-            my $code = DevInfo($hash, $type, 'notAllowedErrCode', 1);
-            $dataPtr->{ERRCODE} = $code if ($code);
-            next OBJLOOP;
-        }
-        
-        my $device = $name;                                 # default device is myself
-        my $rname  = $reading;                              # given name as reading name
-        my $dev    = $hash;
-        if ($rname =~ /^([^\:]+):(.+)$/) {                  # can we split given name to device:reading?
-            $device = $1;
-            $rname  = $2;
-            $dev    = $defs{$device};
-        }
-                
-        if (!CheckRange($hash, {val => $val, min => ObjInfo($hash, $key, 'min'), max => ObjInfo($hash, $key, 'max')} ) ) {
-            Log3 $name, 4, "$name: ParseObj ignores value $val because it is out of bounds for reading $rname of device $device";
-            $dataPtr->{ERRCODE} = DevInfo($hash, $type, 'valueErrCode', 1);
-            next OBJLOOP;
-        }
-        if (!TryCall($hash, 'ModbusReadingsFn', $reading, $val)) {    
-            Log3 $name, 4, "$name: ParseObj assigns value $val to reading $rname of device $device";
-            if ($dev eq $hash) {
-                readingsBulkUpdate($dev, $rname, $val);         # assign value to one of this devices readings 
-            } else {
-                readingsSingleUpdate($dev, $rname, $val, 1);    # assign value to reading - another Fhem device
-            }
-        }
-        $hash->{gotReadings}{$reading} = $val;
-    }
-    continue {                                                  # gehe zum nächsten Wert
-        last OBJLOOP if ($dataPtr->{ERRCODE});                  # happens only as slave
-        if ($type =~ '[cd]') {
-            $startAdr++;
-            $rest = (length($rest) > 1 ? substr($rest, 1) : '');
-            last OBJLOOP if ($lastAdr && $startAdr > $lastAdr);     # only set for unpacked coil / input bit string
-        } 
-        else {
-            $startAdr += $objLen;            
-            $rest = (length($rest) > ($objLen*2) ? substr($rest, $objLen * 2) : '');
-        }
-        Log3 $name, 5, "$name: ParseObj moves to next object, skip $objLen to $type$startAdr" if ($rest);
-    }
-    readingsEndUpdate($hash, 1);
-    Log3 $name, 5, "$name: ParseObj created " . scalar keys (%{$hash->{gotReadings}}) . " readings";
+    Log3 $name, 5, "$name: ParseDataString created " . scalar keys (%{$hash->{gotReadings}}) . " readings";
     return;
 }
 
@@ -2655,15 +2716,14 @@ sub HandleRequest {
         delete $hash->{REQUEST};                    # this one was invalid anyway
     } else {
         $logHash = GetLogHash($hash, $id);              # look for Modbus logical slave or relay device (right id)
-        
         if ($logHash) {                                 # other errors might need to create a response answer back to the master
             # our id, no cheksum error, we are responsible, logHash is set properly                                          
             if ($hash->{MODE} eq 'slave') {
                 if (!$request->{ERRCODE} && exists $fcMap{$fCode}{write}) {   # supported write fCode request contains data to be parsed and stored
                     my $pLogHash = ($logHash->{CHILDOF} ? $logHash->{CHILDOF} : $logHash);
-                    Log3 $name, 5, "$name: passing value string of write request to ParseObj to set readings";                  
-                    ParseObj($pLogHash, $request); # parse the request value, set reading with formatting etc. like for replies
-                    # parseObj can also set ERRCODE (illegal address, value out of bounds) so CreateResponse/PackResponse will create an error message back to master
+                    Log3 $name, 5, "$name: passing value string of write request to ParseDataString to set readings";                  
+                    ParseDataString($pLogHash, $request); # parse the request value, set reading with formatting etc. like for replies
+                    # ParseDataString can also set ERRCODE (illegal address, value out of bounds) so CreateResponse/PackResponse will create an error message back to master
                 }
                 CreateResponse($hash, $logHash, $request);  # create and send response, data or unsupported fCode error if request->{ERRCODE} and {ERROR} were set during parse
                 $hash->{EXPECT} = 'request';  
@@ -3271,7 +3331,7 @@ sub ProcessRequestQueue {
     
     my $msg = CheckDisable($maHash);
     if ($msg) {                                 # logical/physical device disabled, logged by CheckDisable
-        $msg = 'dropping queue because logical or io device is disabled';
+        $msg = 'dropping queue because logical or io device is unavailable or disabled';
         delete $ioHash->{QUEUE};                # drop whole queue
     } 
     elsif (!IsOpen($ioHash)) {
@@ -3356,22 +3416,25 @@ sub PackObj {
     
     while ($counter < $valuesLen) {
         # einzelne Felder verarbeiten
-        my $key     = $type . $startAdr;
-        my $reading = ObjInfo($logHash, $key, 'reading');                    # is data coming from a reading
-        my $expr    = ObjInfo($logHash, $key, 'setexpr');      # or a setexpr (convert to register data)
-        my $unpack  = ObjInfo($logHash, $key, 'unpack');  
-        my $len     = ObjInfo($logHash, $key, 'len');           # default to 1 Reg / 2 Bytes
-        my $decode  = ObjInfo($logHash, $key, 'decode');        # character decoding 
-        my $encode  = ObjInfo($logHash, $key, 'encode');        # character encoding 
-        my $revRegs = ObjInfo($logHash, $key, 'revRegs');      # do not reverse register order by default
-        my $swpRegs = ObjInfo($logHash, $key, 'bswapRegs');  # dont reverse bytes in registers by default
+        my $objCombi = $type . $startAdr;
+        #Log3 $name, 5, "$name: PackObj at $objCombi, counter $counter, valuesLen $valuesLen";
+        my $reading  = ObjInfo($logHash, $objCombi, 'reading');     # is data coming from a reading
+        my $expr     = ObjInfo($logHash, $objCombi, 'setexpr');     # or a setexpr (convert to register data)
+        my $unpack   = ObjInfo($logHash, $objCombi, 'unpack');      # pack code to use, defaults to n
+        my $len      = ObjInfo($logHash, $objCombi, 'len');         # default to 1 Reg / 2 Bytes
+        my $decode   = ObjInfo($logHash, $objCombi, 'decode');      # character decoding 
+        my $encode   = ObjInfo($logHash, $objCombi, 'encode');      # character encoding 
+        my $revRegs  = ObjInfo($logHash, $objCombi, 'revRegs');     # do not reverse register order by default
+        my $swpRegs  = ObjInfo($logHash, $objCombi, 'bswapRegs');   # dont reverse bytes in registers by default
+        #Log3 $name, 5, "$name: PackObj at $objCombi, counter $counter, valuesLen $valuesLen, reading $reading";
         $len = 1 if ($type =~ /[cd]/);
         
         if (!$reading && !$expr) {
-            Log3 $name, 5, "$name: PackObj doesn't have reading or expr information for $key, set error code to 2 (addressErrCode)";
+            Log3 $name, 5, "$name: PackObj doesn't have reading or expr information for $objCombi";
             my $code = DevInfo($logHash, $type, 'addressErrCode', 2); 
             if ($code) {
                 $response->{ERRCODE} = $code;       			# if set, packResponse will not use values string
+                Log3 $name, 5, "$name: PackObj sets error code to $code";
                 return 0;
             }
         } 
@@ -3386,12 +3449,12 @@ sub PackObj {
                 $rname  = $2;
             }
             $val = ReadingsVal($device, $rname, '');
-            Log3 $name, 4, "$name: PackObj for $key is using reading $rname of device $device with value $val";
+            Log3 $name, 4, "$name: PackObj for $objCombi is using reading $rname of device $device with value $val";
         }
 
         $val = EvalExpr($logHash, {expr => $expr, val => $val, '$type' => $type, '%startAdr' => $startAdr} );
-        $val = FormatVal($logHash, {val => $val, format => ObjInfo($logHash, $key, 'format')});        
-        $val = MapConvert($logHash, {map => ObjInfo($logHash, $key, 'map'), 
+        $val = FormatVal($logHash, {val => $val, format => ObjInfo($logHash, $objCombi, 'format')});        
+        $val = MapConvert($logHash, {map => ObjInfo($logHash, $objCombi, 'map'), 
                                       val => $val, reverse => 1, undefIfNoMatch => 1});
         $val = decode($decode, $val) if ($decode);              # decode
         $val = encode($encode, $val) if ($encode);              # encode again
@@ -3401,7 +3464,8 @@ sub PackObj {
             $counter++;
         } 
         else {
-            my $dataPart = pack ($unpack, $val);                # use unpack code
+            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PackObj pack for $objCombi value $val with code $unpack created warning: @_"; };
+            my $dataPart = pack ($unpack, $val);                # use unpack code, might create warnings
             Log3 $name, 5, "$name: PackObj packed $val with pack code $unpack to " . unpack ('H*', $dataPart);
             $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);
             Log3 $name, 5, "$name: PackObj padded / cut object to " . unpack ('H*', $dataPart);
@@ -3623,6 +3687,159 @@ sub SendFrame {
 }
 
 
+###########################################################
+# create a hash with all objects / groups to be requested
+sub CreateUpdateHash {
+    my $hash      = shift;
+    my $name      = $hash->{NAME};
+    my $modHash   = $modules{$hash->{TYPE}};    # module hash
+    my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
+    my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
+    my $intvl     = $hash->{Interval};
+    my $now       = gettimeofday();
+
+    my @RawObjList;
+    foreach my $attribute (keys %{$attr{$name}}) {     # add all reading attributes to a list unless they are also in parseInfo
+        if ($attribute =~ /^obj-(.*)-reading$/) {
+            push @RawObjList, $1 if (!$parseInfo->{$1});
+        }
+    };
+    push @RawObjList, keys (%{$parseInfo});     # add all parseInfo readings to the list
+    Log3 $name, 5, "$name: CreateUpdateList full object list: " . join (' ',  sort @RawObjList);
+
+    my @objList;
+    my %objHash;
+    my %grpHash;
+    foreach my $objCombi (sort compObjCombi @RawObjList) {   # sorted by type+adr
+        my $reading    = ObjInfo($hash, $objCombi, 'reading');
+        my $poll       = ObjInfo($hash, $objCombi, 'poll');
+        my $delay      = ObjInfo($hash, $objCombi, 'polldelay');
+        my $group      = ObjInfo($hash, $objCombi, 'group');
+        my $len        = ObjInfo($hash, $objCombi, 'len');
+        my $lastRead   = $hash->{lastRead}{$objCombi} // 0;
+        my $type       = substr($objCombi, 0, 1);
+        my $adr        = substr($objCombi, 1);
+        my $maxLen     = DevInfo($hash, $type, 'combine', 0);
+        my $objText    = "$objCombi len $len $reading";
+        #Log3 $name, 5, "$name: CreateUpdateList check $objCombi reading $reading, poll = $poll, polldelay = $delay, last = $lastRead";
+        my $groupNr;
+        $groupNr = $1 if ($group && $group =~ /(\d+)-(\d+)/);
+        if ($groupNr) {                                 # handle group
+            my $objRef = $grpHash{'g'.$groupNr};
+            my $span   = 0;
+            if ($objRef) {
+                $span = $adr - $objRef->{adr} + $len;
+                if ($objRef->{type} ne $type) {
+                    Log3 $name, 3, "$name: CreateUpdateList found incompatible types in group $groupNr (so far $objRef->{type}, now $type";
+                } 
+                elsif ($objRef->{adr} > $adr) {
+                    Log3 $name, 3, "$name: CreateUpdateList found wrong adr sorting in group $groupNr. Old $objRef->{adr}, new $adr. Please report this bug";
+                } 
+                elsif ($maxLen && $span > $maxLen) {
+                    Log3 $name, 3, "$name: CreateUpdateList found group $groupNr span $span is longer than defined maximum $maxLen";
+                } 
+                else {              # add to group
+                    $objRef->{len} = $span;
+                    $objRef->{groupInfo} .= ($objRef->{groupInfo} ? ' and ' : '') . $objText;
+                    #Log3 $name, 5, "$name: CreateUpdateList adds $objText to group $groupNr";
+                }
+            } 
+            else {                  # new object for group
+                #Log3 $name, 5, "$name: CreateUpdateList creates new hash for group $groupNr with $objText";
+                $objRef = {type => $type, adr => $adr, len => $len, reading => $reading, 
+                        groupInfo => $objText, group => $group, objCombi => 'g'.$groupNr};
+                $grpHash{'g'.$groupNr} = $objRef;
+            }
+        }
+        if (($poll && $poll ne 'once') || ($poll eq 'once' && !$lastRead)) {        # this was wrongly implemented (once should be specified as delay). Keep for backward compatibility
+            if (!$delay || ($delay && $delay ne 'once') || ($delay eq 'once' && !$lastRead)) {
+                $delay = 0 if ($delay eq 'once' || !$delay);
+                $delay = $1 * ($intvl ? $intvl : 1) if ($delay =~ /^x([0-9]+)/);    # delay as multiplyer if starts with x
+                if ($now >= $lastRead + $delay) {           # this object is due to be requested
+                    if ($groupNr) {
+                        $objHash{'g'.$groupNr} = $grpHash{'g'.$groupNr};
+                        Log3 $name, 5, "$name: CreateUpdateList will request group $groupNr because of $objText";
+                    } 
+                    else {                                  # no group
+                        $objHash{$objCombi} = {objCombi => $objCombi, type => $type, adr => $adr, reading => $reading, len => $len};
+                        Log3 $name, 5, "$name: CreateUpdateList will request $objText";
+                    }
+                }
+                else {                                          # delay not over
+                    if ($groupNr && $objHash{'g'.$groupNr}) {   # but part of a group to be requested
+                        Log3 $name, 5, "$name: CreateUpdateList will request $reading because it is part of group $groupNr";
+                    } 
+                    else {                                      # delay not over and not in a group to be requested
+                        Log3 $name, 5, "$name: CreateUpdateList will skip $reading, delay not over";
+                    }
+                }
+            }
+        }
+    }
+    return \%objHash;
+}
+
+
+###################################
+# combine objects to be requested
+sub CombineUpdateHash {
+    my $hash     = shift;
+    my $objHash  = shift;
+    my $name     = $hash->{NAME};
+    my $nextSpan = 0;
+    my $reason   = 'first object';
+    my $lastText = '';
+    my $nextText = '';
+    my $lastObj;
+    my $maxLen;
+
+    Log3 $name, 4, "$name: CombineUpdateHash objHash keys before combine: " . join ',', keys %{$objHash};
+    Log3 $name, 5, "$name: CombineUpdateHash tries to combine read commands";
+
+    COMBINELOOP:
+    foreach my $nextObj (sort compObjTA values %{$objHash}) {       # sorting type/adr 
+        $maxLen = DevInfo($hash, $nextObj->{type}, 'combine', 1);
+        next COMBINELOOP if (!$lastObj);            # initial round
+        $reason = '';
+        $lastText = $lastObj->{groupInfo} ? "$lastObj->{objCombi} len $lastObj->{len} ($lastObj->{groupInfo})" 
+            : "$lastObj->{objCombi} len $lastObj->{len} $lastObj->{reading}";
+        $nextText = $nextObj->{groupInfo} ? "$nextObj->{objCombi} len $nextObj->{len} ($nextObj->{groupInfo})" 
+            : "$nextObj->{objCombi} len $nextObj->{len} $nextObj->{reading}";            
+        $nextSpan = ($nextObj->{adr} + $nextObj->{len}) - $lastObj->{adr};   # combined length
+        if ($nextObj->{adr} <= $lastObj->{adr}) {
+            $reason = 'wrong order defined';
+        } elsif ($nextObj->{type} ne $lastObj->{type}) {
+            $reason = 'different types';
+        } elsif ($nextSpan > $maxLen) {
+            $reason = "span $nextSpan would be bigger than max $maxLen";
+        }
+        if (!$reason) {                                 # do combine, no reason against it
+            Log3 $name, 5, "$name: CombineUpdateHash combine $lastText with $nextText to span $nextSpan, drop read for $nextObj->{objCombi}";
+            $lastObj->{combine} .= ($lastObj->{combine} ? ' and ' : "$lastText with ") . $nextText;
+            $lastObj->{span} = $nextSpan;               # increase the length to include following object
+            delete $objHash->{$nextObj->{objCombi}};    # remove from hash
+        } else {
+            Log3 $name, 5, "$name: CombineUpdateHash cant combine $lastText with $nextText, $reason";
+        }
+    }
+    continue {
+        if ($reason) {
+            $nextObj->{span} = $nextObj->{len};
+            $lastObj = $nextObj ;        # point last obj to next so combination can start with the next one
+        }
+    }
+    Log3 $name, 5, "$name: CombineUpdateHash keys are now " . join ',', keys %{$objHash};
+    my $logMsg = '';
+    foreach my $obj (sort compObjTA values %{$objHash}) {
+        #Log3 $name, 5, "$name: CombineUpdateHash logmsg obj = $obj->{objCombi} span $obj->{span} reading $obj->{reading}";
+        $logMsg = ($logMsg ? "$logMsg, " : '') . "$obj->{objCombi} len $obj->{span} " . 
+                    ($obj->{combine} ? "(combined $obj->{combine})" : "($obj->{reading})");
+    }
+    Log3 $name, 4, "$name: GetUpdate will now create requests for $logMsg" ;    
+    return;
+}    
+
+
 ###############################################################################
 # called via internal timer from 
 # logical device module with 
@@ -3636,108 +3853,26 @@ sub GetUpdate {
     my $param     = shift;
     my ($calltype,$name) = split(':',$param);
     my $hash      = $defs{$name};               # logical device hash
-    my $modHash   = $modules{$hash->{TYPE}};    # module hash
-    my $parseInfo = ($hash->{parseInfo} ? $hash->{parseInfo} : $modHash->{parseInfo});
-    my $devInfo   = ($hash->{deviceInfo} ? $hash->{deviceInfo} : $modHash->{deviceInfo});
-    my $intvl     = $hash->{Interval};
     my $now       = gettimeofday();
     
-    Log3 $name, 4, "$name: GetUpdate called from " . FhemCaller();
-    $hash->{'.LastUpdate'} = $now;              # note the we were called - even when not as 'update' and UpdateTimer is not called afterwards
-    UpdateTimer($hash, \&Modbus::GetUpdate, 'next') if ($calltype eq 'update');
-    
+    Log3 $name, 4, "$name: GetUpdate (V$Module_Version) called from " . FhemCaller();
+    $hash->{'.LastUpdate'} = $now;              # note that we were called - even when not as 'update' and UpdateTimer is not called afterwards
+    UpdateTimer($hash, \&Modbus::GetUpdate, 'next') if ($calltype eq 'update');    
     my $msg = CheckDisable($hash);
-    if ($msg) {
-        Log3 $name, 5, "$name: GetUpdate called but $msg";
-        return;
-    }
+    return if ($msg);
     my $ioHash = GetIOHash($hash);              # only needed for profiling, availability id checked in CheckDisable    
     Profiler($ioHash, 'Fhem');
     
-    my @ObjList;
-    foreach my $at (keys %{$attr{$name}}) {
-        if ($at =~ /^obj-(.*)-reading$/) {
-            push @ObjList, $1 if (!$parseInfo->{$1});
-        }
-    };
-    #Log3 $name, 5, "$name: GetUpdate objects from attributes: " . join (' ',  @ObjList);
-    push @ObjList, keys (%{$parseInfo});
-    Log3 $name, 4, "$name: GetUpdate full object list: " . join (' ',  sort @ObjList);
-    
-    # create readList by checking delays and poll settings for ObjList
-    my (%readList, %readLen, %readName, %readComb);         # list hash + additional info for logging
-    foreach my $objCombi (sort @ObjList) {
-        my $reading    = ObjInfo($hash, $objCombi, 'reading');
-        my $poll       = ObjInfo($hash, $objCombi, 'poll');
-        my $lastRead   = $hash->{lastRead}{$objCombi} // 0;
-        my $delay      = ObjInfo($hash, $objCombi, 'polldelay');
-        #Log3 $name, 5, "$name: GetUpdate check $objCombi reading $reading, poll = $poll, polldelay = $delay, last = $lastRead";
-        if (($poll && $poll ne 'once') || ($poll eq 'once' && !$lastRead)) {        # this was wrongly implemented (once should be specified as delay). Keep for backward compatibility
-            if (!$delay || ($delay && $delay ne 'once') || ($delay eq 'once' && !$lastRead)) {
-                $delay = 0 if ($delay eq 'once' || !$delay);
-                $delay = $1 * ($intvl ? $intvl : 1) if ($delay =~ /^x([0-9]+)/);    # delay as multiplyer if starts with x
-                if ($now >= $lastRead + $delay) {
-                    my $reading = ObjInfo($hash, $objCombi, 'reading');
-                    my $len     = ObjInfo($hash, $objCombi, 'len');
-                    $readList{$objCombi} = 1;           # include it in the list of items to read
-                    $readLen{$objCombi}  = $len;
-                    $readName{$objCombi} = $reading;
-                }
-                Log3 $name, 5, "$name: GetUpdate will skip $reading, delay not over" if (!$readList{$objCombi});
-            }
-        }
-    }
-    
-    Log3 $name, 4, "$name: GetUpdate readList before combine = " . join (' ', keys %readList);
-    # combine objects in Readlist by increasing the length of a first object and removing the second
-    Log3 $name, 5, "$name: GetUpdate tries to combine read commands";
-    my ($type,     $adr,     $reading,     $len,     $span);
-    my ($nextType, $nextAdr, $nextReading, $nextLen, $nextSpan);
-    my ($obj, $maxLen);
-    $adr  = 0; $type = ''; $span = 0; $nextSpan = 0;    
-    COMBINELOOP:
-    foreach my $nextObj (sort compObjKeys keys %readList) {
-        $nextType    = substr($nextObj, 0, 1);
-        $nextAdr     = substr($nextObj, 1);
-        $nextReading = ObjInfo($hash, $nextObj, 'reading');
-        $nextLen     = ObjInfo($hash, $nextObj, 'len');
-        $readList{$nextObj} = $nextLen;
-        if ($obj && $maxLen){
-            $nextSpan = ($nextAdr + $nextLen) - $adr;   # Combined length with next object
-            if ($nextType eq $type && $nextSpan <= $maxLen && $nextSpan > $span) {
-                Log3 $name, 5, "$name: GetUpdate combines request for $reading ($obj) with $nextReading ($nextObj), ".
-                    "span=$nextSpan, max=$maxLen, drop read for $nextObj";
-                $readComb{$obj} .= ($readComb{$obj} ? ' and ' : "$obj len $readLen{$obj} $readName{$obj} with ") 
-                    . "$nextObj len $readLen{$nextObj} $readName{$nextObj}";
-                delete $readList{$nextObj};             # no individual read for this object, combine with last
-                $span = $nextSpan;
-                $readList{$obj} = $nextSpan;            # increase the length to include following object
-                next COMBINELOOP;   # don't change current object variables
-            } 
-            else {
-                Log3 $name, 5, "$name: GetUpdate cant combine request for $reading / $obj with $nextReading / $nextObj, ".
-                    ($nextType eq $type ? "span $nextSpan > max $maxLen" : 'different type');
-                $nextSpan = 0;
-            }
-        }
-        ($obj, $type, $adr, $reading, $len, $span) = ($nextObj,  $nextType, $nextAdr, $nextReading, $nextLen, $nextSpan);
-        $maxLen = DevInfo($hash, $type, 'combine', 1);
-        # Log3 $name, 5, "$name: GetUpdate: combine for $type is $maxLen";    
-    }
-    my $logMsg = '';
-    foreach my $objCombi (sort compObjKeys keys %readList) {
-        #Log3 $name, 5, "$name: GetUpdate prepare LogMsg, obj=$objCombi, logMsg=$logMsg";
-        my $span = $readList{$objCombi};
-        $logMsg = ($logMsg ? "$logMsg, " : '') . "$objCombi len $span " . 
-            ($readComb{$objCombi} ? "(combined $readComb{$objCombi})" : "($readName{$objCombi} len $readLen{$objCombi})");
-    }
-    #Log3 $name, 4, "$name: GetUpdate readList = " . join (' ', keys %readList);
-    Log3 $name, 4, "$name: GetUpdate readList = $logMsg" ;
+    my $objHash = CreateUpdateHash($hash);    
+    CombineUpdateHash($hash, $objHash);
 
-    foreach my $objCombi (sort compObjKeys keys %readList) {
-        my $span = $readList{$objCombi};
-        DoRequest($hash, {TYPE => substr($objCombi, 0, 1), ADR => substr($objCombi, 1), OPERATION => 'read', LEN => $span, 
-                        DBGINFO => "getUpdate for " . ($readComb{$objCombi} ? "combined $readComb{$objCombi}" : "$readName{$objCombi} len $readLen{$objCombi}")});
+    # now create the requests
+    foreach my $obj (sort compObjTA values %{$objHash}) {       # sorted by type / adr
+        next if !$obj;  
+        my $span = $obj->{span};
+        DoRequest($hash, {TYPE => $obj->{type}, ADR => $obj->{adr}, OPERATION => 'read', LEN => $span, 
+                        DBGINFO => "getUpdate for " . 
+                        ($obj->{combine} ? "combined $obj->{combine}" : "$obj->{reading} len $obj->{len}")});
     }
     Profiler($ioHash, 'Idle');   
     return;
@@ -3771,10 +3906,10 @@ sub RequestText {
 # describe response as string
 sub ResponseText {
     my $response = shift;    
-    return "response: " . ($response->{MODBUSID} ? "id $response->{MODBUSID}, " : 'no id') .
+    return "response: " . ($response->{MODBUSID} ? "id $response->{MODBUSID}" : 'no id') .
         ($response->{FCODE} ? ", fc $response->{FCODE}" : ", no fcode ") .
         ($response->{ERRCODE} ? ", error code $response->{ERRCODE}" : '') .
-        ($response->{TYPE} && $response->{ADR} ? ", $response->{TYPE} . $response->{ADR}" : '') .
+        ($response->{TYPE} && $response->{ADR} ? ", $response->{TYPE}$response->{ADR}" : '') .
         ($response->{LEN} ? ", len $response->{LEN}" : '') .
         ($response->{VALUES} ? ', values ' . unpack('H*', $response->{VALUES}) : '') .
         (defined($response->{TID}) ? ", tid $response->{TID}" : '');
@@ -4166,7 +4301,7 @@ sub CheckDisable {
             $msg = 'IO device is disabled';
         }
     }
-    Log3 $name, 5, "$name: CheckDisable returns $msg" if ($msg);
+    Log3 $name, 5, "$name: CheckDisable called from " . FhemCaller() . " returns $msg" if ($msg);
     return $msg;
 }   
 
@@ -4507,13 +4642,13 @@ sub ResetExpect {
 
 
 ########################################
-# not used currently
-sub compObjAttrs ($$) {                     ## no critic - seems to be required here
+# used for sorting and combine checking
+sub compObjCombi ($$) {                      ## no critic - seems to be required here
     my ($a,$b) = @_;
-    my $aType  = substr($a, 4, 1);
-    my $aStart = substr($a, 5);
-    my $bType  = substr($b, 4, 1);
-    my $bStart = substr($b, 5);
+    my $aType  = substr($a, 0, 1);
+    my $aStart = substr($a, 1);
+    my $bType  = substr($b, 0, 1);
+    my $bStart = substr($b, 1);
     my $result = ($aType cmp $bType);   
     return $result if ($result);
     $result = $aStart <=> $bStart;
@@ -4521,14 +4656,39 @@ sub compObjAttrs ($$) {                     ## no critic - seems to be required 
 }
 
 
-########################################
-# used for sorting and combine checking
-sub compObjKeys ($$) {                      ## no critic - seems to be required here
-    my ($a,$b) = @_;
-    my $aType  = substr($a, 0, 1);
-    my $aStart = substr($a, 1);
-    my $bType  = substr($b, 0, 1);
-    my $bStart = substr($b, 1);
+##############################################################################
+# used for sorting hashes that contain data objects for reading creation
+# compare $obj{$objCombi}{group} group-order values
+sub compObjGroups ($$) {                    ## no critic - seems to be required here
+    my ($a, $b) = @_;
+    my $aGrp = $a->{group} // 0;
+    my $bGrp = $b->{group} // 0;
+    my ($aNr, $aPos) = ($aGrp =~ /(\d+)-(\d+)/);
+    my ($bNr, $bPos) = ($bGrp =~ /(\d+)-(\d+)/);
+    my $result = (($aNr // 0) <=> ($bNr // 0));
+    return $result if ($result);
+    $result = ($aPos // 0) <=> ($bPos // 0);
+    return $result if ($result);
+
+    my $aType  = $a->{type} // '';
+    my $aStart = $a->{adr} // 0;
+    my $bType  = $b->{type} // '';
+    my $bStart = $b->{adr} // 0;
+    $result = ($aType cmp $bType);   
+    return $result if ($result);
+    $result = $aStart <=> $bStart;
+    return $result;
+}
+
+
+##############################################################################
+# used for sorting hashes that contain data objects for getupdate
+sub compObjTA ($$) {                    ## no critic - seems to be required here
+    my ($a, $b) = @_;
+    my $aType  = $a->{type} // '';
+    my $aStart = $a->{adr} // 0;
+    my $bType  = $b->{type} // '';
+    my $bStart = $b->{adr} // 0;
     my $result = ($aType cmp $bType);   
     return $result if ($result);
     $result = $aStart <=> $bStart;
@@ -4836,13 +4996,15 @@ sub TryCall {
             tbd.    
             
         <li><b>skipGarbage</b></li> 
-            by default when waiting for a response, the module will skip bytes that can not be the start of correct frames.<br>
+            If the module is used as master or if it is using Modbus ASCII as protocol, then the module will skip bytes received 
+            that can not be the start of correct frames.<br>
             For Modbus ASCII it skips bytes until the expected starting byte ":" is seen.
             For Modbus RTU a response has to start with the id of the request that was sent before.<br>
-            If set to 1 this attribute will enhance the way the module treats Modbus request frames over serial lines in passive mode.
+            If set to 1 this attribute will enhance the way the module treats Modbus request frames over serial lines in passive mode and a slave.
             It will then skip all bytes until a byte with a modbus id is seen that is used by a logical Fhem modbus device. 
-            Under normal circumstances this behavior should not do any harm and lead to more robustness. 
-            However since it changes the original behavior of this module it has to be turned on explicitely.<br>
+            Or if the last frame was a request, then it skips everything until the modbus id of this request is seen as the start of a response.
+            Setting this attribuet to 1 might lead to more robustness, however when there are other slaves on the same bus, it might als create trouble when other slaves do not send responses.
+            <br>
             
         <li><b>profileInterval</b></li> 
             if set to something non zero it is the time period in seconds for which the module will create bus usage statistics. 

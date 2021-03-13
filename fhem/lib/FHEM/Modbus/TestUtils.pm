@@ -24,7 +24,8 @@ package FHEM::Modbus::TestUtils;
 use strict;
 use warnings;
 use GPUtils         qw(:all);
-use Time::HiRes     qw(gettimeofday);    
+use Time::HiRes     qw(gettimeofday);
+use Test::More;
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -35,6 +36,7 @@ our @EXPORT_OK = qw(
         findTimesInLog
         calcDelays
         SetTestOptions
+        CheckAndReset
      );
 
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
@@ -55,7 +57,11 @@ BEGIN {
         InternalVal
         featurelevel
         
+        FhemTestUtils_gotEvent
+        FhemTestUtils_gotLog
         FhemTestUtils_getLogTime
+        FhemTestUtils_resetLogs
+        FhemTestUtils_resetEvents
         
         defs
         modules
@@ -99,7 +105,7 @@ our %results;
 # find the next test step number 
 # internal function, called from NextStep
 sub GetNextStep {
-    Log3 undef, 1, "Test GetNextStep: look for next step";
+    #Log3 undef, 1, "Test GetNextStep: look for next step";
     my $next = $testStep;
     FINDSTEP: 
     while (1) {
@@ -119,18 +125,18 @@ sub GetNextStep {
 # also internally by CallStep and SimResponseRead
 sub NextStep {
     my $delay = shift // 0;
-    my $next  = GetNextStep();
+    my $next  = shift // GetNextStep();
     if (!$next || ($delay && $delay eq 'end')) {        # done if no more steps
         Log3 undef, 1, "Test NextStep: no more steps found - exiting";
         done_testing;
         exit(0);
     }
     if (!$delay || $delay ne 'wait') {                  # set timer to next step unless waiting for reception of data
-        Log3 undef, 1, "Test NextStep: set timer to call step $next with delay $delay";
+        #Log3 undef, 1, "Test NextStep: set timer to call step $next with delay $delay";
         InternalTimer(gettimeofday() + $delay, \&CallStep, "main::testStep$next");
         $testStep = $next;
     }
-    Log3 undef, 1, "Test NextStep: done.";
+    #Log3 undef, 1, "Test NextStep: done.";
     return;
 }
 
@@ -150,7 +156,7 @@ sub CallStep {
     if ($@) {
         Log3 undef, 1, "Test step $step call created error: $@";
     } else {
-        Log3 undef, 1, "Test step $step ($func) done, delay before next step is $delay";
+        Log3 undef, 1, "Test step $step ($func) done" . (defined ($delay) ? ", delay before next step is $delay" : "");
     }
     # if step function returns 'wait' then do not set timer for next step but wait for ReactOnLogRegex or similar
     NextStep($delay);                   # check for next step and set timer or end testing
@@ -288,6 +294,16 @@ sub calcDelays {
         Log3 undef, 1, "Test step $testStep: delay between $testOptions{Time2Name} in step " . ($testStep - 1) . " and $testOptions{Time1Name} in step $testStep is $commDelay, between each $testOptions{Time1Name} $sendDelay";
     }
     return ($commDelay, $sendDelay, $lastDelay);
+}
+
+
+################################################################################
+# Reset Logs and Events and check for Warnings
+sub CheckAndReset {
+    is(FhemTestUtils_gotLog('PERL WARNING'), 0, "no Perl Warnings so far");
+    FhemTestUtils_resetLogs();
+    FhemTestUtils_resetEvents();
+    return;
 }
 
 
