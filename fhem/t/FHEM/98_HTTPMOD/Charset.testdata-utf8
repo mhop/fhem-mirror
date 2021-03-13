@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=cp437
+--end-of-http-header--
+<html>
+<head><title>Test</title></head>
+<body>
+<center><h1>Test Data</h1></center>
+<hr><center>for HTTPMOD Test</center>
+
+Überraschung mit Änderungen éè
+kleine Umlaute: äöü
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Cache-Control: no-cache, no-store, must-revalidate
+Pragma: no-cache
+Expires: 0
+Length: unspecified
+--end-of-http-header--
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0,  minimum-scale=1.0">
+<title>BSB-LAN</title>
+<style>A:link  {color:blue;text-decoration: none;} A:visited {color:blue;text-decoration: none;} A:hover {color:red;text-decoration: none;background-color:yellow} A:active {color:blue;text-decoration: none;} A:focus {color:red;text-decoration: none;}
+table {width: 100%;  max-width: 1024px;  margin: auto;}
+td {vertical-align: top;}
+td.header {vertical-align: middle;}
+input {width: 100%; box-sizing: border-box;} select {width: 100%;}</style>
+</head><body>
+<script>function set(line){
+var value = document.getElementById('value'+line).value.replace(/\.$/, '');
+value = value.replace(':', '.');
+value = value.replace('---', '');
+if(isNaN(value)==false || value == ''){
+window.open(document.getElementById('main_link').href+'S'+line+'='+value,'_self');
+}}
+function setbit(line){
+var x=document.getElementById('value'+line); var value=0;
+for (var i=0; i<x.options.length; i++) {
+if(x.options[i].selected){
+value=value+eval(x.options[i].value);
+}}
+window.open(document.getElementById('main_link').href+'S'+line+'='+value,'_self');
+}</script>
+<font face='Arial'>
+<center><h1><a href='/4444/' ID=main_link>BSB-LAN</A></h1></center>
+<table align=center><tr bgcolor=#f0f0f0><td class="header" width=20% align=center>
+        <a href='/4444/K'>Heizungsfunktionen</a></td>
+        <td class="header" width=20% align=center><a href='/4444/K49'>Sensoren</a></td><td class="header" width=20% align=center>
+        <a href='/4444/DG'>Zeichne Logdatei</a></td><td class="header" width=20% align=center><a href='/4444/Q'>Prüfe auf neue Parameter</a></td></tr>
+<tr bgcolor=#f0f0f0><td class="header" width=20% align=center>
+    <a href='/4444/C'>Einstellungen</a></td><td class="header" width=20% align=center>
+    <a href='https://1coderookie.github.io/BSB-LPB-LAN/kap08.html#81-auflistung-und-beschreibung-der-url-befehle' target='_new'>URL-Befehle</a></td>
+    <td class="header" width=20% align=center><a href='https://1coderookie.github.io/BSB-LPB-LAN/inhaltsverzeichnis.html' target='new'>Handbuch</a></td>
+    <td class="header" width=20% align=center><a href='https://1coderookie.github.io/BSB-LPB-LAN/kap15.html' target='_new'>FAQ</a></td></tr></table><p></p>
+    <table align=center><tr><td class="header">
+<tr><td> 712 Heizkreis 1 - Reduziertsollwert: 21.0 &deg;C</td><td>
+<input type=text id='value712' VALUE='21.0'></td><td><input type=button value='Set' onclick="set(712)"></td></tr></td></tr></table>
+</body>
+</html>
