@@ -1454,6 +1454,7 @@ sub _transferInverterValues {
       $paref->{ethishour} = $ethishour;
       $paref->{nhour}     = $nhour;
       setPVhistory ($paref);
+      delete $paref->{nhour};
   }  
     
 return;
@@ -2700,8 +2701,8 @@ sub setPVhistory {
   my $type = $hash->{TYPE};  
   my $day  = strftime "%d", localtime($t);                                                        # aktueller Tag 
   
-  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($nhour && defined $ethishour);  # realer Energieertrag
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($chour && defined $calcpv);     # prognostizierter Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($nhour);                        # realer Energieertrag
+  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($chour);                        # prognostizierter Energieertrag
   
   Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
     
