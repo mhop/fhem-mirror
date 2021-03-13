@@ -907,7 +907,11 @@ SYSSTAT_GetUpdate($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  if( $hash->{QUEUE} && scalar @{$hash->{QUEUE}} ) {
+  if( AttrVal($name, "noSSH", undef) ) {
+    my @queue = ();
+    $hash->{QUEUE} = \@queue;
+  
+  } elsif( !AttrVal($name, "noSSH", undef) && $hash->{QUEUE} && scalar @{$hash->{QUEUE}} ) {
     Log3 $name, 2, "$name: unanswered query in queue, reconnecting";
     SYSSTAT_Connect($hash);
     return;
