@@ -1236,9 +1236,11 @@ sub writeCacheToFile {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
+  return if(!$data{$type}{$name}{$cachename});
+  
   my @pvh;
   
-  my $json  = encode_json ($data{$type}{$name}{$cachename});
+  my $json  = encode_json $data{$type}{$name}{$cachename};
   push @pvh, $json;
   
   my $error = FileWrite($file, @pvh);
