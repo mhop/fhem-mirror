@@ -34,7 +34,7 @@ sub testStep1 {     # preparation of slave content, enable devices
 sub testStep2 {     # get holding registers 
     LogStep "get TempWasserEin";
     fhem ('attr Master verbose 3');
-    fhem ('attr Slave verbose 3');
+    fhem ('attr Slave verbose 3'); 
     fhem ('get Master TempWasserEin');
     fhem ('get Master Test1');
     fhem ('get Master Test2');
@@ -104,15 +104,14 @@ sub testStep9 {     # check write data
     LogStep "check log for map and set o2 2";
     is(FhemTestUtils_gotLog('0506000a0001698c'), 1, "set o1 on message in log");
     is(FhemTestUtils_gotLog('0506000b0002784d'), 1, "set O2 2 message in log");
+    CheckAndReset();
     fhem ('attr Master verbose 3');
     return 0.1;
 }
 
-
 sub testStep10 {    # check combined read of holding registers and coils
     LogStep "getUpdate with combine";
-    FhemTestUtils_resetEvents();
-    fhem ('attr Master verbose 3');
+    fhem ('attr Master verbose 5'); # 3
     fhem ('attr Slave verbose 3');
     fhem ('set Master reread');
     return 0.15;
@@ -159,20 +158,19 @@ sub testStep14 {
     fhem ('attr Master closeAfterResponse 1');
     fhem ('attr Master verbose 4');
     fhem ('set Master reread');
-    return 0.1;
+    return 0.2;
 }
 
 sub testStep15 {
     is(FhemTestUtils_gotEvent(qr/Master:Test1: 6/), 1, "Retrieve Test1");
     is(FhemTestUtils_gotEvent(qr/Master:Test3: abcdefg/), 1, "Retrieve Test4");   
     is(FhemTestUtils_gotLog('HandleResponse will close because closeAfterResponse is set and queue is empty'), 1, "closed");
+    CheckAndReset();
     return 0.1;
 }
 
 sub testStep16 {
     LogStep "try get while closed";
-    FhemTestUtils_resetEvents();
-    FhemTestUtils_resetLogs();
     fhem ('get Master TempWasserEin');
     fhem ('attr Master queueDelay 0.3');
     return 0.1;
@@ -189,18 +187,17 @@ sub testStep18 {
     LogStep "check get result after another delay";
     is(FhemTestUtils_gotEvent(qr/Master:TempWasserEin:\s12/xms), 1, "retrieve from local slave after open and QueueDelay");
     is(FhemTestUtils_gotLog('close because closeAfterResponse'), 1, "device closed again");
+    CheckAndReset();
     return 0.1;
 }
 
 
 sub testStep19 {
     LogStep "now that the connection is closed again, try another prioritized get";
-    FhemTestUtils_resetEvents();
-    FhemTestUtils_resetLogs();
-    fhem ('attr Master nonPrioritizedGet 0');
-    fhem ('attr Master dev-timing-timeout 0.5');
-    fhem ('attr Master verbose 5');
-    fhem ('get Master TempWasserEin');
+    fhem 'attr Master nonPrioritizedGet 0';
+    fhem 'attr Master dev-timing-timeout 0.5';
+    fhem 'attr Master verbose 5';
+    fhem 'get Master TempWasserEin';
     return 0.1;
 }
 
@@ -215,7 +212,44 @@ sub testStep20 {
 sub testStep21 {
     LogStep "check result after prio get";
     is(FhemTestUtils_gotLog('Master: read.* buffer: 050302000c4981'), 1, "answer arrives after readanswer timeout");
+    CheckAndReset();
     return;
+}
+
+
+sub testStep30 { 
+    LogStep "try to read non existant register from slave";
+    fhem ('attr Master closeAfterResponse 0');
+    fhem 'attr Slave verbose 5';
+    fhem 'attr Master nonPrioritizedGet 1';
+    fhem 'get Master NoReading';
+    return 0.2;
+}
+
+sub testStep31 {     
+    LogStep "check read NoReading result";
+    is(FhemTestUtils_gotLog('HandleResponse done.*fCode 131'), 1, "got address error from Slave");
+    CheckAndReset();
+    return 0.1;
+}
+
+sub testStep35 {  
+    LogStep "try to read non existant register from slave with error code set to 0";
+    fhem 'attr Slave dev-addressErrCode 0';
+    fhem 'get Master NoReading';
+    return 0.2;
+}
+
+sub testStep36 {     
+    LogStep "check read NoReading result";
+    is(FhemTestUtils_gotLog('HandleResponse done.*fCode 131'), 0, "got no address error from Slave");
+    return 0.1;
+}
+
+sub testStep32 {     
+    #LogStep "";
+    #is(FhemTestUtils_gotEvent(qr/D1:TempWasserAus:\s20/xms), 1, "Write value to local slave");
+    return 0.1;
 }
 
 1;

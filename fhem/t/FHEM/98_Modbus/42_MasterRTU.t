@@ -140,7 +140,7 @@ sub testStep21 {
 
 sub testStep22 {
     LogStep('check reception of response with added 0');
-    is(FhemTestUtils_gotLog('ParseObj called from HandleResponse with data hex 0137, type h'), 1, "correct data part extracted");
+    is(FhemTestUtils_gotLog('called from HandleResponse with data hex 0137, type h'), 1, "correct data part extracted");
     is(FhemTestUtils_gotEvent(qr/PWP:dummy500:\s311/xms), 1, "Parse h500");
     fhem 'attr PWP verbose 3';
     return;

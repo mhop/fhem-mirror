@@ -13,7 +13,7 @@ is(FhemTestUtils_gotLog("set interval test not valid"), 1, "invalid interval in 
 
 
 InternalTimer(time()+1, sub() {
-    isnt(FhemTestUtils_gotLog("GetUpdate called"), 0, "GetUpdate in log");
+    isnt(FhemTestUtils_gotLog("GetUpdate .* called from"), 0, "GetUpdate in log");
     isnt(FhemTestUtils_gotLog("UpdateTimer called from.*GetUpdate"), 0, "UpdateTimer in log");
 
     done_testing;

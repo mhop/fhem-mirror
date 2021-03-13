@@ -60,7 +60,7 @@ sub testStep5 {
 
 sub testStep6 {
     LogStep "check reception of reply and send another repeated reply";
-    is(FhemTestUtils_gotLog('ParseObj has no information about handling h356'), 1, "try parsing registers");
+    is(FhemTestUtils_gotLog('has no information about handling h356'), 1, "try parsing registers");
     FhemTestUtils_resetLogs();
     FhemTestUtils_resetEvents();
     SimRead('MS', 'fe03100000000b000000400000011a00000167f378');   # the reply repeated
@@ -70,7 +70,7 @@ sub testStep6 {
 
 sub testStep7 {
     LogStep "check reception of repeated reply";
-    is(FhemTestUtils_gotLog('ParseObj has no information about handling'), 0, "no try parsing registers again since request is missing");   
+    is(FhemTestUtils_gotLog('has no information about handling'), 0, "no try parsing registers again since request is missing");   
     is(FhemTestUtils_gotLog('HandleResponse got data but we don.t have a request'), 1, "next response without a request seen");
     FhemTestUtils_resetLogs();
     FhemTestUtils_resetEvents();    

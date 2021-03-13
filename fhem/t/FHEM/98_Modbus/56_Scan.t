@@ -62,11 +62,11 @@ sub testStep6 {
 }
 
 sub testStep7 {
-    #fhem ('attr Master verbose 5');
-    #fhem ('attr Slave verbose 5');
+    fhem ('attr Master verbose 4');
+    fhem ('attr Slave verbose 5');
     fhem ('attr Master dev-timing-timeout 0.3');
     fhem ('set Master scanModbusId 1-8 h100');
-    return 2;
+    return 6;
 }
 
 
