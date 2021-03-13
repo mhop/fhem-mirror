@@ -140,9 +140,14 @@ SYSSTAT_Connect($)
     InternalTimer(gettimeofday()+5, "SYSSTAT_GetUpdate", $hash, 0);
 
     return;
+
+  } elsif( AttrVal($name, "noSSH", undef ) ) {
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+5, "SYSSTAT_GetUpdate", $hash, 0);
+
+    return;
   }
 
-  return undef if( AttrVal($name, "noSSH", undef ) );
   return undef if( AttrVal($name, "disable", undef ) );
 
   my @queue = ();
@@ -910,8 +915,8 @@ SYSSTAT_GetUpdate($)
   if( AttrVal($name, "noSSH", undef) ) {
     my @queue = ();
     $hash->{QUEUE} = \@queue;
-  
-  } elsif( !AttrVal($name, "noSSH", undef) && $hash->{QUEUE} && scalar @{$hash->{QUEUE}} ) {
+
+  } elsif( $hash->{QUEUE} && scalar @{$hash->{QUEUE}} ) {
     Log3 $name, 2, "$name: unanswered query in queue, reconnecting";
     SYSSTAT_Connect($hash);
     return;
@@ -982,6 +987,10 @@ SYSSTAT_GetUpdateSNMP($)
 
   if( !$hash->{USE_SNMP} || !defined($hash->{session}) ) {
     return undef;
+  }
+
+  if(!$hash->{LOCAL}) {
+    return if( IsDisabled($name) > 0 );
   }
 
   SYSSTAT_getLoadAVGSNMP($hash);
