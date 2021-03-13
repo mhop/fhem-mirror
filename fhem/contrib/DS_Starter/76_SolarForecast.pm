@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ",
+  "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ".
+                           "cachefile pvhist is persistent ",
   "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
   "0.7.0"  => "01.03.2021  add function DbLog_splitFn ",
   "0.6.0"  => "27.01.2021  change calcPVforecast from formula 1 to formula 2 ",
@@ -1007,8 +1008,17 @@ sub Delete {
   my $arg   = shift;
   my $name  = $hash->{NAME};
   
-  my $file  = $pvhcache.$name;
-  my $error = FileDelete($file);                                                 # Cache File der PV History löschen
+  my $file  = $pvhcache.$name;                                      # Cache File PV History löschen
+  my $error = FileDelete($file);      
+
+  if ($error) {
+      Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
+  }  
+  
+  $error = qq{};
+  $file  = $pvrcache.$name;                                         # Cache File PV Real löschen
+  $error = FileDelete($file); 
+  
   if ($error) {
       Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
   }
@@ -1021,7 +1031,7 @@ return;
 ################################################################
 sub centralTask {
   my $hash = shift;
-  my $name = $hash->{NAME};                                                                        # Name des eigenen Devices 
+  my $name = $hash->{NAME};                                         # Name des eigenen Devices 
   my $type = $hash->{TYPE};  
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
@@ -1075,7 +1085,7 @@ sub centralTask {
 
       #Log3($name, 1, "$name - PV forecast Hash: ".      Dumper $data{$hash->{TYPE}}{$name}{pvfc});
       #Log3($name, 1, "$name - Weather forecast Hash: ". Dumper $data{$hash->{TYPE}}{$name}{weather});
-      # Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
+      #Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
       #Log3($name, 1, "$name - current values Hash: ".   Dumper $data{$hash->{TYPE}}{$name}{current});
       
       if(@da) {
@@ -1407,8 +1417,8 @@ sub _transferInverterValues {
   
   my $edaypast = 0;
   deleteReadingspec ($hash, "Today_Hour00_PVreal");
-  for my $h (0..int($chour)-1) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVreal", 0);
+  for my $hour (0..int($chour)-1) {                                                           # alle bisherigen Erzeugungen des Tages summieren                                            
+      $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_PVreal", 0);
   }
   
   my $ethishour = int ($etoday - $edaypast);
