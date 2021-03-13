@@ -120,13 +120,13 @@ sub UpdateTimer {
         if ($hash->{'.TRIGGERTIME'}) {
             Log3 $name, 4, "$name: UpdateTimer called from " . FhemCaller() . " with cmd $cmd and interval $intvl stops timer";
             delete $hash->{'.TRIGGERTIME'};
-            #delete $hash->{TRIGGERTIME_FMT};
             delete $hash->{'.LastUpdate'};
+            #delete $hash->{TRIGGERTIME_FMT};
         }
         return;
     }
     if ($cmd eq 'next') {
-        $hash->{'.LastUpdate'} = $now;                         # start timer from now, ignore potential last update time
+        $hash->{'.LastUpdate'} = $now;                      # start timer from now, ignore potential last update time
     } 
     my $nextUpdate;
     if ($hash->{'.TimeAlign'}) {                                    # TimeAlign: do as if interval started at time w/o drift ...
@@ -665,9 +665,12 @@ sub FlattenJSON {
     eval { use JSON };                  
     return if($@);
 
-    my $decoded = eval { decode_json($buffer) }; 
+    my $decoded = eval { decode_json($buffer) };
+    my $cT = $hash->{'.Content-Type'} // '';
+    my $logLvl = ($cT =~ /json/i ? 3 : 4);
     if ($@) {
-        Log3 $name, 3, "$name: error while parsing JSON data: $@";
+        Log3 $name, $logLvl, "$name: error while parsing JSON data: $@";
+        #Log3 $name, 3, "$name: Content-Type was $cT";
     } 
     else {
         JsonFlatter($hash, $decoded);
@@ -682,47 +685,73 @@ sub FlattenJSON {
 sub MemReading {
     my $hash = shift;
     my $name = $hash->{NAME};        # Fhem device name
-    my $v    = `awk '/VmSize/{print \$2}' /proc/$$/status`;
-    $v = sprintf("%.2f",(rtrim($v)/1024));
-    readingsBeginUpdate($hash);
-    readingsBulkUpdate ($hash, "Fhem_Mem", $v);
-    readingsBulkUpdate ($hash, "Fhem_BufCounter", $hash->{BufCounter}) if defined($hash->{BufCounter});
-    readingsEndUpdate($hash, 1);
-    Log3 $name, 5, "$name: Read checked virtual Fhem memory: " . $v . "MB" .
-        (defined($hash->{BufCounter}) ? ", BufCounter = $hash->{BufCounter}" : "");
+    if (-e "/proc/$$/status") {
+        my $v    = `awk '/VmSize/{print \$2}' /proc/$$/status`;
+        $v = sprintf("%.2f",(rtrim($v)/1024));
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate ($hash, "Fhem_Mem", $v);
+        readingsBulkUpdate ($hash, "Fhem_BufCounter", $hash->{BufCounter}) if defined($hash->{BufCounter});
+        readingsEndUpdate($hash, 1);
+        Log3 $name, 5, "$name: Read checked virtual Fhem memory: " . $v . "MB" .
+            (defined($hash->{BufCounter}) ? ", BufCounter = $hash->{BufCounter}" : "");
+    } else {
+        Log3 $name, 5, "$name: MemReading only works under Linux";
+    }
     return;
 }
 
 
-##########################################
-# decode charset in a http response
+########################################################
+# get content-type and decode charset in a http response
 sub BodyDecode {    
     my $hash       = shift;
     my $body       = shift;
     my $header     = shift // '';
     my $name       = $hash->{NAME};        # Fhem device name
-    my $fDefault   = ($featurelevel > 5.9 ? 'auto' : '');
-    my $bodyDecode = AttrVal($name, 'bodyDecode', $fDefault);
+    my $bodyDecode = AttrVal($name, 'bodyDecode', 'default');
+    my $bodyCharset;
+    my $decoding;
 
-    if ($bodyDecode eq 'auto' or $bodyDecode eq 'Auto') {
-        if ($header =~/Content-Type:.*charset=([\w\-\.]+)/i) {
-            $bodyDecode = $1;
-            Log3 $name, 4, "$name: BodyDecode found charset header and set decoding to $bodyDecode (bodyDecode was set to auto)";
-        } 
-        else {
-            $bodyDecode = "";
-            Log3 $name, 4, "$name: BodyDecode found no charset header (bodyDecode was set to auto)";
-        }
+    if ($header =~/Content-Type:(.*)/i) {
+        $hash->{'.Content-Type'} = $1;
     }
-    if ($bodyDecode) {
-        if ($bodyDecode =~ m{\A [Nn]one \z}xms) {
-            Log3 $name, 4, "$name: BodyDecode is not decoding the response body (set to none)";
-        } 
-        else {
-            $body = decode($bodyDecode, $body);
-            Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyDecode ";
+    if ($header =~/Content-Type:.*charset=([\w\-\.]+)/i) {
+        $bodyCharset = $1;
+        $hash->{'.bodyCharset'} = $bodyCharset;
+    }
+    else {
+        $bodyCharset = 'not found';
+        delete $hash->{'.bodyCharset'};
+    }
+
+    if ($bodyDecode =~ m{\A [Nn]one \z}xms) {
+        Log3 $name, 4, "$name: BodyDecode is not decoding the response body (charset $bodyCharset, bodyDecode set to none)";
+    }
+    elsif ($bodyDecode eq 'default') {
+        Log3 $name, 4, "$name: BodyDecode is not decoding the response body (charset $bodyCharset, bodyDecode defaults to none)";
+    }
+    elsif ($bodyDecode =~ m{\A [Aa]uto \z}xms) {
+        if ($bodyCharset eq 'not found') {
+            Log3 $name, 4, "$name: BodyDecode is not decoding the response body (charset header not found, bodyDecode set to auto)";
         }
-        #Log3 $name, 5, "$name: BodyDecode callback " . ($body ? "new body as utf-8 is: \n" . encode ('utf-8', $body) : "body empty");
+        else {
+            Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyCharset (charset header $bodyCharset, bodyDecode set to auto)";
+            $decoding = $bodyCharset;
+        }      
+    }
+    elsif (lower($bodyDecode) eq lower($bodyCharset)) {
+        Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyDecode";    
+        $decoding = $bodyCharset;
+    } 
+    else {
+        Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyDecode but charset header is $bodyCharset";
+        $decoding = $bodyCharset;
+    }
+
+    if ($decoding) {
+        $body = decode($decoding, $body);
+        $hash->{'.bodyCharset'} = 'internal';
+        #Log3 $name, 5, "$name: BodyDecode " . ($body ? "new body as utf-8 is: \n" . encode ('utf-8', $body) : "body empty");
     }
     return $body;
 }
