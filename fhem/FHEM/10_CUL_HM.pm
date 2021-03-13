@@ -1369,8 +1369,9 @@ sub CUL_HM_Parse($$) {#########################################################
                                    $mh{dst}));
   if(!$mh{devH} && $mh{mTp} eq "00") { # generate device
     my $sname = "HM_$mh{src}";
-    Log3 undef, 2, "CUL_HM Unknown device $sname is now defined";
-    DoTrigger("global","UNDEFINED $sname CUL_HM $mh{src}");
+    my $defret = CommandDefine(undef,"$sname CUL_HM $mh{src}");
+    Log 1,"CUL_HM Unknown device $sname is now defined ".(defined $defret ? " return: $defret" : "");
+    
     $mh{devN} = $sname ;
     $mh{devH} = CUL_HM_id2Hash($mh{src}); #sourcehash - changed to channel entity
     $mh{devH}->{IODev} = $iohash;
@@ -3218,9 +3219,7 @@ sub CUL_HM_Parse($$) {#########################################################
 sub CUL_HM_parseCommon(@){#####################################################
   # parsing commands that are device independent
   my ($ioHash,$mhp) = @_;
-  
   return "" if(!$mhp->{devH}{DEF});# this should be from ourself
-
   my ($p)     = $mhp->{p};
   my $devHlpr = $mhp->{devH}{helper};     
   my $ret = "";
@@ -3441,16 +3440,19 @@ sub CUL_HM_parseCommon(@){#####################################################
                   if (!$modules{CUL_HM}{helper}{hmManualOper});
     my $ioN = $ioHash->{NAME};
     # hmPair set in IOdev or  eventually in ccu!
-    my $ioOwn = InternalVal($ioN,"owner_CCU","");
+    my $ioOwn  = InternalVal($ioN,"owner_CCU","");
     my $hmPair = InternalVal($ioN,"hmPair"      ,InternalVal($ioOwn,"hmPair"      ,0 ));
     my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",""));
+    
+    Log3 $ioOwn,3,"CUL_HM received config CCU:$ioOwn device: $mhp->{devN}. PairForSec: ".($hmPair?"on":"off")." PairSerial: $hmPser";
+
     if ( $hmPair ){# pairing is active
       if (!$hmPser || $hmPser eq ReadingsVal($mhp->{devN},"D-serialNr","")){
 
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
         # pair now
-        Log3 $mhp->{devH},3, "CUL_HM pair: $mhp->{devN} "
+        Log3 $ioOwn    ,3, "CUL_HM pair: $mhp->{devN} "
                       ."$attr{$mhp->{devN}}{subType}, "
                       ."model $attr{$mhp->{devN}}{model} "
                       ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
