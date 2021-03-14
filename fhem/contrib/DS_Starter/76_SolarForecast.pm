@@ -307,7 +307,7 @@ my $definterval = 70;                                                           
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvrcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVR_SolarForecast_";   # Filename-Fragment für PV Real (wird mit Devicename ergänzt)
 
-my $calcmaxd    = 30;                                                            # Anzahl Tage für Durchschnittermittlung zur Vorhersagekorrektur
+my $calcmaxd    = 7;                                                             # Anzahl Tage (default) für Durchschnittermittlung zur Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
@@ -317,7 +317,7 @@ my $cloud_base  = 0;                                                            
 my $rainslope   = 0.30;                                                          # Steilheit des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Anzahl Tage für Attr numHistDays  
+my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
 
 ################################################################
 #               Init Fn
@@ -3381,7 +3381,7 @@ werden weitere SolarForecast Devices zugeordnet.
        <li><b>numHistDays </b><br>
          Anzahl der vergangenen Tage die zur Durchschnittsermittlung von PV Erzeugung und PV Vorhersage aus den historischen 
          Daten verwendet werden. Diese Werte dienen zur automatischen Vorhersageanpassung sofern verwendet. <br>
-         (default: 30)
+         (default: 7)
        </li>
        <br>
    
