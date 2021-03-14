@@ -117,7 +117,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "0.11.0" => "14.03.2021  new attr history_hour, beam1Content, beam2Content, implement sub forecastGraphic from Wzut, ".
-                           "rename attr beamColor, beamColor2 ",
+                           "rename attr beamColor, beamColor2 , more fixes ",
   "0.10.0" => "13.03.2021  hour shifter in sub _transferMeterValues, lot of fixes ",
   "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ".
                            "cachefile pvhist is persistent ",
@@ -1357,8 +1357,8 @@ sub _transferWeatherValues {
   push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
   push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
   
-  my $fc0_SunRise_round = (sprintf "%02d", (split ":", $fc0_SunRise)[0] - 1);
-  my $fc0_SunSet_round  = (sprintf "%02d", (split ":", $fc0_SunSet)[0] + 1);
+  my $fc0_SunRise_round = (sprintf "%02d", (split ":", $fc0_SunRise)[0]);
+  my $fc0_SunSet_round  = (sprintf "%02d", (split ":", $fc0_SunSet)[0]);
   
   for my $num (0..47) {                      
       my $fh = $chour + $num; 
@@ -1447,7 +1447,7 @@ sub _transferInverterValues {
   
   my $edaypast = 0;
   deleteReadingspec ($hash, "Today_Hour00_PVreal");
-  for my $hour (0..int $chour) {                                                           # alle bisherigen Erzeugungen des Tages summieren                                            
+  for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_PVreal", 0);
   }
   
