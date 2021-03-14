@@ -1937,7 +1937,7 @@ sub forecastGraphic {                                                           
     }
 
     $pv{0} = (AttrVal($name, 'Val1', 'forecast') eq 'forecast') ? $val1 : $val2;
-    $co{0} = (AttrVal($name, 'Val2', 'forecast') eq 'forecast') ? $val1 : $val2;
+    $co{0} = (AttrVal($name, 'Val2', '')         eq 'forecast') ? $val1 : $val2;
     $di{0} = $pv{0} - $co{0};
 
     # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
@@ -2042,7 +2042,7 @@ sub forecastGraphic {                                                           
        }
 
        $pv{$i} = (AttrVal($name, 'Val1', 'forecast') eq 'forecast') ? $val1 : $val2;
-       $co{$i} = (AttrVal($name, 'Val2', 'forecast') eq 'forecast') ? $val1 : $val2;
+       $co{$i} = (AttrVal($name, 'Val2', '')         eq 'forecast') ? $val1 : $val2;
 
        # sicher stellen das wir keine undefs in der Liste haben !
        $pv{$i} //= 0;
