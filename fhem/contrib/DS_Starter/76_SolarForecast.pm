@@ -2667,11 +2667,17 @@ sub calcFromHistory {
           unshift @efa, $k[$ei];
           $ei--;
       }
+        
+      my $anzavg = scalar(@efa);
       
-      Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Days ($calcd) for calc: ".join " ",@efa); 
-  
-      # my $pvhh         = $data{$type}{$name}{pvhist};
-      my $anzavg       = scalar(@efa);
+      if($anzavg) {
+          Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Days ($calcd) for calc: ".join " ",@efa); 
+      }
+      else {                                                                              # vermeide Fehler: Illegal division by zero
+          Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Use only current day for average calc");
+          return;
+      }
+      
       my ($pvrl,$pvfc) = (0,0);
             
       for my $dayfa (@efa) {
@@ -2881,7 +2887,7 @@ return;
 }
 
 ################################################################
-#    alle Readings eines Devices oder nur Reaging-Regex 
+#    alle Readings eines Devices oder nur Reading-Regex 
 #    löschen
 ################################################################
 sub deleteReadingspec {
