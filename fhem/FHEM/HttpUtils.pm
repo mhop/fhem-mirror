@@ -251,7 +251,8 @@ HttpUtils_gethostbyname($$$$)
     my $fh;
     if(open($fh, $dh)) {
       while(my $line = <$fh>) {
-        if($line =~ m/^([^# \t]+).*\b\Q$host\E\b/) {
+        if($line =~ m/^([^#\s]+).*?\s\Q$host\E\s/ ||
+           $line =~ m/^([^#\s]+).*?\s\Q$host\E$/) {
           if($1 =~ m/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/ &&        # IP-Address
              $1<256 && $2<256 && $3<256 && $4<256) {
             $fn->($hash, undef, pack("CCCC", $1, $2, $3, $4));
