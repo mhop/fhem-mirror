@@ -116,7 +116,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.10.0" => "13.03.2021  hour shifter in sub _transferMeterValues ",
+  "0.11.0" => "14.03.2021  new attr history_hour, beam1Content, beam2Content, implement sub forecastGraphic from Wzut, ".
+                           "rename attr beamColor, beamColor2 ",
+  "0.10.0" => "13.03.2021  hour shifter in sub _transferMeterValues, lot of fixes ",
   "0.9.0"  => "13.03.2021  more helper hashes Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251 ".
                            "cachefile pvhist is persistent ",
   "0.8.0"  => "07.03.2021  helper hash Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350 ",
@@ -341,8 +343,10 @@ sub Initialize {
   $hash->{NotifyFn}           = \&Notify;
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
-                                "beamColor:colorpicker,RGB ".
-                                "beamColor2:colorpicker,RGB ".
+                                "beam1Color:colorpicker,RGB ".
+                                "beam1Content:forecast,real,consumption ".
+                                "beam2Color:colorpicker,RGB ".
+                                "beam2Content:forecast,real,consumption ".
                                 "beamHeight ".
                                 "beamWidth ".
                                 # "consumerList ".
@@ -352,6 +356,7 @@ sub Initialize {
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
                                 "headerDetail:all,co,pv,pvco,statusLink ".
+                                "history_hour:slider,-12,-1,0 ".
                                 "hourCount:slider,4,1,24 ".
                                 "hourStyle ".
                                 "htmlStart ".
@@ -366,7 +371,7 @@ sub Initialize {
                                 "showLink:1,0 ".
                                 "showNight:1,0 ".
                                 "showWeather:1,0 ".
-                                "spaceSize ".   
+                                "spaceSize ".                                
                                 "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".
                                 "weatherColor_night:colorpicker,RGB ".                                
@@ -1608,8 +1613,7 @@ sub forecastGraphic {                                                           
   my ($val,$height);
   my ($z2,$z3,$z4);
   my $he;                                                                                  # Balkenhöhe
-  my (%pv,%is,%t,%we,%we_txt,%di,%co);                                                     # statt zusätzlich %we_txt , we verwenden und umbauen ?
-  my @pgCDev;
+  my (%pv,%is,%t,%we,%di,%co);
   
   ##########################################################
   # Kontext des SolarForecast-Devices speichern für Refresh
@@ -1665,8 +1669,8 @@ sub forecastGraphic {                                                           
   }
 
   my $cclv                    = "L05";
-  @pgCDev                     = split(',',AttrVal($name,"consumerList",""));            # definierte Verbraucher ermitteln
-  my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
+  my @pgCDev                  = split ',', AttrVal($name,"consumerList","");            # definierte Verbraucher ermitteln
+  my ($legend_style, $legend) = split '_', AttrVal($name,'consumerLegend','icon_top');
 
   $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
   
@@ -1716,13 +1720,15 @@ sub forecastGraphic {                                                           
   ###################################  
   my $maxhours   =  AttrNum ($name, 'hourCount',             24   );
   my $hourstyle  =  AttrVal ($name, 'hourStyle',          undef   );
-  my $colorfc    =  AttrVal ($name, 'beamColor',          undef   );
-  my $colorc     =  AttrVal ($name, 'beamColor2',         'C4C4A7');               
+  my $colorfc    =  AttrVal ($name, 'beam1Color',         undef   );
+  my $colorc     =  AttrVal ($name, 'beam2Color',         'C4C4A7');
+  my $beam1cont  =  AttrVal ($name, 'beam1Content',     'forecast');
+  my $beam2cont  =  AttrVal ($name, 'beam2Content',     'forecast');  
   my $icon       =  AttrVal ($name, 'consumerAdviceIcon', undef   );
   my $html_start =  AttrVal ($name, 'htmlStart',          undef   );                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
   my $html_end   =  AttrVal ($name, 'htmlEnd',            undef   );                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
 
-  my $type       =  AttrVal ($name, 'layoutType',          'pv'   );
+  my $lotype     =  AttrVal ($name, 'layoutType',          'pv'   );
   my $kw         =  AttrVal ($name, 'Wh/kWh',              'Wh'   );
 
   $height        =  AttrNum ($name, 'beamHeight',           200   );
@@ -1783,8 +1789,8 @@ sub forecastGraphic {                                                           
   # Headerzeile generieren 
   ##########################  
   if ($header) {
-      my $lang    = AttrVal    ("global", "language",           "EN"  );
-      my $alias   = AttrVal    ($name,    "alias",              $name );                            # Linktext als Aliasname
+      my $lang    = AttrVal ("global", "language", "EN"  );
+      my $alias   = AttrVal ($name,    "alias",    $name );                                         # Linktext als Aliasname
       
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, "ThisHour_PVforecast", "0000-00-00 00:00:00");         # letzter Forecast Update  
@@ -1894,108 +1900,160 @@ sub forecastGraphic {                                                           
       $header .= "</table>";     
   }
 
-  ##########################
-  # Werte aktuelle Stunde
-  ##########################
-  $pv{0}   = ReadingsNum($name, "ThisHour_PVforecast",  0);
-  $co{0}   = ReadingsNum($name, "ThisHour_Consumption", 0);
-  $di{0}   = $pv{0} - $co{0}; 
-  $is{0}   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;  
-  $we{0}   = $hash->{HELPER}{"ThisHour_WeatherId"} if($weather);                                 # für Wettericons 
-  $we{0} //= 99;
+    ##########################
+    # Werte aktuelle Stunde
+    ##########################
 
-  if(AttrVal("global","language","EN") eq "DE") {
-      (undef,undef,undef,$t{0}) = ReadingsVal($name, "ThisHour_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-      $we_txt{0}                = $hash->{HELPER}{"ThisHour_WeatherTxt"} if($weather);
-  } 
-  else {
-      (undef,undef,undef,$t{0}) = ReadingsVal($name, "ThisHour_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  }
-  
-  $we_txt{0} //= '';
-  $t{0}        = int($t{0});                                                                     # zum Rechnen Integer ohne führende Null
+    my $t0;
 
-  ###########################################################
-  # get consumer list and display it in portalGraphics
-  ###########################################################  
-  for (@pgCDev) {
-      my ($itemName, undef) = split(':',$_);
-      $itemName =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
-      $_        =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
+    (undef,undef,undef,$t0) = ReadingsVal($name, "ThisHour_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+    (undef,undef,undef,$t0) = ReadingsVal($name, "ThisHour_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
+
+    $t{0} = int($t0);
+
+    my $thishour = $t{0}; # aktuelle Stunde, wird erst später gebraucht.
+
+    my $offset = AttrNum($name, 'history_hour', 0);
+
+    my $val1;
+    my $val2;
+
+    if ($offset) {
+        $t{0} += $offset;
+        $t{0} += 24 if ($t{0} < 0);
+
+        $t0    = sprintf('%02d', $t{0}); 
+        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}        : 0;
+        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}      : 0;
+        $we{0} = (exists($data{$hash->{TYPE}}{$name}{weather}{$t0}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$t0}{id} : -1 if ($weather);
+
+        #$is{0}     = undef;
+    }
+    else {   
+        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   :  0;
+        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} :  0;
+        $we{0} = (exists($hash->{HELPER}{'ThisHour_WeatherId'}))    ? $hash->{HELPER}{"ThisHour_WeatherId"}    : -1 if ($weather);
+
+        #$is{0} = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
+    }
+
+    $pv{0} = $beam1cont eq 'forecast' ? $val1 : $val2;
+    $co{0} = $beam2cont eq 'forecast' ? $val1 : $val2;
+    $di{0} = $pv{0} - $co{0};
+
+    # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
+    $lotype = 'pv' if ($beam1cont eq $beam2cont);
+
+    $we{0} //= -1;
+
+    ###########################################################
+    # get consumer list and display it in portalGraphics
+    ###########################################################  
+    for (@pgCDev) {
+        my ($itemName, undef) = split(':',$_);
+        $itemName =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
+        $_        =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
     
-      ##################################
-      #check if listed device is planned
-      if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {
-          #get start and end hour
-          my ($start, $end);                                                                     # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
+        ##################################
+        #check if listed device is planned
+        if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {
+            #get start and end hour
+            my ($start, $end);                                                                     # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
 
-          if(AttrVal("global","language","EN") eq "DE") {
-              (undef,undef,undef,$start) = ReadingsVal($name, $itemName."_PlannedOpTimeBegin", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name, $itemName."_PlannedOpTimeEnd",   '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-          } 
-          else {
-              (undef,undef,undef,$start) = ReadingsVal($name, $itemName."_PlannedOpTimeBegin", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-              (undef,undef,undef,$end)   = ReadingsVal($name, $itemName."_PlannedOpTimeEnd",   '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-          }
+            if(AttrVal("global","language","EN") eq "DE") {
+                (undef,undef,undef,$start) = ReadingsVal($name, $itemName."_PlannedOpTimeBegin", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+                (undef,undef,undef,$end)   = ReadingsVal($name, $itemName."_PlannedOpTimeEnd",   '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
+            } 
+            else {
+                (undef,undef,undef,$start) = ReadingsVal($name, $itemName."_PlannedOpTimeBegin", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+                (undef,undef,undef,$end)   = ReadingsVal($name, $itemName."_PlannedOpTimeEnd",   '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+            }
 
-          $start   = int($start);
-          $end     = int($end);
-          my $flag = 0;                                                                          # default kein Tagesverschieber
+            $start   = int($start);
+            $end     = int($end);
+            my $flag = 0;                                                                          # default kein Tagesverschieber
 
-          #######################################
-          #correct the hour for accurate display
-          if ($start < $t{0}) {                                                                  # consumption seems to be tomorrow
-              $start = 24-$t{0}+$start;
-              $flag  = 1;
-          } 
-          else { 
-              $start -= $t{0};          
-          }
+            ####################################### 
+            #correct the hour for accurate display
+            if ($start < $t{0}) {                                                                  # consumption seems to be tomorrow
+                $start = 24-$t{0}+$start;
+                $flag  = 1;
+            } 
+            else { 
+                $start -= $t{0};          
+            }
 
-          if ($flag) {                                                                           # consumption seems to be tomorrow
-              $end = 24-$t{0}+$end;
-          } 
-          else { 
-              $end -= $t{0}; 
-          }
+            if ($flag) {                                                                           # consumption seems to be tomorrow
+                $end = 24-$t{0}+$end;
+            } 
+            else { 
+                $end -= $t{0}; 
+            }
 
-          $_ .= ":".$start.":".$end;
-      } 
-      else { 
-          $_ .= ":24:24"; 
-      } 
-      Log3($name, 4, "$name - Consumer planned data: $_");
-  }
+            $_ .= ":".$start.":".$end;
+        } 
+        else { 
+            $_ .= ":24:24"; 
+        } 
+        Log3($name, 4, "$name - Consumer planned data: $_");
+    }
 
-  $maxVal    = !$maxVal ? $pv{0} : $maxVal;                                                      # Startwert wenn kein Wert bereits via attr vorgegeben ist
-  my $maxCon = $co{0};                                                                           # für Typ co
-  my $maxDif = $di{0};                                                                           # für Typ diff
-  my $minDif = $di{0};                                                                           # für Typ diff
+    $maxVal    = !$maxVal ? $pv{0} : $maxVal;                                                      # Startwert wenn kein Wert bereits via attr vorgegeben ist
+    my $maxCon = $co{0};                                                                           # für Typ co
+    my $maxDif = $di{0};                                                                           # für Typ diff
+    my $minDif = $di{0};                                                                           # für Typ diff
 
-  for my $i (1..$maxhours-1) {
-     $pv{$i}   = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_PVforecast",  0);            # Erzeugung
-     $co{$i}   = ReadingsNum($name, "NextHour".sprintf("%02d",$i)."_Consumption", 0);            # Verbrauch
-     $di{$i}   = $pv{$i} - $co{$i};
+    #Log3($hash,3 , Dumper($data{$hash->{TYPE}}{$name}));
 
-     $maxVal   = $pv{$i} if ($pv{$i} > $maxVal); 
-     $maxCon   = $co{$i} if ($co{$i} > $maxCon);
-     $maxDif   = $di{$i} if ($di{$i} > $maxDif);
-     $minDif   = $di{$i} if ($di{$i} < $minDif);
+    for my $i (1..$maxhours-1) {
+        my $ti;
+        my $val1;
+        my $val2 = 0;
 
-     $is{$i}   = (ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
-     $we{$i}   = $hash->{HELPER}{"NextHour".   sprintf("%02d",$i)."_WeatherId"} if($weather);    # für Wettericons 
-     $we{$i} //= 99;
+        my $ii = sprintf('%02d',$i);
 
-     if(AttrVal("global","language","EN") eq "DE") {
-        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x;
-        $we_txt{$i}                = $hash->{HELPER}{"NextHour".  sprintf("%02d",$i)."_WeatherTxt"} if($weather);                                         # für Wettericons 
-     } 
-     else {
-        (undef,undef,undef,$t{$i}) = ReadingsVal($name,"NextHour".sprintf("%02d",$i)."_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-     }
+       (undef,undef,undef,$ti) = ReadingsVal($name,"NextHour".$ii."_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+       (undef,undef,undef,$ti) = ReadingsVal($name,"NextHour".$ii."_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
 
-     $we_txt{$i} //= '';
-     $t{$i}        = int($t{$i});                                  # keine führende 0
+       $t{$i}  = int($ti); # keine führende 0
+
+       $t{$i} += $offset;
+       $t{$i} += 24 if ($t{$i} < 0);
+
+       if ($offset < 0) {
+           my $j = $t{0} + $i;
+           $j -= 24 if ($j > 23);
+           my $jj  = sprintf('%02d',$j);
+
+           if ($i <= abs($offset)) {
+               $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj}        : 0;
+               $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj}      : 0;
+               $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj}{id} : -1 if ($weather);
+           }
+           else {
+               my $nh  = sprintf('%02d', $t{0}+$i-$thishour);
+               $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast', 0);
+               $we{$i} = $hash->{HELPER}{'NextHour'.$nh.'_WeatherId'} if($weather);
+           }
+       }
+       else {
+           $val1   = ReadingsNum($name, 'NextHour'.$ii.'_PVforecast',  0);                # Forecast
+           $we{$i} = $hash->{HELPER}{'NextHour'.$ii.'_WeatherId'} if($weather);           # für Wettericons 
+           #$is{$i} = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
+       }
+
+       $pv{$i} = $beam1cont eq 'forecast' ? $val1 : $val2;
+       $co{$i} = $beam2cont eq 'forecast' ? $val1 : $val2;
+
+       # sicher stellen das wir keine undefs in der Liste haben !
+       $pv{$i} //= 0;
+       $co{$i} //= 0;
+       $di{$i}   = $pv{$i} - $co{$i};
+
+       $maxVal   = $pv{$i} if ($pv{$i} > $maxVal); 
+       $maxCon   = $co{$i} if ($co{$i} > $maxCon);
+       $maxDif   = $di{$i} if ($di{$i} > $maxDif);
+       $minDif   = $di{$i} if ($di{$i} < $minDif);
   }
 
   ######################################
@@ -2028,7 +2086,7 @@ sub forecastGraphic {                                                           
       $ret .= "<tr class='even'><td class='smaportal'></td>";                                # freier Platz am Anfang
 
       for my $i (0..$maxhours-1) {                                                           # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
-          if ($pv{$i} || $show_night || ($type eq 'pvco') || ($type eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
+          if ($pv{$i} || $show_night || ($lotype eq 'pvco') || ($lotype eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
               my $night               = ($we{$i} > 99) ? 1 : 0;
               $we{$i}                -= 100 if ($night);
               my ($icon_name, $title) = weather_icon($we{$i});                               # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
@@ -2059,7 +2117,8 @@ sub forecastGraphic {                                                           
       
       for my $i (0..$maxhours-1) {
           $val  = formatVal6($di{$i},$kw,$we{$i});
-          $val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                             # negative Zahlen in Fettschrift 
+          #$val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                             # negative Zahlen in Fettschrift 
+          $val  = '<b>'.$val.'<b/>' if ($di{$i} < 0);
           $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
       $ret .= "<td class='smaportal'></td></tr>"; # freier Platz am Ende 
@@ -2067,6 +2126,7 @@ sub forecastGraphic {                                                           
 
   $ret .= "<tr class='even'><td class='smaportal'></td>";                                    # Neue Zeile mit freiem Platz am Anfang
 
+  
   for my $i (0..$maxhours-1) {
       # Achtung Falle, Division by Zero möglich, 
       # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
@@ -2074,17 +2134,22 @@ sub forecastGraphic {                                                           
       $maxVal = 1   if (!int $maxVal);
       $maxCon = 1   if (!$maxCon);
 
+      #Log3($hash,3, "h $height , V:$maxVal , C: $maxCon");
+
       # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins 
       # dass die Grundlinie der Balken nach unten durchbrochen wird
-      if($type eq 'co') { 
-          $he = int(($maxCon-$co{$i})/$maxCon*$height) + $fsize;                             # he - freier der Raum über den Balken.
-          $z3 = int($height + $fsize - $he);                                                 # Resthöhe
-      } 
-      elsif($type eq 'pv') {
+
+      #if($lotype eq 'co') { 
+         # $he = int(($maxCon-$co{$i})/$maxCon*$height) + $fsize;                             # he - freier der Raum über den Balken.
+         # $z3 = int($height + $fsize - $he);                                                 # Resthöhe
+      #}
+
+      if ($lotype eq 'pv') {
           $he = int(($maxVal-$pv{$i}) / $maxVal*$height) + $fsize;
           $z3 = int($height + $fsize - $he);
       } 
-      elsif($type eq 'pvco') {
+
+      if ($lotype eq 'pvco') {
           # Berechnung der Zonen
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
           # z2 - der Ertrag ggf mit Icon
@@ -2108,8 +2173,9 @@ sub forecastGraphic {                                                           
           if ($z3 < int($fsize/2)) {                                                        # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3; $z3 = 0; 
           }
-      } 
-      else {                                                                                # Typ diff
+      }
+
+      if ($lotype eq 'diff') {  # Typ diff
           # Berechnung der Zonen
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
@@ -2168,9 +2234,9 @@ sub forecastGraphic {                                                           
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
       
       my $v;
-      if (($type eq 'pv') || ($type eq 'co')) {
-          $v   = ($type eq 'co') ? $co{$i} : $pv{$i} ; 
-          $v   = 0 if (($type eq 'co') && !$pv{$i} && !$show_night);                        # auch bei type co die Nacht ggf. unterdrücken
+      if ($lotype eq 'pv') {
+          $v   = ($lotype eq 'co') ? $co{$i} : $pv{$i} ; 
+          #$v   = 0 if (($lotype eq 'co') && !$pv{$i} && !$show_night);                        # auch bei type co die Nacht ggf. unterdrücken
           $val = formatVal6($v,$kw,$we{$i});
 
           $ret .="<table width='100%' height='100%'>";                                      # mit width=100% etwas bessere Füllung der Balken
@@ -2193,8 +2259,9 @@ sub forecastGraphic {                                                           
               
               $ret .= "</td></tr>";
          }   
-      } 
-      elsif ($type eq 'pvco') { 
+      }
+ 
+     if ($lotype eq 'pvco') { 
           my ($color1, $color2, $style1, $style2);
 
           $ret .="<table width='100%' height='100%'>\n";                                   # mit width=100% etwas bessere Füllung der Balken
@@ -2232,7 +2299,7 @@ sub forecastGraphic {                                                           
 
          $ret .= "<tr class='odd' style='height:".$z2."px'>";
          $ret .= "<td align='center' class='smaportal' ".$style1.">$val";     
-         $ret .= $is{$i} if (defined $is{$i});
+         #$ret .= $is{$i} if (defined $is{$i});
          
          ##################################
          # inject the new icon if defined
@@ -2240,15 +2307,18 @@ sub forecastGraphic {                                                           
          
          $ret .= "</td></tr>";
 
-         if($z3) {                                                                                 # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
+         if ($z3) {                                                                                 # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
              $ret .= "<tr class='odd' style='height:".$z3."px'>";
              $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
          }
       } 
-      else {                                                                                       # Type diff
+
+      if ($lotype eq 'diff') {                                                                                       # Type diff
           my $style = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret     .= "<table width='100%' border='0'>\n";                                         # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
-          $val      = ($di{$i} >= 0) ? formatVal6($di{$i},$kw,$we{$i}) : '';
+          #$val      = ($di{$i} >= 0) ? formatVal6($di{$i},$kw,$we{$i}) : '';
+
+          $val      = ($di{$i} > 0) ? formatVal6($di{$i},$kw,$we{$i}) : '';
           $val      = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($di{$i} == 0);                         # Sonderfall , hier wird die 0 gebraucht !
 
           if($val) {
@@ -2291,13 +2361,16 @@ sub forecastGraphic {                                                           
 
       if ($show_diff eq 'bottom') {                                                                # zusätzliche diff Anzeige
           $val  = formatVal6($di{$i},$kw,$we{$i});
-          $val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                                   # Kommentar siehe oben bei show_diff eq top
+          #$val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                                   # Kommentar siehe oben bei show_diff eq top
+          $val  = '<b>'.$val.'<b/>' if ($di{$i} < 0);
           $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
       }
 
       $ret  .= "<tr class='even'><td class='smaportal' style='vertical-align:bottom; text-align:center;'>";
-      $t{$i} = $t{$i}.$hourstyle if(defined($hourstyle));                                          # z.B. 10:00 statt 10
-      $ret  .= $t{$i}."</td></tr></table></td>";                                                   # Stundenwerte ohne führende 0
+      $t{$i} = $t{$i}.$hourstyle if(defined($hourstyle));# z.B. 10:00 statt 10
+      #$ret  .= (($t{$i} == $thishour) && ($offset < 0)) ? "<b>$t{$i}</b>" : $t{$i}; # Stundenwerte ohne führende 0
+      $ret .= (($t{$i} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$t{$i}.'</span></a>' : $t{$i};
+      $ret .="</td></tr></table></td>";                                                   
   }
   
   $ret .= "<td class='smaportal'></td></tr>";
@@ -3241,18 +3314,47 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br>
     
-       <a name="beamColor"></a>
-       <li><b>beamColor </b><br>
+       <a name="beam1Color"></a>
+       <li><b>beam1Color </b><br>
          Farbauswahl der primären Balken.  
        </li>
        <br>
        
-       <a name="beamColor2"></a>
-       <li><b>beamColor2 </b><br>
-         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "Generation_Consumption" 
-         (pvco) und "Differential" (diff).
+       <a name="beam1Content"></a>
+       <li><b>beam1Content </b><br>
+         Legt den darzustellenden Inhalt der primären Balken fest.
+       
+         <ul>   
+         <table>  
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>forecast</b>     </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>real</b>         </td><td>tatsächliche PV-Erzeugung             </td></tr>
+            <tr><td> <b>consumption</b>  </td><td>Energie Bezug aus dem Netz            </td></tr>
+         </table>
+         </ul>       
+       </li>
+       <br> 
+       
+       <a name="beam2Color"></a>
+       <li><b>beam2Color </b><br>
+         Farbauswahl der sekundären Balken. Die zweite Farbe ist nur sinnvoll für den Anzeigedevice-Typ "pvco" und "diff".
        </li>
        <br>  
+       
+       <a name="beam2Content"></a>
+       <li><b>beam2Content </b><br>
+         Legt den darzustellenden Inhalt der sekundären Balken fest. 
+
+         <ul>   
+         <table>  
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>forecast</b>     </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>real</b>         </td><td>tatsächliche PV-Erzeugung             </td></tr>
+            <tr><td> <b>consumption</b>  </td><td>Energie Bezug aus dem Netz            </td></tr>
+         </table>
+         </ul>         
+       </li>
+       <br>
        
        <a name="beamHeight"></a>
        <li><b>beamHeight &lt;value&gt; </b><br>
@@ -3268,6 +3370,14 @@ werden weitere SolarForecast Devices zugeordnet.
          (default: 6 (auto))
        </li>
        <br>  
+       
+       <a name="consumerAdviceIcon"></a>
+       <li><b>consumerAdviceIcon </b><br>
+         Setzt das Icon zur Darstellung der Zeiten mit Verbraucherempfehlung. 
+         Dazu kann ein beliebiges Icon mit Hilfe der Standard "Select Icon"-Funktion (links unten im FHEMWEB) direkt ausgewählt 
+         werden. 
+       </li>  
+       <br>
 
        <a name="consumerList"></a>
        <li><b>consumerList &lt;Verbraucher1&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,&lt;Verbraucher2&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,...</b><br>
@@ -3286,7 +3396,7 @@ werden weitere SolarForecast Devices zugeordnet.
        <li><b>consumerLegend &ltnone | icon_top | icon_bottom | text_top | text_bottom&gt; </b><br>
          Lage bzw. Art und Weise der angezeigten Verbraucherlegende.
        </li>
-       <br>       
+       <br>        
   
        <a name="disable"></a>
        <li><b>disable</b><br>
@@ -3368,6 +3478,24 @@ werden weitere SolarForecast Devices zugeordnet.
          manuell erfolgen. <br>
          (default: 70)
        </li><br>
+       
+       <a name="layoutType"></a>
+       <li><b>layoutType &lt;pv | co | pvco | diff&gt; </b><br>
+       Layout der integrierten Grafik. <br>
+       (default: pv)  
+       <br><br>
+       
+       <ul>   
+       <table>  
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
+          <tr><td> <b>pv</b>    </td><td>- Erzeugung </td></tr>
+          <tr><td> <b>co</b>    </td><td>- Verbrauch </td></tr>
+          <tr><td> <b>pvco</b>  </td><td>- Erzeugung und Verbrauch </td></tr>
+          <tr><td> <b>diff</b>  </td><td>- Differenz von Erzeugung und Verbrauch </td></tr>
+       </table>
+       </ul>
+       </li>
+       <br> 
  
        <a name="maxPV"></a>
        <li><b>maxPV &lt;0...val&gt; </b><br>
@@ -3433,33 +3561,7 @@ werden weitere SolarForecast Devices zugeordnet.
          Balken u.U. über die Grundlinie. In diesen Fällen bitte den Wert erhöhen. <br>
          (default: 24)
        </li>
-       <br> 
-       
-       <a name="consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Setzt das Icon zur Darstellung der Zeiten mit Verbraucherempfehlung. 
-         Dazu kann ein beliebiges Icon mit Hilfe der Standard "Select Icon"-Funktion (links unten im FHEMWEB) direkt ausgewählt 
-         werden. 
-       </li>  
        <br>
-
-       <a name="layoutType"></a>
-       <li><b>layoutType &lt;pv | co | pvco | diff&gt; </b><br>
-       Layout der Portalgrafik. <br>
-       (default: pv)  
-       <br><br>
-       
-       <ul>   
-       <table>  
-       <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>pv</b>    </td><td>- Erzeugung </td></tr>
-          <tr><td> <b>co</b>    </td><td>- Verbrauch </td></tr>
-          <tr><td> <b>pvco</b>  </td><td>- Erzeugung und Verbrauch </td></tr>
-          <tr><td> <b>diff</b>  </td><td>- Differenz von Erzeugung und Verbrauch </td></tr>
-       </table>
-       </ul>
-       </li>
-       <br> 
        
        <a name="Wh/kWh"></a>
        <li><b>Wh/kWh &lt;Wh | kWh&gt; </b><br>
