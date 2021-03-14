@@ -438,7 +438,7 @@ sub _readCacheFile {
   
   my $name      = $hash->{NAME};
 
-  my ($error, @content) = FileRead ($file);                                        # Cache File lesen wenn vorhanden
+  my ($error, @content) = FileRead ($file);                                        
   
   if(!$error) {
       my $json    = join "", @content;
@@ -448,7 +448,7 @@ sub _readCacheFile {
            $data{$hash->{TYPE}}{$name}{$cachename} = decode_json ($json);
       }
       else {
-          Log3($name, 2, qq{$name - WARNING - the content of file "$file" is not readable and may be corrupt});
+          Log3($name, 2, qq{$name - WARNING - The content of file "$file" is not readable and may be corrupt});
       }
   }
       
@@ -1456,7 +1456,7 @@ sub _transferInverterValues {
       $data{$hash->{TYPE}}{$name}{pvreal}{sprintf("%02d",$nhour)} = $ethishour;               # Hilfshash Wert PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
-      $paref->{nhour}     = $nhour;
+      $paref->{nhour}     = sprintf("%02d",$nhour);
       $paref->{histname}  = "pvrl";
       setPVhistory ($paref);
       delete $paref->{histname};
