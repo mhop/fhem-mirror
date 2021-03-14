@@ -973,9 +973,9 @@ sub DbLogSplit {
       $reading  =~ tr/://d;
       $value    = $parts[1];
       $unit     = $parts[2];
+      
+      # Log3 ($device, 1, qq{$device - Split for DbLog done -> Reading: $reading, Value: $value, Unit: $unit});
   }
-  
-  Log3 ($device, 5, qq{$device - Split for DbLog done -> Reading: $reading, Value: $value, Unit: $unit});
 
 return ($reading, $value, $unit);
 }
