@@ -1447,7 +1447,7 @@ sub _transferInverterValues {
   
   my $edaypast = 0;
   deleteReadingspec ($hash, "Today_Hour00_PVreal");
-  for my $hour (0..int($chour)-1) {                                                           # alle bisherigen Erzeugungen des Tages summieren                                            
+  for my $hour (0..int $chour) {                                                           # alle bisherigen Erzeugungen des Tages summieren                                            
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_PVreal", 0);
   }
   
