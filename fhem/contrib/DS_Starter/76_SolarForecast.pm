@@ -1376,7 +1376,7 @@ sub _transferWeatherValues {
           $epoche   = $t + (3600*$num);
       }
 
-      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  99);                              # 55_DWD -> 0 .. 98 definiert , 99 ist nicht vorhanden                                                    # führende 0 einfügen wenn nötig
+      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  -1);
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
       my $r101  = ReadingsNum($fcname, "fc${fd}_${fh}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
       
@@ -1429,8 +1429,6 @@ sub _transferInverterValues {
       deleteReadingspec ($hash, "Today_Hour.*_PV.*");
   }
   
-  ## aktuelle PV-Erzeugung
-  #########################
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$edunit) = split ":", $h->{etoday};                                             # Readingname/Unit für Tagesenergie
   
@@ -1613,7 +1611,7 @@ sub forecastGraphic {                                                           
   my ($val,$height);
   my ($z2,$z3,$z4);
   my $he;                                                                                  # Balkenhöhe
-  my (%pv,%is,%t,%we,%di,%co);
+  my (%beam1,%is,%t,%we,%di,%beam2);
   
   ##########################################################
   # Kontext des SolarForecast-Devices speichern für Refresh
@@ -1915,31 +1913,27 @@ sub forecastGraphic {                                                           
 
     my $offset = AttrNum($name, 'history_hour', 0);
 
-    my $val1;
-    my $val2;
-
     if ($offset) {
         $t{0} += $offset;
         $t{0} += 24 if ($t{0} < 0);
 
         $t0    = sprintf('%02d', $t{0}); 
-        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}        : 0;
-        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}      : 0;
         $we{0} = (exists($data{$hash->{TYPE}}{$name}{weather}{$t0}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$t0}{id} : -1 if ($weather);
 
         #$is{0}     = undef;
     }
     else {   
-        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   :  0;
-        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} :  0;
         $we{0} = (exists($hash->{HELPER}{'ThisHour_WeatherId'}))    ? $hash->{HELPER}{"ThisHour_WeatherId"}    : -1 if ($weather);
 
         #$is{0} = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
     }
 
-    $pv{0} = $beam1cont eq 'forecast' ? $val1 : $val2;
-    $co{0} = $beam2cont eq 'forecast' ? $val1 : $val2;
-    $di{0} = $pv{0} - $co{0};
+    my $pvfc0   = exists $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   : 0;
+    my $pvreal0 = exists $data{$hash->{TYPE}}{$name}{pvreal}{$t0} ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} : 0;
+        
+    $beam1{0} = $beam1cont eq 'forecast' ? $pvfc0 : $pvreal0;
+    $beam2{0} = $beam2cont eq 'forecast' ? $pvfc0 : $pvreal0;
+    $di{0} = $beam1{0} - $beam2{0};
 
     # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
     $lotype = 'pv' if ($beam1cont eq $beam2cont);
@@ -1998,8 +1992,8 @@ sub forecastGraphic {                                                           
         Log3($name, 4, "$name - Consumer planned data: $_");
     }
 
-    $maxVal    = !$maxVal ? $pv{0} : $maxVal;                                                      # Startwert wenn kein Wert bereits via attr vorgegeben ist
-    my $maxCon = $co{0};                                                                           # für Typ co
+    $maxVal    = !$maxVal ? $beam1{0} : $maxVal;                                                   # Startwert wenn kein Wert bereits via attr vorgegeben ist
+    my $maxCon = $beam2{0};                                                                        # für Typ co
     my $maxDif = $di{0};                                                                           # für Typ diff
     my $minDif = $di{0};                                                                           # für Typ diff
 
@@ -2007,8 +2001,8 @@ sub forecastGraphic {                                                           
 
     for my $i (1..$maxhours-1) {
         my $ti;
-        my $val1;
-        my $val2 = 0;
+        my $pvfci;
+        my $pvreali = 0;
 
         my $ii = sprintf('%02d',$i);
 
@@ -2026,32 +2020,32 @@ sub forecastGraphic {                                                           
            my $jj  = sprintf('%02d',$j);
 
            if ($i <= abs($offset)) {
-               $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj}        : 0;
-               $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj}      : 0;
-               $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj}{id} : -1 if ($weather);
+               $pvfci   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj}        :  0;
+               $pvreali = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj}      :  0;
+               $we{$i}  = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj}{id} : -1 if ($weather);
            }
            else {
                my $nh  = sprintf('%02d', $t{0}+$i-$thishour);
-               $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast', 0);
+               $pvfci  = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast', 0);
                $we{$i} = $hash->{HELPER}{'NextHour'.$nh.'_WeatherId'} if($weather);
            }
        }
        else {
-           $val1   = ReadingsNum($name, 'NextHour'.$ii.'_PVforecast',  0);                # Forecast
+           $pvfci   = ReadingsNum($name, 'NextHour'.$ii.'_PVforecast',  0);               # Forecast
            $we{$i} = $hash->{HELPER}{'NextHour'.$ii.'_WeatherId'} if($weather);           # für Wettericons 
            #$is{$i} = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
        }
 
-       $pv{$i} = $beam1cont eq 'forecast' ? $val1 : $val2;
-       $co{$i} = $beam2cont eq 'forecast' ? $val1 : $val2;
+       $beam1{$i} = $beam1cont eq 'forecast' ? $pvfci : $pvreali;
+       $beam2{$i} = $beam2cont eq 'forecast' ? $pvfci : $pvreali;
 
        # sicher stellen das wir keine undefs in der Liste haben !
-       $pv{$i} //= 0;
-       $co{$i} //= 0;
-       $di{$i}   = $pv{$i} - $co{$i};
+       $beam1{$i} //= 0;
+       $beam2{$i} //= 0;
+       $di{$i}   = $beam1{$i} - $beam2{$i};
 
-       $maxVal   = $pv{$i} if ($pv{$i} > $maxVal); 
-       $maxCon   = $co{$i} if ($co{$i} > $maxCon);
+       $maxVal   = $beam1{$i} if ($beam1{$i} > $maxVal); 
+       $maxCon   = $beam2{$i} if ($beam2{$i} > $maxCon);
        $maxDif   = $di{$i} if ($di{$i} > $maxDif);
        $minDif   = $di{$i} if ($di{$i} < $minDif);
   }
@@ -2086,7 +2080,7 @@ sub forecastGraphic {                                                           
       $ret .= "<tr class='even'><td class='smaportal'></td>";                                # freier Platz am Anfang
 
       for my $i (0..$maxhours-1) {                                                           # keine Anzeige bei Null Ertrag bzw. in der Nacht , Typ pcvo & diff haben aber immer Daten in der Nacht
-          if ($pv{$i} || $show_night || ($lotype eq 'pvco') || ($lotype eq 'diff')) {            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
+          if ($beam1{$i} || $show_night || ($lotype eq 'pvco') || ($lotype eq 'diff')) {     # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
               my $night               = ($we{$i} > 99) ? 1 : 0;
               $we{$i}                -= 100 if ($night);
               my ($icon_name, $title) = weather_icon($we{$i});                               # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
@@ -2117,7 +2111,7 @@ sub forecastGraphic {                                                           
       
       for my $i (0..$maxhours-1) {
           $val  = formatVal6($di{$i},$kw,$we{$i});
-          #$val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                             # negative Zahlen in Fettschrift 
+          #$val  = ($di{$i} < 0) ?  '<b>'.$val.'<b/>' : '+'.$val;                            # negative Zahlen in Fettschrift 
           $val  = '<b>'.$val.'<b/>' if ($di{$i} < 0);
           $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
@@ -2140,12 +2134,12 @@ sub forecastGraphic {                                                           
       # dass die Grundlinie der Balken nach unten durchbrochen wird
 
       #if($lotype eq 'co') { 
-         # $he = int(($maxCon-$co{$i})/$maxCon*$height) + $fsize;                             # he - freier der Raum über den Balken.
+         # $he = int(($maxCon-$beam2{$i})/$maxCon*$height) + $fsize;                          # he - freier der Raum über den Balken.
          # $z3 = int($height + $fsize - $he);                                                 # Resthöhe
       #}
 
       if ($lotype eq 'pv') {
-          $he = int(($maxVal-$pv{$i}) / $maxVal*$height) + $fsize;
+          $he = int(($maxVal-$beam1{$i}) / $maxVal*$height) + $fsize;
           $z3 = int($height + $fsize - $he);
       } 
 
@@ -2158,11 +2152,11 @@ sub forecastGraphic {                                                           
 
           $maxVal = $maxCon if ($maxCon > $maxVal);                                         # wer hat den größten Wert ?
 
-          if ($pv{$i} > $co{$i}) {                                                          # pv oben , co unten
-              $z2 = $pv{$i}; $z3 = $co{$i}; 
+          if ($beam1{$i} > $beam2{$i}) {                                                    # pv oben , co unten
+              $z2 = $beam1{$i}; $z3 = $beam2{$i}; 
           } 
           else {                                                                            # tauschen, Verbrauch ist größer als Ertrag
-              $z3 = $pv{$i}; $z2 = $co{$i}; 
+              $z3 = $beam1{$i}; $z2 = $beam2{$i}; 
           }
 
           $he = int(($maxVal-$z2)/$maxVal*$height);
@@ -2235,8 +2229,8 @@ sub forecastGraphic {                                                           
       
       my $v;
       if ($lotype eq 'pv') {
-          $v   = ($lotype eq 'co') ? $co{$i} : $pv{$i} ; 
-          #$v   = 0 if (($lotype eq 'co') && !$pv{$i} && !$show_night);                        # auch bei type co die Nacht ggf. unterdrücken
+          $v   = ($lotype eq 'co') ? $beam2{$i} : $beam1{$i} ; 
+          #$v   = 0 if (($lotype eq 'co') && !$beam1{$i} && !$show_night);                  # auch bei type co die Nacht ggf. unterdrücken
           $val = formatVal6($v,$kw,$we{$i});
 
           $ret .="<table width='100%' height='100%'>";                                      # mit width=100% etwas bessere Füllung der Balken
@@ -2270,27 +2264,27 @@ sub forecastGraphic {                                                           
               $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>";
           }
 
-          if($pv{$i} > $co{$i}) {                                                          # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-              $val     = formatVal6($pv{$i},$kw,$we{$i});
+          if($beam1{$i} > $beam2{$i}) {                                                    # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+              $val     = formatVal6($beam1{$i},$kw,$we{$i});
               $color1  = $colorfc;
               $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
               $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
               
               if($z3) {                                                                    # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-                  $v       = formatVal6($co{$i},$kw,$we{$i});
+                  $v       = formatVal6($beam2{$i},$kw,$we{$i});
                   $color2  = $colorc;
                   $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
                   $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
               } 
           } 
           else {
-              $val     = formatVal6($co{$i},$kw,$we{$i});
+              $val     = formatVal6($beam2{$i},$kw,$we{$i});
               $color1  = $colorc;
               $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
               $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
               
               if($z3) {
-                  $v       = formatVal6($pv{$i},$kw,$we{$i});
+                  $v       = formatVal6($beam1{$i},$kw,$we{$i});
                   $color2  = $colorfc;
                   $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
                   $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
@@ -3109,7 +3103,7 @@ werden weitere SolarForecast Devices zugeordnet.
 
       <ul>
          <table>  
-         <colgroup> <col width=35%> <col width=65%> </colgroup>
+         <colgroup> <col width=25%> <col width=75%> </colgroup>
             <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R101,ww,SunUp,SunRise,SunSet                                                   </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>         
@@ -3125,11 +3119,17 @@ werden weitere SolarForecast Devices zugeordnet.
       <a name="currentInverterDev"></a>
       <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etoday=&lt;Reading Energieerzeugung aktueller Tag&gt;:&lt;Einheit&gt;  </b> <br> 
       Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. 
-      Es ist anzugeben, welche Readings die aktuelle PV-Leistung und die erzeugte Energie des aktuellen Tages liefern sowie deren Einheit (W,kW,Wh,kWh).
       <br>
-      Das Reading im Schlüssel etoday muß die tägliche Erzeugung beginnend mit 0 um 00:00 Uhr aufsteigend bis zum maximalen
-      täglichen Ertrag am Ende des Tages enthalten.
-      <br><br>
+      
+      <ul>   
+       <table>  
+       <colgroup> <col width=10%> <col width=90%> </colgroup>
+          <tr><td> <b>pv</b>       </td><td>Reading mit aktueller PV-Leistung                                                                                              </td></tr>
+          <tr><td> <b>etoday</b>   </td><td>PV Erzeugung des aktuellen Tages beginnend mit 0 um 00:00 Uhr aufsteigend bis zum maximalen täglichen Ertrag am Ende des Tages </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                            </td></tr>
+        </table>
+      </ul> 
+      <br>
       
       <ul>
         <b>Beispiel: </b> <br>
@@ -3144,9 +3144,17 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="currentMeterDev"></a>
       <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; </b> <br> 
-      Legt ein beliebiges Device zur Messung des aktuellen Energiebezugs fest. 
-      Es ist das Reading anzugeben welches die aktuell aus dem Netz bezogene Leistung liefert sowie dessen Einheit (W,kW).
-      <br><br>
+      Legt ein beliebiges Device zur Messung des aktuellen Energiebezugs fest.
+      <br>
+      
+      <ul>   
+       <table>  
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
+          <tr><td> <b>gcon</b>     </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW)                                       </td></tr>
+        </table>
+      </ul> 
+      <br>
       
       <ul>
         <b>Beispiel: </b> <br>
