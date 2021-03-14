@@ -421,7 +421,7 @@ sub Twilight_init_ExtWeather_usage {
     my ($extWeather, $extWReading, $err);
     my @parts;
     if (!looks_like_number($devreading)) {
-        @parts = split m{ }x, $devreading, 2;
+        @parts = split m{\s}x, $devreading, 2;
         ($extWeather, $extWReading) = split m{:}x, $parts[0]; 
         return 'External weather device seems not to exist' if !defined $defs{$extWeather} && $init_done;
         
