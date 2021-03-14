@@ -4755,7 +4755,7 @@ sub ring
     }
   }  
   if (defined $icon and $icon ne "") {
-    $ic="$ic\@".color($currColor,$ln) if ($icon !~ /@/); 
+    $ic="$ic\@".color($currColor,$ln) if ($ic !~ /@/); 
   }
   my $width=int($size/100*63);
   my $height=int($size/100*58);
@@ -4905,11 +4905,11 @@ sub ring2
   }    
 
   if (defined $icon and $icon ne "") {
-    if ($icon !~ /@/) {
-      $ic="$icon\@".color($currColor,$ln);
-    } elsif ($icon =~ /^(.*\@)colorVal1/) {
+    if ($ic !~ /@/) {
+      $ic="$ic\@".color($currColor,$ln);
+    } elsif ($ic =~ /^(.*\@)colorVal1/) {
       $ic="$1".color($currColor,$ln);
-    } elsif ($icon =~ /^(.*\@)colorVal2/) {
+    } elsif ($ic =~ /^(.*\@)colorVal2/) {
       $ic="$1".color($currColor2,$ln);
     }
   }
