@@ -2790,15 +2790,30 @@ sub setPVhistory {
   
   if($histname eq "pvrl") {                                                                       # realer Energieertrag
       $val = $ethishour;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;       
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;  
+      
+      my $pvrlsum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $pvrlsum += $data{$type}{$name}{pvhist}{$day}{$k}{pvrl} // 0;
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;      
   }
   
   if($histname eq "pvfc") {                                                                       # prognostizierter Energieertrag
       $val = $calcpv;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $calcpv;    
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $calcpv; 
+
+      my $pvfcsum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $pvfcsum += $data{$type}{$name}{pvhist}{$day}{$k}{pvfc} // 0;
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;       
   }
   
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
+  delete $data{$type}{$name}{pvhist}{$day}{summary};
     
 return;
 }
