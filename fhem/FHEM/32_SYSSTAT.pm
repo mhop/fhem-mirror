@@ -1151,17 +1151,18 @@ SYSSTAT_getLoadAVGSNMP($ )
 
     if( !$response ) {
       my $response = SYSSTAT_readOIDs($hash,'.1.3.6.1.2.1.25.3.3.1.2');
-      my $avg = '';
+      my $avg;
       my %lavg = ();
-      my $load = 0;
+      my $load;
       foreach my $key (keys %{$response}) {
-        $avg .= ',' if( $avg ne '' );
+        $avg .= ',' if( $avg );
         $avg .= $response->{$key};
+        $load = 0 if( !$load );
         $load += $response->{$key} / 100;
       }
 
-      $hash->{BlockingResult}{state} = $avg;
-      $hash->{BlockingResult}{load} = $load;
+      $hash->{BlockingResult}{state} = $avg if( defined($avg) );
+      $hash->{BlockingResult}{load} = $load if( defined($load) );
       #readingsBulkUpdate($hash, 'state', $avg) if( $avg );
       #readingsBulkUpdate($hash, 'load', $load) if( $load );
       return undef;
