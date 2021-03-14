@@ -4,7 +4,6 @@ package main;
 
 use strict;
 use warnings;
-use POSIX;
 use Time::HiRes qw(gettimeofday);
 
 #####################################
