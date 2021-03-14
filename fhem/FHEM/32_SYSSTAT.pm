@@ -483,7 +483,7 @@ SYSSTAT_Parse($$$)
       my $hours = $uptime % 24;
       my $days = int($uptime / 24);
 
-      $uptime = sprintf( "%d days, %d:%.2d", $days, $hours, $minutes);
+      $uptime = sprintf( "%d days, %d:%.2d:%.2d", $days, $hours, $minutes, $seconds);
     }
 
     if( $hash->{BlockingResult} ) {
@@ -630,6 +630,7 @@ SYSSTAT_InitSNMP($)
            -community => AttrVal($name,"snmpCommunity","public"),
            -port      => 161,
            -version   => AttrVal($name,"snmpVersion",1),
+           -translate =>    [ -timeticks => 0x0 ],
                         );
   if( $error ) {
     Log3 $name, 2, "$name: $error";
@@ -1343,20 +1344,8 @@ SYSSTAT_getUptimeSNMP($)
     my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
 
     my $uptime = $response->{'.1.3.6.1.2.1.25.1.1.0'};
-    if( $uptime && $uptime =~ m/(\d+)\s\D+,\s(\d+):(\d+):(\d+)/ ) {
-      my $days = $1?$1:0;
-      my $hours = $2;
-      my $minutes = $3;
-      my $seconds = $4;
-
-      $uptime = $days * 24;
-      $uptime += $hours;
-      $uptime *= 60;
-      $uptime += $minutes;
-      $uptime *= 60;
-      $uptime += $seconds;
-
-      SYSSTAT_Parse($hash, 'cat /proc/uptime', $uptime);
+    if( defined($uptime) ) {
+      SYSSTAT_Parse($hash, 'cat /proc/uptime', $uptime/100);
       return;
     }
 
