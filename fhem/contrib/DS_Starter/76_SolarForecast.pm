@@ -1314,9 +1314,10 @@ sub _transferDWDForecastValues {
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";         
       }
       
-      if($fd == 0 && sprintf("%02d",$fh) eq $chour) {
+      if($fd == 0) {
           $paref->{calcpv}   = $calcpv;
           $paref->{histname} = "pvfc";
+          $paref->{nhour}    = sprintf("%02d",$fh);
           setPVhistory ($paref); 
           delete $paref->{histname};
       }
@@ -2698,7 +2699,6 @@ sub setPVhistory {
   my $hash      = $paref->{hash};
   my $name      = $paref->{name};
   my $t         = $paref->{t};                                                                    # aktuelle Unix-Zeit
-  my $chour     = $paref->{chour};
   my $nhour     = $paref->{nhour};
   my $histname  = $paref->{histname}  // qq{};
   my $ethishour = $paref->{ethishour} // 0;
@@ -2707,10 +2707,19 @@ sub setPVhistory {
   my $type = $hash->{TYPE};  
   my $day  = strftime "%d", localtime($t);                                                        # aktueller Tag 
   
-  $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour if($histname eq "pvrl");           # realer Energieertrag
-  $data{$type}{$name}{pvhist}{$day}{$chour}{pvfc} = $calcpv    if($histname eq "pvfc");           # prognostizierter Energieertrag
+  my $val  = q{};
   
-  Log3 ($name, 5, "$name - set PV History hour $chour -> real: $ethishour, forecast: $calcpv");
+  if($histname eq "pvrl") {                                                                       # realer Energieertrag
+      $val = $ethishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;       
+  }
+  
+  if($histname eq "pvfc") {                                                                       # prognostizierter Energieertrag
+      $val = $calcpv;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvfc} = $calcpv;    
+  }
+  
+  Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
     
 return;
 }
