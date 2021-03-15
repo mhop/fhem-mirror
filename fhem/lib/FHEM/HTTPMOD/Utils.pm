@@ -739,7 +739,7 @@ sub BodyDecode {
             $decoding = $bodyCharset;
         }      
     }
-    elsif (lower($bodyDecode) eq lower($bodyCharset)) {
+    elsif (lc($bodyDecode) eq lc($bodyCharset)) {
         Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyDecode";    
         $decoding = $bodyCharset;
     } 
