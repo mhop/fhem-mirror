@@ -41,6 +41,7 @@
 # 31.01.21 GA add attribute maxOffTimeMode (max, 1, 2, 3)
 # 01.02.21 GA fix move reading maxOffTimeCalculation into an attribute and internal values
 # 11.03.21 GA fix prevent parallel InternalTimer calls
+# 14.03.21 GA fix change order of PWMR processing for maxOffTime handling
 
 ##############################################
 # $Id$
@@ -283,57 +284,86 @@ PWM_Calculate($)
   }
 
 
+  ############################
   # maxOffTimeProtect handling
-  my $maxOffTimeCnt = $RoomsMaxOffTimeProtect_stay_on;
-  my $maxOffTimeMode = $hash->{c_maxOffTimeMode};
 
   if (defined($hash->{c_maxOffTimeCalculation}) and ($hash->{c_maxOffTimeCalculation} eq "on")) {
+
+    my $maxOffTimeCnt = $RoomsMaxOffTimeProtect_stay_on;
+    my $maxOffTimeMode = $hash->{c_maxOffTimeMode};
+
     Log3 ($hash, 3, "PWM_Calculate $name: checkpoint maxOffTime (param $maxOffTimeMode) (cur $maxOffTimeCnt)");
-  }
   
-  foreach my $d (sort keys %RoomsMaxOffTimeProtect) { # sort: off_mop; on_mop; on_mop_maybe; on_mop_stay
-
-    if ($RoomsMaxOffTimeProtect{$d}      eq "off_mop") {
-      $RoomsToSwitchOff{$d} = 1;
-      $RoomsPulses{$d}      = 0;
-
-    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop") {
-
-      if ($maxOffTimeCnt < int($maxOffTimeMode)) {
-        $RoomsToSwitchOn{$d} = 1;
-        $RoomsPulses{$d}     = $hash->{MaxPulse};
-	$maxOffTimeCnt++;
-      } else {
-        Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F19 maxOffTime protection stay off (Max $maxOffTimeMode)");
-        $RoomsToStayOff{$d}  = 1;
-        $RoomsPulses{$d}     = 0;
+    # handle: off_mop, on_mop_stay
+    foreach my $d (sort keys %RoomsMaxOffTimeProtect) {
+  
+      if ($RoomsMaxOffTimeProtect{$d}      eq "off_mop") {
+        $RoomsToSwitchOff{$d} = 1;
+        $RoomsPulses{$d}      = 0;
+    	$maxOffTimeCnt--;
+  
+      } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_stay") {
+        $RoomsToStayOn{$d}  = 1;
+        $RoomsPulses{$d}    = $hash->{MaxPulse};
       }
-
-    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_stay") {
-      $RoomsToStayOn{$d}  = 1;
-      $RoomsPulses{$d}    = $hash->{MaxPulse};
-
-    } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_maybe") {
-
-      # on_mop_maybe may only be set if c_maxOffTimeMode > 1
-      if (($RoomsMaxOffTimeProtect_on + $RoomsMaxOffTimeProtect_stay_on > 0) 
-	  and ($maxOffTimeCnt < int($maxOffTimeMode))) {
-        Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F20 maxOffTime protection pulled on with another room");
-        $RoomsToSwitchOn{$d} = 1;
-        $RoomsPulses{$d}     = $hash->{MaxPulse};
-	$maxOffTimeCnt++;
-
-      } else {
-        $RoomsToStayOff{$d}  = 1;
-        $RoomsPulses{$d}     = 0;
-      }
+  
     }
 
-    $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
-    $defs{$d}->{READINGS}{oldpulse}{VAL}  = $RoomsPulses{$d};
+    # handle: on_mop
+    # sort ascending reading lastswitch (longest time off serves first)
+    foreach my $d (
+      sort { $defs{$a}->{READINGS}{lastswitch}{VAL} <=> $defs{$b}->{READINGS}{lastswitch}{VAL} } 
+      keys %RoomsMaxOffTimeProtect) {
 
-    $newpulseSum += $RoomsPulses{$d};
-    $newpulseMax = max($newpulseMax, $RoomsPulses{$d});
+      if ($RoomsMaxOffTimeProtect{$d} eq "on_mop") {
+  
+        if ($maxOffTimeCnt < int($maxOffTimeMode)) {
+          $RoomsToSwitchOn{$d} = 1;
+          $RoomsPulses{$d}     = $hash->{MaxPulse};
+    	  $maxOffTimeCnt++;
+        } else {
+          Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F19 maxOffTime protection stay off (Max $maxOffTimeMode)");
+          $RoomsToStayOff{$d}  = 1;
+          $RoomsPulses{$d}     = 0;
+        }
+      }
+
+    }
+  
+    # handle: on_mop_maybe
+    # sort ascending reading lastswitch (longest time off serves first)
+    foreach my $d (
+      sort { $defs{$a}->{READINGS}{lastswitch}{VAL} <=> $defs{$b}->{READINGS}{lastswitch}{VAL} } 
+      keys %RoomsMaxOffTimeProtect) {
+
+      #Log3 ($hash, 3, "PWM_Calculate $name: checkpoint2 maxOffTime $defs{$d}->{NAME} ".
+      #	    "$defs{$d}->{READINGS}{lastswitch}{TIME} ".
+      #	    "$defs{$d}->{READINGS}{actorState}{VAL} "
+      #);
+  
+      if ($RoomsMaxOffTimeProtect{$d} eq "on_mop_maybe") {
+  
+        # on_mop_maybe may only be set if c_maxOffTimeMode > 1
+        if (($RoomsMaxOffTimeProtect_on + $RoomsMaxOffTimeProtect_stay_on > 0) 
+  	  and ($maxOffTimeCnt < int($maxOffTimeMode))) {
+          Log3 ($hash, 3, "PWM_Calculate $defs{$d}->{NAME}: F20 maxOffTime protection pulled on with another room");
+          $RoomsToSwitchOn{$d} = 1;
+          $RoomsPulses{$d}     = $hash->{MaxPulse};
+          $maxOffTimeCnt++;
+  
+        } else {
+          $RoomsToStayOff{$d}  = 1;
+          $RoomsPulses{$d}     = 0;
+        }
+      }
+  
+      # for all types of *mop*
+      $defs{$d}->{READINGS}{oldpulse}{TIME} = TimeNow();
+      $defs{$d}->{READINGS}{oldpulse}{VAL}  = $RoomsPulses{$d};
+  
+      $newpulseSum += $RoomsPulses{$d};
+      $newpulseMax = max($newpulseMax, $RoomsPulses{$d});
+    }
   }
 
 
