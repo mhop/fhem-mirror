@@ -195,6 +195,7 @@ FHEMWEB_Initialize($)
     plotWeekStartDay:0,1,2,3,4,5,6
     nrAxis
     redirectCmds:0,1
+    redirectTo
     refresh
     reverseLogs:0,1
     roomIcons:textField-long
@@ -869,7 +870,8 @@ FW_answerCall($)
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
     my $file = urlDecode($ofile);        # 69164
-    $file =~ s/\?.*//; # Remove timestamp of CSS reloader
+    $file =~ s/[?#].*//; # Remove timestamp of CSS reloader
+    $file = "index.html" if(defined($file) && $file eq ""); # 119470
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
@@ -891,6 +893,12 @@ FW_answerCall($)
     return FW_serveSpecial("favicon", "ico", "$FW_icondir/default", 1);
 
   } else {
+    my $redirectTo = AttrVal($FW_wname, "redirectTo","");
+    if($redirectTo) {
+      Log3 $FW_wname, 1, "$FW_wname: redirecting $arg to $FW_ME/$redirectTo$arg";
+      return FW_answerCall("$FW_ME/$redirectTo$arg") 
+    }
+
     Log3 $FW_wname, 4, "$FW_wname: redirecting $arg to $FW_ME";
     TcpServer_WriteBlocking($me,
              "HTTP/1.1 302 Found\r\n".
