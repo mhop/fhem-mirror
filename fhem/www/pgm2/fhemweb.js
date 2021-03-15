@@ -393,7 +393,6 @@ FW_getHelp(dev, fn)
     var lang = $("body").attr("data-language");
     var url = FW_root+"/docs/commandref_frame"+
                 (lang == "EN" ? "" : "_"+lang)+".html";
-log(url);
     $.ajax({
       url:url, headers: { "cache-control": "no-cache" },
       success: function(data, textStatus, req){

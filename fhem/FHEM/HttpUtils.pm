@@ -302,14 +302,13 @@ HttpUtils_gethostbyname($$$$)
 
   $dh{dnsTo} = 0.25;
   $dh{lSelectTs} = $selectTimestamp;
-  $dh{selectTimestamp} = $selectTimestamp;
 
   sub
   dnsQuery($)
   {
     my ($dh) = @_;
-    $dh->{dnsTo} *= 2 if($dh->{lSelectTs} != $dh->{selectTimestamp});
-    $dh->{lSelectTs} = $dh->{selectTimestamp};
+    $dh->{dnsTo} *= 2 if($dh->{lSelectTs} != $selectTimestamp);
+    $dh->{lSelectTs} = $selectTimestamp;
     return HttpUtils_Err({ hash=>$dh, msg=>"DNS"})
         if($dh->{dnsTo} > $dh->{origHash}->{timeout}/2);
     my $ret = syswrite $dh->{conn}, $dh->{qry};
