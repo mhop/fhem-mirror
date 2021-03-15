@@ -197,7 +197,7 @@ FHEMWEB_Initialize($)
     redirectCmds:0,1
     refresh
     reverseLogs:0,1
-    roomIcons
+    roomIcons:textField-long
     showUsedFiles:0,1
     sortRooms
     sslVersion
