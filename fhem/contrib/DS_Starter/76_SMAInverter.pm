@@ -1,5 +1,5 @@
 #################################################################################################################
-# $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $
+# $Id: 76_SMAInverter.pm 20080 2019-09-22 22:00:00Z DS_Starter $
 #################################################################################################################
 #
 #  Copyright notice
@@ -32,7 +32,6 @@ eval "use FHEM::Meta;1"       or my $modMetaAbsent     = 1;
 
 # Versions History by DS_Starter
 our %SMAInverter_vNotesIntern = (
-  "2.14.1" => "27.02.2021  change save .etotal_yesterday, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664 ",
   "2.14.0" => "08.10.2019  readings bat_loadtotal (BAT_LOADTOTAL), bat_loadtoday (BAT_LOADTODAY) included by 300P, Forum: #topic,56080.msg986302.html#msg986302",
   "2.13.4" => "30.08.2019  STP10.0-3AV-40 298 included into %SMAInverter_devtypes ",
   "2.13.3" => "28.08.2019  commandref revised ",
@@ -571,10 +570,9 @@ sub SMAInverter_getstatusDoParse($) {
  my ($sunrise_h,$sunrise_m,$sunrise_s) = split(":",sunrise_abs('-'.$offset));
  my ($sunset_h,$sunset_m,$sunset_s)    = split(":",sunset_abs('+'.$offset));
 
- my $oper_start   = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunrise_h,minute=>$sunrise_m,second=>$sunrise_s,time_zone=>'local');
- my $oper_stop    = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunset_h,minute=>$sunset_m,second=>$sunset_s,time_zone=>'local');
- my $oper_start_d = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>00,minute=>10,second=>00,time_zone=>'local');
- my $dt_now       = DateTime->now(time_zone=>'local');
+ my $oper_start = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunrise_h,minute=>$sunrise_m,second=>$sunrise_s,time_zone=>'local');
+ my $oper_stop  = DateTime->new(year=>$year+1900,month=>$mon+1,day=>$mday,hour=>$sunset_h,minute=>$sunset_m,second=>$sunset_s,time_zone=>'local');
+ my $dt_now     = DateTime->now(time_zone=>'local');
 
  Log3 $name, 4, "$name - current time: ".$dt_now->dmy('.')." ".$dt_now->hms;
  Log3 $name, 4, "$name - operation time begin: ".$oper_start->dmy('.')." ".$oper_start->hms;
@@ -584,7 +582,7 @@ sub SMAInverter_getstatusDoParse($) {
  my $opertime_stop  = $oper_stop->dmy('.')." ".$oper_stop->hms;
 
  # ETOTAL speichern für ETODAY-Berechnung wenn WR ETODAY nicht liefert
- if ($dt_now <= $oper_start_d) {                                        # V2.14.1, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664
+ if ($dt_now >= $oper_stop) {
      my $val = 0;
      $val = ReadingsNum($name, "etotal", 0)*1000 if (exists $defs{$name}{READINGS}{etotal});
      $val = ReadingsNum($name, "SPOT_ETOTAL", 0) if (exists $defs{$name}{READINGS}{SPOT_ETOTAL});
@@ -592,10 +590,10 @@ sub SMAInverter_getstatusDoParse($) {
  }
 
  # BATTERYLOAD_TOTAL speichern für BAT_LOADTODAY-Berechnung wenn WR BAT_LOADTODAY nicht liefert
- if ($dt_now <= $oper_start_d) {                                        # V2.14.1, Forum: https://forum.fhem.de/index.php/topic,56080.msg1134664.html#msg1134664
+ if ($dt_now >= $oper_stop) {
      my $val = 0;
      $val = ReadingsNum($name, "bat_loadtotal", 0)*1000 if (exists $defs{$name}{READINGS}{bat_loadtotal});
-     $val = ReadingsNum($name, "BAT_LOADTOTAL", 0)      if (exists $defs{$name}{READINGS}{BAT_LOADTOTAL});
+     $val = ReadingsNum($name, "BAT_LOADTOTAL", 0) if (exists $defs{$name}{READINGS}{BAT_LOADTOTAL});
      BlockingInformParent("SMAInverter_setReadingFromBlocking", [$name, ".bat_loadtotal_yesterday", $val], 0);
  }
 
@@ -1183,30 +1181,27 @@ sub SMAInverter_SMAcommand($$$$$) {
 
  # Check the data identifier
  $data_ID = unpack("v*", substr $data, 55, 2);
- Log3 ($name, 5, "$name - Data identifier $data_ID");
+ Log3 $name, 5, "$name - Data identifier $data_ID";
 
  if($data_ID eq 0x2601)	{
      if (length($data) >= 66) {
 		 $inv_SPOT_ETOTAL = unpack("V*", substr($data, 62, 4));
 	 } else {
-         Log3 ($name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !");
+         Log3 $name, 3, "$name - WARNING - ETOTAL wasn't deliverd ... set it to \"0\" !";
          $inv_SPOT_ETOTAL = 0;
 	 }
 
      if (length($data) >= 82) {
 		 $inv_SPOT_ETODAY = unpack("V*", substr ($data, 78, 4));
-	 } 
-     else {
+	 } else {
          # ETODAY wurde vom WR nicht geliefert, es wird versucht ihn zu berechnen
-         Log3 ($name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...");
+         Log3 $name, 3, "$name - ETODAY wasn't delivered from inverter, try to calculate it ...";
          my $etotold = ReadingsNum($name, ".etotal_yesterday", undef);
-         
          if(defined $etotold && $inv_SPOT_ETOTAL > $etotold) {
              $inv_SPOT_ETODAY = $inv_SPOT_ETOTAL - $etotold;
-             Log3 ($name, 3, "$name - ETODAY calculated successfully !");
-         } 
-         else {
-             Log3 ($name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !");
+             Log3 $name, 3, "$name - ETODAY calculated successfully !";
+         } else {
+             Log3 $name, 3, "$name - WARNING - unable to calculate ETODAY ... set it to \"0\" !";
              $inv_SPOT_ETODAY = 0;
          }
 	 }
@@ -1637,12 +1632,12 @@ sub SMAInverter_setVersionInfo($) {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
 	  # META-Daten sind vorhanden
 	  $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $ im Kopf komplett! vorhanden )
+	  if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
 		  $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
 	  } else {
 		  $modules{$type}{META}{x_version} = $v;
 	  }
-	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20399 2019-10-23 16:48:57Z DS_Starter $ im Kopf komplett! vorhanden )
+	  return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 76_SMAInverter.pm 20080 2019-08-30 08:25:27Z DS_Starter $ im Kopf komplett! vorhanden )
 	  if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
 	      # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
 		  # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
