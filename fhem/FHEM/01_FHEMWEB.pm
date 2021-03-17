@@ -870,8 +870,7 @@ FW_answerCall($)
     $dir =~ s,www/,,g; # Want commandref.html to work from file://...
 
     my $file = urlDecode($ofile);        # 69164
-    $file =~ s/[?#].*//; # Remove timestamp of CSS reloader
-    $file = "index.html" if(defined($file) && $file eq ""); # 119470
+    $file =~ s/\?.*//; # Remove timestamp of CSS reloader
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
