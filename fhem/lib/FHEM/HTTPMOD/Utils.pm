@@ -745,7 +745,7 @@ sub BodyDecode {
     } 
     else {
         Log3 $name, 4, "$name: BodyDecode is decoding the response body as $bodyDecode but charset header is $bodyCharset";
-        $decoding = $bodyCharset;
+        $decoding = $bodyDecode;
     }
 
     if ($decoding) {
