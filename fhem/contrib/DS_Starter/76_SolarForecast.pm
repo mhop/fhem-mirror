@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumtion total in currentMeterdev ",
   "0.13.0" => "16.03.2021  changed sub forecastGraphic from Wzut ",
   "0.12.0" => "16.03.2021  switch etoday to etotal ",
   "0.11.0" => "14.03.2021  new attr history_hour, beam1Content, beam2Content, implement sub forecastGraphic from Wzut, ".
@@ -170,6 +171,8 @@ my %hget = (                                                                # Ha
   html         => { fn => \&_gethtml,          needcred => 0 },
   ftui         => { fn => \&_getftui,          needcred => 0 },
   pvHistory    => { fn => \&_getlistPVHistory, needcred => 0 },
+  pvReal       => { fn => \&_getlistPVReal,    needcred => 0 },
+  weatherData  => { fn => \&_getlistWeather,   needcred => 0 },
   stringConfig => { fn => \&_getstringConfig,  needcred => 0 },
 );
 
@@ -605,7 +608,7 @@ sub _setmeterDevice {                    ## no critic "not used"
       return qq{The device "$medev" doesn't exist!};
   }
   
-  if(!$h->{gcon}) {
+  if(!$h->{gcon} || !$h->{contotal}) {
       return qq{The syntax of "$opt" isn't right. Please consider the commandref.};
   }  
 
@@ -834,7 +837,9 @@ sub Get {
                 "data:noArg ".
                 "html:noArg ".
                 "pvHistory:noArg ".
-                "stringConfig:noArg "
+                "pvReal:noArg ".
+                "stringConfig:noArg ".
+                "weatherData:noArg "
                 ;
                 
   return if(IsDisabled($name));
@@ -895,8 +900,41 @@ return pageAsHtml ($hash,"ftui");
 sub _getlistPVHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
- 
-  my $ret = listPVHistory ($hash);
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  
+  my $ret   = listDataPool ($hash, "pvhist");
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter listPVReal
+###############################################################
+sub _getlistPVReal {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  
+  my $ret   = listDataPool ($hash, "pvreal");
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter listWeather
+###############################################################
+sub _getlistWeather {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  
+  my $ret   = listDataPool ($hash, "weather");
                     
 return $ret;
 }
@@ -1438,6 +1476,8 @@ sub _transferInverterValues {
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total
   
+  return if(!$pvread || !$edread);
+  
   Log3($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
   
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
@@ -1450,17 +1490,14 @@ sub _transferInverterValues {
   my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
   
   my $edaypast = 0;
-  # deleteReadingspec ($hash, "Today_Hour00_PVreal");
   
   for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
       $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_PVreal", 0);
   }
   
   my $do = 0;
-  if ($edaypast == 0) {
+  if ($edaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
       if (defined $hash->{HELPER}{INITETOTAL}) {
-          # $edaypast = $hash->{HELPER}{INITETOTAL};
-          # $hash->{HELPER}{INITETOTAL} = $etotal;
           $do = 1;
       }
       else {
@@ -1508,20 +1545,76 @@ sub _transferMeterValues {
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};  
 
-  my $medev  = ReadingsVal($name, "currentMeterDev", "");                                 # aktuelles Meter device
+  my $medev  = ReadingsVal($name, "currentMeterDev", "");                                     # aktuelles Meter device
   my ($a,$h) = parseParams ($medev);
   $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
   
-  my ($gc,$gcunit) = split ":", $h->{gcon};                                               # Readingname/Unit für aktuellen Netzbezug
+  my $tlim = "23";                                                                            # Stunde 23 -> bestimmte Aktionen                  
+  my $type = $hash->{TYPE}; 
   
-  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit)");
+  if($chour =~ /^($tlim)$/x) {
+      deleteReadingspec ($hash, "Today_Hour.*_Consumption");
+      delete $hash->{HELPER}{INITCONTOTAL};
+  }
+  
+  my ($gc,$gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
+  my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
+  
+  return if(!$gc || !$gt);
+  
+  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), contotal=$gt ($ctunit)");
   
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
-  my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                        # aktueller Bezug (-) oder Einspeisung
-  
+  my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
+    
   push @$daref, "Current_GridConsumption:".$co." W";
-  $data{$hash->{TYPE}}{$name}{current}{consumption} = $co;                                # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{consumption} = $co;                                            # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      
+  my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
+  my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
+   
+  my $cdaypast = 0;
+  
+  for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
+      $cdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_Consumption", 0);
+  }
+  
+  my $do = 0;
+  if ($cdaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
+      if (defined $hash->{HELPER}{INITCONTOTAL}) {
+          $do = 1;
+      }
+      else {
+          $hash->{HELPER}{INITCONTOTAL} = $gctotal;
+      }
+  }
+  elsif (!defined $hash->{HELPER}{INITCONTOTAL}) {
+      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$cdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_Consumption", 0);
+  }
+  else {
+      $do = 1;
+  }
+  
+  if ($do) {
+      my $gctotthishour = int ($gctotal - ($cdaypast + $hash->{HELPER}{INITCONTOTAL}));
+      
+      # Log3($name, 1, "$name - gctotal: $gctotal, cdaypast: $cdaypast, HELPER: $hash->{HELPER}{INITCONTOTAL}, gctotthishour: $gctotthishour  ");
+      
+      if($gctotthishour < 0) {
+          $gctotthishour = 0;
+      }
+      
+      my $nhour = $chour+1;
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_Consumption:".$gctotthishour." Wh";
+      $data{$type}{$name}{consumption}{sprintf("%02d",$nhour)} = $gctotthishour;                     # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      
+      $paref->{gctotthishour} = $gctotthishour;
+      $paref->{nhour}        = sprintf("%02d",$nhour);
+      $paref->{histname}     = "cons";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+  }   
       
 return;
 }
@@ -2817,9 +2910,10 @@ sub setPVhistory {
   my $t         = $paref->{t};                                                                    # aktuelle Unix-Zeit
   my $nhour     = $paref->{nhour};
   my $day       = $paref->{day};
-  my $histname  = $paref->{histname}  // qq{};
-  my $ethishour = $paref->{ethishour} // 0;
-  my $calcpv    = $paref->{calcpv}    // 0;
+  my $histname  = $paref->{histname}      // qq{};
+  my $ethishour = $paref->{ethishour}     // 0;
+  my $calcpv    = $paref->{calcpv}        // 0;
+  my $gthishour = $paref->{gctotthishour} // 0;
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -2848,42 +2942,80 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;       
   }
   
+  if($histname eq "cons") {                                                                       # bezogene Energie
+      $val = $gthishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{cons} = $gthishour; 
+
+      my $gcsum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $gcsum += $data{$type}{$name}{pvhist}{$day}{$k}{cons} // 0;
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{cons} = $gcsum;       
+  }
+  
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
     
 return;
 }
 
 ################################################################
-#           liefert aktuelle Einträge des PV Cache
+#           liefert aktuelle Einträge des in $htol
+#           angegebenen internen Hash
 ################################################################
-sub listPVHistory {                 
+sub listDataPool {                 
   my $hash = shift;
+  my $htol = shift;  
   
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
-  my $pvhh = $data{$type}{$name}{pvhist};  
   
-  # Log3 ($name, 5, "$name - PV History content: ".Dumper $pvhh);
+  my ($sq,$h);
   
   my $sub = sub { 
       my $day = shift;
       my $ret;          
-      for my $key (sort{$a<=>$b} keys %{$pvhh->{$day}}) {
-          my $pvrl = $pvhh->{$day}{$key}{pvrl} // 0;
-          my $pvfc = $pvhh->{$day}{$key}{pvfc} // 0;
+      for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
+          my $pvrl = $h->{$day}{$key}{pvrl} // 0;
+          my $pvfc = $h->{$day}{$key}{pvfc} // 0;
+          my $cons = $h->{$day}{$key}{cons} // 0;
           $ret    .= "\n      " if($ret);
-          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc";
+          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, consumption: $cons";
       }
       return $ret;
   };
-        
-  if (!keys %{$pvhh}) {
-      return qq{PV cache is empty.};
+  
+  if ($htol eq "pvhist") {
+      $h = $data{$type}{$name}{pvhist};
+      if (!keys %{$h}) {
+          return qq{PV cache is empty.};
+      }
+      for my $idx (reverse sort{$a<=>$b} keys %{$h}) {
+          $sq .= $idx." => ".$sub->($idx)."\n";             
+      }
   }
   
-  my $sq;
-  for my $idx (reverse sort{$a<=>$b} keys %{$pvhh}) {
-      $sq .= $idx." => ".$sub->($idx)."\n";             
+  if ($htol eq "weather") {
+      $h = $data{$hash->{TYPE}}{$name}{weather};
+      if (!keys %{$h}) {
+          return qq{Weather cache is empty.};
+      }
+      for my $idx (sort{$a<=>$b} keys %{$h}) {
+          $sq .= $idx." => id:         ".$data{$hash->{TYPE}}{$name}{weather}{$idx}{id}.        "\n"; 
+          $sq .= "   => txt:        "   .$data{$hash->{TYPE}}{$name}{weather}{$idx}{txt}.       "\n";
+          $sq .= "   => cloudcover: "   .$data{$hash->{TYPE}}{$name}{weather}{$idx}{cloudcover}."\n";
+          $sq .= "   => rainprob:   "   .$data{$hash->{TYPE}}{$name}{weather}{$idx}{rainprob}.  "\n";
+      }
+  }
+  
+  if ($htol eq "pvreal") {
+      $h = $data{$type}{$name}{pvreal};
+      if (!keys %{$h}) {
+          return qq{PV real cache is empty.};
+      }
+      for my $idx (sort{$a<=>$b} keys %{$h}) {
+          $sq .= $idx." => ".$data{$type}{$name}{pvreal}{$idx}."\n";             
+      }
   }
       
 return $sq;
@@ -2991,6 +3123,9 @@ return $timestamp;
 #       $daref:  Referenz zum Array der zu erstellenden Readings
 #                muß Paare <Readingname>:<Wert> enthalten
 #       $doevt:  1-Events erstellen, 0-keine Events erstellen
+#
+# readingsBulkUpdate($hash,$reading,$value,$changed,$timestamp)
+#
 ################################################################
 sub createReadingsFromArray {
   my $hash  = shift;
@@ -3158,7 +3293,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Energieerzeugung total&gt;:&lt;Einheit&gt;  </b> <br> 
+      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Summe Energieerzeugung&gt;:&lt;Einheit&gt;  </b> <br> 
       Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. 
       <br>
       
@@ -3184,23 +3319,24 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; </b> <br> 
-      Legt ein beliebiges Device zur Messung des aktuellen Energiebezugs fest.
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; contotal=&lt;Reading Summe Netzbezug&gt;:&lt;Einheit&gt;</b> <br> 
+      Legt ein beliebiges Device zur Messung des Energiebezugs fest.
       <br>
       
       <ul>   
        <table>  
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>gcon</b>     </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW)                                       </td></tr>
+          <tr><td> <b>gcon</b>     </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert   </td></tr>
+          <tr><td> <b>contotal</b> </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                         </td></tr>
         </table>
       </ul> 
       <br>
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W <br>
-        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W)
+        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W contotal=Bezug_Wirkleistung_Zaehler:kWh <br>
+        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W) und den totalen Bezug im Reading "Bezug_Wirkleistung_Zaehler" (kWh)
       </ul>      
       </li>
     </ul>
@@ -3345,6 +3481,24 @@ werden weitere SolarForecast Devices zugeordnet.
       <li><b>pvHistory </b> <br>  
       Listet die PV Werte der letzten Tage sortiert nach dem Tagesdatum und der Stunde des jeweiligen Tages auf.
       Dabei sind <b>pvreal</b> der reale und <b>pvforecast</b> der prognostizierte PV Ertrag.
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="pvReal"></a>
+      <li><b>pvReal </b> <br>  
+      Listet die ermittelten PV Werte des Ringwertzählers der letzten 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
+      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="weatherData"></a>
+      <li><b>weatherData </b> <br>  
+      Listet die ermittelten Wetterdaten des Ringwertzählers der letzten 24h auf. Die Stundenangaben beziehen sich auf den 
+      Beginn der Stunde, z.B. bezieht sich die Angabe 09 auf die Zeit von 09:00-10:00. 
       </li>      
     </ul>
     <br>
