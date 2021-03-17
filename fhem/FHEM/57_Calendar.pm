@@ -269,6 +269,19 @@ Note: the state... readings from the previous version of this module (2015 and
 earlier) are not available any more.
 
 
+*** Note on cutoff of event creation
+
+Events that are more than 400 days in the past or in the future from their 
+time of creation are omitted. This time window can be further reduced by 
+the cutoffOlderThan and cutoffLaterThan attributes. 
+
+This would have the following consequence: as long as the calendar is not 
+re-initialized (set ... reload or restart of FHEM) and the VEVENT record is 
+not modified, events beyond the horizon may never get created.
+
+Thus, a forced reload should be scheduled every now and then after initialization or 
+reload. 
+
 
 Processing of calendar events
 -----------------------------
@@ -1729,6 +1742,7 @@ sub Calendar_Initialize($) {
                       "cutoffOlderThan cutoffLaterThan hideOlderThan hideLaterThan ".
                       "onCreateEvent quirks ".
                       "defaultFormat defaultTimeFormat ".
+                      "hasModeReadings:0,1 " .
                       $readingFnAttributes;
 }
 
@@ -1778,6 +1792,20 @@ sub Calendar_Define($$) {
 
 
   return undef;
+}
+
+#####################################
+sub Calendar_deleteModeReadings($) {
+
+  my ($hash) = @_;
+  my $deletedCount= 0;
+  my $name= $hash->{NAME};
+
+  foreach my $reading (grep { /mode.*/ } keys %{$hash->{READINGS}} ) {
+      readingsDelete($hash, $reading);
+      $deletedCount++;
+  }
+  Log3 $hash, 3, "Calendar $name: $deletedCount obsolete mode readings deleted." if($deletedCount);
 }
 
 #####################################
@@ -3094,20 +3122,25 @@ sub Calendar_UpdateCalendar($$) {
   #main::Debug "Calendar $name: creating calendar events";
 
   my $ignoreCancelled= AttrVal($name, "ignoreCancelled", 0);
+  my $clearedCount= 0;
+  my $createdCount= 0;
   foreach my $id (keys %vevents) {
         my $v= $vevents{$id};
         if($v->isObsolete() or ($ignoreCancelled and $v->isCancelled())) {
+            $clearedCount++;
             $v->clearEvents();
             next;
         }
         my $onCreateEvent= AttrVal($name, "onCreateEvent", undef);
         if($v->hasChanged() or !$v->numEvents()) {
+            $createdCount++;
             #main::Debug "createEvents";
             $v->createEvents($name, $t, $onCreateEvent,
               $cutoffLowerBound, $cutoffUpperBound, %vevents);
         }
-
   }
+  Log3 $hash, 4, "Calendar $name: events for $clearedCount records cleared, events for $createdCount records created.";
+
 
   #main::Debug "*** Result:";
   #main::Debug $ical->asString();
@@ -3134,8 +3167,12 @@ sub Calendar_UpdateCalendar($$) {
 sub Calendar_CheckTimes($$) {
 
     my ($hash, $t) = @_;
+    my $name= $hash->{NAME};
 
-    Log3 $hash, 4, "Calendar " . $hash->{NAME} . ": Checking times...";
+    Log3 $hash, 4, "Calendar $name: Checking times...";
+
+    # delete obsolete readings
+    Calendar_deleteModeReadings($hash) unless AttrVal($name, "hasModeReadings", 0);
 
     #
     # determine the uids of all events and their most interesting mode
@@ -3230,18 +3267,22 @@ sub Calendar_CheckTimes($$) {
         }
     }
 
+ 
     # clears all events in CHANGED, thus must be called first
     readingsBeginUpdate($hash);
     # we update the readings
-    rbu($hash, "modeUpcoming", es(@upcoming));
-    rbu($hash, "modeAlarm", es(@alarm));
-    rbu($hash, "modeAlarmed", es(@alarmed));
-    rbu($hash, "modeAlarmOrStart", es(@alarm,@start));
-    rbu($hash, "modeChanged", es(@changed));
-    rbu($hash, "modeStart", es(@start));
-    rbu($hash, "modeStarted", es(@started));
-    rbu($hash, "modeEnd", es(@end));
-    rbu($hash, "modeEnded", es(@ended));
+    if(AttrVal($name, "hasModeReadings", 0)) {
+        Log3 $hash, 5, "Calendar $name: Updating obsolete mode readings...";
+        rbu($hash, "modeUpcoming", es(@upcoming));
+        rbu($hash, "modeAlarm", es(@alarm));
+        rbu($hash, "modeAlarmed", es(@alarmed));
+        rbu($hash, "modeAlarmOrStart", es(@alarm,@start));
+        rbu($hash, "modeChanged", es(@changed));
+        rbu($hash, "modeStart", es(@start));
+        rbu($hash, "modeStarted", es(@started));
+        rbu($hash, "modeEnd", es(@end));
+        rbu($hash, "modeEnded", es(@ended));
+    } 
     readingsBulkUpdate($hash, "state", "triggered");
     # DoTrigger, because sub is called by a timer instead of dispatch
     readingsEndUpdate($hash, 1);
@@ -3363,8 +3404,22 @@ sub CalendarEventsAsHtml($;$) {
       define MyCalendar Calendar ical url https://www.google.com&shy;/calendar/ical/john.doe%40example.com&shy;/private-foo4711/basic.ics
       define YourCalendar Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
       define SomeCalendar Calendar ical file /home/johndoe/calendar.ics
-      </pre>
+    </pre>
+
+    Note on cutoff of event creation:<ul><li>
+    
+      Events that are more than 400 days in the past or in the future from their 
+      time of creation are omitted. This time window can be further reduced by 
+      the <code>cutoffOlderThan</code> and <code>cutoffLaterThan</code> attributes.
+
+      This would have the following consequence: as long as the calendar is not 
+      re-initialized (<code>set ... reload</code> or restart of FHEM) and the VEVENT record is 
+      not modified, events beyond the horizon never get created.
+
+      Thus, a forced reload should be scheduled every now and then.</li></ul>
+      
   </ul>
+  <br>
 
   <a name="Calendarset"></a>
   <b>Set </b><br><br>
@@ -3560,7 +3615,7 @@ sub CalendarEventsAsHtml($;$) {
     <tr><th align="left"><code>&lt;returnTypeSpec&gt;</code></th><th align="left">description</th></tr>
     <tr><td><code>$text</code></td><td>a multiline string in human-readable format (default)</td></tr>
     <tr><td><code>@texts</code></td><td>an array of strings in human-readable format</td></tr>
-    <tr><td><code>@event</code></td><td>an array of Calendar::Event hashes</td></tr>
+    <tr><td><code>@events</code></td><td>an array of Calendar::Event hashes</td></tr>
 
     </table>
     <br><br>
@@ -3743,6 +3798,10 @@ sub CalendarEventsAsHtml($;$) {
         although they are cancelled.
     </li><p>
 
+    <li><code>hasModeReadings</code><br>
+        Set to 1 to use the obsolete mode readings.
+    </li><p>
+
     <li><code>quirks &lt;values&gt;</code><br>
         Parameters to handle special situations. <code>&lt;values&gt;</code> is
         a comma-separated list of the following keywords:
@@ -3805,7 +3864,10 @@ sub CalendarEventsAsHtml($;$) {
   for the earliest future time among all alarm, start or end times of all calendar events.
   <p>
 
-  A calendar device has several readings. Except for <code>calname</code>, each reading is a semicolon-separated list of UIDs of
+  For backward compatibility, mode readings are filled when the <code>hasModeReadings</code> attribute is set. The remainder of
+  this description applies to the obsolete mode readings.<p>
+
+  Each mode reading is a semicolon-separated list of UIDs of
   calendar events that satisfy certain conditions:
   <table>
   <tr><td>calname</td><td>name of the calendar</td></tr>
@@ -4065,7 +4127,25 @@ sub CalendarEventsAsHtml($;$) {
       define DeinKalender Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
       define IrgendeinKalender Calendar ical file /home/johndoe/calendar.ics
       </pre>
+      <br>
+
+      Hinweis zur Erzeugung von Terminen:<ul><li>
+    
+      Termine, die zum Zeitpunkt ihrer Erstellung mehr als 400 Tage in der Vergangenheit oder in der Zukunft liegen,
+      werden ausgelassen. Dieses Zeitfenster kann durch die
+      Attribute <code>cutoffOlderThan</code> und <code>cutoffLaterThan</code> noch verkleinert werden.
+
+      Dies kann zur Folge haben, dass Termine jenseits dieses Horizonts niemals erstellt werden, 
+      solange der Kalender nicht neu initialisiert wird (<code>set ... reload</code> oder Neustart von FHEM) 
+      oder der VEVENT-Datensatz nicht ver&auml;ndert wird.
+
+      Daher sollte ab und zu ein erzwungenes Neuladen eingeplant werden.
+      </li></ul>
+      
   </ul>
+  <br>
+
+
 
   <a name="Calendarset"></a>
   <b>Set </b><br><br>
@@ -4262,7 +4342,7 @@ sub CalendarEventsAsHtml($;$) {
     <tr><th align="left"><code>&lt;returnTypeSpec&gt;</code></th><th align="left">Beschreibung</th></tr>
     <tr><td><code>$text</code></td><td>ein mehrzeiliger String in menschenlesbarer Darstellung (Vorgabe)</td></tr>
     <tr><td><code>@texts</code></td><td>ein Array von Strings in menschenlesbarer Darstellung</td></tr>
-    <tr><td><code>@event</code></td><td>ein Array von Calendar::Event-Hashs</td></tr>
+    <tr><td><code>@events</code></td><td>ein Array von Calendar::Event-Hashs</td></tr>
 
     </table>
     <br><br>
@@ -4385,6 +4465,11 @@ sub CalendarEventsAsHtml($;$) {
         Serie zur&uuml;ckgegeben werden, die gel&ouml;scht sind.
     </li><p>
 
+    <li><code>hasModeReadings</code><br>
+        Auf 1 setzen, um die veralteten mode-Readings zu benutzen.
+    </li><p>
+
+
     <li><code>quirks &lt;values&gt;</code><br>
         Parameter f&uuml;r spezielle Situationen. <code>&lt;values&gt;</code> ist
         eine kommaseparierte Liste der folgenden Schl&uuml;sselw&ouml;rter:
@@ -4431,7 +4516,10 @@ sub CalendarEventsAsHtml($;$) {
   Ein Kalender-Ereignis wechselt umgehend von einem Modus zum anderen, wenn die Zeit f&uuml;r eine &Auml;nderung erreicht wurde. Dies wird dadurch erreicht, dass auf die fr&uuml;heste zuk&uuml;nftige Zeit aller Alarme, Start- oder Endzeiten aller Kalender-Ereignisse gewartet wird.
   <p>
 
-  Ein Kalender-Device hat verschiedene Readings. Mit Ausnahme von <code>calname</code> stellt jedes Reading eine semikolonseparierte Liste aus UID von Kalender-Ereignisse dar, welche bestimmte Zust&auml;nde haben:
+  Aus Gr&uuml;nden der Abw&auml;rtskompatibilit&auml;t werden mode-Readings gef&uuml;llt, wenn das Attribut <code>hasModeReadings</code> gesetzt ist.
+  Der Rest dieser Beschreibung bezieht sich auf diese veralteten mode-Readings.<p>
+  
+  Ein Kalender-Device hat verschiedene mode-Readings. Jedes mode-Reading stellt eine semikolonseparierte Liste aus UID von Kalender-Ereignisse dar, welche bestimmte Zust&auml;nde haben:
   <table>
   <tr><td>calname</td><td>Name des Kalenders</td></tr>
   <tr><td>modeAlarm</td><td>Ereignisse im Alarm-Modus</td></tr>
