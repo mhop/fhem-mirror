@@ -324,6 +324,10 @@ MQTT2_SERVER_Read($@)
   ####################################
   if($cpt eq "CONNECT") {
     # V3:MQIsdb V4:MQTT
+    if(ord($fb) & 0xf) { # lower nibble must be zero
+      Log3 $sname, 3, "$cname with bogus CONNECT (".ord($fb)."), disconnecting";
+      return CommandDelete(undef, $cname);
+    }
     ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
     $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
     $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
