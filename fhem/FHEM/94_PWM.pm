@@ -42,6 +42,7 @@
 # 01.02.21 GA fix move reading maxOffTimeCalculation into an attribute and internal values
 # 11.03.21 GA fix prevent parallel InternalTimer calls
 # 14.03.21 GA fix change order of PWMR processing for maxOffTime handling
+# 18.03.21 GA fix maxOffTime handling bug in restriction of max rooms on
 
 ##############################################
 # $Id$
@@ -300,7 +301,6 @@ PWM_Calculate($)
       if ($RoomsMaxOffTimeProtect{$d}      eq "off_mop") {
         $RoomsToSwitchOff{$d} = 1;
         $RoomsPulses{$d}      = 0;
-    	$maxOffTimeCnt--;
   
       } elsif ($RoomsMaxOffTimeProtect{$d} eq "on_mop_stay") {
         $RoomsToStayOn{$d}  = 1;
