@@ -326,6 +326,15 @@ my $rain_base   = 0;                                                            
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
 
+# Information zu verwendeten internen Datenhashes
+# $data{$type}{$name}{pvfc}                                                      # PV forecast Ringspeicher
+# $data{$type}{$name}{weather}                                                   # Weather forecast Ringspeicher
+# $data{$type}{$name}{pvreal}                                                    # PV real
+# $data{$type}{$name}{current}                                                   # current values
+# $data{$type}{$name}{pvhist}                                                    # historische Werte pvreal, pvforecast, gridconsumtion                  
+
+
+
 ################################################################
 #               Init Fn
 ################################################################
@@ -2945,14 +2954,14 @@ sub setPVhistory {
   
   if($histname eq "cons") {                                                                       # bezogene Energie
       $val = $gthishour;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{cons} = $gthishour; 
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{gcons} = $gthishour; 
 
       my $gcsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $gcsum += $data{$type}{$name}{pvhist}{$day}{$k}{cons} // 0;
+          $gcsum += $data{$type}{$name}{pvhist}{$day}{$k}{gcons} // 0;
       }
-      $data{$type}{$name}{pvhist}{$day}{99}{cons} = $gcsum;       
+      $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;       
   }
   
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
@@ -2977,9 +2986,9 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl = $h->{$day}{$key}{pvrl} // 0;
-          my $pvfc = $h->{$day}{$key}{pvfc} // 0;
-          my $cons = $h->{$day}{$key}{cons} // 0;
+          my $pvrl = $h->{$day}{$key}{pvrl}  // 0;
+          my $pvfc = $h->{$day}{$key}{pvfc}  // 0;
+          my $cons = $h->{$day}{$key}{gcons} // 0;
           $ret    .= "\n      " if($ret);
           $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, consumption: $cons";
       }
