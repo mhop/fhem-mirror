@@ -1350,11 +1350,11 @@ sub _transferDWDForecastValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $t     = $paref->{t};
+  my $t     = $paref->{t};                                                                     # Epoche Zeit
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   
-  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
+  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                   # aktuelles Forecast Device
   return if(!$fcname || !$defs{$fcname});
   
   my ($time_str,$epoche);
@@ -1376,14 +1376,8 @@ sub _transferDWDForecastValues {
       
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
-      if($num == 0) {          
-          $time_str = "NextHour00";
-          $epoche   = $t;                                                                     # Epoche Zeit
-      }
-      else {
-          $time_str = "NextHour".sprintf "%02d", $num;
-          $epoche   = $t + (3600*$num);
-      }
+      $time_str = "NextHour".sprintf "%02d", $num;
+      $epoche   = $t + (3600*$num);
       
       my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
       $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv if($num < 24);         # Hilfshash Wert PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
@@ -1416,7 +1410,7 @@ sub _transferWeatherValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $t     = $paref->{t};
+  my $t     = $paref->{t};                                                                      # Epoche Zeit
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   
@@ -1445,14 +1439,8 @@ sub _transferWeatherValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
       
-      if($num == 0) {          
-          $time_str = "NextHour00";
-          $epoche   = $t;                                                                     # Epoche Zeit
-      }
-      else {
-          $time_str = "NextHour".sprintf "%02d", $num;
-          $epoche   = $t + (3600*$num);
-      }
+      $time_str = "NextHour".sprintf "%02d", $num;
+      $epoche   = $t + (3600*$num);
 
       my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  -1);
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
@@ -3539,8 +3527,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvForecast"></a>
       <li><b>pvForecast </b> <br>  
-      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
-      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
+      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. Die Stundenangaben beziehen sich auf den
+      Beginn der Stunde, z.B. bezieht sich 09 auf die Zeit von 08:00-09:00. 
       </li>      
     </ul>
     <br>
@@ -3557,8 +3545,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="weatherData"></a>
       <li><b>weatherData </b> <br>  
-      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
-      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
+      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf. Die Stundenangaben beziehen sich auf den
+      Beginn der Stunde, z.B. bezieht sich 09 auf die Zeit von 08:00-09:00. 
       </li>      
     </ul>
     <br>
