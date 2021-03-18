@@ -1135,6 +1135,8 @@ sub centralTask {
   ### nicht mehr benötigte Readings löschen - kann später wieder raus !!
   deleteReadingspec ($hash, "Today_Hour.*_Consumption");
   deleteReadingspec ($hash, "ThisHour_.*");
+  deleteReadingspec ($hash, "Today_PV");
+  deleteReadingspec ($hash, "Tomorrow_PV");
 
   my $interval = controlParams ($name); 
   
@@ -1932,7 +1934,7 @@ sub forecastGraphic {                                                           
 
   my $pv4h = ReadingsNum ($name,"Next04Hours_PV",          0);
   my $pvRe = ReadingsNum ($name,"RestOfDay_PV",            0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PV",             0);
+  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",     0);
   my $pvCu = ReadingsNum ($name,"Current_PV",              0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
@@ -3138,10 +3140,10 @@ sub collectSummaries {
       $todaySum->{PV}      += ReadingsNum ($name, "Today_Hour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= 23);
   }
   
-  push @$daref, "Next04Hours_PV:". (int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDay_PV:".   (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PV:".    (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PV:".       (int $todaySum->{PV}).     " Wh";
+  push @$daref, "Next04Hours_PV:".     (int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDay_PV:".       (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast:".(int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast:".   (int $todaySum->{PV}).     " Wh";
 
   createReadingsFromArray ($hash, $daref, 1);
   
