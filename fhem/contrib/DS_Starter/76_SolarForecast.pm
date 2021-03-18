@@ -2990,7 +2990,7 @@ sub listDataPool {
           my $pvfc = $h->{$day}{$key}{pvfc}  // 0;
           my $cons = $h->{$day}{$key}{gcons} // 0;
           $ret    .= "\n      " if($ret);
-          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, consumption: $cons";
+          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $cons";
       }
       return $ret;
   };
@@ -3489,8 +3489,10 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvHistory"></a>
       <li><b>pvHistory </b> <br>  
-      Listet die PV Werte der letzten Tage sortiert nach dem Tagesdatum und der Stunde des jeweiligen Tages auf.
-      Dabei sind <b>pvreal</b> der reale und <b>pvforecast</b> der prognostizierte PV Ertrag.
+      Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und der Stunde des jeweiligen 
+      Tages auf.
+      Dabei sind <b>pvreal</b> der reale PV Ertrag, <b>pvforecast</b> der prognostizierte PV Ertrag und <b>gridcon</b> 
+      der Netzbezug der jeweiligen Stunde.
       </li>      
     </ul>
     <br>
