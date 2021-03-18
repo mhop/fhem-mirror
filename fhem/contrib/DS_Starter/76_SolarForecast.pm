@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
   "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDForecastValues ",
   "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumption total in currentMeterdev ",
   "0.13.0" => "16.03.2021  changed sub forecastGraphic from Wzut ",
@@ -1133,6 +1134,7 @@ sub centralTask {
   
   ### nicht mehr benötigte Readings löschen - kann später wieder raus !!
   deleteReadingspec ($hash, "Today_Hour.*_Consumption");
+  deleteReadingspec ($hash, "ThisHour_.*");
 
   my $interval = controlParams ($name); 
   
@@ -1373,7 +1375,7 @@ sub _transferDWDForecastValues {
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
       if($num == 0) {          
-          $time_str = "ThisHour";
+          $time_str = "NextHour00";
           $epoche   = $t;                                                                     # Epoche Zeit
       }
       else {
@@ -1442,7 +1444,7 @@ sub _transferWeatherValues {
       last if($fd > 1);
       
       if($num == 0) {          
-          $time_str = "ThisHour";
+          $time_str = "NextHour00";
           $epoche   = $t;                                                                     # Epoche Zeit
       }
       else {
@@ -1793,7 +1795,7 @@ sub forecastGraphic {                                                           
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";
   
-  my $pv0    = ReadingsNum ($name, "ThisHour_PVforecast", undef);
+  my $pv0    = ReadingsNum ($name, "NextHour00_PVforecast", undef);
   
   my $is     = ReadingsVal ($name, "inverterStrings",     undef);                          # String Konfig
   my $peak   = ReadingsVal ($name, "modulePeakString",    undef);                          # String Peak
@@ -1964,7 +1966,7 @@ sub forecastGraphic {                                                           
       my $alias   = AttrVal    ($name,    "alias",              $name );                            # Linktext als Aliasname
       
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = ReadingsTimestamp($name, "ThisHour_PVforecast", "0000-00-00 00:00:00");         # letzter Forecast Update  
+      my $lup     = ReadingsTimestamp($name, "NextHour00_PVforecast", "0000-00-00 00:00:00");         # letzter Forecast Update  
       
       my $lupt    = "last update:";
       my $autoct  = "automatic correction:";  
@@ -2077,8 +2079,8 @@ sub forecastGraphic {                                                           
 
     my $thishour;
 
-    (undef,undef,undef,$thishour) = ReadingsVal($name, "ThisHour_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-    (undef,undef,undef,$thishour) = ReadingsVal($name, "ThisHour_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
+    (undef,undef,undef,$thishour) = ReadingsVal($name, "NextHour00_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+    (undef,undef,undef,$thishour) = ReadingsVal($name, "NextHour00_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
     $thishour = int($thishour); # keine führende Null
     $t{0} = $thishour;
 
@@ -2099,8 +2101,8 @@ sub forecastGraphic {                                                           
     $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   :  0;
         $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} :  0;
     # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
-    $we{0} = (exists($hash->{HELPER}{'ThisHour_WeatherId'}))    ? $hash->{HELPER}{"ThisHour_WeatherId"}    : -1;
-    #$is{0}   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
+    $we{0} = (exists($hash->{HELPER}{'NextHour00_WeatherId'}))    ? $hash->{HELPER}{"NextHour00_WeatherId"}    : -1;
+    #$is{0}   = (ReadingsVal($name,"NextHour00_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
     }
 
     $beam1{0} = ($beam1cont eq 'forecast') ? $val1 : $val2;
@@ -3125,7 +3127,7 @@ sub collectSummaries {
   my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   
   my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
-  my $thforecast       = ReadingsNum ($name, "ThisHour_PVforecast", 0);
+  my $thforecast       = ReadingsNum ($name, "NextHour00_PVforecast", 0);
   $next4HoursSum->{PV} = $thforecast;
   $restOfDaySum->{PV}  = $thforecast;
   
@@ -3533,6 +3535,15 @@ werden weitere SolarForecast Devices zugeordnet.
     <br>
     
     <ul>
+      <a name="pvForecast"></a>
+      <li><b>pvForecast </b> <br>  
+      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
+      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
       <a name="pvReal"></a>
       <li><b>pvReal </b> <br>  
       Listet die im Ringspeicher vorhandenen PV Erzeugungswerte der letzten 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
@@ -3544,8 +3555,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="weatherData"></a>
       <li><b>weatherData </b> <br>  
-      Listet die im Ringspeicher vorhandenen Wetterdaten der letzten 24h auf. Die Stundenangaben beziehen sich auf den 
-      Beginn der Stunde, z.B. bezieht sich die Angabe 09 auf die Zeit von 09:00-10:00. 
+      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
+      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
       </li>      
     </ul>
     <br>
