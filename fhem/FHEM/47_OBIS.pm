@@ -94,6 +94,8 @@ my %Ext_Channel_Postfix = (
 );
 
 my $SML_ENDTAG = chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1A);
+my $SML_START  = chr(0x1B) . chr(0x1B) . chr(0x1B) . chr(0x1B) . 
+                 chr(0x01) . chr(0x01) . chr(0x01) . chr(0x01);
     
 #####################################
 sub OBIS_Initialize($)
@@ -133,7 +135,7 @@ sub OBIS_Define($$)
   my $device_name = "OBIS_".$name;
   $modules{OBIS}{defptr}{$device_name} = $hash;
   
-# If device="none", prepeare for an external IO-Module
+# If device="none", prepare for an external IO-Module
   if($dev=~/none|ext/) {
   	if (@a == 4){
 	  	my $device_name = "OBIS.".$a[4];
@@ -142,7 +144,7 @@ sub OBIS_Define($$)
   	}
     AssignIoPort($hash);
     Log3 $hash, 1, "OBIS ($name) - OBIS device is none, commands will be echoed only";
-   return undef;
+    return undef;
   }
 
   my $baudrate;
@@ -160,7 +162,7 @@ sub OBIS_Define($$)
   else { 
     $baudrate=9600;
     $hash->{helper}{SPEED}="5";
-    $hash->{helper}{NETDEV}=1;
+    $hash->{helper}{NETDEV}= $dev =~ /:\d+$/ ? 1 : 0;
   }
   
   my %devs= (
@@ -175,27 +177,43 @@ sub OBIS_Define($$)
     "E350USB"	=>  ["/?!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)],
     "AS1440"	=> 	["/2!".chr(13).chr(10),    600,    chr(6)."0".$hash->{helper}{SPEED}."0".chr(13).chr(10)]
     );
-    if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
-    $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
-    $hash->{helper}{DEVICES} =$devs{$type};
-    $hash->{helper}{RULECACHE} = {};
-    $hash->{helper}{TRIGGERTIME}=gettimeofday();
-#    if( !$init_done ) {
-#	    $attr{$name}{"event-on-change-reading"} = ".*";
- #   }
-    if ($hash->{helper}{DEVICES}[1]>0) {
-	  my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
-      Log3 $hash, 5, "OBIS ($name) - Internal timer set to ".FmtDateTime($t);
-	  InternalTimer($t, "GetUpdate", $hash, 0);
-    }
-	InternalTimer(gettimeofday()+60, "CheckNoData", $hash, 0) if ($hash->{helper}{NETDEV});
-	$hash->{helper}{EoM}=-1;
+  if (!$devs{$type}) {return 'unknown meterType. Must be one of <nothing>, SML, Standard, VSM102, E110'};
+  $devs{$type}[1] = $hash->{helper}{DEVICES}[1] // $devs{$type}[1];
+  $hash->{helper}{DEVICES} =$devs{$type};
+  $hash->{helper}{RULECACHE} = {};
+  $hash->{helper}{TRIGGERTIME}=gettimeofday();
+
+  if ($hash->{helper}{DEVICES}[1]>0) {
+	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
+    Log3 $hash, 5, "OBIS ($name) - Internal timer set to ".FmtDateTime($t);
+	InternalTimer($t, "GetUpdate", $hash, 0);
+  }
+  InternalTimer(gettimeofday()+60, "CheckNoData", $hash, 0) if ($hash->{helper}{NETDEV});
+  $hash->{helper}{EoM}=-1;
   
-  	Log3 $hash, 5, "OBIS ($name) - Opening device...";
+  Log3 $hash, 5, "OBIS ($name) - Opening device...";
 
+  if (! -f $dev) {
     DevIo_OpenDev($hash, 0, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
+  } else {
+    # Debug mode: Open a FHEM debug session and process it...
+    Log3 $hash, 1, "OBIS ($name) - Replaying session";
+    open (FH, $dev);
+    $attr{$name}{"verbose"} = 5;
+    my $t1 = gettimeofday();
+    my $lines = 0;
+    while (<FH>) {
+      next unless /^\d{4}.\d\d.\d\d \d\d:\d\d:\d\d .: OBIS.*Full message->\s*(.*)$/;
+      OBIS_Parse ($hash, (pack 'H*', $1));
+      $lines++;
+    }
+    my $dt = gettimeofday()-$t1;
+    readingsSingleUpdate($hash, "state",
+      $lines . ' lines in ' . $dt . ' seconds = ' . int($lines/$dt + 0.5) . ' lines per second', 0);
+    close FH;
+  }
 
-    return;
+  return;
 }
 
 #####################################
@@ -362,8 +380,121 @@ sub OBIS_Read($)
     return(undef);
 }
 
+my @pow10plus5 = ( 0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, 100000 );
+my %unitmap = (
+  0x1E => "Wh",
+  0x1B => "W",
+  0x21 => "A",
+  0x23 => "V",
+  0x2C => "Hz",
+  0x01 => "",
+  0x1D => "varh",
+);
 
+# Input: devhash, textoutput, reverse byte buffer, maxelements
 
+sub OBIS_Parse_List 
+{
+  my $hash = $_[0];
+  my $elements = $_[2];
+  my @result;
+
+#Log3 $hash, 3, "OBIS_Parse_List : Scan for $elements element";
+  my $cntdown = $elements;
+  my $isobis = ($elements == 7) ? 1 : 0;
+  while ($cntdown>0 && (length $_[3])) {
+    
+	my $tl = ord chop($_[3]);
+    $isobis &= ($tl == 0x7) if ($cntdown == $elements);
+#Log3 $hash, 3, "OBIS_Parse_List : TL is " . sprintf("%02X", $tl);
+	my $len = $tl & 0xf;
+	my $tltype = $tl & 0x70;
+    my $tllast = $tl;
+	while ($tllast & 0x80) {
+	  $tllast = ord chop($_[3]);
+	  if ($tl & 0x70) {
+		Log3 $hash, 3, "2nd TL-byte != 0, reserved according spec";
+      }
+      $len = ($len*16) + ($tllast & 0xf);
+	}
+    $len--;
+    return undef if ($len>length $_[3] || $len<0);
+
+    if ($tltype == 0) {
+      # String
+      if ($len<=0) {
+        push @result, "";
+      } elsif (($len==6) && ($cntdown==$elements)) {
+        push @result, sprintf("%d-%d:%d.%d.%d*%d",
+				ord chop($_[3]), ord chop($_[3]),
+				ord chop($_[3]), ord chop($_[3]),
+				ord chop($_[3]), ord chop($_[3]));
+      } else {
+        my $str;
+		while ($len--) {
+		  $str .= sprintf ("%02X", ord chop($_[3]));
+        }
+        if ($elements==7 && $#result==4) {
+		  if($result[0]=~$SML_specialities{"HEX4"}[0]) {
+			$str=$SML_specialities{"HEX4"}[1]->($str)
+		  } elsif($result[0]=~$SML_specialities{"HEX2"}[0]) {
+			$str=$SML_specialities{"HEX2"}[1]->($str)
+		  } else {
+			$str=~s/([A-F0-9]{2})/chr(hex($1))/eg;
+			$str=~s/[^!-~\s\r\n\t]//g;
+          }
+        }
+        push @result, $str;
+      }
+    } elsif ($tltype == 0x50 || $tltype == 0x60) {
+      # Signed (5) or Unsigned (6) Int
+      my $num = 0;
+      if ($tltype==0x60 && $len>3 && $result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{DZGHACK}) {
+		$tltype = 0x50;
+      }
+      $num = ord chop($_[3]) if ($len--);
+	  my $subme = ($tltype == 0x50) && ($num & 0x80) ? ( 1 << (8*($len+1)) ) : 0;
+	  while ($len-- > 0) {
+		$num = ($num<<8) | ord chop($_[3]);
+      }
+      push @result, ($num-$subme);
+    } elsif ($tltype == 0x40) {
+      push @result, (ord chop($_[3]) != 0);
+    } elsif ($tltype == 0x70) {
+      push @result, ref OBIS_Parse_List($hash, $_[1], $len+1, $_[3]);
+    }
+	$cntdown--;
+  }
+  my $i = 0;
+  return @result if (!$isobis);
+
+  # We should have now an 7 element array: reading(0), status(1), valTime(2), unit(3), scaler(4), data(5)
+  if ($result[4] && looks_like_number($result[4]) && looks_like_number($result[5])) {
+    $result[5] *= ($result[4]<-5 || $result[4]>5) ? 10**$result[4] : $pow10plus5[$result[4]+5];
+  }
+  if (looks_like_number($result[3])) {
+    my $repl = $unitmap{$result[3]};
+    $result[3] = $repl // "var";
+  }
+  if (looks_like_number($result[1])) {
+    $result[5] = (($result[1] == 0xA2) ? "<" : (($result[1] == 0x82) ? ">" : "")) . $result[5];
+  }
+
+  my $line = $result[0] . "(" . $result[5] . ($result[3] eq "" ? "" : "*".$result[3]) . ")\r\n";
+  $hash->{helper}{DZGHACK} = 1 if ($line=~/^1-0:96\.50\.1\*255\(DZG\)/);
+  $_[1] .= $line;
+  return undef;
+
+#  Log3 $hash,3,"OBIS line is " . $line . $line2 . ")";
+# $line.$line2.")\r\n"
+#  while ($i < scalar @result) {
+#    Log3 $hash,3,"List element $i is " . $result[$i];
+#    $i++;
+#  }
+}
+
+# Input: devhash, bytesequence
+# Output: decoded text, remaining buffer
 sub OBIS_trySMLdecode($$)
 {
 	my ( $hash, $remainingSML ) = @_;
@@ -378,110 +509,39 @@ sub OBIS_trySMLdecode($$)
 	$hash->{MeterType}="SML";
 
     # Fast fail for messages w/o end tag
-	my $endtagIdx = rindex ($remainingSML, $SML_ENDTAG);
-      if ($endtagIdx<0 || ((length $remainingSML)-$endtagIdx) < 3) {
-	return ("", $remainingSML);
-	}
-
-	$remainingSML=uc(unpack('H*',$remainingSML));
 	my $newMsg="";
-	while ($remainingSML=~/(1B1B1B1B010101.*?1B1B1B1B1A[0-9A-F]{6})/mip) {
-		
-		my $msg=$1;
-	    Log3 $hash,5,"OBIS ($name) - SML-Parse $1" if ($ll>=5);
-		
-		$remainingSML=${^POSTMATCH};
-		if (OBIS_CRC16($hash,pack('H*',$msg)) == 1) {
-			$remainingSML=""; #reset possible further messages if actual CRC ok; if someone misses some messages, we remove it. 
-			my $OBISmsg="";
-			my $initstr="/";
-			my $OBISid=$msg=~m/7701([0-9A-F]*?)01/g;
-			Log3 $hash,5,"OBIS ($name) - Full message-> $msg" if ($ll>=5);
-			(undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
-			while ($msg =~ m/(7707)([0-9A-F]*)/g) {
-      			my @list=$&=~/(7707)([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)/g;
-      			Log3 $hash,5,"OBIS ($name) - Telegram=$msg" if ($ll>=5);
-      			if (!@list) {Log3 $hash,3,"OBIS - Empty datagram: .$msg";next};
-	    		my $line=hex($list[1])."-".hex($list[2]).":".hex($list[3]).".".hex($list[4]).".".hex($list[5])."*255(";
-	    		if ($line eq '255-255:255.255.255*255(') {
-	    			$list[7]=~/(7707.*)/;
-	    			$msg=$1;
-	    		} else
-	    		{
-					my ($status,$statusL,$statusT,$valTime,$valTimeL,$valTimeT,$unit,$unitL,$unitT,$scaler,$scalerL,$scalerT,$data,$dataL,$dataT,$other);		   
-		    		($statusL,$statusT,$status,$other)=OBIS_decodeTL($list[7]);
-		    		($valTimeL,$valTimeT,$valTime,$other)=OBIS_decodeTL($other);
-		    		($unitL,$unitT,$unit,$other)=OBIS_decodeTL($other);
-		    		($scalerL,$scalerT,$scaler,$other)=OBIS_decodeTL($other);
-		    		($dataL,$dataT,$data,$msg)=OBIS_decodeTL($other);
-		    		my $line2=""; 
-		    		if ($dataT ==0 ) {				
-						$line2=$data;
-		    			if($line=~$SML_specialities{"HEX4"}[0]) {
-	#	    				$line2=$SML_specialities{"HEX4"}[1]->($data)
-		    			} elsif($line=~$SML_specialities{"HEX2"}[0]) {
-	#    					$line2=$SML_specialities{"HEX2"}[1]->($data)
-		    			} else {
-		    				$data=~s/([A-F0-9]{2})/chr(hex($1))/eg;
-		    				$data=~s/[^!-~\s]//g;
-		    				$line2="$data";
-	    				}
-	    				
-	# Type signed (=80) and unsigned (=96) Integer
-					} elsif ($dataT & 0b01010000|$dataT & 0b01100000) {		
-						$unit= $unit eq "1E" ? "Wh" :
-	   							  $unit eq "1B" ? "W" :
-	   							  $unit eq "21" ? "A" :
-	   							  $unit eq "23" ? "V" :
-	   							  $unit eq "2C" ? "Hz" :
-	   							  $unit eq "01" ? ""  : 
-	   							  $unit eq "1D" ? "varh" :
-	   							  $unit eq "" ? "" : "var";
-						$scaler=$scaler ne "" ? (10**unpack("c", pack("C", hex($scaler)))) : 1;
-						if ($scaler==0) {$scaler=1};	# just to make sure
-						$line2.="<" if ($status=~/[aA]2$/);
-						$line2.=">" if ($status=~/82$/);
-						my $val=0;
-						# signed Values
-						my $tmp="";
-						if ($dataT & 0b00010000) {
-                            # Was: if ($data =~ /^[89a-f]/i)
-                            # workaround for DZG meter wrongly encoding positive values:
-							if ($data =~ /^[89a-f]/i && 
-                               ($line!~/^1-0:16\.7\.0/ || $dataL>3 || $newMsg!~/1-0:96\.50\.1\*255\(DZG\)/)) {
-                               $val =  hex($data) - hex(sprintf ("FF" x $dataL)) -1;
-                            }
-							else {$val = hex($data)} #positive value
-						}
-						if ($dataT & 0b00100000 || $val>=0) {
-							$val=hex($data);
-						}
-						$line2.=($val*$scaler).($unit eq "" ? "" : "*$unit"); # if($dataT ==96);					
-					} elsif ($dataT & 0b01000000) {		# Type Boolean - no Idea, where this is used
-						$line2=OBIS_hex2int($data);			# 0=false, everything else is true
-					} elsif ($dataT & 0b01110000) {		# Type List of.... - Time is sometimes delivered as structure
-	#					my @a_Length;
-	#					my @a_Type;
-	#					my @a_Data;
-	#					for (my $b=0;$b<$dataL;$b++) {
-	#						my ($l_length,$l_type,$l_data);
-	#					}
-						
-					}
-					$initstr.="$line2\\" if ($line=~$SML_specialities{"INFO"}[0]);
-					$newMsg.=$line.$line2.")\r\n";
-	###### TypeLength-Test ends here
-				}
-			}
-			$initstr=~s/\\$//;
-			$newMsg=$initstr.chr(13).chr(10).$newMsg;
-			$newMsg.="!".chr(13).chr(10);
-			Log3 $hash,4,"OBIS ($name) - MSG IS: \r\n$newMsg" if ($ll>=4);
-		} else {
-			$hash->{CRC_Errors}+=1;
-		}
-	}
-	return ($newMsg,pack('H*',$remainingSML));
+    do {
+      # 1) endTag has to be found, 2) startTag has to be found, 3) end behind start:
+	  my $endtagIdx = index ($remainingSML, $SML_ENDTAG);
+	  return ("", $remainingSML)
+		if ($endtagIdx<0 || ((length $remainingSML)-$endtagIdx) < 8);
+      my $startIdx = index ($remainingSML, $SML_START);
+	  return ("", substr($remainingSML, $endtagIdx+8))
+		if ($startIdx<0);
+	  return ("", substr($remainingSML, $startIdx))
+		if ($startIdx>=$endtagIdx);
+
+	  my $msg=substr($remainingSML, $startIdx, $endtagIdx+8-$startIdx);
+      Log3 $hash,5,"OBIS ($name) - SML-Parse " . uc(unpack('H*',$msg)) if ($ll>=5);
+	  if (OBIS_CRC16($hash,$msg) == 1) {
+		$remainingSML=""; #reset possible further messages if actual CRC ok; if someone misses some messages, we remove it. 
+		my $OBISmsg="";
+		my $initstr="/";
+		Log3 $hash,5,"OBIS ($name) - Full message-> " . uc(unpack('H*',$msg)) if ($ll>=5);
+
+		OBIS_Parse_List($hash, $newMsg, 9999, scalar reverse substr($msg, 8, $endtagIdx-8));
+
+		$initstr=~s/\\$//;
+		$newMsg=$initstr.chr(13).chr(10).$newMsg;
+		$newMsg.="!".chr(13).chr(10);
+		Log3 $hash,4,"OBIS ($name) - MSG IS: \r\n$newMsg" if ($ll>=4);
+	  } else {
+		$hash->{CRC_Errors}+=1;
+		Log3 $hash,4,"OBIS ($name) - CRC Error in Input" if ($ll>=4);
+		$remainingSML = substr($remainingSML, $endtagIdx+8);
+	  }
+	} while (length ($remainingSML)>4);
+	return ($newMsg,$remainingSML);
 }
 
 sub OBIS_Parse($$)
@@ -489,19 +549,20 @@ sub OBIS_Parse($$)
 	my ($hash, $buf) = @_;
 	my $name = $hash->{NAME};
 
-	my $buf2=uc(unpack('H*',$buf));
-	if($hash->{MeterType}!~/SML|Unknown/ && $buf2=~m/7701([0-9A-F]*?)01/g) {
-		Log3 $hash, 3, "OBIS ($name) - OBIS_Ext called";
-		my (undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
-		
-	  	my $device_name = "OBIS.".$OBISid;
-  		Log3 $hash,5,"OBIS ($name) - New Devicename: $device_name";
-  		my $def = $modules{OBIS}{defptr}{"$device_name"};
-  		if(!$def) {
-        	Log3 $hash, 3, "OBIS ($name) - Unknown device $device_name, please define it";
-        	return "UNDEFINED $device_name OBIS none Ext $OBISid";
-  		}
-	}
+# gvz Unsure what this is for
+#	my $buf2=uc(unpack('H*',$buf));
+#	if($hash->{MeterType}!~/SML|Unknown/ && $buf2=~m/7701([0-9A-F]*?)01/g) {
+#		Log3 $hash, 3, "OBIS ($name) - OBIS_Ext called";
+#		my (undef,undef,$OBISid,undef)=OBIS_decodeTL($1);
+#		
+#	  	my $device_name = "OBIS.".$OBISid;
+#  		Log3 $hash,5,"OBIS ($name) - New Devicename: $device_name";
+#  		my $def = $modules{OBIS}{defptr}{"$device_name"};
+#  		if(!$def) {
+#        	Log3 $hash, 3, "OBIS ($name) - Unknown device $device_name, please define it";
+#        	return "UNDEFINED $device_name OBIS none Ext $OBISid";
+#  		}
+#	}
 	$hash->{helper}{BUFFER} .= $buf;
 	if (length($hash->{helper}{BUFFER}) >10000) { #longer than 3 messages, this is a traffic jam
 	  	$hash->{helper}{BUFFER}  =substr( $hash->{helper}{BUFFER} , -10000);
@@ -857,51 +918,8 @@ sub OBIS_CRC16($$) {
 	$crc ^= 0xffff;
     $crc = (($crc & 0xff) << 8) | (($crc & 0xff00) >> 8);
 	return $crc2==$crc ? 1 : 0;
-  }
- 
-  
-
-###############################################
-# Input: Whole Datastream, inkl. TL-Byte      #
-# Output: Length, Type, Value, remaining Data #
-###############################################
-sub OBIS_decodeTL {
-	my ($msg)=@_;
-	my $msgLength=0;
-	my $msgType=0;
-	my $lt="";
-	my $tmp="";
-#	Log 3,"In: $msg";
-	if ($msg) {
-		$msgType  =hex(substr($msg,0,2)) & 0b01110000;
-		do {
-			$lt=hex(substr($msg,0,2));
-			$msg=substr($msg,2);
-			$msgLength=($msgLength*16) + ($lt & 0b00001111);
-		} while ($lt & 0b10000000);
-#		Log 3,"Calculated length: $msgLength";
-		if ($msgType == 0b01110000) {
-			for (my $i=0;$i<$msgLength;$i++) {
-				my $tmp2="";
-#				Log 3,"--> $msg";
-				(undef,undef,undef,$msg,$tmp2)=OBIS_decodeTL($msg);
-#				Log 3,"<-- $tmp2 $msg";
-				$tmp.=$tmp2 if (defined $tmp2);
-			}
-			$msgLength-=1;
-		}
-		$msgLength-=1;
-		my $valu;
-		if (length($msg)>$msgLength*2) {
-			$valu=substr($msg,0,$msgLength*2);
-			$tmp.=$valu;
-		$msg=substr($msg,$msgLength*2);
-		}
-#		Log 3,"   Split Msg: $tmp $msg";
-	return $msgLength,$msgType,$valu,$msg,$tmp;
-	};
 }
-
+ 
 1;
 
 =pod
