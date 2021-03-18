@@ -2163,7 +2163,9 @@ FW_fileList($;$)
   my @ret;
   return @ret if(!opendir(DH, $dir));
   while(my $f = readdir(DH)) {
-    next if($f !~ m,^$re$, || $f eq "99_Utils.pm");
+    next if($f !~ m,^$re$, || $f eq "98_FhemTestUtils.pm" || 
+                              $f eq "99_Utils.pm");
+
     push(@ret, $f);
   }
   closedir(DH);
