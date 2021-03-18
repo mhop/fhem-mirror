@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.8.0"  => "18.03.2021  extend commandref, switch to 'stable' ",
   "0.7.7"  => "07.01.2021  avoid FHEM crash if Cache file content is not valid JSON format ",
   "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
   "0.7.5"  => "07.12.2020  minor fix avoid overtakers ",
@@ -2656,20 +2657,39 @@ return $out;
  <ul>
 
   <ul>  
-  <a name="interval"></a>
-  <li><b>interval &lt;Sekunden&gt;</b> <br> 
-  
-    Automatischer Start der internen Queue alle X Sekunden. Alle zum Startzeitpunkt in der Queue enthaltenen Einträge
-    (z.B. mit prepareUpload eingefügt) werden abgearbeitet. Ist "0" angegeben, wird kein automatischer Start 
-    ausgeführt. (default)   
+  <a name="additionalInfo"></a>
+  <li><b>additionalInfo </b> <br> 
+    Legt die zusätzlich anzuzeigenden Eigenschaften beim Abruf von Datei- oder Verzeichnisinformationen fest.  
     
   </li><br>
   </ul>  
   
   <ul>  
-  <a name="loginRetries"></a>
-  <li><b>loginRetries</b> <br> 
+  <a name="excludeFromUpload"></a>
+  <li><b>excludeFromUpload </b> <br> 
+    Die eingetragenen Dateien oder Verzeichnisse werden vom Upload (Übertragung zur Synology Diskstation) ausgeschlossen.
+    Die Angaben werden als Regex ausgewertet. Mehrere Objekte sind durch Komma zu trennen. <br>
+    <b>Hinweis:</b> Dateien/Verzeichnisse mit "@" im Namen werden per default vom Upload ausgeschlossen. <br><br>
+
+    <b>Beispiel: </b> <br>
+    attr &lt;Name&gt; excludeFromUpload ./FHEM/FhemUtils/cacheSSCam.*,./www/SVGcache.*     
+    
+  </li><br>
+  </ul> 
   
+  <ul>  
+  <a name="interval"></a>
+  <li><b>interval &lt;Sekunden&gt;</b> <br>
+    Automatischer Start der internen Queue alle X Sekunden. Alle zum Startzeitpunkt in der Queue enthaltenen Einträge
+    (z.B. mit prepareUpload eingefügt) werden abgearbeitet. Ist "0" angegeben, wird kein automatischer Start 
+    ausgeführt. (default)   
+    
+  </li><br>
+  </ul> 
+  
+  <ul>  
+  <a name="loginRetries"></a>
+  <li><b>loginRetries</b> <br>
     Anzahl der Versuche für das inititiale User login. <br>
     (default: 3)
     
@@ -2733,7 +2753,7 @@ return $out;
     "File Station"
   ],
   "version": "v1.1.1",
-  "release_status": "testing",
+  "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
   ],
