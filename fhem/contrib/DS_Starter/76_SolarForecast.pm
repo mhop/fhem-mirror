@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumtion total in currentMeterdev ",
+  "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDForecastValues ",
+  "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumption total in currentMeterdev ",
   "0.13.0" => "16.03.2021  changed sub forecastGraphic from Wzut ",
   "0.12.0" => "16.03.2021  switch etoday to etotal ",
   "0.11.0" => "14.03.2021  new attr history_hour, beam1Content, beam2Content, implement sub forecastGraphic from Wzut, ".
@@ -1112,6 +1113,9 @@ sub centralTask {
   my $type = $hash->{TYPE};  
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
+  
+  ### nicht mehr benötigte Readings löschen - kann später wieder raus !!
+  deleteReadingspec ($hash, "Today_Hour.*_Consumption");
 
   my $interval = controlParams ($name); 
   
@@ -1339,11 +1343,13 @@ sub _transferDWDForecastValues {
       Log3($name, 2, qq{$name - ERROR - the attribute "forecastProperties" of device "$fcname" must contain: }.join ",",@aneeded);
   }
   
-  # deleteReadingspec ($hash, "NextHour.*");
-  
   for my $num (0..47) {      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
-      last if($fd > 1);
+      
+      if($fd > 1) {                                                                           # überhängende Readings löschen 
+          deleteReadingspec ($hash, "NextHour".$num.".*");
+          next;
+      }
 
       my $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
@@ -1564,7 +1570,6 @@ sub _transferMeterValues {
   
   if($chour =~ /^($tlim)$/x) {
       deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
-      deleteReadingspec ($hash, "Today_Hour.*_Consumption");                                  # kann später wieder raus !!
       delete $hash->{HELPER}{INITCONTOTAL};
   }
   
