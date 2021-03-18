@@ -23,15 +23,10 @@
 
 #
 #   ToDo / Ideas 
-#                   Log levels aufräumen (4-5) got incomplete frame etc.
-#                   obj-xxx-group g-p
-#                   details on requested / combined objects when timeout (store in debug hash key)
-#                   
-#                   limit combine?!!
+#                   limit combine?!! (Max 7d / 125 Register read bzw. 7b write), bei coils read max 7d0, bei write 7b0
 #                   verify that nextOpenDelay is integer and >= 1
 #                   set active results in error when tcp is already open
 #                   enforce nextOpenDelay even if slave immediately closes after open https://forum.fhem.de/index.php/topic,75638.570.html
-#                   rework scanning withot temp attrs
 #                   set generateTestData to create rData hash and calls to is(getEvent...), save config, ...
 #
 #                   when define of relay is modified -> close all open TCP server connection devices to force reconnect and get correct parameters
@@ -277,7 +272,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.00 - 7.2.2021';
+my $Module_Version = '4.4.01 - 18.3.2021';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -2595,13 +2590,18 @@ sub CreateDataObjects {
     OBJLOOP:
     foreach my $obj (@sortedList) {
         my $objCombi = $obj->{objCombi};
-        my @val = unpack ($obj->{unpack}, $obj->{data});      # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
+        my $objData  = $obj->{data};
+
+        $objData = ReverseWordOrder($hash, $objData, $obj->{len}) if (ObjInfo($hash, $objCombi, 'revRegs'));
+        $objData = SwapByteOrder   ($hash, $objData, $obj->{len}) if (ObjInfo($hash, $objCombi, 'bswapRegs'));
+
+        my @val = unpack ($obj->{unpack}, $objData);      # fill @val array in case unpack contains codes for more fields, other elements can be used in expr later.
         if (!defined($val[0])) {                # undefined value as result of unpack -> skip to next object
             my $logLvl = AttrVal($name, 'timeoutLogLevel', 3);
-            Log3 $name, $logLvl, "$name: CreateDataObjects unpack of " . unpack ('H*', $obj->{data}) . " with $obj->{unpack} for $obj->{reading} resulted in undefined value";
+            Log3 $name, $logLvl, "$name: CreateDataObjects unpack of " . unpack ('H*', $objData) . " with $obj->{unpack} for $obj->{reading} resulted in undefined value";
             next OBJLOOP;
         } 
-        Log3 $name, 5, "$name: CreateDataObjects unpacked " . unpack ('H*', $obj->{data}) . " with $obj->{unpack} to " . ReadableArray(\@val);
+        Log3 $name, 5, "$name: CreateDataObjects unpacked " . unpack ('H*', $objData) . " with $obj->{unpack} to " . ReadableArray(\@val);
         arrayEncoding($hash, \@val, ObjInfo($hash, $objCombi, 'decode'), ObjInfo($hash, $objCombi, 'encode'));
         my $val = $val[0];
 
@@ -3470,8 +3470,8 @@ sub PackObj {
             $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);
             Log3 $name, 5, "$name: PackObj padded / cut object to " . unpack ('H*', $dataPart);
             $counter += $len; 
-            
-            $dataPart = ReverseWordOrder($logHash, $dataPart, $len) if ($revRegs && length($dataPart > 3));
+            Log3 $name, 5, "$name: PackObj revRegs = $revRegs, dplen = " . length($dataPart);
+            $dataPart = ReverseWordOrder($logHash, $dataPart, $len) if ($revRegs && length($dataPart) > 3);
             $dataPart = SwapByteOrder($logHash, $dataPart, $len) if ($swpRegs);
             $data .= $dataPart;
         }
@@ -3770,7 +3770,8 @@ sub CreateUpdateHash {
                         Log3 $name, 5, "$name: CreateUpdateList will request $reading because it is part of group $groupNr";
                     } 
                     else {                                      # delay not over and not in a group to be requested
-                        Log3 $name, 5, "$name: CreateUpdateList will skip $reading, delay not over";
+                        my $passed = $now - $lastRead;
+                        Log3 $name, 5, "$name: CreateUpdateList will skip $reading, delay not over (delay $delay, $passed passed)";
                     }
                 }
             }
