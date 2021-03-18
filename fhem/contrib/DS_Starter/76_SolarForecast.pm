@@ -1554,7 +1554,8 @@ sub _transferMeterValues {
   my $type = $hash->{TYPE}; 
   
   if($chour =~ /^($tlim)$/x) {
-      deleteReadingspec ($hash, "Today_Hour.*_Consumption");
+      deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
+      deleteReadingspec ($hash, "Today_Hour.*_Consumption");                                  # kann später wieder raus !!
       delete $hash->{HELPER}{INITCONTOTAL};
   }
   
@@ -1577,7 +1578,7 @@ sub _transferMeterValues {
   my $cdaypast = 0;
   
   for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      $cdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_Consumption", 0);
+      $cdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
   }
   
   my $do = 0;
@@ -1590,7 +1591,7 @@ sub _transferMeterValues {
       }
   }
   elsif (!defined $hash->{HELPER}{INITCONTOTAL}) {
-      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$cdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_Consumption", 0);
+      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$cdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $do = 1;
@@ -1606,7 +1607,7 @@ sub _transferMeterValues {
       }
       
       my $nhour = $chour+1;
-      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_Consumption:".$gctotthishour." Wh";
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridConsumption:".$gctotthishour." Wh";
       $data{$type}{$name}{consumption}{sprintf("%02d",$nhour)} = $gctotthishour;                     # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{gctotthishour} = $gctotthishour;
@@ -3731,8 +3732,8 @@ werden weitere SolarForecast Devices zugeordnet.
        
        <a name="numHistDays"></a>
        <li><b>numHistDays </b><br>
-         Anzahl der vergangenen Tage die zur Durchschnittsermittlung von PV Erzeugung und PV Vorhersage aus den historischen 
-         Daten verwendet werden. Diese Werte dienen zur automatischen Vorhersageanpassung sofern verwendet. <br>
+         Anzahl der vergangenen Tage (historische Daten) die zur Autokorrektur der PV Vorhersage verwendet werden sofern
+         aktiviert. <br>
          (default: 7)
        </li>
        <br>
