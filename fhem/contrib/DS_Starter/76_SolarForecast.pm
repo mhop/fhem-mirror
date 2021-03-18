@@ -168,13 +168,14 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data         => { fn => \&_getdata,          needcred => 0 },
-  html         => { fn => \&_gethtml,          needcred => 0 },
-  ftui         => { fn => \&_getftui,          needcred => 0 },
-  pvHistory    => { fn => \&_getlistPVHistory, needcred => 0 },
-  pvReal       => { fn => \&_getlistPVReal,    needcred => 0 },
-  weatherData  => { fn => \&_getlistWeather,   needcred => 0 },
-  stringConfig => { fn => \&_getstringConfig,  needcred => 0 },
+  data         => { fn => \&_getdata,           needcred => 0 },
+  html         => { fn => \&_gethtml,           needcred => 0 },
+  ftui         => { fn => \&_getftui,           needcred => 0 },
+  pvHistory    => { fn => \&_getlistPVHistory,  needcred => 0 },
+  pvReal       => { fn => \&_getlistPVReal,     needcred => 0 },
+  pvForecast   => { fn => \&_getlistPVForecast, needcred => 0 },
+  weatherData  => { fn => \&_getlistWeather,    needcred => 0 },
+  stringConfig => { fn => \&_getstringConfig,   needcred => 0 },
 );
 
 my %hff = (                                                                                           # Flächenfaktoren 
@@ -330,7 +331,7 @@ my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{pvfc}                                                      # PV forecast Ringspeicher
 # $data{$type}{$name}{weather}                                                   # Weather forecast Ringspeicher
-# $data{$type}{$name}{pvreal}                                                    # PV real
+# $data{$type}{$name}{pvreal}                                                    # PV real Ringspeicher
 # $data{$type}{$name}{current}                                                   # current values
 # $data{$type}{$name}{pvhist}                                                    # historische Werte pvreal, pvforecast, gridconsumtion                  
 
@@ -846,6 +847,7 @@ sub Get {
   my $getlist = "Unknown argument $opt, choose one of ".
                 "data:noArg ".
                 "html:noArg ".
+                "pvForecast:noArg ".
                 "pvHistory:noArg ".
                 "pvReal:noArg ".
                 "stringConfig:noArg ".
@@ -930,6 +932,21 @@ sub _getlistPVReal {
   my $type  = $hash->{TYPE};
   
   my $ret   = listDataPool ($hash, "pvreal");
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter listPVForecast
+###############################################################
+sub _getlistPVForecast {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  
+  my $ret   = listDataPool ($hash, "pvfc");
                     
 return $ret;
 }
@@ -1365,8 +1382,8 @@ sub _transferDWDForecastValues {
       }
       
       my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
-      $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;                       # Hilfshash Wert PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-      
+      $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv if($num < 24);         # Hilfshash Wert PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
       
@@ -1402,6 +1419,7 @@ sub _transferWeatherValues {
   my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
   return if(!$fcname || !$defs{$fcname});
   
+  my $type = $hash->{TYPE};
   my ($time_str,$epoche);
   
   my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
@@ -1454,10 +1472,12 @@ sub _transferWeatherValues {
       $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
       $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
       
-      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;           # Hilfshash Wert Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
-      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
-      $data{$hash->{TYPE}}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
+      if($num < 24) {
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  # Hilfshash Wert Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
+      }
   }
       
 return;
@@ -3032,6 +3052,16 @@ sub listDataPool {
           $sq .= $idx." => ".$data{$type}{$name}{pvreal}{$idx}."\n";             
       }
   }
+  
+  if ($htol eq "pvfc") {
+      $h = $data{$type}{$name}{pvfc};
+      if (!keys %{$h}) {
+          return qq{PV forecast cache is empty.};
+      }
+      for my $idx (sort{$a<=>$b} keys %{$h}) {
+          $sq .= $idx." => ".$data{$type}{$name}{pvfc}{$idx}."\n";             
+      }
+  }
       
 return $sq;
 }
@@ -3505,7 +3535,7 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvReal"></a>
       <li><b>pvReal </b> <br>  
-      Listet die ermittelten PV Werte des Ringwertzählers der letzten 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
+      Listet die im Ringspeicher vorhandenen PV Erzeugungswerte der letzten 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
       des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
       </li>      
     </ul>
@@ -3514,7 +3544,7 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="weatherData"></a>
       <li><b>weatherData </b> <br>  
-      Listet die ermittelten Wetterdaten des Ringwertzählers der letzten 24h auf. Die Stundenangaben beziehen sich auf den 
+      Listet die im Ringspeicher vorhandenen Wetterdaten der letzten 24h auf. Die Stundenangaben beziehen sich auf den 
       Beginn der Stunde, z.B. bezieht sich die Angabe 09 auf die Zeit von 09:00-10:00. 
       </li>      
     </ul>
