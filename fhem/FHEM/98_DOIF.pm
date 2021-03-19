@@ -4314,6 +4314,7 @@ sub bar
   my ($format,$value);
   my ($ic,$iscale,$ix,$iy,$rotate);
   my $minCol=$minColor;
+  my $ypos;
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4328,7 +4329,13 @@ sub bar
   } 
   
   $unit="" if (!defined $unit);
-  $bheight=60 if (!defined $bheight);
+  if (!defined $bheight) {
+    if (defined ($icon)) {
+      $bheight=80;
+    } else {
+      $bheight=60;
+    }
+  }  
   my $height=$bheight-10;
  
   if (!defined $header or $header eq "") {
@@ -4344,6 +4351,8 @@ sub bar
   $max=100 if (!defined $max);
   
   $dec=1 if (!defined $dec);
+  
+  $ypos=int(($height-44)/3+10);
 
   ($format,$value,$val)=format_value($val,$min,$dec);
 
@@ -4388,9 +4397,9 @@ sub bar
       $ix=$bwidth/2+5;
     };
     if (defined ($iy)) {
-      $iy+=($height/2-12);
+      $iy+=$ypos;
     } else {
-      $iy=($height/2-12);
+      $iy=$ypos;
     };
     $rotate=0 if (!defined $rotate);
     $iscale=1 if (!defined $iscale);
@@ -4448,13 +4457,31 @@ sub bar
   }
   my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
   
-  if (defined $valDec) {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unitformat,$unit);
+  
+  if ($bheight>=80 or !defined ($icon) and $bheight >= 50) {
+    if (defined $valDec) {
+      $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan></text>',
+             $bwidth/2+15,(defined ($icon) ? $ypos+38:$ypos+20),color($currColor,$ln),$fontformat,$valInt,$valDec);
+ 
+      $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:10px;%s">%s</tspan></text>',
+             $bwidth/2+15,(defined ($icon) ? $ypos+49:$ypos+31),color($currColor,$ln),$unitformat,$unit);
+    } else {
+      $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan></text>',
+             $bwidth/2+15,(defined ($icon) ? $ypos+38:$ypos+20),color($currColor,$ln),$fontformat,$valInt);
+      
+      $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:10px;%s">%s</tspan></text>',
+             $bwidth/2+15,(defined ($icon) ? $ypos+49:$ypos+31),color($currColor,$ln),$unitformat,$unit);
+    }
   } else {
-    $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
-           $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unitformat,$unit);
+    if (defined $valDec) {
+      $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
+             $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$valDec,$unitformat,$unit);
+    } else {
+      $out.= sprintf('<text text-anchor="end" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan><tspan dx="2" style="font-size:10px;%s">%s</tspan></text>',
+             $bwidth+6,(defined ($icon) ? $height/2+25:$height/2+12),color($currColor,$ln),$fontformat,$valInt,$unitformat,$unit);
+    }
   }
+  
   $out.= '</g>';
  	$out.= '</svg>';
 return ($out);
