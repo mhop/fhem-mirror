@@ -1479,11 +1479,11 @@ sub _transferWeatherValues {
           $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
       }
       
-      if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
+      if($num < 24 && $fh < 24) {                                                      # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{id}         = $wid;                  
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{txt}        = $txt;   
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{cloudcover} = $neff;
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{rainprob}   = $r101;
       }
   }
       
