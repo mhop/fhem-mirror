@@ -1454,7 +1454,7 @@ sub _transferWeatherValues {
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
       my $r101  = ReadingsNum($fcname, "fc${fd}_${fh}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
       
-      my $fhstr = sprintf "%02d", $fh;
+      my $fhstr = sprintf "%02d", $fh-1;
       
       if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {         # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
           $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
@@ -1479,7 +1479,7 @@ sub _transferWeatherValues {
           $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
       }
       
-      if($num < 24 && $fh < 24) {                                                      # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      if($num < 24 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{id}         = $wid;                  
           $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{txt}        = $txt;   
           $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{cloudcover} = $neff;
