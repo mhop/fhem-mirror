@@ -4392,9 +4392,9 @@ sub bar
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
     if (defined ($ix)) {
-      $ix+=$bwidth/2+5;
+      $ix+=$bwidth/2+3;
     } else {
-      $ix=$bwidth/2+5;
+      $ix=$bwidth/2+3;
     };
     if (defined ($iy)) {
       $iy+=$ypos;
