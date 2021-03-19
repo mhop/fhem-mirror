@@ -1392,8 +1392,8 @@ sub _transferDWDForecastValues {
           push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                       # Zeit fortschreiben
       }
       
-      if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
+      if($num < 24 && $fh < 24) {                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+          $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh+1)} = $calcpv;
       } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
