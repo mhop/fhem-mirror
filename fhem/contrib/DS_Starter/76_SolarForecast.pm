@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.15.2" => "19.03.2021  some bug fixing ",
   "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
   "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDForecastValues ",
   "0.14.0" => "17.03.2021  new getter PVReal, weatherData, consumption total in currentMeterdev ",
@@ -1132,7 +1133,10 @@ sub centralTask {
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   
-  ### nicht mehr benötigte Readings löschen - kann später wieder raus !!
+  ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
+  for my $i (keys %{$data{$type}{$name}{pvhist}}) {
+      delete $data{$type}{$name}{pvhist}{$i}{"00"};
+  }
   deleteReadingspec ($hash, "Today_Hour.*_Consumption");
   deleteReadingspec ($hash, "ThisHour_.*");
   deleteReadingspec ($hash, "Today_PV");
@@ -1367,8 +1371,9 @@ sub _transferDWDForecastValues {
   for my $num (0..47) {      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
+      my $num1 = $num-1;
       if($fd > 1) {                                                                           # überhängende Readings löschen 
-          deleteReadingspec ($hash, "NextHour".$num.".*");
+          deleteReadingspec ($hash, "NextHour".$num1.".*");
           next;
       }
 
@@ -1376,22 +1381,27 @@ sub _transferDWDForecastValues {
       
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
-      $time_str = "NextHour".sprintf "%02d", $num;
-      $epoche   = $t + (3600*$num);
+      if ($num1 >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num1;
+          $epoche   = $t + (3600*$num1);
+      }
       
       my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
-      $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv if($num < 24);         # Hilfshash Wert PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
 
+      if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+          $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
+      }
+      
       push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
       push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";         
+          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";             
       }
       
-      if($fd == 0) {
+      if($fd == 0 && $fh) {
           $paref->{calcpv}   = $calcpv;
           $paref->{histname} = "pvfc";
           $paref->{nhour}    = sprintf("%02d",$fh);
@@ -1439,8 +1449,12 @@ sub _transferWeatherValues {
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
       
-      $time_str = "NextHour".sprintf "%02d", $num;
-      $epoche   = $t + (3600*$num);
+      my $num1 = $num-1;
+      
+      if ($num1 >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num1;
+          $epoche   = $t + (3600*$num1);
+      }
 
       my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  -1);
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
@@ -1464,8 +1478,8 @@ sub _transferWeatherValues {
       $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
       $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
       
-      if($num < 24) {
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  # Hilfshash Wert Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
@@ -3516,10 +3530,10 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvHistory"></a>
       <li><b>pvHistory </b> <br>  
-      Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und der Stunde des jeweiligen 
-      Tages auf.
+      Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und Stunde. 
+      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr. 
       Dabei sind <b>pvreal</b> der reale PV Ertrag, <b>pvforecast</b> der prognostizierte PV Ertrag und <b>gridcon</b> 
-      der Netzbezug der jeweiligen Stunde.
+      der Netzbezug der jeweiligen Stunde. 
       </li>      
     </ul>
     <br>
@@ -3527,8 +3541,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvForecast"></a>
       <li><b>pvForecast </b> <br>  
-      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. Die Stundenangaben beziehen sich auf den
-      Beginn der Stunde, z.B. bezieht sich 09 auf die Zeit von 08:00-09:00. 
+      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. 
+      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
       </li>      
     </ul>
     <br>
@@ -3536,8 +3550,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvReal"></a>
       <li><b>pvReal </b> <br>  
-      Listet die im Ringspeicher vorhandenen PV Erzeugungswerte der letzten 24h auf. Die Stundenangaben beziehen sich auf die Stunde 
-      des Tages, z.B. Stunde 09 ist die Zeit von 08:00-09:00. 
+      Listet die im Ringspeicher vorhandenen PV Erzeugungswerte der letzten 24h auf.
+      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.
       </li>      
     </ul>
     <br>
@@ -3545,8 +3559,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="weatherData"></a>
       <li><b>weatherData </b> <br>  
-      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf. Die Stundenangaben beziehen sich auf den
-      Beginn der Stunde, z.B. bezieht sich 09 auf die Zeit von 08:00-09:00. 
+      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf.
+      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.
       </li>      
     </ul>
     <br>
