@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  48_BlinkCamera: Change to new Blink login API / add resetUniqueID
  - change:  47_OBIS: redesign of parser (major change)
  - bugfix:  57_Calendar: avoid spurious re-creation of all events
  - bugfix:  49_IPCAM: not sending events for sequential snapshots fixed
