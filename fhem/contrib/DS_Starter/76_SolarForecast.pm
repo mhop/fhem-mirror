@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
   "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
   "0.15.0" => "18.03.2021  delete overhanging readings in sub _transferDWDForecastValues ",
@@ -1186,8 +1187,8 @@ sub centralTask {
       Log3 ($name, 5, "$name - ################################################################");
       Log3 ($name, 5, "$name - current hour: $chour");
       
-      _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen 
-      _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen 
+      _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
+      _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
 
@@ -1381,7 +1382,7 @@ sub _transferDWDForecastValues {
       
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
-      my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
+      my $calcpv = calcPVforecast ($name, $v, $num);                                          # Vorhersage gewichtet kalkulieren
       
       if ($num1 >= 0) {
           $time_str = "NextHour".sprintf "%02d", $num1;
@@ -2750,7 +2751,7 @@ sub calcPVforecast {
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh), 1        );       # Korrekturfaktor für die Stunde des Tages
-  
+
   my $pvsum  = 0;  
   
   for my $st (@strings) {                                                                       # für jeden String der Config ..
@@ -2761,7 +2762,6 @@ sub calcPVforecast {
       my $af     = $hff{$ta}{$moddir} / 100;                                                    # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
       $hc        = 1 if(1*$hc == 0);
       
-      # pv (Wh)  = G * f * 0.00027778 (kWh/m2) / 1 kW/m2 * Pnenn (kW) * PR * Korr * 1000
       my $pv   = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf * 1000);
   
       my $lh = {                                                                                # Log-Hash zur Ausgabe
