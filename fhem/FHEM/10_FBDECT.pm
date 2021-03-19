@@ -401,6 +401,7 @@ my %fbhttp_readings = (
    power           => 'sprintf("power:%.2f W", $val/1000)',
    present         => '"present:".($val?"yes":"no")',
    productname     => '"FBTYPE:$val"',
+   rel_humidity    => '"rel_humidity:$val %"',
    state           => '"state:".($val?"on":"off")',
    voltage         => 'sprintf("voltage:%.3f V", $val/1000)',
 #  tist => 'sprintf("temperature:%.1f C (measured)", $val/2)', # Forum #57644
