@@ -1381,19 +1381,19 @@ sub _transferDWDForecastValues {
       
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
       
+      my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
+      
       if ($num1 >= 0) {
           $time_str = "NextHour".sprintf "%02d", $num1;
           $epoche   = $t + (3600*$num1);
+          
+          push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
+          push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                       # Zeit fortschreiben
       }
       
-      my $calcpv = calcPVforecast ($name, $v, $fh);                                           # Vorhersage gewichtet kalkulieren
-
       if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
-      }
-      
-      push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-      push @$daref, "${time_str}_Time:"      .TimeAdjust ($epoche);                           # Zeit fortschreiben 
+      } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
@@ -1448,13 +1448,6 @@ sub _transferWeatherValues {
   for my $num (0..47) {                      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
-      
-      my $num1 = $num-1;
-      
-      if ($num1 >= 0) {
-          $time_str = "NextHour".sprintf "%02d", $num1;
-          $epoche   = $t + (3600*$num1);
-      }
 
       my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  -1);
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
@@ -1473,10 +1466,17 @@ sub _transferWeatherValues {
 
       Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
-      $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
-      $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
-      $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
-      $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
+      my $num1 = $num-1;
+      
+      if ($num1 >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num1;
+          $epoche   = $t + (3600*$num1);
+      
+          $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
+          $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
+          $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
+          $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
+      }
       
       if($num < 24 && $fh && $fh < 24) {                                                      # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
