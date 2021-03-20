@@ -4462,16 +4462,16 @@ sub bar
   if ($bheight>=75 or !defined ($icon) and $bheight >= 50) {
     if (defined $valDec) {
       $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></tspan></text>',
-             $bwidth/2+15,(defined ($icon) ? $ypos+23:$ypos+5),color($currColor,$ln),$fontformat,$valInt,$valDec);
+             $bwidth/2+15,(defined ($icon) ? $ypos+24:$ypos+5),color($currColor,$ln),$fontformat,$valInt,$valDec);
  
       $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:10px;%s">%s</tspan></text>',
-             $bwidth/2+15,(defined ($icon) ? $ypos+34:$ypos+16),color($currColor,$ln),$unitformat,$unit);
+             $bwidth/2+15,(defined ($icon) ? $ypos+35:$ypos+16),color($currColor,$ln),$unitformat,$unit);
     } else {
       $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:16px;font-weight:bold;%s">%s</tspan></text>',
-             $bwidth/2+15,(defined ($icon) ? $ypos+23:$ypos+5),color($currColor,$ln),$fontformat,$valInt);
+             $bwidth/2+15,(defined ($icon) ? $ypos+24:$ypos+5),color($currColor,$ln),$fontformat,$valInt);
       
       $out.= sprintf('<text text-anchor="middle" x="%d" y="%d" style="fill:%s"><tspan style="font-size:10px;%s">%s</tspan></text>',
-             $bwidth/2+15,(defined ($icon) ? $ypos+34:$ypos+16),color($currColor,$ln),$unitformat,$unit);
+             $bwidth/2+15,(defined ($icon) ? $ypos+35:$ypos+16),color($currColor,$ln),$unitformat,$unit);
     }
   } else {
     if (defined $valDec) {
