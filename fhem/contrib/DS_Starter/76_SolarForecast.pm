@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.17.0" => "20.03.2021  new attr cloudFactorSlope, fixes in Graphic sub ",
+  "0.17.0" => "20.03.2021  new attr cloudFactorSlope / rainFactorSlope, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
@@ -390,6 +390,7 @@ sub Initialize {
                                 "maxVariancePerDay ".
                                 "maxPV ".
                                 "numHistDays:$cda ".
+                                "rainFactorSlope:slider,0,1,100 ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
                                 "showLink:1,0 ".
@@ -2762,14 +2763,15 @@ sub calcPVforecast {
   my $chour = strftime "%H", localtime($t+($num*3600));                                         # aktuelle Stunde
   my $reld  = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my $cloudslope = AttrVal($name, "cloudFactorSlope", $clslopedef);                      # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $cloudslope = AttrVal($name, "cloudFactorSlope", $clslopedef);                             # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $rainslope  = AttrVal($name, "rainFactorSlope", $rslopedef);                               # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
   my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_CloudCover"} // 0;         # effektive Wolkendecke
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                     # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                   # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_RainProb"} // 0;           # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rslopedef/100);                             # Rain Correction Faktor mit Steilheit
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                       # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$num), 1);              # Korrekturfaktor für die Stunde des Tages
@@ -2796,6 +2798,7 @@ sub calcPVforecast {
           "Cloudfactor"              => $ccf,
           "Rainprob"                 => $rainprob,
           "Rainfactor"               => $rcf,
+          "RainFactorSlope"          => $rainslope." %",
           "pvCorrectionFactor"       => $hc,
           "Radiation"                => $rad,
           "Factor kJ to kWh"         => $kJtokWh,
@@ -3699,7 +3702,7 @@ werden weitere SolarForecast Devices zugeordnet.
        
        <a name="cloudFactorSlope"></a>
        <li><b>cloudFactorSlope </b><br>
-         Prozentuale Berücksichtigung (Steilheit) der Bewölkung bei der solaren Ertragsermittlung. <br>
+         Prozentuale Berücksichtigung (Steilheit) der Bewölkung bei der solaren Vorhersage. <br>
          Höhere Werte vermindern tendenziell den prognostizierten PV Ertrag, kleinere Werte erhöhen den prognostizierten PV 
          Ertrag tendenziell.<br>
          (default: 45)         
@@ -3826,6 +3829,15 @@ werden weitere SolarForecast Devices zugeordnet.
          (default: 7)
        </li>
        <br>
+       
+       <a name="rainFactorSlope"></a>
+       <li><b>rainFactorSlope </b><br>
+         Prozentuale Berücksichtigung (Steilheit) der Regenprognose bei der solaren Vorhersage. <br>
+         Höhere Werte vermindern tendenziell den prognostizierten PV Ertrag, kleinere Werte erhöhen den prognostizierten PV 
+         Ertrag tendenziell.<br>
+         (default: 20)         
+       </li>  
+       <br> 
    
        <a name="showDiff"></a>
        <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
