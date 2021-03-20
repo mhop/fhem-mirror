@@ -43,6 +43,7 @@ use warnings;
 sub TA_CMI_JSON_Initialize {
   my ($hash) = @_;
 
+  $hash->{SetFn}     = "TA_CMI_JSON::Set";
   $hash->{GetFn}     = "TA_CMI_JSON::Get";
   $hash->{DefFn}     = "TA_CMI_JSON::Define";
   $hash->{UndefFn}   = "TA_CMI_JSON::Undef";
@@ -135,7 +136,7 @@ BEGIN {
     ))
 };
 
-sub Define {
+sub Define($$) {
   my ( $hash, $def ) = @_;
   my @a = split( "[ \t][ \t]*", $def );
  
@@ -164,7 +165,7 @@ sub Define {
   return undef;
 }
 
-sub Notify {
+sub Notify($$) {
   my ($own_hash, $dev_hash) = @_;
   my $ownName = $own_hash->{NAME}; # own name / hash
  
@@ -179,7 +180,7 @@ sub Notify {
 
 }
 
-sub SetupIntervals {
+sub SetupIntervals($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
@@ -200,14 +201,14 @@ sub SetupIntervals {
 
 }
 
-sub GetStatus {
+sub GetStatus($) {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
   PerformHttpRequest($hash);
 }
 
-sub Undef {
+sub Undef($$) {
   my ($hash, $arg) = @_; 
   my $name = $hash->{NAME};
 
@@ -217,13 +218,13 @@ sub Undef {
   return undef;
 }
 
-sub PerformHttpRequest {
-    my ($hash, $def) = @_;
+sub PerformHttpRequest($) {
+    my ($hash) = @_;
     my $name = $hash->{NAME};
     
     my $queryParam = $hash->{QUERYPARAM};
     $queryParam = '' unless defined $queryParam;
-    my $url = "http://$hash->{CMIURL}/INCLUDE/api.cgi?jsonnode=$hash->{NODEID}&jsonparam=$queryParam";
+    my $url = "http://$hash->{CMIURL}/INCLUDE/api.cgi?jsonnode=$hash->{NODEID}&jsonparam=$queryParam"."&_=".gettimeofday();
     my $username = AttrVal($name, 'username', 'admin');
     my $password = AttrVal($name, 'password', 'admin');
 
@@ -238,10 +239,11 @@ sub PerformHttpRequest {
                     callback   => \&ParseHttpResponse
                 };
 
+    Log3 $name, 4, "TA_CMI_JSON ($name) - PerformHttpRequest $url";
     HttpUtils_NonblockingGet($param);
 }
 
-sub ParseHttpResponse {
+sub ParseHttpResponse($$$) {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
@@ -311,17 +313,17 @@ sub ParseHttpResponse {
   return undef;
 }
 
-sub extractDeviceName {
+sub extractDeviceName($) {
     my ($input) = @_;
     return (defined($deviceNames{$input}) ? $deviceNames{$input} : 'unknown: ' . $input);
 }
 
-sub extractVersion {
+sub extractVersion($) {
     my ($input) = @_;
     return (defined($versions{$input}) ? $versions{$input} : 'unknown: ' . $input);
 }
 
-sub extractReadings {
+sub extractReadings($$$$) {
   my ( $hash, $keyValues, $id, $dataKey ) = @_;
   my $name = $hash->{NAME};
 
@@ -370,7 +372,80 @@ sub extractReadings {
   return undef;
 }
 
-sub Get {
+sub Set($$$@) {
+  my ( $hash, $name, $opt, @arg) = @_;
+
+  Log3 $name, 5, "TA_CMI_JSON ($name) - Set: $name $opt ".join(' ', @arg);
+
+  if ($opt eq 'fixwertAnalog' || $opt eq 'fixwertDigital') {
+    
+    my $index = $arg[0];
+    my $value = $arg[1];
+
+    my $type;
+    if ($opt eq 'fixwertAnalog') {
+      $type = 'D1';
+    } else {
+      $type = '1f';
+    }
+
+    FixwertChangeRequest($hash, $index, $value, $type);
+
+    return undef;
+  }
+
+  return 'fixwertAnalog fixwertDigital';
+}
+
+sub FixwertChangeRequest($$$$) {
+    my ($hash, $index, $value, $type) = @_;
+    my $name = $hash->{NAME};
+    my $nodeId = $hash->{NODEID};
+    my $cmiIp = $hash->{CMIURL};
+
+    my $hexNodeId = sprintf('%1x',$nodeId);
+    $hexNodeId = "0$hexNodeId" unless length($hexNodeId) == 2;
+
+    $index--; #1 on the Web UI is index 0. 2 is 1, etc.
+    my $hexIndex = sprintf('%1x',$index);
+    $hexIndex = "0$hexIndex" unless length($hexIndex) == 2;
+    
+    my $referrer = "Referer: http://$cmiIp/menupagex.cgi?nodex2=".$hexNodeId."005800";
+    my $url = "http://$cmiIp/INCLUDE/change.cgi?changeadrx2=".$hexNodeId."00".$hexIndex."4414".$type."01&changetox2=".$value."&_=".gettimeofday();
+    my $username = AttrVal($name, 'username', 'admin');
+    my $password = AttrVal($name, 'password', 'admin');
+
+    my $param = {
+                    url        => "$url",
+                    timeout    => 5,
+                    hash       => $hash,
+                    method     => "GET",
+                    header     => $referrer,
+                    user       => $username,
+                    pwd        => $password,
+                    callback   => \&FixwertChangeRequest_Callback
+                };
+
+    Log3 $name, 4, "TA_CMI_JSON ($name) - FixwertChangeRequest $url";
+    HttpUtils_NonblockingGet($param);
+}
+
+sub FixwertChangeRequest_Callback {
+my ($param, $err, $data) = @_;
+  my $hash = $param->{hash};
+  my $name = $hash->{NAME};
+
+  if($err ne "") {
+    Log3 $name, 0, "TA_CMI_JSON ($name) - error while calling ".$param->{url}." - $err";
+
+  } elsif($data ne "") {
+    Log3 $name, 5, "TA_CMI_JSON ($name) - FixwertChangeRequest_Callback: $data";
+  }
+
+  return undef;
+}
+
+sub Get($$$$) {
   my ( $hash, $name, $opt, $args ) = @_;
 
   if ("update" eq $opt) {
@@ -387,14 +462,14 @@ sub Get {
   return "Unknown argument $opt, choose one of update readOutputStates";
 }
 
-sub RequestOutputStates {
+sub RequestOutputStates($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $nodeId = $hash->{NODEID};
     my $hexNodeId = sprintf('%1x',$nodeId);
     $hexNodeId = "0$hexNodeId" unless length($hexNodeId) == 2;
 
-    my $url = "http://$hash->{CMIURL}/INCLUDE/agx2.cgi?nodex2=$hexNodeId";
+    my $url = "http://$hash->{CMIURL}/INCLUDE/agx2.cgi?nodex2=$hexNodeId"."&_=".gettimeofday();
     my $username = AttrVal($name, 'username', 'admin');
     my $password = AttrVal($name, 'password', 'admin');
 
@@ -413,7 +488,7 @@ sub RequestOutputStates {
     HttpUtils_NonblockingGet($param);
 }
 
-sub ParseOutputStateResponse {
+sub ParseOutputStateResponse($$$) {
   my ($param, $err, $data) = @_;
   my $hash = $param->{hash};
   my $name = $hash->{NAME};
@@ -471,90 +546,6 @@ sub ParseOutputStateResponse {
   return undef;
 }
 
-my $counter = 0;
-
-sub DetailFn {
-  my $css = '<style>
-#headag{
-	float:left;
-	border-right:solid 1px black;
-	cursor:pointer;
-}
-.headag{
-	color:grey;
-	padding-bottom:4px;
-	display:inline-block;
-	min-width:11px;
-	position:relative;
-}
-.agmisch{
-	display:inline;
-	font-size:0.8em;
-	margin-right:-0.3em;
-	position:relative;
-	width:0;
-}
-.headagshow{
-	color:black;
-}
-.headag > .hand{
-	width:100%;
-	position:absolute;
-	left:0px;
-	bottom:0px;
-	height:8px;
-}
-.hand img{
-	margin-left:auto;
-	margin-right:auto;
-	display:block;
-	width:11px;
-	height:7px;
-}
-.Auto-On,.Manual-On{
-	background:#00f000;
-	border:#000 solid 1px;
-	border-radius:2px;
-}
-.Manual-Off{
-        background-color:lightgray;
-}
-</style>';
-
-
-my $html = '
-<div id="headag" fadresse="10045800">
-<span id="headag1" class="headag headagshow">1</span>
-<span id="headag2" class="headag headagshow">2</span>
-<span id="headag3" class="headag headagshow">3</span>
-<span id="headag4" class="headag">'.$counter.'</span>
-<span id="headag5" class="headag headagshow">5</span>
-<span id="headag6" class="headag headagshow">6</span>
-<span id="headag7" class="headag headagshow on">7</span>
-<span id="headag8" class="headag headagshow">8</span>
-<span id="headag9" class="headag headagshow on">9</span>
-<span id="headag10" class="headag headagshow on">10</span>
-<span id="headag11" class="headag">11</span>
-<span id="headag12" class="headag headagshow">12</span>
-<span id="headag13" class="headag headagshow">13</span>
-<span id="headag14" class="headag">14</span>
-<span id="headag15" class="headag">15</span>
-<span id="headag16" class="headag">16</span>
-</div>
-';
-
-$counter++;
-
-#InternalTimer( gettimeofday() + $hash->{INTERVAL}, $functionName, $hash, 0 );
-
-  return $css.$html;
-}
-
-#sub DirectNotify {
-#  my ($filter,$fhemweb_instance,
-#}
-
-
 # Eval-Rückgabewert für erfolgreiches
 # Laden des Moduls
 1;
@@ -589,7 +580,18 @@ $counter++;
   </ul>
   <br><br>
   
-    <a name="TA_CMI_JSONget"></a>
+  <a name="TA_CMI_JSONset"></a>
+  <b>Set</b>
+  <ul>
+    <li><code>fixwertAnalog</code><br>Set Fixwert to an analog value. Example:<br>
+    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code></ul>
+    </li>
+    <li><code>fixwertDigital</code><br>Set Fixwert to a digital value. Also works for impulse values. Example:<br>
+    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code></ul>
+    </li>
+  </ul>
+
+  <a name="TA_CMI_JSONget"></a>
   <b>Get</b>
   <ul>
     <li><code>update</code><br>Triggers querying of values from the CMI. Please note that the request rate is limited to one query per minute.
@@ -649,7 +651,18 @@ Weitere Informationen zu diesem Modul im <a href="https://wiki.fhem.de/wiki/UVR1
   </ul>
   <br><br>
   
-    <a name="TA_CMI_JSONget"></a>
+  <a name="TA_CMI_JSONset"></a>
+  <b>Set</b>
+  <ul>
+    <li><code>fixwertAnalog</code><br>Setzt einen Fixwert auf einen analogen Wert. Beispiel:<br>
+    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code></ul>
+    </li>
+    <li><code>fixwertDigital</code><br>Setzt einen Fixwert auf einen digitalen Wert. Funktioniert auch für Impulse. Beispiel:<br>
+    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code></ul>
+    </li>
+  </ul>
+
+  <a name="TA_CMI_JSONget"></a>
   <b>Get</b>
   <ul>
     <li><code>update</code><br>Hiermit kann sofort eine Abfrage der API ausgef&uuml;hrt werden. Das Limit von einer Anfrage pro Minute besteht trotzdem.

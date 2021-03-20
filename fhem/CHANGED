@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - feature: 72_TA_CMI_JSON: added set fixwertAnalog fixwertDigital
  - change:  70_ZoneMinder: made Crypt dependency for v 1.30 optional
  - change:  48_BlinkCamera: Change to new Blink login API / add resetUniqueID
  - change:  47_OBIS: redesign of parser (major change)
