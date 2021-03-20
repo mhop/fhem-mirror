@@ -1868,7 +1868,7 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
 
 %culHmChanSets = (
                       "HM-CC-TC00"           =>{ "desired-temp" => "(on|off|6.0..30.0;0.5)"
-                                                ,statusRequest  => ""
+#                                                ,statusRequest  => ""
                                                 ,sysTime        => ""
 #                                                ,getSerial      => ""
                                                }
@@ -1969,15 +1969,15 @@ $culHmModelSets{"HM-HM-LC-DW-WM"}        = $culHmSubTypeSets{dimmer};   ##### re
                                                 ,statusRequest  =>""
                                                 ,peerIODev      =>"[IO] -btn- [({set}|unset)] 'not for future use'"
                                                }
-                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"'bright:'(0..100;1|{100}) 'colVal:' (0..100;1|{100}) [(-ontime-|{})] [(-ramp-|{})]"
+                     ,"HM-LC-RGBW-WM02"      =>{ brightCol      =>"'bright:' (0..100;0.5|{100}) 'colVal:' (0..100;1|{100}) [(-ontime-|{})] [(-ramp-|{})]"
                                                 ,color          =>"(0..100;1|{100})"
                                                 ,on             =>""
                                                 ,off            =>""
                                                 ,up             =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                                 ,down           =>"'change:'[(0..100;1|{10})] [(-ontime-|{})] [(-ramptime-|{})]"
                                                }
-                     ,"HM-LC-RGBW-WM03"      =>{ brightAuto     =>"-bright- -colProg- [(-min-|{})] [(-max-|{})] [(-ontime-|{})] [(-ramp-|{})]"
-                                                ,colProgram     =>"[(0..255;1|{0})]"
+                     ,"HM-LC-RGBW-WM03"      =>{ colProgram     =>"(0..255;1|{0})"                                           
+                                                ,brightAuto     =>"'bright:' (0..100;0.5|{100}) 'colProg:' [(0..255;1|{0})] 'min:' [(0..255;1|{0})] 'max:' [(0..255;1|{255})] [(-ontime-|{0})] [(-ramp-|{5})]"
                                                }
                      ,"HM-SEC-SIR-WM01"      =>{ on             =>""
                                                 ,off            =>""
