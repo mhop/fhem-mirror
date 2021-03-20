@@ -5685,7 +5685,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "please enter the duration in seconds"
           if (defined $duration && $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     return "at least bright and colorprogramm need to be set" if (!defined $colProg);
-    
+
+    $bright = int($bright*2);
     my $tval;
     $tval = (!defined $duration) ? "" : CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     $ramp = (!defined $ramp)     ? "" : CUL_HM_encodeTime16($ramp)    ;
