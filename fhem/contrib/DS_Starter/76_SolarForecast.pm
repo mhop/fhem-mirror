@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.17.0" => "20.03.2021  new attr cloudFactorSlope, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
@@ -326,10 +327,10 @@ my $calcmaxd    = 7;                                                            
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $cloudslope  = 45;                                                            # Steilheit (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $clslopedef  = 45;                                                            # Steilheit (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rainslope   = 20;                                                            # Steilheit (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rslopedef   = 20;                                                            # Steilheit (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
@@ -374,6 +375,7 @@ sub Initialize {
                                 # "consumerList ".
                                 # "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 # "consumerAdviceIcon ".
+                                "cloudFactorSlope:slider,0,1,100 ".
                                 "disable:1,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
@@ -1201,20 +1203,15 @@ sub centralTask {
           daref => \@da
       };
       
-      Log3 ($name, 5, "$name - ################################################################");
-      Log3 ($name, 5, "$name - ###                New data collection cycle                 ###");
-      Log3 ($name, 5, "$name - ################################################################");
-      Log3 ($name, 5, "$name - current hour: $chour");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###                New data collection cycle                 ###");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
       
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
-
-      #Log3($name, 1, "$name - PV forecast Hash: ".      Dumper $data{$hash->{TYPE}}{$name}{pvfc});
-      #Log3($name, 1, "$name - Weather forecast Hash: ". Dumper $data{$hash->{TYPE}}{$name}{weather});
-      #Log3($name, 1, "$name - PV real Hash: ".          Dumper $data{$hash->{TYPE}}{$name}{pvreal});
-      #Log3($name, 1, "$name - current values Hash: ".   Dumper $data{$hash->{TYPE}}{$name}{current});
       
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
@@ -1405,9 +1402,9 @@ sub _transferDWDForecastValues {
       
       my $calcpv = calcPVforecast ($name, $v, $num, $t, $fd);                                 # Vorhersage gewichtet kalkulieren
       
-      if ($num1 >= 0) {          
-          $time_str = "NextHour".sprintf "%02d", $num1;
-          $epoche   = $t + (3600*$num1);
+      #if ($num1 >= 0) {          
+          $time_str = "NextHour".sprintf "%02d", $num;
+          $epoche   = $t + (3600*$num);
           my $ta    = TimeAdjust ($epoche);
           
           push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
@@ -1415,7 +1412,7 @@ sub _transferDWDForecastValues {
           
           $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
           $data{$type}{$name}{nexthours}{$time_str}{starttime}    = $ta;
-      }
+      #}
       
       if($num < 23 && $fh < 23) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
@@ -2114,21 +2111,21 @@ sub forecastGraphic {                                                           
     my $val2;
 
     if ($offset) {
-    $t{0} += $offset;
-    $t{0} += 24 if ($t{0} < 0);
-    my $t0 = sprintf('%02d', $t{0}+1); # Index liegt eins höher : 10:00 = Index '11'
-    $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   : 0;
-    $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} : 0;
-    $we{0} = (exists($data{$hash->{TYPE}}{$name}{weather}{$t0}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$t0}{id} : -1;
-    #$is{0}     = undef;
+        $t{0} += $offset;
+        $t{0} += 24 if ($t{0} < 0);
+        my $t0 = sprintf('%02d', $t{0}+1); # Index liegt eins höher : 10:00 = Index '11'
+        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}        : 0;
+        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}      : 0;
+        $we{0} = (exists($data{$hash->{TYPE}}{$name}{weather}{$t0}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$t0}{id} : -1;
+        #$is{0}     = undef;
     }
     else {   
-    my $t0 = sprintf('%02d', $t{0}+1);
-    $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}   :  0;
-        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0} :  0;
-    # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
-    $we{0} = (exists($hash->{HELPER}{'NextHour00_WeatherId'}))    ? $hash->{HELPER}{"NextHour00_WeatherId"}    : -1;
-    #$is{0}   = (ReadingsVal($name,"NextHour00_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
+        my $t0 = sprintf('%02d', $t{0}+1);
+        $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}     :  0;
+        $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}   :  0;
+        # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
+        $we{0} = (exists($hash->{HELPER}{'NextHour00_WeatherId'}))  ? $hash->{HELPER}{"NextHour00_WeatherId"}    : -1;
+        #$is{0}   = (ReadingsVal($name,"NextHour00_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
     }
 
     $beam1{0} = ($beam1cont eq 'forecast') ? $val1 : $val2;
@@ -2200,30 +2197,28 @@ sub forecastGraphic {                                                           
 
     my $val1;
     my $val2 = 0;
-    my $ii   = sprintf('%02d',$i);
+    my $ii   = sprintf('%02d',$i+2);
 
     $t{$i}  = $thishour +$i;
     $t{$i} -= 24 if ($t{$i} > 23);
 
     if ($offset < 0) {
-
         $t{$i} += $offset;
         $t{$i} += 24 if ($t{$i} < 0);
 
         my $jj  = sprintf('%02d',$t{$i});
 
         if ($i <= abs($offset)) {
-
-        $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj}   : 0;
-        $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj} : 0;
-        $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj}{id} : -1;
+            $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj+1}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj+1}        : 0;
+            $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj+1}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj+1}      : 0;
+            $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj+1}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj+1}{id} : -1;
         }
         else {
-        my $nh  = sprintf('%02d', $i+$offset);
-        $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast',  0);
-        # ToDo : klären ob -1 oder nicht !
-        #$nh  = sprintf('%02d', $i+$offset-1);
-        $we{$i} = (exists($hash->{HELPER}{'NextHour'.$nh.'_WeatherId'})) ?$hash->{HELPER}{'NextHour'.$nh.'_WeatherId'} : -1;
+            my $nh  = sprintf('%02d', $i+$offset+1);
+            $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast',  0);
+            # ToDo : klären ob -1 oder nicht !
+            #$nh  = sprintf('%02d', $i+$offset-1);
+            $we{$i} = (exists($hash->{HELPER}{'NextHour'.$nh.'_WeatherId'})) ?$hash->{HELPER}{'NextHour'.$nh.'_WeatherId'} : -1;
         }
     }
     else {
@@ -2767,13 +2762,14 @@ sub calcPVforecast {
   my $chour = strftime "%H", localtime($t+($num*3600));                                         # aktuelle Stunde
   my $reld  = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my @strings = sort keys %{$stch};
+  my $cloudslope = AttrVal($name, "cloudFactorSlope", $clslopedef);                      # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my @strings    = sort keys %{$stch};
   
   my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_CloudCover"} // 0;         # effektive Wolkendecke
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                     # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_RainProb"} // 0;           # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                             # Rain Correction Faktor mit Steilheit
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rslopedef/100);                             # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$num), 1);              # Korrekturfaktor für die Stunde des Tages
@@ -2791,18 +2787,19 @@ sub calcPVforecast {
       my $pv   = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf * 1000);
   
       my $lh = {                                                                                # Log-Hash zur Ausgabe
-          "moduleDirection"         => $moddir,
-          "modulePeakString"        => $peak,
-          "moduleTiltAngle"         => $ta,
-          "Area factor"             => $af,
-          "Cloudcover"              => $cloudcover,
-          "Cloudfactor"             => $ccf,
-          "Rainprob"                => $rainprob,
-          "Rainfactor"              => $rcf,
-          "pvCorrectionFactor"      => $hc,
-          "Radiation"               => $rad,
-          "Factor kJ to kWh"        => $kJtokWh,
-          "PV generation (Wh)"      => $pv
+          "moduleDirection"          => $moddir,
+          "modulePeakString"         => $peak,
+          "moduleTiltAngle"          => $ta,
+          "Area factor"              => $af,
+          "Cloudcover"               => $cloudcover,
+          "CloudFactorSlope"         => $cloudslope." %",
+          "Cloudfactor"              => $ccf,
+          "Rainprob"                 => $rainprob,
+          "Rainfactor"               => $rcf,
+          "pvCorrectionFactor"       => $hc,
+          "Radiation"                => $rad,
+          "Factor kJ to kWh"         => $kJtokWh,
+          "PV generation"            => $pv." Wh"
       };  
       
       my $sq;
@@ -2810,7 +2807,7 @@ sub calcPVforecast {
           $sq .= $idx." => ".$lh->{$idx}."\n";             
       }
 
-      Log3($name, 5, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
+      Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
       
       $pvsum += $pv;
   }
@@ -2819,7 +2816,7 @@ sub calcPVforecast {
       $pvsum = int $pvsum;
   }
   
-  Log3($name, 5, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum");
+  Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum");
  
 return $pvsum;
 }
@@ -3700,32 +3697,14 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br>  
        
-       <a name="consumerAdviceIcon"></a>
-       <li><b>consumerAdviceIcon </b><br>
-         Setzt das Icon zur Darstellung der Zeiten mit Verbraucherempfehlung. 
-         Dazu kann ein beliebiges Icon mit Hilfe der Standard "Select Icon"-Funktion (links unten im FHEMWEB) direkt ausgewählt 
-         werden. 
+       <a name="cloudFactorSlope"></a>
+       <li><b>cloudFactorSlope </b><br>
+         Prozentuale Berücksichtigung (Steilheit) der Bewölkung bei der solaren Ertragsermittlung. <br>
+         Höhere Werte vermindern tendenziell den prognostizierten PV Ertrag, kleinere Werte erhöhen den prognostizierten PV 
+         Ertrag tendenziell.<br>
+         (default: 45)         
        </li>  
-       <br>
-
-       <a name="consumerList"></a>
-       <li><b>consumerList &lt;Verbraucher1&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,&lt;Verbraucher2&gt;:&lt;Icon&gt;@&lt;Farbe&gt;,...</b><br>
-         Komma getrennte Liste der am SMA Sunny Home Manager angeschlossenen Geräte. <br>
-         Sobald die Aktivierung einer der angegebenen Verbraucher geplant ist, wird der geplante Zeitraum in der Grafik 
-         angezeigt. 
-         Der Name des Verbrauchers muss dabei dem Namen im Reading "L3_&lt;Verbrauchername&gt;_Planned" entsprechen. <br><br>
-       
-         <b>Beispiel: </b> <br>
-         attr &lt;name&gt; consumerList Trockner:scene_clothes_dryer@yellow,Waschmaschine:scene_washing_machine@lightgreen,Geschirrspueler:scene_dishwasher@orange
-         <br>
-       </li>
-       <br>  
-           
-       <a name="consumerLegend"></a>
-       <li><b>consumerLegend &ltnone | icon_top | icon_bottom | text_top | text_bottom&gt; </b><br>
-         Lage bzw. Art und Weise der angezeigten Verbraucherlegende.
-       </li>
-       <br>        
+       <br>      
   
        <a name="disable"></a>
        <li><b>disable</b><br>
