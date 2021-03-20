@@ -34,7 +34,6 @@ package main;
 use strict;
 use warnings;
 use HttpUtils;
-use Crypt::MySQL qw(password41);
 use DevIo;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 
@@ -699,6 +698,12 @@ sub ZoneMinder_Trigger_ChangeText {
 sub ZoneMinder_calcAuthHash {
   my ($hash) = @_;
   my $name = $hash->{NAME};
+
+  eval 'use Crypt::MySQL qw(password41)';
+  if($@) {
+    Log3 $name, 0, "ZoneMinder ($name) - ERROR: Crypt::MySQL required for auth-hash support in ZoneMinder 1.30. Please install Crypt::MySQL (or upgrade to ZoneMinder 1.32+)";
+    return $name;
+  }
 
   Log3 $name, 4, "ZoneMinder ($name) - calling calcAuthHash";
 
