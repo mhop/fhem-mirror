@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.16.0" => "19.03.2021  new getter nextHours ",
+  "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
   "0.15.1" => "18.03.2021  replace ThisHour_ by NextHour00_ ",
@@ -326,10 +326,10 @@ my $calcmaxd    = 7;                                                            
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $cloudslope  = 0.3;                                                           # Steilheit des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cloudslope  = 45;                                                            # Steilheit (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rainslope   = 0.2;                                                           # Steilheit des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rainslope   = 20;                                                            # Steilheit (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
@@ -1382,6 +1382,7 @@ sub _transferDWDForecastValues {
   return if(!$fcname || !$defs{$fcname});
   
   my ($time_str,$epoche);
+  my $type = $hash->{TYPE};
   
   my @aneeded = checkdwdattr ($fcname);
   if (@aneeded) {
@@ -1394,6 +1395,7 @@ sub _transferDWDForecastValues {
       my $num1 = $num-1;
       if($fd > 1) {                                                                           # überhängende Readings löschen 
           deleteReadingspec ($hash, "NextHour".$num1.".*");
+          delete $data{$type}{$name}{nexthours}{'NextHour'.$num1};
           next;
       }
 
@@ -1409,14 +1411,14 @@ sub _transferDWDForecastValues {
           my $ta    = TimeAdjust ($epoche);
           
           push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-          push @$daref, "${time_str}_Time:"      .$ta;                                        # Zeit fortschreiben
+          push @$daref, "${time_str}_Time:"      .$ta;
           
-          $data{$hash->{TYPE}}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
-          $data{$hash->{TYPE}}{$name}{nexthours}{$time_str}{timestr}    = $ta;
+          $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
+          $data{$type}{$name}{nexthours}{$time_str}{starttime}    = $ta;
       }
       
       if($num < 23 && $fh < 23) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$hash->{TYPE}}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
+          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
       } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
@@ -1477,7 +1479,7 @@ sub _transferWeatherValues {
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                              # Effektive Wolkendecke
       my $r101  = ReadingsNum($fcname, "fc${fd}_${fh}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
       
-      my $fhstr = sprintf "%02d", $fh-1;                                                      # hier kann Tag/Nacht-Grenze verstellt werden
+      my $fhstr = sprintf "%02d", $fh;                                                        # hier kann Tag/Nacht-Grenze verstellt werden
       
       if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {         # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
           $wid += 100;                                                                        # "1" der WeatherID voranstellen wenn Nacht
@@ -1490,17 +1492,13 @@ sub _transferWeatherValues {
 
       Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
-      my $num1 = $num-1;
-      
-      if ($num1 >= 0) {
-          $time_str = "NextHour".sprintf "%02d", $num;
-          $epoche   = $t + (3600*$num);
-      
-          $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
-          $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
-          $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
-          $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
-      }
+      $time_str = "NextHour".sprintf "%02d", $num;
+      $epoche   = $t + (3600*$num);
+  
+      $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
+      $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
+      $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
+      $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
       
       if($num < 23 && $fh < 23) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{id}         = $wid;                  
@@ -2772,10 +2770,10 @@ sub calcPVforecast {
   my @strings = sort keys %{$stch};
   
   my $cloudcover = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_CloudCover"} // 0;         # effektive Wolkendecke
-  my $ccf        = 1 - (($cloudcover - $cloud_base) * $cloudslope / 100);                       # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                     # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   my $rainprob   = $hash->{HELPER}{"NextHour".sprintf("%02d",$num)."_RainProb"} // 0;           # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - (($rainprob - $rain_base) * $rainslope / 100);                           # Rain Correction Faktor mit Steilheit
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                             # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$num), 1);              # Korrekturfaktor für die Stunde des Tages
@@ -3106,9 +3104,9 @@ sub listDataPool {
       }
       for my $idx (sort keys %{$h}) {
           my $nhfc = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
-          my $nhts = $data{$type}{$name}{nexthours}{$idx}{timestr};
+          my $nhts = $data{$type}{$name}{nexthours}{$idx}{starttime};
           $sq     .= "\n" if($sq);
-          $sq     .= $idx." => timestr: $nhts, pvforecast: $nhfc";
+          $sq     .= $idx." => starttime: $nhts, pvforecast: $nhfc";
       }
   }
       
@@ -3566,6 +3564,14 @@ werden weitere SolarForecast Devices zugeordnet.
       <a name="data"></a>
       <li><b>data </b> <br>  
       Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="nextHours"></a>
+      <li><b>nextHours </b> <br>  
+      Listet die erwarteten Werte der nächsten Stunden auf.
       </li>      
     </ul>
     <br>
