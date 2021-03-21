@@ -125,7 +125,7 @@ f18_tables()
 
   $("#content .devType").each(function(){
     var el = this, grp = $(el).text();
-    f18_addPin(el, "Room."+FW_urlParams.room+".grp."+grp, true,
+    f18_addPin(el, "Room."+f18_room+".grp."+grp, true,
     function(isFixed){
       var ntr = $(el).closest("tr").next("tr");
       isFixed ? $(ntr).show() : $(ntr).hide();
