@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.17.1" => "21.03.2021  bug fixes ",
   "0.17.0" => "20.03.2021  new attr cloudFactorSlope / rainFactorSlope, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
@@ -1213,7 +1214,7 @@ sub centralTask {
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
-       
+      
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
@@ -1296,8 +1297,6 @@ sub createStringConfig {                 ## no critic "not used"
   if(@tom) {
       return qq{Some Strings are not used. Please delete this string names from "inverterStrings" :}.join ",",@tom;
   }
-  
-  # Log3 ($name, 2, "$name - string config: ".Dumper $data{$type}{$name}{strings});
    
 return;
 }
@@ -1390,31 +1389,33 @@ sub _transferDWDForecastValues {
   for my $num (0..47) {      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
-      my $num1 = $num-1;
       if($fd > 1) {                                                                           # überhängende Readings löschen 
-          deleteReadingspec ($hash, "NextHour".$num1.".*");
-          delete $data{$type}{$name}{nexthours}{"NextHour".$num1};
+          deleteReadingspec ($hash, "NextHour".($num-1).".*");
+          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num-1)};
           next;
       }
 
       my $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Val=$v");
+      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Rad1h=$v");
       
       my $calcpv = calcPVforecast ($name, $v, $num, $t, $fd);                                 # Vorhersage gewichtet kalkulieren
                 
-      $time_str = "NextHour".sprintf "%02d", $num;
-      $epoche   = $t + (3600*$num);
-      my $ta    = TimeAdjust ($epoche);
+      my $num1 = $num-1;
+      if($num1 >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num1;
+          $epoche   = $t + (3600*$num);                                                       # ACHTUNG ! hier $num statt $num1 verwenden !
+          my $ta    = TimeAdjust ($epoche);
+          
+          push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
+          push @$daref, "${time_str}_Time:"      .$ta;
+          
+          $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
+          $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
+      }
       
-      push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-      push @$daref, "${time_str}_Time:"      .$ta;
-      
-      $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
-      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
-      
-      if($num < 23 && $fh < 23) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
+      if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh+1)} = $calcpv;
       } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
@@ -1450,7 +1451,7 @@ sub _transferWeatherValues {
   return if(!$fcname || !$defs{$fcname});
   
   my $type = $hash->{TYPE};
-  my ($time_str,$epoche);
+  my ($time_str);
   
   my $fc0_SunRise = ReadingsVal($fcname, "fc0_SunRise", "00:00");                               # Sonnenaufgang heute    
   my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute  
@@ -1488,17 +1489,18 @@ sub _transferWeatherValues {
 
       Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
-      $time_str = "NextHour".sprintf "%02d", $num;
-      $epoche   = $t + (3600*$num);
-  
-      $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
-      # $hash->{HELPER}{"${time_str}_WeatherTxt"} = $txt;
-      $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
-      $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
-      
-      $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
-      $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
-      $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
+      my $num1 = $num-1;
+      if($num1 >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num1;
+   
+          $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
+          $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
+          $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
+          
+          $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
+          $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
+          $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
+      }
       
       if($num < 23 && $fh < 23) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh+1)}{id}         = $wid;                  
@@ -1585,7 +1587,7 @@ sub _transferInverterValues {
       
       my $nhour = $chour+1;
       push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal:".$ethishour." Wh";
-      $data{$type}{$name}{pvreal}{sprintf("%02d",$nhour)} = $ethishour;                     # Hilfshash Wert PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      $data{$type}{$name}{pvreal}{sprintf("%02d",$nhour)} = $ethishour;                     # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
       $paref->{nhour}     = sprintf("%02d",$nhour);
@@ -2123,7 +2125,7 @@ sub forecastGraphic {                                                           
         #$is{0}     = undef;
     }
     else {   
-        my $t0 = sprintf('%02d', $t{0}+1);
+        my $t0 = sprintf('%02d', $t{0});
         $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}     :  0;
         $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}   :  0;
         # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
@@ -2212,12 +2214,12 @@ sub forecastGraphic {                                                           
         my $jj  = sprintf('%02d',$t{$i});
 
         if ($i <= abs($offset)) {
-            $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj+1}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj+1}        : 0;
-            $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj+1}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj+1}      : 0;
-            $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj+1}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj+1}{id} : -1;
+            $val1   = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$jj}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$jj}        : 0;
+            $val2   = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$jj}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$jj}      : 0;
+            $we{$i} = (exists($data{$hash->{TYPE}}{$name}{weather}{$jj}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$jj}{id} : -1;
         }
         else {
-            my $nh  = sprintf('%02d', $i+$offset+1);
+            my $nh  = sprintf('%02d', $i+$offset);
             $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast',  0);
             # ToDo : klären ob -1 oder nicht !
             #$nh  = sprintf('%02d', $i+$offset-1);
@@ -3105,8 +3107,8 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhfc = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
           my $nhts = $data{$type}{$name}{nexthours}{$idx}{starttime};
+          my $nhfc = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
           my $wid  = $data{$type}{$name}{nexthours}{$idx}{weatherid};
           my $neff = $data{$type}{$name}{nexthours}{$idx}{cloudcover};
           my $r101 = $data{$type}{$name}{nexthours}{$idx}{rainprob};
@@ -3178,22 +3180,19 @@ sub collectSummaries {
   my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   
   my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
-  # my $thforecast       = ReadingsNum ($name, "NextHour00_PVforecast", 0);
   my $thforecast       = $data{$type}{$name}{nexthours}{NextHour00}{pvforecast};
   
   $next4HoursSum->{PV} = $thforecast;
   $restOfDaySum->{PV}  = $thforecast;
   
   for my $h (1..47) {
-      #$next4HoursSum->{PV} += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h <= 3);
-      #$restOfDaySum->{PV}  += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h <= $rdh);
-      #$tomorrowSum->{PV}   += ReadingsNum ($name, "NextHour".  (sprintf "%02d", $h)."_PVforecast", 0) if($h >  $rdh);
-      #$todaySum->{PV}      += ReadingsNum ($name, "Today_Hour".(sprintf "%02d", $h)."_PVforecast", 0) if($h <= 23);
-      
-      $next4HoursSum->{PV} += $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} if($h <= 3);
-      $restOfDaySum->{PV}  += $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} if($h <= $rdh);
-      $tomorrowSum->{PV}   += $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} if($h >  $rdh);
-      $todaySum->{PV}      += $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} if($h <= 23);
+      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h});
+      my $pvfc = $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast};
+            
+      $next4HoursSum->{PV} += $pvfc if($h <= 3);
+      $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
+      $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
+      $todaySum->{PV}      += $pvfc if($h <= 23);
   }
   
   push @$daref, "Next04Hours_PV:".     (int $next4HoursSum->{PV})." Wh";
