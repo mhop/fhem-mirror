@@ -51,7 +51,11 @@ sub TA_CMI_JSON_Initialize {
 #  $hash->{FW_detailFn} = "TA_CMI_JSON::DetailFn";
 #  $hash->{FW_directNotify} = "TA_CMI_JSON::DirectNotify";
 
-  $hash->{AttrList} = "username password outputStatesInterval interval readingNamesInputs readingNamesOutputs readingNamesDL-Bus readingNamesLoggingAnalog readingNamesLoggingDigital includePrettyReadings:0,1 includeUnitReadings:0,1 prettyOutputStates:0,1 " . $readingFnAttributes;
+  $hash->{AttrList} = "username password outputStatesInterval interval readingNamesInputs:textField-long ".
+                      "readingNamesOutputs:textField-long readingNamesDL-Bus:textField-long ".
+                      "readingNamesLoggingAnalog:textField-long readingNamesLoggingDigital:textField-long ".
+                      "includePrettyReadings:0,1 includeUnitReadings:0,1 prettyOutputStates:0,1 setList:textField-long ".
+                      $readingFnAttributes;
 
   Log3 '', 3, "TA_CMI_JSON - Initialize done ...";
 }
@@ -113,6 +117,12 @@ my %outputStates = (
   3 => 'Auto-On',
   5 => 'Manual-Off',
   7 => 'Manual-On'
+);
+
+my %fixwertTypes = (
+  'fixwertAnalog' => 'D1',
+  'fixwertDigital' => '11',
+  'fixwertImpuls' => '1f'
 );
 
 ## Import der FHEM Funktionen
@@ -372,29 +382,60 @@ sub extractReadings($$$$) {
   return undef;
 }
 
-sub Set($$$@) {
+sub Set {
   my ( $hash, $name, $opt, @arg) = @_;
 
   Log3 $name, 5, "TA_CMI_JSON ($name) - Set: $name $opt ".join(' ', @arg);
 
-  if ($opt eq 'fixwertAnalog' || $opt eq 'fixwertDigital') {
-    
+  my ($sets, $cmdList) = getCmdHash(AttrVal($name, 'setList', ''));
+
+  if ($opt eq 'fixwertAnalog' || $opt eq 'fixwertDigital' || $opt eq 'fixwertImpuls') {
     my $index = $arg[0];
     my $value = $arg[1];
 
-    my $type;
-    if ($opt eq 'fixwertAnalog') {
-      $type = 'D1';
-    } else {
-      $type = '1f';
-    }
+    my $type = $fixwertTypes{$opt};
 
     FixwertChangeRequest($hash, $index, $value, $type);
 
     return undef;
+  } else {
+
+    my $command = $sets->{$opt};
+
+    if (defined $command) {
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   command: $command";
+      my ($cmd, $index, $value) = split(' ', $command);
+
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   cmd: $cmd";
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   index: $index";
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   value: $value";
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   arg: ".join(' ', @arg);
+
+      unshift @arg, $value if (defined $value);
+      unshift @arg, $index if (defined $index);
+
+#      Log3 $name, 5, "TA_CMI_JSON ($name) -   arg2: ".join(' ', @arg);
+      return Set($hash, $name, $cmd, @arg);
+    }
   }
 
-  return 'fixwertAnalog fixwertDigital';
+  return "Unknown argument $opt, choose one of fixwertAnalog fixwertDigital fixwertImpuls $cmdList";
+}
+
+# credits for this method go to MQTT2_DEVICE
+sub getCmdHash($)
+{
+  my ($list) = @_;
+  my (%h, @cmd);
+  map { 
+    my ($k,$v) = split(" ",$_,2);
+    push @cmd, $k;
+    $k =~ s/:.*//; # potential arguments
+    $h{$k} = $v;
+  }
+  grep /./,
+  split("\n", $list);
+  return (\%h, join(" ",@cmd));
 }
 
 sub FixwertChangeRequest($$$$) {
@@ -584,10 +625,13 @@ sub ParseOutputStateResponse($$$) {
   <b>Set</b>
   <ul>
     <li><code>fixwertAnalog</code><br>Set Fixwert to an analog value. Example:<br>
-    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code></ul>
+    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code> will set Fixwert 3 to 64.0</ul>
     </li>
     <li><code>fixwertDigital</code><br>Set Fixwert to a digital value. Also works for impulse values. Example:<br>
-    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code></ul>
+    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code> will set Fixwert 2 to On/Yes.</ul>
+    </li>
+    <li><code>fixwertImpuls</code><br>Trigger an impulse to Fixwert. Example:<br>
+    <ul><code>set cmiNode fixwertImpuls &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertImpuls 3 1</code> will send an On-impulse to Fixwert 3.</ul>
     </li>
   </ul>
 
@@ -615,6 +659,11 @@ sub ParseOutputStateResponse($$$) {
     <li><code>interval</code><br>Query interval in seconds. Minimum query interval is 60 seconds.</li>
     <li><code>outputStatesInterval</code><br>Request interval in seconds for getting output states.</li>
     <li><code>prettyOutputStates [0:1]</code><br>If set, generates a reading _State_Pretty for output states (eg Auto-On, Manual-Off)</li>
+    <li>
+      <code>setList</code><br>Used to define Set shortcuts for fixwertAnalog, Digital, and Impuls. eg <code>Light_on:noArg fixwertImpuls 3 1</code><br>
+      The second parameter (for the value) can be left out and directly read from the input field. eg <code>Water_Temperature fixwertAnalog 7</code><br>
+      can be used like <code>set cmiNode Water_Temperature 55.0</code>.
+    </li>
     <li><code>username</code><br>Username for querying the JSON-API. Needs to be either admin or user privilege.</li>
     <li><code>password</code><br>Password for querying the JSON-API.</li>
     
@@ -655,10 +704,13 @@ Weitere Informationen zu diesem Modul im <a href="https://wiki.fhem.de/wiki/UVR1
   <b>Set</b>
   <ul>
     <li><code>fixwertAnalog</code><br>Setzt einen Fixwert auf einen analogen Wert. Beispiel:<br>
-    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code></ul>
+    <ul><code>set cmiNode fixwertAnalog &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertAnalog 3 64.0</code>setzt Fixwert 3 auf 64.0</ul>
     </li>
     <li><code>fixwertDigital</code><br>Setzt einen Fixwert auf einen digitalen Wert. Funktioniert auch für Impulse. Beispiel:<br>
-    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code></ul>
+    <ul><code>set cmiNode fixwertDigital &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertDigital 2 1</code> setzt Fixwert 2 auf Ein/Ja</ul>
+    </li>
+    <li><code>fixwertImpuls</code><br>Sendet einen Impuls an den Fixwert. Beispiel:<br>
+    <ul><code>set cmiNode fixwertImpuls &lt;index&gt; &lt;value&gt;<br>set cmiNode fixwertImpuls 3 1</code> sendet einen Ein-Impuls nach Fixwert 3.</ul>
     </li>
   </ul>
 
@@ -686,6 +738,11 @@ Weitere Informationen zu diesem Modul im <a href="https://wiki.fhem.de/wiki/UVR1
     <li><code>interval</code><br>Abfrage-Intervall in Sekunden. Muss mindestens 60 sein.</li>
     <li><code>outputStatesInterval</code><br>Abfrage-Intervall für Ausgangs-Stati in Sekunden.</li>
     <li><code>prettyOutputStates [0:1]</code><br>Definiert, ob zu einem Ausgangs-Status ein zusätzliches Reading _State_Pretty geschrieben werden soll (liefert zB Auto-On, Manual-Off)</li>
+    <li>
+      <code>setList</code><br>Dienst zum Anlegen direkter Set Befehle für fixwertAnalog, Digital, und Impuls. zB <code>Licht_ein:noArg fixwertImpuls 3 1</code><br>
+      Wird der zweite Parameter (der Wert) weggelassen, kann dieser direkt aus dem Textfeld übernommen werden. zB <code>Wasser_Temperatur fixwertAnalog 7</code><br>
+      könnte dann mit <code>set cmiNode Wasser_Temperatur 55.0</code> verwendet werden.
+    </li>
     <li><code>username</code><br>Username zur Abfrage der JSON-API. Muss die Berechtigungsstufe admin oder user haben.</li>
     <li><code>password</code><br>Passwort zur Abfrage der JSON-API.</li>
   </ul>
