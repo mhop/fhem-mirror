@@ -3187,7 +3187,7 @@ sub collectSummaries {
   
   for my $h (1..47) {
       next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h});
-      my $pvfc = $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast};
+      my $pvfc = $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} // 0;
             
       $next4HoursSum->{PV} += $pvfc if($h <= 3);
       $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
