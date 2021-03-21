@@ -4775,7 +4775,7 @@ sub ring
     $maxColor=&{$func}($max);
     $currColor=&{$func}($value);
   } elsif (ref($func) eq "ARRAY") {
-    $minColor=${$func}[0];
+    $minColor=${$func}[1];
     $maxColor=${$func}[-1];
     for (my $i=0;$i<@{$func};$i+=2) {
       if ($value <= ${$func}[$i]) {
