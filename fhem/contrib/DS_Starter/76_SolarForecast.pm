@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.17.1" => "21.03.2021  bug fixes ",
+  "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
   "0.17.0" => "20.03.2021  new attr cloudFactorSlope / rainFactorSlope, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
@@ -1492,12 +1492,7 @@ sub _transferWeatherValues {
       
       my $num1 = $num-1;
       if($num1 >= 0) {
-          $time_str = "NextHour".sprintf "%02d", $num1;
-   
-          $hash->{HELPER}{"${time_str}_WeatherId"}  = $wid;
-          $hash->{HELPER}{"${time_str}_CloudCover"} = $neff;
-          $hash->{HELPER}{"${time_str}_RainProb"}   = $r101;
-          
+          $time_str                                             = "NextHour".sprintf "%02d", $num1;         
           $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
           $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
           $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
@@ -2130,7 +2125,7 @@ sub forecastGraphic {                                                           
         $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}     :  0;
         $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}   :  0;
         # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
-        $we{0} = (exists($hash->{HELPER}{'NextHour00_WeatherId'}))  ? $hash->{HELPER}{"NextHour00_WeatherId"}    : -1;
+        $we{0} = $data{$hash->{TYPE}}{$name}{nexthours}{NextHour00} ? $data{$hash->{TYPE}}{$name}{nexthours}{NextHour00}{weatherid} // -1 : -1;
         #$is{0}   = (ReadingsVal($name,"NextHour00_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
     }
 
@@ -2224,12 +2219,12 @@ sub forecastGraphic {                                                           
             $val1   = ReadingsNum($name, 'NextHour'.$nh.'_PVforecast',  0);
             # ToDo : klären ob -1 oder nicht !
             #$nh  = sprintf('%02d', $i+$offset-1);
-            $we{$i} = (exists($hash->{HELPER}{'NextHour'.$nh.'_WeatherId'})) ?$hash->{HELPER}{'NextHour'.$nh.'_WeatherId'} : -1;
+            $we{$i} = $data{$hash->{TYPE}}{$name}{nexthours}{'NextHour'.$nh} ? $data{$hash->{TYPE}}{$name}{nexthours}{'NextHour'.$nh}{weatherid} // -1 : -1;
         }
     }
     else {
         $val1   = ReadingsNum($name, 'NextHour'.$ii.'_PVforecast',  0); # Forecast
-        $we{$i} = (exists($hash->{HELPER}{'NextHour'.$ii.'_WeatherId'})) ? $hash->{HELPER}{'NextHour'.$ii.'_WeatherId'} : -1; # für Wettericons 
+        $we{$i} = $data{$hash->{TYPE}}{$name}{nexthours}{'NextHour'.$ii} ? $data{$hash->{TYPE}}{$name}{nexthours}{'NextHour'.$ii}{weatherid} // -1 : -1; # für Wettericons 
         #$is{$i}   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
     }
 
