@@ -118,7 +118,7 @@ if($cmd eq 'joinGroup') {return qq($topic { "command": "joingroup",  "input": "$
 if($cmd eq 'setAVTUri') {return qq($topic { "command": "setavtransporturi",  "input": "$payload"})}
 if($cmd eq 'notify') {return qq($topic { "command":"notify","input":{"trackUri":"$arr[2]","onlyWhenPlaying":false,"timeout":100,"volume":$arr[1],"delayMs":700}})}
 
-my %t=('true'=>'mute','false'=>'unmute');
+my %t=('true'=>'mute','false'=>'unmute','on'=>'mute','off'=>'unmute');
 if($cmd eq 'mute')   {return qq(sonos/$uuid/control { "command": "$t{$payload}" } )}
 if($cmd eq 'input')  {
    $value = $payload eq "TV" ? "tv" : $payload eq "Line_In" ? "line" : "queue"; 
