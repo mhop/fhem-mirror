@@ -23,7 +23,6 @@
 #   Todo:       
 #               setXYHintExpression zum dynamischen Ändern / Erweitern der Hints
 #               extractAllReadings mit Filter / Prefix
-#               get after set um readings zu aktualisieren
 #               definierbarer prefix oder Suffix für Readingsnamen wenn sie von unterschiedlichen gets über readingXY erzeugt werden
 #               reading mit Status je get (error, no match, ...) oder reading zum nachverfolgen der schritte, fehler, auth etc.
 #
@@ -141,7 +140,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.05 - 6.3.2021';
+my $Module_Version = '4.1.06 - 20.3.2021';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
@@ -1265,7 +1264,7 @@ sub SetFn {
             Log3 $name, 3, "$name: no URL for set $setNum";
         }
     } else {
-        readingsSingleUpdate($hash, makeReadingName($setName), $rawVal, 0);
+        readingsSingleUpdate($hash, makeReadingName($setName), $rawVal, 1);
     }
     ChainGet($hash, 'set', $setNum);
     return;
