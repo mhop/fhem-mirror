@@ -1366,31 +1366,67 @@ set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
 
 # based on a proposal by twdotnet, https://forum.fhem.de/index.php/topic,94495.msg1137400.html#msg1137400
 # shelly i3 3 channel input switches
-name:tasmota_3channel_split
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
-desc:shelly i3 3 channel device flashed with Tasmota. <br>NOTE: a second and third device will be created for the second and third channel
+# shelly i3 3 channel input switches with device configuration
+name:tasmota_3channel_input_shelly_i3
+filter:TYPE=MQTT2_DEVICE
+desc:Shelly i3 device flashed with Tasmota, provides three input only channels. <p>Device will be configured with selectable SwitchMode and optional GPIO Template. <br>Recommended SwitchModes 1=FollowMode (normally open switches> or 2=InvertedFollowMode (normally closed switches) </p><p>Tasmota 9.1+ is required for <a href=https://tasmota.github.io/docs/Buttons-and-Switches/#setoption114>SetOption114</a> to detach switches from relays. <br>For Tasmota &lt;9.1 fake relays on GPIO2,GPIO3,GPIO4 will be used. In case of ghost switching try using SwitchMode=2 with normally closed switches on inputs. <p>NOTE: <br>A second and third device will be created for the second and third input with suffixes *_CH2 and *_CH3</p>
 order:A_03
+par:RADIO_TEMPLATE;Configure device and GPIO with SetOption114 (for Tasmota 9.1+);{ undef }
+par:RADIO_TEMPLATE_PRE91;Configure device and GPIO with fake relays (for Tasmota <9.1);{ undef }
+par:RADIO_NO_TEMPLATE;Configure device without GPIO template;{ undef }
+par:SWITCHMODE1;SwitchMode for Input 1;{ undef }
+par:SWITCHMODE2;SwitchMode for Input 2;{ undef }
+par:SWITCHMODE3;SwitchMode for Input 3;{ undef }
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
+par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 }
 par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
-set DEVICE attrTemplate tasmota_2channel_split \CALLSPEECHRECOGN=0 \SETCHANNELINFO=0
-#create device for CH3
+par:ICON;ICON as set, defaults to taster;{ AttrVal("DEVICE","icon","taster") }
+par:IO_DEV;Currently used IO;{ AttrVal("DEVICE","IODev",undef)}
+# autoconfigure device
+option:{RADIO_NO_TEMPLATE}
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SetOption26 1; SetOption114 1; SaveData 1
+option:{RADIO_TEMPLATE}
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SetOption26 1; SetOption114 1; SaveData 1; template {"NAME":"Shelly i3","GPIO":[0,0,0,0,0,0,0,0,193,194,192,0,0,4736],"FLAG":0,"BASE":18}; module 0
+option:{RADIO_TEMPLATE_PRE91}
+set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SetOption26 1; SaveData 1; template {"NAME":"Shelly i3","GPIO":[0,0,224,225,226,0,0,0,193,194,192,0,0,4736],"FLAG":0,"BASE":18}; module 0
+option:global
+# setup main device channel 1
+attr DEVICE icon ICON
+attr DEVICE jsonMap Switch1_Action:state
+attr DEVICE setList \
+  off:noArg    STATTOPIC/Switch1 0\
+  on:noArg     STATTOPIC/Switch1 1\
+  toggle:noArg STATTOPIC/Switch1 2
+attr DEVICE readingList \
+  TELETOPIC/LWT:.* LWT\
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+deletereading -q DEVICE (?!associatedWith).*
+attr DEVICE setStateList on off toggle
+attr DEVICE autocreate 0
+# channel 2
+copy DEVICE DEVICE_CH2
+deleteattr DEVICE_CH2 alias
+attr DEVICE_CH2 readingList \
+  STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE_CH2 jsonMap Switch2_Action:state
+attr DEVICE_CH2 setList \
+  off:noArg    STATTOPIC/Switch2 0\
+  on:noArg     STATTOPIC/Switch2 1\
+  toggle:noArg STATTOPIC/Switch2 2
+# channel 3
 copy DEVICE_CH2 DEVICE_CH3
+deleteattr DEVICE_CH3 alias
+attr DEVICE_CH3 jsonMap Switch3_Action:state
 attr DEVICE_CH3 setList \
-  off:noArg    CMNDTOPIC/POWER3 0\
-  on:noArg     CMNDTOPIC/POWER3 1\
-  toggle:noArg CMNDTOPIC/POWER3 2
-attr DEVICE_CH3 setStateList on off toggle
-attr DEVICE_CH3 readingList \
-  STATTOPIC/POWER3:.* state
+  off:noArg    STATTOPIC/Switch3 0\
+  on:noArg     STATTOPIC/Switch3 1\
+  toggle:noArg STATTOPIC/Switch3 2
+# associations
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3
-option:{ CALLSPEECHRECOGN }
-set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
-option:global
-attr DEVICE,DEVICE_CH2,DEVICE_CH3 model tasmota_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210305
+attr DEVICE,DEVICE_CH2,DEVICE_CH3 model tasmota_shelly_i3
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210321
 
 
 # sonoff 4 channel device flashed with Tasmota.
