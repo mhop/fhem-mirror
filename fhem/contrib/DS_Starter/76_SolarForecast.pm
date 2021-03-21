@@ -1416,6 +1416,7 @@ sub _transferDWDForecastValues {
       
       if($num < 23 && $fh > 0 && $fh < 24) {                                                  # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
+
       } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
@@ -3715,8 +3716,7 @@ werden weitere SolarForecast Devices zugeordnet.
        <a name="cloudFactorSlope"></a>
        <li><b>cloudFactorSlope </b><br>
          Prozentuale Berücksichtigung (Steilheit) der Bewölkung bei der solaren Vorhersage. <br>
-         Höhere Werte vermindern tendenziell den prognostizierten PV Ertrag, kleinere Werte erhöhen den prognostizierten PV 
-         Ertrag tendenziell.<br>
+         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 45)         
        </li>  
        <br>      
@@ -3845,8 +3845,7 @@ werden weitere SolarForecast Devices zugeordnet.
        <a name="rainFactorSlope"></a>
        <li><b>rainFactorSlope </b><br>
          Prozentuale Berücksichtigung (Steilheit) der Regenprognose bei der solaren Vorhersage. <br>
-         Höhere Werte vermindern tendenziell den prognostizierten PV Ertrag, kleinere Werte erhöhen den prognostizierten PV 
-         Ertrag tendenziell.<br>
+         Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 20)         
        </li>  
        <br> 
