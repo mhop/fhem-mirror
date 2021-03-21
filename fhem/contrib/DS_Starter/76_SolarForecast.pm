@@ -1414,7 +1414,7 @@ sub _transferDWDForecastValues {
           $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
       }
       
-      if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+      if($num < 23 && $fh > 0 && $fh < 24) {                                                  # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
       } 
       
