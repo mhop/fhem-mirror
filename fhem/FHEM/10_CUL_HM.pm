@@ -3558,6 +3558,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $chnhash->{helper}{getCfgListNo};
           CUL_HM_rmOldRegs($chnName,$readCont);
           $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
+          CUL_HM_cfgStateDelay($chnName);#schedule check when finished
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3614,7 +3615,6 @@ sub CUL_HM_parseCommon(@){#####################################################
           delete $mhp->{cHash}{helper}{shadowReg}{$regLNp};   #rm shadow
           # peerChannel name from/for user entry. <IDorName> <deviceID> <ioID>
           CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
-          CUL_HM_cfgStateDelay($mhp->{cHash}{NAME});
         }
         else{
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
@@ -3638,7 +3638,6 @@ sub CUL_HM_parseCommon(@){#####################################################
       
       if($data eq "00"){#update finished for mStp 05. Now update display
         CUL_HM_updtRegDisp($fHash,$list,$peerID);
-        CUL_HM_cfgStateDelay($fName);
       }
       else{
         my $regLNp = "RegL_".$list.".".$peer;
@@ -3673,7 +3672,6 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_UpdtReadSingle($fHash,$regLN,$rCur,0);
           if ($mhp->{mStp} eq "04"){
             CUL_HM_updtRegDisp($fHash,$list,$peerID);
-            CUL_HM_cfgStateDelay($fName);
           }
         }
       }
@@ -6808,6 +6806,8 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $arg = $a[2] ? $a[2] : "";
     $arg = 60 if( $arg !~ m/^\d+$/);
     CUL_HM_RemoveHMPair("hmPairForSec:$name");
+    $defs{$_}{lastMsg}="cleared" foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=lastMsg=.*t:00 s:...... d:000000.*")); #remove old config message from duplicate filter
+
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "CUL_HM_RemoveHMPair", "hmPairForSec:$name", 1);
   }
@@ -8945,7 +8945,7 @@ sub CUL_HM_updtRegDisp($$$) {
   elsif ($md eq "HM-SEC-SD-2"){
     CUL_HM_SD_2($hash) if ($list == 0);
   }
-
+  CUL_HM_cfgStateDelay($name);#schedule check when finished
 }
 sub CUL_HM_cfgStateDelay($) {#update cfgState timer 
   my $name = shift;
@@ -8956,7 +8956,7 @@ sub CUL_HM_cfgStateDelay($) {#update cfgState timer
     CUL_HM_cfgStateUpdate("cfgStateUpdate:$name");
   }
   else{
-    InternalTimer(gettimeofday()+ 30,"CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0);     
+    InternalTimer(gettimeofday()+ 60,"CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0);     
   }
 }
 sub CUL_HM_cfgStateUpdate($) {#update cfgState
