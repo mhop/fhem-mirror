@@ -1404,7 +1404,7 @@ sub _transferDWDForecastValues {
       my $num1 = $num-1;
       if($num1 >= 0) {
           $time_str = "NextHour".sprintf "%02d", $num1;
-          $epoche   = $t + (3600*$num);                                                       # ACHTUNG ! hier $num statt $num1 verwenden !
+          $epoche   = $t + (3600*$num1);                                                       # ACHTUNG ! hier $num statt $num1 verwenden !
           my $ta    = TimeAdjust ($epoche);
           
           push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
@@ -2118,14 +2118,14 @@ sub forecastGraphic {                                                           
     if ($offset) {
         $t{0} += $offset;
         $t{0} += 24 if ($t{0} < 0);
-        my $t0 = sprintf('%02d', $t{0}+1); # Index liegt eins höher : 10:00 = Index '11'
+        my $t0 = sprintf('%02d', $t{0}); # Index liegt eins höher : 10:00 = Index '11'
         $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}        : 0;
         $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}      : 0;
         $we{0} = (exists($data{$hash->{TYPE}}{$name}{weather}{$t0}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$t0}{id} : -1;
         #$is{0}     = undef;
     }
     else {   
-        my $t0 = sprintf('%02d', $t{0});
+        my $t0 = sprintf('%02d', $t{0}+1);
         $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$t0}))   ? $data{$hash->{TYPE}}{$name}{pvfc}{$t0}     :  0;
         $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$t0})) ? $data{$hash->{TYPE}}{$name}{pvreal}{$t0}   :  0;
         # ToDo : klären ob ThisHour:weather_Id stimmt in Bezug zu ThisHour_Time
