@@ -1415,7 +1415,7 @@ sub _transferDWDForecastValues {
       }
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh+1)} = $calcpv;
+          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
       } 
       
       $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
