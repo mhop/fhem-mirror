@@ -87,7 +87,9 @@ my $repositoryID = '$Id$';
 #   login changed to V5 api and also new format of response  #msg1141218
 #   reset unique id as additional reset option
 
-#   
+#   change header for auth to new value token-auth
+#   adapter also region from login to new tier
+#   changed alert handing only when network is identified
 #   
 ##############################################################################
 ##############################################################################
@@ -181,7 +183,7 @@ my $BlinkCamera_loginjson = "{ \"password\" : \"q_password_q\", \"client_specifi
 my $BlinkCamera_loginjsonV5 = "{ \"app_version\": \"6.2.7 (10212) \", \"client_name\": \"fhem q_name_q\",  \"client_type\": \"ios\", \"device_identifier\": \"fhem q_fuuid_q\", \"email\": \"q_email_q\", \"os_version\": \"14.4\", \"password\": \"q_password_q\", \"reauth\": q_reauth_q, \"unique_id\": \"q_uniqueid_q\" }";
 
 
-my $BlinkCamera_verifyPinjson = "{ \"pin\" : q_pin_q }";
+my $BlinkCamera_verifyPinjson = "{ \"pin\" : \"q_pin_q\" }";
 
 my $BlinkCamera_configCamAlertjson = "{ \"camera\" : \"q_id_q\", \"id\" : \"q_id_q\", \"network\" : \"q_network_q\", \"motion_alert\" : \"q_alert_q\" }";
 
@@ -207,6 +209,10 @@ my $BlinkCamera_videofile = "BlinkCamera/q_name_q/video/q_id_q.mp4";
 # special debug setting
 my $BlinkCamera_specialLog = 4;
 
+
+# NEw Header store for toekn auth
+# my $BlinkCamera_TokenHeader = "TOKEN_AUTH";
+my $BlinkCamera_TokenHeader = "token-auth";
 
 ##############################################################################
 ##############################################################################
@@ -713,10 +719,11 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( $cmd eq "verifyPin" ) {
     
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
       #   /api/v4/account/<accountid>/client/<clientid>/pin/verify
-      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v4/account/".$hash->{account}."/client/".$hash->{clientid}."/pin/verify";
+#ORG      $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v4/account/".$hash->{account}."/client/".$hash->{clientid}."/pin/verify";
+      $hash->{HU_DO_PARAMS}->{url} = "https://rest-e004.immedia-semi.com"."/api/v4/account/".$hash->{account}."/client/".$hash->{clientid}."/pin/verify";
     
       $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_verifyPinjson;
       $hash->{HU_DO_PARAMS}->{data} =~ s/q_pin_q/$par1/g;
@@ -725,7 +732,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "camEnable") || ($cmd eq "camDisable" ) ) {
     
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
       
       my $ctype = "invalid";
@@ -764,7 +771,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "arm") || ($cmd eq "disarm" ) ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       if ( defined( $net ) ) {
         $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/network/".$net."/".$cmd;
@@ -775,7 +782,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ($cmd eq "homescreen" ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "GET";
       
@@ -790,7 +797,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "networks" ) ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "GET" ;
 
@@ -800,7 +807,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "command" )  ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "GET";
 
@@ -813,7 +820,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "alerts" )  ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "GET";
       
@@ -833,7 +840,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "cameraConfig" ) ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "GET";
 
@@ -846,7 +853,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "cameraThumbnail" ) ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "POST";
       $hash->{HU_DO_PARAMS}->{data} = "";
@@ -881,7 +888,7 @@ sub BlinkCamera_DoCmd($$;$$$)
       Log3 $name, 5, "BlinkCamera_DoCmd $name:   par1 :".$par1.":";
       Log3 $name, 5, "BlinkCamera_DoCmd $name:   curl :".(defined($curl)?$curl:"<undef>").":";
       
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       $hash->{HU_DO_PARAMS}->{method} = "GET";
       if ( defined( $curl ) ) {
         $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}.$curl.".jpg";
@@ -911,7 +918,7 @@ sub BlinkCamera_DoCmd($$;$$$)
       $par1 = $vid;
       $hash->{HU_DO_PARAMS}->{par1} = $par1;
       
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       $hash->{HU_DO_PARAMS}->{method} = "GET";
 
       if ( defined( $vidUrl ) ) {
@@ -960,13 +967,13 @@ sub BlinkCamera_DoCmd($$;$$$)
         # } 
 
         ## OLD
-        # $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+        # $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
         # $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v3/videos/delete";
         # $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_deleteVideojson;
         # $hash->{HU_DO_PARAMS}->{data} =~ s/q_id_q/$vid/g;
 
-        $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
+        $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken}."\r\n"."Content-Type: application/json";
 
         $hash->{HU_DO_PARAMS}->{url} = $hash->{URL}."/api/v1/accounts/".$hash->{account}."/media/delete";
         $hash->{HU_DO_PARAMS}->{data} = $BlinkCamera_deleteVideojson;
@@ -980,7 +987,7 @@ sub BlinkCamera_DoCmd($$;$$$)
     #######################
     } elsif ( ($cmd eq "liveview" ) ) {
 
-      $hash->{HU_DO_PARAMS}->{header} .= "\r\n"."TOKEN_AUTH: ".$hash->{AuthToken};
+      $hash->{HU_DO_PARAMS}->{header} .= "\r\n".$BlinkCamera_TokenHeader.": ".$hash->{AuthToken};
       
       $hash->{HU_DO_PARAMS}->{method} = "POST";
 
@@ -1139,15 +1146,25 @@ sub BlinkCamera_ParseLogin($$$)
 #    }
 #  }
     
-  my $resreg = $result->{region};
+# V4
+#  my $resreg = $result->{region};
+#  if ( defined( $resreg ) ) {
+#    $readUpdates->{region} = $resreg->{tier};
+#    $readUpdates->{regionName} = $resreg->{description};
+#  } else {
+#    $readUpdates->{region} = undef;    
+#    $readUpdates->{regionName} = undef;    
+#  }
+  
+# V5
+  my $resreg = $result->{account};
   if ( defined( $resreg ) ) {
     $readUpdates->{region} = $resreg->{tier};
-    $readUpdates->{regionName} = $resreg->{description};
+    $readUpdates->{regionName} = $resreg->{region};
   } else {
     $readUpdates->{region} = undef;    
     $readUpdates->{regionName} = undef;    
   }
-  
   return $ret;
 }
 
@@ -1201,19 +1218,6 @@ sub BlinkCamera_ParseHomescreen($$$)
 
   Log3 $name, 4, "BlinkCamera_ParseHomescreen $name:  ";
   
-  # Homescreen succesful so start a request for alerst/videos/notifications
-  $hash->{alertSkipped} = 0 if ( ! defined ($hash->{alertSkipped} ) );
-  if ( defined ($hash->{alertUpdate} ) ) {
-    $hash->{alertSkipped} += 1;
-    if ( $hash->{alertSkipped} > 10 ) {
-      delete( $hash->{alertUpdate} );
-      $hash->{alertSkipped} = 0;
-      Log3 $name, 3, "BlinkCamera_Callback $name: alertUpdate reset - too many times skipped" ;
-    }
-  } else {
-    BlinkCamera_ParseStartAlerts($hash) 
-  }
-
   # grab network list from summary
   my $resnet = $result->{networks};
   my $firstnetwork = undef;
@@ -1267,7 +1271,26 @@ sub BlinkCamera_ParseHomescreen($$$)
     Log3 $name, 2, "BlinkCamera_ParseHomescreen $name: Network ID not found - please set attribute to existing network";
   } else {
     Log3 $name, 4, "BlinkCamera_ParseHomescreen $name: network  ".$network ;
+
+    # changed alerts after network identification only
+    # Homescreen succesful so start a request for alerst/videos/notifications
+    $hash->{alertSkipped} = 0 if ( ! defined ($hash->{alertSkipped} ) );
+    if ( defined ($hash->{alertUpdate} ) ) {
+      $hash->{alertSkipped} += 1;
+      if ( $hash->{alertSkipped} > 10 ) {
+        delete( $hash->{alertUpdate} );
+        $hash->{alertSkipped} = 0;
+        Log3 $name, 3, "BlinkCamera_Callback $name: alertUpdate reset - too many times skipped" ;
+      }
+    } else {
+      BlinkCamera_ParseStartAlerts($hash) 
+    }
+
   }
+
+
+
+
 
   # sync module information
   my $syncList = $result->{sync_modules};
