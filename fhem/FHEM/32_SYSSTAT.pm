@@ -782,6 +782,22 @@ SYSSTAT_Attr($$$)
 
     SYSSTAT_Connect($hash)
 
+  } elsif( $attrName eq 'noSSH') {
+    if( $cmd eq 'set' && $attrVal ne '0' ) {
+      $attr{$name}{$attrName} = $attrVal;
+      if( $hash->{HOST} ) {
+        SYSSTAT_Disconnect($hash);
+        delete $hash->{CONNECTS};
+        delete $hash->{helper}{has_proc_loadavg};
+        delete $hash->{helper}{has_proc_stat};
+        delete $hash->{helper}{has_proc_uptime};
+      }
+
+    } else {
+      SYSSTAT_Connect($hash);
+
+    }
+
   } elsif( $attrName eq 'filesystems') {
     my @filesystems = split(',',$attrVal);
     @{$hash->{filesystems}} = @filesystems;
@@ -1000,7 +1016,7 @@ SYSSTAT_GetUpdateSNMP($)
   }
 
   if(!$hash->{LOCAL}) {
-    return if( IsDisabled($name) > 0 );
+    return undef if( IsDisabled($name) > 0 );
   }
 
   SYSSTAT_getLoadAVGSNMP($hash);
@@ -1054,7 +1070,7 @@ SYSSTAT_BlockingCall($)
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  $hash->{BlockingResult} = ();
+  $hash->{BlockingResult} = {};
 
   SYSSTAT_GetUpdateSNMP($hash);
 
