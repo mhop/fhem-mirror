@@ -1403,10 +1403,10 @@ sub _transferDWDForecastValues {
       
       my $calcpv = calcPVforecast ($name, $v, $num, $t, $fh, $fd);                            # Vorhersage gewichtet kalkulieren
                 
-      my $num1 = $num-1;
-      if($num1 >= 0) {
-          $time_str = "NextHour".sprintf "%02d", $num1;
-          $epoche   = $t + (3600*$num1);                                                      
+      #my $num1 = $num-1;
+      if($num >= 0) {
+          $time_str = "NextHour".sprintf "%02d", $num;
+          $epoche   = $t + (3600*$num);                                                      
           my $ta    = TimeAdjust ($epoche);
           
           push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
@@ -1501,7 +1501,7 @@ sub _transferWeatherValues {
           $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
       }
       
-      if($num < 23 && $fh > 0 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      if($num < 23 && $fh > 0 && $fh < 24) {                                                   # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
@@ -2196,7 +2196,7 @@ sub forecastGraphic {                                                           
 
           #######################################
           #correct the hour for accurate display
-          if ($start < $hfcg->{0}{time}) {                                                                  # consumption seems to be tomorrow
+          if ($start < $hfcg->{0}{time}) {                                                       # consumption seems to be tomorrow
               $start = 24-$hfcg->{0}{time}+$start;
               $flag  = 1;
           } 
