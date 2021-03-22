@@ -1357,11 +1357,21 @@ SYSSTAT_getUptimeSNMP($)
   if( $hash->{USE_SNMP} && defined($hash->{session}) ) {
     Log3 $name, 5, "$name: trying snmp uptime";
 
-    my @snmpoids = ( '.1.3.6.1.2.1.25.1.1.0' );
+    my @snmpoids = ( '.1.3.6.1.2.1.1.3.0' );
 
     my $response = SYSSTAT_readOIDs($hash,\@snmpoids);
 
-    my $uptime = $response->{'.1.3.6.1.2.1.25.1.1.0'};
+    my $uptime = $response->{'.1.3.6.1.2.1.1.3.0'};
+    if( defined($uptime) ) {
+      SYSSTAT_Parse($hash, 'cat /proc/uptime', $uptime/100);
+      return;
+    }
+
+    @snmpoids = ( '.1.3.6.1.2.1.25.1.1.0' );
+
+    $response = SYSSTAT_readOIDs($hash,\@snmpoids);
+
+    $uptime = $response->{'.1.3.6.1.2.1.25.1.1.0'};
     if( defined($uptime) ) {
       SYSSTAT_Parse($hash, 'cat /proc/uptime', $uptime/100);
       return;
