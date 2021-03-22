@@ -167,6 +167,10 @@ sub Define($$) {
   $hash->{NODEID} = $nodeId;
   $hash->{QUERYPARAM} = $queryParams;
 
+  my $hexNodeId = sprintf('%1x',$nodeId);
+  $hexNodeId = "0$hexNodeId" unless length($hexNodeId) == 2;
+  $hash->{NODEID_HEX} = $hexNodeId;
+
   Log3 $name, 3, "TA_CMI_JSON ($name) - Define ... module=$module, CMI-URL=$cmiUrl, nodeId=$nodeId";
   readingsSingleUpdate($hash, 'state', 'defined', 1);
 
@@ -443,9 +447,7 @@ sub FixwertChangeRequest($$$$) {
     my $name = $hash->{NAME};
     my $nodeId = $hash->{NODEID};
     my $cmiIp = $hash->{CMIURL};
-
-    my $hexNodeId = sprintf('%1x',$nodeId);
-    $hexNodeId = "0$hexNodeId" unless length($hexNodeId) == 2;
+    my $hexNodeId = $hash->{NODEID_HEX};
 
     $index--; #1 on the Web UI is index 0. 2 is 1, etc.
     my $hexIndex = sprintf('%1x',$index);
@@ -507,8 +509,7 @@ sub RequestOutputStates($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
     my $nodeId = $hash->{NODEID};
-    my $hexNodeId = sprintf('%1x',$nodeId);
-    $hexNodeId = "0$hexNodeId" unless length($hexNodeId) == 2;
+    my $hexNodeId = $hash->{NODEID_HEX};
 
     my $url = "http://$hash->{CMIURL}/INCLUDE/agx2.cgi?nodex2=$hexNodeId"."&_=".gettimeofday();
     my $username = AttrVal($name, 'username', 'admin');
