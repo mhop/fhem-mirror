@@ -43,7 +43,7 @@ SYSSTAT_Initialize($)
   $hash->{SetFn}    = "SYSSTAT_Set";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 noSSH:1,0 ssh_user";
+  $hash->{AttrList} = "disable:1 disabledForIntervals raspberrycpufreq:1 raspberrytemperature:0,1,2 synologytemperature:0,1,2 stat:1 uptime:1,2 load:0 noSSH:1,0 ssh_user";
   $hash->{AttrList} .= " snmp:1,0 mibs:textField-long snmpVersion:1,2 snmpCommunity" if( $SYSSTAT_hasSNMP );
   $hash->{AttrList} .= " filesystems showpercent readings:textField-long readingsFormat:textField-long";
   $hash->{AttrList} .= " useregex:1";
@@ -122,6 +122,8 @@ SYSSTAT_Disconnect($)
   delete($hash->{FH});
   delete($hash->{FD});
   delete($selectlist{$name});
+
+  $hash->{PARTIAL} ='';
 
   $hash->{STATE} = "Disconnected";
   Log3 $name, 3, "$name: Disconnected";
@@ -1019,7 +1021,7 @@ SYSSTAT_GetUpdateSNMP($)
     return undef if( IsDisabled($name) > 0 );
   }
 
-  SYSSTAT_getLoadAVGSNMP($hash);
+  SYSSTAT_getLoadAVGSNMP($hash) if( AttrVal($name, 'load', 1) > 0 );
 
   SYSSTAT_getFilesystemsSNMP($hash) if( $hash->{do_diskusage} && $#{$hash->{filesystems}} >= 0 );
 
@@ -1552,6 +1554,8 @@ attr <device> readingsFormat { frequency => '{ $VALUE = [map {int($_ / 1000)} sp
     <li>uptime<br>
       If set and > 0 the system uptime is read.<br>
       If set to 2 the uptime is displayed in seconds.</li>
+    <li>load<br>
+      If set and = 0 the system load is not read.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
     <li>ssh_user<br>
@@ -1714,6 +1718,8 @@ attr <device> readingsFormat { frequency => '{ $VALUE = [map {int($_ / 1000)} sp
     <li>uptime<br>
       Wenn gesetzt und > 0 wird die Betriebszeit (uptime) des Systems ausgelesen.<br>
       Wenn Wert 2 ist, wird die Betriebszeit (uptime) in Sekunden angezeigt.</li>
+    <li>load<br>
+      Wenn gesetzt und = 0 wird die  last (load) des nicht Systems ausgelesen.</li>
     <li>useregex<br>
       Wenn Wert gesetzt, werden die Eintr&auml;ge der Dateisysteme als regex behandelt.</li>
     <li>ssh_user<br>
