@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.18.0" => "21.03.2021  new  sub forecastGraphic from Wzut ",
+  "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
+  "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
   "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
   "0.17.0" => "20.03.2021  new attr cloudFactorSlope / rainFactorSlope, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
@@ -1400,7 +1401,7 @@ sub _transferDWDForecastValues {
       
       Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Rad1h=$v");
       
-      my $calcpv = calcPVforecast ($name, $v, $num, $t, $fd);                                 # Vorhersage gewichtet kalkulieren
+      my $calcpv = calcPVforecast ($name, $v, $num, $t, $fh, $fd);                            # Vorhersage gewichtet kalkulieren
                 
       my $num1 = $num-1;
       if($num1 >= 0) {
@@ -1413,6 +1414,7 @@ sub _transferDWDForecastValues {
           
           $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
           $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
+          $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $v;                         # nur Info: original Vorhersage Strahlungsdaten
       }
       
       if($num < 23 && $fh > 0 && $fh < 24) {                                                  # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
@@ -1420,7 +1422,7 @@ sub _transferDWDForecastValues {
 
       } 
       
-      $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
+      # $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";             
@@ -1807,7 +1809,7 @@ sub forecastGraphic {                                                           
   my ($val,$height);
   my ($z2,$z3,$z4);
   my $he;                                                                                  # Balkenhöhe
-  #my (%is,%di);
+
   my $hfcg      = $data{$hash->{TYPE}}{$name}{html};                                       #(hfcg = hash forecast graphic)
   my $pvhist    = $data{$hash->{TYPE}}{$name}{pvhist};
   my $next_hour = $data{$hash->{TYPE}}{$name}{nexthours};
@@ -1993,9 +1995,7 @@ sub forecastGraphic {                                                           
       my $alias   = AttrVal    ($name,    "alias",              $name );                            # Linktext als Aliasname
       
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = ReadingsTimestamp($name, "NextHour00_PVforecast", "0000-00-00 00:00:00");         # letzter Forecast Update  
-      # ToDo : warum geht das hier nicht ?
-      #my $lup     = (exists($next_hour->{NextHour00}{starttime})) ? $next_hour->{NextHour00}{starttime} : '0000-00-00 00:00:00' ;
+      my $lup     = ReadingsTimestamp($name, "NextHour00_PVforecast", "0000-00-00 00:00:00");       # letzter Forecast Update
 
       my $lupt    = "last update:";
       my $autoct  = "automatic correction:";  
@@ -2027,7 +2027,7 @@ sub forecastGraphic {                                                           
              $lup = "$year-$month-$day&nbsp;$time"; 
           }
 
-          my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')\"";    # Update Button generieren        
+          my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')\"";               # Update Button generieren        
 
           if ($ftui eq "ftui") {
               $cmdupdate = "\"ftui.setFhemStatus('get $name data')\"";     
@@ -2113,23 +2113,19 @@ sub forecastGraphic {                                                           
   my $day;
 
   my $t = (exists($next_hour->{'NextHour00'}{starttime})) ? $next_hour->{'NextHour00'}{starttime}  : (AttrVal('global', 'language', '') eq 'DE') ? '00.00.0000 24' : '0000-00-00 24';
-  #($year,$month,$day,$thishour) = ReadingsVal($name, "NextHour00_Time", '0000-00-00 24') =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-
-  #($day,$month,$year,$thishour) = ReadingsVal($name, "NextHour00_Time", '00.00.0000 24') =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
-  #$t = (exists($next_hour->{'NextHour00'}{starttime})) ? $next_hour->{'NextHour00'}{starttime}  : '00.00.0000 24';
   ($day_str,$month,$year,$thishour) = $t =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
 
+  $thishour++;
+  
   $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour); # keine führende Null
+  $thishour            = int($thishour);                                                              # keine führende Null
 
   $hfcg->{0}{time}     = $thishour;
   $hfcg->{0}{day_str}  = $day_str;
   $day                 = int($day_str);
   $hfcg->{0}{day}      = $day;
-  # gleich die Unix Zeit dazu holen
-  #$hfcg->{0}{mktime}   = timelocal(0,0,$thishour,$day,int($month),$year);
-  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month),$year);
+  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month),$year);                         # gleich die Unix Zeit dazu holen
 
   my $val1 = 0;
   my $val2 = 0;
@@ -2141,21 +2137,16 @@ sub forecastGraphic {                                                           
 
       if ($hfcg->{0}{time} < 0) {
           $hfcg->{0}{time} += 24;
-          # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
-          my $n_day    = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));
+          my $n_day    = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));       # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
           $hfcg->{0}{day}     = int($n_day);
           $hfcg->{0}{day_str} = $n_day;
-          # hfcg->{0}{day_str} muss jetzt ungleich dem $day_str sein !
       }
 
       $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
-
-      # Achtung Falle :
-      #if (exists($pvhist->{$hfcg->{0}{day_str}})) {
-      $val1 = (exists($pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{pvfc}))  ? $pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{pvfc}  : 0;
-      $val2 = (exists($pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{pvrl}))  ? $pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{pvrl}  : 0;
-      $val3 = (exists($pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{gcons})) ? $pvhist->{$hfcg->{0}{day_str}}{$hfcg->{0}{time_str}}{gcons} : 0;
-      #}
+      
+      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvfc",  0);
+      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
+      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
 
       $hfcg->{0}{weather} = (exists($data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id} : undef;
   }
@@ -2168,14 +2159,13 @@ sub forecastGraphic {                                                           
       #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
   }
 
-  $hfcg->{0}{time_str} .= $hourstyle;
+  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
 
   $hfcg->{0}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'consumption') ? $val3 : $val4;
   $hfcg->{0}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'consumption') ? $val3 : $val4;
   $hfcg->{0}{diff}  = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
-  # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
-  $lotype = 'pv' if ($beam1cont eq $beam2cont);
+  $lotype = 'pv' if ($beam1cont eq $beam2cont);                                                  # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
   ###########################################################
   # get consumer list and display it in portalGraphics
@@ -2242,13 +2232,13 @@ sub forecastGraphic {                                                           
 
       $hfcg->{$i}{time}  = $hfcg->{0}{time} + $i;
 
-      while ($hfcg->{$i}{time} > 23) {
+      while ($hfcg->{$i}{time} > 24) {
           $hfcg->{$i}{time} -= 24; # wird bis zu 2x durchlaufen
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time});
 
-      my $nh; # next hour
+      my $nh;                                                                                          # next hour
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {
@@ -2270,12 +2260,11 @@ sub forecastGraphic {                                                           
 
       if (defined($nh)) {
           $val1   = $next_hour->{'NextHour'.$nh} ? $next_hour->{'NextHour'.$nh}{pvforecast} // 0 : 0;
-          # ToDo : klären ob -1 oder nicht !
           $hfcg->{$i}{weather} = $next_hour->{'NextHour'.$nh} ? $next_hour->{'NextHour'.$nh}{weatherid} // undef : undef;
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
 
-      $hfcg->{$i}{time_str} .= $hourstyle;
+      $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
 
       $hfcg->{$i}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'consumption') ? $val3 : $val4;
       $hfcg->{$i}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'consumption') ? $val3 : $val4;
@@ -2291,349 +2280,343 @@ sub forecastGraphic {                                                           
       $minDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff} < $minDif);
   }
 
-    #Log3($hash,3,Dumper($hfcg));
-    ######################################
-    # Tabellen Ausgabe erzeugen
-    ######################################
+  #Log3($hash,3,Dumper($hfcg));
+  ######################################
+  # Tabellen Ausgabe erzeugen
+  ######################################
  
-    # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
-    # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
-    # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
+  # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
+  # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
+  # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
 
-    $ret  = "<html>";
-    $ret .= $html_start if (defined($html_start));
-    $ret .= "<style>TD.smaportal {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
-    $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
-    $ret .= "<tr><td class='smaportal'>";
-    $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
+  $ret  = "<html>";
+  $ret .= $html_start if (defined($html_start));
+  $ret .= "<style>TD.smaportal {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+  $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
+  $ret .= "<tr><td class='smaportal'>";
+  $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
 
-    if ($header) {                                                                                            # Header ausgeben 
-        $ret .= "<tr class='odd'>";
-        # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
-        $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td></tr>";
-    }
+  if ($header) {                                                                                            # Header ausgeben 
+      $ret .= "<tr class='odd'>";
+      # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td></tr>";
+  }
 
-    if ($legend_txt && ($legend eq 'top')) {
-        $ret .= "<tr class='odd'>";
-        $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legend_txt</td></tr>";
-    }
+  if ($legend_txt && ($legend eq 'top')) {
+      $ret .= "<tr class='odd'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legend_txt</td></tr>";
+  }
 
-    if ($weather) {
-        $ret .= "<tr class='even'><td class='smaportal'></td>";                                                  # freier Platz am Anfang
+  if ($weather) {
+      $ret .= "<tr class='even'><td class='smaportal'></td>";                                                  # freier Platz am Anfang
 
-        my $ii;
-        for my $i (0..($maxhours*2)-1) {
+      my $ii;
+      for my $i (0..($maxhours*2)-1) {
 
-            last if (!exists($hfcg->{$i}{weather}));
-            next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-            # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
-            $ii++; # wieviele Stunden Icons haben wir bisher beechnet  ?
-            last if ($ii > $maxhours); # vorzeitiger Abbruch
+          last if (!exists($hfcg->{$i}{weather}));
+          next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
+          # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
+          $ii++;                                                                                               # wieviele Stunden Icons haben wir bisher beechnet  ?
+          last if ($ii > $maxhours); # vorzeitiger Abbruch
 
-            # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
-            # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
-            if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-            my ($icon_name, $title) = (($hfcg->{$i}{weather} > 99)) ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
-            # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
-            Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
+          # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
+          # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
+          if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
+          my ($icon_name, $title) = (($hfcg->{$i}{weather} > 99)) ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
+          # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
+          Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
 
-            $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
-            $val        = FW_makeImage($icon_name);
+          $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
+          $val        = FW_makeImage($icon_name);
 
-            if ($val eq $icon_name) {                                      # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-                $val  ='<b>???<b/>';                                                       
-                Log3($name, 3, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
-            }
+          if ($val eq $icon_name) {                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+              $val  ='<b>???<b/>';                                                       
+              Log3($name, 3, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+          }
 
-            $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
-            # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
-            } 
-            else { 
-            $ret .= "<td></td>";  
-            $hfcg->{$i}{weather} = undef; # ToDo : prüfen ob noch nötig
-            }
-        }
+          $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
+          # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+          } 
+          else { 
+              $ret .= "<td></td>";  
+              $hfcg->{$i}{weather} = undef;                                                  # ToDo : prüfen ob noch nötig
+          }
+      }
 
-        $ret .= "<td class='smaportal'></td></tr>";                                            # freier Platz am Ende der Icon Zeile
-    }
+      $ret .= "<td class='smaportal'></td></tr>";                                            # freier Platz am Ende der Icon Zeile
+  }
 
-    if($show_diff eq 'top') {                                                                  # Zusätzliche Zeile Ertrag - Verbrauch
-    $ret .= "<tr class='even'><td class='smaportal'></td>";                                # freier Platz am Anfang
-    my $ii;
-    for my $i (0..($maxhours*2)-1) {
-        # gleiche Bedingung wie oben
-        next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-        $ii++; # wieviele Stunden haben wir bisher angezeigt ?
-        last if ($ii > $maxhours); # vorzeitiger Abbruch
+  if($show_diff eq 'top') {                                                                  # Zusätzliche Zeile Ertrag - Verbrauch
+      $ret .= "<tr class='even'><td class='smaportal'></td>";                                # freier Platz am Anfang
+      my $ii;
+      for my $i (0..($maxhours*2)-1) {
+          # gleiche Bedingung wie oben
+          next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
+          $ii++; # wieviele Stunden haben wir bisher angezeigt ?
+          last if ($ii > $maxhours); # vorzeitiger Abbruch
 
-        $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-        $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val; # negative Zahlen in Fettschrift, 0 aber ohne +
-        $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
-    }
-    $ret .= "<td class='smaportal'></td></tr>"; # freier Platz am Ende 
-    }
+          $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
+          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val; # negative Zahlen in Fettschrift, 0 aber ohne +
+          $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
+      }
+      $ret .= "<td class='smaportal'></td></tr>"; # freier Platz am Ende 
+  }
 
-    $ret .= "<tr class='even'><td class='smaportal'></td>";                                    # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='even'><td class='smaportal'></td>";                                    # Neue Zeile mit freiem Platz am Anfang
 
-    my $ii = 0;
-    for my $i (0..($maxhours*2)-1) {
-    # gleiche Bedingung wie oben
-    next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-    $ii++;
-    last if ($ii > $maxhours);
+  my $ii = 0;
+  for my $i (0..($maxhours*2)-1) {
+      # gleiche Bedingung wie oben
+      next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
+      $ii++;
+      last if ($ii > $maxhours);
 
-    # Achtung Falle, Division by Zero möglich, 
-    # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
-    $height = 200 if (!$height);                                                           # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
-    $maxVal = 1   if (!int $maxVal);
-    $maxCon = 1   if (!$maxCon);
+      # Achtung Falle, Division by Zero möglich, 
+      # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
+      $height = 200 if (!$height);                                                           # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $maxVal = 1   if (!int $maxVal);
+      $maxCon = 1   if (!$maxCon);
 
-    # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins 
-    # dass die Grundlinie der Balken nach unten durchbrochen wird
+      # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins 
+      # dass die Grundlinie der Balken nach unten durchbrochen wird
 
-    if ($lotype eq 'pv') {
-        $he = int(($maxVal-$hfcg->{$i}{beam1}) / $maxVal*$height) + $fsize;
-        $z3 = int($height + $fsize - $he);
-    } 
+      if ($lotype eq 'pv') {
+          $he = int(($maxVal-$hfcg->{$i}{beam1}) / $maxVal*$height) + $fsize;
+          $z3 = int($height + $fsize - $he);
+      } 
 
-    if ($lotype eq 'pvco') {
-        # Berechnung der Zonen
-        # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
-        # z2 - der Ertrag ggf mit Icon
-        # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
-        # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
+      if ($lotype eq 'pvco') {
+          # Berechnung der Zonen
+          # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
+          # z2 - der Ertrag ggf mit Icon
+          # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
+          # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
 
-        $maxVal = $maxCon if ($maxCon > $maxVal);                                         # wer hat den größten Wert ?
+          $maxVal = $maxCon if ($maxCon > $maxVal);                                         # wer hat den größten Wert ?
 
-        if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # pv oben , co unten
-        $z2 = $hfcg->{$i}{beam1}; $z3 = $hfcg->{$i}{beam2}; 
-        } 
-        else {                                                                            # tauschen, Verbrauch ist größer als Ertrag
-        $z3 = $hfcg->{$i}{beam1}; $z2 = $hfcg->{$i}{beam2}; 
-        }
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # pv oben , co unten
+              $z2 = $hfcg->{$i}{beam1}; $z3 = $hfcg->{$i}{beam2}; 
+          } 
+          else {                                                                            # tauschen, Verbrauch ist größer als Ertrag
+              $z3 = $hfcg->{$i}{beam1}; $z2 = $hfcg->{$i}{beam2}; 
+          }
 
-        $he = int(($maxVal-$z2)/$maxVal*$height);
-        $z2 = int(($z2 - $z3)/$maxVal*$height);
+          $he = int(($maxVal-$z2)/$maxVal*$height);
+          $z2 = int(($z2 - $z3)/$maxVal*$height);
 
-        $z3 = int($height - $he - $z2);                                                   # was von maxVal noch übrig ist
-          
-        if ($z3 < int($fsize/2)) {                                                        # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
-        $z2 += $z3; $z3 = 0; 
-        }
-    }
-
-    if ($lotype eq 'diff') {  # Typ diff
-        # Berechnung der Zonen
-        # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
-        # z2 - positiver Balken inkl Icon
-        # z3 - negativer Balken
-        # z4 - Zahl negativer Wert + fsize
-
-        my ($px_pos,$px_neg);
-        my $maxPV = 0;                                                                    # ToDo:  maxPV noch aus Attribut maxPV ableiten
-
-        if ($maxPV) {                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxPV = 0
-        $px_pos = int($height/2);
-        $px_neg = $height - $px_pos;                                                  # Rundungsfehler vermeiden
-        } 
-        else {                                                                            # Dynamische hoch/runter Verschiebung der Null-Linie        
-        if  ($minDif >= 0 ) {                                                         # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
-            $px_neg = 0;
-            $px_pos = $height;
-        } 
-        else {
-            if ($maxDif > 0) {
-            $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));     # Wieviel % entfallen auf unten ?
-            $px_pos = $height-$px_neg;                                            # der Rest ist oben
-            }
-            else {                                                                    # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
-            $px_neg = $height;
-            $px_pos = 0;
-            }
-        }
-        }
-
-        if ($hfcg->{$i}{diff} >= 0) {                                                               # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
-            $z2 = $hfcg->{$i}{diff};
-            $z3 = abs($minDif);
-        } 
-        else {
-        $z2 = $maxDif;
-        $z3 = abs($hfcg->{$i}{diff}); # Nur Betrag ohne Vorzeichen
-        }
- 
-        # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
-        $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);                        # Teilung durch 0 vermeiden
-        $z2 = ($px_pos - $he) ;
-
-        $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg);              # Teilung durch 0 unbedingt vermeiden
-        $z3 = ($px_neg - $z4);
-
-        # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
-        $he += $fsize; 
-        $z4 += $fsize if ($z3);                                                           # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
-    }
-    
-    # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
-    # das \n erleichtert das lesen des Seitenquelltext beim debugging
-    # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
-
-    $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
-
-    if ($lotype eq 'pv') {
-        #my $v   = ($lotype eq 'co') ? $hfcg->{$i}{beam2} : $hfcg->{$i}{beam1} ; 
-        #$v   = 0 if (($lotype eq 'co') && !$hfcg->{$i}{beam1} && !$show_night);                        # auch bei type co die Nacht ggf. unterdrücken
-        $val = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-
-        $ret .="<table width='100%' height='100%'>";                                      # mit width=100% etwas bessere Füllung der Balken
-        $ret .="<tr class='even' style='height:".$he."px'>";
-        $ret .="<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
-
-        if ($hfcg->{$i}{beam1} || $show_night) {                                                     # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
-        my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
-        $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';         # Syntaxhilight 
-
-        $ret .= "<tr class='odd' style='height:".$z3."px;'>";
-        $ret .= "<td align='center' class='smaportal' ".$style.">";
+          $z3 = int($height - $he - $z2);                                                   # was von maxVal noch übrig ist
               
-        my $sicon = 1;                                                    
-        #$ret .= $is{$i} if (defined ($is{$i}) && $sicon);
+          if ($z3 < int($fsize/2)) {                                                        # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+              $z2 += $z3; $z3 = 0; 
+          }
+      }
 
-        ##################################
-        # inject the new icon if defined
-        #$ret .= consinject($hash,$i,@pgCDev) if($s);
-              
-        $ret .= "</td></tr>";
-        }
-    }
- 
-    if ($lotype eq 'pvco') { 
-        my ($color1, $color2, $style1, $style2, $v);
+      if ($lotype eq 'diff') {                                                              # Typ diff
+          # Berechnung der Zonen
+          # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
+          # z2 - positiver Balken inkl Icon
+          # z3 - negativer Balken
+          # z4 - Zahl negativer Wert + fsize
 
-        $ret .="<table width='100%' height='100%'>\n";                                   # mit width=100% etwas bessere Füllung der Balken
+          my ($px_pos,$px_neg);
+          my $maxPV = 0;                                                                    # ToDo:  maxPV noch aus Attribut maxPV ableiten
 
-        # der Freiraum oben kann beim größten Balken ganz entfallen
-        $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>" if ($he);
+          if ($maxPV) {                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxPV = 0
+              $px_pos = int($height/2);
+              $px_neg = $height - $px_pos;                                                  # Rundungsfehler vermeiden
+          } 
+          else {                                                                            # Dynamische hoch/runter Verschiebung der Null-Linie        
+              if  ($minDif >= 0 ) {                                                         # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
+                  $px_neg = 0;
+                  $px_pos = $height;
+              } 
+              else {
+                  if ($maxDif > 0) {
+                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));     # Wieviel % entfallen auf unten ?
+                      $px_pos = $height-$px_neg;                                            # der Rest ist oben
+                  }
+                  else {                                                                    # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
+                      $px_neg = $height;
+                      $px_pos = 0;
+                  }
+              }
+          }
 
-        if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
-        $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-        $color1  = $colorfc;
-        $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-        $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
-              
-        if($z3) {                                                                    # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
-            $v       = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
-            $color2  = $colorc;
-            $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-            $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
-        } 
-        } 
-        else {
-        $val     = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
-        $color1  = $colorc;
-        $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-        $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
-              
-        if($z3) {
-            $v       = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
-            $color2  = $colorfc;
-            $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-            $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
-        }
-        }
-
-        $ret .= "<tr class='odd' style='height:".$z2."px'>";
-        $ret .= "<td align='center' class='smaportal' ".$style1.">$val";     
-        #$ret .= $is{$i} if (defined $is{$i});
-         
-        ##################################
-        # inject the new icon if defined
-        #$ret .= consinject($hash,$i,@pgCDev) if($s);
-         
-        $ret .= "</td></tr>";
-
-        if ($z3) {                                                                                 # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
-        $ret .= "<tr class='odd' style='height:".$z3."px'>";
-        $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
-        }
-    } 
-
-    if ($lotype eq 'diff') {                                                                                       # Type diff
-        my $style = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-        $ret .= "<table width='100%' border='0'>\n";                                         # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
-        #$val  = ($hfcg->{$i}{diff} >= 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
-
-        $val = ($hfcg->{$i}{diff} > 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
-        $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                         # Sonderfall , hier wird die 0 gebraucht !
-
-        if ($val) {
-        $ret .= "<tr class='even' style='height:".$he."px'>";
-        $ret .= "<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
-        }
-
-        if ($hfcg->{$i}{diff} >= 0) {                                                                       # mit Farbe 1 colorfc füllen
-        $style .= defined $colorfc ? " background-color:#$colorfc\"" : '"';
-        $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                       # Sonderfall , 1px dünnen Strich ausgeben
-        $ret  .= "<tr class='odd' style='height:".$z2."px'>";
-        $ret  .= "<td align='center' class='smaportal' ".$style.">";
-        #$ret  .= $is{$i} if (defined $is{$i});
-        $ret  .= "</td></tr>";
-        } 
-        else {                                                                                   # ohne Farbe
-        $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                           # Sonderfall, hier wird die 0 gebraucht !
-            if ($z2 && $val) {                                                                   # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
-            $ret .= "<tr class='even' style='height:".$z2."px'>";
-            $ret .= "<td class='smaportal'></td></tr>";
-            }
-        }
+          if ($hfcg->{$i}{diff} >= 0) {                                                   # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
+              $z2 = $hfcg->{$i}{diff};
+              $z3 = abs($minDif);
+          } 
+          else {
+              $z2 = $maxDif;
+              $z3 = abs($hfcg->{$i}{diff});                                               # Nur Betrag ohne Vorzeichen
+          }
      
-        if ($hfcg->{$i}{diff} < 0) {                                                                        # Negativ Balken anzeigen ?
-        $style .= (defined($colorc)) ? " background-color:#$colorc\"" : '"';                 # mit Farbe 2 colorc füllen
-        $ret   .= "<tr class='odd' style='height:".$z3."px'>";
-        $ret   .= "<td align='center' class='smaportal' ".$style."></td></tr>";
-        } 
-        elsif ($z3) {                                                                             # ohne Farbe
-        $ret .= "<tr class='even' style='height:".$z3."px'>";
-        $ret .= "<td class='smaportal'></td></tr>";
-        }
+          # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
+          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);                        # Teilung durch 0 vermeiden
+          $z2 = ($px_pos - $he) ;
 
-        if($z4) {                                                                                # kann entfallen wenn auch z3 0 ist
-        $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '&nbsp;';
-        $ret .= "<tr class='even' style='height:".$z4."px'>";
-        $ret .= "<td class='smaportal' style='vertical-align:top'>".$val."</td></tr>";
-        }
-    }
+          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg);              # Teilung durch 0 unbedingt vermeiden
+          $z3 = ($px_neg - $z4);
 
-    if ($show_diff eq 'bottom') {                                                                # zusätzliche diff Anzeige
-        $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-        #$val = 0 if ($val eq '&nbsp;');
-        #$hfcg->{$i}{diff} = 0 if ($hfcg->{$i}{diff} eq ' ');
-        $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;'); # negative Zahlen in Fettschrift, 0 aber ohne +
-        $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
-    }
+          # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
+          $he += $fsize; 
+          $z4 += $fsize if ($z3);                                                                       # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
+      }
+        
+      # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
+      # das \n erleichtert das lesen des Seitenquelltext beim debugging
+      # vertical-align:bottom damit alle Balken und Ausgaben wirklich auf der gleichen Grundlinie sitzen
 
-    $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:bottom; text-align:center;'>";
-    $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
-    $thishour = 99 if ($hfcg->{$i}{time} == $thishour); # nur einmal verwenden !
-    $ret .="</td></tr></table></td>";                                                   
-    } ## for i
+      $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
 
+      if ($lotype eq 'pv') {
+          #my $v   = ($lotype eq 'co') ? $hfcg->{$i}{beam2} : $hfcg->{$i}{beam1} ; 
+          #$v   = 0 if (($lotype eq 'co') && !$hfcg->{$i}{beam1} && !$show_night);                      # auch bei type co die Nacht ggf. unterdrücken
+          $val = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
 
-    $ret .= "<td class='smaportal'></td></tr>";
+          $ret .="<table width='100%' height='100%'>";                                                  # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<tr class='even' style='height:".$he."px'>";
+          $ret .="<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
 
-    ###################
-    # Legende unten
-    if ($legend_txt && ($legend eq 'bottom')) {
-    $ret .= "<tr class='odd'>";
-    $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-    $ret .= "$legend_txt</td></tr>";
-    }
+          if ($hfcg->{$i}{beam1} || $show_night) {                                                      # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
+              my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';                     # Syntaxhilight 
 
-    $ret .=  "</table></td></tr></table>";
-    $ret .= $html_end if (defined($html_end));
-    $ret .= "</html>";
+              $ret .= "<tr class='odd' style='height:".$z3."px;'>";
+              $ret .= "<td align='center' class='smaportal' ".$style.">";
+                      
+              my $sicon = 1;                                                    
+              #$ret .= $is{$i} if (defined ($is{$i}) && $sicon);
 
-    return $ret;
+              ##################################
+              # inject the new icon if defined
+              #$ret .= consinject($hash,$i,@pgCDev) if($s);
+                      
+              $ret .= "</td></tr>";
+          }
+      }
+     
+      if ($lotype eq 'pvco') { 
+          my ($color1, $color2, $style1, $style2, $v);
+
+          $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
+
+          # der Freiraum oben kann beim größten Balken ganz entfallen
+          $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>" if ($he);
+
+          if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+              $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
+              $color1  = $colorfc;
+              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
+                      
+              if($z3) {                                                                                          # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
+                  $v       = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
+                  $color2  = $colorc;
+                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
+              } 
+          } 
+          else {
+              $val     = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
+              $color1  = $colorc;
+              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
+                      
+              if($z3) {
+                  $v       = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
+                  $color2  = $colorfc;
+                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
+              }
+          }
+
+          $ret .= "<tr class='odd' style='height:".$z2."px'>";
+          $ret .= "<td align='center' class='smaportal' ".$style1.">$val";
+             
+          ##################################
+          # inject the new icon if defined
+          #$ret .= consinject($hash,$i,@pgCDev) if($s);
+             
+          $ret .= "</td></tr>";
+
+          if ($z3) {                                                                                     # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
+              $ret .= "<tr class='odd' style='height:".$z3."px'>";
+              $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
+          }
+      } 
+
+      if ($lotype eq 'diff') {                                                                          # Type diff
+          my $style = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+          $ret .= "<table width='100%' border='0'>\n";                                                  # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
+
+          $val = ($hfcg->{$i}{diff} > 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
+          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                         # Sonderfall , hier wird die 0 gebraucht !
+
+          if ($val) {
+              $ret .= "<tr class='even' style='height:".$he."px'>";
+              $ret .= "<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
+          }
+
+          if ($hfcg->{$i}{diff} >= 0) {                                                                 # mit Farbe 1 colorfc füllen
+              $style .= defined $colorfc ? " background-color:#$colorfc\"" : '"';
+              $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                  # Sonderfall , 1px dünnen Strich ausgeben
+              $ret  .= "<tr class='odd' style='height:".$z2."px'>";
+              $ret  .= "<td align='center' class='smaportal' ".$style.">";
+              $ret  .= "</td></tr>";
+          } 
+          else {                                                                                        # ohne Farbe
+              $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                      # Sonderfall, hier wird die 0 gebraucht !
+              if ($z2 && $val) {                                                                        # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
+                  $ret .= "<tr class='even' style='height:".$z2."px'>";
+                  $ret .= "<td class='smaportal'></td></tr>";
+              }
+          }
+         
+          if ($hfcg->{$i}{diff} < 0) {                                                                  # Negativ Balken anzeigen ?
+              $style .= (defined($colorc)) ? " background-color:#$colorc\"" : '"';                      # mit Farbe 2 colorc füllen
+              $ret   .= "<tr class='odd' style='height:".$z3."px'>";
+              $ret   .= "<td align='center' class='smaportal' ".$style."></td></tr>";
+          } 
+          elsif ($z3) {                                                                                 # ohne Farbe
+              $ret .= "<tr class='even' style='height:".$z3."px'>";
+              $ret .= "<td class='smaportal'></td></tr>";
+          }
+
+          if($z4) {                                                                                     # kann entfallen wenn auch z3 0 ist
+              $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '&nbsp;';
+              $ret .= "<tr class='even' style='height:".$z4."px'>";
+              $ret .= "<td class='smaportal' style='vertical-align:top'>".$val."</td></tr>";
+          }
+      }
+
+      if ($show_diff eq 'bottom') {                                                                     # zusätzliche diff Anzeige
+          $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
+          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;'); # negative Zahlen in Fettschrift, 0 aber ohne +
+          $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
+      }
+
+      $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:bottom; text-align:center;'>";
+      $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
+      $thishour = 99 if ($hfcg->{$i}{time} == $thishour);                                               # nur einmal verwenden !
+      $ret .="</td></tr></table></td>";                                                   
+  }
+
+  $ret .= "<td class='smaportal'></td></tr>";
+
+  ###################
+  # Legende unten
+  if ($legend_txt && ($legend eq 'bottom')) {
+      $ret .= "<tr class='odd'>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+      $ret .= "$legend_txt</td></tr>";
+  }
+
+  $ret .=  "</table></td></tr></table>";
+  $ret .= $html_end if (defined($html_end));
+  $ret .= "</html>";
+
+return $ret;
 }
 
 ################################################################
@@ -2808,8 +2791,9 @@ return @aneeded;
 sub calcPVforecast {            
   my $name = shift;
   my $rad  = shift;                                                                                   # Nominale Strahlung aus DWD Device
-  my $num  = shift;                                                                                   # Stunde des Tages 
+  my $num  = shift;                                                                                   # Nexthour 
   my $t    = shift;                                                                                   # aktueller Unix Timestamp
+  my $fh   = shift;
   my $fd   = shift;
   
   my $hash = $defs{$name};
@@ -2831,7 +2815,7 @@ sub calcPVforecast {
   my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                             # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
-  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$num), 1);                    # Korrekturfaktor für die Stunde des Tages
+  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);                   # Korrekturfaktor der Stunde des Tages einbeziehen
 
   my $pvsum  = 0;  
   
@@ -2945,6 +2929,9 @@ sub calcVariance {
       my ($pvavg,$fcavg) = calcFromHistory ($paref);                                                      # historische PV / Forecast Vergleichswerte ermitteln
       $pvval             = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                                       # Ertrag aktuelle Stunde berücksichtigen
       $fcval             = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                                       # Vorhersage aktuelle Stunde berücksichtigen
+      
+      Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
+      
       my $factor         = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
       
       if(abs($factor - $oldfac) > $maxvar) {
@@ -3010,14 +2997,12 @@ sub calcFromHistory {
       my ($pvrl,$pvfc) = (0,0);
             
       for my $dayfa (@efa) {
-          $pvrl += $pvhh->{$dayfa}{$hour}{pvrl} // 0;
-          $pvfc += $pvhh->{$dayfa}{$hour}{pvfc} // 0;
+          $pvrl += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
+          $pvfc += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
       }
       
       my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
       my $fcavg = sprintf "%.2f", $pvfc / $anzavg;
-      
-      Log3 ($name, 4, "$name - PV History -> average hour ($hour) -> real: $pvavg, forecast: $fcavg");
       
       return ($pvavg,$fcavg);
   }
@@ -3051,7 +3036,7 @@ sub setPVhistory {
       my $pvrlsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $pvrlsum += $data{$type}{$name}{pvhist}{$day}{$k}{pvrl} // 0;
+          $pvrlsum += HistoryVal ($hash, $day, $k, "pvrl", 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{pvrl} = $pvrlsum;      
   }
@@ -3063,7 +3048,7 @@ sub setPVhistory {
       my $pvfcsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $pvfcsum += $data{$type}{$name}{pvhist}{$day}{$k}{pvfc} // 0;
+          $pvfcsum += HistoryVal ($hash, $day, $k, "pvfc", 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{pvfc} = $pvfcsum;       
   }
@@ -3075,7 +3060,7 @@ sub setPVhistory {
       my $gcsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          $gcsum += $data{$type}{$name}{pvhist}{$day}{$k}{gcons} // 0;
+          $gcsum += HistoryVal ($hash, $day, $k, "gcons", 0);
       }
       $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;       
   }
@@ -3102,9 +3087,9 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl = $h->{$day}{$key}{pvrl}  // 0;
-          my $pvfc = $h->{$day}{$key}{pvfc}  // 0;
-          my $cons = $h->{$day}{$key}{gcons} // 0;
+          my $pvrl = HistoryVal ($hash, $day, $key, "pvrl",  0);
+          my $pvfc = HistoryVal ($hash, $day, $key, "pvfc",  0);
+          my $cons = HistoryVal ($hash, $day, $key, "gcons", 0);
           $ret    .= "\n      " if($ret);
           $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $cons";
       }
@@ -3160,13 +3145,14 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts = $data{$type}{$name}{nexthours}{$idx}{starttime};
-          my $nhfc = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
-          my $wid  = $data{$type}{$name}{nexthours}{$idx}{weatherid};
-          my $neff = $data{$type}{$name}{nexthours}{$idx}{cloudcover};
-          my $r101 = $data{$type}{$name}{nexthours}{$idx}{rainprob};
-          $sq     .= "\n" if($sq);
-          $sq     .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101";
+          my $nhts  = $data{$type}{$name}{nexthours}{$idx}{starttime};
+          my $nhfc  = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
+          my $wid   = $data{$type}{$name}{nexthours}{$idx}{weatherid};
+          my $neff  = $data{$type}{$name}{nexthours}{$idx}{cloudcover};
+          my $r101  = $data{$type}{$name}{nexthours}{$idx}{rainprob};
+          my $rad1h = $data{$type}{$name}{nexthours}{$idx}{Rad1h};
+          $sq      .= "\n" if($sq);
+          $sq      .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101, Rad1h: $rad1h";
       }
   }
       
@@ -3358,6 +3344,40 @@ sub createNotifyDev {
   }
   
 return;
+}
+
+################################################################
+#    Wert des pvhist-Hash zurückliefern
+#    Usage:
+#    HistoryVal ($hash, $day, $hod, $key, $def)
+#
+#    $day: Tag des Monats (01,02,...,31)
+#    $hod: Stunde des Tages (01,02,...,24,99)
+#    $key:    pvrl  - realer PV Ertrag
+#             pvfc  - PV Vorhersage
+#             gcons - realer Netzbezug
+#    $def:    Defaultwert
+#
+################################################################
+sub HistoryVal {
+  my $hash = shift;
+  my $day  = shift;
+  my $hod  = shift;
+  my $key  = shift;
+  my $def  = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  my ($d,$n,$default) = @_;
+  if(defined($data{$type}{$name}{pvhist})                    &&
+     defined($data{$type}{$name}{pvhist}{$day})              &&
+     defined($data{$type}{$name}{pvhist}{$day}{$hod})        &&
+     defined($data{$type}{$name}{pvhist}{$day}{$hod}{$key})) {
+     return  $data{$type}{$name}{pvhist}{$day}{$hod}{$key};
+  }
+
+return $def;
 }
 
 1;
