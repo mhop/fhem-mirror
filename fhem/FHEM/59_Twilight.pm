@@ -402,7 +402,7 @@ sub Twilight_Attr {
 
     if ( $attrName eq 'useExtWeather' ) {
         if ($cmd eq 'set') {
-            return "External weather device already in use, most likely assigned by define" if $hash->{helper}{extWeather}{regexp} =~ m{$attrVal}xms;
+            return "External weather device already in use, most likely assigned by define" if defined $hash->{helper} && defined $hash->{helper}{extWeather}{regexp} && $hash->{helper}{extWeather}{regexp} =~ m{$attrVal}xms;
             return Twilight_init_ExtWeather_usage($hash, $attrVal); 
         } elsif ($cmd eq 'del') {
             notifyRegexpChanged( $hash, q{} );
