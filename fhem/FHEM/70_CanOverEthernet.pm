@@ -319,7 +319,7 @@ sub CanOverEthernet_getValue {
   <ul>
     <code>define &lt;name&gt; CanOverEthernet</code>
     <br><br>
-    Defines a CanOverEthernet device. FHEM will start listening to UDP broadcast
+    Defines a CanOverEthernet device. FHEM will start listening to UDP broadcasts
     on port 5441.
     <br>
     Example:
@@ -332,12 +332,12 @@ sub CanOverEthernet_getValue {
 
 <a name="CanOverEthernetset"><b>Set</b></a>
   <ul>
-    <li><a href="#sendDataAnalog">sendDataAnalog</a><br>Sends analog values.<br>Example:
+    <li><a href="#sendDataAnalog">sendDataAnalog</a><br>Publishes analog values.<br>Example:
     <code>set <name> sendDataAnalog &lt;Target-IP&gt; &lt;CAN-Channel&gt; &lt;Index&gt;=&lt;Value&gt;;&lt;Type&gt;<br>
     set coe sendDataAnalog 192.168.1.1 3 1=22.7;1 2=18.0;1
     </code>
     </li>
-    <li><a href="#sendDataDigital">sendDataDigital</a><br>Sends digital values. This can be 0 or 1.<br>Example:
+    <li><a href="#sendDataDigital">sendDataDigital</a><br>Publishes digital values. This can be 0 or 1.<br>Example:
     <code>set <name> sendDataDigital &lt;Target-IP&gt; &lt;CAN-Channel&gt; &lt;Index&gt;=&lt;Value&gt;<br>
     set coe sendDataDigital 192.168.1.1 3 1=1 2=0
     </code>
@@ -356,7 +356,7 @@ sub CanOverEthernet_getValue {
   <ul>
     <code>define &lt;name&gt; CanOverEthernet</code>
     <br><br>
-    Erstellt ein CanOverEthernet device. FHEM empfängt auf Port 5441 UDP broadcast.
+    Erstellt ein CanOverEthernet device. FHEM empfängt auf Port 5441 UDP broadcasts.
     <br>
     Beispiel:
     <ul>
@@ -367,12 +367,12 @@ sub CanOverEthernet_getValue {
   </ul>
 <a name="CanOverEthernetset"><b>Set</b></a>
   <ul>
-    <li><a href="#sendDataAnalog">sendDataAnalog</a><br>Sendet analoge Werte.<br>Beispiel:
+    <li><a href="#sendDataAnalog">sendDataAnalog</a><br>Ver&ouml;ffentlicht analoge Werte.<br>Beispiel:
       <code>set <name> sendDataAnalog &lt;Target-IP&gt; &lt;CAN-Channel&gt; &lt;Index&gt;=&lt;Value&gt;;&lt;Type&gt;<br>
       set coe sendDataAnalog 192.168.1.1 3 1=22.7;1 2=18.0;1
       </code>
     </li>
-    <li><a href="#sendDataDigital">sendDataDigital</a><br>Sends digitale Werte. Also nur 0 oder 1.<br>Beispiel:
+    <li><a href="#sendDataDigital">sendDataDigital</a><br>Ver&ouml;ffentlicht digitale Werte. Also nur 0 oder 1.<br>Beispiel:
       <code>set <name> sendDataDigital &lt;Target-IP&gt; &lt;CAN-Channel&gt; &lt;Index&gt;=&lt;Value&gt;<br>
       set coe sendDataDigital 192.168.1.1 3 1=1 2=0
       </code>

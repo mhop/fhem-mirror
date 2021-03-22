@@ -44,7 +44,7 @@ sub COE_Node_Initialize {
   $hash->{GetFn}       = "COE_Node_Get";
   $hash->{SetFn}       = "COE_Node_Set";
 
-  $hash->{AttrList} = "readingsConfigAnalog readingsConfigDigital " . $readingFnAttributes;
+  $hash->{AttrList} = "readingsConfigAnalog:textField-long readingsConfigDigital:textField-long " . $readingFnAttributes;
   $hash->{Match} = "^.*";
 
   return undef;
