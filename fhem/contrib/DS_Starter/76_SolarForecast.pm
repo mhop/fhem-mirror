@@ -340,6 +340,7 @@ my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{pvfc}                                                      # PV forecast Ringspeicher
+# $data{$type}{$name}{consumption}                                               # Netzbezug Ringspeicher
 # $data{$type}{$name}{weather}                                                   # Weather forecast Ringspeicher
 # $data{$type}{$name}{pvreal}                                                    # PV real Ringspeicher
 # $data{$type}{$name}{current}                                                   # current values
@@ -1404,7 +1405,7 @@ sub _transferDWDForecastValues {
       my $calcpv = calcPVforecast ($name, $v, $num, $t, $fh, $fd);                            # Vorhersage gewichtet kalkulieren
                 
       #my $num1 = $num-1;
-      if($num >= 0) {
+      #if($num >= 0) {
           $time_str = "NextHour".sprintf "%02d", $num;
           $epoche   = $t + (3600*$num);                                                      
           my $ta    = TimeAdjust ($epoche);
@@ -1415,7 +1416,7 @@ sub _transferDWDForecastValues {
           $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
           $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
           $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $v;                         # nur Info: original Vorhersage Strahlungsdaten
-      }
+      #}
       
       if($num < 23 && $fh > 0 && $fh < 24) {                                                  # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
@@ -1493,13 +1494,13 @@ sub _transferWeatherValues {
 
       Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
-      my $num1 = $num-1;
-      if($num1 >= 0) {
-          $time_str                                             = "NextHour".sprintf "%02d", $num1;         
+      #my $num1 = $num-1;
+      #if($num1 >= 0) {
+          $time_str                                             = "NextHour".sprintf "%02d", $num;         
           $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
           $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
           $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
-      }
+      #}
       
       if($num < 23 && $fh > 0 && $fh < 24) {                                                   # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
