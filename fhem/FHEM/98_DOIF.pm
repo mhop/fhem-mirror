@@ -4670,8 +4670,8 @@ sub temp_temp_ring {
 } 
 
 sub icon_ring {
-  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$lr,$ln) = @_;
-  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,undef,$lr,$ln,$icon));
+  my ($icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$lr,$ln,$mode) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$lr,$ln,$icon));
 }
 
 sub icon_mring {
@@ -4679,10 +4679,21 @@ sub icon_mring {
   return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$lr,$ln,$icon,$icon));
 }
 
+sub icon_uring {
+  my ($mode,$icon,$val,$min,$max,$minColor,$maxColor,$unit,$decfont,$size,$func,$lr,$ln) = @_;
+  return(ring ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$lr,$ln,$icon));
+}
+
 sub mring
 {
   my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$lr,$ln) = @_;
   return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,1,$lr,$ln));
+}
+
+sub uring
+{
+  my ($mode,$val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$lr,$ln) = @_;
+  return(ring($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$lr,$ln));
 }
 
 sub icon_ring2 {
@@ -4713,13 +4724,17 @@ sub icon_temp_temp_ring {
 
 sub ring
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$model,$lr,$ln,$icon) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$lr,$ln,$icon) = @_;
   my $out;
-  
+   
+  my ($monochrom,$minMax,$innerRing,$pointer);
+  ($monochrom,$minMax,$innerRing,$pointer)=split (/,/,$mode) if (defined $mode);
+ 
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
   $fontformat="" if (!defined $fontformat);
   $unitformat="" if (!defined $unitformat);
+  
   
   my ($ic,$iscale,$ix,$iy,$rotate)=();
   
@@ -4761,15 +4776,15 @@ sub ring
     $maxColor=0 if (!defined $maxColor);
   }
   
-  $max=$value if($value>$max);
+  $max=$value if ($value>$max);
   $min=$value if ($value<$min);
   $size=100 if (!defined $size);
-  my $prop=($value-$min)/($max-$min);
+  my $prop=($value-$min)/($max-$min); 
+
   my ($x1,$y1,$x2,$y2);
-  ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
-  my $val1=int($prop*100)+20;
+  ($x1,$y1,$x2,$y2)=(int($prop*100),0,0,int((1-$prop)*100));
   my $currColor;
- 
+  
   if (ref($func) eq "CODE") {
     $minColor=&{$func}($min);
     $maxColor=&{$func}($max);
@@ -4792,8 +4807,9 @@ sub ring
       $currColor=(1-$prop)*($minColor-$maxColor)+$maxColor;
     }
   }
-  if (defined($model)) {
-      $minColor=$currColor;
+  my $minCol=$minColor;
+  if (defined $monochrom and $monochrom==1) {
+    $minColor=$currColor;
   }
   
   if (defined $icon and $icon ne "") {
@@ -4804,9 +4820,13 @@ sub ring
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.8"/><stop offset="1" style="stop-color:rgb(32, 32, 32);stop-opacity:0.9"/></linearGradient>';
-  $out.= sprintf('<linearGradient id="grad_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
-  <stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
- 
+  if (!defined $pointer) {
+    $out.= sprintf('<linearGradient id="grad_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+    <stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
+  } 
+  $out.= sprintf('<linearGradient id="grad_ring_max_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  <stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',$minCol,$maxColor,100,0,0,0,color($maxColor,50),color($minColor,50));
+
   $out.= '<linearGradient id="grad_stroke3" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.6"/>\
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/></linearGradient>';
   $out.='</defs>';
@@ -4814,25 +4834,36 @@ sub ring
   $out.='<g stroke="url(#grad_stroke3)" fill="none" stroke-width="4">';
   $out.=describeArc(41, 30, 28, 0, 280);
   $out.='</g>';
-  $out.=sprintf('<g stroke="url(#grad_ring1_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor,$minColor,(defined $lr ? $lr:0));
-  $out.=describeArc(41, 30, 28, 0, int($prop*280));
+  if (defined $pointer) {
+    $out.='<g stroke="'.color($currColor,$lr).'" fill="none" stroke-width="3.5">';
+    $out.=describeArc(41, 30, 28, int($prop*280-$pointer/2), int($prop*280+$pointer/2));
+  } else {
+    $out.=sprintf('<g stroke="url(#grad_ring1_%d_%d_%d)" fill="none" stroke-width="2.5">',$currColor,$minColor,(defined $lr ? $lr:0));
+    $out.=describeArc(41, 30, 28, 0, int($prop*280));
+  }
   $out.='</g>';
   
-  if (ref($func) eq "ARRAY"){
-    my $from=0;
-    my $diff=$max-$min;
-    for (my $i=0;$i<@{$func};$i+=2) {
-      my $curr=${$func}[$i];
-      my $color=${$func}[$i+1];
-      my $to=int(($curr-$min)/$diff*280);
-      $out.='<g stroke="'.color($color,40).'" fill="none" stroke-width="1" opacity="1">';
-      $out.=describeArc(41, 30, 25.5, $from, $to);
+  if (defined $innerRing and $innerRing==1) {
+    if (ref($func) eq "ARRAY"){
+      my $from=0;
+      my $diff=$max-$min;
+      for (my $i=0;$i<@{$func};$i+=2) {
+        my $curr=${$func}[$i];
+        my $color=${$func}[$i+1];
+        my $to=int(($curr-$min)/$diff*280);
+        $out.='<g stroke="'.color($color,50).'" fill="none" stroke-width="1" opacity="0.9">';
+        $out.=describeArc(41, 30, 25.5, $from, $to);
+        $out.='</g>';
+        $from=$to+2;
+      }
+    } else {
       $out.='</g>';
-      $from=$to+2;
+      $out.=sprintf('<g stroke="url(#grad_ring_max_%d_%d)" fill="none" stroke-width="1" opacity="0.9">',$minCol,$maxColor);
+      $out.=describeArc(41, 30, 25.5, 0, 280);
+      $out.='</g>';
     }
   }
-
-  
+ 
   if (defined $icon and $icon ne "" and  $icon ne " ") {
     my $svg_icon=::FW_makeImage($ic);
     if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
@@ -4849,14 +4880,19 @@ sub ring
   if (defined $valDec) {
       $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></text>',
                      ($icflag ? 43.5:34),color($currColor,$ln),(defined ($icon) ? 14:20),$fontformat,$valInt,$valDec);
-
   } else {
     $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
                    ($icflag ? 43.5:34),color($currColor,$ln),(defined ($icon) ? 14:20),$fontformat,$valInt);
   }
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;%s">%s</text>',
                  ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unitformat,$unit) if (defined $unit);
+  
+  if (defined $minMax and $minMax==1) {
+    $out.= sprintf('<text text-anchor="middle" x="27" y="58" style="fill:%s;font-size:5.5px;">%s</text>',color($minCol,$ln),sprintf($format,$min));
+    $out.= sprintf('<text text-anchor="middle" x="55" y="58" style="fill:%s;font-size:5.5px;">%s</text>',color($maxColor,$ln),sprintf($format,$max));
+  }
   $out.= '</svg>';
+ 
   return ($out);
 }
 
