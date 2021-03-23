@@ -4889,8 +4889,8 @@ sub ring
                  ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unitformat,$unit) if (defined $unit);
   
   if (defined $minMax and $minMax) {
-    $out.= sprintf('<text text-anchor="middle" x="23" y="58" style="fill:%s;font-size:6px;%s">%s</text>',color($minCol,$ln),($minMax eq "1" ? "":$minMax),sprintf($format,$min));
-    $out.= sprintf('<text text-anchor="middle" x="59" y="58" style="fill:%s;font-size:6px;%s">%s</text>',color($maxColor,$ln),($minMax eq "1" ? "":$minMax),sprintf($format,$max));
+    $out.= sprintf('<text text-anchor="middle" x="23" y="58" style="fill:%s;font-size:6px;%s">%s</text>',color($minCol,$lr),($minMax eq "1" ? "":$minMax),sprintf($format,$min));
+    $out.= sprintf('<text text-anchor="middle" x="59" y="58" style="fill:%s;font-size:6px;%s">%s</text>',color($maxColor,$lr),($minMax eq "1" ? "":$minMax),sprintf($format,$max));
   }
   $out.= '</svg>';
  
