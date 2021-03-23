@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.20.0" => "23.03.2021  new sub CircularVal, some fixes ",
+  "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
   "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
   "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
@@ -1465,11 +1465,19 @@ sub _transferWeatherValues {
           $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
       #}
       
-      if($num < 23 && $fh < 24) {                                                   # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
+      if($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
           $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherid}         = $wid;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathertxt}        = $txt;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathercloudcover} = $neff;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherrainprob}   = $r101;
+      }
+      
+      if($fd == 0 && $fh) {                                                                   # WeatherId in pvhistory speichern
+          $paref->{wid}      = $wid;
+          $paref->{histname} = "weatherid";
+          $paref->{nhour}    = sprintf("%02d",$fh+1);
+          setPVhistory ($paref); 
+          delete $paref->{histname};
       }
   }
       
@@ -1776,7 +1784,6 @@ sub forecastGraphic {                                                           
 
   my $hfcg      = $data{$hash->{TYPE}}{$name}{html};                                       #(hfcg = hash forecast graphic)
   my $pvhist    = $data{$hash->{TYPE}}{$name}{pvhist};
-  my $next_hour = $data{$hash->{TYPE}}{$name}{nexthours};
 
   ##########################################################
   # Kontext des SolarForecast-Devices speichern für Refresh
@@ -1789,11 +1796,11 @@ sub forecastGraphic {                                                           
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";
 
-  my $pv0    = (exists($next_hour->{'NextHour00'}{pvforecast})) ? $next_hour->{'NextHour00'}{pvforecast} : undef;
-  my $is     = ReadingsVal ($name, "inverterStrings",  undef);                             # String Konfig
-  my $peak   = ReadingsVal ($name, "modulePeakString", undef);                             # String Peak
-  my $dir    = ReadingsVal ($name, "moduleDirection",  undef);                             # Modulausrichtung Konfig
-  my $ta     = ReadingsVal ($name, "moduleTiltAngle",  undef);                             # Modul Neigungswinkel Konfig
+  my $pv0    = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);
+  my $is     = ReadingsVal  ($name, "inverterStrings",  undef);                            # String Konfig
+  my $peak   = ReadingsVal  ($name, "modulePeakString", undef);                            # String Peak
+  my $dir    = ReadingsVal  ($name, "moduleDirection",  undef);                            # Modulausrichtung Konfig
+  my $ta     = ReadingsVal  ($name, "moduleTiltAngle",  undef);                            # Modul Neigungswinkel Konfig
   
   if(!$is || !$fcdev || !$indev || !$peak || !defined $pv0 || !$dir || !$ta) {
       my $link = qq{<a href="/fhem?detail=$name">$name</a>};  
@@ -2076,7 +2083,7 @@ sub forecastGraphic {                                                           
   my $day_str;
   my $day;
 
-  my $t = (exists($next_hour->{'NextHour00'}{starttime})) ? $next_hour->{'NextHour00'}{starttime}  : (AttrVal('global', 'language', '') eq 'DE') ? '00.00.0000 24' : '0000-00-00 24';
+  my $t = NexthoursVal ($hash, "NextHour00", "starttime", AttrVal('global', 'language', '') eq 'DE' ? '00.00.0000 24' : '0000-00-00 24');
   ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
   ($day_str,$month,$year,$thishour) = $t =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
 
@@ -2112,7 +2119,8 @@ sub forecastGraphic {                                                           
       $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
       $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
 
-      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
+      # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
+      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "weatherid", undef);
   }
   else {
       $val1  = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
@@ -2212,7 +2220,7 @@ sub forecastGraphic {                                                           
               $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
-              $hfcg->{$i}{weather} = CircularVal ($hash, $hfcg->{$i}{time_str}, "weatherid", undef);
+              $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", undef);
           }
           else {
               $nh  = sprintf('%02d', $i+$offset);
@@ -2223,8 +2231,8 @@ sub forecastGraphic {                                                           
       }
 
       if (defined($nh)) {
-          $val1   = $next_hour->{'NextHour'.$nh} ? $next_hour->{'NextHour'.$nh}{pvforecast} // 0 : 0;
-          $hfcg->{$i}{weather} = $next_hour->{'NextHour'.$nh} ? $next_hour->{'NextHour'.$nh}{weatherid} // undef : undef;
+          $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",    0);
+          $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid", undef);
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
 
@@ -2772,10 +2780,10 @@ sub calcPVforecast {
   my $rainslope  = AttrVal($name, "rainFactorSlope", $rslopedef);                                     # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
-  my $cloudcover = $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{cloudcover} // 0;  # effektive Wolkendecke
+  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                         # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $rainprob   = $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{rainprob} // 0;    # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+  my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
   my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                             # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
@@ -2989,6 +2997,7 @@ sub setPVhistory {
   my $ethishour = $paref->{ethishour}     // 0;
   my $calcpv    = $paref->{calcpv}        // 0;
   my $gthishour = $paref->{gctotthishour} // 0;
+  my $wid       = $paref->{wid}           // -1;
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -3029,6 +3038,11 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;       
   }
   
+  if($histname eq "weatherid") {                                                                       # bezogene Energie
+      $val = $wid;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;     
+  }
+  
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
     
 return;
@@ -3051,11 +3065,12 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl = HistoryVal ($hash, $day, $key, "pvrl",  0);
-          my $pvfc = HistoryVal ($hash, $day, $key, "pvfc",  0);
-          my $cons = HistoryVal ($hash, $day, $key, "gcons", 0);
+          my $pvrl = HistoryVal ($hash, $day, $key, "pvrl",      0);
+          my $pvfc = HistoryVal ($hash, $day, $key, "pvfc",      0);
+          my $cons = HistoryVal ($hash, $day, $key, "gcons",     0);
+          my $wid  = HistoryVal ($hash, $day, $key, "weatherid", -1);
           $ret    .= "\n      " if($ret);
-          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $cons";
+          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $cons, weatherid: $wid";
       }
       return $ret;
   };
@@ -3094,12 +3109,12 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts  = $data{$type}{$name}{nexthours}{$idx}{starttime};
-          my $nhfc  = $data{$type}{$name}{nexthours}{$idx}{pvforecast};
-          my $wid   = $data{$type}{$name}{nexthours}{$idx}{weatherid};
-          my $neff  = $data{$type}{$name}{nexthours}{$idx}{cloudcover};
-          my $r101  = $data{$type}{$name}{nexthours}{$idx}{rainprob};
-          my $rad1h = $data{$type}{$name}{nexthours}{$idx}{Rad1h};
+          my $nhts  = NexthoursVal ($hash, $idx, "starttime",  qq{});
+          my $nhfc  = NexthoursVal ($hash, $idx, "pvforecast",    0);
+          my $wid   = NexthoursVal ($hash, $idx, "weatherid",    -1);
+          my $neff  = NexthoursVal ($hash, $idx, "cloudcover",    0);
+          my $r101  = NexthoursVal ($hash, $idx, "rainprob",      0);
+          my $rad1h = NexthoursVal ($hash, $idx, "Rad1h",         0);
           $sq      .= "\n" if($sq);
           $sq      .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101, Rad1h: $rad1h";
       }
@@ -3168,15 +3183,15 @@ sub collectSummaries {
   my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   
   my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
-  my $thforecast       = $data{$type}{$name}{nexthours}{NextHour00}{pvforecast};
+  my $thforecast       = NexthoursVal ($hash, "NextHour00", "pvforecast", 0);
   
   $next4HoursSum->{PV} = $thforecast;
   $restOfDaySum->{PV}  = $thforecast;
   
   for my $h (1..47) {
-      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h});
-      my $pvfc = $data{$type}{$name}{nexthours}{"NextHour".sprintf "%02d",$h}{pvforecast} // 0;
-            
+      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$h)});
+      my $pvfc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
+         
       $next4HoursSum->{PV} += $pvfc if($h <= 3);
       $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
       $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
@@ -3305,7 +3320,7 @@ return;
 #    $key:    pvrl  - realer PV Ertrag
 #             pvfc  - PV Vorhersage
 #             gcons - realer Netzbezug
-#    $def:    Defaultwert
+#    $def: Defaultwert
 #
 ################################################################
 sub HistoryVal {
@@ -3333,7 +3348,7 @@ return $def;
 #    Usage:
 #    CircularVal ($hash, $hod, $key, $def)
 #
-#    $hod: Stunde des Tages (01,02,...,24,99)
+#    $hod: Stunde des Tages (01,02,...,24)
 #    $key:    pvrl              - realer PV Ertrag
 #             pvfc              - PV Vorhersage
 #             gcons             - realer Netzbezug
@@ -3341,7 +3356,7 @@ return $def;
 #             weathertxt        - DWD Wetter Text
 #             weathercloudcover - DWD Wolkendichte
 #             weatherrainprob   - DWD Regenwahrscheinlichkeit
-#    $def:    Defaultwert
+#    $def: Defaultwert
 #
 ################################################################
 sub CircularVal {
@@ -3357,6 +3372,39 @@ sub CircularVal {
      defined($data{$type}{$name}{circular}{$hod})        &&
      defined($data{$type}{$name}{circular}{$hod}{$key})) {
      return  $data{$type}{$name}{circular}{$hod}{$key};
+  }
+
+return $def;
+}
+
+################################################################
+# Wert des nexthours-Hash zurückliefern
+# Usage:
+# NexthoursVal ($hash, $hod, $key, $def)
+#
+# $hod: nächste Stunde (NextHour00, NextHour01,...)
+# $key: starttime  - Startzeit der abgefragten nächsten Stunde
+#       pvforecast - PV Vorhersage
+#       weatherid  - DWD Wetter id 
+#       cloudcover - DWD Wolkendichte
+#       rainprob   - DWD Regenwahrscheinlichkeit
+#       Rad1h      - Globalstrahlung (kJ/m2)
+# $def: Defaultwert
+#
+################################################################
+sub NexthoursVal {
+  my $hash = shift;
+  my $hod  = shift;
+  my $key  = shift;
+  my $def  = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if(defined($data{$type}{$name}{nexthours})              &&
+     defined($data{$type}{$name}{nexthours}{$hod})        &&
+     defined($data{$type}{$name}{nexthours}{$hod}{$key})) {
+     return  $data{$type}{$name}{nexthours}{$hod}{$key};
   }
 
 return $def;
