@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.20.0" => "23.03.2021  new sub CircularVal, some fixes ",
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
   "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
   "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
@@ -180,10 +181,8 @@ my %hget = (                                                                # Ha
   html         => { fn => \&_gethtml,           needcred => 0 },
   ftui         => { fn => \&_getftui,           needcred => 0 },
   pvHistory    => { fn => \&_getlistPVHistory,  needcred => 0 },
-  pvReal       => { fn => \&_getlistPVReal,     needcred => 0 },
-  pvForecast   => { fn => \&_getlistPVForecast, needcred => 0 },
+  pvCircular   => { fn => \&_getlistPVCircular, needcred => 0 },
   nextHours    => { fn => \&_getlistNextHours,  needcred => 0 },
-  weatherData  => { fn => \&_getlistWeather,    needcred => 0 },
   stringConfig => { fn => \&_getstringConfig,   needcred => 0 },
 );
 
@@ -324,7 +323,7 @@ my $defmaxvar   = 0.5;                                                          
 my $definterval = 70;                                                            # Standard Abfrageintervall
 
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
-my $pvrcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVR_SolarForecast_";   # Filename-Fragment für PV Real (wird mit Devicename ergänzt)
+my $pvccache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 
 my $calcmaxd    = 7;                                                             # Anzahl Tage (default) für Durchschnittermittlung zur Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -339,12 +338,9 @@ my $rain_base   = 0;                                                            
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
 
 # Information zu verwendeten internen Datenhashes
-# $data{$type}{$name}{pvfc}                                                      # PV forecast Ringspeicher
-# $data{$type}{$name}{consumption}                                               # Netzbezug Ringspeicher
-# $data{$type}{$name}{weather}                                                   # Weather forecast Ringspeicher
-# $data{$type}{$name}{pvreal}                                                    # PV real Ringspeicher
+# $data{$type}{$name}{circular}                                                  # Ringspeicher
 # $data{$type}{$name}{current}                                                   # current values
-# $data{$type}{$name}{pvhist}                                                    # historische Werte pvreal, pvforecast, gridconsumtion                  
+# $data{$type}{$name}{pvhist}                                                    # historische Werte       
 # $data{$type}{$name}{nexthours}                                                 # NextHours Werte
 
 
@@ -445,13 +441,13 @@ sub Define {
   my $cachename         = "pvhist";
   $params->{file}       = $file;
   $params->{cachename}  = $cachename;
-  _readCacheFile ($params);                                                       
-  
-  $file                 = $pvrcache.$name;                                         # Cache File PV Real lesen wenn vorhanden
-  $cachename            = "pvreal";
+  _readCacheFile ($params);
+
+  $file                 = $pvccache.$name;                                         # Cache File PV Circular lesen wenn vorhanden
+  $cachename            = "circular";
   $params->{file}       = $file;
   $params->{cachename}  = $cachename;
-  _readCacheFile ($params);                                                       
+  _readCacheFile ($params);  
     
   readingsSingleUpdate($hash, "state", "initialized", 1); 
 
@@ -842,7 +838,7 @@ sub _setwriteHistory {                   ## no critic "not used"
   
   my $ret = writeCacheToFile ($hash, "pvhist", $pvhcache.$name);     # Cache File für PV History schreiben
   
-  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
+  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
 
 return $ret;
 }
@@ -861,11 +857,9 @@ sub Get {
                 "data:noArg ".
                 "html:noArg ".
                 "nextHours:noArg ".
-                "pvForecast:noArg ".
+                "pvCircular:noArg ".
                 "pvHistory:noArg ".
-                "pvReal:noArg ".
-                "stringConfig:noArg ".
-                "weatherData:noArg "
+                "stringConfig:noArg "
                 ;
                 
   return if(IsDisabled($name));
@@ -936,31 +930,16 @@ return $ret;
 }
 
 ###############################################################
-#                       Getter listPVReal
+#                       Getter pvCircular
 ###############################################################
-sub _getlistPVReal {
+sub _getlistPVCircular {
   my $paref = shift;
   my $hash  = $paref->{hash};
   
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};
   
-  my $ret   = listDataPool ($hash, "pvreal");
-                    
-return $ret;
-}
-
-###############################################################
-#                       Getter listPVForecast
-###############################################################
-sub _getlistPVForecast {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-  
-  my $ret   = listDataPool ($hash, "pvfc");
+  my $ret   = listDataPool ($hash, "circular");
                     
 return $ret;
 }
@@ -976,21 +955,6 @@ sub _getlistNextHours {
   my $type  = $hash->{TYPE};
   
   my $ret   = listDataPool ($hash, "nexthours");
-                    
-return $ret;
-}
-
-###############################################################
-#                       Getter listWeather
-###############################################################
-sub _getlistWeather {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-  
-  my $ret   = listDataPool ($hash, "weather");
                     
 return $ret;
 }
@@ -1094,7 +1058,7 @@ sub Shutdown {
   my $type = $hash->{TYPE};
   
   writeCacheToFile ($hash, "pvhist", $pvhcache.$name);               # Cache File für PV History schreiben
-  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
+  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
   
 return; 
 }
@@ -1137,10 +1101,10 @@ sub Delete {
 
   if ($error) {
       Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
-  }  
+  }
   
   $error = qq{};
-  $file  = $pvrcache.$name;                                         # Cache File PV Real löschen
+  $file  = $pvccache.$name;                                         # Cache File PV Circular löschen
   $error = FileDelete($file); 
   
   if ($error) {
@@ -1327,8 +1291,8 @@ sub periodicWriteCachefiles {
   
   return if(IsDisabled($name));
   
-  writeCacheToFile ($hash, "pvhist", $pvhcache.$name);               # Cache File für PV History schreiben
-  writeCacheToFile ($hash, "pvreal", $pvrcache.$name);               # Cache File für PV Real schreiben
+  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
   
 return;
 }
@@ -1418,21 +1382,20 @@ sub _transferDWDForecastValues {
           $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $v;                         # nur Info: original Vorhersage Strahlungsdaten
       #}
       
-      if($num < 23 && $fh > 0 && $fh < 24) {                                                  # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$type}{$name}{pvfc}{sprintf("%02d",$fh)} = $calcpv;
-
+      if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{pvfc} = $calcpv;
       } 
       
       # $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh)."_PVforecast:$calcpv Wh";             
+          push @$daref, "Today_Hour".sprintf("%02d",$fh+1)."_PVforecast:$calcpv Wh";             
       }
       
       if($fd == 0 && $fh) {
           $paref->{calcpv}   = $calcpv;
           $paref->{histname} = "pvfc";
-          $paref->{nhour}    = sprintf("%02d",$fh);
+          $paref->{nhour}    = sprintf("%02d",$fh+1);
           setPVhistory ($paref); 
           delete $paref->{histname};
       }
@@ -1502,11 +1465,11 @@ sub _transferWeatherValues {
           $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
       #}
       
-      if($num < 23 && $fh > 0 && $fh < 24) {                                                   # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{id}         = $wid;                  
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{txt}        = $txt;   
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{cloudcover} = $neff;
-          $data{$type}{$name}{weather}{sprintf("%02d",$fh)}{rainprob}   = $r101;
+      if($num < 23 && $fh < 24) {                                                   # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherid}         = $wid;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathertxt}        = $txt;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathercloudcover} = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherrainprob}   = $r101;
       }
   }
       
@@ -1586,8 +1549,8 @@ sub _transferInverterValues {
       }
       
       my $nhour = $chour+1;
-      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal:".$ethishour." Wh";
-      $data{$type}{$name}{pvreal}{sprintf("%02d",$nhour)} = $ethishour;                     # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal:".$ethishour." Wh";       
+      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;          # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
       $paref->{nhour}     = sprintf("%02d",$nhour);
@@ -1672,11 +1635,11 @@ sub _transferMeterValues {
       
       my $nhour = $chour+1;
       push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridConsumption:".$gctotthishour." Wh";
-      $data{$type}{$name}{consumption}{sprintf("%02d",$nhour)} = $gctotthishour;                     # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                 # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{gctotthishour} = $gctotthishour;
-      $paref->{nhour}        = sprintf("%02d",$nhour);
-      $paref->{histname}     = "cons";
+      $paref->{nhour}         = sprintf("%02d",$nhour);
+      $paref->{histname}      = "cons";
       setPVhistory ($paref);
       delete $paref->{histname};
   }   
@@ -2149,14 +2112,14 @@ sub forecastGraphic {                                                           
       $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
       $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
 
-      $hfcg->{0}{weather} = (exists($data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id} : undef;
+      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
   }
   else {
-      $val1  = (exists($data{$hash->{TYPE}}{$name}{pvfc}{$hfcg->{0}{time_str}}))        ? $data{$hash->{TYPE}}{$name}{pvfc}{$hfcg->{0}{time_str}}        : 0;
-      $val2  = (exists($data{$hash->{TYPE}}{$name}{pvreal}{$hfcg->{0}{time_str}}))      ? $data{$hash->{TYPE}}{$name}{pvreal}{$hfcg->{0}{time_str}}      : 0;
-      $val3  = (exists($data{$hash->{TYPE}}{$name}{consumption}{$hfcg->{0}{time_str}})) ? $data{$hash->{TYPE}}{$name}{consumption}{$hfcg->{0}{time_str}} : 0;
+      $val1  = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
+      $val2  = CircularVal ($hash, $hfcg->{0}{time_str}, "pvrl",  0);
+      $val3  = CircularVal ($hash, $hfcg->{0}{time_str}, "gcons", 0);
 
-      $hfcg->{0}{weather} = (exists($data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$hfcg->{0}{time_str}}{id} : undef;
+      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
       #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
   }
 
@@ -2246,10 +2209,10 @@ sub forecastGraphic {                                                           
               # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
               my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i)));
 
-              $val1 = (exists($pvhist->{$ds}{$hfcg->{$i}{time_str}}{pvfc}))  ? $pvhist->{$ds}{$hfcg->{$i}{time_str}}{pvfc}  : 0;
-              $val2 = (exists($pvhist->{$ds}{$hfcg->{$i}{time_str}}{pvrl}))  ? $pvhist->{$ds}{$hfcg->{$i}{time_str}}{pvrl}  : 0;
-              $val3 = (exists($pvhist->{$ds}{$hfcg->{$i}{time_str}}{gcons})) ? $pvhist->{$ds}{$hfcg->{$i}{time_str}}{gcons} : 0;
-              $hfcg->{$i}{weather} = (exists($data{$hash->{TYPE}}{$name}{weather}{$hfcg->{$i}{time_str}}{id})) ? $data{$hash->{TYPE}}{$name}{weather}{$hfcg->{$i}{time_str}}{id} : undef;
+              $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
+              $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
+              $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
+              $hfcg->{$i}{weather} = CircularVal ($hash, $hfcg->{$i}{time_str}, "weatherid", undef);
           }
           else {
               $nh  = sprintf('%02d', $i+$offset);
@@ -3107,36 +3070,21 @@ sub listDataPool {
       }
   }
   
-  if ($htol eq "weather") {
-      $h = $data{$type}{$name}{weather};
+  if ($htol eq "circular") {
+      $h = $data{$type}{$name}{circular};
       if (!keys %{$h}) {
-          return qq{Weather cache is empty.};
+          return qq{Circular cache is empty.};
       }
-      for my $idx (sort{$a<=>$b} keys %{$h}) {
-          $sq .= $idx." => id:         ".$data{$type}{$name}{weather}{$idx}{id}.        "\n"; 
-          $sq .= "   => txt:        "   .$data{$type}{$name}{weather}{$idx}{txt}.       "\n";
-          $sq .= "   => cloudcover: "   .$data{$type}{$name}{weather}{$idx}{cloudcover}."\n";
-          $sq .= "   => rainprob:   "   .$data{$type}{$name}{weather}{$idx}{rainprob}.  "\n";
-      }
-  }
-  
-  if ($htol eq "pvreal") {
-      $h = $data{$type}{$name}{pvreal};
-      if (!keys %{$h}) {
-          return qq{PV real cache is empty.};
-      }
-      for my $idx (sort{$a<=>$b} keys %{$h}) {
-          $sq .= $idx." => ".$data{$type}{$name}{pvreal}{$idx}."\n";             
-      }
-  }
-  
-  if ($htol eq "pvfc") {
-      $h = $data{$type}{$name}{pvfc};
-      if (!keys %{$h}) {
-          return qq{PV forecast cache is empty.};
-      }
-      for my $idx (sort{$a<=>$b} keys %{$h}) {
-          $sq .= $idx." => ".$data{$type}{$name}{pvfc}{$idx}."\n";             
+      for my $idx (sort keys %{$h}) {
+          my $pvfc   = CircularVal ($hash, $idx, "pvfc",              0);
+          my $pvrl   = CircularVal ($hash, $idx, "pvrl",              0);
+          my $gcons  = CircularVal ($hash, $idx, "gcons",             0);
+          my $wid    = CircularVal ($hash, $idx, "weatherid",        -1);
+          my $wtxt   = CircularVal ($hash, $idx, "weathertxt",       "");
+          my $wccv   = CircularVal ($hash, $idx, "weathercloudcover", 0);
+          my $wrprb  = CircularVal ($hash, $idx, "weatherrainprob",   0);
+          $sq      .= "\n" if($sq);
+          $sq      .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, weathercloudcover: $wccv, weatherrainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
       }
   }
   
@@ -3370,12 +3318,45 @@ sub HistoryVal {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  my ($d,$n,$default) = @_;
   if(defined($data{$type}{$name}{pvhist})                    &&
      defined($data{$type}{$name}{pvhist}{$day})              &&
      defined($data{$type}{$name}{pvhist}{$day}{$hod})        &&
      defined($data{$type}{$name}{pvhist}{$day}{$hod}{$key})) {
      return  $data{$type}{$name}{pvhist}{$day}{$hod}{$key};
+  }
+
+return $def;
+}
+
+################################################################
+#    Wert des circular-Hash zurückliefern
+#    Usage:
+#    CircularVal ($hash, $hod, $key, $def)
+#
+#    $hod: Stunde des Tages (01,02,...,24,99)
+#    $key:    pvrl              - realer PV Ertrag
+#             pvfc              - PV Vorhersage
+#             gcons             - realer Netzbezug
+#             weatherid         - DWD Wetter id 
+#             weathertxt        - DWD Wetter Text
+#             weathercloudcover - DWD Wolkendichte
+#             weatherrainprob   - DWD Regenwahrscheinlichkeit
+#    $def:    Defaultwert
+#
+################################################################
+sub CircularVal {
+  my $hash = shift;
+  my $hod  = shift;
+  my $key  = shift;
+  my $def  = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if(defined($data{$type}{$name}{circular})              &&
+     defined($data{$type}{$name}{circular}{$hod})        &&
+     defined($data{$type}{$name}{circular}{$hod}{$key})) {
+     return  $data{$type}{$name}{circular}{$hod}{$key};
   }
 
 return $def;
@@ -3666,27 +3647,41 @@ werden weitere SolarForecast Devices zugeordnet.
       <a name="pvHistory"></a>
       <li><b>pvHistory </b> <br>  
       Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und Stunde. 
-      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr. 
-      Dabei sind <b>pvreal</b> der reale PV Ertrag, <b>pvforecast</b> der prognostizierte PV Ertrag und <b>gridcon</b> 
-      der Netzbezug der jeweiligen Stunde. 
+      Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit 
+      von 08 - 09 Uhr. <br><br>
+      
+      <ul>
+         <table>  
+         <colgroup> <col width=20%> <col width=80%> </colgroup>
+            <tr><td> <b>pvforecast</b>  </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde           </td></tr>
+            <tr><td> <b>pvreal</b>      </td><td>reale PV Erzeugung der jeweiligen Stunde                      </td></tr>
+            <tr><td> <b>gcons</b>       </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde </td></tr>
+         </table>
+      </ul>
       </li>      
     </ul>
     <br>
     
     <ul>
-      <a name="pvForecast"></a>
-      <li><b>pvForecast </b> <br>  
-      Listet die im Ringspeicher vorhandenen PV Vorhersagewerte der kommenden 24h auf. 
+      <a name="pvCircular"></a>
+      <li><b>pvCircular </b> <br>  
+      Listet die vorhandenen Werte Ringspeicher auf.  
       Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
-      </li>      
-    </ul>
-    <br>
-    
-    <ul>
-      <a name="pvReal"></a>
-      <li><b>pvReal </b> <br>  
-      Listet die im Ringspeicher vorhandenen PV Erzeugungswerte der letzten 24h auf.
-      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.
+      Erläuterung der Werte: <br><br>
+      
+      <ul>
+         <table>  
+         <colgroup> <col width=20%> <col width=80%> </colgroup>
+            <tr><td> <b>pvforecast</b>        </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
+            <tr><td> <b>pvreal</b>            </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
+            <tr><td> <b>gcons</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
+            <tr><td> <b>weathercloudcover</b> </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
+            <tr><td> <b>weatherrainprob</b>   </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
+            <tr><td> <b>weatherid</b>         </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
+            <tr><td> <b>weathertxt</b>        </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
+         </table>
+      </ul>
+      
       </li>      
     </ul>
     <br>
