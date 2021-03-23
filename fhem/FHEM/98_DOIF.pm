@@ -4824,9 +4824,10 @@ sub ring
     $out.= sprintf('<linearGradient id="grad_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
     <stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
   } 
-  $out.= sprintf('<linearGradient id="grad_ring_max_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
-  <stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',$minCol,$maxColor,100,0,0,0,color($maxColor,50),color($minColor,50));
-
+  if (defined $innerRing and $innerRing==1 and ref($func) ne "ARRAY") {
+    $out.= sprintf('<linearGradient id="grad_ring_max_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+    <stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',$minCol,$maxColor,(defined $lr ? $lr:0),100,0,0,0,color($maxColor,$lr),color($minCol,$lr));
+  }
   $out.= '<linearGradient id="grad_stroke3" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.6"/>\
   <stop offset="1" style="stop-color:rgb(48,48,48); stop-opacity:0.8"/></linearGradient>';
   $out.='</defs>';
@@ -4851,14 +4852,14 @@ sub ring
         my $curr=${$func}[$i];
         my $color=${$func}[$i+1];
         my $to=int(($curr-$min)/$diff*280);
-        $out.='<g stroke="'.color($color,50).'" fill="none" stroke-width="1" opacity="0.9">';
+        $out.='<g stroke="'.color($color,$lr).'" fill="none" stroke-width="1" opacity="0.9">';
         $out.=describeArc(41, 30, 25.5, $from, $to);
         $out.='</g>';
         $from=$to+2;
       }
     } else {
       $out.='</g>';
-      $out.=sprintf('<g stroke="url(#grad_ring_max_%d_%d)" fill="none" stroke-width="1" opacity="0.9">',$minCol,$maxColor);
+      $out.=sprintf('<g stroke="url(#grad_ring_max_%d_%d_%d)" fill="none" stroke-width="1" opacity="0.9">',$minCol,$maxColor,(defined $lr ? $lr:0));
       $out.=describeArc(41, 30, 25.5, 0, 280);
       $out.='</g>';
     }
@@ -4887,9 +4888,9 @@ sub ring
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;%s">%s</text>',
                  ($icflag ? 53:47),color($currColor,$ln),($icflag ? 9:12),$unitformat,$unit) if (defined $unit);
   
-  if (defined $minMax and $minMax==1) {
-    $out.= sprintf('<text text-anchor="middle" x="27" y="58" style="fill:%s;font-size:5.5px;">%s</text>',color($minCol,$ln),sprintf($format,$min));
-    $out.= sprintf('<text text-anchor="middle" x="55" y="58" style="fill:%s;font-size:5.5px;">%s</text>',color($maxColor,$ln),sprintf($format,$max));
+  if (defined $minMax and $minMax) {
+    $out.= sprintf('<text text-anchor="middle" x="26" y="58" style="fill:%s;font-size:5.5px;%s">%s</text>',color($minCol,$ln),($minMax eq "1" ? "":$minMax),sprintf($format,$min));
+    $out.= sprintf('<text text-anchor="middle" x="57" y="58" style="fill:%s;font-size:5.5px;%s">%s</text>',color($maxColor,$ln),($minMax eq "1" ? "":$minMax),sprintf($format,$max));
   }
   $out.= '</svg>';
  
