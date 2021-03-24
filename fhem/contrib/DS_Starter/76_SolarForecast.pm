@@ -59,6 +59,7 @@ BEGIN {
           delFromAttrList
           devspec2array
           deviceEvents
+          DoTrigger
           Debug
           fhemTimeLocal
           FmtDateTime
@@ -116,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.21.0" => "24.03.2021  event management ",
   "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
   "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
@@ -1132,6 +1134,7 @@ sub centralTask {
   deleteReadingspec ($hash, "ThisHour_.*");
   deleteReadingspec ($hash, "Today_PV");
   deleteReadingspec ($hash, "Tomorrow_PV");
+  deleteReadingspec ($hash, "NextHour.*");
 
   my $interval = controlParams ($name); 
   
@@ -1181,13 +1184,16 @@ sub centralTask {
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
-      
+            
+      collectSummaries ($hash, $chour, \@da);                                                      # Zusammenfassung nächste 4 Stunden u.a. erstellen
+
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
       }
       
-      collectSummaries ($hash, $chour, \@da);                                                      # Zusammenfassung nächste 4 Stunden u.a. erstellen
-      calcVariance     ($params);                                                                  # Autokorrektur berechnen
+      calcVariance ($params);                                                                      # Autokorrektur berechnen
+      
+      _additionalEvents ($params);
       
       readingsSingleUpdate($hash, "state", "updated", 1);                                          # Abschluß state      
   }
@@ -1356,9 +1362,8 @@ sub _transferDWDForecastValues {
   for my $num (0..47) {      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       
-      if($fd > 1) {                                                                           # überhängende Readings löschen 
-          deleteReadingspec ($hash, "NextHour".($num-1).".*");
-          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num-1)};
+      if($fd > 1) {                                                                           # überhängende Werte löschen 
+          delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
           next;
       }
 
@@ -1374,8 +1379,8 @@ sub _transferDWDForecastValues {
           $epoche   = $t + (3600*$num);                                                      
           my $ta    = TimeAdjust ($epoche);
           
-          push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-          push @$daref, "${time_str}_Time:"      .$ta;
+          #push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
+          #push @$daref, "${time_str}_Time:"      .$ta;
           
           $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
           $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
@@ -1400,6 +1405,8 @@ sub _transferDWDForecastValues {
           delete $paref->{histname};
       }
   }
+  
+  push @$daref, ".lastupdateForecastValues:".$t;                                              # Statusreading letzter DWD update
       
 return;
 }
@@ -1671,6 +1678,60 @@ return ($fd,$fh);
 }
 
 ################################################################
+#     Zusätzliche Events für Logging generieren
+################################################################
+sub _additionalEvents {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $t     = $paref->{t};                                  # Epoche Zeit
+  
+  my $no_replace = 1;                                       # Ersetzung von Events durch das Attribut eventMap verhindern
+  my $date       = strftime "%Y-%m-%d", localtime($t);      # aktuelles Datum
+  my $mseclog    = AttrVal("global", "mseclog", 0);
+  my $tsmsec     = $mseclog ? ".000" : q{};
+  
+  for my $num (1..24) {
+      my $ts   = $date." ".sprintf("%02d",$num).":00:00".$tsmsec;
+      
+      my $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$num)."_PVforecast", undef);  
+      __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
+      
+      my $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$num)."_PVreal", undef);
+      __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+  }
+
+  my $ret = DoTrigger($name, undef, $no_replace);
+  
+return;
+}
+
+################################################################
+#     Zusätzliche Events für Logging generieren
+################################################################
+sub __addCHANGED {
+  my $hash = shift;
+  my $val  = shift;
+  my $ts   = shift;
+  
+  if($hash->{CHANGED}) {
+      push @{$hash->{CHANGED}}, $val;
+  } 
+  else {
+      $hash->{CHANGED}[0] = $val;
+  }
+  
+  if($hash->{CHANGETIME}) {
+      push @{$hash->{CHANGETIME}}, $ts;
+  } 
+  else {
+      $hash->{CHANGETIME}[0] = $ts;
+  }
+  
+return;
+}
+
+################################################################
 #              FHEMWEB Fn
 ################################################################
 sub FwFn {
@@ -1932,7 +1993,7 @@ sub forecastGraphic {                                                           
 
   my $pv4h = ReadingsNum ($name,"Next04Hours_PV",          0);
   my $pvRe = ReadingsNum ($name,"RestOfDay_PV",            0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PV",             0);
+  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",     0);
   my $pvCu = ReadingsNum ($name,"Current_PV",              0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
@@ -1966,7 +2027,7 @@ sub forecastGraphic {                                                           
       my $alias   = AttrVal    ($name,    "alias",              $name );                            # Linktext als Aliasname
       
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
-      my $lup     = ReadingsTimestamp($name, "NextHour00_PVforecast", "0000-00-00 00:00:00");       # letzter Forecast Update
+      my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
       my $lupt    = "last update:";
       my $autoct  = "automatic correction:";  
@@ -3203,7 +3264,7 @@ sub collectSummaries {
   push @$daref, "Tomorrow_PVforecast:".(int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast:".   (int $todaySum->{PV}).     " Wh";
 
-  createReadingsFromArray ($hash, $daref, 1);
+  # createReadingsFromArray ($hash, $daref, 1);
   
 return;
 }
