@@ -314,7 +314,7 @@ my %weather_ids = (
   '97'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Regen oder Schnee'                                   },
   '98'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Sandsturm'                                           },
   '99'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Graupel oder Hagel'                                  },
-  '100' => { s => '0', icon => 'weather_night ',           txtd => 'sternenklarer Himmel'                                                     },
+  '100' => { s => '0', icon => 'weather_night',            txtd => 'sternenklarer Himmel'                                                     },
 );
 
 my @chours      = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
@@ -1180,6 +1180,7 @@ sub centralTask {
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
       
+      _additionalEvents          ($params);                                                        # zusätzliche Events generieren + Zusatzaufgaben
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
@@ -1192,8 +1193,6 @@ sub centralTask {
       }
       
       calcVariance ($params);                                                                      # Autokorrektur berechnen
-      
-      _additionalEvents ($params);
       
       readingsSingleUpdate($hash, "state", "updated", 1);                                          # Abschluß state      
   }
@@ -1334,6 +1333,59 @@ sub writeCacheToFile {
   }
    
 return; 
+}
+
+################################################################
+#     Zusätzliche Events für Logging generieren und
+#     Sonderaufgaben !
+################################################################
+sub _additionalEvents {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $t     = $paref->{t};                                  # Epoche Zeit
+  
+  my $no_replace = 1;                                       # Ersetzung von Events durch das Attribut eventMap verhindern
+  my $date       = strftime "%Y-%m-%d", localtime($t);      # aktuelles Datum
+  my $mseclog    = AttrVal("global", "mseclog", 0);
+  my $tsmsec     = $mseclog ? ".000" : q{};
+  
+  my ($ts,$pvfc,$pvrl);
+  
+  $ts   = $date." ".sprintf("%02d",$chour).":00:00".$tsmsec;
+  
+  $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVforecast", undef);  
+  __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
+  
+  $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", undef);
+  __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+  
+  my $tlim = "00";                                                                            # bestimmte Aktionen                    
+  if($chour =~ /^($tlim)$/x) {
+      if(!exists $hash->{HELPER}{H00DONE}) {
+          $ts   = $date." ".sprintf("%02d",24).":00:00".$tsmsec;
+          
+          $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",24)."_PVforecast", undef);  
+          __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
+          
+          $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",24)."_PVreal", undef);
+          __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+          
+          deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
+          deleteReadingspec ($hash, "Today_Hour.*_PV.*");
+          delete $hash->{HELPER}{INITETOTAL};
+          delete $hash->{HELPER}{INITCONTOTAL};
+          $hash->{HELPER}{H00DONE} = 1;
+      }
+  }
+  else {
+      delete $hash->{HELPER}{H00DONE};
+  }
+
+  my $ret = DoTrigger($name, undef, $no_replace);
+  
+return;
 }
 
 ################################################################
@@ -1508,13 +1560,7 @@ sub _transferInverterValues {
   $indev     = $a->[0] // "";
   return if(!$indev || !$defs{$indev});
   
-  my $tlim = "23";                                                                            # Stunde 23 -> bestimmte Aktionen                  
-  my $type = $hash->{TYPE}; 
-  
-  if($chour =~ /^($tlim)$/x) {
-      deleteReadingspec ($hash, "Today_Hour.*_PV.*");
-      delete $hash->{HELPER}{INITETOTAL};
-  }
+  my $type = $hash->{TYPE};
   
   my ($pvread,$pvunit) = split ":", $h->{pv};                                                 # Readingname/Unit für aktuelle PV Erzeugung
   my ($edread,$etunit) = split ":", $h->{etotal};                                             # Readingname/Unit für Energie total
@@ -1593,13 +1639,7 @@ sub _transferMeterValues {
   $medev     = $a->[0] // "";
   return if(!$medev || !$defs{$medev});
   
-  my $tlim = "23";                                                                            # Stunde 23 -> bestimmte Aktionen                  
   my $type = $hash->{TYPE}; 
-  
-  if($chour =~ /^($tlim)$/x) {
-      deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
-      delete $hash->{HELPER}{INITCONTOTAL};
-  }
   
   my ($gc,$gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
   my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
@@ -1675,35 +1715,6 @@ sub _calcDayHourMove {
   $fh    = $fh - ($fd * 24);  
    
 return ($fd,$fh);
-}
-
-################################################################
-#     Zusätzliche Events für Logging generieren
-################################################################
-sub _additionalEvents {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $t     = $paref->{t};                                  # Epoche Zeit
-  
-  my $no_replace = 1;                                       # Ersetzung von Events durch das Attribut eventMap verhindern
-  my $date       = strftime "%Y-%m-%d", localtime($t);      # aktuelles Datum
-  my $mseclog    = AttrVal("global", "mseclog", 0);
-  my $tsmsec     = $mseclog ? ".000" : q{};
-  
-  for my $num (1..24) {
-      my $ts   = $date." ".sprintf("%02d",$num).":00:00".$tsmsec;
-      
-      my $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$num)."_PVforecast", undef);  
-      __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
-      
-      my $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$num)."_PVreal", undef);
-      __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
-  }
-
-  my $ret = DoTrigger($name, undef, $no_replace);
-  
-return;
 }
 
 ################################################################
@@ -2355,7 +2366,7 @@ sub forecastGraphic {                                                           
           # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
           # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
           if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-          my ($icon_name, $title) = (($hfcg->{$i}{weather} > 99)) ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
+          my ($icon_name, $title) = (($hfcg->{$i}{weather} > 100)) ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
           # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
           Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
 
