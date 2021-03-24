@@ -1362,7 +1362,7 @@ sub _additionalEvents {
   __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
   
   $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", undef);
-  __addCHANGED ($hash, "Gridconsumption: ".$gcon, $ts) if(defined $gcon);
+  __addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
   
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
@@ -1376,7 +1376,7 @@ sub _additionalEvents {
           __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
           
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", undef);
-          __addCHANGED ($hash, "Gridconsumption: ".$gcon, $ts) if(defined $gcon);
+          __addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
           
           deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
