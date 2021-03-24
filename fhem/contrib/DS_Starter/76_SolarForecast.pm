@@ -1351,7 +1351,7 @@ sub _additionalEvents {
   my $mseclog    = AttrVal("global", "mseclog", 0);
   my $tsmsec     = $mseclog ? ".000" : q{};
   
-  my ($ts,$pvfc,$pvrl);
+  my ($ts,$pvfc,$pvrl,$gcon);
   
   $ts   = $date." ".sprintf("%02d",$chour).":00:00".$tsmsec;
   
@@ -1361,16 +1361,22 @@ sub _additionalEvents {
   $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", undef);
   __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
   
+  $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", undef);
+  __addCHANGED ($hash, "Gridconsumption: ".$gcon, $ts) if(defined $gcon);
+  
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
-          $ts   = $date." ".sprintf("%02d",24).":00:00".$tsmsec;
+          $ts   = $date." 24:00:00".$tsmsec;
           
-          $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",24)."_PVforecast", undef);  
+          $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", undef);  
           __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
           
-          $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",24)."_PVreal", undef);
+          $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", undef);
           __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+          
+          $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", undef);
+          __addCHANGED ($hash, "Gridconsumption: ".$gcon, $ts) if(defined $gcon);
           
           deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
