@@ -2768,7 +2768,7 @@ par:DEVNAME;name of this shelly;{ AttrVal("DEVICE","readingList","") =~ m,shelli
 par:ICON;ICON as set, defaults to motion_detector;{ AttrVal("DEVICE","icon","motion_detector") }
 attr DEVICE icon ICON
 attr DEVICE devStateIcon {my $onl = ReadingsVal($name,"online","false") eq "true"?"10px-kreis-gruen":"10px-kreis-rot"; \
-my $moti = ReadingsVal($name,"motion","false") eq "true"?"people_sensor ":"message_presence"; \
+my $moti = ReadingsVal($name,"motion","false") eq "true"?"people_sensor":"message_presence"; \
 "<a href=\"http://".ReadingsVal($name,"ip","none")." \"target=\"_blank\">".FW_makeImage($onl)."</a> <a href=\"/fhem?cmd.dummy=set $name toggle&XHR=1\">".FW_makeImage($moti)."</a>"}
 attr DEVICE readingList shellies/DEVNAME/online:.* online\
   shellies/DEVNAME/sensor/status:.* { json2nameValue($EVENT) }\
@@ -2777,7 +2777,7 @@ attr DEVICE readingList shellies/DEVNAME/online:.* online\
 attr DEVICE setList x_update:noArg shellies/DEVNAME/command update_fw\
   x_mqttcom shellies/DEVNAME/command $EVTPART1
 attr DEVICE model shellymotion
-setreading DEVICE attrTemplateVersion 20210226
+setreading DEVICE attrTemplateVersion 20210324
 
 
 # shellyht using original firmware
