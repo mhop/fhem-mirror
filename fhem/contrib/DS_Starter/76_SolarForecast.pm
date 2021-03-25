@@ -124,7 +124,7 @@ my %vNotesIntern = (
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
   "0.18.0" => "21.03.2021  implement sub forecastGraphic from Wzut ",
   "0.17.1" => "21.03.2021  bug fixes, delete Helper->NextHour ",
-  "0.17.0" => "20.03.2021  new attr cloudFactorSlope / rainFactorSlope, fixes in Graphic sub ",
+  "0.17.0" => "20.03.2021  new attr cloudFactorDamping / rainFactorDamping, fixes in Graphic sub ",
   "0.16.0" => "19.03.2021  new getter nextHours, some fixes ",
   "0.15.3" => "19.03.2021  corrected weather consideration for call calcPVforecast ",
   "0.15.2" => "19.03.2021  some bug fixing ",
@@ -333,10 +333,10 @@ my $calcmaxd    = 7;                                                            
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $clslopedef  = 45;                                                            # Steilheit (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cldampdef  = 45;                                                             # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rslopedef   = 20;                                                            # Steilheit (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rdampdef   = 20;                                                             # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
@@ -379,7 +379,7 @@ sub Initialize {
                                 # "consumerList ".
                                 # "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 # "consumerAdviceIcon ".
-                                "cloudFactorSlope:slider,0,1,100 ".
+                                "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
@@ -394,7 +394,7 @@ sub Initialize {
                                 "maxVariancePerDay ".
                                 "maxPV ".
                                 "numHistDays:$cda ".
-                                "rainFactorSlope:slider,0,1,100 ".
+                                "rainFactorDamping:slider,0,1,100 ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
                                 "showLink:1,0 ".
@@ -2861,15 +2861,15 @@ sub calcPVforecast {
   my $chour = strftime "%H", localtime($t+($num*3600));                                               # aktuelle Stunde
   my $reld  = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my $cloudslope = AttrVal($name, "cloudFactorSlope", $clslopedef);                                   # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
-  my $rainslope  = AttrVal($name, "rainFactorSlope", $rslopedef);                                     # prozentuale Berücksichtigung des Regenkorrekturfaktors
+  my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
+  my $raindamp   = AttrVal($name, "rainFactorDamping", $rdampdef);                                    # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $cloudslope/100);                         # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                         # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $rainslope/100);                             # Rain Correction Faktor mit Steilheit
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                             # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);                   # Korrekturfaktor der Stunde des Tages einbeziehen
@@ -2892,11 +2892,11 @@ sub calcPVforecast {
           "moduleTiltAngle"          => $ta,
           "Area factor"              => $af,
           "Cloudcover"               => $cloudcover,
-          "CloudFactorSlope"         => $cloudslope." %",
+          "CloudFactorDamping"       => $clouddamp." %",
           "Cloudfactor"              => $ccf,
           "Rainprob"                 => $rainprob,
           "Rainfactor"               => $rcf,
-          "RainFactorSlope"          => $rainslope." %",
+          "RainFactorDamping"        => $raindamp." %",
           "pvCorrectionFactor"       => $hc,
           "Radiation"                => $rad,
           "Factor kJ to kWh"         => $kJtokWh,
@@ -3914,9 +3914,9 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br>  
        
-       <a name="cloudFactorSlope"></a>
-       <li><b>cloudFactorSlope </b><br>
-         Prozentuale Berücksichtigung (Steilheit) der Bewölkung bei der solaren Vorhersage. <br>
+       <a name="cloudFactorDamping"></a>
+       <li><b>cloudFactorDamping </b><br>
+         Prozentuale Berücksichtigung (Dämpfung) des Bewölkungprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 45)         
        </li>  
@@ -4044,9 +4044,9 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br>
        
-       <a name="rainFactorSlope"></a>
-       <li><b>rainFactorSlope </b><br>
-         Prozentuale Berücksichtigung (Steilheit) der Regenprognose bei der solaren Vorhersage. <br>
+       <a name="rainFactorDamping"></a>
+       <li><b>rainFactorDamping </b><br>
+         Prozentuale Berücksichtigung (Dämpfung) des Regenprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 20)         
        </li>  
