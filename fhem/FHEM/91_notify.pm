@@ -385,12 +385,12 @@ END
 =item summary_DE f&uuml;hrt bei Events Anweisungen aus
 =begin html
 
-<a name="notify"></a>
+<a id="notify"></a>
 <h3>notify</h3>
 <ul>
   <br>
 
-  <a name="notifydefine"></a>
+  <a id="notify-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; notify &lt;pattern&gt; &lt;command&gt;</code>
@@ -489,18 +489,21 @@ END
   <br>
 
 
-  <a name="notifyset"></a>
+  <a id="notify-set"></a>
   <b>Set </b>
   <ul>
+    <a id="notify-set-addRegexpPart"></a>
     <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;<br>
         add a regexp part, which is constructed as device:regexp.  The parts
         are separated by |.  Note: as the regexp parts are resorted, manually
         constructed regexps may become invalid. </li>
+    <a id="notify-set-removeRegexpPart"></a>
     <li>removeRegexpPart &lt;re&gt;<br>
         remove a regexp part.  Note: as the regexp parts are resorted, manually
         constructed regexps may become invalid.<br>
         The inconsistency in addRegexpPart/removeRegexPart arguments originates
         from the reusage of javascript functions.</li>
+    <a id="notify-set-inactive"></a>
     <li>inactive<br>
         Inactivates the current device. Note the slight difference to the
         disable attribute: using set inactive the state is automatically saved
@@ -508,27 +511,28 @@ END
         This command is intended to be used by scripts to temporarily
         deactivate the notify.<br>
         The concurrent setting of the disable attribute is not recommended.</li>
+    <a id="notify-set-active"></a>
     <li>active<br>
         Activates the current device (see inactive).</li>
     </ul>
     <br>
 
 
-  <a name="notifyget"></a>
+  <a id="notify-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="notifyattr"></a>
+  <a id="notify-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
-    <a name="disabledAfterTrigger"></a>
+    <a id="notify-attr-disabledAfterTrigger"></a>
     <li>disabledAfterTrigger someSeconds<br>
       disable the execution for someSeconds after it triggered.
     </li>
 
-    <a name="addStateEvent"></a>
+    <a id="notify-attr-addStateEvent"></a>
     <li>addStateEvent<br>
       The event associated with the state Reading is special, as the "state: "
       string is stripped, i.e $EVENT is not "state: on" but just "on". In some
@@ -543,7 +547,7 @@ END
       supporting the <a href="#readingFnAttributes">readingFnAttributes</a>.
       </li>
 
-    <a name="forwardReturnValue"></a>
+    <a id="notify-attr-forwardReturnValue"></a>
     <li>forwardReturnValue<br>
         Forward the return value of the executed command to the caller,
         default is disabled (0).  If enabled (1), then e.g. a set command which
@@ -551,14 +555,14 @@ END
         FHEMWEB to display this value, when clicking "on" or "off", which is
         often not intended.</li>
 
-    <a name="ignoreRegexp"></a>
+    <a id="notify-attr-ignoreRegexp"></a>
     <li>ignoreRegexp regexp<br>
         It is hard to create a regexp which is _not_ matching something, this
         attribute helps in this case, as the event is ignored if it matches the
         argument. The syntax is the same as for the original regexp.
         </li>
 
-    <a name="readLog"></a>
+    <a id="notify-attr-readLog"></a>
     <li>readLog<br>
         Execute the notify for messages appearing in the FHEM Log. The device
         in this case is set to the notify itself, e.g. checking for the startup
@@ -569,7 +573,7 @@ END
         </code></ul>
         </li>
 
-    <a name="perlSyntaxCheck"></a>
+    <a id="notify-attr-perlSyntaxCheck"></a>
     <li>perlSyntaxCheck<br>
         by setting the <b>global</b> attribute perlSyntaxCheck, a syntax check
         will be executed upon definition or modification, if the command is
@@ -585,12 +589,12 @@ END
 
 =begin html_DE
 
-<a name="notify"></a>
+<a id="notify"></a>
 <h3>notify</h3>
 <ul>
   <br>
 
-  <a name="notifydefine"></a>
+  <a id="notify-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; notify &lt;Suchmuster&gt; &lt;Anweisung&gt;</code>
@@ -712,18 +716,21 @@ END
   <br>
 
 
-  <a name="notifyset"></a>
+  <a id="notify-set"></a>
   <b>Set </b>
   <ul>
+    <a id="notify-set-addRegexpPart"></a>
     <li>addRegexpPart &lt;device&gt; &lt;regexp&gt;<br>
         F&uuml;gt ein regexp Teil hinzu, der als device:regexp aufgebaut ist.
         Die Teile werden nach Regexp-Regeln mit | getrennt.  Achtung: durch
         hinzuf&uuml;gen k&ouml;nnen manuell erzeugte Regexps ung&uuml;ltig
         werden.</li>
+    <a id="notify-set-removeRegexpPart"></a>
     <li>removeRegexpPart &lt;re&gt;<br>
         Entfernt ein regexp Teil.  Die Inkonsistenz von addRegexpPart /
         removeRegexPart-Argumenten hat seinen Ursprung in der Wiederverwendung
         von Javascript-Funktionen.</li>
+    <a id="notify-set-inactive"></a>
     <li>inactive<br>
         Deaktiviert das entsprechende Ger&auml;t. Beachte den leichten
         semantischen Unterschied zum disable Attribut: "set inactive"
@@ -733,28 +740,29 @@ END
         deaktivieren.<br>
         Das gleichzeitige Verwenden des disable Attributes wird nicht empfohlen.
         </li>
+    <a id="notify-set-active"></a>
     <li>active<br>
         Aktiviert das entsprechende Ger&auml;t, siehe inactive.
         </li>
     </ul>
     <br>
 
-  <a name="notifyget"></a>
+  <a id="notify-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="notifyattr"></a>
+  <a id="notify-attr"></a>
   <b>Attribute</b>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
-    <a name="disabledAfterTrigger"></a>
+    <a id="notify-attr-disabledAfterTrigger"></a>
     <li>disabledAfterTrigger &lt;sekunden&gt;<br>
       deaktiviert die Ausf&uuml;hrung f&uuml;r &lt;sekunden&gt; nach dem
       das notify ausgel&ouml;st wurde.
     </li>
 
-    <a name="addStateEvent"></a>
+    <a id="notify-attr-addStateEvent"></a>
     <li>addStateEvent<br>
       Das mit dem state Reading verkn&uuml;pfte Event ist speziell, da das
       dazugeh&ouml;rige Prefix "state: " entfernt wird, d.h. $EVENT ist nicht
@@ -774,14 +782,14 @@ END
       </ul>
       </li>
 
-    <a name="forwardReturnValue"></a>
+    <a id="notify-attr-forwardReturnValue"></a>
     <li>forwardReturnValue<br>
         R&uuml;ckgabe der Werte eines ausgef&uuml;hrten Kommandos an den
         Aufrufer.  Die Voreinstellung ist 0 (ausgeschaltet), um weniger
         Meldungen im Log zu haben.
         </li>
 
-    <a name="ignoreRegexp"></a>
+    <a id="notify-attr-ignoreRegexp"></a>
     <li>ignoreRegexp regexp<br>
         Es ist nicht immer einfach ein Regexp zu bauen, was etwas _nicht_
         matcht. Dieses Attribut hilft in diesen F&auml;llen: das Event wird
@@ -789,7 +797,7 @@ END
         in der Definition.
         </li>
 
-    <a name="readLog"></a>
+    <a id="notify-attr-readLog"></a>
     <li>readLog<br>
         Das notify wird f&uuml;r Meldungen, die im FHEM-Log erscheinen,
         ausgegef&uuml;hrt. Das "Event-Generierende-Ger&auml;t" wird auf dem
@@ -801,7 +809,7 @@ END
         </code></ul>
         </li>
 
-    <a name="perlSyntaxCheck"></a>
+    <a id="notify-attr-perlSyntaxCheck"></a>
     <li>perlSyntaxCheck<br>
         nach setzen des <b>global</b> Attributes perlSyntaxCheck wird eine 
         Syntax-Pr&uuml;fung der Anweisung durchgef&uuml;hrt bei jeder
