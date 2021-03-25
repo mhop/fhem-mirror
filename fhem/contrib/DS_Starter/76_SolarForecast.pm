@@ -117,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.23.0" => "25.03.2021  change attr layoutType ",
+  "0.23.0" => "25.03.2021  change attr layoutType, fix calc reading Today_PVforecast ",
   "0.22.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
   "0.21.0" => "24.03.2021  event management ",
   "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
@@ -1188,7 +1188,7 @@ sub centralTask {
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);
             
-      collectSummaries ($hash, $chour, \@da);                                                      # Zusammenfassung nächste 4 Stunden u.a. erstellen
+      calcSummaries ($hash, $chour, \@da);                                                         # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
@@ -3254,7 +3254,7 @@ return $sc;
 ################################################################
 #               Zusammenfassungen erstellen
 ################################################################
-sub collectSummaries {            
+sub calcSummaries {            
   my $hash  = shift;
   my $chour = shift;                          # aktuelle Stunde
   my $daref = shift;
@@ -3280,15 +3280,16 @@ sub collectSummaries {
       $next4HoursSum->{PV} += $pvfc if($h <= 3);
       $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
       $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
-      $todaySum->{PV}      += $pvfc if($h <= 23);
+  }
+  
+  for my $th (1..24) {
+      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
   }
   
   push @$daref, "Next04Hours_PV:".     (int $next4HoursSum->{PV})." Wh";
   push @$daref, "RestOfDay_PV:".       (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast:".(int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast:".   (int $todaySum->{PV}).     " Wh";
-
-  # createReadingsFromArray ($hash, $daref, 1);
   
 return;
 }
