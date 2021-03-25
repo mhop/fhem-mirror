@@ -117,7 +117,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.21.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
+  "0.23.0" => "25.03.2021  change attr layoutType ",
+  "0.22.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
   "0.21.0" => "24.03.2021  event management ",
   "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
@@ -389,7 +390,7 @@ sub Initialize {
                                 "htmlStart ".
                                 "htmlEnd ".
                                 "interval ".
-                                "layoutType:pv,co,pvco,diff ".
+                                "layoutType:single,double,diff ".
                                 "maxVariancePerDay ".
                                 "maxPV ".
                                 "numHistDays:$cda ".
@@ -1984,7 +1985,7 @@ sub forecastGraphic {                                                           
   my $html_start =  AttrVal ($name, 'htmlStart',          undef   );                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
   my $html_end   =  AttrVal ($name, 'htmlEnd',            undef   );                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
 
-  my $lotype     =  AttrVal ($name, 'layoutType',          'pv'   );
+  my $lotype     =  AttrVal ($name, 'layoutType',       'single'  );
   my $kw         =  AttrVal ($name, 'Wh/kWh',              'Wh'   );
 
   $height        =  AttrNum ($name, 'beamHeight',           200   );
@@ -2220,15 +2221,15 @@ sub forecastGraphic {                                                           
   $hfcg->{0}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'consumption') ? $val3 : $val4;
   $hfcg->{0}{diff}  = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
-  $lotype = 'pv' if ($beam1cont eq $beam2cont);                                                  # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
+  $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
   ###########################################################
   # get consumer list and display it in portalGraphics
   ###########################################################  
   for (@pgCDev) {
       my ($itemName, undef) = split(':',$_);
-      $itemName =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
-      $_        =~ s/^\s+|\s+$//gx;                                                              #trim it, if blanks were used
+      $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
+      $_        =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
     
       ##################################
       #check if listed device is planned
@@ -2276,7 +2277,7 @@ sub forecastGraphic {                                                           
 
   $maxVal    = !$maxVal ? $hfcg->{0}{beam1} : $maxVal;                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
 
-  my $maxCon = $hfcg->{0}{beam1};                                                                       # für Typ co
+  my $maxCon = $hfcg->{0}{beam1};                                                                       
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
@@ -2438,12 +2439,12 @@ sub forecastGraphic {                                                           
       # Der zusätzliche Offset durch $fsize verhindert bei den meisten Skins 
       # dass die Grundlinie der Balken nach unten durchbrochen wird
 
-      if ($lotype eq 'pv') {
+      if ($lotype eq 'single') {
           $he = int(($maxVal-$hfcg->{$i}{beam1}) / $maxVal*$height) + $fsize;
           $z3 = int($height + $fsize - $he);
       } 
 
-      if ($lotype eq 'pvco') {
+      if ($lotype eq 'double') {
           # Berechnung der Zonen
           # he - freier der Raum über den Balken. fsize wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen 
           # z2 - der Ertrag ggf mit Icon
@@ -2452,7 +2453,7 @@ sub forecastGraphic {                                                           
 
           $maxVal = $maxCon if ($maxCon > $maxVal);                                         # wer hat den größten Wert ?
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # pv oben , co unten
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                    # Beam1 oben , Beam2 unten
               $z2 = $hfcg->{$i}{beam1}; $z3 = $hfcg->{$i}{beam2}; 
           } 
           else {                                                                            # tauschen, Verbrauch ist größer als Ertrag
@@ -2527,9 +2528,7 @@ sub forecastGraphic {                                                           
 
       $ret .="<td style='text-align: center; padding-left:1px; padding-right:1px; margin:0px; vertical-align:bottom; padding-top:0px'>\n";
 
-      if ($lotype eq 'pv') {
-          #my $v   = ($lotype eq 'co') ? $hfcg->{$i}{beam2} : $hfcg->{$i}{beam1} ; 
-          #$v   = 0 if (($lotype eq 'co') && !$hfcg->{$i}{beam1} && !$show_night);                      # auch bei type co die Nacht ggf. unterdrücken
+      if ($lotype eq 'single') {
           $val = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
 
           $ret .="<table width='100%' height='100%'>";                                                  # mit width=100% etwas bessere Füllung der Balken
@@ -2554,7 +2553,7 @@ sub forecastGraphic {                                                           
           }
       }
      
-      if ($lotype eq 'pvco') { 
+      if ($lotype eq 'double') { 
           my ($color1, $color2, $style1, $style2, $v);
 
           $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
@@ -2562,7 +2561,7 @@ sub forecastGraphic {                                                           
           # der Freiraum oben kann beim größten Balken ganz entfallen
           $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>" if ($he);
 
-          if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, co pder pv ? Wert und Farbe für Zone 2 & 3 vorbesetzen
+          if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
               $color1  = $colorfc;
               $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
@@ -4005,18 +4004,19 @@ werden weitere SolarForecast Devices zugeordnet.
        </li><br>
        
        <a name="layoutType"></a>
-       <li><b>layoutType &lt;pv | co | pvco | diff&gt; </b><br>
+       <li><b>layoutType &lt;single | double | diff&gt; </b><br>
        Layout der integrierten Grafik. <br>
-       (default: pv)  
+       Der darzustellende Inhalt der Balken wird durch die Attribute <b>beam1Content</b> bzw. <b>beam2Content</b> 
+       bestimmt. <br>
+       (default: single)  
        <br><br>
        
        <ul>   
        <table>  
-       <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>pv</b>    </td><td>- Erzeugung </td></tr>
-          <tr><td> <b>co</b>    </td><td>- Verbrauch </td></tr>
-          <tr><td> <b>pvco</b>  </td><td>- Erzeugung und Verbrauch </td></tr>
-          <tr><td> <b>diff</b>  </td><td>- Differenz von Erzeugung und Verbrauch </td></tr>
+       <colgroup> <col width=5%> <col width=95%> </colgroup>
+          <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                         </td></tr>
+          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an                                                                            </td></tr>
+          <tr><td> <b>diff</b>    </td><td>- Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
        </table>
        </ul>
        </li>
