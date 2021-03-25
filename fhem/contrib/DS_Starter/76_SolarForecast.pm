@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.21.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
   "0.21.0" => "24.03.2021  event management ",
   "0.20.0" => "23.03.2021  new sub CircularVal, NexthoursVal, some fixes ",
   "0.19.0" => "22.03.2021  new sub HistoryVal, some fixes ",
@@ -1367,7 +1368,7 @@ sub _additionalEvents {
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
-          $ts   = $date." 24:00:00".$tsmsec;
+          $ts   = $date." 23:59:59".$tsmsec;
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", undef);  
           __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
@@ -1424,10 +1425,12 @@ sub _transferDWDForecastValues {
           delete $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)};
           next;
       }
-
-      my $v = ReadingsVal($fcname, "fc${fd}_${fh}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh}_Rad1h, Rad1h=$v");
+      my $fh1 = $fh+1;
+      my $fh2 = $fh1 == 24 ? 23 : $fh1;
+      my $v   = ReadingsVal($fcname, "fc${fd}_${fh2}_Rad1h", 0);
+      
+      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$v");
       
       my $calcpv = calcPVforecast ($name, $v, $num, $t, $fh, $fd);                            # Vorhersage gewichtet kalkulieren
                 
@@ -1446,19 +1449,19 @@ sub _transferDWDForecastValues {
       #}
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{pvfc} = $calcpv;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{pvfc} = $calcpv;
       } 
       
       # $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
       
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh+1)."_PVforecast:$calcpv Wh";             
+          push @$daref, "Today_Hour".sprintf("%02d",$fh1)."_PVforecast:$calcpv Wh";             
       }
       
-      if($fd == 0 && $fh) {
+      if($fd == 0 && $fh1) {
           $paref->{calcpv}   = $calcpv;
           $paref->{histname} = "pvfc";
-          $paref->{nhour}    = sprintf("%02d",$fh+1);
+          $paref->{nhour}    = sprintf("%02d",$fh1);
           setPVhistory ($paref); 
           delete $paref->{histname};
       }
@@ -1501,15 +1504,17 @@ sub _transferWeatherValues {
   my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
   my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
   
-  for my $num (0..47) {                      
+  for my $num (0..46) {                      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
       last if($fd > 1);
 
-      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh}_ww",  -1);
-      my $neff  = ReadingsNum($fcname, "fc${fd}_${fh}_Neff", 0);                               # Effektive Wolkendecke
-      my $r101  = ReadingsNum($fcname, "fc${fd}_${fh}_R101", 0);                               # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+      my $fh1   = $fh+1;
+      my $fh2   = $fh1 == 24 ? 23 : $fh1;
+      my $wid   = ReadingsNum($fcname, "fc${fd}_${fh2}_ww",  -1);
+      my $neff  = ReadingsNum($fcname, "fc${fd}_${fh2}_Neff", 0);                              # Effektive Wolkendecke
+      my $r101  = ReadingsNum($fcname, "fc${fd}_${fh2}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
       
-      my $fhstr = sprintf "%02d", $fh-1;                                                       # hier kann Tag/Nacht-Grenze verstellt werden
+      my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
       
       if($fd == 0 && ($fhstr lt $fc0_SunRise_round || $fhstr gt $fc0_SunSet_round)) {          # Zeit vor Sonnenaufgang oder nach Sonnenuntergang heute
           $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
@@ -1518,9 +1523,9 @@ sub _transferWeatherValues {
           $wid += 100;                                                                         # "1" der WeatherID voranstellen wenn Nacht
       }
       
-      my $txt = ReadingsVal($fcname, "fc${fd}_${fh}_wwd", '');
+      my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
 
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
       #my $num1 = $num-1;
       #if($num1 >= 0) {
@@ -1531,16 +1536,16 @@ sub _transferWeatherValues {
       #}
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherid}         = $wid;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathertxt}        = $txt;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weathercloudcover} = $neff;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh+1)}{weatherrainprob}   = $r101;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}         = $wid;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt}        = $txt;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathercloudcover} = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherrainprob}   = $r101;
       }
       
-      if($fd == 0 && $fh) {                                                                   # WeatherId in pvhistory speichern
+      if($fd == 0 && $fh1) {                                                                   # WeatherId in pvhistory speichern
           $paref->{wid}      = $wid;
           $paref->{histname} = "weatherid";
-          $paref->{nhour}    = sprintf("%02d",$fh+1);
+          $paref->{nhour}    = sprintf("%02d",$fh1);
           setPVhistory ($paref); 
           delete $paref->{histname};
       }
@@ -2294,7 +2299,10 @@ sub forecastGraphic {                                                           
           if ($i <= abs($offset)) {
               # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
               my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i)));
-
+              
+              # Sonderfall Mitternacht
+              $ds   = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
+              
               $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
               $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
               $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
