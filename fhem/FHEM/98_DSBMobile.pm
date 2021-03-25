@@ -55,7 +55,7 @@ sub DSBMobile_Initialize($) {
     $hash->{DefFn}   = "DSBMobile_Define";
     $hash->{UndefFn} = "DSBMobile_Undefine";
 
-    $hash->{GetFn}   = "DSBMobile_Get";
+    $hash->{GetFn} = "DSBMobile_Get";
 
     #$hash->{SetFn}   = "DSBMobile_Set";
     $hash->{AttrFn} = "DSBMobile_Attr";
@@ -137,14 +137,18 @@ sub DSBMobile_Get($@) {
     my ( $hash, @a ) = @_;
     my $name  = $hash->{NAME};
     my $ret   = "";
-    my $usage = 'Unknown argument $a[1], choose one of timetable:noArg';
+    my $usage = 'Unknown argument $a[1], choose one of timetable:noArg timetablev2:noArg';
 
     return "\"get $name\" needs at least one argument"
         unless ( defined( $a[1] ) );
 
     if ( $a[1] eq "timetable" ) {
         $hash->{helper}{forceRead} = 1;
-        return DSBMobile_query($hash);
+        return DSBMobile_queryv2($hash);
+    }
+    elsif ( $a[1] eq "timetable" ) {
+        $hash->{helper}{forceRead} = 1;
+        return DSBMobile_queryv2($hash);
     }
 
     # return usage hint
@@ -154,6 +158,81 @@ sub DSBMobile_Get($@) {
     return undef;
 }
 
+sub DSBMobile_queryv2 {
+    my ($hash) = shift;
+    my $name = $hash->{NAME};
+    my $user = AttrVal( $name, "dsb_user",     q{} );
+    my $pw   = AttrVal( $name, "dsb_password", q{} );
+    if ( $user eq q{} or $pw eq q{} ) {
+        return "User and password have to be maintained in the attributes";
+    }
+    my %arg = (
+        "UserId"     => $user,
+        "UserPw"     => $pw,
+        "appversion" => "3.6.2",
+        "osversion"  => "14.4",
+        "bundleid"   => "bundleid=de.digitales-schwarzes-brett.dsblight",
+    );
+    my $header = {
+
+        #'Host'            => 'mobileapi.dsbcontrol.de',
+        'User-Agent'      => 'DSBmobile/2678 CFNetwork/1220.1 Darwin/20.3.0',
+        'Connection'      => 'keep-alive',
+        'Accept'          => '*/*',
+        'Accept-Language' => 'de-de',
+        'Accept-Encoding' => 'zip, deflate, br',
+    };
+    my $url
+        = "https://mobileapi.dsbcontrol.de/authid?user=$user&password=$pw&appversion=3.6.&osversion=14.4&bundleid=de.digitales-schwarzes-brett.dsblight&pushid=";
+
+    my $param = {
+        header   => $header,
+        url      => $url,
+        method   => "GET",
+        hash     => $hash,
+        callback => \&DSBMobile_getDataCallbackv2
+    };
+    HttpUtils_NonblockingGet($param);
+
+    return;
+}
+
+sub DSBMobile_getDataCallbackv2 {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err ne q{} ) {
+        Log3( $name, 3, "[$name] Error while requesting " . $param->{url} . " - $err" );
+        readingsSingleUpdate( $hash, "error", $err, 0 );
+        return;
+    }
+
+    $data =~ s/"//g;
+    Log3 $name, 4, "[$name] GetData - received $data";
+    readingsSingleUpdate( $hash, "authid", $data, 0 );
+
+    my $url = "https://mobileapi.dsbcontrol.de/dsbtimetables?authid=" . $data;
+
+    my $param = {
+        url      => $url,
+        method   => "GET",
+        hash     => $hash,
+        callback => \&DSBMobile_getDataCallback
+    };
+    HttpUtils_NonblockingGet($param);
+
+    my $url = "https://mobileapi.dsbcontrol.de/dsbdocuments?authid=" . $data;
+
+    $param = {
+        url      => $url,
+        method   => "GET",
+        hash     => $hash,
+        callback => \&DSBMobile_getDocsCallback
+    };
+    HttpUtils_NonblockingGet($param);
+    return;
+}
 #####################################
 sub DSBMobile_query($) {
     my ($hash) = @_;
@@ -191,6 +270,7 @@ sub DSBMobile_query($) {
     my $body = '{"req": {"Data": "' . $b64 . '","DataType": 1}}';
 
     my $header = {
+
         #'Host'            => 'app.dsbcontrol.de',
         'Content-Type'    => 'application/json; charset=utf-8',
         'User-Agent'      => 'DSBmobile/9759 (iPhone; iOS 13.3; Scale/3.00)',
@@ -226,57 +306,74 @@ sub DSBMobile_getDataCallback($) {
 
     Log3 $name, 5, "[$name] 1st nonblocking HTTP Call returning";
     Log3 $name, 5, "[$name] GetData - received $data";
-    my $j = DSBMobile_safe_decode_json( $hash, $data );
-    return unless defined($j);
-    my $d64 = decode_base64( $j->{d} );
-    my $json;
-    IO::Uncompress::Gunzip::gunzip \$d64 => \$json;
-    $json = latin1ToUtf8($json);
-    my $res = DSBMobile_safe_decode_json( $hash, $json );
-    if ( $res->{Resultcode} == 1 ) {
-        readingsSingleUpdate( $hash, "error", $res->{ResultStatusInfo}, 0 );
-        return undef;
-    }
+    my $json = DSBMobile_safe_decode_json( $hash, $data );
+    return unless defined($json);
+
+    #my $d64 = decode_base64( $j->{d} );
+    #my $json;
+    #IO::Uncompress::Gunzip::gunzip \$d64 => \$json;
+    my $res = latin1ToUtf8($json);
+    
+    #if ( $res->{Resultcode} == 1 ) {
+    #    readingsSingleUpdate( $hash, "error", $res->{ResultStatusInfo}, 0 );
+    #    return undef;
+    #}
     Log3 $name, 5, "[$name] JSON received: " . Dumper($res);
 
-    # todo - add error handling
+    ##my $subtt = @$res->{Childs};
+
     my $url;
     my $udate;
-    my $test = $res->{ResultMenuItems}[0]->{Childs};
-    my @aus;
     my %ttpages = ();    # hash to get unique urls
-    foreach my $c (@$test) {
 
-        #if ($c->{Title} eq "Pläne") {
-
-        #$ret .= Dumper($c->{root}{Childs}[0]->{Childs}[0]->{Detail});
-        foreach my $topic ($c) {
-            if ( $c->{MethodName} eq "timetable" ) {
-                my $p = $topic->{Root}{Childs};
-                for my $tt (@$p) {
-                    my $subtt = $tt->{Childs};
-                    for my $stt (@$subtt) {
-                        $url           = $stt->{Detail};
-                        $udate         = $stt->{Date};
-                        $ttpages{$url} = 1;
-                        Log3 $name, 5, "[$name] found url $url";
-                    }
-                }
-            }
-            if ( $c->{MethodName} eq "tiles" ) {
-                my $d = $topic->{Root}{Childs};
-
-                for my $tile (@$d) {
-                    my %au = (
-                        title => $tile->{Title},
-                        url   => $tile->{Childs}[0]->{Detail},
-                        date  => $tile->{Childs}[0]->{Date}
-                    );
-                    push( @aus, \%au );
-                }
-            }
+    for my $tt (@$res) {
+        my $subtt = $tt->{Childs};
+        for my $stt (@$subtt) {
+            $url           = $stt->{Detail};
+            $udate         = $stt->{Date};
+            $ttpages{$url} = 1;
+            Log3 $name, 5, "[$name] found url $url";
         }
     }
+
+    # todo - add error handling
+    # my $url;
+    # my $udate;
+    # my $test = $res->{ResultMenuItems}[0]->{Childs};
+    # my @aus;
+    # my %ttpages = ();    # hash to get unique urls
+    # foreach my $c (@$test) {
+
+    #     #if ($c->{Title} eq "Pläne") {
+
+    #     #$ret .= Dumper($c->{root}{Childs}[0]->{Childs}[0]->{Detail});
+    #     foreach my $topic ($c) {
+    #         if ( $c->{MethodName} eq "timetable" ) {
+    #             my $p = $topic->{Root}{Childs};
+    #             for my $tt (@$p) {
+    #                 my $subtt = $tt->{Childs};
+    #                 for my $stt (@$subtt) {
+    #                     $url           = $stt->{Detail};
+    #                     $udate         = $stt->{Date};
+    #                     $ttpages{$url} = 1;
+    #                     Log3 $name, 5, "[$name] found url $url";
+    #                 }
+    #             }
+    #         }
+    #         if ( $c->{MethodName} eq "tiles" ) {
+    #             my $d = $topic->{Root}{Childs};
+
+    #             for my $tile (@$d) {
+    #                 my %au = (
+    #                     title => $tile->{Title},
+    #                     url   => $tile->{Childs}[0]->{Detail},
+    #                     date  => $tile->{Childs}[0]->{Date}
+    #                 );
+    #                 push( @aus, \%au );
+    #             }
+    #         }
+    #     }
+    # }
 
     my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst )
         = localtime( gettimeofday() );
@@ -300,6 +397,113 @@ sub DSBMobile_getDataCallback($) {
     }
     delete $hash->{helper}{forceRead};
 
+    # my $i = 0;
+    # CommandDeleteReading( undef, $name . " i.*" );
+    # readingsBeginUpdate($hash);
+    # foreach my $line (@aus) {
+    #     my $reading = "i" . $i . "_";
+    #     my %line    = %{$line};
+    #     foreach my $key ( keys %line ) {
+    #         my $val = %$line{$key};
+    #         $val = "-" if ( !defined $val );
+    #         readingsBulkUpdate( $hash, $reading . $key, $val );
+    #     }
+    #     $i++;
+    # }
+    # readingsBulkUpdate( $hash, ".lastAResult", encode_json( \@aus ) );
+    #readingsEndUpdate( $hash, 1 );
+
+    # build an array from url hash
+    my @ttpages = keys %ttpages;
+
+    if ( @ttpages == 1 ) {
+        Log3 $name, 4, "[$name] Extracted the url: " . $url;
+    }
+    else {
+        Log3 $name, 4, "[$name] Extracted multiple urls: " . Dumper(@ttpages);
+    }
+    $hash->{helper}{tturl} = \@ttpages;
+    DSBMobile_processTTPages($hash);
+    return undef;
+}
+
+sub DSBMobile_getDocsCallback($) {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err ne "" ) {
+        Log3 $name, 3, "[$name] Error while requesting " . $param->{url} . " - $err";
+        readingsSingleUpdate( $hash, "error", $err, 0 );
+        return undef;
+    }
+
+    Log3 $name, 5, "[$name] 2nd nonblocking HTTP Call returning";
+    Log3 $name, 5, "[$name] GetData - received $data";
+    my $json = DSBMobile_safe_decode_json( $hash, $data );
+    return unless defined($json);
+
+    #my $d64 = decode_base64( $j->{d} );
+    #my $json;
+    #IO::Uncompress::Gunzip::gunzip \$d64 => \$json;
+    my $res = latin1ToUtf8($json);
+    
+    #if ( $res->{Resultcode} == 1 ) {
+    #    readingsSingleUpdate( $hash, "error", $res->{ResultStatusInfo}, 0 );
+    #    return undef;
+    #}
+    Log3 $name, 5, "[$name] JSON received: " . Dumper($res);
+
+    my @aus;
+
+    for my $tile (@$res) {
+        my %au = (
+            title => $tile->{Title},
+            url   => $tile->{Childs}[0]->{Detail},
+            date  => $tile->{Childs}[0]->{Date}
+        );
+        push( @aus, \%au );
+    }
+
+    # todo - add error handling
+    # my $url;
+    # my $udate;
+    # my $test = $res->{ResultMenuItems}[0]->{Childs};
+    # my @aus;
+    # my %ttpages = ();    # hash to get unique urls
+    # foreach my $c (@$test) {
+
+    #     #if ($c->{Title} eq "Pläne") {
+
+    #     #$ret .= Dumper($c->{root}{Childs}[0]->{Childs}[0]->{Detail});
+    #     foreach my $topic ($c) {
+    #         if ( $c->{MethodName} eq "timetable" ) {
+    #             my $p = $topic->{Root}{Childs};
+    #             for my $tt (@$p) {
+    #                 my $subtt = $tt->{Childs};
+    #                 for my $stt (@$subtt) {
+    #                     $url           = $stt->{Detail};
+    #                     $udate         = $stt->{Date};
+    #                     $ttpages{$url} = 1;
+    #                     Log3 $name, 5, "[$name] found url $url";
+    #                 }
+    #             }
+    #         }
+    #         if ( $c->{MethodName} eq "tiles" ) {
+    #             my $d = $topic->{Root}{Childs};
+
+    #             for my $tile (@$d) {
+    #                 my %au = (
+    #                     title => $tile->{Title},
+    #                     url   => $tile->{Childs}[0]->{Detail},
+    #                     date  => $tile->{Childs}[0]->{Date}
+    #                 );
+    #                 push( @aus, \%au );
+    #             }
+    #         }
+    #     }
+    # }
+
     my $i = 0;
     CommandDeleteReading( undef, $name . " i.*" );
     readingsBeginUpdate($hash);
@@ -316,19 +520,9 @@ sub DSBMobile_getDataCallback($) {
     readingsBulkUpdate( $hash, ".lastAResult", encode_json( \@aus ) );
     readingsEndUpdate( $hash, 1 );
 
-    # build an array from url hash
-    my @ttpages = keys %ttpages;
-
-    if ( @ttpages == 1 ) {
-        Log3 $name, 4, "[$name] Extracted the url: " . $url;
-    }
-    else {
-        Log3 $name, 4, "[$name] Extracted multiple urls: " . Dumper(@ttpages);
-    }
-    $hash->{helper}{tturl} = \@ttpages;
-    DSBMobile_processTTPages($hash);
-    return undef;
+    return;
 }
+
 #####################################
 sub DSBMobile_processTTPages($) {
     my ($hash) = @_;
@@ -405,6 +599,22 @@ sub DSBMobile_getTTCallback($) {
     my $idata = $data;
     my @dinfo = $idata =~ m/(<table class="info" >(?:(?:\r\n|[\r\n])[^\r\n]+?)*\/table>)/g;
 
+    my $jdata = $data;
+	my @einfo = $jdata =~ m/<div class="mon_title">(.*)<\/div>\s*(<table class="info" >(?:(?:\r\n|[\r\n])[^\r\n]+?)*\/table>)/g;
+	Log3 $name, 5, "[$name] Found info of the Day with Date: " . Dumper(@einfo);
+
+	my %jtabs;
+    foreach my $ein (@einfo) {
+		Log3 $name, 5, "[$name] Looping at: " . Dumper($ein);    	
+		next;
+        my ( $date, undef ) = split( " ", $ein );
+        my ( $d, $m, $y ) = split( /\./, $date );
+        my $fdate = $y . "-" . sprintf( "%02s", $m ) . "-" . sprintf( "%02s", $d );
+		my $tinfo = HTML::TableExtract->new();
+        $tinfo->parse(@$ein[1]);
+        $jtabs{$fdate} = $tinfo;
+    }
+
     my @itabs;
     foreach my $din (@dinfo) {
         Log3 $name, 5, "[$name] Found info of the Day: " . Dumper($din);
@@ -445,7 +655,8 @@ sub DSBMobile_getTTCallback($) {
         my $fdate = $y . "-" . sprintf( "%02s", $m ) . "-" . sprintf( "%02s", $d );
 
         my $t    = $tabs[$i];
-        my $info = $itabs[$i];
+        #my $info = $itabs[$i];
+        my $info = $jtabs{fdate};
         $i++;
         my $j     = 0;
         my $group = undef;
@@ -560,7 +771,7 @@ sub DSBMobile_ProcessTimer($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    DSBMobile_query($hash);
+    DSBMobile_queryv2($hash);
 
     my $now = int( gettimeofday() );
     my $interval = AttrNum( $name, "dsb_interval", 0 );
@@ -641,9 +852,9 @@ sub DSBMobile_simpleHTML($;$) {
     my $out = AttrVal( $name, "dsb_outputFormat", undef );
 
     foreach my $day (@days) {
-        my ($y,$m,$d) = split('-',$day);
-        my $pday = sprintf('%02d.%02d.%04d', $d, $m, $y);
-        
+        my ( $y, $m, $d ) = split( '-', $day );
+        my $pday = sprintf( '%02d.%02d.%04d', $d, $m, $y );
+
         my $row   = 0;
         my $class = "even";
         $ret .= "</table><table class='block wide'><tr class='$class'><td><b>" . $pday . "</b></td></tr>";
