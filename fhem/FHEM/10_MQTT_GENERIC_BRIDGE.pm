@@ -30,6 +30,9 @@
 # 
 # CHANGE LOG
 #
+# 25.03.2021 1.4.1
+#  bugfix    : no publish with no global map
+#
 # 04.03.2021 1.4.0
 # change     : perl critic fixes by Beta-User
 #
@@ -415,7 +418,7 @@ use GPUtils qw(:all);
 
 #my $DEBUG = 1;
 my $cvsid = '$Id$';
-my $VERSION = "version 1.4.0 by hexenmeister\n$cvsid";
+my $VERSION = "version 1.4.1 by hexenmeister\n$cvsid";
 
 my %sets = (
 );
@@ -1142,8 +1145,10 @@ sub getDevicePublishRec {
   my $ret = [];
   my $map = $hash->{+HS_TAB_NAME_DEVICES};
   return $ret unless defined $map;
+
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec: $dev, $reading, ".Dumper($map));
   
-  my $globalMap = $map->{':global'};
+  my $globalMap = $map->{':global'} // {};
   my $devMap = $map->{$dev};
 
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> devmap: ".Dumper($devMap));
@@ -1188,15 +1193,19 @@ sub getDevicePublishRec {
 sub getDevicePublishRecIntern {
   my $hash       = shift // return;
   my $devMap     = shift // carp q[No device map provided!] && return;
-  my $globalMap  = shift // carp q[No globalMap provided!]  && return;
+  my $globalMap  = shift; # optional
   my $dev        = shift // carp q[No device name provided!] && return;
   my $readingKey = shift; #seems to be optional
   my $reading    = shift // carp q[No reading provided!] && return;
-  my $postFix    = shift; #mandatory? or assign a default?
+  my $postFix    = shift; # may be undef
+  
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> hash: ".$hash);
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> devmap: ".Dumper($devMap));
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> globalmap: ".Dumper($globalMap));
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> dev: ".Dumper($dev));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> readingKey: ".Dumper($readingKey));
   #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> reading: ".Dumper($reading));
+  #Log3($hash->{NAME},1,"MQTT_GENERIC_BRIDGE:DEBUG:> [$hash->{NAME}] getDevicePublishRec> params> postFix: ".Dumper($postFix));
 
   # publish map
   my $publishMap = $devMap->{':publish'};
@@ -1994,6 +2003,7 @@ sub getDevInfo {
           $res.="  publish:\n";
       for my $rname (sort keys %{$hash->{+HS_TAB_NAME_DEVICES}->{$dname}->{':publish'}}) {
             my $pubRecList = getDevicePublishRec($hash, $dname, $rname);
+            #Log3($hash->{NAME},5,"MQTT_GENERIC_BRIDGE:DEBUG:> getDevInfo ($hash, $dname, $rname)".Dumper($pubRecList));
         next if !defined($pubRecList);
         for my $pubRec (@$pubRecList) {
           next if !defined($pubRec);
