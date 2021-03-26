@@ -122,8 +122,7 @@ notify_Exec($$)
       Log3 $ln, 3, "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
       $ntfy->{TRIGGERTIME} = $now;
-      $ntfy->{STATE} =
-        AttrVal($ln,'showtime',1) ? $dev->{NTFY_TRIGGERTIME} : 'active';
+      $ntfy->{STATE} = $dev->{NTFY_TRIGGERTIME} if(AttrVal($ln,'showtime',1));
       last if($dat);
     }
   }
