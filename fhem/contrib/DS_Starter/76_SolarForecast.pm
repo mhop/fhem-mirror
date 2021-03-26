@@ -341,8 +341,6 @@ my $cloud_base  = 0;                                                            
 my $rdampdef    = 20;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
-
 # Information zu verwendeten internen Datenhashes
 # $data{$type}{$name}{circular}                                                  # Ringspeicher
 # $data{$type}{$name}{current}                                                   # current values
@@ -356,8 +354,7 @@ my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 sub Initialize {
   my ($hash) = @_;
 
-  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized"); 
-  my $cda = join ",", @consdays;
+  my $fwd = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
   
   $hash->{DefFn}              = \&Define;
   $hash->{UndefFn}            = \&Undef;
@@ -395,7 +392,7 @@ sub Initialize {
                                 "layoutType:single,double,diff ".
                                 "maxVariancePerDay ".
                                 "maxPV ".
-                                "numHistDays:$cda ".
+                                "numHistDays:slider,1,1,30 ".
                                 "rainFactorDamping:slider,0,1,100 ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
