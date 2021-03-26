@@ -117,6 +117,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
+                           "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
   "0.23.0" => "25.03.2021  change attr layoutType, fix calc reading Today_PVforecast ",
   "0.22.0" => "25.03.2021  event management, move DWD values one hour to the future, some more corrections ",
   "0.21.0" => "24.03.2021  event management ",
@@ -207,116 +209,116 @@ my %hff = (                                                                     
 my %weather_ids = (
   # s =>  0 , 0 - 3   DWD -> kein signifikantes Wetter
   # s =>  1 , 45 - 99 DWD -> signifikantes Wetter
-  '0'   => { s => '0', icon => 'weather_sun',              txtd => 'sonnig' },
-  '1'   => { s => '0', icon => 'weather_cloudy_light',     txtd => 'Bewölkung abnehmend' },
-  '2'   => { s => '0', icon => 'weather_cloudy',           txtd => 'Bewölkung unverändert' },
-  '3'   => { s => '0', icon => 'weather_cloudy_heavy',     txtd => 'Bewölkung zunehmend' },
-  '4'   => { s => '0', icon => 'unknown',                  txtd => 'Sicht durch Rauch oder Asche vermindert' },
-  '5'   => { s => '0', icon => 'unknown',                  txtd => 'trockener Dunst (relative Feuchte < 80 %)' },
-  '6'   => { s => '0', icon => 'unknown',                  txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt' },
-  '7'   => { s => '0', icon => 'unknown',                  txtd => 'Staub oder Sand bzw. Gischt, vom Wind herangeführt' },
-  '8'   => { s => '0', icon => 'unknown',                  txtd => 'gut entwickelte Staub- oder Sandwirbel' },
-  '9'   => { s => '0', icon => 'unknown',                  txtd => 'Staub- oder Sandsturm im Gesichtskreis, aber nicht an der Station' },
+  '0'   => { s => '0', icon => 'weather_sun',              txtd => 'sonnig',                                                                   txte => 'sunny'                                                                      },
+  '1'   => { s => '0', icon => 'weather_cloudy_light',     txtd => 'Bewölkung abnehmend',                                                      txte => 'Cloudiness decreasing'                                                      },
+  '2'   => { s => '0', icon => 'weather_cloudy',           txtd => 'Bewölkung unverändert',                                                    txte => 'Cloudiness unchanged'                                                       },
+  '3'   => { s => '0', icon => 'weather_cloudy_heavy',     txtd => 'Bewölkung zunehmend',                                                      txte => 'Cloudiness increasing'                                                      },
+  '4'   => { s => '0', icon => 'unknown',                  txtd => 'Sicht durch Rauch oder Asche vermindert',                                  txte => 'Visibility reduced by smoke or ash'                                         },
+  '5'   => { s => '0', icon => 'unknown',                  txtd => 'trockener Dunst (relative Feuchte < 80 %)',                                txte => 'dry haze (relative humidity < 80 %)'                                        },
+  '6'   => { s => '0', icon => 'unknown',                  txtd => 'verbreiteter Schwebstaub, nicht vom Wind herangeführt',                    txte => 'widespread airborne dust, not brought in by the wind'                       },
+  '7'   => { s => '0', icon => 'unknown',                  txtd => 'Staub oder Sand bzw. Gischt, vom Wind herangeführt',                       txte => 'Dust or sand or spray, brought in by the wind'                              },
+  '8'   => { s => '0', icon => 'unknown',                  txtd => 'gut entwickelte Staub- oder Sandwirbel',                                   txte => 'well-developed dust or sand vortex'                                         },
+  '9'   => { s => '0', icon => 'unknown',                  txtd => 'Staub- oder Sandsturm im Gesichtskreis, aber nicht an der Station',        txte => 'Dust or sand storm in the visual circle, but not at the station'            },
 
-  '10'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel' },
-  '11'  => { s => '0', icon => 'weather_rain_fog',         txtd => 'Nebel mit Regen'                                                       },
-  '12'  => { s => '0', icon => 'weather_fog',              txtd => 'durchgehender Bodennebel'                                              },
-  '13'  => { s => '0', icon => 'unknown',                  txtd => 'Wetterleuchten sichtbar, kein Donner gehört'                           },
-  '14'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag im Gesichtskreis, nicht den Boden erreichend'             },
-  '15'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Ferne (> 5 km), aber nicht an der Station'         },
-  '16'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Nähe (< 5 km), aber nicht an der Station'          },
-  '17'  => { s => '0', icon => 'unknown',                  txtd => 'Gewitter (Donner hörbar), aber kein Niederschlag an der Station'       },
-  '18'  => { s => '0', icon => 'unknown',                  txtd => 'Markante Böen im Gesichtskreis, aber kein Niederschlag an der Station' },
-  '19'  => { s => '0', icon => 'unknown',                  txtd => 'Tromben (trichterförmige Wolkenschläuche) im Gesichtskreis'            },
+  '10'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '11'  => { s => '0', icon => 'weather_rain_fog',         txtd => 'Nebel mit Regen',                                                          txte => 'Fog with rain'                                                              },
+  '12'  => { s => '0', icon => 'weather_fog',              txtd => 'durchgehender Bodennebel',                                                 txte => 'continuous ground fog'                                                      },
+  '13'  => { s => '0', icon => 'unknown',                  txtd => 'Wetterleuchten sichtbar, kein Donner gehört',                              txte => 'Weather light visible, no thunder heard'                                    },
+  '14'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag im Gesichtskreis, nicht den Boden erreichend',                txte => 'Precipitation in the visual circle, not reaching the ground'                },
+  '15'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Ferne (> 5 km), aber nicht an der Station',            txte => 'Precipitation in the distance (> 5 km), but not at the station'             },
+  '16'  => { s => '0', icon => 'unknown',                  txtd => 'Niederschlag in der Nähe (< 5 km), aber nicht an der Station',             txte => 'Precipitation in the vicinity (< 5 km), but not at the station'             },
+  '17'  => { s => '0', icon => 'unknown',                  txtd => 'Gewitter (Donner hörbar), aber kein Niederschlag an der Station',          txte => 'Thunderstorm (thunder audible), but no precipitation at the station'        },
+  '18'  => { s => '0', icon => 'unknown',                  txtd => 'Markante Böen im Gesichtskreis, aber kein Niederschlag an der Station',    txte => 'marked gusts in the visual circle, but no precipitation at the station'     },
+  '19'  => { s => '0', icon => 'unknown',                  txtd => 'Tromben (trichterförmige Wolkenschläuche) im Gesichtskreis',               txte => 'Trombles (funnel-shaped cloud tubes) in the circle of vision'               },
 
-  '20'  => { s => '0', icon => 'unknown',                  txtd => 'nach Sprühregen oder Schneegriesel' },
-  '21'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regen' },
-  '22'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schnefall' },
-  '23'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeregen oder Eiskörnern' },
-  '24'  => { s => '0', icon => 'unknown',                  txtd => 'nach gefrierendem Regen' },
-  '25'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regenschauer' },
-  '26'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeschauer' },
-  '27'  => { s => '0', icon => 'unknown',                  txtd => 'nach Graupel- oder Hagelschauer' },
-  '28'  => { s => '0', icon => 'unknown',                  txtd => 'nach Nebel' },
-  '29'  => { s => '0', icon => 'unknown',                  txtd => 'nach Gewitter' },
+  '20'  => { s => '0', icon => 'unknown',                  txtd => 'nach Sprühregen oder Schneegriesel',                                       txte => 'after drizzle or snow drizzle'                                              },
+  '21'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regen',                                                               txte => 'after rain'                                                                 },
+  '22'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schnefall',                                                           txte => 'after snowfall'                                                             },
+  '23'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeregen oder Eiskörnern',                                         txte => 'after sleet or ice grains'                                                  },
+  '24'  => { s => '0', icon => 'unknown',                  txtd => 'nach gefrierendem Regen',                                                  txte => 'after freezing rain'                                                        },
+  '25'  => { s => '0', icon => 'unknown',                  txtd => 'nach Regenschauer',                                                        txte => 'after rain shower'                                                          },
+  '26'  => { s => '0', icon => 'unknown',                  txtd => 'nach Schneeschauer',                                                       txte => 'after snow shower'                                                          },
+  '27'  => { s => '0', icon => 'unknown',                  txtd => 'nach Graupel- oder Hagelschauer',                                          txte => 'after sleet or hail showers'                                                },
+  '28'  => { s => '0', icon => 'unknown',                  txtd => 'nach Nebel',                                                               txte => 'after fog'                                                                  },
+  '29'  => { s => '0', icon => 'unknown',                  txtd => 'nach Gewitter',                                                            txte => 'after thunderstorm'                                                         },
 
-  '30'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität abnehmend' },
-  '31'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, unveränderte Intensität' },
-  '32'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität zunehmend' },
-  '33'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität abnehmend' },
-  '34'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, unveränderte Intensität' },
-  '35'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität zunehmend' },
-  '36'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneefegen, unter Augenhöhe' },
-  '37'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneefegen, unter Augenhöhe' },
-  '38'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneetreiben, über Augenhöhe' },
-  '39'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneetreiben, über Augenhöhe' },
+  '30'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität abnehmend',                 txte => 'light or moderate sandstorm, decreasing in intensity'                       },
+  '31'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, unveränderte Intensität',                 txte => 'light or moderate sandstorm, unchanged intensity'                           },
+  '32'  => { s => '0', icon => 'unknown',                  txtd => 'leichter oder mäßiger Sandsturm, an Intensität zunehmend',                 txte => 'light or moderate sandstorm, increasing in intensity'                       },
+  '33'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität abnehmend',                              txte => 'heavy sandstorm, decreasing in intensity'                                   },
+  '34'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, unveränderte Intensität',                              txte => 'heavy sandstorm, unchanged intensity'                                       },
+  '35'  => { s => '0', icon => 'unknown',                  txtd => 'schwerer Sandsturm, an Intensität zunehmend',                              txte => 'heavy sandstorm, increasing in intensity'                                   },
+  '36'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneefegen, unter Augenhöhe',                       txte => 'light or moderate snow sweeping, below eye level'                           },
+  '37'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneefegen, unter Augenhöhe',                                     txte => 'heavy snow sweeping, below eye level'                                       },
+  '38'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichtes oder mäßiges Schneetreiben, über Augenhöhe',                      txte => 'light or moderate blowing snow, above eye level'                            },
+  '39'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'starkes Schneetreiben, über Augenhöhe',                                    txte => 'heavy snow drifting, above eye level'                                       },
 
-  '40'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in einiger Entfernung' },
-  '41'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in Schwaden oder Bänken' },
-  '42'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dünner werdend' },
-  '43'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dünner werdend' },
-  '44'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, unverändert' },
-  '45'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel' },
-  '46'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dichter werdend' },
-  '47'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dichter werdend' },
-  '48'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel mit Reifbildung' },
-  '49'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel mit Reifansatz, Himmel nicht erkennbar' },
+  '40'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in einiger Entfernung',                                              txte => 'Fog in some distance'                                                       },
+  '41'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel in Schwaden oder Bänken',                                            txte => 'Fog in swaths or banks'                                                     },
+  '42'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dünner werdend',                                  txte => 'Fog, sky recognizable, thinning'                                            },
+  '43'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dünner werdend',                            txte => 'Fog, sky not recognizable, thinning'                                        },
+  '44'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, unverändert',                                     txte => 'Fog, sky recognizable, unchanged'                                           },
+  '45'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel',                                                                    txte => 'Fog'                                                                        },
+  '46'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel erkennbar, dichter werdend',                                 txte => 'Fog, sky recognizable, becoming denser'                                     },
+  '47'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel, Himmel nicht erkennbar, dichter werdend',                           txte => 'Fog, sky not visible, becoming denser'                                      },
+  '48'  => { s => '1', icon => 'weather_fog',              txtd => 'Nebel mit Reifbildung',                                                    txte => 'Fog with frost formation'                                                   },
+  '49'  => { s => '0', icon => 'weather_fog',              txtd => 'Nebel mit Reifansatz, Himmel nicht erkennbar',                             txte => 'Fog with frost, sky not visible'                                            },
 
-  '50'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener leichter Sprühregen' },
-  '51'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen' },
-  '52'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Sprühregen' },
-  '53'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen' },
-  '54'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Sprühregen' },
-  '55'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Sprühregen' },
-  '56'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter gefrierender Sprühregen' },
-  '57'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker gefrierender Sprühregen' },
-  '58'  => { s => '0', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen mit Regen' },
-  '59'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker Sprühregen mit Regen' },
+  '50'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener leichter Sprühregen',                                       txte => 'intermittent light drizzle'                                                 },
+  '51'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '52'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Sprühregen',                                        txte => 'intermittent moderate drizzle'                                              },
+  '53'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen',                                                      txte => 'light drizzle'                                                              },
+  '54'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Sprühregen',                                        txte => 'intermittent heavy drizzle'                                                 },
+  '55'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Sprühregen',                                                       txte => 'heavy drizzle'                                                              },
+  '56'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter gefrierender Sprühregen',                                         txte => 'light freezing drizzle'                                                     },
+  '57'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker gefrierender Sprühregen',                             txte => 'moderate or heavy freezing drizzle'                                         },
+  '58'  => { s => '0', icon => 'weather_rain_light',       txtd => 'leichter Sprühregen mit Regen',                                            txte => 'light drizzle with rain'                                                    },
+  '59'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'mäßiger oder starker Sprühregen mit Regen',                                txte => 'moderate or heavy drizzle with rain'                                        },
 
-  '60'  => { s => '0', icon => 'weather_rain_light',       txtd => 'unterbrochener leichter Regen oder einzelne Regentropfen'                 },
-  '61'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regen'                                                           },
-  '62'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Regen'                                             },
-  '63'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger Regen'                                                            },
-  '64'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Regen'                                             },
-  '65'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Regen'                                                            },
-  '66'  => { s => '1', icon => 'weather_rain_snow_light',  txtd => 'leichter gefrierender Regen'                                              },
-  '67'  => { s => '1', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker gefrierender Regen'                                  },
-  '68'  => { s => '0', icon => 'weather_rain_snow_light',  txtd => 'leichter Schneeregen'                                                     },
-  '69'  => { s => '0', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker Schneeregen'                                         },
+  '60'  => { s => '0', icon => 'weather_rain_light',       txtd => 'unterbrochener leichter Regen oder einzelne Regentropfen',                 txte => 'intermittent light rain or single raindrops'                                },
+  '61'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regen',                                                           txte => 'light rain'                                                                 },
+  '62'  => { s => '0', icon => 'weather_rain',             txtd => 'unterbrochener mäßiger Regen',                                             txte => 'intermittent moderate rain'                                                 },
+  '63'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger Regen',                                                            txte => 'moderate rain'                                                              },
+  '64'  => { s => '0', icon => 'weather_rain_heavy',       txtd => 'unterbrochener starker Regen',                                             txte => 'intermittent heavy rain'                                                    },
+  '65'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'starker Regen',                                                            txte => 'heavy rain'                                                                 },
+  '66'  => { s => '1', icon => 'weather_rain_snow_light',  txtd => 'leichter gefrierender Regen',                                              txte => 'light freezing rain'                                                        },
+  '67'  => { s => '1', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker gefrierender Regen',                                  txte => 'moderate or heavy freezing rain'                                            },
+  '68'  => { s => '0', icon => 'weather_rain_snow_light',  txtd => 'leichter Schneeregen',                                                     txte => 'light sleet'                                                                },
+  '69'  => { s => '0', icon => 'weather_rain_snow_heavy',  txtd => 'mäßiger oder starker Schneeregen',                                         txte => 'moderate or heavy sleet'                                                    },
 
-  '70'  => { s => '0', icon => 'weather_snow_light',       txtd => 'unterbrochener leichter Schneefall oder einzelne Schneeflocken'           },
-  '71'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneefall'                                                      },
-  '72'  => { s => '0', icon => 'weather_snow',             txtd => 'unterbrochener mäßiger Schneefall'                                        },
-  '73'  => { s => '1', icon => 'weather_snow',             txtd => 'mäßiger Schneefall'                                                       },
-  '74'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'unterbrochener starker Schneefall'                                        },
-  '75'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'starker Schneefall'                                                       },
-  '76'  => { s => '0', icon => 'weather_frost',            txtd => 'Eisnadeln (Polarschnee)'                                                  },
-  '77'  => { s => '1', icon => 'weather_frost',            txtd => 'Schneegriesel'                                                            },
-  '78'  => { s => '0', icon => 'weather_frost',            txtd => 'Schneekristalle'                                                          },
-  '79'  => { s => '0', icon => 'weather_frost',            txtd => 'Eiskörner (gefrorene Regentropfen)'                                       },
+  '70'  => { s => '0', icon => 'weather_snow_light',       txtd => 'unterbrochener leichter Schneefall oder einzelne Schneeflocken',           txte => 'intermittent light snowfall or single snowflakes'                           },
+  '71'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneefall',                                                      txte => 'light snowfall'                                                             },
+  '72'  => { s => '0', icon => 'weather_snow',             txtd => 'unterbrochener mäßiger Schneefall',                                        txte => 'intermittent moderate snowfall'                                             },
+  '73'  => { s => '1', icon => 'weather_snow',             txtd => 'mäßiger Schneefall',                                                       txte => 'moderate snowfall'                                                          },
+  '74'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'unterbrochener starker Schneefall',                                        txte => 'intermittent heavy snowfall'                                                },
+  '75'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'starker Schneefall',                                                       txte => 'heavy snowfall'                                                             },
+  '76'  => { s => '0', icon => 'weather_frost',            txtd => 'Eisnadeln (Polarschnee)',                                                  txte => 'Ice needles (polar snow)'                                                   },
+  '77'  => { s => '1', icon => 'weather_frost',            txtd => 'Schneegriesel',                                                            txte => 'Snow drizzle'                                                               },
+  '78'  => { s => '0', icon => 'weather_frost',            txtd => 'Schneekristalle',                                                          txte => 'Snow crystals'                                                              },
+  '79'  => { s => '0', icon => 'weather_frost',            txtd => 'Eiskörner (gefrorene Regentropfen)',                                       txte => 'Ice grains (frozen raindrops)'                                              },
 
-  '80'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regenschauer'                                                    },
-  '81'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger oder starkerRegenschauer'                                         },
-  '82'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'sehr starker Regenschauer'                                                },
-  '83'  => { s => '0', icon => 'weather_snow',             txtd => 'mäßiger oder starker Schneeregenschauer'                                  },
-  '84'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer'                                                   },
-  '85'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer'                                                   },
-  '86'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Schneeschauer'                                       },
-  '87'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Graupelschauer'                                      },
-  '88'  => { s => '0', icon => 'unknown',                  txtd => 'leichter Hagelschauer'                                                    },
-  '89'  => { s => '0', icon => 'unknown',                  txtd => 'mäßiger oder starker Hagelschauer'                                        },
+  '80'  => { s => '1', icon => 'weather_rain_light',       txtd => 'leichter Regenschauer',                                                    txte => 'light rain shower'                                                          },
+  '81'  => { s => '1', icon => 'weather_rain',             txtd => 'mäßiger oder starkerRegenschauer',                                         txte => 'moderate or heavy rain shower'                                              },
+  '82'  => { s => '1', icon => 'weather_rain_heavy',       txtd => 'sehr starker Regenschauer',                                                txte => 'very heavy rain shower'                                                     },
+  '83'  => { s => '0', icon => 'weather_snow',             txtd => 'mäßiger oder starker Schneeregenschauer',                                  txte => 'moderate or heavy sleet shower'                                             },
+  '84'  => { s => '0', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '85'  => { s => '1', icon => 'weather_snow_light',       txtd => 'leichter Schneeschauer',                                                   txte => 'light snow shower'                                                          },
+  '86'  => { s => '1', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Schneeschauer',                                       txte => 'moderate or heavy snow shower'                                              },
+  '87'  => { s => '0', icon => 'weather_snow_heavy',       txtd => 'mäßiger oder starker Graupelschauer',                                      txte => 'moderate or heavy sleet shower'                                             },
+  '88'  => { s => '0', icon => 'unknown',                  txtd => 'leichter Hagelschauer',                                                    txte => 'light hailstorm'                                                            },
+  '89'  => { s => '0', icon => 'unknown',                  txtd => 'mäßiger oder starker Hagelschauer',                                        txte => 'moderate or heavy hailstorm'                                                },
 
-  '90'  => { s => '0', icon => 'weather_thunderstorm',     txtd => ''                                                                         },
-  '91'  => { s => '0', icon => 'weather_storm',            txtd => ''                                                                         },
-  '92'  => { s => '0', icon => 'weather_thunderstorm',     txtd => ''                                                                         },
-  '93'  => { s => '0', icon => 'weather_thunderstorm',     txtd => ''                                                                         },
-  '94'  => { s => '0', icon => 'weather_thunderstorm',     txtd => ''                                                                         },
-  '95'  => { s => '1', icon => 'weather_thunderstorm',     txtd => 'leichtes oder mäßiges Gewitter ohne Graupel oder Hagel'                   },
-  '96'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter ohne Graupel oder Hagel,Gewitter mit Graupel oder Hagel' },
-  '97'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Regen oder Schnee'                                   },
-  '98'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Sandsturm'                                           },
-  '99'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Graupel oder Hagel'                                  },
-  '100' => { s => '0', icon => 'weather_night',            txtd => 'sternenklarer Himmel'                                                     },
+  '90'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
+  '91'  => { s => '0', icon => 'weather_storm',            txtd => '',                                                                         txte => ''                                                                           },
+  '92'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
+  '93'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
+  '94'  => { s => '0', icon => 'weather_thunderstorm',     txtd => '',                                                                         txte => ''                                                                           },
+  '95'  => { s => '1', icon => 'weather_thunderstorm',     txtd => 'leichtes oder mäßiges Gewitter ohne Graupel oder Hagel',                   txte => 'light or moderate thunderstorm without sleet or hail'                       },
+  '96'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter ohne Graupel oder Hagel,Gewitter mit Graupel oder Hagel', txte => 'strong thunderstorm without sleet or hail,thunderstorm with sleet or hail'  },
+  '97'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Regen oder Schnee',                                   txte => 'heavy thunderstorm with rain or snow'                                       },
+  '98'  => { s => '0', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Sandsturm',                                           txte => 'strong thunderstorm with sandstorm'                                         },
+  '99'  => { s => '1', icon => 'weather_storm',            txtd => 'starkes Gewitter mit Graupel oder Hagel',                                  txte => 'strong thunderstorm with sleet or hail'                                     },
+  '100' => { s => '0', icon => 'weather_night',            txtd => 'sternenklarer Himmel',                                                     txte => 'starry sky'                                                                 },
 );
 
 my @chours      = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten                              
@@ -333,10 +335,10 @@ my $calcmaxd    = 7;                                                            
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $cldampdef  = 45;                                                             # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cldampdef   = 45;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rdampdef   = 20;                                                             # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rdampdef    = 20;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 my @consdays    = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30); # Auswahl Anzahl Tage für Attr numHistDays  
@@ -384,7 +386,7 @@ sub Initialize {
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
                                 "headerDetail:all,co,pv,pvco,statusLink ".
-                                "history_hour:slider,-23,-1,0 ".
+                                "historyHour:slider,-23,-1,0 ".
                                 "hourCount:slider,4,1,24 ".
                                 "hourStyle ".
                                 "htmlStart ".
@@ -403,7 +405,7 @@ sub Initialize {
                                 "spaceSize ".                                
                                 "Wh/kWh:Wh,kWh ".
                                 "weatherColor:colorpicker,RGB ".
-                                "weatherColor_night:colorpicker,RGB ".                                
+                                "weatherColorNight:colorpicker,RGB ".                                
                                 $readingFnAttributes;
 
   $hash->{FW_hideDisplayName} = 1;                     # Forum 88667
@@ -1866,8 +1868,7 @@ sub forecastGraphic {                                                           
   my ($z2,$z3,$z4);
   my $he;                                                                                  # Balkenhöhe
 
-  my $hfcg      = $data{$hash->{TYPE}}{$name}{html};                                       #(hfcg = hash forecast graphic)
-  my $pvhist    = $data{$hash->{TYPE}}{$name}{pvhist};
+  my $hfcg = $data{$hash->{TYPE}}{$name}{html};                                            #(hfcg = hash forecast graphic)
 
   ##########################################################
   # Kontext des SolarForecast-Devices speichern für Refresh
@@ -1972,7 +1973,7 @@ sub forecastGraphic {                                                           
   # Parameter f. Anzeige extrahieren
   ###################################  
   my $maxhours   =  AttrNum ($name, 'hourCount',             24   );
-  my $offset     =  AttrNum($name, 'history_hour',            0   );
+  my $offset     =  AttrNum ($name, 'historyHour',            0   );
 
   my $hourstyle  =  AttrVal ($name, 'hourStyle',              ''  );
 
@@ -1998,7 +1999,7 @@ sub forecastGraphic {                                                           
   my $show_diff  =  AttrVal ($name, 'showDiff',            'no'   );                      # zusätzliche Anzeige $di{} in allen Typen
   my $weather    =  AttrNum ($name, 'showWeather',            1   );
   my $colorw     =  AttrVal ($name, 'weatherColor',    'FFFFFF'   );                      # Wetter Icon Farbe
-  my $colorwn    =  AttrVal ($name, 'weatherColor_night', $colorw );                      # Wetter Icon Farbe Nacht
+  my $colorwn    =  AttrVal ($name, 'weatherColorNight',  $colorw );                      # Wetter Icon Farbe Nacht
 
   my $wlalias    =  AttrVal ($name, 'alias',              $name   );
   my $header     =  AttrNum ($name, 'showHeader',             1   ); 
@@ -2046,8 +2047,8 @@ sub forecastGraphic {                                                           
   # Headerzeile generieren 
   ##########################  
   if ($header) {
-      my $lang    = AttrVal    ("global", "language",           "EN"  );
-      my $alias   = AttrVal    ($name,    "alias",              $name );                            # Linktext als Aliasname
+      my $lang    = AttrVal ("global", "language", "EN"  );
+      my $alias   = AttrVal ($name,    "alias",    $name );                                         # Linktext als Aliasname
       
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
@@ -2367,7 +2368,7 @@ sub forecastGraphic {                                                           
   }
 
   if ($weather) {
-      $ret .= "<tr class='even'><td class='smaportal'></td>";                                                  # freier Platz am Anfang
+      $ret .= "<tr class='even'><td class='smaportal'></td>";                                               # freier Platz am Anfang
 
       my $ii;
       for my $i (0..($maxhours*2)-1) {
@@ -2375,26 +2376,24 @@ sub forecastGraphic {                                                           
           last if (!exists($hfcg->{$i}{weather}));
           next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
           # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
-          $ii++;                                                                                               # wieviele Stunden Icons haben wir bisher beechnet  ?
-          last if ($ii > $maxhours); # vorzeitiger Abbruch
+          $ii++;                                                                                            # wieviele Stunden Icons haben wir bisher beechnet  ?
+          last if ($ii > $maxhours);
 
-          # FHEM Wetter Icons (weather_xxx) , Skalierung und Farbe durch FHEM Bordmittel
           # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
           if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
-          my ($icon_name, $title) = (($hfcg->{$i}{weather} > 100)) ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
-          # unknown -> FHEM Icon Fragezeichen im Kreis wird als Ersatz Icon ausgegeben
-          Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
+              my ($icon_name, $title) = $hfcg->{$i}{weather} > 100 ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
+              Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
 
-          $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
-          $val        = FW_makeImage($icon_name);
+              $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
+              $val        = FW_makeImage($icon_name);
 
-          if ($val eq $icon_name) {                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
-              $val  ='<b>???<b/>';                                                       
-              Log3($name, 3, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
-          }
+              if ($val eq $icon_name) {                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+                  $val  ='<b>???<b/>';                                                       
+                  Log3($name, 3, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+              }
 
-          $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
-          # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+              $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
+              # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
           } 
           else { 
               $ret .= "<td></td>";  
@@ -2766,10 +2765,13 @@ sub formatVal6 {
 sub weather_icon {
   my $id = shift;
 
-  $id    = int $id;
+  $id      = int $id;
+  my $lang = AttrVal ("global", "language", "EN");
+  
+  my $txt  = $lang eq "DE" ? "txtd" : "txte";
   
   if(defined $weather_ids{$id}) {
-      return $weather_ids{$id}{icon}, encode("utf8", $weather_ids{$id}{txtd});
+      return $weather_ids{$id}{icon}, encode("utf8", $weather_ids{$id}{$txt});
   }
   
 return 'unknown','';
@@ -3125,7 +3127,8 @@ sub setPVhistory {
   
   if($histname eq "weatherid") {                                                                       # bezogene Energie
       $val = $wid;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;     
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;   
+      $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};       
   }
   
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
@@ -3546,9 +3549,9 @@ werden weitere SolarForecast Devices zugeordnet.
       <ul>
          <table>  
          <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Strahlungsdaten liefert          </td></tr>
-            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert        </td></tr>
-            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches aktuelle Netzbezugsdaten liefert </td></tr>         
+            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Wetter- und Strahlungsdaten liefert  </td></tr>
+            <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert            </td></tr>
+            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>         
          </table>
       </ul>
       <br>
@@ -4110,8 +4113,8 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br> 
 
-       <a name="weatherColor_night"></a>
-       <li><b>weatherColor_night </b><br>
+       <a name="weatherColorNight"></a>
+       <li><b>weatherColorNight </b><br>
          Farbe der Wetter-Icons für die Nachtstunden.
        </li>
        <br>        
