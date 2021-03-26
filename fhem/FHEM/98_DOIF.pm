@@ -4365,8 +4365,8 @@ sub bar
     $maxColor=0 if (!defined $maxColor);
   }
   $minCol=$minColor;
-  $max=$value if($value>$max);
-  $min=$value if ($value<$min);
+  $value=$max if($value>$max);
+  $value=$min if ($value<$min);
   $size=100 if (!defined $size);
   
   my $prop=($value-$min)/($max-$min);
@@ -4578,7 +4578,7 @@ sub color {
    return ($hue);
   }
   my $l;
-  if (defined $lightness) {
+  if (defined $lightness and $lightness ne "") {
     $l=$lightness;
   } else {
     if ($hue>180 and $hue<290) {
@@ -4777,8 +4777,8 @@ sub ring
     $maxColor=0 if (!defined $maxColor);
   }
   
-  $max=$value if ($value>$max);
-  $min=$value if ($value<$min);
+  $value=$max if ($value>$max);
+  $value=$min if ($value<$min);
   $size=100 if (!defined $size);
   my $prop=($value-$min)/($max-$min); 
 
@@ -4952,8 +4952,8 @@ sub ring2
     $minColor=120 if (!defined $minColor);
     $maxColor=0 if (!defined $maxColor);
   }
-  $max=$value if($value>$max);
-  $min=$value if ($value<$min);
+  $value=$max if($value>$max);
+  $value=$min if ($value<$min);
   $size=100 if (!defined $size);
   
   my $prop=($value-$min)/($max-$min);
@@ -4983,8 +4983,8 @@ sub ring2
     $minColor2=120 if (!defined $minColor2);
     $maxColor2=0 if (!defined $maxColor2);
   }
-  $max2=$value2 if($value2>$max2);
-  $min2=$value2 if ($value2<$min2);
+  $value2=$max2 if($value2>$max2);
+  $value2=$min2 if ($value2<$min2);
   my $prop2=($value2-$min2)/($max2-$min2);
   my ($x12,$y12,$x22,$y22);
   ($x12,$y12,$x22,$y22)=($prop2*100,0,0,(1-$prop2)*100);
@@ -5030,8 +5030,8 @@ sub ring2
   $out.='</g>';
   
   
-  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2">',$currColor,$minColor,(defined $lr ? $lr:0));
-  $out.=describeArc(41, 30, 28, 0, int($prop*280));
+  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2.3">',$currColor,$minColor,(defined $lr ? $lr:0));
+  $out.=describeArc(41, 30, 28.2, 0, int($prop*280));
   $out.='</g>';
   
   if (defined $icon and $icon ne "" and  $icon ne " ") {
