@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "3.0";
+my $version = "3.1";
 
 #-- these we may get on request
 my %gets = (
@@ -120,7 +120,8 @@ my %shelly_models = (
     "shellyrgbw" => [0,0,4,1],
     "shellydimmer" => [0,0,1,1],
     "shellyem" => [1,0,0,2],
-    "shellybulb" => [0,0,1,1]
+    "shellybulb" => [0,0,1,1],
+    "shellyuni" => [2,0,0,1]
     );
     
 my %shelly_regs = (
@@ -345,7 +346,7 @@ sub Shelly_Attr(@) {
 
   #---------------------------------------  
   }elsif ( ($cmd eq "set") && ($attrName =~ /mode/) ) {
-    if( $model !~ /shelly(2|(rgb|bulb)).*/ ){
+    if( defined($model) && $model !~ /shelly(2|(rgb|bulb)).*/){
       Log3 $name,1,"[Shelly_Attr] setting the mode attribute only works for model=shelly2|shelly2.5|shellyrgbw|shellybulb";
       return
     }
@@ -567,9 +568,9 @@ sub Shelly_Set ($@) {
   }
   
   #-- commands strongly dependent on Shelly type
-  #-- we have a Shelly 1,4 or ShellyPlug switch type device
+  #-- we have a Shelly 1, Uni, 4 or ShellyPlug switch type device
   #-- or we have a Shelly 2 switch type device
-  if( ($model =~ /shelly1.*/) || ($model eq "shelly4") || ($model eq "shellyplug") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){ 
+  if( ($model =~ /shelly1.*/) || ($model eq "shellyuni") || ($model eq "shelly4") || ($model eq "shellyplug") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){ 
     
     #-- WEB asking for command list 
     if( $cmd eq "?" ) {   
@@ -1054,7 +1055,7 @@ sub Shelly_pwd($){
   readingsBulkUpdateIfChanged($hash,"network","<html>connected to <a href=\"http://".$hash->{TCPIP}."\">".$hash->{TCPIP}."</a></html>",1);
   
   #-- we have a Shelly 1/1pw, Shelly 4, Shelly 2/2.5,  ShellyPlug or ShellyEM switch type device
-  if( ($model =~ /shelly1.*/) || ($model eq "shellyplug") || ($model eq "shelly4") || ($model eq "shellyem") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
+  if( ($model =~ /shelly1.*/) || ($model eq "shellyuni") || ($model eq "shellyplug") || ($model eq "shelly4") || ($model eq "shellyem") || (($model =~ /shelly2.*/) && ($mode eq "relay")) ){
     for( my $i=0;$i<$channels;$i++){
       $subs = (($channels == 1) ? "" : "_".$i);
       $ison       = $jhash->{'relays'}[$i]{'ison'};
@@ -1225,11 +1226,11 @@ sub Shelly_pwd($){
   #-- common to all Shelly models
   my $hasupdate = $jhash->{'update'}{'has_update'};
   my $firmware  = $jhash->{'update'}{'old_version'};
-  $firmware     =~ /.*\/(.*)\@.*/;
+  $firmware     =~ /.*\/(v[0-9.]+(-rc\d|)).*/;
   $firmware     = $1; 
   if( $hasupdate ){
      my $newfw  = $jhash->{'update'}{'new_version'};
-     $newfw     =~ /.*\/(.*)\@.*/;
+     $newfw     =~ /.*\/(v[0-9.]+(-rc\d|)).*/;
      $newfw     = $1; 
      $firmware .= "(update needed to $newfw)";
   }
@@ -1243,6 +1244,19 @@ sub Shelly_pwd($){
     readingsBulkUpdateIfChanged($hash,"cloud","disabled");  
   }
   
+  #-- look for external sensors
+  if ($jhash->{'ext_temperature'}) {
+    my %sensors = %{$jhash->{'ext_temperature'}};
+    foreach my $temp (keys %sensors){
+      readingsBulkUpdate($hash,"temperature_".$temp,$sensors{$temp}->{'tC'}); 
+    }
+  }
+  if ($jhash->{'ext_humidity'}) {
+    my %sensors = %{$jhash->{'ext_humidity'}};
+    foreach my $hum (keys %sensors){
+      readingsBulkUpdate($hash,"humidity_".$hum,$sensors{$hum}->{'hum'}); 
+    }
+  }
   readingsEndUpdate($hash,1);
   
   #-- cyclic update
@@ -1619,14 +1633,14 @@ sub Shelly_updown2($){
                 <br />set the value of a configuration register</li>
         <li>password &lt;password&gt;<br>This is the only way to set the password for the Shelly web interface</li>
         </ul>
-        For Shelly switching devices (model=shelly1|shelly1pm|shelly4|shellyplug|shellyem or (model=shelly2/2.5 and mode=relay)) 
+        For Shelly switching devices (model=shelly1|shelly1pm|shellyuni|shelly4|shellyplug|shellyem or (model=shelly2/2.5 and mode=relay)) 
         <ul>
             <li>
                 <code>set &lt;name&gt; on|off|toggle  [&lt;channel&gt;] </code>
                 <br />switches channel &lt;channel&gt; on or off. Channel numbers are 0 and 1 for model=shelly2/2.5, 0..3 for model=shelly4. If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>
             <li>
                 <code>set &lt;name&gt; on-for-timer|off-for-timer &lt;time&gt; [&lt;channel&gt;] </code>
-                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2/2.5, and 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
+                <br />switches &lt;channel&gt; on or off for &lt;time&gt; seconds. Channel numbers are 0 and 1 for model=shelly2/2.5 or model=shellyuni, and 0..3 model=shelly4.  If the channel parameter is omitted, the module will switch the channel defined in the defchannel attribute.</li>           
             <li>
                 <code>set &lt;name&gt; xtrachannels </code>
                 <br />create <i>readingsProxy</i> devices for switching device with more than one channel</li>           
@@ -1698,7 +1712,7 @@ sub Shelly_updown2($){
         <h4>Attributes</h4>
         <ul>
             <li><code>attr &lt;name&gt; shellyuser &lt;shellyuser&gt;</code><br>username for addressing the Shelly web interface</li>
-            <li><<code>attr &lt;name&gt; model generic|shelly1|shelly1pm|shelly2|shelly2.5|shelly4|shellyplug|shellydimmer|shellyrgbw </code>
+            <li><<code>attr &lt;name&gt; model generic|shelly1|shelly1pm|shelly2|shelly2.5|shellyuni|shelly4|shellyplug|shellydimmer|shellyrgbw </code>
                 <br />type of the Shelly device. >If the model attribute is set to <i>generic</i>, the device does not contain any actors, 
                 it is just a placeholder for arbitrary sensors</li>
             <li><code>attr &lt;name&gt; mode relay|roller (only for model=shelly2/2.5) mode white|color (only for model=shellyrgbw)</code>
