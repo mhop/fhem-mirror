@@ -4780,7 +4780,9 @@ sub ring
   $value=$max if ($value>$max);
   $value=$min if ($value<$min);
   $size=100 if (!defined $size);
-  my $prop=($value-$min)/($max-$min); 
+
+  my $prop=0;
+  $prop=($value-$min)/($max-$min) if ($max-$min);
 
   my ($x1,$y1,$x2,$y2);
   ($x1,$y1,$x2,$y2)=(int($prop*100),0,0,int((1-$prop)*100));
@@ -4853,14 +4855,14 @@ sub ring
         my $curr=${$func}[$i];
         my $color=${$func}[$i+1];
         my $to=int(($curr-$min)/$diff*280);
-        $out.=sprintf('<g %s stroke="%s" fill="none" stroke-width="1">',($innerRing eq "1" ? "":$innerRing),color($color,$lir));
+        $out.=sprintf('<g stroke="%s" fill="none" stroke-width="1" style="%s">',color($color,$lir),($innerRing eq "1" ? "":$innerRing));
         $out.=describeArc(41, 30, 25.5, $from, $to);
         $out.='</g>';
         $from=$to+2;
       }
     } else {
       $out.='</g>';
-      $out.=sprintf('<g %s stroke="url(#grad_ring_max_%d_%d_%d)" fill="none" stroke-width="1" opacity="0.8">',($innerRing eq "1" ? "":$innerRing),$minCol,$maxColor,(defined $lir ? $lir:0));
+      $out.=sprintf('<g stroke="url(#grad_ring_max_%d_%d_%d)" fill="none" stroke-width="1" opacity="0.8" style="%s">',$minCol,$maxColor,(defined $lir ? $lir:0),($innerRing eq "1" ? "":$innerRing));
       $out.=describeArc(41, 30, 25.5, 0, 280);
       $out.='</g>';
     }
@@ -4956,9 +4958,11 @@ sub ring2
   $value=$min if ($value<$min);
   $size=100 if (!defined $size);
   
-  my $prop=($value-$min)/($max-$min);
+  my $prop=0;
+  $prop=($value-$min)/($max-$min) if ($max-$min);
+  
   my ($x1,$y1,$x2,$y2)=($prop*100,0,0,(1-$prop)*100);
-  my $val1=int($prop*100)+20;
+
   my $currColor;
   if (defined $func) {
     $currColor=&{$func}($value);
@@ -4985,10 +4989,12 @@ sub ring2
   }
   $value2=$max2 if($value2>$max2);
   $value2=$min2 if ($value2<$min2);
-  my $prop2=($value2-$min2)/($max2-$min2);
+  my $prop2=0;
+  $prop2=($value2-$min2)/($max2-$min2) if ($max2-$min2);
+  
   my ($x12,$y12,$x22,$y22);
   ($x12,$y12,$x22,$y22)=($prop2*100,0,0,(1-$prop2)*100);
-  my $val12=int($prop2*100)+20;
+
   my $currColor2;
   if (defined $func2) {
    $currColor2=&{$func2}($value2);
