@@ -329,6 +329,7 @@ FHEM/66_EseraOneWire.pm      pizmus               1Wire
 FHEM/66_EseraShutter.pm      pizmus               1Wire
 FHEM/66_EseraTemp.pm         pizmus               1Wire
 FHEM/67_ECMDDevice.pm        neubert              Sonstige Systeme
+FHEM/_69_SoftliqCloud.pm     KernSani             Unterstützende Dienste
 FHEM/70_BOTVAC.pm            vuffiraa             Sonstige Systeme
 FHEM/70_BRAVIA.pm            vuffiraa             Multimedia
 FHEM/70_CanOverEthernet.pm   delmar               Sonstige Systeme
