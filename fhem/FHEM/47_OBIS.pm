@@ -774,7 +774,8 @@ sub OBIS_Attr(@)
 			return "OBIS ($name) - $name: attr pollingMode must be on or off"
 				if ($aName eq "pollingMode" && $aVal!~/^(on|off)$/);
 			my $dopoll = ($aName eq "interval" || AttrVal($name,"interval",0)>0) &&
-						 (($aName eq "pollingMode" && $aVal eq "on") || AttrVal($name,"pollingMode","off") eq "on");
+						 (($aName eq "pollingMode" && $aVal eq "on") || 
+							($aName ne "pollingMode" && AttrVal($name,"pollingMode","off") eq "on"));
 Log3 $name, 3, "OBIS ($name) - Attr $aName Val $aVal, dopoll = $dopoll";
 			if ($dopoll) {
 #				DevIo_CloseDev($hash);
