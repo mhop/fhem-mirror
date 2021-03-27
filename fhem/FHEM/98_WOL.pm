@@ -21,7 +21,9 @@
 #
 #============================================================================
 #       Changelog:
-#       2021-03-26, v1.05:  Don't check sshHost during startup, added commandref Params, $BC in WOL_by_cmd (thanks Otto)
+#       2021-03-27, v1.05:  Don't check sshHost during startup
+#                           added params ($IP, $MAC, $BC) to commandref (thanks Otto)
+#                           $BC in WOL_by_cmd (thanks Otto)
 #       2020-01-08, v1.04:  Minor fixes and improved error handling
 #                           Added option to execute perl/FHEM/System command for wakeup (local or ssh)
 #                           Added option to execute shutdown command via ssh
