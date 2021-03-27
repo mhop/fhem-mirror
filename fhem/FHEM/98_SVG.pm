@@ -169,7 +169,8 @@ sub
 SVG_Attr($$$$)
 {
   my ($parent, $dev, $attr, $default) = @_;
-  my $val = AttrVal($dev, $attr, undef);
+  my $val;
+  $val = AttrVal($dev, $attr, undef) if($dev);
   return $val if(defined($val));
   return AttrVal($parent, $attr, $default);
 }
