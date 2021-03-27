@@ -1,7 +1,7 @@
 # $Id$
 #  erweitert um die Funktion nas_control        Dietmar Ortmann $
 #
-#	  Maintenance since 2019 KernSani - Thanks Dietmar for all you did for FHEM, RIP
+#     Maintenance since 2019 KernSani - Thanks Dietmar for all you did for FHEM, RIP
 #
 #     This file is part of fhem.
 #
@@ -20,15 +20,16 @@
 #
 #
 #============================================================================
-#	  	Changelog:
-#		2020-01-08, v1.04:	Minor fixes and improved error handling
-#							Added option to execute perl/FHEM/System command for wakeup (local or ssh)
-#							Added option to execute shutdown command via ssh
-#		2019-02-10, v1.03:	Fixed check for invalid broadcast address
-#		2019-02-07, v1.02:	First quick revision of commandref
-#							Added German commandref
-#							Removed textboxes for set commands
-#		2019-02-07, v1.01:	Removed dependency on Twilight Module
+#       Changelog:
+#       2021-03-26, v1.05:  Don't check sshHost during startup, added commandref Params, $BC in WOL_by_cmd (thanks Otto)
+#       2020-01-08, v1.04:  Minor fixes and improved error handling
+#                           Added option to execute perl/FHEM/System command for wakeup (local or ssh)
+#                           Added option to execute shutdown command via ssh
+#       2019-02-10, v1.03:  Fixed check for invalid broadcast address
+#       2019-02-07, v1.02:  First quick revision of commandref
+#                           Added German commandref
+#                           Removed textboxes for set commands
+#       2019-02-07, v1.01:  Removed dependency on Twilight Module
 #
 #
 ##############################################################################
@@ -40,7 +41,20 @@ use IO::Socket;
 use Blocking;
 use Time::HiRes qw(gettimeofday);
 
-my $version = "1.04";
+my $version = "1.05";
+
+use constant {
+    SQ_MINIMUM_INTERVAL => 300,
+    LOG_CRITICAL        => 0,
+    LOG_ERROR           => 1,
+    LOG_WARNING         => 2,
+    LOG_SEND            => 3,
+    LOG_RECEIVE         => 4,
+    LOG_DEBUG           => 5,
+    TCPPACKETSIZE       => 16384,
+};
+my $EMPTY = q{};
+my $SPACE = q{ };
 
 ################################################################################
 sub WOL_Initialize($) {
@@ -50,14 +64,14 @@ sub WOL_Initialize($) {
     $hash->{DefFn}   = "WOL_Define";
     $hash->{UndefFn} = "WOL_Undef";
     $hash->{AttrFn}  = "WOL_Attr";
-    $hash->{AttrList} =
-"interval shutdownCmd:textField-long wolCmd:textField-long sysCmd:textField-long sshHostShutdown sysInterface useUdpBroadcast sshHost "
-      . $readingFnAttributes;
+    $hash->{AttrList}
+        = "interval shutdownCmd:textField-long wolCmd:textField-long sysCmd:textField-long sshHostShutdown sysInterface useUdpBroadcast sshHost "
+        . $readingFnAttributes;
 }
 ################################################################################
 sub WOL_Define($$) {
     my ( $hash, $def ) = @_;
-    my @a = split( "[ \t][ \t]*", $def );
+    my @a = split( /[ \t][ \t]*/xsm, $def );
 
     my $u = "wrong syntax: define <name> WOL <MAC_ADRESS> <IP> <mode> <repeat> ";
     return $u if ( int(@a) < 4 );
@@ -72,16 +86,16 @@ sub WOL_Define($$) {
     $mode   = "BOTH" if ( !defined $mode );
 
     return "invalid MAC<$mac> - use HH:HH:HH:HH:HH:HH"
-      if ( !( $mac =~ m/^([0-9a-f]{2}([:-]|$)){6}$/i ) );
+        if ( !( $mac =~ m/^([0-9a-f]{2}([:-]|$)){6}$/i ) );
 
     return "invalid IP<$ip> - use ddd.ddd.ddd.ddd"
-      if ( !( $ip =~ m/^([0-9]{1,3}([.-]|$)){4}$/i ) );
+        if ( !( $ip =~ m/^([0-9]{1,3}([.-]|$)){4}$/i ) );
 
     return "invalid mode<$mode> - use BOTH|EW|UDP|CMD"
-      if ( !( $mode =~ m/^(BOTH|EW|UDP|CMD)$/ ) );
+        if ( !( $mode =~ m/^(BOTH|EW|UDP|CMD)$/ ) );
 
     return "invalid repeat<$repeat> - use 999"
-      if ( !( $repeat =~ m/^[0-9]{1,3}$/i ) );
+        if ( !( $repeat =~ m/^[0-9]{1,3}$/i ) );
 
     $hash->{NAME}   = $name;
     $hash->{MAC}    = $mac;
@@ -159,9 +173,8 @@ sub WOL_UpdateReadings($) {
     my $abortFn    = "WOL_PingAbort";
 
     if ( !( exists( $hash->{helper}{RUNNING_PID} ) ) ) {
-        $hash->{helper}{RUNNING_PID} =
-          BlockingCall( $blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash );
-		   $hash->{helper}{RUNNING_PID}{loglevel} = 4;
+        $hash->{helper}{RUNNING_PID} = BlockingCall( $blockingFn, $arg, $finishFn, $timeout, $abortFn, $hash );
+        $hash->{helper}{RUNNING_PID}{loglevel} = 4;
     }
     else {
         Log3 $hash, 3, "[$name] Blocking Call running no new started";
@@ -244,12 +257,12 @@ sub WOL_wake($) {
 
     #$host = '255.255.255.255' if ( !defined $host );
     $host = AttrVal( $name, "useUdpBroadcast", "" );
-	if ($host eq "" && $hash->{MODE} =~/UDP|BOTH/) {
-		my @ip = split(/\./,$hash->{IP});
-		$ip[3] = "255";
-		$host = join("\.",@ip);
-		Log3 $name, 1, "[$name] Guessing broadcast address: $host"; 
-	}
+    if ( $host eq "" && $hash->{MODE} =~ /UDP|BOTH|CMD/ ) {
+        my @ip = split( /\./, $hash->{IP} );
+        $ip[3] = "255";
+        $host = join( "\.", @ip );
+        Log3 $name, 1, "[$name] Guessing broadcast address: $host";
+    }
 
     readingsBeginUpdate($hash);
 
@@ -264,15 +277,18 @@ sub WOL_wake($) {
         readingsBulkUpdate( $hash, "packet_via_UDP", $host );
     }
     if ( $hash->{MODE} eq "CMD" ) {
-        WOL_by_cmd( $hash, "on" );
+        WOL_by_cmd( $hash, "on", $host );
     }
     readingsEndUpdate( $hash, defined( $hash->{LOCAL} ? 0 : 1 ) );
 }
 
 ################################################################################
 # method to wake/shutdown via cmd
-sub WOL_by_cmd($$) {
-    my ( $hash, $mode ) = @_;
+sub WOL_by_cmd {
+    my $hash = shift;
+    my $mode = shift;
+    my $bc   = shift;
+
     my $name = $hash->{NAME};
     my $mac  = $hash->{MAC};
     my $ip   = $hash->{IP};
@@ -299,10 +315,16 @@ sub WOL_by_cmd($$) {
         }
     }
 
+
+    if (!$bc) {
+        $bc = $EMPTY;
+    }
+
     #Replacements
     $cmd =~ s/\$MAC/$mac/g;
     $cmd =~ s/\$IP/$ip/g;
-
+    $cmd =~ s/\$BC/$bc/g;
+    
     #Execute via SSH if sshHost given
     if ( $host ne "" ) {
         my $sshCmd = "\"ssh ";
@@ -321,10 +343,11 @@ sub WOL_by_cmd($$) {
 
      #}
      #else {
-     #	Log3 $hash, 1, "[$name] ssh command should be one of ether-wake|etherwake|wakonlan|wake (see sysCmd attribute)!";
-     #	return undef;
+     #  Log3 $hash, 1, "[$name] ssh command should be one of ether-wake|etherwake|wakonlan|wake (see sysCmd attribute)!";
+     #  return undef;
      #}
-		$sshCmd .= " -T ".$cmd;
+        $sshCmd .= " -T " . $cmd;
+
         #Enclose SSH command in double quotes
         $sshCmd .= "\"";
         $cmd = $sshCmd;
@@ -400,7 +423,7 @@ sub WOL_by_ew($$) {
         }
         if ( $sysCmd eq "" ) {
             Log3 $name, 1,
-"[$name] no system command for WOL found - use '/usr/bin/ether-wake' or '/usr/bin/wakeonlan' or define Attribut sysCmd";
+                "[$name] no system command for WOL found - use '/usr/bin/ether-wake' or '/usr/bin/wakeonlan' or define Attribut sysCmd";
             return undef;
         }
 
@@ -462,7 +485,8 @@ sub WOL_Attr($$$) {
         }
     }
 
-    if ( ( $attrName eq "sshHost" or $attrName eq "sshHostShutdown" ) and $cmd eq "set" ) {
+# check if sshHost exists only at creation/change of the attribute, $init_done should prevent the check during initialization )
+    if ( ( $attrName eq "sshHost" or $attrName eq "sshHostShutdown" ) and $cmd eq "set" && $init_done ) {
         my $cmd = "timeout 5 ssh -q $attrVal exit || echo 1";
         my $res = qx ($cmd);
         if ( ($res) ) {
@@ -503,7 +527,7 @@ So, for example a Buffalo NAS can be kept awake.
     <dt><b>mode <i>[EW|UDP]</i></b></dt>
        <dd>EW:  wakeup by <i>usr/bin/ether-wake</i> </dd>
        <dd>UDP: wakeup by an implementation like <i>Net::Wake(CPAN)</i></dd>
-	   <dd>CMD: wakeup via own command (FHEM command, Perl Code or system Command - see Attribut wolCmd</dd>
+       <dd>CMD: wakeup via own command (FHEM command, Perl Code or system Command - see Attribut wolCmd</dd>
     </dl>
     <br><br>
 
@@ -513,7 +537,7 @@ So, for example a Buffalo NAS can be kept awake.
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 EW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          by ether-wake(linux command)</code><br>
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 BOTH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          by both methods</code><br>
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 UDP 200 &nbsp;&nbsp;&nbsp;                                        in repeat mode</code><br>
-	  <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 CMD </code><br>
+      <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 CMD </code><br>
     </ul>
     <br><br>
 
@@ -550,7 +574,7 @@ So, for example a Buffalo NAS can be kept awake.
     <li><code>attr &lt;name&gt; sysCmd &lt;string&gt;</code>
                 <br>Custom command executed to wakeup a remote machine, i.e. <code>/usr/bin/ether-wake or /usr/bin/wakeonlan</code></li>
      <li><code>attr &lt;name&gt; wolCmd &lt;command&gt;</code>
-                <br>Custom command executed to wakeup a remote machine. Can be &lt;command&gt;, as in at, notify oder Watchdog. If the attribute sshHost is set, the command will be executed as a shell command in remote system</li>
+                <br>Custom command executed to wakeup a remote machine. Can be &lt;command&gt;, as in at, notify oder Watchdog. If the attribute sshHost is set, the command will be executed as a shell command in remote system. Replacements $MAC, $IP and $BC could be used for MAC, IP and UdpBroadcast.</li>
    <li><code>attr &lt;name&gt; shutdownCmd &lt;command&gt;</code>
                 <br>Custom command executed to shutdown a remote machine. You can use &lt;command&gt;, like you use it in at, notify or Watchdog If the attribute sshHostShutdown is set, the command will be executed as a shell command in remote system</li>
     <br><br>
@@ -597,7 +621,7 @@ So kann z.B. ein Buffalo NAS "wach" gehalten werden.
     <dt><b>mode <i>[EW|UDP]</i></b></dt>
        <dd>EW:  aufwecken durch <i>usr/bin/ether-wake</i> </dd>
        <dd>UDP: aufwecken durch eine Implementierung wie <i>Net::Wake(CPAN)</i></dd>
-	   <dd>CMD: aufwecken durch einen eigenen Befehl (FHEM Kommando, Perl Code oder system Command - siehe Attribut wolCmd</dd>
+       <dd>CMD: aufwecken durch einen eigenen Befehl (FHEM Kommando, Perl Code oder system Command - siehe Attribut wolCmd</dd>
     </dl>
     <br><br>
 
@@ -607,7 +631,7 @@ So kann z.B. ein Buffalo NAS "wach" gehalten werden.
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 EW&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          über ether-wake(Linux Befehl)</code><br>
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 BOTH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          über beide Methoden</code><br>
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 UDP 200 &nbsp;&nbsp;&nbsp;                                        im repeat Modus</code><br>
-	  <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 CMD </code><br>
+      <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24 CMD </code><br>
     </ul>
     <br><br>
 
@@ -644,9 +668,9 @@ So kann z.B. ein Buffalo NAS "wach" gehalten werden.
     <li><code>attr &lt;name&gt; sysCmd &lt;string&gt;</code>
                 <br>Eigener Befehl, um ein entferntes Gerät aufzuwecken, z.B. <code>/usr/bin/ether-wake or /usr/bin/wakeonlan</code></li>
     <li><code>attr &lt;name&gt; wolCmd &lt;command&gt;</code>
-                <br>Eigener Befehl, um ein entferntes Gerät aufzuwecken. Es können &lt;command&gt;, wie in at, notify oder Watchdog verwendet werden. Wenn das Attribut sshHost gesetzt ist, wird ein shell Befehl im remote System ausgeführt.
+                <br>Eigener Befehl, um ein entferntes Gerät aufzuwecken. Es können &lt;command&gt;, wie in at, notify oder Watchdog verwendet werden. Wenn das Attribut sshHost gesetzt ist, wird ein shell Befehl im remote System ausgeführt. Die Platzhalter $MAC, $IP und $BC koennen verwendet werden und werden durch MAC, IP und UdpBroadcast ersetzt.
     </li>
-	<li><code>attr &lt;name&gt; shutdownCmd &lt;command&gt;</code>
+    <li><code>attr &lt;name&gt; shutdownCmd &lt;command&gt;</code>
                 <br>Eigener Befehl, um ein entferntes Gerät herunter zu fahren. Es können &lt;command&gt;, wie in at, notify oder Watchdog verwendet werden. Wenn das Attribut sshHostShutdown gesetzt ist, wird ein shell Befehl im remote System ausgeführt.
     </li>
 
