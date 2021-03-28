@@ -1154,6 +1154,7 @@ sub centralTask {
   deleteReadingspec ($hash, "Today_PV");
   deleteReadingspec ($hash, "Tomorrow_PV");
   deleteReadingspec ($hash, "NextHour.*");
+  deleteReadingspec ($hash, "moduleEfficiency");
 
   my $interval = controlParams ($name); 
   
