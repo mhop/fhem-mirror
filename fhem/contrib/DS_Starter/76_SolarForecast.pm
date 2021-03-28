@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
                            "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
   "0.23.0" => "25.03.2021  change attr layoutType, fix calc reading Today_PVforecast ",
@@ -183,13 +184,14 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data         => { fn => \&_getdata,           needcred => 0 },
-  html         => { fn => \&_gethtml,           needcred => 0 },
-  ftui         => { fn => \&_getftui,           needcred => 0 },
-  pvHistory    => { fn => \&_getlistPVHistory,  needcred => 0 },
-  pvCircular   => { fn => \&_getlistPVCircular, needcred => 0 },
-  nextHours    => { fn => \&_getlistNextHours,  needcred => 0 },
-  stringConfig => { fn => \&_getstringConfig,   needcred => 0 },
+  data          => { fn => \&_getdata,           needcred => 0 },
+  html          => { fn => \&_gethtml,           needcred => 0 },
+  ftui          => { fn => \&_getftui,           needcred => 0 },
+  valCurrent    => { fn => \&_getlistCurrent,    needcred => 0 },
+  pvHistory     => { fn => \&_getlistPVHistory,  needcred => 0 },
+  pvCircular    => { fn => \&_getlistPVCircular, needcred => 0 },
+  nextHours     => { fn => \&_getlistNextHours,  needcred => 0 },
+  stringConfig  => { fn => \&_getstringConfig,   needcred => 0 },
 );
 
 my %hff = (                                                                                           # Flächenfaktoren 
@@ -370,9 +372,9 @@ sub Initialize {
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "beam1Color:colorpicker,RGB ".
-                                "beam1Content:forecast,real,consumption ".
+                                "beam1Content:forecast,real,gridconsumption ".
                                 "beam2Color:colorpicker,RGB ".
-                                "beam2Content:forecast,real,consumption ".
+                                "beam2Content:forecast,real,gridconsumption ".
                                 "beamHeight ".
                                 "beamWidth ".
                                 # "consumerList ".
@@ -410,7 +412,7 @@ sub Initialize {
   # $hash->{FW_addDetailToSummary} = 1;
   # $hash->{FW_atPageEnd} = 1;                         # wenn 1 -> kein Longpoll ohne informid in HTML-Tag
 
-  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+  eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
  
 return; 
 }
@@ -690,7 +692,7 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^($tilt)$/x) {
+      if($value !~ /^(?$tilt)$/x) {
           return qq{The tilt angle of "$key" is wrong};
       }     
   }
@@ -721,7 +723,7 @@ sub _setmoduleDirection {                ## no critic "not used"
   }
   
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^($dirs)$/x) {
+      if($value !~ /^(?$dirs)$/x) {
           return qq{The module direction of "$key" is wrong: $value};
       }     
   }
@@ -862,7 +864,8 @@ sub Get {
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
                 "pvHistory:noArg ".
-                "stringConfig:noArg "
+                "stringConfig:noArg ".
+                "valCurrent:noArg "
                 ;
                 
   return if(IsDisabled($name));
@@ -958,6 +961,21 @@ sub _getlistNextHours {
   my $type  = $hash->{TYPE};
   
   my $ret   = listDataPool ($hash, "nexthours");
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter valCurrent
+###############################################################
+sub _getlistCurrent {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+  
+  my $ret   = listDataPool ($hash, "current");
                     
 return $ret;
 }
@@ -1428,32 +1446,37 @@ sub _transferDWDForecastValues {
       
       my $fh1 = $fh+1;
       my $fh2 = $fh1 == 24 ? 23 : $fh1;
-      my $v   = ReadingsVal($fcname, "fc${fd}_${fh2}_Rad1h", 0);
+      my $rad = ReadingsVal($fcname, "fc${fd}_${fh2}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$v");
+      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
       
-      my $calcpv = calcPVforecast ($name, $v, $num, $t, $fh, $fd);                            # Vorhersage gewichtet kalkulieren
+      my $params = {
+          hash => $hash,
+          name => $name,
+          rad  => $rad,
+          t    => $t,
+          num  => $num,
+          fh   => $fh,
+          fd   => $fd
+      };
+      
+      my $calcpv = calcPVforecast ($params);                                                  # Vorhersage gewichtet kalkulieren
                 
-      #my $num1 = $num-1;
-      #if($num >= 0) {
-          $time_str = "NextHour".sprintf "%02d", $num;
-          $epoche   = $t + (3600*$num);                                                      
-          my $ta    = TimeAdjust ($epoche);
-          
-          #push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
-          #push @$daref, "${time_str}_Time:"      .$ta;
-          
-          $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
-          $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
-          $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $v;                         # nur Info: original Vorhersage Strahlungsdaten
-      #}
+      $time_str = "NextHour".sprintf "%02d", $num;
+      $epoche   = $t + (3600*$num);                                                      
+      my $ta    = TimeAdjust ($epoche);
+      
+      #push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
+      #push @$daref, "${time_str}_Time:"      .$ta;
+      
+      $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
+      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
+      $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                           # nur Info: original Vorhersage Strahlungsdaten
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{pvfc} = $calcpv;
       } 
-      
-      # $hash->{HELPER}{"fc${fd}_".sprintf("%02d",$fh)."_Rad1h"} = $v." kJ/m2";                 # nur Info: original Vorhersage Strahlungsdaten zur Berechnung Auto-Korrekturfaktor in Helper speichern           
-      
+            
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           push @$daref, "Today_Hour".sprintf("%02d",$fh1)."_PVforecast:$calcpv Wh";             
       }
@@ -1527,13 +1550,10 @@ sub _transferWeatherValues {
 
       Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
       
-      #my $num1 = $num-1;
-      #if($num1 >= 0) {
-          $time_str                                             = "NextHour".sprintf "%02d", $num;         
-          $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
-          $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
-          $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
-      #}
+      $time_str                                             = "NextHour".sprintf "%02d", $num;         
+      $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
+      $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
+      $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}         = $wid;
@@ -1663,7 +1683,7 @@ sub _transferMeterValues {
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
     
   push @$daref, "Current_GridConsumption:".$co." W";
-  $data{$type}{$name}{current}{consumption} = $co;                                            # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+  $data{$type}{$name}{current}{gridconsumption} = $co;                                        # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
   my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
@@ -1802,7 +1822,7 @@ sub pageRefresh {
   
   # Seitenrefresh festgelegt durch SolarForecast-Attribut "autoRefresh" und "autoRefreshFW"
   my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
-  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }
+  { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
   
   my $al = AttrVal($d, "autoRefresh", 0);
   
@@ -1891,7 +1911,7 @@ sub forecastGraphic {                                                           
       $ret    .= "<tr style='height:".$height."px'>";
       $ret    .= "<td>";
       
-      if(!$fcdev) {
+      if(!$fcdev) {                                                                        ## no critic 'Cascading'
           $ret .= qq{Please select a Solar Forecast device with "set $link currentForecastDev"};
       }
       elsif(!$indev) {
@@ -2215,8 +2235,8 @@ sub forecastGraphic {                                                           
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
 
-  $hfcg->{0}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'consumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'consumption') ? $val3 : $val4;
+  $hfcg->{0}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
   $hfcg->{0}{diff}  = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
   $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
@@ -2250,7 +2270,7 @@ sub forecastGraphic {                                                           
 
           #######################################
           #correct the hour for accurate display
-          if ($start < $hfcg->{0}{time}) {                                                       # consumption seems to be tomorrow
+          if ($start < $hfcg->{0}{time}) {                                                       # gridconsumption seems to be tomorrow
               $start = 24-$hfcg->{0}{time}+$start;
               $flag  = 1;
           } 
@@ -2258,7 +2278,7 @@ sub forecastGraphic {                                                           
               $start -= $hfcg->{0}{time};          
           }
 
-          if ($flag) {                                                                           # consumption seems to be tomorrow
+          if ($flag) {                                                                           # gridconsumption seems to be tomorrow
               $end = 24-$hfcg->{0}{time}+$end;
           } 
           else { 
@@ -2280,9 +2300,9 @@ sub forecastGraphic {                                                           
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
 
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      my $val2 = 0;
-      my $val3 = 0;
-      my $val4 = 0;
+      $val2 = 0;
+      $val3 = 0;
+      $val4 = 0;
 
       $hfcg->{$i}{time}  = $hfcg->{0}{time} + $i;
 
@@ -2323,8 +2343,8 @@ sub forecastGraphic {                                                           
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
 
-      $hfcg->{$i}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'consumption') ? $val3 : $val4;
-      $hfcg->{$i}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'consumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
 
       # sicher stellen das wir keine undefs in der Liste haben !
       $hfcg->{$i}{beam1} //= 0;
@@ -2845,14 +2865,15 @@ return @aneeded;
 # 
 ##################################################################################################
 sub calcPVforecast {            
-  my $name = shift;
-  my $rad  = shift;                                                                                   # Nominale Strahlung aus DWD Device
-  my $num  = shift;                                                                                   # Nexthour 
-  my $t    = shift;                                                                                   # aktueller Unix Timestamp
-  my $fh   = shift;
-  my $fd   = shift;
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
+  my $num   = $paref->{num};               # Nexthour 
+  my $t     = $paref->{t};                 # aktueller Unix Timestamp
+  my $fh    = $paref->{fh};
+  my $fd    = $paref->{fd};
   
-  my $hash = $defs{$name};
   my $type = $hash->{TYPE};
   my $stch = $data{$type}{$name}{strings};                                                            # String Configuration Hash
   my $pr   = 1.0;                                                                                     # Performance Ratio (PR)
@@ -2865,10 +2886,10 @@ sub calcPVforecast {
   my @strings    = sort keys %{$stch};
   
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                         # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
-  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                             # Rain Correction Faktor mit Steilheit
+  my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
 
   my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
   my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);                   # Korrekturfaktor der Stunde des Tages einbeziehen
@@ -2998,7 +3019,7 @@ sub calcVariance {
           Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic - old factor: $oldfac)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc:done";
   }
   
@@ -3204,6 +3225,16 @@ sub listDataPool {
           $sq      .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101, Rad1h: $rad1h";
       }
   }
+  
+  if ($htol eq "current") {
+      $h = $data{$type}{$name}{current};
+      if (!keys %{$h}) {
+          return qq{current values cache is empty.};
+      }
+      for my $idx (sort keys %{$h}) {
+          $sq .= $idx." => ".$h->{$idx}."\n";  
+      }
+  }
       
 return $sq;
 }
@@ -3347,7 +3378,7 @@ sub deleteReadingspec {
   
   my $readingspec = '^'.$spec.'$';
   
-  for my $reading ( grep { /$readingspec/ } keys %{$hash->{READINGS}} ) {
+  for my $reading ( grep { /$readingspec/x } keys %{$hash->{READINGS}} ) {
       readingsDelete($hash, $reading);
   }
   
@@ -3365,20 +3396,20 @@ sub createNotifyDev {
   
   if($init_done == 1) {
       my @nd;
-      my ($a,$h);
+      my ($afc,$ain,$ame,$h);
       
       my $fcdev = ReadingsVal($name, "currentForecastDev", "");              # Forecast Device
-      ($a,$h) = parseParams ($fcdev);
-      $fcdev  = $a->[0] // "";      
+      ($afc,$h) = parseParams ($fcdev);
+      $fcdev    = $afc->[0] // "";      
       
       my $indev = ReadingsVal($name, "currentInverterDev", "");              # Inverter Device
-      ($a,$h) = parseParams ($indev);
-      $indev  = $a->[0] // "";
+      ($ain,$h) = parseParams ($indev);
+      $indev    = $ain->[0] // "";
       
       my $medev = ReadingsVal($name, "currentMeterDev",    "");              # Meter Device
       
-      ($a,$h) = parseParams ($medev);
-      $medev  = $a->[0] // "";
+      ($ame,$h) = parseParams ($medev);
+      $medev    = $ame->[0] // "";
       
       push @nd, $fcdev;
       push @nd, $indev;
@@ -3821,10 +3852,18 @@ werden weitere SolarForecast Devices zugeordnet.
     <br>
     
     <ul>
-      <a name="weatherData"></a>
-      <li><b>weatherData </b> <br>  
-      Listet die im Ringspeicher vorhandenen Wetterdaten der kommenden 24h auf.
-      Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.
+      <a name="stringConfig"></a>
+      <li><b>stringConfig </b> <br>  
+      Zeigt die aktuelle Stringkonfiguration. Dabei wird gleichzeitig eine Plausibilitätsprüfung vorgenommen und das Ergebnis
+      sowie eventuelle Anweisungen zur Fehlerbehebung ausgegeben. 
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="valCurrent"></a>
+      <li><b>valCurrent </b> <br>  
+      Listet die aktuell ermittelten Werte auf.
       </li>      
     </ul>
     <br>
@@ -3871,9 +3910,9 @@ werden weitere SolarForecast Devices zugeordnet.
          <ul>   
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
-            <tr><td> <b>forecast</b>     </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>real</b>         </td><td>tatsächliche PV-Erzeugung             </td></tr>
-            <tr><td> <b>consumption</b>  </td><td>Energie Bezug aus dem Netz            </td></tr>
+            <tr><td> <b>forecast</b>        </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>real</b>            </td><td>tatsächliche PV-Erzeugung             </td></tr>
+            <tr><td> <b>gridconsumption</b> </td><td>Energie Bezug aus dem Netz            </td></tr>
          </table>
          </ul>       
        </li>
@@ -3892,9 +3931,9 @@ werden weitere SolarForecast Devices zugeordnet.
          <ul>   
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
-            <tr><td> <b>forecast</b>     </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>real</b>         </td><td>tatsächliche PV-Erzeugung             </td></tr>
-            <tr><td> <b>consumption</b>  </td><td>Energie Bezug aus dem Netz            </td></tr>
+            <tr><td> <b>forecast</b>        </td><td>Vorhersage der PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>real</b>            </td><td>tatsächliche PV-Erzeugung             </td></tr>
+            <tr><td> <b>gridconsumption</b> </td><td>Energie Bezug aus dem Netz            </td></tr>
          </table>
          </ul>         
        </li>
