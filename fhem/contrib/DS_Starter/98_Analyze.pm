@@ -552,7 +552,7 @@ sub checkRef {
   
   return if($ref ne q{});                   # Referenz ok
   
-  my $ret = "No ref found. Try print value of the key:\n\n".Dumper $val;
+  my $ret = "No ref found. Try print value of the object:\n\n".Dumper $val;
   Log3($name, 4, "$name - $ret");
   
 return $ret;
