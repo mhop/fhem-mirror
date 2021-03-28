@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       98_Analyze.pm
 #
-#       (c) 2020 by Heiko Maaz
+#       (c) 2020-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module analyzes the data structure size in FHEM
@@ -89,6 +89,7 @@ BEGIN {
 
 # Versions History intern
   my %vNotesIntern = (
+    "0.2.0"  => "28.03.2021  bug fix ",
     "0.1.0"  => "25.11.2020  initial "
   );
 
@@ -531,7 +532,6 @@ return;
 
 ######################################################################################
 #                   check valide Referenz
-#                  return undef wenn Referenz ok.
 ######################################################################################
 sub checkRef {
   my $name = shift;
@@ -539,17 +539,20 @@ sub checkRef {
   my $obj  = shift;
   
   my $ref  = q{};
+  my $val;
   
   if ($obj) {
       eval {$ref = ref $oref->{$obj}};
+      $val = $oref->{$obj};
   }
   else {
       eval {$ref = ref $oref};
+      $val = $oref;
   }
   
   return if($ref ne q{});                   # Referenz ok
   
-  my $ret = "no ref found. Dumper value:\n".Dumper $obj ? $oref->{$obj} : $oref;
+  my $ret = "No ref found. Try print value of the key:\n\n".Dumper $val;
   Log3($name, 4, "$name - $ret");
   
 return $ret;
