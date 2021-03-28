@@ -417,13 +417,25 @@ sub OBIS_Parse_List
     } elsif ($tltype == 0x50 || $tltype == 0x60) {
       # Signed (5) or Unsigned (6) Int
       my $num = 0;
+      my $subme = 0;
       if ($tltype==0x60 && $len>3 && $result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{DZGHACK}) {
 		$tltype = 0x50;
       }
-      $num = ord chop($_[3]) if ($len--);
-	  my $subme = ($tltype == 0x50) && ($num & 0x80) ? ( 1 << (8*($len+1)) ) : 0;
-	  while ($len-- > 0) {
-		$num = ($num<<8) | ord chop($_[3]);
+      if ($len==8) {
+        $num = unpack($tltype = 0x50 ? 'q>' : 'Q>',
+				chop($_[3]).chop($_[3]).chop($_[3]).chop($_[3]).
+				chop($_[3]).chop($_[3]).chop($_[3]).chop($_[3]));
+      } elsif ($len==4) {
+        $num = unpack($tltype = 0x50 ? 'l>' : 'L>',
+				chop($_[3]).chop($_[3]).chop($_[3]).chop($_[3]));
+	  } elsif ($len<8) {
+        $num = ord chop($_[3]) if ($len--);
+	    $subme = ($tltype == 0x50) && ($num & 0x80) ? ( 1 << (8*($len+1)) ) : 0;
+	    while ($len-- > 0) {
+		  $num = ($num<<8) | ord chop($_[3]);
+        }
+      } else {
+		Log3 $hash, 1, "OBIS - Number sized over 8 bytes - no support implemented yet";
       }
       push @result, ($num-$subme);
     } elsif ($tltype == 0x40) {
