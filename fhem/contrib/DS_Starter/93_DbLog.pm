@@ -1,5 +1,5 @@
 ############################################################################################################################################
-# $Id: 93_DbLog.pm 22246 2020-06-23 21:12:11Z DS_Starter $
+# $Id: 93_DbLog.pm 23888 2021-03-04 19:58:00Z DS_Starter $
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
   "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
                            "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
   "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
@@ -274,6 +275,8 @@ sub DbLog_Initialize {
                                "colValue ".
                                "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
                                "DbLogType:Current,History,Current/History,SampleFill/History ".
+                               "SQLiteJournalMode:WAL,off ".
+                               "SQLiteCacheSize ".
                                "dbSchema ".
                                "defaultMinInterval:textField-long ".
                                "disable:1,0 ".
@@ -421,7 +424,11 @@ sub DbLog_Attr {
   my $do                      = 0;
 
   if($cmd eq "set") {
-      if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "cacheOverflowThreshold" || $aName eq "timeout") {   
+      if ($aName eq "syncInterval"           || 
+          $aName eq "cacheLimit"             || 
+          $aName eq "cacheOverflowThreshold" ||
+          $aName eq "SQLiteCacheSize"        ||           
+          $aName eq "timeout") {   
           if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
       }
       
@@ -1354,7 +1361,7 @@ sub DbLog_Log {
       Log3 $name, 4, "DbLog $name -> ################################################################";
       Log3 $name, 4, "DbLog $name -> ###              start of new Logcycle                       ###";
       Log3 $name, 4, "DbLog $name -> ################################################################";
-      Log3 $name, 4, "DbLog $name -> number of events received: $max for device: $dev_name";
+      Log3 $name, 4, "DbLog $name -> number of events received: $max of device: $dev_name";
   }
     
   my $re                 = $hash->{REGEXP};
@@ -3225,18 +3232,25 @@ sub DbLog_ConnectPush {
       DbLog_setReadingstate ($hash, $state);
   }
 
-  $hash->{DBHP}= $dbhp;
+  $hash->{DBHP} = $dbhp;
   
   if ($hash->{MODEL} eq "SQLITE") {
     $dbhp->do("PRAGMA temp_store=MEMORY");
     $dbhp->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption, 
                                              # SQLite should always be run with its default synchronous setting of FULL.
                                              # https://sqlite.org/howtocorrupt.html
-    $dbhp->do("PRAGMA journal_mode=WAL");
-    $dbhp->do("PRAGMA cache_size=4000");
+    
+    if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
+        $dbhp->do("PRAGMA journal_mode=off");
+    }
+    else {
+        $dbhp->do("PRAGMA journal_mode=WAL");
+    }
+    
+    $dbhp->do("PRAGMA cache_size=". AttrVal($name, "SQLiteCacheSize", "4000"));
   }
  
-  return 1;
+return 1;
 }
 
 sub DbLog_ConnectNewDBH {
@@ -6480,13 +6494,13 @@ sub DbLog_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 22246 2020-06-23 21:12:11Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 23888 2021-03-04 19:58:00Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 22246 2020-06-23 21:12:11Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 23888 2021-03-04 19:58:00Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -7243,6 +7257,29 @@ sub DbLog_showChildHandles {
   <br>
   
   <ul>
+     <a name="cacheOverflowThreshold"></a>
+     <li><b>cacheOverflowThreshold</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; cacheOverflowThreshold &lt;n&gt; 
+       </code><br>
+     
+       In asynchronous log mode, sets the threshold of &lt;n&gt; records above which the cache contents are exported to a file 
+       instead of writing the data to the database. <br>
+       The function corresponds to the "exportCache purgecache" set command and uses its settings. <br>    
+       With this attribute an overload of the server memory can be prevented if the database is not available for a longer period of time. 
+       time (e.g. in case of error or maintenance). If the attribute value is smaller or equal to the value of the 
+       attribute "cacheLimit", the value of "cacheLimit" is used for "cacheOverflowThreshold". <br>
+       In this case, the cache will <b>always</b> be written to a file instead of to the database if the threshold value
+       has been reached. <br>
+       Thus, the data can be specifically written to one or more files with this setting, in order to import them into the 
+       database at a later time with the set command "importCachefile".
+     </ul>
+     </li>
+  </ul>
+  <br>
+  
+  <ul>
      <a name="colEvent"></a>
      <li><b>colEvent</b>
      <ul>
@@ -7611,6 +7648,43 @@ attr SMA_Energymeter DbLogValueFn
   </ul>
   <br>
   
+  <ul>
+     <a name="SQLiteCacheSize"></a>
+     <li><b>SQLiteCacheSize</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteCacheSize &lt;number of memory pages used for caching&gt;
+       </code><br>
+
+       The default is about 4MB of RAM to use for caching (page_size=1024bytes, cache_size=4000).<br>
+       Embedded devices with scarce amount of RAM can go with 1000 pages or less. This will impact
+       the overall performance of SQLite. <br>
+       (default: 4000)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a name="SQLiteJournalMode"></a>
+     <li><b>SQLiteJournalMode</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
+       </code><br>
+
+       Determines how SQLite databases are opened. Generally the Write-Ahead-Log (<b>WAL</b>) is the best choice for robustness
+       and data integrity.<br>
+       Since WAL about doubles the spaces requirements on disk it might not be the best fit for embedded devices
+       using a RAM backed disk. <b>off</b> will turn the journaling off. In case of corruption, the database probably
+       won't be possible to repair and has to be recreated! <br>
+       (default: WAL) <br><br>
+       <b>Note:</b> FHEM must be restarted to take this attribute affected !
+     </ul>
+     </li>
+  </ul>
+  <br>
+
   <ul>
     <a name="syncEvents"></a>
     <li><b>syncEvents</b>
@@ -8649,8 +8723,8 @@ attr SMA_Energymeter DbLogValueFn
        Attributs "cacheLimit", wird der Wert von "cacheLimit" für "cacheOverflowThreshold" verwendet. <br>
        In diesem Fall wird der Cache <b>immer</b> in ein File geschrieben anstatt in die Datenbank sofern der Schwellenwert
        erreicht wurde. <br>
-       Somit kann diese Einstellung bewußt genutzt werden, um die Daten zu einem späteren Zeitpunkt mit dem Set-Kommando "importCachefile"
-       in die Datenbank zu importieren.
+       So können die Daten mit dieser Einstellung gezielt in ein oder mehrere Dateien geschreiben werden, um sie zu einem 
+       späteren Zeitpunkt mit dem Set-Befehl "importCachefile" in die Datenbank zu importieren.
      </ul>
      </li>
   </ul>
@@ -9060,6 +9134,44 @@ attr SMA_Energymeter DbLogValueFn
   </ul>
   <br>
   
+  <ul>
+     <a name="SQLiteCacheSize"></a>
+     <li><b>SQLiteCacheSize</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteCacheSize &lt;Anzahl Memory Pages für Cache&gt;
+       </code><br>
+
+       Standardmäßig werden ca. 4MB RAM für Caching verwendet (page_size=1024bytes, cache_size=4000).<br>
+       Bei Embedded Devices mit wenig RAM genügen auch 1000 Pages - zu Lasten der Performance. <br>
+       (default: 4000)<br><br>
+       <b>Note:</b> FHEM muß nach der Attributänderung restarted werden !
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a name="SQLiteJournalMode"></a>
+     <li><b>SQLiteJournalMode</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
+       </code><br>
+
+       Moderne SQLite Datenbanken werden mit einem Write-Ahead-Log (<b>WAL</b>) geöffnet, was optimale Datenintegrität
+       und gute Performance gewährleistet.<br>
+       Allerdings benötigt WAL zusätzlich ungefähr den gleichen Festplattenplatz wie die eigentliche Datenbank. Bei knappem
+       Festplattenplatz (z.B. eine RAM Disk in Embedded Devices) kann das Journal deaktiviert werden (<b>off</b>).
+       Im Falle eines Datenfehlers kann die Datenbank aber wahrscheinlich nicht repariert werden, und muss neu erstellt
+       werden! <br>
+       (default: WAL) <br><br>
+       <b>Note:</b> FHEM muß nach der Attributänderung restarted werden !
+     </ul>
+     </li>
+  </ul>
+  <br>
+
   <ul>
     <a name="syncEvents"></a>
     <li><b>syncEvents</b>
