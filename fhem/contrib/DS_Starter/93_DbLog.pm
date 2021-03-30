@@ -456,6 +456,11 @@ sub DbLog_Attr {
 
       if ($aName eq "shutdownWait") {
          return "DbLog $name - The attribute $aName is deprecated and has been removed !";
+      }  
+
+      if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {   
+          InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
+          InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
       }      
   }
  
@@ -562,6 +567,29 @@ sub DbLog_Attr {
   }
 
 return;
+}
+
+################################################################
+#   reopen DB beim Setzen bestimmter Attribute
+################################################################
+sub DbLog_attrForSQLite {
+  my $hash = shift;
+
+  return if($hash->{MODEL} ne "SQLITE");
+  
+  my $name = $hash->{NAME};
+  
+  my $dbh = $hash->{DBHP};
+  if ($dbh) {
+      my $history = $hash->{HELPER}{TH};
+      if(!$dbh->{AutoCommit}) {
+          eval {$dbh->commit()} or Log3($name, 2, "DbLog $name -> Error commit $history - $@");  
+      }      
+      $dbh->disconnect();
+  }
+  DbLog_ConnectPush ($hash,1);  
+   
+return;   
 }
 
 ################################################################
@@ -3242,12 +3270,16 @@ sub DbLog_ConnectPush {
     
     if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
         $dbhp->do("PRAGMA journal_mode=off");
+        $hash->{SQLITEWALMODE} = "off";
     }
     else {
         $dbhp->do("PRAGMA journal_mode=WAL");
+        $hash->{SQLITEWALMODE} = "on";
     }
     
-    $dbhp->do("PRAGMA cache_size=". AttrVal($name, "SQLiteCacheSize", "4000"));
+    my $cs = AttrVal($name, "SQLiteCacheSize", "4000");
+    $dbhp->do("PRAGMA cache_size=$cs");
+    $hash->{SQLITECACHESIZE} = $cs;
   }
  
 return 1;
@@ -7678,8 +7710,7 @@ attr SMA_Energymeter DbLogValueFn
        Since WAL about doubles the spaces requirements on disk it might not be the best fit for embedded devices
        using a RAM backed disk. <b>off</b> will turn the journaling off. In case of corruption, the database probably
        won't be possible to repair and has to be recreated! <br>
-       (default: WAL) <br><br>
-       <b>Note:</b> FHEM must be restarted to take this attribute affected !
+       (default: WAL)
      </ul>
      </li>
   </ul>
@@ -9144,8 +9175,7 @@ attr SMA_Energymeter DbLogValueFn
 
        Standardmäßig werden ca. 4MB RAM für Caching verwendet (page_size=1024bytes, cache_size=4000).<br>
        Bei Embedded Devices mit wenig RAM genügen auch 1000 Pages - zu Lasten der Performance. <br>
-       (default: 4000)<br><br>
-       <b>Note:</b> FHEM muß nach der Attributänderung restarted werden !
+       (default: 4000)
      </ul>
      </li>
   </ul>
@@ -9165,8 +9195,7 @@ attr SMA_Energymeter DbLogValueFn
        Festplattenplatz (z.B. eine RAM Disk in Embedded Devices) kann das Journal deaktiviert werden (<b>off</b>).
        Im Falle eines Datenfehlers kann die Datenbank aber wahrscheinlich nicht repariert werden, und muss neu erstellt
        werden! <br>
-       (default: WAL) <br><br>
-       <b>Note:</b> FHEM muß nach der Attributänderung restarted werden !
+       (default: WAL)
      </ul>
      </li>
   </ul>
