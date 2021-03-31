@@ -845,9 +845,10 @@ sub UpdateStatus {
     $t = ($data[4] >> 6) & 1;
     $hash->{helper}{temp_manual} = $t*2;
     readingsBulkUpdate ($hash, 'temp-manual',  $t); # 2 = manuelle Temp im Automodus
-    readingsBulkUpdate ($hash, 'room-temp',     sprintf('%.1f', $data[5] / 2));
-    readingsBulkUpdate ($hash, 'desired-temp',  sprintf('%.1f', $data[6] / 2));
-    Log3($name, 4, "$name, temp-manual : $t , room-temp : ".sprintf('%.1f', $data[5] / 2).' desired-temp : '.sprintf('%.1f', $data[6] / 2));
+    my $room_temp    = sprintf('%.1f', $data[5] / 2);
+    my $desired_temp = sprintf('%.1f', $data[6] / 2);
+    readingsBulkUpdate ($hash, 'room-temp',     $room_temp);
+    readingsBulkUpdate ($hash, 'desired-temp',  $desired_temp);
 
     $val = $data[7]  & 15;
     $hash->{helper}{auto_mode} = $val;
@@ -895,8 +896,10 @@ sub UpdateStatus {
     readingsBulkUpdate ($hash, 'power-on-mem',  ($data[16]) ? 'off' : 'on');
 
     readingsBulkUpdate ($hash, 'unknown',    $data[17]); # ???
-    readingsBulkUpdate ($hash, 'floor-temp', sprintf('%0.1f', $data[18] / 2));
-    Log3($name, 4, "$name,  floor-temp : ".sprintf('%.1f', $data[18] / 2));
+    my $floor_temp = sprintf('%0.1f', $data[18] / 2);
+    readingsBulkUpdate ($hash, 'floor-temp', $floor_temp);
+
+    Log3($name, 4, "$name, Temperatures -> Room : $room_temp , Floor : $floor_temp , Desired : $desired_temp");
 
     readingsBulkUpdate ($hash, 'time',       sprintf('%02d:%02d:%02d', $data[19],$data[20],$data[21]));
     readingsBulkUpdate ($hash, 'dayofweek',  $data[22]);
