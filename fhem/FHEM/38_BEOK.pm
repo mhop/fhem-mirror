@@ -268,9 +268,11 @@ sub Get {
     my $hash = shift;
     my $name = shift;
     my $cmd  = shift // return "get $name needs at least one argument !";
-    my $gets = 'status:noArg  auth:noArg temperature:noArg';
+    my $gets = 'status:noArg auth:noArg temperature:noArg';
 
     return "unknown command, choose one of $gets" if ($cmd eq '?');
+
+    Log3($name, 4, "$name, Get $cmd");
 
     if ($cmd eq 'auth') {
 	return 'device auth key already stored' if ($hash->{isAuth});
@@ -355,8 +357,6 @@ sub Set {
    if (($cmd eq '?') || ($cmd =~ m{ /^(on-|off-|toggle|intervals)/ }x)) {
         return SetExtensions($hash, $cmdList, $name, $cmd, $subcmd);
     }
-
-    ($subcmd) ? Log3($name, 5, "$name, set $cmd $subcmd") : Log3($name, 5, "$name, set $cmd");
 
     return 'no set commands allowed, auth key and device id are missing ! ( need run get auth first )' if (!$hash->{isAuth});
 
@@ -1181,7 +1181,10 @@ sub summaryFn {
 	$locked  = "<a onClick=\"FW_cmd('/fhem?XHR=1&$link&room=$room$csrf')\">$locked</a>" if ($locked);
 	$html   .= '<td>'.$relay.'</td><td>'.$locked.'</td>';
 
-	$html .= '<td align="right">'.$names[0].ReadingsNum($name,'room-temp',0).' &deg;C<br>'.$names[1].ReadingsNum($name,'floor-temp',0).' &deg;C</td>';
+	$html .= '<td align="right">'.$names[0].ReadingsNum($name,'room-temp',0).' &deg;C';
+	my $flt = $names[1].ReadingsNum($name, 'floor-temp', 0);
+	$html .= '<br>'.$flt.' &deg;C' if (($flt > 0) || (ReadingsVal($name, 'sensor', '') ne 'internal'));
+	$html .= '</td>';
 
 	$html .= "<td align=\"center\">".$names[2]."<br><select  id=\"".$name."_tempList\" name=\"".$name."_tempList\" class=\"dropdown\" onchange=\"FW_cmd('/fhem?XHR=1$csrf&cmd.$name=set $name desired-temp ' + this.options[this.selectedIndex].value)\">";
 
