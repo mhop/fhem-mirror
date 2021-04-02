@@ -182,6 +182,11 @@
 #					"heating.sensors.power.output.value" => "Sensor_Stromproduktion" und
 #                 	"heating.circuits.X.operating.programs.Y.demand" =>
 #				      "HK(X+1)-Solltemperatur_Y_Anforderung" (X=0,1,2 und Y=normal,reduced,comfort)
+# 2021-02-21      Umstieg auf Endpoint v2 zur Authorization
+#                 *experimentell* Attribut vitoconnect_device
+#                 Workaround für Forum #561
+#                 Neue Readings für "*ValueReadAt"
+#                 
 #
 #   ToDo:         timeout konfigurierbar machen
 #				  Attribute implementieren und dokumentieren
@@ -207,9 +212,9 @@ use Time::Seconds;
 
 my $client_id     = '79742319e39245de5f91d15ff4cac2a8';
 my $client_secret = '8ad97aceb92c5892e102b093c7c083fa';
-my $authorizeURL  = 'https://iam.viessmann.com/idp/v1/authorize';
+my $authorizeURL  = 'https://iam.viessmann.com/idp/v2/authorize';
 
-my $token_url  = "https://iam.viessmann.com/idp/v1/token";
+my $token_url  = "https://iam.viessmann.com/idp/v2/token";
 my $apiURLBase = "https://api.viessmann-platform.io";
 my $apiURLInst =
   "https://api.viessmann-platform.io/operational-data/v1/installations";
@@ -241,7 +246,8 @@ my $RequestList = {
 
     "heating.circuits.enabled"                   => "Aktive_Heizkreise",
     "heating.circuits.0.active"                  => "HK1-aktiv",
-    "heating.circuits.0.circulation.pump.status" => "HK1-Zirkulationspumpe",
+	"heating.circuits.0.type"                  => "HK1-Typ",
+	"heating.circuits.0.circulation.pump.status" => "HK1-Zirkulationspumpe",
     "heating.circuits.0.circulation.schedule.active" =>
       "HK1-Zeitsteuerung_Zirkulation_aktiv",
     "heating.circuits.0.circulation.schedule.entries" =>
@@ -328,6 +334,7 @@ my $RequestList = {
     "heating.circuits.0.zone.mode.active" => "HK1-ZoneMode_aktive",
 
     "heating.circuits.1.active"                  => "HK2-aktiv",
+    "heating.circuits.1.type"                  => "HK2-Typ",
     "heating.circuits.1.circulation.pump.status" => "HK2-Zirkulationspumpe",
     "heating.circuits.1.circulation.schedule.active" =>
       "HK2-Zeitsteuerung_Zirkulation_aktiv",
@@ -414,6 +421,7 @@ my $RequestList = {
     "heating.circuits.1.zone.mode.active" => "HK2-ZoneMode_aktive",
 
     "heating.circuits.2.active"                  => "HK3-aktiv",
+    "heating.circuits.2.type"                  => "HK3-Typ",
     "heating.circuits.2.circulation.pump.status" => "HK3-Zirkulationspumpe",
     "heating.circuits.2.circulation.schedule.active" =>
       "HK3-Zeitsteuerung_Zirkulation_aktiv",
@@ -511,6 +519,7 @@ my $RequestList = {
     "heating.controller.serial.value"  => "Controller_Seriennummer",
     "heating.device.time.offset.value" => "Device_Time_Offset",
     "heating.dhw.active"               => "WW-aktiv",
+    "heating.dhw.status"               => "WW-Status",
     "heating.dhw.charging.active"      => "WW-Aufladung",
 
     "heating.dhw.charging.level.bottom" => "WW-Speichertemperatur_unten",
@@ -575,11 +584,11 @@ my $RequestList = {
     "heating.fuelCell.power.production.year" =>
       "Brennstoffzelle_Stromproduktion/Jahr",
     "heating.fuelCell.sensors.temperature.return.status" =>
-      "Brennstoffzelle_Temperatur_Rücklauf_Status",
+      "Brennstoffzelle_Temperatur_Ruecklauf_Status",
     "heating.fuelCell.sensors.temperature.return.unit" =>
-      "Brennstoffzelle_Temperatur_Rücklauf/Einheit",
+      "Brennstoffzelle_Temperatur_Ruecklauf/Einheit",
     "heating.fuelCell.sensors.temperature.return.value" =>
-      "Brennstoffzelle_Temperatur_Rücklauf",
+      "Brennstoffzelle_Temperatur_Ruecklauf",
     "heating.fuelCell.sensors.temperature.supply.status" =>
       "Brennstoffzelle_Temperatur_Vorlauf_Status",
     "heating.fuelCell.sensors.temperature.supply.unit" =>
@@ -601,18 +610,30 @@ my $RequestList = {
     "heating.gas.consumption.dhw.week"  => "Gasverbrauch_WW/Woche",
     "heating.gas.consumption.dhw.month" => "Gasverbrauch_WW/Monat",
     "heating.gas.consumption.dhw.year"  => "Gasverbrauch_WW/Jahr",
+    "heating.gas.consumption.dhw.dayValueReadAt"   => "Gasverbrauch_WW/Tag_gelesen_am",
+    "heating.gas.consumption.dhw.weekValueReadAt"  => "Gasverbrauch_WW/Woche_gelesen_am",
+    "heating.gas.consumption.dhw.monthValueReadAt" => "Gasverbrauch_WW/Monat_gelesen_am",
+    "heating.gas.consumption.dhw.yearValueReadAt"  => "Gasverbrauch_WW/Jahr_gelesen_am",
     "heating.gas.consumption.dhw.unit"  => "Gasverbrauch_WW/Einheit",
 
     "heating.gas.consumption.heating.day"   => "Gasverbrauch_Heizung/Tag",
     "heating.gas.consumption.heating.week"  => "Gasverbrauch_Heizung/Woche",
     "heating.gas.consumption.heating.month" => "Gasverbrauch_Heizung/Monat",
     "heating.gas.consumption.heating.year"  => "Gasverbrauch_Heizung/Jahr",
+	"heating.gas.consumption.heating.dayValueReadAt"   => "Gasverbrauch_Heizung/Tag_gelesen_am",
+    "heating.gas.consumption.heating.weekValueReadAt"  => "Gasverbrauch_Heizung/Woche_gelesen_am",
+    "heating.gas.consumption.heating.monthValueReadAt" => "Gasverbrauch_Heizung/Monat_gelesen_am",
+    "heating.gas.consumption.heating.yearValueReadAt"  => "Gasverbrauch_Heizung/Jahr_gelesen_am",
     "heating.gas.consumption.heating.unit"  => "Gasverbrauch_Heizung/Einheit",
     "heating.gas.consumption.total.day"     => "Gasverbrauch_Total/Tag",
     "heating.gas.consumption.total.month"   => "Gasverbrauch_Total/Woche",
     "heating.gas.consumption.total.unit"    => "Gasverbrauch_Total/Einheit",
     "heating.gas.consumption.total.week"    => "Gasverbrauch_Total/Woche",
     "heating.gas.consumption.total.year"    => "Gasverbrauch_Total/Jahr",
+    "heating.gas.consumption.total.dayValueReadAt"     => "Gasverbrauch_Total/Tag_gelesen_am",
+    "heating.gas.consumption.total.monthValueReadAt"   => "Gasverbrauch_Total/Woche_gelesen_am",
+    "heating.gas.consumption.total.weekValueReadAt"    => "Gasverbrauch_Total/Woche_gelesen_am",
+    "heating.gas.consumption.total.yearValueReadAt"    => "Gasverbrauch_Total/Jahr_gelesen_am",
 
     "heating.gas.consumption.fuelCell.day" =>
       "Gasverbrauch_Brennstoffzelle/Tag",
@@ -662,6 +683,10 @@ my $RequestList = {
     "heating.power.consumption.total.month" => "Stromverbrauch_Total/Monat",
     "heating.power.consumption.total.week"  => "Stromverbrauch_Total/Woche",
     "heating.power.consumption.total.year"  => "Stromverbrauch_Total/Jahr",
+    "heating.power.consumption.total.dayValueReadAt"   => "Stromverbrauch_Total/Tag_gelesen_am",
+    "heating.power.consumption.total.monthValueReadAt" => "Stromverbrauch_Total/Monat_gelesen_am",
+    "heating.power.consumption.total.weekValueReadAt"  => "Stromverbrauch_Total/Woche_gelesen_am",
+    "heating.power.consumption.total.yearValueReadAt"  => "Stromverbrauch_Total/Jahr_gelesen_am",
     "heating.power.consumption.total.unit"  => "Stromverbrauch_Total/Einheit",
 
     "heating.power.production.current.status" =>
@@ -791,6 +816,8 @@ sub vitoconnect_Initialize {
       . "vitoconnect_raw_readings:0,1 "
       . "vitoconnect_gw_readings:0,1 "
       . "vitoconnect_actions_active:0,1 "
+  	  . "vitoconnect_device:0,1 "
+	  . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
       . $readingFnAttributes;
     return;
 }
@@ -1593,9 +1620,11 @@ sub vitoconnect_getResource {
         vitoconnect_getCode($hash);
         return;
     }
+	my $dev=AttrVal( $name, 'vitoconnect_device', 0 );
+	#Log3 $name, 4, "$name - dev: $dev";
     my $param = {
         url => "$apiURLBase/operational-data/installations/$installation/"
-          . "gateways/$gw/devices/0/features/",
+          . "gateways/$gw/devices/$dev/features/",
         hash     => $hash,
         header   => "Authorization: Bearer $access_token",
         timeout  => 10,
@@ -1702,9 +1731,7 @@ sub vitoconnect_getResourceCallback {
                 my $Reading = $RequestList->{ $FieldName . "." . $Key };
                 if ( !defined($Reading)
                     || AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" )
-                {
-                    $Reading = $FieldName . "." . $Key;
-                }
+                { $Reading = $FieldName . "." . $Key; }
 
                 # Log3 $name, 5, "$name - Property: $FieldName $Key";
                 my $Type  = $Properties{$Key}{type};
@@ -1721,10 +1748,16 @@ sub vitoconnect_getResourceCallback {
                 }
                 elsif ( $Type eq "array" ) {
                     if ( defined($Value) ) {
-                        my $Array = join( ",", @$Value );
-                        readingsBulkUpdate( $hash, $Reading, $Array );
-                        Log3 $name, 5,
-                          "$name - $FieldName" . ".$Key: $Array ($Type)";
+                        # my $Array = join( ",", @$Value );
+						# Log3 $name, 1, "$name - Array Workaround for Property: $FieldName $Key ";
+						if ( ref($Value) eq 'ARRAY' ) {
+						  my $Array = ( join( ",", @$Value ) );
+                          readingsBulkUpdate( $hash, $Reading, $Array );
+                          Log3 $name, 5,
+                            "$name - $FieldName" . ".$Key: $Array ($Type)";
+						} else {
+							Log3 $name, 1, "$name - Array Workaround for Property: $FieldName $Key ";
+						}
                     }
                 }
                 elsif ( $Type eq "boolean" ) {
@@ -1791,10 +1824,11 @@ sub vitoconnect_action {
     my $access_token = $hash->{".access_token"};
     my $installation = $hash->{".installation"};
     my $gw           = $hash->{".gw"};
-
+	
+	my $dev=AttrVal( $name, 'vitoconnect_device', 0 );
     my $param = {
         url => "$apiURLInst/$installation/gateways/$gw/"
-          . "devices/0/features/$feature",
+          . "devices/$dev/features/$feature",
         hash   => $hash,
         header => "Authorization: Bearer $access_token\r\n"
           . "Content-Type: application/json",
