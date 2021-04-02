@@ -438,14 +438,14 @@ at_ultimo(;$$$)
 =item helper
 =begin html
 
-<a name="at"></a>
+<a id="at"></a>
 <h3>at</h3>
 <ul>
 
   Start an arbitrary FHEM command at a later time.<br>
   <br>
 
-  <a name="atdefine"></a>
+  <a id="at-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; at [&lt;timespec&gt;|&lt;datespec&gt;]
@@ -540,15 +540,16 @@ at_ultimo(;$$$)
   </ul>
 
 
-  <a name="atset"></a>
+  <a id="at-set"></a>
   <b>Set</b>
   <ul>
-    <a name="modifyTimeSpec"></a>
+    <a id="at-set-modifyTimeSpec"></a>
     <li>modifyTimeSpec &lt;timespec&gt;<br>
         Change the execution time. Note: the N-times repetition is ignored.
         It is intended to be used in combination with
         <a href="#webCmd">webCmd</a>, for an easier modification from the room
         overview in FHEMWEB.</li>
+    <a id="at-set-inactive"></a>
     <li>inactive<br>
         Inactivates the current device. Note the slight difference to the
         disable attribute: using set inactive the state is automatically saved
@@ -557,11 +558,14 @@ at_ultimo(;$$$)
         deactivate the at.<br>
         The concurrent setting of the disable attribute is not recommended.
         </li>
+    <a id="at-set-active"></a>
     <li>active<br>
         Activates the current device (see inactive).</li>
+    <a id="at-set-execNow"></a>
     <li>execNow<br>
         Execute the command associated with the at. The execution of a relative
         at is not affected by this command.</li>
+    <a id="at-set-skip_next"></a>
     <li>skip_next<br>
         skip the next execution. Just like the attribute with the same name,
         but better suited for webCmd.
@@ -569,15 +573,13 @@ at_ultimo(;$$$)
 
   </ul><br>
 
-
-
-  <a name="atget"></a>
+  <a id="at-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="atattr"></a>
+  <a id="at-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="alignTime"></a>
+    <a id="at-attr-alignTime"></a>
     <li>alignTime<br>
         Applies only to relative at definitions: adjust the time of the next
         command execution so, that it will also be executed at the desired
@@ -591,7 +593,7 @@ at_ultimo(;$$$)
         </ul>
         </li><br>
 
-    <a name="computeAfterInit"></a>
+    <a id="at-attr-computeAfterInit"></a>
     <li>computeAfterInit<br>
         If perlfunc() in the timespec relies on some other/dummy readings, then
         it will return a wrong time upon FHEM start, as the at define is
@@ -599,34 +601,10 @@ at_ultimo(;$$$)
         FHEM will recompute timespec after the initialization is finished.
         </li><br>
 
-    <a name="disable"></a>
-    <li>disable<br>
-        Can be applied to at/watchdog/notify/FileLog devices.<br>
-        Disables the corresponding at/notify or FileLog device. Note:
-        If applied to an <a href="#at">at</a>, the command will not be executed,
-        but the next time will be computed.</li><br>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
-    <a name="disabledForIntervals"></a>
-    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
-        Space separated list of HH:MM or D@HH:MM tupels. If the current time is
-        between the two time specifications, the current device is disabled.
-        Instead of HH:MM you can also specify HH or HH:MM:SS. D is the day of
-        the week, with 0 indicating Sunday and 3 indicating Wednesday.
-        Specifying the day for the "from" part does _not_ specify it for the
-        "to" part, i.e.  1@00-24 will disable from monday to the end of the
-        week, but not on sunday (as 1@00 is greater than any time on sunday).
-        To specify an interval spawning midnight, you have to specify two
-        intervals, e.g.:
-        <ul>
-          23:00-24:00 00:00-01:00
-        </ul>
-        If parts of the attribute value are enclosed in {}, they are evaluated:
-        <ul>
-          {sunset_abs()}-24 {sunrise_abs()}-08
-        </ul>
-        </li><br>
-
-    <a name="skip_next"></a>
+    <a id="at-attr-skip_next"></a>
     <li>skip_next<br>
         Used for at commands: skip the execution of the command the next
         time.</li><br>
@@ -641,14 +619,14 @@ at_ultimo(;$$$)
 
 =begin html_DE
 
-<a name="at"></a>
+<a id="at"></a>
 <h3>at</h3>
 <ul>
 
   Startet einen beliebigen FHEM Befehl zu einem sp&auml;teren Zeitpunkt.<br>
   <br>
 
-  <a name="atdefine"></a>
+  <a id="at-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; at [&lt;timespec&gt;|&lt;datespec&gt;]
@@ -746,16 +724,17 @@ at_ultimo(;$$$)
   </ul>
 
 
-  <a name="atset"></a>
+  <a id="at-set"></a>
   <b>Set</b>
   <ul>
-    <a name="modifyTimeSpec"></a>
+    <a id="at-set-modifyTimeSpec"></a>
     <li>modifyTimeSpec &lt;timespec&gt;<br>
         &Auml;ndert die Ausf&uuml;hrungszeit. Achtung: die N-malige
         Wiederholungseinstellung wird ignoriert. Gedacht zur einfacheren
         Modifikation im FHEMWEB Raum&uuml;bersicht, dazu muss man
         modifyTimeSpec in <a href="webCmd">webCmd</a> spezifizieren.
         </li>
+    <a id="at-set-inactive"></a>
     <li>inactive<br>
         Deaktiviert das entsprechende Ger&auml;t. Beachte den leichten
         semantischen Unterschied zum disable Attribut: "set inactive"
@@ -765,13 +744,16 @@ at_ultimo(;$$$)
         deaktivieren.<br>
         Das gleichzeitige Verwenden des disable Attributes wird nicht empfohlen.
         </li>
+    <a id="at-set-active"></a>
     <li>active<br>
         Aktiviert das entsprechende Ger&auml;t, siehe inactive.
         </li>
+    <a id="at-set-execNow"></a>
     <li>execNow<br>
         F&uuml;hrt das mit dem at spezifizierte Befehl aus. Beeinflu&szlig;t
         nicht die Ausf&uuml;hrungszeiten relativer Spezifikationen.
         </li>
+    <a id="at-set-skip_next"></a>
     <li>skip_next<br>
         genau wie der gleichnamige Attribut, verhindert die n&auml;chste
         Ausf&uuml;hrung. Als set Befehl, eignet sich besser f&uuml;r webCmd.
@@ -779,13 +761,13 @@ at_ultimo(;$$$)
   </ul><br>
 
 
-  <a name="atget"></a>
+  <a id="atget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="atattr"></a>
+  <a id="at-attr"></a>
   <b>Attribute</b>
   <ul>
-    <a name="alignTime"></a>
+    <a id="at-attr-alignTime"></a>
     <li>alignTime<br>
         Nur f&uuml;r relative Definitionen: Stellt den Zeitpunkt der
         Ausf&uuml;hrung des Befehls so, dass er auch zur alignTime
@@ -800,7 +782,7 @@ at_ultimo(;$$$)
         </ul>
         </li><br>
 
-    <a name="computeAfterInit"></a>
+    <a id="at-attr-computeAfterInit"></a>
     <li>computeAfterInit<br>
         Falls perlfunc() im timespec Readings or Statusinformationen
         ben&ouml;gt, dann wird sie eine falsche Zeit beim FHEM-Start
@@ -809,37 +791,10 @@ at_ultimo(;$$$)
         Readings erneut ausgef&uuml;hrt. (Siehe Forum #56706)
         </li><br>
 
-    <a name="disable"></a>
-    <li>disable<br>
-        Deaktiviert das entsprechende Ger&auml;t.<br>
-        Hinweis: Wenn angewendet auf ein <a href="#at">at</a>, dann wird der
-        Befehl nicht ausgef&uuml;hrt, jedoch die n&auml;chste
-        Ausf&uuml;hrungszeit berechnet.</li><br>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
 
-    <a name="disabledForIntervals"></a>
-    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
-        Das Argument ist eine Leerzeichengetrennte Liste von Minuszeichen-
-        getrennten HH:MM oder D@HH:MM Paaren. Falls die aktuelle Uhrzeit
-        zwischen diesen Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie
-        beim disable, ausgesetzt. Statt HH:MM kann man auch HH oder HH:MM:SS
-        angeben.  D ist der Tag der Woche, mit 0 als Sonntag and 3 als
-        Mittwoch. Die Angabe des Wochentags f&uuml;r den "von" Wert impliziert
-        _nicht_ den gleichen Tag f&uuml;r den "bis" Wert, z.Bsp.  deaktiviert
-        1@00-24 die Asf&uuml;hrung von Montag bis Ende der Woche, aber nicht
-        Sonntag (da alle Zeitangaben am Montag vor 1@00 liegen).
-        Um einen Intervall um Mitternacht zu spezifizieren, muss man
-        zwei einzelne angeben, z.Bsp.:
-        <ul>
-          23:00-24:00 00:00-01:00
-        </ul>
-        Falls Teile des Wertes in {} eingeschlossen sind, dann werden sie als
-        ein Perl Ausdruck ausgewertet:
-        <ul>
-          {sunset_abs()}-24 {sunrise_abs()}-08
-        </ul>
-        </li><br>
-
-    <a name="skip_next"></a>
+    <a id="at-attr-skip_next"></a>
     <li>skip_next<br>
         Wird bei at Befehlen verwendet um die n&auml;chste Ausf&uuml;hrung zu
         &uuml;berspringen</li><br>

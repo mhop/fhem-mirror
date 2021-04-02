@@ -561,23 +561,19 @@ END
         argument. The syntax is the same as for the original regexp.
         </li>
 
+    <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
+
     <a id="notify-attr-readLog"></a>
     <li>readLog<br>
         Execute the notify for messages appearing in the FHEM Log. The device
-        in this case is set to the notify itself, e.g. checking for the startup
-        message looks like:
+        in this case is set to the notify itself, e.g. checking for the
+        startup message looks like:
         <ul><code>
           define n notify n:.*Server.started.* { Log 1, "Really" }<br>
           attr n readLog
         </code></ul>
         </li>
 
-    <a id="notify-attr-perlSyntaxCheck"></a>
-    <li>perlSyntaxCheck<br>
-        by setting the <b>global</b> attribute perlSyntaxCheck, a syntax check
-        will be executed upon definition or modification, if the command is
-        perl and FHEM is already started.
-        </li>
 
   </ul>
   <br>
@@ -792,9 +788,11 @@ END
     <li>ignoreRegexp regexp<br>
         Es ist nicht immer einfach ein Regexp zu bauen, was etwas _nicht_
         matcht. Dieses Attribut hilft in diesen F&auml;llen: das Event wird
-        ignoriert, falls es den angegebenen Regexp matcht. Syntax ist gleich wie
-        in der Definition.
+        ignoriert, falls es den angegebenen Regexp matcht. Syntax ist gleich
+        wie in der Definition.
         </li>
+
+    <li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
 
     <a id="notify-attr-readLog"></a>
     <li>readLog<br>
@@ -807,13 +805,6 @@ END
           attr n readLog
         </code></ul>
         </li>
-
-    <a id="notify-attr-perlSyntaxCheck"></a>
-    <li>perlSyntaxCheck<br>
-        nach setzen des <b>global</b> Attributes perlSyntaxCheck wird eine 
-        Syntax-Pr&uuml;fung der Anweisung durchgef&uuml;hrt bei jeder
-        &Auml;nderung (define oder modify), falls die Anweisung Perl ist, und
-        FHEM bereits gestartet ist.  </li>
 
   </ul>
   <br>

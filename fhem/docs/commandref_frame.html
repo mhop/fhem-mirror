@@ -679,12 +679,34 @@ The following local attributes are used by a wider range of devices:
         for this type of device. The attribute IODev needs to be used only if
         you attached more than one physical device capable of receiving signals
         for this logical device.</li><br>
-    <li>Special: attribute disable can be toggled<br/>
-        Attribute "disable" can be toggled by issuing the following command:<br/>
-        <br/>
-        <code>attr &lt;device&gt; disable toggle</code><br/>
-        <br/>
-        Attribute "disable" must be offered by the corresponding module</li>
+
+    <a name="disable"></a>
+    <li>disable<br>
+        Disables the corresponding device. Note: it can be toggled by issuing the following command:<br/>
+        <br>
+        <code>attr &lt;device&gt; disable toggle</code>
+        </li><br>
+
+    <a name="disabledForIntervals"></a>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
+        Space separated list of HH:MM or D@HH:MM tupels. If the current time is
+        between the two time specifications, the current device is disabled.
+        Instead of HH:MM you can also specify HH or HH:MM:SS. D is the day of
+        the week, with 0 indicating Sunday and 3 indicating Wednesday.
+        Specifying the day for the "from" part does _not_ specify it for the
+        "to" part, i.e.  1@00-24 will disable from monday to the end of the
+        week, but not on sunday (as 1@00 is greater than any time on sunday).
+        To specify an interval spawning midnight, you have to specify two
+        intervals, e.g.:
+        <ul>
+          23:00-24:00 00:00-01:00
+        </ul>
+        If parts of the attribute value are enclosed in {}, they are evaluated:
+        <ul>
+          {sunset_abs()}-24 {sunrise_abs()}-08
+        </ul>
+        </li><br>
+
 </ul>
 <!-- attributes end - diese Zeile nicht entfernen! -->
 
@@ -1699,6 +1721,13 @@ The following local attributes are used by a wider range of devices:
         some Fritzbox installations, and it will be set automatically for
         Windows.
     </li><br>
+
+    <a id="perlSyntaxCheck"></a>
+    <li>perlSyntaxCheck<br>
+        by setting the <b>global</b> attribute perlSyntaxCheck, a syntax check
+        will be executed upon definition or modification, if the command is
+        perl and FHEM is already started.
+        </li><br>
 
     <a name="pidfilename"></a>
     <li>pidfilename<br>

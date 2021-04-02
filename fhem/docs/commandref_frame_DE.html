@@ -688,12 +688,36 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       Device f&auml;hig ist, Signale von diesem logischen Device zu empfangen.
       </li><br>
 
-    <li>Attribut "disable" umschalten<br/>
-      Das Attribut "disable" kann, sofern vom Ger&auml;temodul bereitgestellt,<br/>
-      mit folgendem Befehl einfach umgeschaltet werden:</br>
-      <br/>
-      <code>attr &lt;device&gt; disable toggle</code><br/>
-    </li>
+    <a name="disable"></a>
+    <li>disable<br>
+      Deaktiviert das entsprechende Ger&auml;t.<br>
+      Sie mit folgendem Befehl einfach umgeschaltet werden:</br>
+      <code>attr &lt;device&gt; disable toggle</code>
+      </li><br>
+
+    <a name="disabledForIntervals"></a>
+    <li>disabledForIntervals HH:MM-HH:MM HH:MM-HH:MM ...<br>
+      Das Argument ist eine Leerzeichengetrennte Liste von Minuszeichen-
+      getrennten HH:MM oder D@HH:MM Paaren. Falls die aktuelle Uhrzeit
+      zwischen diesen Werten f&auml;llt, dann wird die Ausf&uuml;hrung, wie
+      beim disable, ausgesetzt. Statt HH:MM kann man auch HH oder HH:MM:SS
+      angeben.  D ist der Tag der Woche, mit 0 als Sonntag and 3 als
+      Mittwoch. Die Angabe des Wochentags f&uuml;r den "von" Wert impliziert
+      _nicht_ den gleichen Tag f&uuml;r den "bis" Wert, z.Bsp.  deaktiviert
+      1@00-24 die Asf&uuml;hrung von Montag bis Ende der Woche, aber nicht
+      Sonntag (da alle Zeitangaben am Montag vor 1@00 liegen).
+      Um einen Intervall um Mitternacht zu spezifizieren, muss man
+      zwei einzelne angeben, z.Bsp.:
+      <ul>
+        23:00-24:00 00:00-01:00
+      </ul>
+      Falls Teile des Wertes in {} eingeschlossen sind, dann werden sie als
+      ein Perl Ausdruck ausgewertet:
+      <ul>
+        {sunset_abs()}-24 {sunrise_abs()}-08
+      </ul>
+      </li><br>
+
 </ul>
 <!-- attributes end - diese Zeile nicht entfernen! -->
 <br><br>
@@ -1811,6 +1835,13 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
         Dieses Attribut ist bei einigen FHEM Installationen auf FRITZ!-Boxen
         notwendig, und wid fuer Windows automatisch gesetzt.
     </li><br>
+
+    <a id="perlSyntaxCheck"></a>
+    <li>perlSyntaxCheck<br>
+        nach setzen des <b>global</b> Attributes perlSyntaxCheck wird eine 
+        Syntax-Pr&uuml;fung der Anweisung durchgef&uuml;hrt bei jeder
+        &Auml;nderung (define oder modify), falls die Anweisung Perl ist, und
+        FHEM bereits gestartet ist.</li><br>
 
     <a name="pidfilename="></a>
     <li>pidfilename<br>
