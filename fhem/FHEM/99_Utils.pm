@@ -22,9 +22,10 @@ time_str2num($)
 }
 
 sub
-min($@)
+min(@)
 {
   my ($min, @vars) = @_; 
+  return $min if(!defined($min));
   for (@vars) {
     $min = $_ if $_ lt $min;
   }           
@@ -32,9 +33,10 @@ min($@)
 }
 
 sub
-max($@)
+max(@)
 {
   my ($max, @vars) = @_; 
+  return $max if(!defined($max));
   for (@vars) {
     $max = $_ if $_ gt $max;
   }           
