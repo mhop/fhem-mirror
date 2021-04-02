@@ -25,7 +25,7 @@
 # Broadlink protocol parts are stolen from 38_Broadlink.pm :) , THX to daniel2311
 
 package FHEM::BEOK;  ## no critic 'package'
-# das no critic könnte weg wenn die Module nicht mehr zwingend mit NN_ beginnnen müssen
+# das no critic könnte weg wenn die Module nicht mehr zwingend mit NN_ beginnen müssen
 
 use strict;
 use warnings;
@@ -93,7 +93,7 @@ sub Initialize
     $hash->{GetFn}        = \&FHEM::BEOK::Get;
     $hash->{AttrFn}       = \&FHEM::BEOK::Attr;
     $hash->{FW_summaryFn} = \&FHEM::BEOK::summaryFn;
-    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language display:auto,always_on keepAuto:0,1 '
+    $hash->{AttrList}     = 'interval timeout disable:0,1 timesync:0,1 language:DE,EN display:auto,always_on keepAuto:0,1 '
                             .'skipTimeouts:0,9 maxErrorLog model:BEOK,Floureon,Hysen,KETOTEK,Chunyang,unknown weekprofile '
                             .$readingFnAttributes;
 
@@ -885,7 +885,7 @@ sub UpdateStatus {
     $val = ($data[13] << 8) + $data[14];
     $hash->{helper}{AdJ} = $val; #  Raumtemp adj -5 - 0 - +5
 
-    my $adj = ($val >=  0) ? sprintf('%.1f', $val / 2) : sprintf('%.1f', (0x10000 - $val) / -2);
+    my $adj = (($val >=  0) && ($val < 10)) ? sprintf('%.1f', $val / 2) : sprintf('%.1f', (0x10000 - $val) / -2);
 
     readingsBulkUpdate ($hash, 'room-temp-adj', $adj);
 
@@ -1151,7 +1151,7 @@ sub summaryFn {
 
     return $state if (($state ne 'on' ) && ($state ne 'off'));
 
-    if (AttrVal($name, 'language', '') eq 'DE') {
+    if (AttrVal($name, 'language', AttrVal('global', 'language', 'DE')) eq 'DE') {
 	@names = ('Raum ','Boden ','Soll','Modus');
     }
 
@@ -1182,8 +1182,8 @@ sub summaryFn {
 	$html   .= '<td>'.$relay.'</td><td>'.$locked.'</td>';
 
 	$html .= '<td align="right">'.$names[0].ReadingsNum($name,'room-temp',0).' &deg;C';
-	my $flt = $names[1].ReadingsNum($name, 'floor-temp', 0);
-	$html .= '<br>'.$flt.' &deg;C' if (($flt > 0) || (ReadingsVal($name, 'sensor', '') ne 'internal'));
+	my $flt = ReadingsNum($name, 'floor-temp', 0);
+	$html .= '<br>'.$names[1].$flt.' &deg;C' if (($flt > 0) || (ReadingsVal($name, 'sensor', '') ne 'internal'));
 	$html .= '</td>';
 
 	$html .= "<td align=\"center\">".$names[2]."<br><select  id=\"".$name."_tempList\" name=\"".$name."_tempList\" class=\"dropdown\" onchange=\"FW_cmd('/fhem?XHR=1$csrf&cmd.$name=set $name desired-temp ' + this.options[this.selectedIndex].value)\">";
@@ -1494,7 +1494,9 @@ sub summaryFn {
     </ul>
 </ul>
 
-=for :application/json;q=META.json 98_readingsWatcher.pm
+=end html_DE
+
+=for :application/json;q=META.json 38_BEOK.pm
 
 {
   "abstract": "connection to BEOK / Floureon / Hysen WiFi room thermostat",
@@ -1525,7 +1527,9 @@ sub summaryFn {
         "FHEM": 5.00918799,
         "GPUtils": 0,
         "Time::HiRes": 0,
-        "IO::Socket": 0
+        "IO::Socket": 0,
+        "Crypt::CBC":0,
+        "Crypt::OpenSSL::AES":0
       },
       "recommends": {
         "FHEM::Meta": 0
@@ -1537,5 +1541,6 @@ sub summaryFn {
 }
 =end :application/json;q=META.json
 
-=end html_DE
 =cut
+
+
