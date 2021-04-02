@@ -452,7 +452,7 @@ FBDECT_ParseHttp($$$)
       my ($txt,$h,$ln) = (@_);
       $txt =~ s#<([^/\s>]+?)[^/]*?>(.*?)</\g1>#
         my ($n,$c) = ($1,$2);
-        $ln = makeReadingName($1) if($n eq "name" && $c =~ m/:\s*([^\s]*)$/);
+        $ln = makeReadingName($1) if($n eq "name" && $c =~ m/:\s*(.*)$/);
         if($n eq "lastpressedtimestamp" && $ln) {
           $h->{"${n}_$ln"} = ($c =~ m/^\d{10}$/ ? FmtDateTime($c) : "N/A");
         }
