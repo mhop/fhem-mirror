@@ -1479,9 +1479,8 @@ sub _transferDWDForecastValues {
       $epoche          = $t + (3600*$num);                                                      
       my ($ta,$realts) = TimeAdjust ($epoche);
       
-      my $ta1          = $realts;
-      $ta1             =~ s/:/<>/gx;
-      push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$ta1 if($num == 0);
+      $realts          =~ s/:/<>/gx;
+      push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$realts if($num == 0);
       #push @$daref, "${time_str}_Time:"      .$ta;
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
