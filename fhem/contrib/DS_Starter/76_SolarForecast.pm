@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
                            "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
@@ -393,7 +394,7 @@ sub Initialize {
                                 "interval ".
                                 "layoutType:single,double,diff ".
                                 "maxVariancePerDay ".
-                                "maxPV ".
+                                "maxValBeam ".
                                 "numHistDays:slider,1,1,30 ".
                                 "rainFactorDamping:slider,0,1,100 ".
                                 "showDiff:no,top,bottom ".
@@ -1689,14 +1690,14 @@ sub _transferMeterValues {
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
   my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
    
-  my $cdaypast = 0;
+  my $gcdaypast = 0;
   
   for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      $cdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
+      $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
   }
   
   my $do = 0;
-  if ($cdaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
+  if ($gcdaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
       if (defined $hash->{HELPER}{INITCONTOTAL}) {
           $do = 1;
       }
@@ -1705,16 +1706,16 @@ sub _transferMeterValues {
       }
   }
   elsif (!defined $hash->{HELPER}{INITCONTOTAL}) {
-      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$cdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+      $hash->{HELPER}{INITCONTOTAL} = $gctotal-$gcdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
       $do = 1;
   }
   
   if ($do) {
-      my $gctotthishour = int ($gctotal - ($cdaypast + $hash->{HELPER}{INITCONTOTAL}));
+      my $gctotthishour = int ($gctotal - ($gcdaypast + $hash->{HELPER}{INITCONTOTAL}));
       
-      # Log3($name, 1, "$name - gctotal: $gctotal, cdaypast: $cdaypast, HELPER: $hash->{HELPER}{INITCONTOTAL}, gctotthishour: $gctotthishour  ");
+      # Log3($name, 1, "$name - gctotal: $gctotal, gcdaypast: $gcdaypast, HELPER: $hash->{HELPER}{INITCONTOTAL}, gctotthishour: $gctotthishour  ");
       
       if($gctotthishour < 0) {
           $gctotthishour = 0;
@@ -2011,7 +2012,7 @@ sub forecastGraphic {                                                           
   my $width      =  AttrNum ($name, 'beamWidth',              6   );                      # zu klein ist nicht problematisch
   my $w          =  $width*$maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   my $fsize      =  AttrNum ($name, 'spaceSize',             24   );
-  my $maxVal     =  AttrNum ($name, 'maxPV',                  0   );                      # dyn. Anpassung der Balkenhöhe oder statisch ?
+  my $maxVal     =  AttrNum ($name, 'maxValBeam',             0   );                      # dyn. Anpassung der Balkenhöhe oder statisch ?
 
   my $show_night =  AttrNum ($name, 'showNight',              0   );                      # alle Balken (Spalten) anzeigen ?
   my $show_diff  =  AttrVal ($name, 'showDiff',            'no'   );                      # zusätzliche Anzeige $di{} in allen Typen
@@ -2078,7 +2079,7 @@ sub forecastGraphic {                                                           
       my $lblPvTo = "tomorrow:";
       my $lblPvCu = "actual";
      
-      if(AttrVal("global", "language", "EN") eq "DE") {                                             # Header globales Sprachschema Deutsch
+      if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
           $lupt    = "Stand:";
           $autoct  = "automatische Korrektur:";          
           $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
@@ -2093,12 +2094,10 @@ sub forecastGraphic {                                                           
       # Header Link + Status + Update Button      
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
           my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-
-          if(AttrVal("global","language","EN") eq "DE") {
+          
+          $lup = "$year-$month-$day&nbsp;$time";
+          if($lang eq "DE") {
              $lup = "$day.$month.$year&nbsp;$time"; 
-          } 
-          else {
-             $lup = "$year-$month-$day&nbsp;$time"; 
           }
 
           my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')\"";               # Update Button generieren        
@@ -2495,9 +2494,9 @@ sub forecastGraphic {                                                           
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxPV = 0;                                                                    # ToDo:  maxPV noch aus Attribut maxPV ableiten
+          my $maxValBeam = 0;                                                               # ToDo:  maxValBeam noch aus Attribut maxValBeam ableiten
 
-          if ($maxPV) {                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxPV = 0
+          if ($maxValBeam) {                                                                # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
               $px_neg = $height - $px_pos;                                                  # Rundungsfehler vermeiden
           } 
@@ -4063,10 +4062,12 @@ werden weitere SolarForecast Devices zugeordnet.
        </li>
        <br> 
  
-       <a name="maxPV"></a>
-       <li><b>maxPV &lt;0...val&gt; </b><br>
-         Maximaler Ertrag in einer Stunde zur Berechnung der Balkenhöhe. <br>
-         (default: 0 -> dynamisch)
+       <a name="maxValBeam"></a>
+       <li><b>maxValBeam &lt;0...val&gt; </b><br>
+         Festlegung des maximalen Betrags des primären Balkens (Stundenwert) zur Berechnung der maximalen Balkenhöhe. 
+         Dadurch erfolgt eine Anpassung der zulässigen Gesamthöhe der Grafik. <br>
+         Wenn nicht gesetzt oder 0, erfolgt eine dynamische Anpassung. <br>
+         (default: 0)
        </li>
        <br>
        
