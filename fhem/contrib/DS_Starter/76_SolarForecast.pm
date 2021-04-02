@@ -117,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam ",
+  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalEvents ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
                            "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
@@ -693,7 +693,7 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   }
 
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^(?$tilt)$/x) {
+      if($value !~ /^(?:$tilt)$/x) {
           return qq{The tilt angle of "$key" is wrong};
       }     
   }
@@ -724,7 +724,7 @@ sub _setmoduleDirection {                ## no critic "not used"
   }
   
   while (my ($key, $value) = each %$h) {
-      if($value !~ /^(?$dirs)$/x) {
+      if($value !~ /^(?:$dirs)$/x) {
           return qq{The module direction of "$key" is wrong: $value};
       }     
   }
@@ -1388,6 +1388,7 @@ sub _additionalEvents {
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
+          $date = strftime "%Y-%m-%d", localtime($t-7200);                                    # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59".$tsmsec;
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", undef);  
