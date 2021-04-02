@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.27.0" => "02.04.2021  additional readings ",
   "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalEvents ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
@@ -1154,7 +1155,7 @@ sub centralTask {
   deleteReadingspec ($hash, "ThisHour_.*");
   deleteReadingspec ($hash, "Today_PV");
   deleteReadingspec ($hash, "Tomorrow_PV");
-  deleteReadingspec ($hash, "NextHour.*");
+  # deleteReadingspec ($hash, "NextHour.*");
   deleteReadingspec ($hash, "moduleEfficiency");
 
   my $interval = controlParams ($name); 
@@ -1357,7 +1358,7 @@ return;
 }
 
 ################################################################
-#     Zusätzliche Events für Logging generieren und
+#     Zusätzliche Readings/ Events für Logging generieren und
 #     Sonderaufgaben !
 ################################################################
 sub _additionalEvents {
@@ -1365,6 +1366,7 @@ sub _additionalEvents {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
+  my $daref = $paref->{daref};
   my $t     = $paref->{t};                                  # Epoche Zeit
   
   my $no_replace = 1;                                       # Ersetzung von Events durch das Attribut eventMap verhindern
@@ -1372,33 +1374,41 @@ sub _additionalEvents {
   my $mseclog    = AttrVal("global", "mseclog", 0);
   my $tsmsec     = $mseclog ? ".000" : q{};
   
-  my ($ts,$pvfc,$pvrl,$gcon);
+  my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
-  $ts   = $date." ".sprintf("%02d",$chour).":00:00".$tsmsec;
+  #$ts   = $date." ".sprintf("%02d",$chour).":00:00".$tsmsec;
+  $ts1  = $date." ".sprintf("%02d",$chour)."<>00<>00";
   
-  $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVforecast", undef);  
-  __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
+  $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVforecast", 0); 
+  push @$daref, "LastHourPVforecast:".$pvfc." Wh:".$ts1;
+  #__addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
   
-  $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", undef);
-  __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+  $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", 0);
+  push @$daref, "LastHourPVreal:".$pvrl." Wh:".$ts1;
+  #__addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
   
-  $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", undef);
-  __addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
+  $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
+  push @$daref, "LastHourGridconsumptionReal:".$gcon." Wh:".$ts1;
+  #__addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
   
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                    # Vortag (2 h Differenz reichen aus)
-          $ts   = $date." 23:59:59".$tsmsec;
+          #$ts   = $date." 23:59:59".$tsmsec;
+          $ts   = $date." 23:59:59";
           
-          $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", undef);  
-          __addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
+          $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", 0);  
+          push @$daref, "LastHourPVforecast:".$pvfc.":".$ts1;
+          #__addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
           
-          $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", undef);
-          __addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
+          $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", 0);
+          push @$daref, "LastHourPVreal:".$pvrl.":".$ts1;
+          #__addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
           
-          $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", undef);
-          __addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
+          $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
+          push @$daref, "LastHourGridconsumptionReal:".$gcon.":".$ts1;
+          #__addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
           
           deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
@@ -1411,7 +1421,7 @@ sub _additionalEvents {
       delete $hash->{HELPER}{H00DONE};
   }
 
-  my $ret = DoTrigger($name, undef, $no_replace);
+  # my $ret = DoTrigger($name, undef, $no_replace);
   
 return;
 }
@@ -1465,11 +1475,13 @@ sub _transferDWDForecastValues {
       
       my $calcpv = calcPVforecast ($params);                                                  # Vorhersage gewichtet kalkulieren
                 
-      $time_str = "NextHour".sprintf "%02d", $num;
-      $epoche   = $t + (3600*$num);                                                      
-      my $ta    = TimeAdjust ($epoche);
+      $time_str        = "NextHour".sprintf "%02d", $num;
+      $epoche          = $t + (3600*$num);                                                      
+      my ($ta,$realts) = TimeAdjust ($epoche);
       
-      #push @$daref, "${time_str}_PVforecast:".$calcpv." Wh";
+      my $ta1          = $realts;
+      $ta1             =~ s/:/<>/gx;
+      push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$ta1 if($num == 0);
       #push @$daref, "${time_str}_Time:"      .$ta;
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
@@ -1519,6 +1531,11 @@ sub _transferWeatherValues {
   my $fc0_SunSet  = ReadingsVal($fcname, "fc0_SunSet",  "00:00");                               # Sonnenuntergang heute  
   my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen   
   my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen 
+  
+  $fc0_SunRise    =~ s/:/<>/x;
+  $fc0_SunSet     =~ s/:/<>/x;
+  $fc1_SunRise    =~ s/:/<>/x;
+  $fc1_SunSet     =~ s/:/<>/x;
   
   push @$daref, "Today_SunRise:".   $fc0_SunRise;
   push @$daref, "Today_SunSet:".    $fc0_SunSet;
@@ -2802,16 +2819,24 @@ sub TimeAdjust {
   my $epoch = shift;
   
   my ($lyear,$lmonth,$lday,$lhour) = (localtime($epoch))[5,4,3,2];
+  my $ts;
   
-  $lyear += 1900;                  # year is 1900 based
-  $lmonth++;                       # month number is zero based
+  $lyear += 1900;                                                                             # year is 1900 based
+  $lmonth++;                                                                                  # month number is zero based
+  
+  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                      # Standard f. z.B. Readingstimstamp
+  $year += 1900;                                                                            
+  $mon++;  
+  my $realts = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          
   
   if(AttrVal("global","language","EN") eq "DE") {
-      return (sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,"00:00"));
+      $ts = sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,"00:00");
   } 
   else {
-      return (sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00"));
+      $ts = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");
   }
+  
+return ($ts,$realts);
 }
 
 ################################################################
@@ -3360,8 +3385,10 @@ sub createReadingsFromArray {
   readingsBeginUpdate($hash);
   
   for my $elem (@$daref) {
-      my ($rn,$rval) = split ":", $elem, 2;
-      readingsBulkUpdate($hash, $rn, $rval);      
+      my ($rn,$rval,$ts) = split ":", $elem, 3;
+      $rval              =~ s/<>/:/gx;
+      $ts                =~ s/<>/:/gx if(defined $ts);
+      readingsBulkUpdate($hash, $rn, $rval, undef, $ts);      
   }
 
   readingsEndUpdate($hash, $doevt);
