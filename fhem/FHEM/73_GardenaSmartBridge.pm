@@ -10,6 +10,7 @@
 #       - Matthias (Kenneth)    Thanks for Wiki entry
 #       - BioS                  Thanks for predefined start points Code
 #       - fettgu                Thanks for Debugging Irrigation Control data flow
+#       - Sebastian (BOFH)      Thanks for new Auth Code after API Change
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -232,8 +233,8 @@ sub Define {
     $hash->{BRIDGE} = 1;
     $hash->{URL} =
       AttrVal( $name, 'gardenaBaseURL',
-        'https://sg-api.dss.husqvarnagroup.net' )
-      . '/sg-1';
+        'https://smart.gardena.com' )
+      . '/v1';
     $hash->{VERSION}   = version->parse($VERSION)->normal;
     $hash->{INTERVAL}  = 60;
     $hash->{NOTIFYDEV} = "global,$name";
@@ -315,12 +316,12 @@ sub Attr {
     }
     elsif ( $attrName eq 'gardenaBaseURL' ) {
         if ( $cmd eq 'set' ) {
-            $hash->{URL} = $attrVal . '/sg-1';
+            $hash->{URL} = $attrVal;
             Log3 $name, 3,
               "GardenaSmartBridge ($name) - set gardenaBaseURL to: $attrVal";
         }
         elsif ( $cmd eq 'del' ) {
-            $hash->{URL} = 'https://sg-api.dss.husqvarnagroup.net/sg-1';
+            $hash->{URL} = 'https://smart.gardena.com/v1';
         }
     }
 
@@ -357,7 +358,7 @@ sub Notify {
             $devtype eq 'GardenaSmartBridge'
             && (
                 grep /^gardenaAccountPassword.+/,
-                @{$events} || ReadingsVal( '$devname', 'token', '' ) eq 'none'
+                @{$events}
             )
         )
       );
@@ -470,8 +471,8 @@ sub Write {
 "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: secret!, DATA: secret!, METHOD: $method"
     );
 
-#     Log3($name, 3,
-#         "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
+    #  Log3($name, 3,
+    #      "GardenaSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method");
 
     return;
 }
@@ -490,6 +491,8 @@ sub ErrorHandling {
 
     my $dname = $dhash->{NAME};
 
+   Log3 $name, 2, "GardenaSmartBridge ($name) - Request: $data";
+   
     my $decode_json = eval { decode_json($data) };
     if ($@) {
         Log3 $name, 3, "GardenaSmartBridge ($name) - JSON error while request";
@@ -710,12 +713,15 @@ sub ResponseProcessing {
         }
     }
 
-    #     print Dumper $decode_json;
+    # print Dumper $decode_json;
 
-    if ( defined( $decode_json->{sessions} ) && $decode_json->{sessions} ) {
+    if ( defined( $decode_json->{data} ) && $decode_json->{data} 
+        && ref($decode_json->{data}) eq 'HASH'
+        && !defined( $hash->{helper}->{user_id})) {
 
-        $hash->{helper}{session_id} = $decode_json->{sessions}{token};
-        $hash->{helper}{user_id}    = $decode_json->{sessions}{user_id};
+        $hash->{helper}{session_id}     = $decode_json->{data}{id};
+        $hash->{helper}{user_id}        = $decode_json->{data}{attributes}->{user_id};
+        $hash->{helper}{refresh_token}  = $decode_json->{data}{attributes}->{refresh_token};
 
         Write( $hash, undef, undef, undef );
         Log3 $name, 3, "GardenaSmartBridge ($name) - fetch locations id";
@@ -827,9 +833,6 @@ sub WriteReadings {
                 $v = encode_utf8($v);
                 readingsBulkUpdateIfChanged( $hash, $t, $v );
             }
-
-            readingsBulkUpdateIfChanged( $hash, 'zones',
-                scalar( @{ $decode_json->{zones} } ) );
         }
         elsif ($decode_json->{id} ne $hash->{helper}{locations_id}
             && ref( $decode_json->{abilities} ) eq 'ARRAY'
@@ -853,11 +856,7 @@ sub WriteReadings {
                           {name} . '-' . $t,
                         $v
                       )
-                      if (
-                        $decode_json->{abilities}[0]{properties}[$properties]
-                        {name} ne 'ethernet_status'
-                        || $decode_json->{abilities}[0]{properties}
-                        [$properties]{name} ne 'wifi_status' );
+                      if ($decode_json->{abilities}[0]{properties}[$properties]{name} !~ /ethernet_status|wifi_status/ );
 
                     if (
                         (
@@ -884,8 +883,10 @@ sub WriteReadings {
                         elsif ( $decode_json->{abilities}[0]{properties}
                             [$properties]{name} eq 'wifi_status' )
                         {
+                            #TODO: read valies if bridge connected to wifi
                             readingsBulkUpdateIfChanged( $hash,
-                                'wifi_status-ssid', $v->{ssid} );
+                             'wifi_status-ssid', $v->{ssid} )
+                              if (ref($v->{ssid}) ne 'HASH');
                             readingsBulkUpdateIfChanged( $hash,
                                 'wifi_status-mac', $v->{mac} );
                             readingsBulkUpdateIfChanged( $hash,
@@ -958,16 +959,28 @@ sub getToken {
       if ( defined( $hash->{helper}{locations_id} )
         && $hash->{helper}{locations_id} );
 
+    # Write(
+    #     $hash,
+    #     '"sessions": {"email": "'
+    #       . AttrVal( $name, 'gardenaAccountEmail', 'none' )
+    #       . '","password": "'
+    #       . ReadPassword( $hash, $name ) . '"}',
+    #     undef,
+    #     undef
+    # );
+    
     Write(
-        $hash,
-        '"sessions": {"email": "'
-          . AttrVal( $name, 'gardenaAccountEmail', 'none' )
-          . '","password": "'
-          . ReadPassword( $hash, $name ) . '"}',
-        undef,
-        undef
-    );
+         $hash,
+         '"data": {"type":"token", "attributes":{"username": "' 
+            . AttrVal( $name, 'gardenaAccountEmail', 'none' )      
+            . '","password": "'
+            . ReadPassword( $hash, $name ) . '", "client_id":"smartgarden-jwt-client"}}',
+         undef,
+         undef
+     );
 
+Log3 $name, 4, '"data": {"type":"token", "attributes":{"username": "'      . AttrVal( $name, 'gardenaAccountEmail', 'none' )      . '","password": "'
+          . ReadPassword( $hash, $name ) . '", "client_id":"smartgarden-jwt-client"}}';
     Log3 $name, 3,
 "GardenaSmartBridge ($name) - send credentials to fetch Token and locationId";
 
@@ -1122,25 +1135,31 @@ sub createHttpValueStrings {
     my $header     = "Content-Type: application/json";
     my $uri        = '';
     my $method     = 'POST';
-    $header .= "\r\nX-Session: $session_id"
-      if ( defined( $hash->{helper}{session_id} ) );
+    $header .= "\r\nAuthorization: Bearer $session_id"
+      if ( defined($hash->{helper}{session_id}) );
+    $header .= "\r\nAuthorization-Provider: husqvarna"
+      if ( defined($hash->{helper}{session_id}) );
+
+    #  $header .= "\r\nx-api-key: $session_id"
+    #    if ( defined( $hash->{helper}{session_id} ) );
     $payload = '{' . $payload . '}' if ( defined($payload) );
     $payload = '{}' if ( !defined($payload) );
 
     if ( $payload eq '{}' ) {
         $method = 'GET';
-        $uri .= '/locations/?user_id=' . $hash->{helper}{user_id}
+        $payload = '';
+        $uri .= '/locations/?locatioId=null&user_id=' . $hash->{helper}{user_id}
           if ( exists( $hash->{helper}{user_id} )
             && !defined( $hash->{helper}{locations_id} ) );
         readingsSingleUpdate( $hash, 'state', 'fetch locationId', 1 )
           if ( !defined( $hash->{helper}{locations_id} ) );
-        $uri .= '/sessions' if ( !defined( $hash->{helper}{session_id} ) );
+        $uri .= '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
         $uri .= '/devices'
           if (!defined($abilities)
             && defined( $hash->{helper}{locations_id} ) );
     }
 
-    $uri .= '/sessions' if ( !defined( $hash->{helper}{session_id} ) );
+    $uri .= '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
 
     if ( defined( $hash->{helper}{locations_id} ) ) {
         if ( defined($abilities) && $abilities eq 'mower_settings' ) {
@@ -1272,8 +1291,7 @@ sub DeletePassword {
     <li>longitude - Längengrad des Grundstücks</li>
     <li>name - Name of your Garden – Default „My Garden“</li>
     <li>state - State of the Bridge</li>
-    <li>token - SessionID</li>
-    <li>zones - </li>
+    <li>token - SessionID</li> 
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeset"></a>
@@ -1334,8 +1352,7 @@ sub DeletePassword {
     <li>longitude - Längengrad des Grundst&uuml;cks</li>
     <li>name - Name für das Grundst&uuml;ck – Default „My Garden“</li>
     <li>state - Status der Bridge</li>
-    <li>token - SessionID</li>
-    <li>zones - </li>
+    <li>token - SessionID</li> 
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeset"></a>
@@ -1376,7 +1393,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.3",
+  "version": "v2.2.1",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
