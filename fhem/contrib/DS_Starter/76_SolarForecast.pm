@@ -759,10 +759,12 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   
   readingsSingleUpdate($hash, $opt, $prop." (manual)", 1);
   
+  my $cfnum = (split "_", $opt)[1]; 
+  deleteReadingspec ($hash, "pvCorrectionFactor_${cfnum}_autocalc");
+  
   my @da;
   my $t      = time;                                                                                # aktuelle Unix-Zeit 
   my $chour  = strftime "%H", localtime($t);                                                        # aktuelle Stunde
-  my $fcdev  = ReadingsVal($name, "currentForecastDev", "");                                        # aktuelles Forecast Device
   
   my $params = {
       hash  => $hash,
