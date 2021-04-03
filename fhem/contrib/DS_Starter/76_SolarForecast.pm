@@ -117,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor ",
+  "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
   "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalEvents ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
@@ -1158,8 +1158,11 @@ sub centralTask {
   deleteReadingspec ($hash, "ThisHour_.*");
   deleteReadingspec ($hash, "Today_PV");
   deleteReadingspec ($hash, "Tomorrow_PV");
-  # deleteReadingspec ($hash, "NextHour.*");
+  deleteReadingspec ($hash, "Next04Hours_PV");
+  deleteReadingspec ($hash, "Next.*HoursPVforecast");
   deleteReadingspec ($hash, "moduleEfficiency");
+  deleteReadingspec ($hash, "RestOfDay_PV");
+  deleteReadingspec ($hash, "CurrentHourPVforecast");
 
   my $interval = controlParams ($name); 
   
@@ -1482,8 +1485,8 @@ sub _transferDWDForecastValues {
       $epoche          = $t + (3600*$num);                                                      
       my ($ta,$realts) = TimeAdjust ($epoche);
       
-      $realts          =~ s/:/<>/gx;
-      push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$realts if($num == 0);
+      # $realts          =~ s/:/<>/gx;
+      # push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$realts if($num == 0);
       #push @$daref, "${time_str}_Time:"      .$ta;
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
@@ -2052,15 +2055,15 @@ sub forecastGraphic {                                                           
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
   $icon    = FW_makeImage($icon) if (defined($icon));
-  my $co4h = ReadingsNum ($name,"Next04Hours_Consumption", 0);
-  my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",   0); 
-  my $coTo = ReadingsNum ($name,"Tomorrow_Consumption",    0);
-  my $coCu = ReadingsNum ($name,"Current_GridConsumption", 0);
+  my $co4h = ReadingsNum ($name,"Next04Hours_Consumption",    0);
+  my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",      0); 
+  my $coTo = ReadingsNum ($name,"Tomorrow_Consumption",       0);
+  my $coCu = ReadingsNum ($name,"Current_GridConsumption",    0);
 
-  my $pv4h = ReadingsNum ($name,"Next04Hours_PV",          0);
-  my $pvRe = ReadingsNum ($name,"RestOfDay_PV",            0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",     0);
-  my $pvCu = ReadingsNum ($name,"Current_PV",              0);
+  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast", 0);
+  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",        0); 
+  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",        0);
+  my $pvCu = ReadingsNum ($name,"Current_PV",                 0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
 
@@ -3345,10 +3348,11 @@ sub calcSummaries {
       $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
   }
   
-  push @$daref, "Next04Hours_PV:".     (int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDay_PV:".       (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PVforecast:".(int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast:".   (int $todaySum->{PV}).     " Wh";
+  push @$daref, "NextHours_Sum00_PVforecast:".(int $thforecast)." Wh";
+  push @$daref, "NextHours_Sum04_PVforecast:".(int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDayPVforecast:".       (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast:".       (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast:".          (int $todaySum->{PV}).     " Wh";
   
 return;
 }
