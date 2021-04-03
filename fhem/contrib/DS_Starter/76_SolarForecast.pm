@@ -3047,7 +3047,7 @@ sub calcVariance {
           Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic - old factor: $oldfac)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic - old factor<> $oldfac)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc:done";
   }
   
