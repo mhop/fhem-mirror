@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor ",
   "0.27.0" => "02.04.2021  additional readings ",
   "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalEvents ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
@@ -375,8 +376,10 @@ sub Initialize {
                                 "autoRefreshFW:$fwd ".
                                 "beam1Color:colorpicker,RGB ".
                                 "beam1Content:forecast,real,gridconsumption ".
+                                "beam1FontColor:colorpicker,RGB ".
                                 "beam2Color:colorpicker,RGB ".
                                 "beam2Content:forecast,real,gridconsumption ".
+                                "beam2FontColor:colorpicker,RGB ".
                                 "beamHeight ".
                                 "beamWidth ".
                                 # "consumerList ".
@@ -2014,9 +2017,12 @@ sub forecastGraphic {                                                           
   my $hourstyle  =  AttrVal ($name, 'hourStyle',              ''  );
 
   my $colorfc    =  AttrVal ($name, 'beam1Color',         '000000');
-  my $colorc     =  AttrVal ($name, 'beam2Color',         'C4C4A7');               
+  my $colorc     =  AttrVal ($name, 'beam2Color',         'C4C4A7');
+  my $fcolor1    =  AttrVal ($name, 'beam1FontColor',     'C4C4A7');
+  my $fcolor2    =  AttrVal ($name, 'beam2FontColor',     '000000');
+             
   my $beam1cont  =  AttrVal ($name, 'beam1Content',     'forecast');
-  my $beam2cont  =  AttrVal ($name, 'beam2Content',     'forecast');  
+  my $beam2cont  =  AttrVal ($name, 'beam2Content',     'forecast'); 
 
   my $icon       =  AttrVal ($name, 'consumerAdviceIcon', undef   );
   my $html_start =  AttrVal ($name, 'htmlStart',          undef   );                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
@@ -2566,7 +2572,7 @@ sub forecastGraphic {                                                           
 
           $ret .="<table width='100%' height='100%'>";                                                  # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='even' style='height:".$he."px'>";
-          $ret .="<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
+          $ret .="<td class='smaportal' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
 
           if ($hfcg->{$i}{beam1} || $show_night) {                                                      # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
@@ -2585,9 +2591,10 @@ sub forecastGraphic {                                                           
               $ret .= "</td></tr>";
           }
       }
-     
-      if ($lotype eq 'double') { 
+    
+      if ($lotype eq 'double') {
           my ($color1, $color2, $style1, $style2, $v);
+          my $style =  "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
           $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
 
@@ -2597,27 +2604,23 @@ sub forecastGraphic {                                                           
           if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
               $color1  = $colorfc;
-              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
-                      
+              $style1  = $style." background-color:#$color1; color:#$fcolor1;'";
+
               if($z3) {                                                                                          # die Zuweisung können wir uns sparen wenn Zone 3 nachher eh nicht ausgegeben wird
                   $v       = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
                   $color2  = $colorc;
-                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
-              } 
-          } 
+                  $style2  = $style." background-color:#$color2; color:#$fcolor2;'";
+              }
+          }
           else {
               $val     = formatVal6($hfcg->{$i}{beam2},$kw,$hfcg->{$i}{weather});
               $color1  = $colorc;
-              $style1  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style1 .= (defined($color1)) ? " background-color:#$color1\"" : '"';
-                      
+              $style1  = $style." background-color:#$color1; color:#$fcolor2;'";
+       
               if($z3) {
                   $v       = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
                   $color2  = $colorfc;
-                  $style2  = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-                  $style2 .= (defined($color2)) ? " background-color:#$color2\"" : '"';
+                  $style2  = $style." background-color:#$color2; color:#$fcolor1;'";
               }
           }
 
@@ -2634,10 +2637,10 @@ sub forecastGraphic {                                                           
               $ret .= "<tr class='odd' style='height:".$z3."px'>";
               $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
           }
-      } 
+      }
 
       if ($lotype eq 'diff') {                                                                          # Type diff
-          my $style = "style=\"padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
+          my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
           $ret .= "<table width='100%' border='0'>\n";                                                  # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
           $val = ($hfcg->{$i}{diff} > 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
@@ -2645,11 +2648,11 @@ sub forecastGraphic {                                                           
 
           if ($val) {
               $ret .= "<tr class='even' style='height:".$he."px'>";
-              $ret .= "<td class='smaportal' style='vertical-align:bottom'>".$val."</td></tr>";
+              $ret .= "<td class='smaportal' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
           }
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                 # mit Farbe 1 colorfc füllen
-              $style .= defined $colorfc ? " background-color:#$colorfc\"" : '"';
+              $style .= " background-color:#$colorfc'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                  # Sonderfall , 1px dünnen Strich ausgeben
               $ret  .= "<tr class='odd' style='height:".$z2."px'>";
               $ret  .= "<td align='center' class='smaportal' ".$style.">";
@@ -2662,12 +2665,12 @@ sub forecastGraphic {                                                           
                   $ret .= "<td class='smaportal'></td></tr>";
               }
           }
-         
+        
           if ($hfcg->{$i}{diff} < 0) {                                                                  # Negativ Balken anzeigen ?
-              $style .= (defined($colorc)) ? " background-color:#$colorc\"" : '"';                      # mit Farbe 2 colorc füllen
+              $style .= " background-color:#$colorc'";                                                  # mit Farbe 2 colorc füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='smaportal' ".$style."></td></tr>";
-          } 
+          }
           elsif ($z3) {                                                                                 # ohne Farbe
               $ret .= "<tr class='even' style='height:".$z3."px'>";
               $ret .= "<td class='smaportal'></td></tr>";
