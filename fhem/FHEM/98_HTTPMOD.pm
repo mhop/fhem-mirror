@@ -140,16 +140,16 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '4.1.06 - 20.3.2021';
+my $Module_Version = '4.1.08 - 1.4.2021';
 
 my $AttrList = join (' ', 
       '(reading|get|set)[0-9]+(-[0-9]+)?Name', 
-      '(reading|get|set)[0-9]*(-[0-9]+)?Expr',
+      '(reading|get|set)[0-9]*(-[0-9]+)?Expr:textField-long',
       '(reading|get|set)[0-9]*(-[0-9]+)?Map', 
-      '(reading|get|set)[0-9]*(-[0-9]+)?OExpr',
-      '(reading|get|set)[0-9]*(-[0-9]+)?OMap',
-      '(get|set)[0-9]*(-[0-9]+)?IExpr',
-      '(get|set)[0-9]*(-[0-9]+)?IMap', 
+      '(reading|get|set)[0-9]*(-[0-9]+)?OExpr:textField-long',
+      '(reading|get|set)[0-9]*(-[0-9]+)?OMap:textField-long',
+      '(get|set)[0-9]*(-[0-9]+)?IExpr:textField-long',
+      '(get|set)[0-9]*(-[0-9]+)?IMap:textField-long', 
       '(reading|get|set)[0-9]*(-[0-9]+)?Format', 
       '(reading|get|set)[0-9]*(-[0-9]+)?Decode', 
       '(reading|get|set)[0-9]*(-[0-9]+)?Encode', 
@@ -161,7 +161,7 @@ my $AttrList = join (' ',
       '(reading|get|set)[0-9]+XPath', 
       '(reading|get|set)[0-9]+XPath-Strict', 
       '(reading|get|set)[0-9]+JSON', 
-      '(reading|get|set)[0-9]*RecombineExpr',
+      '(reading|get|set)[0-9]*RecombineExpr:textField-long',
       '(reading|get|set)[0-9]*AutoNumLen',
       '(reading|get|set)[0-9]*AlwaysNum',
       '(reading|get|set)[0-9]*DeleteIfUnmatched',
@@ -172,7 +172,7 @@ my $AttrList = join (' ',
       'readingsRegex.*',              # old 
       'readingsExpr.*',               # old 
       'requestHeader.*',  
-      'requestData.*',
+      'requestData.*:textField-long',
       'noShutdown:0,1',    
       'httpVersion',
       'sslVersion',
@@ -190,15 +190,15 @@ my $AttrList = join (' ',
       'parseFunction2',
       'set[0-9]+Local',               # don't create a request and just set a reading
       '[gs]et[0-9]*URL',
-      '[gs]et[0-9]*Data.*',
+      '[gs]et[0-9]*Data.*:textField-long',
       '[gs]et[0-9]*NoData.*',         # make sure it is an HTTP GET without data - even if a more generic data is defined
-      '[gs]et[0-9]*Header.*',
+      '[gs]et[0-9]*Header.*:textField-long',
       '[gs]et[0-9]*CheckAllReadings:0,1',
       '[gs]et[0-9]*ExtractAllJSON:0,1,2',
       
-      '[gs]et[0-9]*URLExpr',          # old
-      '[gs]et[0-9]*DatExpr',          # old
-      '[gs]et[0-9]*HdrExpr',          # old
+      '[gs]et[0-9]*URLExpr:textField-long',          # old
+      '[gs]et[0-9]*DatExpr:textField-long',          # old
+      '[gs]et[0-9]*HdrExpr:textField-long',          # old
 
       'get[0-9]*Poll:0,1', 
       'get[0-9]*PollDelay',
@@ -235,7 +235,7 @@ my $AttrList = join (' ',
         
       'sid[0-9]*URL',
       'sid[0-9]*Header.*',
-      'sid[0-9]*Data.*',
+      'sid[0-9]*Data.*:textField-long',
       'sid[0-9]*IgnoreRedirects:0,1',      
       'sid[0-9]*ParseResponse:0,1',           # parse response as if it was a get
       'clearSIdBeforeAuth:0,1',
@@ -2512,20 +2512,21 @@ sub FillHttpUtilsHash {
 
     # do user defined replacements first
     if ( $hash->{'.ReplacementEnabled'} ) {
-        $huHash->{header} = DoReplacement($hash, $request->{type}, $huHash->{header} );
-        $huHash->{data}   = DoReplacement($hash, $request->{type}, $huHash->{data} );
+        $huHash->{header} = DoReplacement($hash, $request->{type}, $huHash->{header} ) if ($huHash->{header});
+        $huHash->{data}   = DoReplacement($hash, $request->{type}, $huHash->{data} )   if ($huHash->{data});
         $huHash->{url}    = DoReplacement($hash, $request->{type}, $huHash->{url} );
     }
 
     # then replace $val in header, data and URL with value from request (setVal) if it is still there
-    $huHash->{header} =~ s/\$val/$request->{value}/g;
-    $huHash->{data}   =~ s/\$val/$request->{value}/g;
-    $huHash->{url}    =~ s/\$val/$request->{value}/g;
+    my $value = $request->{value} // '';
+    $huHash->{header} =~ s/\$val/$value/g if ($huHash->{header});
+    $huHash->{data}   =~ s/\$val/$value/g if ($huHash->{data});;
+    $huHash->{url}    =~ s/\$val/$value/g;
 
     # sid replacement is also done here - just before sending so changes in session while request was queued will be reflected
     if ( $hash->{sid} ) {
-        $huHash->{header} =~ s/\$sid/$hash->{sid}/g;
-        $huHash->{data}   =~ s/\$sid/$hash->{sid}/g;
+        $huHash->{header} =~ s/\$sid/$hash->{sid}/g if ($huHash->{header});
+        $huHash->{data}   =~ s/\$sid/$hash->{sid}/g if ($huHash->{data});
         $huHash->{url}    =~ s/\$sid/$hash->{sid}/g;
     }
 
@@ -2634,6 +2635,9 @@ sub AddToSendQueue {
 
     $request->{retryCount}      = 0 if (!$request->{retryCount});
     $request->{ignoreredirects} = 0 if (!$request->{ignoreredirects});
+    $request->{context}         = 'unknown' if (!$request->{context});
+    $request->{type}            = 'unknown' if (!$request->{type});
+    $request->{num}             = 'unknown' if (!$request->{num});
     
     my $qlen = ($hash->{QUEUE} ? scalar(@{$hash->{QUEUE}}) : 0);
     #Log3 $name, 4, "$name: AddToQueue adds $request->{type}, initial queue len: $qlen" . ($request->{'priority'} ? ", priority" : "");
