@@ -672,7 +672,7 @@ sub _setpowerTrigger {                    ## no critic "not used"
   }
   
   for my $key (keys %{$h}) {
-      if($key !~ /^tr[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
+      if($key !~ /^[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
           return qq{The key "$key" is invalid. Please consider the commandref.};
       }
   }
@@ -811,7 +811,7 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
   _transferDWDForecastValues ($params);
   
   if(@da) {
-      push @da, "state:updated";                                                                   # Abschluß state 
+      push @da, "state<>updated";                                                                   # Abschluß state 
       createReadingsFromArray ($hash, \@da, 1);
   }
 
@@ -1420,16 +1420,16 @@ sub _additionalActivities {
   
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
-  $ts1  = $date." ".sprintf("%02d",$chour)."<>00<>00";
+  $ts1  = $date." ".sprintf("%02d",$chour).":00:00";
   
   $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVforecast", 0); 
-  push @$daref, "LastHourPVforecast:".$pvfc." Wh:".$ts1;
+  push @$daref, "LastHourPVforecast<>".$pvfc." Wh<>".$ts1;
   
   $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", 0);
-  push @$daref, "LastHourPVreal:".$pvrl." Wh:".$ts1;
+  push @$daref, "LastHourPVreal<>".$pvrl." Wh<>".$ts1;
   
   $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
-  push @$daref, "LastHourGridconsumptionReal:".$gcon." Wh:".$ts1;
+  push @$daref, "LastHourGridconsumptionReal<>".$gcon." Wh<>".$ts1;
   
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
@@ -1438,13 +1438,13 @@ sub _additionalActivities {
           $ts   = $date." 23:59:59";
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", 0);  
-          push @$daref, "LastHourPVforecast:".$pvfc.":".$ts1;
+          push @$daref, "LastHourPVforecast<>".$pvfc."<>".$ts1;
           
           $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", 0);
-          push @$daref, "LastHourPVreal:".$pvrl.":".$ts1;
+          push @$daref, "LastHourPVreal<>".$pvrl."<>".$ts1;
           
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
-          push @$daref, "LastHourGridconsumptionReal:".$gcon.":".$ts1;
+          push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts1;
           
           deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
@@ -1515,9 +1515,8 @@ sub _transferDWDForecastValues {
       $epoche          = $t + (3600*$num);                                                      
       my ($ta,$realts) = TimeAdjust ($epoche);
       
-      # $realts          =~ s/:/<>/gx;
-      # push @$daref, "CurrentHourPVforecast:".$calcpv." Wh:".$realts if($num == 0);
-      #push @$daref, "${time_str}_Time:"      .$ta;
+      # push @$daref, "CurrentHourPVforecast<>".$calcpv." Wh<>".$realts if($num == 0);
+      #push @$daref, "${time_str}_Time<>"      .$ta;
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
       $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
@@ -1528,7 +1527,7 @@ sub _transferDWDForecastValues {
       } 
             
       if($fd == 0 && int $calcpv > 0) {                                                       # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
-          push @$daref, "Today_Hour".sprintf("%02d",$fh1)."_PVforecast:$calcpv Wh";             
+          push @$daref, "Today_Hour".sprintf("%02d",$fh1)."_PVforecast<>$calcpv Wh";             
       }
       
       if($fd == 0 && $fh1) {
@@ -1540,7 +1539,7 @@ sub _transferDWDForecastValues {
       }
   }
   
-  push @$daref, ".lastupdateForecastValues:".$t;                                              # Statusreading letzter DWD update
+  push @$daref, ".lastupdateForecastValues<>".$t;                                              # Statusreading letzter DWD update
       
 return;
 }
@@ -1567,20 +1566,15 @@ sub _transferWeatherValues {
   my $fc1_SunRise = ReadingsVal($fcname, "fc1_SunRise", "00:00");                               # Sonnenaufgang morgen   
   my $fc1_SunSet  = ReadingsVal($fcname, "fc1_SunSet",  "00:00");                               # Sonnenuntergang morgen 
   
-  $fc0_SunRise    =~ s/:/<>/x;
-  $fc0_SunSet     =~ s/:/<>/x;
-  $fc1_SunRise    =~ s/:/<>/x;
-  $fc1_SunSet     =~ s/:/<>/x;
+  push @$daref, "Today_SunRise<>".   $fc0_SunRise;
+  push @$daref, "Today_SunSet<>".    $fc0_SunSet;
+  push @$daref, "Tomorrow_SunRise<>".$fc1_SunRise;
+  push @$daref, "Tomorrow_SunSet<>". $fc1_SunSet;
   
-  push @$daref, "Today_SunRise:".   $fc0_SunRise;
-  push @$daref, "Today_SunSet:".    $fc0_SunSet;
-  push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
-  push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
-  
-  my $fc0_SunRise_round = sprintf "%02d", (split "<>", $fc0_SunRise)[0];
-  my $fc0_SunSet_round  = sprintf "%02d", (split "<>", $fc0_SunSet)[0];
-  my $fc1_SunRise_round = sprintf "%02d", (split "<>", $fc1_SunRise)[0];
-  my $fc1_SunSet_round  = sprintf "%02d", (split "<>", $fc1_SunSet)[0];
+  my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
+  my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
+  my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
+  my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
   
   for my $num (0..46) {                      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
@@ -1658,7 +1652,7 @@ sub _transferInverterValues {
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
   my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
       
-  push @$daref, "Current_PV:". $pv." W";                                          
+  push @$daref, "Current_PV<>". $pv." W";                                          
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   
   my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
@@ -1696,7 +1690,7 @@ sub _transferInverterValues {
       }
       
       my $nhour = $chour+1;
-      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal:".$ethishour." Wh";       
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal<>".$ethishour." Wh";       
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;          # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{ethishour} = $ethishour;
@@ -1737,7 +1731,7 @@ sub _transferMeterValues {
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
     
-  push @$daref, "Current_GridConsumption:".$co." W";
+  push @$daref, "Current_GridConsumption<>".$co." W";
   $data{$type}{$name}{current}{gridconsumption} = $co;                                        # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
       
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
@@ -1775,7 +1769,7 @@ sub _transferMeterValues {
       }
       
       my $nhour = $chour+1;
-      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridConsumption:".$gctotthishour." Wh";
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridConsumption<>".$gctotthishour." Wh";
       $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                 # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{gctotthishour} = $gctotthishour;
@@ -1805,16 +1799,14 @@ sub _evaluateThresholds {
   my ($a,$h) = parseParams ($pt);
   
   for my $key (keys %{$h}) {
-      my ($knum,$cond) = $key =~ /^tr([0-9]+)(on|off)$/x;
+      my ($knum,$cond) = $key =~ /^([0-9]+)(on|off)$/x;
       
       if($cond eq "on" && $gen > $h->{$key}) {
-          push @$daref, "powerTrigger_${knum}_on:1"  if(!ReadingsVal($name, "powerTrigger_${knum}_on",  0));
-          push @$daref, "powerTrigger_${knum}_off:0" if(ReadingsVal ($name, "powerTrigger_${knum}_off", 0));
+          push @$daref, "powerTrigger_${knum}<>on"  if(ReadingsVal($name, "powerTrigger_${knum}", "off") eq "off");
       }
       
       if($cond eq "off" && $gen < $h->{$key}) {
-          push @$daref, "powerTrigger_${knum}_off:1" if(!ReadingsVal($name, "powerTrigger_${knum}_off", 0));
-          push @$daref, "powerTrigger_${knum}_on:0"  if(ReadingsVal ($name, "powerTrigger_${knum}_on",  0));
+          push @$daref, "powerTrigger_${knum}<>off" if(ReadingsVal($name, "powerTrigger_${knum}", "on") eq "on");
       }
   }
   
@@ -1856,11 +1848,11 @@ sub _calcSummaries {
       $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
   }
   
-  push @$daref, "NextHours_Sum00_PVforecast:".(int $thforecast)." Wh";
-  push @$daref, "NextHours_Sum04_PVforecast:".(int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDayPVforecast:".       (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PVforecast:".       (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast:".          (int $todaySum->{PV}).     " Wh";
+  push @$daref, "NextHours_Sum00_PVforecast<>".(int $thforecast)." Wh";
+  push @$daref, "NextHours_Sum04_PVforecast<>".(int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDayPVforecast<>".       (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast<>".       (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast<>".          (int $todaySum->{PV}).     " Wh";
   
 return;
 }
@@ -3458,9 +3450,7 @@ sub createReadingsFromArray {
   readingsBeginUpdate($hash);
   
   for my $elem (@$daref) {
-      my ($rn,$rval,$ts) = split ":", $elem, 3;
-      $rval              =~ s/<>/:/gx;
-      $ts                =~ s/<>/:/gx if(defined $ts);
+      my ($rn,$rval,$ts) = split "<>", $elem, 3;
       readingsBulkUpdate($hash, $rn, $rval, undef, $ts);      
   }
 
@@ -3863,6 +3853,26 @@ werden weitere SolarForecast Devices zugeordnet.
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; moduleTiltAngle Ostdach=40 Südgarage=60 S3=30 <br>
+      </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="powerTrigger"></a>
+      <li><b>powerTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br> 
+      Sobald die aktuelle PV Erzeugung (Reading Current_PV) die angegebenen Schwellenwerte über- bzw. unterschreitet, werden
+      die jeweiligen Trigger ausgelöst. <br>
+      Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
+      definiert werden (siehe Beispiel). <br>
+      Überschreitet die aktuelle PV Erzeugung eine definierte <b>Xon-Bedingung</b>, wird das Reading <b>powerTrigger_X = on</b> 
+      erstellt/gesetzt. Unterschreitet die aktuelle PV Erzeugung eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
+      <b>powerTrigger_X = off</b> erstellt/gesetzt. <br>
+      <br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; powerTrigger 1on=1000 1off=500 2on=2000 2off=1000 3on=1600 4off=1100<br>
       </ul>
       </li>
     </ul>
