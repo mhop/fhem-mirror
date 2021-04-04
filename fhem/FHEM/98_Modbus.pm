@@ -272,7 +272,7 @@ BEGIN {                         # functions / variables needed from package main
 
 };
 
-my $Module_Version = '4.4.01 - 18.3.2021';
+my $Module_Version = '4.4.02 - 31.3.2021';
 
 my $PhysAttrs = join (' ', 
         'queueDelay',
@@ -3464,7 +3464,9 @@ sub PackObj {
             $counter++;
         } 
         else {
-            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PackObj pack for $objCombi value $val with code $unpack created warning: @_"; };
+            local $SIG{__WARN__} = sub { Log3 $name, 3, "$name: PackObj pack for $objCombi " .
+                (defined ($val) ? "value $val" : "undefined value") . 
+                " $val with code $unpack created warning: @_"; };
             my $dataPart = pack ($unpack, $val);                # use unpack code, might create warnings
             Log3 $name, 5, "$name: PackObj packed $val with pack code $unpack to " . unpack ('H*', $dataPart);
             $dataPart =  substr ($dataPart . pack ('x' . $len * 2, undef), 0, $len * 2);
