@@ -246,8 +246,8 @@ my $AttrList = join (' ',
       
       'replacement[0-9]+Regex',
       'replacement[0-9]+Mode:reading,internal,text,expression,key',   # defaults to text
-      'replacement[0-9]+Value',                                   # device:reading, device:internal, text, replacement expression
-      '[gs]et[0-9]*Replacement[0-9]+Value',                       # can overwrite a global replacement value - todo: auch für auth?
+      'replacement[0-9]+Value:textField-long',                        # device:reading, device:internal, text, replacement expression
+      '[gs]et[0-9]*Replacement[0-9]+Value:textField-long',            # can overwrite a global replacement value - todo: auch für auth?
       
       'do_not_notify:1,0', 
       'disable:0,1',
