@@ -4157,13 +4157,13 @@ werden weitere SolarForecast Devices zugeordnet.
        <br>
        
        <a name="headerDetail"></a>
-       <li><b>headerDetail &lt;all | co | pv | pvco | statusLink&gt; </b><br>
+       <li><b>headerDetail </b><br>
          Detailiierungsgrad der Kopfzeilen. <br>
          (default: all)
          
          <ul>   
          <table>  
-         <colgroup> <col width=15%> <col width=85%> </colgroup>
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
             <tr><td> <b>all</b>        </td><td>Anzeige Erzeugung (PV), Verbrauch (CO), Link zur Device Detailanzeige + Aktualisierungszeit (default) </td></tr>
             <tr><td> <b>co</b>         </td><td>nur Verbrauch (CO)                                                                                    </td></tr>
             <tr><td> <b>pv</b>         </td><td>nur Erzeugung (PV)                                                                                    </td></tr>
