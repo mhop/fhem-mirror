@@ -3149,8 +3149,8 @@ sub calcVariance {
           Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h).":".$factor." (automatic - old factor<> $oldfac)";
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc:done";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
   }
   
   createReadingsFromArray ($hash, \@da, 1);
@@ -3903,7 +3903,7 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="reset"></a>
       <li><b>reset </b> <br> 
-       Löscht die aus der Drop-Down Liste gewählte Datenquelle. <br>    
+       Löscht die aus der Drop-Down Liste gewählte Datenquelle bzw. zu der Funktion gehörende Readings. <br>    
       </li>
     </ul>
     <br>
