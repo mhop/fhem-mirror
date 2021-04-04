@@ -117,9 +117,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
-  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalEvents ",
+  "0.26.0" => "02.04.2021  rename attr maxPV to maxValBeam, bugfix in _additionalActivities ",
   "0.25.0" => "28.03.2021  changes regarding perlcritic, new getter valCurrent ",
   "0.24.0" => "26.03.2021  the language setting of the system is taken into account in the weather texts ".
                            "rename weatherColor_night to weatherColorNight, history_hour to historyHour ",
@@ -162,6 +163,7 @@ my %hset = (                                                                # Ha
   inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
+  powerTrigger            => { fn => \&_setpowerTrigger           },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_06   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_07   => { fn => \&_setpvCorrectionFactor     },
@@ -528,8 +530,9 @@ sub Set {
              "modulePeakString ".
              "moduleTiltAngle ".
              "moduleDirection ".
+             "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev,inverterStrings,pvCorrection,pvHistory ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev,inverterStrings,powerTrigger,pvCorrection,pvHistory ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -593,7 +596,7 @@ sub _setinverterDevice {                 ## no critic "not used"
   }
   
   if(!$h->{pv} || !$h->{etotal}) {
-      return qq{The syntax of "$opt" isn't right. Please consider the commandref.};
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }  
 
   delete $hash->{HELPER}{INITETOTAL};
@@ -639,11 +642,42 @@ sub _setmeterDevice {                    ## no critic "not used"
   }
   
   if(!$h->{gcon} || !$h->{contotal}) {
-      return qq{The syntax of "$opt" isn't right. Please consider the commandref.};
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }  
 
   readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
   createNotifyDev     ($hash);
+
+return;
+}
+
+################################################################
+#                      Setter powerTrigger
+################################################################
+sub _setpowerTrigger {                    ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+  
+  my ($a,$h) = parseParams ($arg);
+  
+  if(!$h) {
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }
+  
+  for my $key (keys %{$h}) {
+      if($key !~ /^tr[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
+          return qq{The key "$key" is invalid. Please consider the commandref.};
+      }
+  }
+
+  readingsSingleUpdate($hash, "powerTrigger", $arg, 1);
 
 return;
 }
@@ -820,6 +854,11 @@ sub _setreset {                          ## no critic "not used"
   
   if($prop eq "pvCorrection") {
       deleteReadingspec   ($hash, "pvCorrectionFactor_.*");
+      return;
+  }
+  
+  if($prop eq "powerTrigger") {
+      deleteReadingspec   ($hash, "powerTrigger.*");
       return;
   }
 
@@ -1210,13 +1249,13 @@ sub centralTask {
       Log3 ($name, 4, "$name - ################################################################");
       Log3 ($name, 4, "$name - current hour of day: ".($chour+1));
       
-      _additionalEvents          ($params);                                                        # zusätzliche Events generieren + Zusatzaufgaben
+      _additionalActivities      ($params);                                                        # zusätzliche Events generieren + Sonderaufgaben
       _transferWeatherValues     ($params);                                                        # Wetterwerte übertragen
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
-      _transferMeterValues       ($params);
-            
-      calcSummaries ($hash, $chour, \@da);                                                         # Zusammenfassungen erstellen
+      _transferMeterValues       ($params);                                                        # Energy Meter auswerten    
+      _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren
+      _calcSummaries ($hash, $chour, \@da);                                                        # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
@@ -1369,7 +1408,7 @@ return;
 #     Zusätzliche Readings/ Events für Logging generieren und
 #     Sonderaufgaben !
 ################################################################
-sub _additionalEvents {
+sub _additionalActivities {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
@@ -1377,49 +1416,40 @@ sub _additionalEvents {
   my $daref = $paref->{daref};
   my $t     = $paref->{t};                                  # Epoche Zeit
   
-  my $no_replace = 1;                                       # Ersetzung von Events durch das Attribut eventMap verhindern
-  my $date       = strftime "%Y-%m-%d", localtime($t);      # aktuelles Datum
-  my $mseclog    = AttrVal("global", "mseclog", 0);
-  my $tsmsec     = $mseclog ? ".000" : q{};
+  my $date  = strftime "%Y-%m-%d", localtime($t);           # aktuelles Datum
   
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
-  #$ts   = $date." ".sprintf("%02d",$chour).":00:00".$tsmsec;
   $ts1  = $date." ".sprintf("%02d",$chour)."<>00<>00";
   
   $pvfc = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVforecast", 0); 
   push @$daref, "LastHourPVforecast:".$pvfc." Wh:".$ts1;
-  #__addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
   
   $pvrl = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_PVreal", 0);
   push @$daref, "LastHourPVreal:".$pvrl." Wh:".$ts1;
-  #__addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
   
   $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   push @$daref, "LastHourGridconsumptionReal:".$gcon." Wh:".$ts1;
-  #__addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
   
   my $tlim = "00";                                                                            # bestimmte Aktionen                    
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                    # Vortag (2 h Differenz reichen aus)
-          #$ts   = $date." 23:59:59".$tsmsec;
           $ts   = $date." 23:59:59";
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", 0);  
           push @$daref, "LastHourPVforecast:".$pvfc.":".$ts1;
-          #__addCHANGED ($hash, "PVforecast: ".$pvfc, $ts) if(defined $pvfc);
           
           $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", 0);
           push @$daref, "LastHourPVreal:".$pvrl.":".$ts1;
-          #__addCHANGED ($hash, "PVreal: ".$pvrl, $ts) if(defined $pvrl);
           
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
           push @$daref, "LastHourGridconsumptionReal:".$gcon.":".$ts1;
-          #__addCHANGED ($hash, "GridconsumptionReal: ".$gcon, $ts) if(defined $gcon);
           
           deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
+          deleteReadingspec ($hash, "powerTrigger_.*");
+          
           delete $hash->{HELPER}{INITETOTAL};
           delete $hash->{HELPER}{INITCONTOTAL};
           $hash->{HELPER}{H00DONE} = 1;
@@ -1428,8 +1458,6 @@ sub _additionalEvents {
   else {
       delete $hash->{HELPER}{H00DONE};
   }
-
-  # my $ret = DoTrigger($name, undef, $no_replace);
   
 return;
 }
@@ -1549,10 +1577,10 @@ sub _transferWeatherValues {
   push @$daref, "Tomorrow_SunRise:".$fc1_SunRise;
   push @$daref, "Tomorrow_SunSet:". $fc1_SunSet;
   
-  my $fc0_SunRise_round = sprintf "%02d", (split ":", $fc0_SunRise)[0];
-  my $fc0_SunSet_round  = sprintf "%02d", (split ":", $fc0_SunSet)[0];
-  my $fc1_SunRise_round = sprintf "%02d", (split ":", $fc1_SunRise)[0];
-  my $fc1_SunSet_round  = sprintf "%02d", (split ":", $fc1_SunSet)[0];
+  my $fc0_SunRise_round = sprintf "%02d", (split "<>", $fc0_SunRise)[0];
+  my $fc0_SunSet_round  = sprintf "%02d", (split "<>", $fc0_SunSet)[0];
+  my $fc1_SunRise_round = sprintf "%02d", (split "<>", $fc1_SunRise)[0];
+  my $fc1_SunSet_round  = sprintf "%02d", (split "<>", $fc1_SunSet)[0];
   
   for my $num (0..46) {                      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
@@ -1757,6 +1785,83 @@ sub _transferMeterValues {
       delete $paref->{histname};
   }   
       
+return;
+}
+
+################################################################
+#     Schwellenwerte auswerten und signalisieren
+################################################################
+sub _evaluateThresholds {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $daref = $paref->{daref};
+  
+  my $gen = CurrentVal ($hash, "generation", 0);            # aktuelle PV Erzeugung
+  my $pt  = ReadingsVal($name, "powerTrigger", "");
+  
+  return if(!$pt);
+  
+  my ($a,$h) = parseParams ($pt);
+  
+  for my $key (keys %{$h}) {
+      my ($knum,$cond) = $key =~ /^tr([0-9]+)(on|off)$/x;
+      
+      if($cond eq "on" && $gen > $h->{$key}) {
+          push @$daref, "powerTrigger_${knum}_on:1"  if(!ReadingsVal($name, "powerTrigger_${knum}_on",  0));
+          push @$daref, "powerTrigger_${knum}_off:0" if(ReadingsVal ($name, "powerTrigger_${knum}_off", 0));
+      }
+      
+      if($cond eq "off" && $gen < $h->{$key}) {
+          push @$daref, "powerTrigger_${knum}_off:1" if(!ReadingsVal($name, "powerTrigger_${knum}_off", 0));
+          push @$daref, "powerTrigger_${knum}_on:0"  if(ReadingsVal ($name, "powerTrigger_${knum}_on",  0));
+      }
+  }
+  
+return;
+}
+
+################################################################
+#               Zusammenfassungen erstellen
+################################################################
+sub _calcSummaries {            
+  my $hash  = shift;
+  my $chour = shift;                          # aktuelle Stunde
+  my $daref = shift;
+  
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  my $next4HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  
+  my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
+  my $thforecast       = NexthoursVal ($hash, "NextHour00", "pvforecast", 0);
+  
+  $next4HoursSum->{PV} = $thforecast;
+  $restOfDaySum->{PV}  = $thforecast;
+  
+  for my $h (1..47) {
+      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$h)});
+      my $pvfc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
+         
+      $next4HoursSum->{PV} += $pvfc if($h <= 3);
+      $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
+      $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
+  }
+  
+  for my $th (1..24) {
+      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
+  }
+  
+  push @$daref, "NextHours_Sum00_PVforecast:".(int $thforecast)." Wh";
+  push @$daref, "NextHours_Sum04_PVforecast:".(int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDayPVforecast:".       (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast:".       (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast:".          (int $todaySum->{PV}).     " Wh";
+  
 return;
 }
 
@@ -3077,6 +3182,10 @@ sub calcFromHistory {
   my $day   = strftime "%d", localtime($t);                                               # aktueller Tag
   my $pvhh  = $data{$type}{$name}{pvhist};
   
+  for my $key (keys %{$pvhh}) {                                                           # evtl. vorhandene leere Schlüssel entfernen
+      delete $data{$type}{$name}{pvhist}{$key} if(!$key);
+  }
+  
   my $calcd = AttrVal($name, "numHistDays", $calcmaxd);
   
   my @k     = sort {$a<=>$b} keys %{$pvhh};
@@ -3316,50 +3425,6 @@ return $sc;
 }
 
 ################################################################
-#               Zusammenfassungen erstellen
-################################################################
-sub calcSummaries {            
-  my $hash  = shift;
-  my $chour = shift;                          # aktuelle Stunde
-  my $daref = shift;
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-
-  my $next4HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
-  
-  my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
-  my $thforecast       = NexthoursVal ($hash, "NextHour00", "pvforecast", 0);
-  
-  $next4HoursSum->{PV} = $thforecast;
-  $restOfDaySum->{PV}  = $thforecast;
-  
-  for my $h (1..47) {
-      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$h)});
-      my $pvfc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
-         
-      $next4HoursSum->{PV} += $pvfc if($h <= 3);
-      $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
-      $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
-  }
-  
-  for my $th (1..24) {
-      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
-  }
-  
-  push @$daref, "NextHours_Sum00_PVforecast:".(int $thforecast)." Wh";
-  push @$daref, "NextHours_Sum04_PVforecast:".(int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDayPVforecast:".       (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PVforecast:".       (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast:".          (int $todaySum->{PV}).     " Wh";
-  
-return;
-}
-
-################################################################
 #  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix 
 #  Timestamp umwandeln
 ################################################################
@@ -3563,6 +3628,32 @@ sub NexthoursVal {
 return $def;
 }
 
+################################################################
+#    Wert des current-Hash zurückliefern
+#    Usage:
+#    CurrentVal ($hash, $key, $def)
+#
+#    $key:    generation      - aktuelle PV Erzeugung
+#             gridconsumption - aktueller Netzbezug
+#    $def:    Defaultwert
+#
+################################################################
+sub CurrentVal {
+  my $hash = shift;
+  my $key  = shift;
+  my $def  = shift;  
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if(defined($data{$type}{$name}{current})                    &&
+     defined($data{$type}{$name}{current}{$key})) {
+     return  $data{$type}{$name}{current}{$key};
+  }
+
+return $def;
+}
+
 1;
 
 =pod
@@ -3654,12 +3745,14 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="currentInverterDev"></a>
       <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Summe Energieerzeugung&gt;:&lt;Einheit&gt;  </b> <br> 
-      Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. 
+      Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. Es kann auch ein Dummy Device mit 
+      entsprechenden Readings sein. Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt
+      dieses Device mit den entsprechenden Readings an.
       <br>
       
       <ul>   
        <table>  
-       <colgroup> <col width=10%> <col width=90%> </colgroup>
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
           <tr><td> <b>pv</b>       </td><td>Reading mit aktueller PV-Leistung                                                                                              </td></tr>
           <tr><td> <b>etotal</b>   </td><td>ein stetig aufsteigender Zähler der gesamten erzeugten Energie </td></tr>
           <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                            </td></tr>
@@ -3680,7 +3773,8 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="currentMeterDev"></a>
       <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; contotal=&lt;Reading Summe Netzbezug&gt;:&lt;Einheit&gt;</b> <br> 
-      Legt ein beliebiges Device zur Messung des Energiebezugs fest.
+      Legt ein beliebiges Device zur Messung des Energiebezugs fest. Es kann auch ein Dummy Device mit entsprechenden Readings 
+      sein.
       <br>
       
       <ul>   
