@@ -334,6 +334,7 @@ my $definve     = 98.3;                                                         
 my $kJtokWh     = 0.00027778;                                                    # Umrechnungsfaktor kJ in kWh
 my $defmaxvar   = 0.5;                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor
 my $definterval = 70;                                                            # Standard Abfrageintervall
+my $defslidenum = 3;                                                             # max. Anzahl der Arrayelemente in Schieberegistern
 
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
@@ -1194,7 +1195,9 @@ sub centralTask {
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
   for my $i (keys %{$data{$type}{$name}{pvhist}}) {
       delete $data{$type}{$name}{pvhist}{$i}{"00"};
+      delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
   }
+  
   deleteReadingspec ($hash, "Today_Hour.*_Consumption");
   deleteReadingspec ($hash, "ThisHour_.*");
   deleteReadingspec ($hash, "Today_PV");
@@ -1655,6 +1658,11 @@ sub _transferInverterValues {
   push @$daref, "Current_PV<>". $pv." W";                                          
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   
+  push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
+  while (scalar @{$data{$type}{$name}{current}{genslidereg}} > $defslidenum) {
+      shift @{$data{$type}{$name}{current}{genslidereg}};
+  }
+  
   my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
   my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
   
@@ -1732,8 +1740,8 @@ sub _transferMeterValues {
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
     
   push @$daref, "Current_GridConsumption<>".$co." W";
-  $data{$type}{$name}{current}{gridconsumption} = $co;                                        # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      
+  $data{$type}{$name}{current}{gridconsumption} = $co;                                        # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
+  
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
   my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
    
@@ -1790,22 +1798,38 @@ sub _evaluateThresholds {
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $daref = $paref->{daref};
-  
-  my $gen = CurrentVal ($hash, "generation", 0);            # aktuelle PV Erzeugung
-  my $pt  = ReadingsVal($name, "powerTrigger", "");
+   
+  my $pt    = ReadingsVal($name, "powerTrigger", "");
   
   return if(!$pt);
+  
+  my $aaref = CurrentVal ($hash, "genslidereg", ""); 
+  my @aa    = @{$aaref} if (ref $aaref eq "ARRAY");
+  
+  return if(scalar @aa < $defslidenum);
+  
+  my $gen      = $aa[0];
+  my ($gt,$lt) = (1,1);
+  
+  for my $elem (@aa) {
+      if($elem < $gen) {
+          $gt = 0;
+      }
+      if($elem > $gen) {
+          $lt = 0;
+      }
+  }
   
   my ($a,$h) = parseParams ($pt);
   
   for my $key (keys %{$h}) {
       my ($knum,$cond) = $key =~ /^([0-9]+)(on|off)$/x;
       
-      if($cond eq "on" && $gen > $h->{$key}) {
+      if($cond eq "on" && $gt && $gen > $h->{$key}) {
           push @$daref, "powerTrigger_${knum}<>on"  if(ReadingsVal($name, "powerTrigger_${knum}", "off") eq "off");
       }
       
-      if($cond eq "off" && $gen < $h->{$key}) {
+      if($cond eq "off" && $lt && $gen < $h->{$key}) {
           push @$daref, "powerTrigger_${knum}<>off" if(ReadingsVal($name, "powerTrigger_${knum}", "on") eq "on");
       }
   }
@@ -3174,10 +3198,6 @@ sub calcFromHistory {
   my $day   = strftime "%d", localtime($t);                                               # aktueller Tag
   my $pvhh  = $data{$type}{$name}{pvhist};
   
-  for my $key (keys %{$pvhh}) {                                                           # evtl. vorhandene leere Schlüssel entfernen
-      delete $data{$type}{$name}{pvhist}{$key} if(!$key);
-  }
-  
   my $calcd = AttrVal($name, "numHistDays", $calcmaxd);
   
   my @k     = sort {$a<=>$b} keys %{$pvhh};
@@ -3240,7 +3260,7 @@ sub setPVhistory {
   
   my $type = $hash->{TYPE};
   my $val  = q{};
-  
+
   if($histname eq "pvrl") {                                                                       # realer Energieertrag
       $val = $ethishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;  
@@ -3366,7 +3386,13 @@ sub listDataPool {
           return qq{current values cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          $sq .= $idx." => ".$h->{$idx}."\n";  
+          if (ref $h->{$idx} ne "ARRAY") {
+              $sq .= $idx." => ".$h->{$idx}."\n";  
+          }
+          else {
+             my $aser = join " ",@{$h->{$idx}};
+             $sq .= $idx." => ".$aser."\n";               
+          }     
       }
   }
       
@@ -3636,7 +3662,7 @@ sub CurrentVal {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  if(defined($data{$type}{$name}{current})                    &&
+  if(defined($data{$type}{$name}{current})       &&
      defined($data{$type}{$name}{current}{$key})) {
      return  $data{$type}{$name}{current}{$key};
   }
@@ -3861,13 +3887,13 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="powerTrigger"></a>
       <li><b>powerTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br> 
-      Sobald die aktuelle PV Erzeugung (Reading Current_PV) die angegebenen Schwellenwerte über- bzw. unterschreitet, werden
-      die jeweiligen Trigger ausgelöst. <br>
-      Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
-      definiert werden (siehe Beispiel). <br>
-      Überschreitet die aktuelle PV Erzeugung eine definierte <b>Xon-Bedingung</b>, wird das Reading <b>powerTrigger_X = on</b> 
-      erstellt/gesetzt. Unterschreitet die aktuelle PV Erzeugung eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
+      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter PV Erzeugungswerte. <br>
+      Überschreiten die letzten drei Messungen der PV Erzeugung eine definierte <b>Xon-Bedingung</b>, wird das Reading 
+      <b>powerTrigger_X = on</b> erstellt/gesetzt. 
+      Unterschreiten die letzten drei Messungen der PV Erzeugung eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
       <b>powerTrigger_X = off</b> erstellt/gesetzt. <br>
+      Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
+      definiert werden. <br>
       <br>
       
       <ul>
