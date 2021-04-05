@@ -1804,32 +1804,29 @@ sub _evaluateThresholds {
   return if(!$pt);
   
   my $aaref = CurrentVal ($hash, "genslidereg", ""); 
-  my @aa    = @{$aaref} if (ref $aaref eq "ARRAY");
+  my @aa    = ();
+  @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
   
   return if(scalar @aa < $defslidenum);
   
-  my $gen      = $aa[0];
-  my ($gt,$lt) = (1,1);
-  
-  for my $elem (@aa) {
-      if($elem < $gen) {
-          $gt = 0;
-      }
-      if($elem > $gen) {
-          $lt = 0;
-      }
-  }
+  my $gen1   = $aa[0];
+  my $gen2   = $aa[1];
+  my $gen3   = $aa[2];
   
   my ($a,$h) = parseParams ($pt);
   
   for my $key (keys %{$h}) {
       my ($knum,$cond) = $key =~ /^([0-9]+)(on|off)$/x;
       
-      if($cond eq "on" && $gt && $gen > $h->{$key}) {
+      if($cond eq "on" && $gen1 > $h->{$key}) {
+          next if($gen2 < $h->{$key});
+          next if($gen3 < $h->{$key});             
           push @$daref, "powerTrigger_${knum}<>on"  if(ReadingsVal($name, "powerTrigger_${knum}", "off") eq "off");
       }
       
-      if($cond eq "off" && $lt && $gen < $h->{$key}) {
+      if($cond eq "off" && $gen1 < $h->{$key}) {
+          next if($gen2 > $h->{$key});
+          next if($gen3 > $h->{$key});
           push @$daref, "powerTrigger_${knum}<>off" if(ReadingsVal($name, "powerTrigger_${knum}", "on") eq "on");
       }
   }
@@ -3739,7 +3736,8 @@ werden weitere SolarForecast Devices zugeordnet.
   <ul>
     <ul>
       <a name="currentForecastDev"></a>
-      <li><b>currentForecastDev </b> <br> 
+      <li><b>currentForecastDev </b> <br><br> 
+      
       Legt das Device (Typ DWD_OpenData) fest, welches die Daten der solaren Vorhersage liefert. Ist noch kein Device dieses Typs
       vorhanden, muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
@@ -3760,7 +3758,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Summe Energieerzeugung&gt;:&lt;Einheit&gt;  </b> <br> 
+      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Summe Energieerzeugung&gt;:&lt;Einheit&gt;  </b> <br><br>  
+      
       Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. Es kann auch ein Dummy Device mit 
       entsprechenden Readings sein. Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt
       dieses Device mit den entsprechenden Readings an.
@@ -3788,7 +3787,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; contotal=&lt;Reading Summe Netzbezug&gt;:&lt;Einheit&gt;</b> <br> 
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; contotal=&lt;Reading Summe Netzbezug&gt;:&lt;Einheit&gt;</b> <br><br> 
+      
       Legt ein beliebiges Device zur Messung des Energiebezugs fest. Es kann auch ein Dummy Device mit entsprechenden Readings 
       sein.
       <br>
@@ -3814,7 +3814,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="inverterStrings"></a>
-      <li><b>inverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br> 
+      <li><b>inverterStrings &lt;Stringname1&gt;[,&lt;Stringname2&gt;,&lt;Stringname3&gt;,...] </b> <br><br>  
+      
       Bezeichnungen der am Wechselrichter aktiven Strings. Diese Bezeichnungen werden als Schlüssel in den weiteren 
       Settings verwendet. <br><br>
       
@@ -3828,7 +3829,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="modulePeakString"></a>
-      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br> 
+      <li><b>modulePeakString &lt;Stringname1&gt;=&lt;Peak&gt; [&lt;Stringname2&gt;=&lt;Peak&gt; &lt;Stringname3&gt;=&lt;Peak&gt; ...] </b> <br><br> 
+      
       Die Peakleistung des Strings "StringnameX" in kWp. Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br><br>
       
@@ -3842,7 +3844,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="moduleDirection"></a>
-      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br> 
+      <li><b>moduleDirection &lt;Stringname1&gt;=&lt;dir&gt; [&lt;Stringname2&gt;=&lt;dir&gt; &lt;Stringname3&gt;=&lt;dir&gt; ...] </b> <br><br>  
+      
       Ausrichtung &lt;dir&gt; der Solarmodule im String "StringnameX". Der Stringname ist ein Schlüsselwert des 
       Readings <b>inverterStrings</b>. <br>
       Die Richtungsangabe &lt;dir&gt; kann eine der folgenden Werte sein: <br><br>
@@ -3872,7 +3875,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="moduleTiltAngle"></a>
-      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br> 
+      <li><b>moduleTiltAngle &lt;Stringname1&gt;=&lt;Winkel&gt; [&lt;Stringname2&gt;=&lt;Winkel&gt; &lt;Stringname3&gt;=&lt;Winkel&gt; ...] </b> <br><br>  
+      
       Neigungswinkel der Solarmodule. Der Stringname ist ein Schlüsselwert des Readings <b>inverterStrings</b>. <br>
       Mögliche Neigungswinkel sind: 0,10,20,30,40,45,50,60,70,80,90 (0 = waagerecht, 90 = senkrecht). <br><br>
       
@@ -3886,8 +3890,9 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="powerTrigger"></a>
-      <li><b>powerTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br> 
-      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter PV Erzeugungswerte. <br>
+      <li><b>powerTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>  
+      
+      Generiert Trigger bei Über- bzw. Unterschreitung bestimmter PV Erzeugungswerte (Current_PV). <br>
       Überschreiten die letzten drei Messungen der PV Erzeugung eine definierte <b>Xon-Bedingung</b>, wird das Reading 
       <b>powerTrigger_X = on</b> erstellt/gesetzt. 
       Unterschreiten die letzten drei Messungen der PV Erzeugung eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
@@ -3906,7 +3911,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="pvCorrectionFactor_Auto"></a>
-      <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br> 
+      <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br><br>  
+      
       Schaltet die automatische Vorhersagekorrektur ein / aus. <br>
       Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
       ein Korrekturfaktor der Solarvorhersage berechnet und auf die Erwartung des kommenden Tages angewendet.
@@ -3919,7 +3925,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="pvCorrectionFactor_XX"></a>
-      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br> 
+      <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br> 
+      
       Manueller Korrekturfaktor für die Stunde XX des Tages zur Anpassung der Vorhersage an die individuelle Anlage. <br>
       (default: 1.0)      
       </li>
@@ -3928,7 +3935,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="reset"></a>
-      <li><b>reset </b> <br> 
+      <li><b>reset </b> <br><br> 
+       
        Löscht die aus der Drop-Down Liste gewählte Datenquelle bzw. zu der Funktion gehörende Readings. <br>    
       </li>
     </ul>
@@ -3936,7 +3944,8 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="writeHistory"></a>
-      <li><b>writeHistory </b> <br> 
+      <li><b>writeHistory </b> <br><br> 
+       
        Die vom Device gesammelten historischen PV Daten werden in ein File geschrieben. Dieser Vorgang wird per default 
        regelmäßig im Hintergrund ausgeführt. Im Internal "HISTFILE" wird der Filename und der Zeitpunkt der letzten 
        Speicherung dokumentiert. <br>    
@@ -3952,7 +3961,7 @@ werden weitere SolarForecast Devices zugeordnet.
   <ul>
     <ul>
       <a name="html"></a>
-      <li><b>html </b> <br>  
+      <li><b>html </b> <br>
       Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben.
       </li>      
     </ul>
@@ -3960,7 +3969,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="data"></a>
-      <li><b>data </b> <br>  
+      <li><b>data </b> <br> 
       Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
       </li>      
     </ul>
@@ -3976,7 +3985,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="pvHistory"></a>
-      <li><b>pvHistory </b> <br>  
+      <li><b>pvHistory </b> <br>
       Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und Stunde. 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit 
       von 08 - 09 Uhr. <br><br>
@@ -3995,7 +4004,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="pvCircular"></a>
-      <li><b>pvCircular </b> <br>  
+      <li><b>pvCircular </b> <br>
       Listet die vorhandenen Werte Ringspeicher auf.  
       Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
       Erläuterung der Werte: <br><br>
@@ -4019,7 +4028,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="stringConfig"></a>
-      <li><b>stringConfig </b> <br>  
+      <li><b>stringConfig </b> <br>
       Zeigt die aktuelle Stringkonfiguration. Dabei wird gleichzeitig eine Plausibilitätsprüfung vorgenommen und das Ergebnis
       sowie eventuelle Anweisungen zur Fehlerbehebung ausgegeben. 
       </li>      
@@ -4028,7 +4037,7 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="valCurrent"></a>
-      <li><b>valCurrent </b> <br>  
+      <li><b>valCurrent </b> <br>
       Listet die aktuell ermittelten Werte auf.
       </li>      
     </ul>
@@ -4043,13 +4052,13 @@ werden weitere SolarForecast Devices zugeordnet.
   <ul>
      <ul>
         <a name="alias"></a>
-        <li><b>alias </b><br>
+        <li><b>alias </b> <br>
           In Verbindung mit "showLink" ein beliebiger Anzeigename.
         </li>
         <br>  
        
        <a name="autoRefresh"></a>
-       <li><b>autoRefresh</b><br>
+       <li><b>autoRefresh</b> <br>
          Wenn gesetzt, werden aktive Browserseiten des FHEMWEB-Devices welches das SolarForecast-Device aufgerufen hat, nach der 
          eingestellten Zeit (Sekunden) neu geladen. Sollen statt dessen Browserseiten eines bestimmten FHEMWEB-Devices neu 
          geladen werden, kann dieses Device mit dem Attribut "autoRefreshFW" festgelegt werden.
