@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       SMUtils.pm
 #
-#       (c) 2020 by Heiko Maaz
+#       (c) 2020-2021 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module provides routines for FHEM modules developed for Synology use cases.
@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.22.0   new sub addCHANGED
 # 1.21.0   new sub timestringToTimestamp / createReadingsFromArray
 # 1.20.7   change to defined ... in sub _addSendqueueSimple
 # 1.20.6   delete $hash->{OPMODE} in checkSendRetry
@@ -47,7 +48,7 @@ use FHEM::SynoModules::ErrCodes qw(:all);                                 # Erro
 use GPUtils qw( GP_Import GP_Export ); 
 use Carp qw(croak carp);
 
-use version; our $VERSION = version->declare('1.20.7');
+use version; our $VERSION = version->declare('1.22.0');
 
 use Exporter ('import');
 our @EXPORT_OK = qw(
@@ -55,6 +56,7 @@ our @EXPORT_OK = qw(
                      delClHash
                      delReadings
                      createReadingsFromArray
+                     addCHANGED
                      trim
                      slurpFile
                      moduleVersion
@@ -307,6 +309,33 @@ sub createReadingsFromArray {
   }
 
   readingsEndUpdate($hash, $doevt);
+  
+return;
+}
+
+################################################################
+#     Zusätzliche Events im CHANGED Hash eintragen
+#     $val - Wert für Trigger Event
+#     $ts  - Timestamp für Trigger Event
+################################################################
+sub addCHANGED {
+  my $hash = shift // carp $carpnohash                          && return;
+  my $val  = shift // carp "got no value for event trigger"     && return;
+  my $ts   = shift // carp "got no timestamp for event trigger" && return;
+  
+  if($hash->{CHANGED}) {
+      push @{$hash->{CHANGED}}, $val;
+  } 
+  else {
+      $hash->{CHANGED}[0] = $val;
+  }
+  
+  if($hash->{CHANGETIME}) {
+      push @{$hash->{CHANGETIME}}, $ts;
+  } 
+  else {
+      $hash->{CHANGETIME}[0] = $ts;
+  }
   
 return;
 }
