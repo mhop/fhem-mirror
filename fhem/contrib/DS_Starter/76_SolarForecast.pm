@@ -3929,9 +3929,9 @@ werden weitere SolarForecast Devices zugeordnet.
       
       Generiert Trigger bei Über- bzw. Unterschreitung der 4-Stunden PV Vorhersage (NextHours_Sum04_PVforecast). <br>
       Überschreiten die letzten drei Messungen der 4-Stunden PV Vorhersagen eine definierte <b>Xon-Bedingung</b>, wird das Reading 
-      <b>powerTrigger_X = on</b> erstellt/gesetzt. 
+      <b>energyH4Trigger_X = on</b> erstellt/gesetzt. 
       Unterschreiten die letzten drei Messungen der 4-Stunden PV Vorhersagen eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
-      <b>powerTrigger_X = off</b> erstellt/gesetzt. <br>
+      <b>energyH4Trigger_X = off</b> erstellt/gesetzt. <br>
       Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
       definiert werden. <br>
       <br>
