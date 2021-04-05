@@ -1756,7 +1756,7 @@ sub vitoconnect_getResourceCallback {
                           Log3 $name, 5,
                             "$name - $FieldName" . ".$Key: $Array ($Type)";
 						} else {
-							Log3 $name, 1, "$name - Array Workaround for Property: $FieldName $Key ";
+							Log3 $name, 4, "$name - Array Workaround for Property: $FieldName $Key ";
 						}
                     }
                 }
