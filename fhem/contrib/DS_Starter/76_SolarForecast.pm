@@ -117,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries ",
+  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries, new setter energyH4Trigger ",
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
@@ -164,6 +164,7 @@ my %hset = (                                                                # Ha
   inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
+  energyH4Trigger         => { fn => \&_setenergyH4Trigger        },
   powerTrigger            => { fn => \&_setpowerTrigger           },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_06   => { fn => \&_setpvCorrectionFactor     },
@@ -528,13 +529,14 @@ sub Set {
              "currentForecastDev:$fcd ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
+             "energyH4Trigger:textField-long ".
              "inverterStrings ".
              "modulePeakString ".
              "moduleTiltAngle ".
              "moduleDirection ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev,inverterStrings,powerTrigger,pvCorrection,pvHistory ".
+             "reset:currentForecastDev,currentInverterDev,currentMeterDev,energyH4Trigger,inverterStrings,powerTrigger,pvCorrection,pvHistory ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -680,6 +682,37 @@ sub _setpowerTrigger {                    ## no critic "not used"
   }
 
   readingsSingleUpdate($hash, "powerTrigger", $arg, 1);
+
+return;
+}
+
+################################################################
+#                      Setter energyH4Trigger
+################################################################
+sub _setenergyH4Trigger {                ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+  
+  my ($a,$h) = parseParams ($arg);
+  
+  if(!$h) {
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }
+  
+  for my $key (keys %{$h}) {
+      if($key !~ /^[0-9]+(?:on|off)$/x || $h->{$key} !~ /^[0-9]+$/x) {
+          return qq{The key "$key" is invalid. Please consider the commandref.};
+      }
+  }
+
+  readingsSingleUpdate($hash, "energyH4Trigger", $arg, 1);
 
 return;
 }
@@ -855,12 +888,17 @@ sub _setreset {                          ## no critic "not used"
   }
   
   if($prop eq "pvCorrection") {
-      deleteReadingspec   ($hash, "pvCorrectionFactor_.*");
+      deleteReadingspec ($hash, "pvCorrectionFactor_.*");
       return;
   }
   
   if($prop eq "powerTrigger") {
-      deleteReadingspec   ($hash, "powerTrigger.*");
+      deleteReadingspec ($hash, "powerTrigger.*");
+      return;
+  }
+  
+  if($prop eq "energyH4Trigger") {
+      deleteReadingspec ($hash, "energyH4Trigger.*");
       return;
   }
 
@@ -1663,9 +1701,7 @@ sub _transferInverterValues {
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   
   push @{$data{$type}{$name}{current}{genslidereg}}, $pv;                                     # Schieberegister PV Erzeugung
-  while (scalar @{$data{$type}{$name}{current}{genslidereg}} > $defslidenum) {
-      shift @{$data{$type}{$name}{current}{genslidereg}};
-  }
+  limitArray ($data{$type}{$name}{current}{genslidereg}, $defslidenum);
   
   my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
   my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
@@ -1743,8 +1779,8 @@ sub _transferMeterValues {
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
     
-  push @$daref, "Current_GridConsumption<>".$co." W";
-  $data{$type}{$name}{current}{gridconsumption} = $co;                                        # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
+  push @$daref, "Current_GridConsumption<>".(int $co)." W";
+  $data{$type}{$name}{current}{gridconsumption} = int $co;                                    # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
   
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
   my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
@@ -1804,20 +1840,59 @@ sub _evaluateThresholds {
   my $daref = $paref->{daref};
    
   my $pt    = ReadingsVal($name, "powerTrigger", "");
+  my $eh4t  = ReadingsVal($name, "energyH4Trigger", "");
   
-  return if(!$pt);
+  if ($pt) {  
+      my $aaref = CurrentVal ($hash, "genslidereg", ""); 
+      my @aa    = ();
+      @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
+      
+      if (scalar @aa >= $defslidenum) {  
+          $paref->{taref}  = \@aa;
+          $paref->{tname}  = "powerTrigger";
+          $paref->{tholds} = $pt;
+          
+          __evaluateArray ($paref);
+      }
+  }
   
-  my $aaref = CurrentVal ($hash, "genslidereg", ""); 
-  my @aa    = ();
-  @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
+  if ($eh4t) {  
+      my $aaref = CurrentVal ($hash, "h4fcslidereg", ""); 
+      my @aa    = ();
+      @aa       = @{$aaref} if (ref $aaref eq "ARRAY");
+      
+      if (scalar @aa >= $defslidenum) {    
+          $paref->{taref}  = \@aa;
+          $paref->{tname}  = "energyH4Trigger";
+          $paref->{tholds} = $eh4t;
+          
+          __evaluateArray ($paref);
+      }
+  }
   
-  return if(scalar @aa < $defslidenum);
+  delete $paref->{taref};
+  delete $paref->{tname};
+  delete $paref->{tholds};
   
-  my $gen1   = $aa[0];
-  my $gen2   = $aa[1];
-  my $gen3   = $aa[2];
+return;
+}
+
+################################################################
+#     Threshold-Array auswerten und Readings vorbereiten
+################################################################
+sub __evaluateArray {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $daref  = $paref->{daref};
+  my $taref  = $paref->{taref};          # Referenz zum Threshold-Array
+  my $tname  = $paref->{tname};          # Thresholdname, z.B. powerTrigger
+  my $tholds = $paref->{tholds};         # Triggervorgaben, z.B. aus Reading powerTrigger
+      
+  my $gen1   = @$taref[0];
+  my $gen2   = @$taref[1];
+  my $gen3   = @$taref[2];
   
-  my ($a,$h) = parseParams ($pt);
+  my ($a,$h) = parseParams ($tholds);
   
   for my $key (keys %{$h}) {
       my ($knum,$cond) = $key =~ /^([0-9]+)(on|off)$/x;
@@ -1825,13 +1900,13 @@ sub _evaluateThresholds {
       if($cond eq "on" && $gen1 > $h->{$key}) {
           next if($gen2 < $h->{$key});
           next if($gen3 < $h->{$key});             
-          push @$daref, "powerTrigger_${knum}<>on"  if(ReadingsVal($name, "powerTrigger_${knum}", "off") eq "off");
+          push @$daref, "${tname}_${knum}<>on"  if(ReadingsVal($name, "${tname}_${knum}", "off") eq "off");
       }
       
       if($cond eq "off" && $gen1 < $h->{$key}) {
           next if($gen2 > $h->{$key});
           next if($gen3 > $h->{$key});
-          push @$daref, "powerTrigger_${knum}<>off" if(ReadingsVal($name, "powerTrigger_${knum}", "on") eq "on");
+          push @$daref, "${tname}_${knum}<>off" if(ReadingsVal($name, "${tname}_${knum}", "on") eq "on");
       }
   }
   
@@ -1898,8 +1973,11 @@ sub _calcSummaries {
   }
   
   for my $th (1..24) {
-      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
+      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
   }
+  
+  push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
+  limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
   
   push @$daref, "NextHours_Sum01_PVforecast<>".(int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".(int $next2HoursSum->{PV})." Wh";
@@ -3449,6 +3527,28 @@ return $sc;
 }
 
 ################################################################
+#  Array auf eine festgelegte Anzahl Elemente beschränken,
+#  Das älteste Element wird entfernt
+#
+#  $href  = Referenz zum Array
+#  $limit = die Anzahl Elemente auf die gekürzt werden soll
+#           (default 3)
+#
+################################################################
+sub limitArray {
+  my $href  = shift;
+  my $limit = shift // 3;  
+  
+  return if(ref $href ne "ARRAY");
+  
+  while (scalar @{$href} > $limit) {
+      shift @{$href};
+  }
+
+return;
+}
+
+################################################################
 #  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix 
 #  Timestamp umwandeln
 ################################################################
@@ -3655,10 +3755,11 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key:   generation      - aktuelle PV Erzeugung
-#         genslidereg     - Schieberegister PV Erzeugung (Array)
-#         gridconsumption - aktueller Netzbezug
-# $def:   Defaultwert
+# $key: generation      - aktuelle PV Erzeugung
+#       genslidereg     - Schieberegister PV Erzeugung (Array)
+#       h4fcslidereg    - Schieberegister 4h PV Forecast (Array)
+#       gridconsumption - aktueller Netzbezug
+# $def: Defaultwert
 #
 ################################################################
 sub CurrentVal {
@@ -3818,6 +3919,27 @@ werden weitere SolarForecast Devices zugeordnet.
         set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W contotal=Bezug_Wirkleistung_Zaehler:kWh <br>
         # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W) und den totalen Bezug im Reading "Bezug_Wirkleistung_Zaehler" (kWh)
       </ul>      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="energyH4Trigger"></a>
+      <li><b>energyH4Trigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>  
+      
+      Generiert Trigger bei Über- bzw. Unterschreitung der 4-Stunden PV Vorhersage (NextHours_Sum04_PVforecast). <br>
+      Überschreiten die letzten drei Messungen der 4-Stunden PV Vorhersagen eine definierte <b>Xon-Bedingung</b>, wird das Reading 
+      <b>powerTrigger_X = on</b> erstellt/gesetzt. 
+      Unterschreiten die letzten drei Messungen der 4-Stunden PV Vorhersagen eine definierte <b>Xoff-Bedingung</b>, wird das Reading 
+      <b>powerTrigger_X = off</b> erstellt/gesetzt. <br>
+      Es kann eine beliebige Anzahl von Triggerbedingungen angegeben werden. Xon/Xoff-Bedingungen müssen nicht zwingend paarweise
+      definiert werden. <br>
+      <br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; energyH4Trigger 1on=2000 1off=1700 2on=2500 2off=2000 3off=1500 <br>
+      </ul>
       </li>
     </ul>
     <br>
