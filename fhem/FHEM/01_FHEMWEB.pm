@@ -1191,6 +1191,7 @@ FW_answerCall($)
     } else {
       my $motd = AttrVal("global", "motd", "");
       my $gie = $defs{global}{init_errors};
+      $gie = "" if(!defined($gie));
       if($motd ne "none" && ($motd || $gie)) {
         FW_addContent("><pre class='motd'>$motd\n$gie</pre></div");
       }
