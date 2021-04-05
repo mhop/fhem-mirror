@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries ",
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
   "0.27.0" => "02.04.2021  additional readings ",
@@ -1207,6 +1208,7 @@ sub centralTask {
   deleteReadingspec ($hash, "moduleEfficiency");
   deleteReadingspec ($hash, "RestOfDay_PV");
   deleteReadingspec ($hash, "CurrentHourPVforecast");
+  deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
 
   my $interval = controlParams ($name); 
   
@@ -1234,17 +1236,19 @@ sub centralTask {
       }      
       
       my @da;
-      my $t     = time;                                                                            # aktuelle Unix-Zeit 
-      my $chour = strftime "%H", localtime($t);                                                    # aktuelle Stunde
-      my $day   = strftime "%d", localtime($t);                                                    # aktueller Tag
+      my $t      = time;                                                                           # aktuelle Unix-Zeit 
+      my $chour  = strftime "%H", localtime($t);                                                   # aktuelle Stunde
+      my $minute = strftime "%M", localtime($t);                                                   # aktuelle Minute
+      my $day    = strftime "%d", localtime($t);                                                   # aktueller Tag
             
       my $params = {
-          hash  => $hash,
-          name  => $name,
-          t     => $t,
-          chour => $chour,
-          day   => $day,
-          daref => \@da
+          hash   => $hash,
+          name   => $name,
+          t      => $t,
+          minute => $minute,
+          chour  => $chour,
+          day    => $day,
+          daref  => \@da
       };
       
       Log3 ($name, 4, "$name - ################################################################");
@@ -1258,7 +1262,7 @@ sub centralTask {
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);                                                        # Energy Meter auswerten    
       _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren
-      _calcSummaries ($hash, $chour, \@da);                                                        # Zusammenfassungen erstellen
+      _calcSummaries             ($params);                                                        # Zusammenfassungen erstellen
 
       if(@da) {
           createReadingsFromArray ($hash, \@da, 1);
@@ -1837,30 +1841,58 @@ return;
 ################################################################
 #               Zusammenfassungen erstellen
 ################################################################
-sub _calcSummaries {            
-  my $hash  = shift;
-  my $chour = shift;                          # aktuelle Stunde
-  my $daref = shift;
+sub _calcSummaries {  
+  my $paref  = shift;
+  my $hash   = $paref->{hash};
+  my $name   = $paref->{name};
+  my $daref  = $paref->{daref};
+  my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
+  my $minute = $paref->{minute};                                                                      # aktuelle Minute
   
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
+  my $type   = $hash->{TYPE};
+  $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
 
+  my $next1HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $next2HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
+  my $next3HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $next4HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $restOfDaySum  = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $tomorrowSum   = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $todaySum      = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   
-  my $rdh              = 24 - $chour - 1;                                         # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
-  my $thforecast       = NexthoursVal ($hash, "NextHour00", "pvforecast", 0);
+  my $rdh              = 24 - $chour - 1;                                                             # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
+  my $remainminutes    = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
   
-  $next4HoursSum->{PV} = $thforecast;
-  $restOfDaySum->{PV}  = $thforecast;
+  my $restofhour       = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
+  
+  $next1HoursSum->{PV} = $restofhour;
+  $next2HoursSum->{PV} = $restofhour;
+  $next3HoursSum->{PV} = $restofhour;
+  $next4HoursSum->{PV} = $restofhour;
+  $restOfDaySum->{PV}  = $restofhour;
   
   for my $h (1..47) {
-      next if(!$data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$h)});
       my $pvfc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
          
-      $next4HoursSum->{PV} += $pvfc if($h <= 3);
+      if($h == 1) {
+          $next1HoursSum->{PV} += $pvfc / 60 * $minute;
+      }
+      
+      if($h <= 2) {
+          $next2HoursSum->{PV} += $pvfc                if($h <  2);
+          $next2HoursSum->{PV} += $pvfc / 60 * $minute if($h == 2); 
+      }
+      
+      if($h <= 3) {
+          $next3HoursSum->{PV} += $pvfc                if($h <  3);
+          $next3HoursSum->{PV} += $pvfc / 60 * $minute if($h == 3); 
+      }  
+
+      if($h <= 4) {
+          $next4HoursSum->{PV} += $pvfc                if($h <  4);
+          $next4HoursSum->{PV} += $pvfc / 60 * $minute if($h == 4); 
+      }      
+      
       $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
       $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
   }
@@ -1869,7 +1901,9 @@ sub _calcSummaries {
       $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);;
   }
   
-  push @$daref, "NextHours_Sum00_PVforecast<>".(int $thforecast)." Wh";
+  push @$daref, "NextHours_Sum01_PVforecast<>".(int $next1HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum02_PVforecast<>".(int $next2HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum03_PVforecast<>".(int $next3HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum04_PVforecast<>".(int $next4HoursSum->{PV})." Wh";
   push @$daref, "RestOfDayPVforecast<>".       (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".       (int $tomorrowSum->{PV}).  " Wh";
@@ -1891,31 +1925,6 @@ sub _calcDayHourMove {
   $fh    = $fh - ($fd * 24);  
    
 return ($fd,$fh);
-}
-
-################################################################
-#     Zusätzliche Events für Logging generieren
-################################################################
-sub __addCHANGED {
-  my $hash = shift;
-  my $val  = shift;
-  my $ts   = shift;
-  
-  if($hash->{CHANGED}) {
-      push @{$hash->{CHANGED}}, $val;
-  } 
-  else {
-      $hash->{CHANGED}[0] = $val;
-  }
-  
-  if($hash->{CHANGETIME}) {
-      push @{$hash->{CHANGETIME}}, $ts;
-  } 
-  else {
-      $hash->{CHANGETIME}[0] = $ts;
-  }
-  
-return;
 }
 
 ################################################################
@@ -3642,13 +3651,14 @@ return $def;
 }
 
 ################################################################
-#    Wert des current-Hash zurückliefern
-#    Usage:
-#    CurrentVal ($hash, $key, $def)
+# Wert des current-Hash zurückliefern
+# Usage:
+# CurrentVal ($hash, $key, $def)
 #
-#    $key:    generation      - aktuelle PV Erzeugung
-#             gridconsumption - aktueller Netzbezug
-#    $def:    Defaultwert
+# $key:   generation      - aktuelle PV Erzeugung
+#         genslidereg     - Schieberegister PV Erzeugung (Array)
+#         gridconsumption - aktueller Netzbezug
+# $def:   Defaultwert
 #
 ################################################################
 sub CurrentVal {
