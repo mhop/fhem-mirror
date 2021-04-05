@@ -395,7 +395,7 @@ foreach my $al (keys %culHmModel){ # duplicate entries for alias devices
   OffDlyBlink     =>{a=> 14.5,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>"blink when in off delay"              ,lit=>{off=>0,on=>1}},
   OnLvlPrio       =>{a=> 14.6,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{high=>0,low=>1}},
   OnDlyMode       =>{a=> 14.7,s=>0.1,l=>3,min=>0      ,max=>1     ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>0,t=>""                                     ,lit=>{setToOff=>0,NoChange=>1}},
-  OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>"0.0"  ,max=>100   ,c=>''         ,p=>'y',f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel off"},
+  OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>"0.0"  ,max=>100.5 ,c=>''         ,p=>'y',f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>"0.0"  ,max=>100   ,c=>''         ,p=>'y',f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>"0.0"  ,max=>100.5 ,c=>''         ,p=>'y',f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"                        ,lit=>{oldLevel=>100.5}},
   OnLevelArm      =>{a=> 17.0,s=>1.0,l=>3,min=>0      ,max=>100   ,c=>'lit'      ,p=>'y',f=>''      ,u=>''    ,d=>1,t=>"onLevel on"                           ,lit=>{disarmed=>0,extSens=>50,allSens=>200}},
@@ -1325,34 +1325,34 @@ $culHmRegModel{"HM-OU-CFM-TW"}          = $culHmRegModel{"HM-OU-CFM-PL"};
                          ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-LC-RGBW-WM02"   =>{ ActHsvCol       =>1,waRed           =>1,waGreen         =>1,waBlue          =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
-                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
-                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
-                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
-                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
-                         ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
-                         ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
-                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
-                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
-                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         # ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         # ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         # ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         # ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         # ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         # ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         # ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
+                         # ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
+                         # ,CtValLo         =>1,CtValHi         =>1
+                         # ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         # ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         # ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         # ,lgMultiExec     =>1,shMultiExec     =>1
                         }
  ,"HM-LC-RGBW-WM03"   =>{ ActColPrgm      =>1,ActMinBoarder   =>1,ActMaxBoarder   =>1,colChangeSpeed  =>1
-                         ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
-                         ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
-                         ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
-                         ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
-                         ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
-                         ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
-                         ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
-                         ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
-                         ,CtValLo         =>1,CtValHi         =>1
-                         ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
-                         ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
-                         ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
-                         ,lgMultiExec     =>1,shMultiExec     =>1
+                         # ,OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1
+                         # ,OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1
+                         # ,ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1
+                         # ,OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1
+                         # ,RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1
+                         # ,DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1
+                         # ,DimJtOn         =>1,DimJtDlyOn      =>1,DimJtRampOff    =>1
+                         # ,DimJtOff        =>1,DimJtDlyOff     =>1,DimJtRampOn     =>1
+                         # ,CtValLo         =>1,CtValHi         =>1
+                         # ,CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1
+                         # ,CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1
+                         # ,OffDlyStep      =>1,OffDlyNewTime   =>1,OffDlyOldTime   =>1
+                         # ,lgMultiExec     =>1,shMultiExec     =>1
                         }
 
  ,"HM-HM-LC-DW-WM01"  =>{ characteristic  =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1}
