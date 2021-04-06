@@ -895,6 +895,34 @@ set DEVICE attrTemplate speechcontrol_type_thermostat
 deletereading -q DEVICE (?!associatedWith).*
 setreading DEVICE attrTemplateVersion 20210211
 
+#contributed by barneybaer, https://forum.fhem.de/index.php/topic,94495.msg1145005.html#msg1145005
+name:zigbee2mqtt_thermostat_without_weekprofile
+desc: Developed for <a href="https://www.zigbee2mqtt.io/devices/SEA801-Zigbee_SEA802-Zigbee.html#saswell-sea801-zigbee%252Fsea802-zigbee">Model Saswell SEA801-Zigbee/SEA802-Zigbee manufactured by Saswell</a> via zigbee2mqtt <br>
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_17b
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to temp_control;{ AttrVal("DEVICE","icon","temp_control") }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  desired-temp:slider,5.0,0.5,30.0,1 $\DEVICETOPIC/set {"current_heating_setpoint": "$EVTPART1"}\
+  btnLock:LOCK,UNLOCK $\DEVICETOPIC/set {"child_lock": "$EVTPART1"}\
+  mode:heat,auto,off $\DEVICETOPIC/set {"system_mode": "$EVTPART1"}\
+  away:ON,OFF $\DEVICETOPIC/set {"away_mode": "$EVTPART1"}\
+  window_detection:ON,OFF,TOOGLE $\DEVICETOPIC/set {"window_detection": "$EVTPART1"}
+attr DEVICE periodicCmd temperature:55
+attr DEVICE devStateIcon LOCKED:secur_lock:btnLock+UNLOCK UNLOCKED:secur_open:btnLock+LOCK
+attr DEVICE webCmd desired-temp
+attr DEVICE jsonMap current_heating_setpoint:desired-temp local_temperature:temperature Battery:batteryPercent system_mode:mode
+attr DEVICE stateFormat btnLock\
+Measured: temperature Battery: batteryPercent %
+attr DEVICE userReadings batteryState:battery_low.* {ReadingsVal($name,'battery_low','false') eq 'false'?'ok':'low'}
+attr DEVICE model zigbee2mqtt_thermostat_without_weekrofile
+set DEVICE attrTemplate speechcontrol_type_thermostat
+deletereading -q DEVICE (?!associatedWith).*
+setreading DEVICE attrTemplateVersion 20210406
 
 ###########################################
 # TASMOTA
