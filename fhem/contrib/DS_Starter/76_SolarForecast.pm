@@ -1780,9 +1780,21 @@ sub _transferMeterValues {
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
   
-  my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
-  my $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                            # aktuelle Einspeisung (W)
-    
+  my $gfin;
+  if ($gf ne "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
+      my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
+      $gfin    = ReadingsNum ($medev, $gf, 0) * $gfuf;                                        # aktuelle Einspeisung (W)
+  }
+  else {                                                                                      # bei negativen gcon -> $gfin = abs($gco), $gco = 0
+      if($gco <= 0) {
+          $gfin = abs($gco);
+          $gco  = 0;
+      }
+      else {
+          $gfin = 0;
+      }
+  }
+  
   push @$daref, "Current_GridConsumption<>".(int $gco)." W";
   $data{$type}{$name}{current}{gridconsumption} = int $gco;                                   # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
   
