@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
   "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries, new setter energyH4Trigger ",
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
   "0.28.0" => "03.04.2021  new attributes beam1FontColor, beam2FontColor, rename/new some readings ",
@@ -645,7 +646,7 @@ sub _setmeterDevice {                    ## no critic "not used"
       return qq{The device "$medev" doesn't exist!};
   }
   
-  if(!$h->{gcon} || !$h->{contotal}) {
+  if(!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }  
 
@@ -1731,8 +1732,6 @@ sub _transferInverterValues {
   if ($do) {
       my $ethishour = int ($etotal - ($edaypast + $hash->{HELPER}{INITETOTAL}));
       
-      # Log3($name, 1, "$name - etotal: $etotal, edaypast: $edaypast, HELPER: $hash->{HELPER}{INITETOTAL}, ethishour: $ethishour  ");
-      
       if($ethishour < 0) {
           $ethishour = 0;
       }
@@ -1770,31 +1769,44 @@ sub _transferMeterValues {
   my $type = $hash->{TYPE}; 
   
   my ($gc,$gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
+  my ($gf,$gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
   my ($gt,$ctunit) = split ":", $h->{contotal};                                               # Readingname/Unit für Bezug total
+  my ($ft,$ftunit) = split ":", $h->{feedtotal};                                              # Readingname/Unit für Einspeisung total
   
-  return if(!$gc || !$gt);
+  return if(!$gc || !$gf || !$gt || !$ft);
   
-  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), contotal=$gt ($ctunit)");
+  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
   
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
-  my $co   = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
+  my $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
+  
+  my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
+  my $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                            # aktuelle Einspeisung (W)
     
-  push @$daref, "Current_GridConsumption<>".(int $co)." W";
-  $data{$type}{$name}{current}{gridconsumption} = int $co;                                    # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
+  push @$daref, "Current_GridConsumption<>".(int $gco)." W";
+  $data{$type}{$name}{current}{gridconsumption} = int $gco;                                   # Hilfshash Wert current grid consumption Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251  
+  
+  push @$daref, "Current_GridFeedIn<>".(int $gfin)." W";
+  $data{$type}{$name}{current}{gridfeedin} = int $gfin;                                       # Hilfshash Wert current grid Feed in
   
   my $ctuf    = $ctunit =~ /^kWh$/xi ? 1000 : 1;
-  my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)      
+  my $gctotal = ReadingsNum ($medev, $gt, 0) * $ctuf;                                         # Bezug total (Wh)    
+
+  my $ftuf    = $ftunit =~ /^kWh$/xi ? 1000 : 1;
+  my $fitotal = ReadingsNum ($medev, $ft, 0) * $ftuf;                                         # Einspeisung total (Wh)   
    
   my $gcdaypast = 0;
+  my $gfdaypast = 0;
   
-  for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
+  for my $hour (0..int $chour) {                                                                     # alle bisherigen Erzeugungen des Tages summieren                                            
       $gcdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridConsumption", 0);
+      $gfdaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_GridFeedIn",      0);
   }
   
-  my $do = 0;
-  if ($gcdaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
+  my $docon = 0;
+  if ($gcdaypast == 0) {                                                                             # Management der Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $hash->{HELPER}{INITCONTOTAL}) {
-          $do = 1;
+          $docon = 1;
       }
       else {
           $hash->{HELPER}{INITCONTOTAL} = $gctotal;
@@ -1804,13 +1816,11 @@ sub _transferMeterValues {
       $hash->{HELPER}{INITCONTOTAL} = $gctotal-$gcdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   }
   else {
-      $do = 1;
+      $docon = 1;
   }
   
-  if ($do) {
+  if ($docon) {
       my $gctotthishour = int ($gctotal - ($gcdaypast + $hash->{HELPER}{INITCONTOTAL}));
-      
-      # Log3($name, 1, "$name - gctotal: $gctotal, gcdaypast: $gcdaypast, HELPER: $hash->{HELPER}{INITCONTOTAL}, gctotthishour: $gctotthishour  ");
       
       if($gctotthishour < 0) {
           $gctotthishour = 0;
@@ -1818,7 +1828,7 @@ sub _transferMeterValues {
       
       my $nhour = $chour+1;
       push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridConsumption<>".$gctotthishour." Wh";
-      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                 # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                  # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
       
       $paref->{gctotthishour} = $gctotthishour;
       $paref->{nhour}         = sprintf("%02d",$nhour);
@@ -1826,6 +1836,40 @@ sub _transferMeterValues {
       setPVhistory ($paref);
       delete $paref->{histname};
   }   
+  
+  my $dofeed = 0;
+  if ($gfdaypast == 0) {                                                                              # Management der Stundenberechnung auf Basis Totalwerte GridFeedIn
+      if (defined $hash->{HELPER}{INITFEEDTOTAL}) {
+          $dofeed = 1;
+      }
+      else {
+          $hash->{HELPER}{INITFEEDTOTAL} = $fitotal;
+      }
+  }
+  elsif (!defined $hash->{HELPER}{INITFEEDTOTAL}) {
+      $hash->{HELPER}{INITFEEDTOTAL} = $fitotal-$gfdaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn", 0);
+  }
+  else {
+      $dofeed = 1;
+  }
+  
+  if ($dofeed) {
+      my $gftotthishour = int ($fitotal - ($gfdaypast + $hash->{HELPER}{INITFEEDTOTAL}));
+           
+      if($gftotthishour < 0) {
+          $gftotthishour = 0;
+      }
+      
+      my $nhour = $chour+1;
+      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_GridFeedIn<>".$gftotthishour." Wh";
+      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{gfeedin} = $gftotthishour;
+      
+      $paref->{gftotthishour} = $gftotthishour;
+      $paref->{nhour}         = sprintf("%02d",$nhour);
+      $paref->{histname}      = "gfeedin";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+  }
       
 return;
 }
@@ -1979,6 +2023,13 @@ sub _calcSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
   
+  my $gcon    = CurrentVal ($hash, "gridconsumption", 0);                                               # Berechnung aktueller Verbrauch
+  my $pvgen   = CurrentVal ($hash, "generation",      0);
+  my $gfeedin = CurrentVal ($hash, "gridfeedin",      0);
+  my $consumption = $pvgen - $gfeedin + $gcon;
+  $data{$type}{$name}{current}{consumption} = $consumption;
+  
+  push @$daref, "Current_Consumption<>".       $consumption.              " W";
   push @$daref, "NextHours_Sum01_PVforecast<>".(int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".(int $next2HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum03_PVforecast<>".(int $next3HoursSum->{PV})." Wh";
@@ -2153,10 +2204,10 @@ sub forecastGraphic {                                                           
           $ret .= qq{Please define all of your used string names with "set $link inverterStrings".};
       }
       elsif(!$peak) {
-          $ret .= qq{Please specify the total module peak with "set $link modulePeakString"};   
+          $ret .= qq{Please specify the total peak power for every string with "set $link modulePeakString"};   
       }
       elsif(!$dir) {
-          $ret .= qq{Please specify the module direction with "set $link moduleDirection"};   
+          $ret .= qq{Please specify the module  direction with "set $link moduleDirection"};   
       }
       elsif(!$ta) {
           $ret .= qq{Please specify the module tilt angle with "set $link moduleTiltAngle"};   
@@ -3330,17 +3381,18 @@ return;
 #   Berechnung des Korrekturfaktors über mehrere Tage
 ################################################################
 sub setPVhistory {               
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $name      = $paref->{name};
-  my $t         = $paref->{t};                                                                    # aktuelle Unix-Zeit
-  my $nhour     = $paref->{nhour};
-  my $day       = $paref->{day};
-  my $histname  = $paref->{histname}      // qq{};
-  my $ethishour = $paref->{ethishour}     // 0;
-  my $calcpv    = $paref->{calcpv}        // 0;
-  my $gthishour = $paref->{gctotthishour} // 0;
-  my $wid       = $paref->{wid}           // -1;
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $t          = $paref->{t};                                                                   # aktuelle Unix-Zeit
+  my $nhour      = $paref->{nhour};
+  my $day        = $paref->{day};
+  my $histname   = $paref->{histname}      // qq{};
+  my $ethishour  = $paref->{ethishour}     // 0;
+  my $calcpv     = $paref->{calcpv}        // 0;
+  my $gcthishour = $paref->{gctotthishour} // 0;                                                  # Grid Consumption
+  my $fithishour = $paref->{gftotthishour} // 0;                                                  # Grid Feed In
+  my $wid        = $paref->{wid}           // -1;
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -3370,8 +3422,8 @@ sub setPVhistory {
   }
   
   if($histname eq "cons") {                                                                       # bezogene Energie
-      $val = $gthishour;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{gcons} = $gthishour; 
+      $val = $gcthishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{gcons} = $gcthishour; 
 
       my $gcsum = 0;
       for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
@@ -3381,7 +3433,19 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{gcons} = $gcsum;       
   }
   
-  if($histname eq "weatherid") {                                                                       # bezogene Energie
+  if($histname eq "gfeedin") {                                                                    # eingespeiste Energie
+      $val = $fithishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{gfeedin} = $fithishour; 
+
+      my $gfisum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $gfisum += HistoryVal ($hash, $day, $k, "gfeedin", 0);
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{gfeedin} = $gfisum;       
+  }
+  
+  if($histname eq "weatherid") {                                                                  # Wetter ID
       $val = $wid;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;   
       $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};       
@@ -3409,12 +3473,13 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl = HistoryVal ($hash, $day, $key, "pvrl",      0);
-          my $pvfc = HistoryVal ($hash, $day, $key, "pvfc",      0);
-          my $cons = HistoryVal ($hash, $day, $key, "gcons",     0);
-          my $wid  = HistoryVal ($hash, $day, $key, "weatherid", -1);
-          $ret    .= "\n      " if($ret);
-          $ret    .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $cons, weatherid: $wid";
+          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",       0);
+          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",       0);
+          my $gcons   = HistoryVal ($hash, $day, $key, "gcons",      0);
+          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",    0);
+          my $wid     = HistoryVal ($hash, $day, $key, "weatherid", -1);
+          $ret       .= "\n      " if($ret);
+          $ret       .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $gcons, gfeedin: $gfeedin, weatherid: $wid";
       }
       return $ret;
   };
@@ -3435,15 +3500,16 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc   = CircularVal ($hash, $idx, "pvfc",              0);
-          my $pvrl   = CircularVal ($hash, $idx, "pvrl",              0);
-          my $gcons  = CircularVal ($hash, $idx, "gcons",             0);
-          my $wid    = CircularVal ($hash, $idx, "weatherid",        -1);
-          my $wtxt   = CircularVal ($hash, $idx, "weathertxt",       "");
-          my $wccv   = CircularVal ($hash, $idx, "weathercloudcover", 0);
-          my $wrprb  = CircularVal ($hash, $idx, "weatherrainprob",   0);
-          $sq      .= "\n" if($sq);
-          $sq      .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, weathercloudcover: $wccv, weatherrainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
+          my $pvfc    = CircularVal ($hash, $idx, "pvfc",              0);
+          my $pvrl    = CircularVal ($hash, $idx, "pvrl",              0);
+          my $gcons   = CircularVal ($hash, $idx, "gcons",             0);
+          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",           0);
+          my $wid     = CircularVal ($hash, $idx, "weatherid",        -1);
+          my $wtxt    = CircularVal ($hash, $idx, "weathertxt",       "");
+          my $wccv    = CircularVal ($hash, $idx, "weathercloudcover", 0);
+          my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   0);
+          $sq        .= "\n" if($sq);
+          $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, weathercloudcover: $wccv, weatherrainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
       }
   }
   
@@ -3657,9 +3723,10 @@ return;
 #
 #    $day: Tag des Monats (01,02,...,31)
 #    $hod: Stunde des Tages (01,02,...,24,99)
-#    $key:    pvrl  - realer PV Ertrag
-#             pvfc  - PV Vorhersage
-#             gcons - realer Netzbezug
+#    $key:    pvrl    - realer PV Ertrag
+#             pvfc    - PV Vorhersage
+#             gcons   - realer Netzbezug
+#             gfeedin - reale Netzeinspeisung
 #    $def: Defaultwert
 #
 ################################################################
@@ -3692,6 +3759,7 @@ return $def;
 #    $key:    pvrl              - realer PV Ertrag
 #             pvfc              - PV Vorhersage
 #             gcons             - realer Netzbezug
+#             gfeedin           - reale Netzeinspeisung
 #             weatherid         - DWD Wetter id 
 #             weathertxt        - DWD Wetter Text
 #             weathercloudcover - DWD Wolkendichte
@@ -3804,8 +3872,6 @@ Anlagenstandort. Im zugeordneten DWD_OpenData Device ist die passende Wetterstat
 festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
 Abhängig von der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.) wird die 
 verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. <br>
-Ein SolarForecast Device unterstützt einen Wechselrichter mit beliebig vielen angeschlossenen Strings. Weiteren Wechselrichtern
-werden weitere SolarForecast Devices zugeordnet.
 
 <ul>
   <a name="SolarForecastdefine"></a>
@@ -3869,19 +3935,20 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentInverterDev"></a>
-      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Reading aktuelle PV-Leistung&gt;:&lt;Einheit&gt; etotal=&lt;Reading Summe Energieerzeugung&gt;:&lt;Einheit&gt;  </b> <br><br>  
+      <li><b>currentInverterDev &lt;Inverter Device Name&gt; pv=&lt;Readingname&gt;:&lt;Einheit&gt; etotal=&lt;Readingname&gt;:&lt;Einheit&gt;  </b> <br><br>  
       
-      Legt ein beliebiges Device zur Lieferung der aktuellen PV Erzeugungswerte fest. Es kann auch ein Dummy Device mit 
-      entsprechenden Readings sein. Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt
-      dieses Device mit den entsprechenden Readings an.
+      Legt ein beliebiges Device und dessen Readings zur Lieferung der aktuellen PV Erzeugungswerte fest. 
+      Es kann auch ein Dummy Device mit entsprechenden Readings sein. 
+      Die Werte mehrerer Inverterdevices führt man z.B. in einem Dummy Device zusammen und gibt dieses Device mit den 
+      entsprechenden Readings an. Die Bedeutung des jeweiligen "Readingname" ist:
       <br>
       
       <ul>   
        <table>  
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>pv</b>       </td><td>Reading mit aktueller PV-Leistung                                                                                              </td></tr>
-          <tr><td> <b>etotal</b>   </td><td>ein stetig aufsteigender Zähler der gesamten erzeugten Energie </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                                                            </td></tr>
+          <tr><td> <b>pv</b>       </td><td>Reading welches die aktuelle PV-Erzeugung liefert                                       </td></tr>
+          <tr><td> <b>etotal</b>   </td><td>Reading welches die gesamte erzeugten Energie liefert (ein stetig aufsteigender Zähler) </td></tr>
+          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                                     </td></tr>
         </table>
       </ul> 
       <br>
@@ -3898,26 +3965,30 @@ werden weitere SolarForecast Devices zugeordnet.
     
     <ul>
       <a name="currentMeterDev"></a>
-      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Reading aktueller Netzbezug&gt;:&lt;Einheit&gt; contotal=&lt;Reading Summe Netzbezug&gt;:&lt;Einheit&gt;</b> <br><br> 
+      <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
       
-      Legt ein beliebiges Device zur Messung des Energiebezugs fest. Es kann auch ein Dummy Device mit entsprechenden Readings 
-      sein.
+      Legt ein beliebiges Device und seine Readings zur Energiemessung fest. 
+      Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
       <br>
       
       <ul>   
        <table>  
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>gcon</b>     </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert   </td></tr>
-          <tr><td> <b>contotal</b> </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert </td></tr>
-          <tr><td> <b>Einheit</b>  </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                         </td></tr>
+          <tr><td> <b>gcon</b>       </td><td>Reading welches die aktuell aus dem Netz bezogene Leistung liefert       </td></tr>
+          <tr><td> <b>contotal</b>   </td><td>Reading welches die Summe der aus dem Netz bezogenen Energie liefert     </td></tr>
+          <tr><td> <b>gfeedin</b>    </td><td>Reading welches die aktuell in das Netz eingespeiste Leistung liefert    </td></tr>
+          <tr><td> <b>feedtotal</b>  </td><td>Reading welches die Summe der in das Netz eingespeisten Energie liefert  </td></tr>
+          <tr><td> <b>Einheit</b>    </td><td>die jeweilige Einheit (W,kW,Wh,kWh)                                      </td></tr>
         </table>
       </ul> 
       <br>
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W contotal=Bezug_Wirkleistung_Zaehler:kWh <br>
-        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W) und den totalen Bezug im Reading "Bezug_Wirkleistung_Zaehler" (kWh)
+        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W contotal=Bezug_Wirkleistung_Zaehler:kWh gfeedin=Einspeisung_Wirkleistung:W feedtotal=Einspeisung_Wirkleistung_Zaehler:kWh  <br>
+        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W), 
+        die Summe des Netzbezugs im Reading "Bezug_Wirkleistung_Zaehler" (kWh), die aktuelle Einspeisung im Reading "Bezug_Wirkleistung_Zaehler" (W),
+        die Summe der Einspeisung im Reading "Einspeisung_Wirkleistung_Zaehler" (kWh)
       </ul>      
       </li>
     </ul>
@@ -4128,6 +4199,7 @@ werden weitere SolarForecast Devices zugeordnet.
             <tr><td> <b>pvforecast</b>  </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde           </td></tr>
             <tr><td> <b>pvreal</b>      </td><td>reale PV Erzeugung der jeweiligen Stunde                      </td></tr>
             <tr><td> <b>gcons</b>       </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde </td></tr>
+            <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung in das Stromnetz der jeweiligen Stunde      </td></tr>
          </table>
       </ul>
       </li>      
@@ -4137,7 +4209,7 @@ werden weitere SolarForecast Devices zugeordnet.
     <ul>
       <a name="pvCircular"></a>
       <li><b>pvCircular </b> <br>
-      Listet die vorhandenen Werte Ringspeicher auf.  
+      Listet die vorhandenen Werte im Ringspeicher auf.  
       Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
       Erläuterung der Werte: <br><br>
       
@@ -4147,6 +4219,7 @@ werden weitere SolarForecast Devices zugeordnet.
             <tr><td> <b>pvforecast</b>        </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
             <tr><td> <b>pvreal</b>            </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
             <tr><td> <b>gcons</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
+            <tr><td> <b>gfeedin</b>           </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
             <tr><td> <b>weathercloudcover</b> </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
             <tr><td> <b>weatherrainprob</b>   </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
             <tr><td> <b>weatherid</b>         </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
