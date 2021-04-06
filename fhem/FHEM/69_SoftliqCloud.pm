@@ -20,12 +20,13 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-#     Changelog:
-#
+#   Changelog:
+#   0.1.01: Small Fix to avoid "garbage" leading to invalid JSON
+#   0.1.00: Initial Release
 ##############################################################################
 ##############################################################################
-#     Todo:
-#
+#   Todo:
+#   * identify more parameters
 #
 ##############################################################################
 package main;
@@ -45,6 +46,9 @@ use DevIo;
 use B qw(svref_2object);
 use utf8;
 use Digest::MD5 qw(md5);
+
+
+my $version = "0.1.01";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -270,6 +274,7 @@ sub Define {
 
     $hash->{NAME} = $name;
     $hash->{USER} = $user;
+    $hash->{VERSION} = $version;
 
     #start timer
     if ( !IsDisabled($name) && $init_done && defined( ReadPassword($hash) ) ) {
@@ -1909,7 +1914,7 @@ sub wsReadDevIo {
     	return;
     }
     $buf =~ s///xsm;
-    $buf =~ s/\\x{1e}//xsm;
+    $buf =~ s/\\x\{1e\}//xsm;
     if ( length($buf) == 0 ) {
         return;
     }
