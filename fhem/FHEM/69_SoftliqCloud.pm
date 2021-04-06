@@ -1664,8 +1664,8 @@ sub wsStart {
     DevIo_SimpleWrite( $hash, '{"protocol":"json","version":1}', 2 );
 
     #succesfully connected - start a timer
-    #my $next = int( gettimeofday() ) + MINUTESECONDS;
-    #InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsClose', $hash, 0 );
+    my $next = int( gettimeofday() ) + MINUTESECONDS;
+    InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsClose', $hash, 0 );
 
     return;
 }
@@ -1909,6 +1909,7 @@ sub wsReadDevIo {
     	return;
     }
     $buf =~ s///xsm;
+    $buf =~ s/\\x{1e}//xsm;
     if ( length($buf) == 0 ) {
         return;
     }
