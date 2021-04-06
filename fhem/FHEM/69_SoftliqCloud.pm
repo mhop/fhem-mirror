@@ -1499,7 +1499,7 @@ sub safe_decode_json {
         1;
     } or do {
         my $error = $@ || 'Unknown failure';
-        Log3 $name, LOG_ERROR, "[$name] - Received invalid JSON: $error";
+        Log3 $name, LOG_ERROR, "[$name] - Received invalid JSON: $error".Dumper($data);
 
     };
     return $json;
