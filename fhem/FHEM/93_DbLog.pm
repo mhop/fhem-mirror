@@ -30,6 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
   "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
                            "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
   "4.10.2"  => "23.06.2020 configCheck changed for SQLite again ",
@@ -274,6 +275,8 @@ sub DbLog_Initialize {
                                "colValue ".
                                "DbLogSelectionMode:Exclude,Include,Exclude/Include ".
                                "DbLogType:Current,History,Current/History,SampleFill/History ".
+                               "SQLiteJournalMode:WAL,off ".
+                               "SQLiteCacheSize ".
                                "dbSchema ".
                                "defaultMinInterval:textField-long ".
                                "disable:1,0 ".
@@ -421,7 +424,11 @@ sub DbLog_Attr {
   my $do                      = 0;
 
   if($cmd eq "set") {
-      if ($aName eq "syncInterval" || $aName eq "cacheLimit" || $aName eq "cacheOverflowThreshold" || $aName eq "timeout") {   
+      if ($aName eq "syncInterval"           || 
+          $aName eq "cacheLimit"             || 
+          $aName eq "cacheOverflowThreshold" ||
+          $aName eq "SQLiteCacheSize"        ||           
+          $aName eq "timeout") {   
           if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
       }
       
@@ -449,6 +456,11 @@ sub DbLog_Attr {
 
       if ($aName eq "shutdownWait") {
          return "DbLog $name - The attribute $aName is deprecated and has been removed !";
+      }  
+
+      if ($aName eq "SQLiteCacheSize" || $aName eq "SQLiteJournalMode") {   
+          InternalTimer(gettimeofday()+1.0, "DbLog_attrForSQLite", $hash, 0);
+          InternalTimer(gettimeofday()+1.5, "DbLog_attrForSQLite", $hash, 0);               # muß zweimal ausgeführt werden - Grund unbekannt :-(
       }      
   }
  
@@ -555,6 +567,29 @@ sub DbLog_Attr {
   }
 
 return;
+}
+
+################################################################
+#   reopen DB beim Setzen bestimmter Attribute
+################################################################
+sub DbLog_attrForSQLite {
+  my $hash = shift;
+
+  return if($hash->{MODEL} ne "SQLITE");
+  
+  my $name = $hash->{NAME};
+  
+  my $dbh = $hash->{DBHP};
+  if ($dbh) {
+      my $history = $hash->{HELPER}{TH};
+      if(!$dbh->{AutoCommit}) {
+          eval {$dbh->commit()} or Log3($name, 2, "DbLog $name -> Error commit $history - $@");  
+      }      
+      $dbh->disconnect();
+  }
+  DbLog_ConnectPush ($hash,1);  
+   
+return;   
 }
 
 ################################################################
@@ -3225,18 +3260,29 @@ sub DbLog_ConnectPush {
       DbLog_setReadingstate ($hash, $state);
   }
 
-  $hash->{DBHP}= $dbhp;
+  $hash->{DBHP} = $dbhp;
   
   if ($hash->{MODEL} eq "SQLITE") {
     $dbhp->do("PRAGMA temp_store=MEMORY");
     $dbhp->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption, 
                                              # SQLite should always be run with its default synchronous setting of FULL.
                                              # https://sqlite.org/howtocorrupt.html
-    $dbhp->do("PRAGMA journal_mode=WAL");
-    $dbhp->do("PRAGMA cache_size=4000");
+    
+    if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
+        $dbhp->do("PRAGMA journal_mode=off");
+        $hash->{SQLITEWALMODE} = "off";
+    }
+    else {
+        $dbhp->do("PRAGMA journal_mode=WAL");
+        $hash->{SQLITEWALMODE} = "on";
+    }
+    
+    my $cs = AttrVal($name, "SQLiteCacheSize", "4000");
+    $dbhp->do("PRAGMA cache_size=$cs");
+    $hash->{SQLITECACHESIZE} = $cs;
   }
  
-  return 1;
+return 1;
 }
 
 sub DbLog_ConnectNewDBH {
@@ -7635,6 +7681,42 @@ attr SMA_Energymeter DbLogValueFn
   <br>
   
   <ul>
+     <a name="SQLiteCacheSize"></a>
+     <li><b>SQLiteCacheSize</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteCacheSize &lt;number of memory pages used for caching&gt;
+       </code><br>
+
+       The default is about 4MB of RAM to use for caching (page_size=1024bytes, cache_size=4000).<br>
+       Embedded devices with scarce amount of RAM can go with 1000 pages or less. This will impact
+       the overall performance of SQLite. <br>
+       (default: 4000)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a name="SQLiteJournalMode"></a>
+     <li><b>SQLiteJournalMode</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
+       </code><br>
+
+       Determines how SQLite databases are opened. Generally the Write-Ahead-Log (<b>WAL</b>) is the best choice for robustness
+       and data integrity.<br>
+       Since WAL about doubles the spaces requirements on disk it might not be the best fit for embedded devices
+       using a RAM backed disk. <b>off</b> will turn the journaling off. In case of corruption, the database probably
+       won't be possible to repair and has to be recreated! <br>
+       (default: WAL)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
     <a name="syncEvents"></a>
     <li><b>syncEvents</b>
     <ul>
@@ -9083,6 +9165,42 @@ attr SMA_Energymeter DbLogValueFn
   </ul>
   <br>
   
+  <ul>
+     <a name="SQLiteCacheSize"></a>
+     <li><b>SQLiteCacheSize</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteCacheSize &lt;Anzahl Memory Pages für Cache&gt;
+       </code><br>
+
+       Standardmäßig werden ca. 4MB RAM für Caching verwendet (page_size=1024bytes, cache_size=4000).<br>
+       Bei Embedded Devices mit wenig RAM genügen auch 1000 Pages - zu Lasten der Performance. <br>
+       (default: 4000)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a name="SQLiteJournalMode"></a>
+     <li><b>SQLiteJournalMode</b>
+     <ul>
+       <code>
+       attr &lt;device&gt; SQLiteJournalMode [WAL|off]
+       </code><br>
+
+       Moderne SQLite Datenbanken werden mit einem Write-Ahead-Log (<b>WAL</b>) geöffnet, was optimale Datenintegrität
+       und gute Performance gewährleistet.<br>
+       Allerdings benötigt WAL zusätzlich ungefähr den gleichen Festplattenplatz wie die eigentliche Datenbank. Bei knappem
+       Festplattenplatz (z.B. eine RAM Disk in Embedded Devices) kann das Journal deaktiviert werden (<b>off</b>).
+       Im Falle eines Datenfehlers kann die Datenbank aber wahrscheinlich nicht repariert werden, und muss neu erstellt
+       werden! <br>
+       (default: WAL)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
   <ul>
     <a name="syncEvents"></a>
     <li><b>syncEvents</b>
