@@ -1498,6 +1498,7 @@ sub _additionalActivities {
           
           delete $hash->{HELPER}{INITETOTAL};
           delete $hash->{HELPER}{INITCONTOTAL};
+          delete $hash->{HELPER}{INITFEEDTOTAL};
           $hash->{HELPER}{H00DONE} = 1;
       }
   }
