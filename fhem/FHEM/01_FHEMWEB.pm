@@ -759,7 +759,7 @@ FW_AsyncOutput($$)
   Log3 $hash->{SNAME}, 4, "AsyncOutput from $hash->{NAME}";
   $hash = $FW_id2inform{$fwid};
   if($hash) {
-    FW_addToWritebuffer($hash, $data."\n");
+    FW_addToWritebuffer($hash, $data."\n") if(defined($hash->{FD})); #120181
   } else {
     $defs{$FW_wname}{asyncOutput}{$fwid} = $data;
   }
