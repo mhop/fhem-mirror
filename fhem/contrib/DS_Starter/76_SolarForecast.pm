@@ -3969,6 +3969,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>
         <b>Beispiel: </b> <br>
         set &lt;name&gt; currentInverterDev STP5000 pv=total_pac:kW etotal=etotal:kWh <br>
+        <br>
         # Device STP5000 liefert PV-Werte. Die aktuell erzeugte Leistung im Reading "total_pac" (kW) und die tägliche Erzeugung im 
           Reading "etotal" (kWh)
       </ul>
@@ -3996,12 +3997,22 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       </ul> 
       <br>
       
+      <b>Sonderfall:</b> Sollte das Reading für gcon und gfeedin identisch, aber vorzeichenbehaftet sein 
+      (Netzbezug+, Netzeinspeisung-), kann gfeedin definiert werden als: <br><br>
+      <ul>
+        gfeedin=-gcon
+      </ul>
+      <br>
+      
+      Die Einheit entfällt in diesem Fall da mit gcon identisch. <br><br>
+      
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentMeterDev SMA_Energymeter gcon=Bezug_Wirkleistung:W contotal=Bezug_Wirkleistung_Zaehler:kWh gfeedin=Einspeisung_Wirkleistung:W feedtotal=Einspeisung_Wirkleistung_Zaehler:kWh  <br>
-        # Device SMA_Energymeter liefert den aktuellen Netzbezug im Reading "Bezug_Wirkleistung" (W), 
-        die Summe des Netzbezugs im Reading "Bezug_Wirkleistung_Zaehler" (kWh), die aktuelle Einspeisung im Reading "Bezug_Wirkleistung_Zaehler" (W),
-        die Summe der Einspeisung im Reading "Einspeisung_Wirkleistung_Zaehler" (kWh)
+        set &lt;name&gt; currentMeterDev Meter gcon=Wirkleistung:W contotal=BezWirkZaehler:kWh gfeedin=-gcon feedtotal=EinWirkZaehler:kWh  <br>
+        <br>
+        # Device Meter liefert den aktuellen Netzbezug im Reading "Wirkleistung" (W), 
+          die Summe des Netzbezugs im Reading "BezWirkZaehler" (kWh), die aktuelle Einspeisung in "Wirkleistung" wenn "Wirkleistung" negativ ist,
+          die Summe der Einspeisung im Reading "EinWirkZaehler" (kWh)
       </ul>      
       </li>
     </ul>
