@@ -2,7 +2,7 @@
 # 00_THZ
 # $Id$
 # by immi 03/2021
-my $thzversion = "0.195";
+my $thzversion = "0.196";
 # this code is based on the hard work of Robert; I just tried to port it
 # http://robert.penz.name/heat-pump-lwz/
 ########################################################################################
@@ -599,7 +599,7 @@ my %sets439539common = (
   "p85MaxDefrostDur"		=> {cmd2=>"0A057D", argMin =>  "60",	argMax =>  "250",	type =>"1clean", unit =>" min"},
   "p85DefrStartThreshold"	=> {cmd2=>"0A057E", argMin =>   "0",	argMax =>   "50",	type =>"1clean", unit =>" %"},  #LLWT_Abtaubeginnschwelle (%) -
   "p85FilterSpeed"		=> {cmd2=>"0A057F", argMin =>   "0",	argMax =>  "100",	type =>"1clean", unit =>" %"},   #LLWT_DrehzahlFilter (%) - increase in VentSpeed to indicate dirt / replacement needed 
-  "p86OutTempCorrection"	=> {cmd2=>"0A05A3", argMin =>   "-5",	argMax =>  "5",		type =>"5temp",  unit =>" K"}   
+  "p86OutTempCorrection"	=> {cmd2=>"0A05A3", argMin =>   "-20",	argMax =>  "30",	type =>"5temp",  unit =>" K"}   
   );
 
 
@@ -2170,7 +2170,7 @@ END
          .  '<polyline points="751,49 756,49"/>   <text x="760" y="53"  class="ylabel">'                    . $v3    . '</text>'
          .  '<polyline points="751,19 756,19"/>   <text x="760" y="23"  class="ylabel">'                    . $v4    . '</text></g>' ."\n";
     #labels ######################
-    $ret .= '<text line_id="line_1"  x="70"  y="100" class="l1"> --- heat curve with insideTemp correction</text>' 
+    $ret .= '<text line_id="line_1"  x="70"  y="100" class="l1"> --- heat curve with insideTemp influence</text>' 
          .  '<text line_id="line_3"  x="70"  y="115" class="l3"> --- heat curve simplified</text>' 
          .  '<text  line_id="line_0" x="70"  y="130" class="l0"> --- working point: outside_tempFiltered='
          . $outside_tempFiltered . '°C heatSetTemp=' . $heatSetTemp . '°C </text>'
