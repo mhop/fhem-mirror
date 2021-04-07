@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
   "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
   "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries, new setter energyH4Trigger ",
   "0.29.0" => "03.04.2021  new setter powerTrigger ",
@@ -1663,6 +1664,15 @@ sub _transferWeatherValues {
           $paref->{histname} = "weatherid";
           $paref->{nhour}    = sprintf("%02d",$fh1);
           setPVhistory ($paref); 
+          
+          $paref->{wcc}      = $neff;
+          $paref->{histname} = "weathercloudcover";
+          setPVhistory ($paref);
+          
+          $paref->{wrp}      = $r101;
+          $paref->{histname} = "weatherrainprob";
+          setPVhistory ($paref);
+          
           delete $paref->{histname};
       }
   }
@@ -2329,7 +2339,7 @@ sub forecastGraphic {                                                           
   my $co4h = ReadingsNum ($name,"Next04Hours_Consumption",    0);
   my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",      0); 
   my $coTo = ReadingsNum ($name,"Tomorrow_Consumption",       0);
-  my $coCu = ReadingsNum ($name,"Current_GridConsumption",    0);
+  my $coCu = ReadingsNum ($name,"Current_Consumption",        0);
 
   my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast", 0);
   my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",        0); 
@@ -3406,6 +3416,8 @@ sub setPVhistory {
   my $gcthishour = $paref->{gctotthishour} // 0;                                                  # Grid Consumption
   my $fithishour = $paref->{gftotthishour} // 0;                                                  # Grid Feed In
   my $wid        = $paref->{wid}           // -1;
+  my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
+  my $wrp        = $paref->{wrp}           // 0;                                                  # Wahrscheinlichkeit von Niederschlag
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -3464,6 +3476,18 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};       
   }
   
+  if($histname eq "weathercloudcover") {                                                          # Wolkenbedeckung
+      $val = $wcc;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $wcc;   
+      $data{$type}{$name}{pvhist}{$day}{99}{wcc}     = q{};       
+  }
+  
+  if($histname eq "weatherrainprob") {                                                            # Niederschlagswahrscheinlichkeit
+      $val = $wrp;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{wrp} = $wrp;   
+      $data{$type}{$name}{pvhist}{$day}{99}{wrp}     = q{};       
+  }
+  
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
     
 return;
@@ -3491,8 +3515,10 @@ sub listDataPool {
           my $gcons   = HistoryVal ($hash, $day, $key, "gcons",      0);
           my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",    0);
           my $wid     = HistoryVal ($hash, $day, $key, "weatherid", -1);
+          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",        0);
+          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",        0);
           $ret       .= "\n      " if($ret);
-          $ret       .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $gcons, gfeedin: $gfeedin, weatherid: $wid";
+          $ret       .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $gcons, gfeedin: $gfeedin, weatherid: $wid, cloudcover: $wcc, rainprob: $wrp";
       }
       return $ret;
   };
@@ -3522,7 +3548,7 @@ sub listDataPool {
           my $wccv    = CircularVal ($hash, $idx, "weathercloudcover", 0);
           my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   0);
           $sq        .= "\n" if($sq);
-          $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, weathercloudcover: $wccv, weatherrainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
+          $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, cloudcover: $wccv, rainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
       }
   }
   
@@ -3736,10 +3762,13 @@ return;
 #
 #    $day: Tag des Monats (01,02,...,31)
 #    $hod: Stunde des Tages (01,02,...,24,99)
-#    $key:    pvrl    - realer PV Ertrag
-#             pvfc    - PV Vorhersage
-#             gcons   - realer Netzbezug
-#             gfeedin - reale Netzeinspeisung
+#    $key:    pvrl      - realer PV Ertrag
+#             pvfc      - PV Vorhersage
+#             gcons     - realer Netzbezug
+#             gfeedin   - reale Netzeinspeisung
+#             weatherid - Wetter ID
+#             wcc       - Grad der Bewölkung
+#             wrp       - Niederschlagswahrscheinlichkeit
 #    $def: Defaultwert
 #
 ################################################################
@@ -4220,10 +4249,13 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>
          <table>  
          <colgroup> <col width=20%> <col width=80%> </colgroup>
-            <tr><td> <b>pvforecast</b>  </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde           </td></tr>
-            <tr><td> <b>pvreal</b>      </td><td>reale PV Erzeugung der jeweiligen Stunde                      </td></tr>
-            <tr><td> <b>gcons</b>       </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde </td></tr>
-            <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung in das Stromnetz der jeweiligen Stunde      </td></tr>
+            <tr><td> <b>pvforecast</b>  </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde                         </td></tr>
+            <tr><td> <b>pvreal</b>      </td><td>reale PV Erzeugung der jeweiligen Stunde                                    </td></tr>
+            <tr><td> <b>gcons</b>       </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde               </td></tr>
+            <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung in das Stromnetz der jeweiligen Stunde                    </td></tr>
+            <tr><td> <b>weatherid</b>   </td><td>Identifikationsnummer des Wetters in der jeweiligen Stunde                  </td></tr>
+            <tr><td> <b>cloudcover</b>  </td><td>effektive Wolkenbedeckung der jeweiligen Stunde                             </td></tr>
+            <tr><td> <b>rainprob</b>    </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
          </table>
       </ul>
       </li>      
