@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.02: Suppress Log message "opening device..."
 #   0.1.01: Small Fix to avoid "garbage" leading to invalid JSON
 #   0.1.00: Initial Release
 ##############################################################################
@@ -48,7 +49,7 @@ use utf8;
 use Digest::MD5 qw(md5);
 
 
-my $version = "0.1.01";
+my $version = "0.1.02";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -1656,6 +1657,7 @@ sub wsConnect2 {
     #$hash->{DeviceName} = $url;
     $hash->{DeviceName} = 'wss:' . $host . ':' . $port . $path;
     $hash->{SSL}        = 1;
+    $hash->{devioLoglevel} = LOG_RECEIVE;
     DevIo_OpenDev( $hash, 0, "FHEM::Gruenbeck::SoftliqCloud::wsStart", "FHEM::Gruenbeck::SoftliqCloud::wsFail" );
 
     return;
