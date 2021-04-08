@@ -660,7 +660,7 @@ sub UpgradeAttributes {
         if ($aName =~ /(.+)IDRegex$/) {
             my $new = $1 . "IdRegex";
             my $val = $attr{$name}{$aName};
-            CommandAttr(undef, "$name $new $val");          # also adds new attr to userattr list through _Attr function
+            CommandAttr(undef, "$name $new $val");
             CommandDeleteAttr(undef, "$name $aName");
             $dHash{$aName} = 1;
             Log3 $name, 3, "$name: upgraded attribute name $aName to new sytax $new";
@@ -3645,7 +3645,10 @@ sub AddToSendQueue {
             restricts the effect of errorLogLevel to such error messages that match this regex.
 
         <li><b>Remarks regarding the automatically created userattr entries</b></li>
-            Fhemweb allows attributes to be edited by clicking on them. However this does not work for attributes that match to a wildcard attribute. To circumvent this restriction HTTPMOD automatically adds an entry for each instance of a defined wildcard attribute to the device userattr list. E.g. if you define a reading[0-9]Name attribute as reading01Name, HTTPMOD will add reading01Name to the device userattr list. These entries only have the purpose of making editing in Fhemweb easier.
+            Fhemweb allows attributes to be edited by clicking on them. However this did not work for attributes that match to a wildcard attribute in earlier versions. 
+            To circumvent this restriction HTTPMOD automatically added an entry for each instance of a defined wildcard attribute to the device userattr list. 
+            E.g. if you define a reading[0-9]Name attribute as reading01Name, HTTPMOD added reading01Name to the device userattr list. 
+            These entries only had the purpose of making editing in Fhemweb easier. In newer versions this has become obsolete.
     </ul>
     <br>
     <b>Author's notes</b><br><br>

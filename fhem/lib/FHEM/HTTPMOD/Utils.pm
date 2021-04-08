@@ -474,8 +474,13 @@ sub SwapByteOrder {
 }
 
 
-#########################################################################
+############################################################################
 # set userAttr-Attribute for Regex-Attrs
+# with recent version of fhem userattrs are no longer needed 
+# to edit them or match hints.
+# so remove all userattr entries for regex attrs 
+# unless their hint is different from the one in the modules list
+#
 # pass device hash and new attr based on a regex attr
 sub ManageUserAttr {                     
     my $hash    = shift;
@@ -509,13 +514,13 @@ sub ManageUserAttr {
             UALOOP:
             foreach my $userAttr (split(" ", $uaList)) {            # for every userAttr
                 my ($userAttrName, $userAttrHint) 
-                    = $userAttr =~ m{ \A ([^:]+) (:?.*) }xms;       # split module attr list entry in name and optional hint
+                    = $userAttr =~ m{ \A ([^:]+) (:?.*) }xms;       # split user attr list entry in name and optional hint
                 #Log3 $name, 5, "$name: ManageUserAttr compares userattr name $userAttrName with passed attr name $aName";
                 if ($userAttrName eq $aName) {
                     #Log3 $name, 5, "$name: ManageUserAttr compares hints from userattr $userAttrHint with hint from list $listAttrHint";
                     $found = 1;
                     if ($userAttrHint && $userAttrHint ne ($listAttrHint // '')) {
-                        $uaHash{$userAttr} = 1;                     # keep $userAttr with hint if module attr has no hint
+                        $uaHash{$userAttr} = 1;                     # keep $userAttr with hint if module attr has different or no hint
                         #Log3 $name, 5, "$name: ManageUserAttr keeps userattr $userAttr with different hint";
                     }
                 } else {
@@ -523,10 +528,11 @@ sub ManageUserAttr {
                     #Log3 $name, 5, "$name: ManageUserAttr keeps other existing userattr $userAttr";
                 }
             }
-            if (!$found && $listAttrHint) {                         # add userAttr with attr from module list
-                $uaHash{$aName . $listAttrHint} = 1;
-                #Log3 $name, 5, "$name: ManageUserAttr adds $aName$listAttrHint";
-            }
+            # this code is no longer necessary - fhem recognizes hints from regex attrs by itself now
+            #if (!$found && $listAttrHint) {                         # add userAttr with attr from module list
+            #    $uaHash{$aName . $listAttrHint} = 1;
+            #    #Log3 $name, 5, "$name: ManageUserAttr adds $aName$listAttrHint";
+            #}
             my $aString = join(" ", sort keys %uaHash);             # reconstruct userAttr list string
             if ($aString) {
                 $attr{$name}{userattr} = $aString;
