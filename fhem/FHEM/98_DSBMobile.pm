@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #     Changelog:
+#     0.0.09: Minor fix in UTF8-conversion
 #     0.0.08: Minor fix, added versioning
 ##############################################################################
 ##############################################################################
@@ -37,7 +38,7 @@ use HttpUtils;
 use Data::Dumper;
 use FHEM::Meta;
 
-my $version = "0.0.08";
+my $version = "0.0.09";
 my $missingModul = "";
 
 #eval "use Blocking;1" or $missingModul .= "Blocking ";
@@ -326,7 +327,7 @@ sub DSBMobile_getDocsCallback($) {
 
     Log3 $name, 5, "[$name] 2nd nonblocking HTTP Call returning";
     Log3 $name, 5, "[$name] GetData - received $data";
-    my $json = DSBMobile_safe_decode_json( $hash, $data );
+    my $json = DSBMobile_safe_decode_json( $hash, latin1ToUtf8($data) );
     return unless defined($json);
 
     my $res = latin1ToUtf8($json);
