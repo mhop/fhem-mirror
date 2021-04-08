@@ -4600,7 +4600,7 @@ sub card
 
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minVal);
-  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/><circle/>',(50-int((${$a}[59]*$m+$n)*10)/10),color($currColor,$ln));
+  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/></circle>',(50-int((${$a}[59]*$m+$n)*10)/10),color($currColor,$ln));
   
   $out.= sprintf('<text text-anchor="end" x="-2" y="3" style="fill:%s;font-size:8px;%s">%s</text>',color($maxColor,$lmm),"",$max);  
   $out.= sprintf('<text text-anchor="end" x="-2" y="53" style="fill:%s;font-size:8px;%s">%s</text>',color($minColor,$lmm),"",$min);
