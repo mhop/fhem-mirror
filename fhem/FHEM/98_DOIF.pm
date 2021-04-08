@@ -4549,7 +4549,7 @@ sub card
   $out.= '<linearGradient id="gradcardback" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<linearGradient id="gradcard_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),color($currColor,$lr),color($minColor,$lr));
   $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:0.8"/></linearGradient>',$maxValColor,$minColor,(defined $lr ? $lr:0),color ($maxValColor,$lr),color($minColor,$lr));
-  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:0.3"/><stop offset="1" style="stop-color:%s;stop-opacity:0.1"/></linearGradient>',$maxValColor,$minColor,(defined $lr ? $lr:0),color($maxValColor,$lr),color($minColor,$lr));
+  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:0.3"/><stop offset="1" style="stop-color:%s;stop-opacity:0.0"/></linearGradient>',$maxValColor,$minColor,(defined $lr ? $lr:0),color($maxValColor,$lr),color($minColor,$lr));
   $out.= '</defs>';
   
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
