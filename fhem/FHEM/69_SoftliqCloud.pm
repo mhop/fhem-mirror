@@ -21,6 +21,8 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.03: Improve error handling
+#           Hide access- & refreshToken
 #   0.1.02: Suppress Log message "opening device..."
 #   0.1.01: Small Fix to avoid "garbage" leading to invalid JSON
 #   0.1.00: Initial Release
@@ -49,7 +51,7 @@ use utf8;
 use Digest::MD5 qw(md5);
 
 
-my $version = "0.1.02";
+my $version = "0.1.03";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -91,6 +93,7 @@ BEGIN {
         qw(
             AttrVal
             AttrNum
+            CommandDeleteReading
             InternalTimer
             InternalVal
             readingsSingleUpdate
@@ -277,6 +280,13 @@ sub Define {
     $hash->{USER} = $user;
     $hash->{VERSION} = $version;
 
+    if (ReadingsVal($name,"accessToken",$EMPTY) ne $EMPTY) {
+        CommandDeleteReading( undef, $name . " accessToken" );
+    }
+    if (ReadingsVal($name,"refreshToken",$EMPTY) ne $EMPTY) {
+        CommandDeleteReading( undef, $name . " refreshToken" );
+    }
+    
     #start timer
     if ( !IsDisabled($name) && $init_done && defined( ReadPassword($hash) ) ) {
         my $next = int( gettimeofday() ) + 1;
@@ -363,7 +373,9 @@ sub Get {
 
     delete $hash->{helper}{cmdQueue};
 
-    return query($hash) if ( $cmd eq 'query' );
+    if ( $cmd eq 'query' ) {
+        return query($hash);
+    }
 
     if ( $cmd eq 'water' || $cmd eq 'salt' ) {
         getRefreshTokenDirect($hash) if isExpiredToken($hash);
@@ -609,7 +621,7 @@ sub query {
 
     my $name = $hash->{NAME};
 
-    if ( ReadingsVal( $name, 'accessToken', $EMPTY ) eq $EMPTY || isExpiredToken($hash) ) {
+    if ( ReadingsVal( $name, '.accessToken', $EMPTY ) eq $EMPTY || isExpiredToken($hash) ) {
         push @{ $hash->{helper}{cmdQueue} }, \&authenticate;
         push @{ $hash->{helper}{cmdQueue} }, \&login;
         push @{ $hash->{helper}{cmdQueue} }, \&getCode;
@@ -784,6 +796,14 @@ sub parseLogin {
 
     # $data should be {"status":"200"}
     Log3 $name, LOG_RECEIVE, $err . " / " . $data . Dumper($header);
+    my $json = safe_decode_json( $hash, $data );
+    if ($json->{status} ne "200") {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "error",             $json->{status} );
+        readingsBulkUpdate( $hash, "error_description", $json->{message} );
+        readingsEndUpdate( $hash, 1 );
+        return;
+    }
 
     my $cookies = getCookies( $hash, $header );
     if ( $hash->{HTTPCookieHash} ) {
@@ -930,8 +950,8 @@ sub parseRefreshToken {
 
     # seems like access token is valid for 14 days, refresg token for 1 hour
     readingsBeginUpdate($hash);
-    readingsBulkUpdate( $hash, "accessToken",  $data->{access_token} );
-    readingsBulkUpdate( $hash, "refreshToken", $data->{refresh_token} );
+    readingsBulkUpdate( $hash, ".accessToken",  $data->{access_token} );
+    readingsBulkUpdate( $hash, ".refreshToken", $data->{refresh_token} );
     readingsBulkUpdate( $hash, "not_before",   strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{not_before} ) ) );
     readingsBulkUpdate( $hash, "expires_on",   strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{expires_on} ) ) );
 
@@ -965,7 +985,7 @@ sub getRefreshTokenHeader {
     my $newdata
         = "client_id=5a83cc16-ffb1-42e9-9859-9fbf07f36df8&scope=https://gruenbeckb2c.onmicrosoft.com/iot/user_impersonation openid profile offline_access&"
         . "refresh_token="
-        . ReadingsVal( $name, 'refreshToken', $EMPTY )    #$hash->{helper}{refreshToken}
+        . ReadingsVal( $name, '.refreshToken', $EMPTY )    #$hash->{helper}{refreshToken}
         . "&client_info=1&" . "grant_type=refresh_token";
     my $param = {
         header => $header,
@@ -1117,7 +1137,7 @@ sub getInfo {
         "Accept" => "application/json, text/plain, */*",
         "User-Agent" =>
             "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-        "Authorization"   => "Bearer " . ReadingsVal( $name, 'accessToken', undef ),
+        "Authorization"   => "Bearer " . ReadingsVal( $name, '.accessToken', undef ),
         "Accept-Language" => "de-de",
         "cache-control"   => "no-cache"
     };
