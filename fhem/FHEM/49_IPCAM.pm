@@ -487,6 +487,7 @@ sub RequestSnapshotWithCallback {
     method => "GET",
     callback => \&IPCAM::RequestSnapshot_Callback,
     hash => $hash,
+    incrementalTimout => 1,
     callbackCommand => $callbackCommand
   };
   HttpUtils_NonblockingGet($apiParam);
