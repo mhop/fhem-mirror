@@ -38,7 +38,7 @@ IPCAM_Initialize($$)
   $hash->{GetFn}    = "IPCAM::Get";
   $hash->{SetFn}    = "IPCAM::Set";
 #  $hash->{FW_detailFn} = "IPCAM::DetailFn";
-  $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage timestamp:0,1 ".
+  $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage httpTimeout timestamp:0,1 ".
                       "cmdPanLeft cmdPanRight cmdTiltUp cmdTiltDown cmdStep ".
                       "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
                       "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
@@ -283,6 +283,8 @@ sub SendCommand {
     url => $camUrl,
     method => "GET",
     callback => \&IPCAM::SendCommand_Callback,
+    incrementalTimeout => 1,
+    timeout => AttrVal($name, 'httpTimeout', 4),
     hash => $hash
   };
 
@@ -488,6 +490,7 @@ sub RequestSnapshotWithCallback {
     callback => \&IPCAM::RequestSnapshot_Callback,
     hash => $hash,
     incrementalTimeout => 1,
+    timeout => AttrVal($name, 'httpTimeout', 4),
     callbackCommand => $callbackCommand
   };
   HttpUtils_NonblockingGet($apiParam);
