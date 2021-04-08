@@ -1786,6 +1786,7 @@ sub _transferMeterValues {
   
   return if(!$gc || !$gf || !$gt || !$ft);
   
+  $gfunit //= $gcunit;
   Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
   
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
