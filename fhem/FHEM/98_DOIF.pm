@@ -1328,8 +1328,10 @@ sub collect_setValue
   my $diff_slots=1;
   my $maxVal;
   my $maxValTime;
+  my $maxValSlot;
   my $minVal;
   my $minValTime;
+  my $minValSlot;
   
   my $va=$hash->{collect}{"$name $reading"}{$hours}{values};
   my $ta=$hash->{collect}{"$name $reading"}{$hours}{times};
@@ -1387,19 +1389,23 @@ sub collect_setValue
       if (!defined $maxVal or $value > $maxVal) {
          $maxVal=$value;
          $maxValTime=$time;
+         $maxValSlot=$i;
          
       }
       if (!defined $minVal or $value < $minVal) {
          $minVal=$value;
          $minValTime=$time;
-         
+         $minValSlot=$i;
       }
     }
   }
   $hash->{collect}{"$name $reading"}{$hours}{max_value}=$maxVal;
   $hash->{collect}{"$name $reading"}{$hours}{max_value_time}=$maxValTime;
+  $hash->{collect}{"$name $reading"}{$hours}{max_value_slot}=$maxValSlot;
+  
   $hash->{collect}{"$name $reading"}{$hours}{min_value}=$minVal;
   $hash->{collect}{"$name $reading"}{$hours}{min_value_time}=$minValTime;
+  $hash->{collect}{"$name $reading"}{$hours}{min_value_slot}=$minValSlot;
 }
 
 sub EvalAllDoIf($$)
@@ -4456,8 +4462,11 @@ sub card
   my $a=@{$collect}{values};
   my $maxVal = ${$collect}{max_value};
   my $maxValTime = ${$collect}{max_value_time};
+  my $maxValSlot = ${$collect}{max_value_slot};
+  
   my $minVal = ${$collect}{min_value};
   my $minValTime = ${$collect}{min_value_time};
+  my $minValSlot = ${$collect}{min_value_slot};
   my $hours = ${$collect}{hours};
   my $time = ${$collect}{time};
 
@@ -4562,6 +4571,7 @@ sub card
   }
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
   $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:1" />';
+  $out.= '<svg width="102" height="72">';
   $out.= '<g transform="translate(32,8) scale(1) ">';
   my $points="";
   my $first=1;
@@ -4586,8 +4596,12 @@ sub card
   $out.=sprintf('<polyline points="0,%s ',$xpos);
   $out.= $points;
   $out.= sprintf('59,%s" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:1" />',$xpos,$maxValColor,$minColor,(defined $lr ? $lr:0),$maxValColor,$minColor,(defined $lr ? $lr:0));
-  
 
+
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal);
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minVal);
+  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"/>',(50-int((${$a}[59]*$m+$n)*10)/10),color($currColor,$ln));
+  
   $out.= sprintf('<text text-anchor="end" x="-2" y="3" style="fill:%s;font-size:8px;%s">%s</text>',color($maxColor,$lmm),"",$max);  
   $out.= sprintf('<text text-anchor="end" x="-2" y="53" style="fill:%s;font-size:8px;%s">%s</text>',color($minColor,$lmm),"",$min);
   $out.= sprintf('<text text-anchor="end" x="-2" y="%s" style="fill:%s;font-size:8px;%s">%s</text>',$xpos+3,color($nullColor,$lmm),"",0) if (defined $nullColor);
@@ -4597,7 +4611,7 @@ sub card
   $out.=sprintf('<text text-anchor="middle" x="29" y="61" style="fill:white; font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*1800)));
   $out.=sprintf('<text text-anchor="end" x="69" y="61" style="fill:white; font-size:8px">%s</text>',::strftime("%H:%M",localtime($time)));
   $out.= '</g>';
-
+  $out.= '</svg>';
   if (defined $header or !defined $icon) {
     $out.='<g transform="translate(105,4)">';     #$out.='<g transform="translate(101,9)">';
     $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness);
