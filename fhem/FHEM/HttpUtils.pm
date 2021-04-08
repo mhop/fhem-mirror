@@ -82,6 +82,7 @@ HttpUtils_Close($)
     }
   }
   delete($hash->{conn});
+  delete($hash->{hu_inProgress});
   delete($hash->{hu_sslAdded});
   delete($hash->{hu_filecount});
   delete($hash->{hu_blocking});
@@ -411,6 +412,7 @@ HttpUtils_Connect($)
                       IO::Socket::INET6->new(Proto=>'tcp', Blocking=>0);
       if(!$hash->{conn}) {
         Log3 $hash, $hash->{loglevel}, "HttpUtils: Creating socket: $!";
+        delete($hash->{hu_inProgress});
         return $hash->{callback}($hash, "Creating socket: $!", "");
       }
       my $sa = length($iaddr)==4 ?  sockaddr_in($port, $iaddr) : 
@@ -447,6 +449,7 @@ HttpUtils_Connect($)
             my $err = HttpUtils_Connect2($hash);
             if($err) {
               Log3 $hash, $hash->{loglevel}, "HttpUtils: $err";
+              delete($hash->{hu_inProgress});
               $hash->{callback}($hash, $err, "");
             }
             return $err;
@@ -553,6 +556,7 @@ HttpUtils_Connect2($)
   }
 
   if($hash->{noConn2}) {
+    delete($hash->{hu_inProgress});
     $hash->{callback}($hash);
     return undef;
   }
@@ -636,7 +640,10 @@ HttpUtils_Connect2($)
         delete($selectlist{$hash});
         RemoveInternalTimer(\%timerHash);
         my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
-        $hash->{callback}($hash, $err, $ret) if(!$redirect);
+        if(!$redirect) {
+          delete($hash->{hu_inProgress});
+          $hash->{callback}($hash, $err, $ret);
+        }
 
       } elsif($hash->{incrementalTimeout}) {    # Forum #85307
         RemoveInternalTimer(\%timerHash);
@@ -927,8 +934,18 @@ HttpUtils_NonblockingGet($)
   $hash->{hu_blocking} = 0;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return $hash->{callback}($hash, $fErr, $fContent) if($isFile);
+  if($hash->{hu_inProgress}) {
+    my $m = "Another HttpUtils_NonblockingGet with the same hash is in progress";
+    Log 1, "ERROR: $m";
+    stacktrace();
+    return $hash->{callback}($hash, $m, undef);
+  }
+  $hash->{hu_inProgress} = 1;
   my $err = HttpUtils_Connect($hash);
-  $hash->{callback}($hash, $err, "") if($err);
+  if($err) {
+    delete($hash->{hu_inProgress});
+    $hash->{callback}($hash, $err, "");
+  }
 }
 
 #################
