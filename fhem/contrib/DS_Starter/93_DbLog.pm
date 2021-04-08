@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.2"  => "08.04.2021 change standard splitting ",
+  "4.12.1"  => "07.04.2021 improve escaping the pipe ",
   "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
   "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
                            "remove prototypes, new subs DbLog_writeFileIfCacheOverflow, DbLog_setReadingstate ",
@@ -839,6 +841,7 @@ sub DbLog_Set {
             $outfile = $dir."cache_".$name."_".$now;
             $out     = ">$outfile";
         }
+        
         if(open(FH, $out)) {
             binmode (FH);
         } 
@@ -927,6 +930,7 @@ sub DbLog_Set {
     }
     elsif ($a[1] eq 'count') {
         $dbh = DbLog_ConnectNewDBH($hash);
+        
         if(!$dbh) {
             Log3($name, 1, "DbLog $name: DBLog_Set - count - DB connect not possible");
             return;
@@ -1077,7 +1081,7 @@ sub DbLog_ParseEvent {
 
   # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-  my @parts = split(/: /,$event);
+  my @parts = split(/: /,$event, 2);
   $reading  = shift @parts;
   if(@parts == 2) { 
     $value = $parts[0];
@@ -1431,7 +1435,7 @@ sub DbLog_Log {
           if($dev_name =~ m/^$re$/ || "$dev_name:$event" =~ m/^$re$/ || $DbLogSelectionMode eq 'Include') {
               my $timestamp = $ts_0;
               $timestamp = $dev_hash->{CHANGETIME}[$i] if(defined($dev_hash->{CHANGETIME}[$i]));
-              $event =~ s/\|/_ESC_/g;    # escape Pipe "|"
+              $event =~ s/\|/_ESC_/gxs;                                                               # escape Pipe "|"
               
               my @r = DbLog_ParseEvent($name,$dev_name, $dev_type, $event);
               $reading = $r[0];
@@ -1450,20 +1454,20 @@ sub DbLog_Log {
               if($exc) {
                   $exc    =~ s/[\s\n]/,/g;
                   @excldr = split(",",$exc);
-                  foreach my $excl (@excldr) {
+                  
+                  for my $excl (@excldr) {
                       ($ds,$rd) = split("#",$excl);
                       @exdvs = devspec2array($ds);
                       if(@exdvs) {
-                          # Log3 $name, 3, "DbLog $name -> excludeDevs: @exdvs";
-                          foreach (@exdvs) {
+                          for my $ed (@exdvs) {
                               if($rd) {
-                                  if("$dev_name:$reading" =~ m/^$_:$rd$/) {
+                                  if("$dev_name:$reading" =~ m/^$ed:$rd$/) {
                                       Log3 $name, 4, "DbLog $name -> Device:Reading \"$dev_name:$reading\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                                       $next = 1;
                                   }
                               } 
                               else {
-                                  if($dev_name =~ m/^$_$/) {
+                                  if($dev_name =~ m/^$ed$/) {
                                       Log3 $name, 4, "DbLog $name -> Device \"$dev_name\" global excluded from logging by attribute \"excludeDevs\" " if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
                                       $next = 1;
                                   }                          
@@ -1485,24 +1489,21 @@ sub DbLog_Log {
               
               $DoIt = 1 if($DbLogSelectionMode =~ m/Exclude/ );
           
-              if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {
-                  # Bsp: "(temperature|humidity):300,battery:3600:force"
+              if($DbLogExclude && $DbLogSelectionMode =~ m/Exclude/) {                                        # Bsp: "(temperature|humidity):300,battery:3600:force"
                   my @v1 = split(/,/, $DbLogExclude);
               
                   for (my $i=0; $i<int(@v1); $i++) {
                       my @v2 = split(/:/, $v1[$i]);
-                      $DoIt = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,); #Reading matcht auf Regexp, kein MinIntervall angegeben
+                      $DoIt = 0 if(!$v2[1] && $reading =~ m,^$v2[0]$,);                                       # Reading matcht auf Regexp, kein MinIntervall angegeben
                   
-                      if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {
-                          #Regexp matcht und MinIntervall ist angegeben
+                      if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                     # Regexp matcht und MinIntervall ist angegeben
                           my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                           my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
                           $lt    = 0  if(!$lt);         
-                          $lv    = "" if(!defined $lv);                   # Forum: #100344
-                          $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
+                          $lv    = "" if(!defined $lv);                                                       # Forum: #100344
+                          $force = ($v2[2] && $v2[2] =~ /force/i) ? 1 : 0;                                    # Forum: #97148
 
-                          if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
-                              # innerhalb MinIntervall und LastValue=Value
+                          if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {                              # innerhalb MinIntervall und LastValue=Value                              
                               $DoIt = 0;
                           }
                       }
@@ -1517,18 +1518,16 @@ sub DbLog_Log {
               
                       for (my $i=0; $i<int(@v1); $i++) {
                           my @v2 = split(/:/, $v1[$i]);
-                          $DoIt = 1 if($reading =~ m,^$v2[0]$,); #Reading matcht auf Regexp
+                          $DoIt = 1 if($reading =~ m,^$v2[0]$,);                                                # Reading matcht auf Regexp
                   
-                          if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {
-                              #Regexp matcht und MinIntervall ist angegeben
+                          if(($v2[1] && $reading =~ m,^$v2[0]$,) && ($v2[1] =~ m/^(\d+)$/)) {                   # Regexp matcht und MinIntervall ist angegeben
                               my $lt = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};
                               my $lv = $defs{$dev_hash->{NAME}}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};
                               $lt    = 0  if(!$lt);
-                              $lv    = "" if(!defined $lv);                   # Forum: #100344
-                              $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;    # Forum: #97148
+                              $lv    = "" if(!defined $lv);                                                     # Forum: #100344
+                              $force = ($v2[2] && $v2[2] =~ /force/i)?1:0;                                      # Forum: #97148
        
-                              if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {
-                                  # innerhalb MinIntervall und LastValue=Value
+                              if(($now-$lt < $v2[1]) && ($lv eq $value || $force)) {                            # innerhalb MinIntervall und LastValue=Value
                                   $DoIt = 0;
                               }
                           }
@@ -1541,7 +1540,7 @@ sub DbLog_Log {
               $DoIt = DbLog_checkDefMinInt($name,$dev_name,$now,$reading,$value);
         
               if ($DoIt) {
-                  my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};    # patch Forum:#111423
+                  my $lastt = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME};                  # patch Forum:#111423
                   my $lastv = $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE};   
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $now;
                   $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $value;
@@ -1549,12 +1548,12 @@ sub DbLog_Log {
                   # Device spezifische DbLogValueFn-Funktion anwenden
                   if($DbLogValueFn ne '') {
                       my $TIMESTAMP     = $timestamp;
-                      my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
+                      my $LASTTIMESTAMP = $lastt // 0;                                                         # patch Forum:#111423
                       my $DEVICE        = $dev_name;
                       my $EVENT         = $event;
                       my $READING       = $reading;
                       my $VALUE         = $value;
-                      my $LASTVALUE     = $lastv // "";                      # patch Forum:#111423
+                      my $LASTVALUE     = $lastv // "";                                                        # patch Forum:#111423
                       my $UNIT          = $unit;
                       my $IGNORE        = 0;
                       my $CN            = " ";
@@ -1562,23 +1561,27 @@ sub DbLog_Log {
                       eval $DbLogValueFn;
                       Log3 $name, 2, "DbLog $name -> error device \"$dev_name\" specific DbLogValueFn: ".$@ if($@);
                       
-                      if($IGNORE) {
-                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);  # patch Forum:#111423
+                      if($IGNORE) {                                                                                        # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);             # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);  
-                          Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-                                                  if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
+                          
+                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
+                              Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by device \"$dev_name\" specific DbLogValueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
+                          }
+                          
                           next;  
                       }
                       
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
                       } 
                       else {
                           Log3 ($name, 2, "DbLog $name -> TIMESTAMP got from DbLogValueFn in $dev_name is invalid: $TIMESTAMP");
                       }
+                      
                       $reading   = $READING  if($READING ne '');
                       $value     = $VALUE    if(defined $VALUE);
                       $unit      = $UNIT     if(defined $UNIT);
@@ -1587,13 +1590,13 @@ sub DbLog_Log {
                   # zentrale valueFn im DbLog-Device abarbeiten
                   if($value_fn ne '') {
                       my $TIMESTAMP     = $timestamp;
-                      my $LASTTIMESTAMP = $lastt // 0;                       # patch Forum:#111423
+                      my $LASTTIMESTAMP = $lastt // 0;                                                        # patch Forum:#111423
                       my $DEVICE        = $dev_name;
                       my $DEVICETYPE    = $dev_type;
                       my $EVENT         = $event;
                       my $READING       = $reading;
                       my $VALUE         = $value;
-                      my $LASTVALUE     = $lastv // "";                      # patch Forum:#111423
+                      my $LASTVALUE     = $lastv // "";                                                       # patch Forum:#111423
                       my $UNIT          = $unit;
                       my $IGNORE        = 0;
                       my $CN            = " ";
@@ -1601,16 +1604,20 @@ sub DbLog_Log {
                       eval $value_fn;
                       Log3 $name, 2, "DbLog $name -> error valueFn: ".$@ if($@);
                       
-                      if($IGNORE) {
-                          # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
-                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);  # patch Forum:#111423
+                      if($IGNORE) {                                                                                     # aktueller Event wird nicht geloggt wenn $IGNORE=1 gesetzt
+                          $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{TIME}  = $lastt if($lastt);          # patch Forum:#111423
                           $defs{$dev_name}{Helper}{DBLOG}{$reading}{$hash->{NAME}}{VALUE} = $lastv if(defined $lastv);                           
-                          Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
-                                                  if($vb4show && !$hash->{HELPER}{".RUNNING_PID"});
+                          
+                          if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}) {
+                              Log3 $hash->{NAME}, 4, "DbLog $name -> Event ignored by valueFn - TS: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit";
+                          }
+                          
                           next;  
                       }
+                      
                       my ($yyyy, $mm, $dd, $hh, $min, $sec) = ($TIMESTAMP =~ /(\d+)-(\d+)-(\d+) (\d+):(\d+):(\d+)/);
                       eval { my $epoch_seconds_begin = timelocal($sec, $min, $hh, $dd, $mm-1, $yyyy-1900); };
+                      
                       if (!$@) {
                           $timestamp = $TIMESTAMP;
                       } 
@@ -1631,8 +1638,8 @@ sub DbLog_Log {
                   Log3 $hash->{NAME}, 4, "DbLog $name -> added event - Timestamp: $timestamp, Device: $dev_name, Type: $dev_type, Event: $event, Reading: $reading, Value: $value, Unit: $unit"
                                           if($vb4show && !$hash->{HELPER}{".RUNNING_PID"}); 
                   
-                  if($async) {                                             # asynchoner non-blocking Mode                                                  
-                      $data{DbLog}{$name}{cache}{index}++;                 # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
+                  if($async) {                                                               # asynchoner non-blocking Mode                                                  
+                      $data{DbLog}{$name}{cache}{index}++;                                   # Cache & CacheIndex für Events zum asynchronen Schreiben in DB
                       my $index = $data{DbLog}{$name}{cache}{index};
                       $data{DbLog}{$name}{cache}{memcache}{$index} = $row;
                       
@@ -1641,7 +1648,7 @@ sub DbLog_Log {
 
                       readingsSingleUpdate($hash, "CacheUsage", $memcount, $mce);
 
-                      if($memcount >= $clim) {                             # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
+                      if($memcount >= $clim) {                                               # asynchrone Schreibroutine aufrufen wenn Füllstand des Cache erreicht ist
                           my $lmlr     = $hash->{HELPER}{LASTLIMITRUNTIME};
                           my $syncival = AttrVal($name, "syncInterval", 30);
                           if(!$lmlr || gettimeofday() > $lmlr+($syncival/2)) {
@@ -1650,9 +1657,9 @@ sub DbLog_Log {
                               $hash->{HELPER}{LASTLIMITRUNTIME} = gettimeofday();
                           }
                       }
-                      $net = tv_interval($nst);                 # Notify-Routine Laufzeit ermitteln
+                      $net = tv_interval($nst);                                              # Notify-Routine Laufzeit ermitteln
                   } 
-                  else {                                        # synchoner Mode
+                  else {                                                                     # synchoner Mode
                       push(@row_array, $row);       
                   }  
               }       
@@ -1660,9 +1667,8 @@ sub DbLog_Log {
       }
   }; 
   if(!$async) {  
-      if(@row_array) {
-          # synchoner Mode
-          return if($hash->{HELPER}{REOPEN_RUNS});              # return wenn "reopen" mit Ablaufzeit gestartet ist          
+      if(@row_array) {                                                                       # synchoner Mode
+          return if($hash->{HELPER}{REOPEN_RUNS});                                           # return wenn "reopen" mit Ablaufzeit gestartet ist          
           
           my $error = DbLog_Push($hash, $vb4show, @row_array);
           Log3 ($name, 5, "DbLog $name -> DbLog_Push Returncode: $error") if($error && $vb4show);
@@ -1675,8 +1681,8 @@ sub DbLog_Log {
           
           # Notify-Routine Laufzeit ermitteln
           $net = tv_interval($nst);
-      
-      } else {
+      } 
+      else {
           CancelDelayedShutdown($name) if($hash->{HELPER}{SHUTDOWNSEQ});
           Log3 ($name, 2, "DbLog $name - no data for last database write cycle") if(delete $hash->{HELPER}{SHUTDOWNSEQ});
       }
@@ -1769,7 +1775,7 @@ sub DbLog_Push {
   my $current   = $hash->{HELPER}{TC};
   my $errorh    = "";
   my $error     = "";
-  my $doins     = 0;  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
+  my $doins     = 0;                                                                  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
   my $dbh;
   
   my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
@@ -1782,8 +1788,7 @@ sub DbLog_Push {
   else {
       $dbh = $hash->{DBHP};
       eval {
-          if ( !$dbh || not $dbh->ping ) {
-              # DB Session dead, try to reopen now !
+          if ( !$dbh || not $dbh->ping ) {                                           # DB Session dead, try to reopen now !
               DbLog_ConnectPush($hash,1);
           }  
       };
@@ -1799,8 +1804,7 @@ sub DbLog_Push {
   $dbh->{RaiseError} = 1; 
   $dbh->{PrintError} = 0;
   
-  if($tl) {
-      # Tracelevel setzen  
+  if($tl) {                                                                         # Tracelevel setzen  
       $dbh->{TraceLevel} = "$tl|$tf";       
   } 
   
@@ -1835,7 +1839,7 @@ sub DbLog_Push {
   
   foreach my $row (@row_array) {
       my @a = split("\\|",$row);
-      s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
+      s/_ESC_/\|/gxs for @a;                                                              # escaped Pipe return to "|"
       push(@timestamp, "$a[0]"); 
       push(@device, "$a[1]");   
       push(@type, "$a[2]");  
@@ -1874,7 +1878,7 @@ sub DbLog_Push {
           no warnings 'uninitialized';          
           foreach my $row (@row_array) {
               my @a = split("\\|",$row);       
-              s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
+              s/_ESC_/\|/gxs for @a;                  # escaped Pipe return to "|"
               Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
               $a[3] =~ s/'/''/g;                      # escape ' with ''
               $a[5] =~ s/'/''/g;                      # escape ' with ''
@@ -2571,7 +2575,7 @@ sub DbLog_PushAsync {
   no warnings 'uninitialized';
   foreach my $row (@row_array) {
       my @a = split("\\|",$row);       
-      s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
+      s/_ESC_/\|/gxs for @a;                    # escaped Pipe return to "|"
       push(@timestamp, "$a[0]"); 
       push(@device, "$a[1]");   
       push(@type, "$a[2]");  
@@ -2608,7 +2612,7 @@ sub DbLog_PushAsync {
           no warnings 'uninitialized';          
           foreach my $row (@row_array) {
               my @a = split("\\|",$row);       
-              s/_ESC_/\|/g for @a;                    # escaped Pipe return to "|"
+              s/_ESC_/\|/gxs for @a;                  # escaped Pipe return to "|"
               Log3 $hash->{NAME}, 5, "DbLog $name -> processing event Timestamp: $a[0], Device: $a[1], Type: $a[2], Event: $a[3], Reading: $a[4], Value: $a[5], Unit: $a[6]";
               $a[3] =~ s/'/''/g;                      # escape ' with ''
               $a[5] =~ s/'/''/g;                      # escape ' with ''
@@ -2868,11 +2872,11 @@ sub DbLog_PushAsync {
                   else {
                       Log3 $hash->{NAME}, 2, "DbLog $name -> WARNING - only ".($ceti-$nins_hist)." of $ceti events inserted into table $history";                 
                   }
-                  s/\|/_ESC_/g for @n2hist;       # escape Pipe "|"
+                  s/\|/_ESC_/gxs for @n2hist;                                                        # escape Pipe "|"
                   $rowlist = join('§', @n2hist);
                   $rowlist = encode_base64($rowlist,"");              
               }
-              eval {$dbh->commit() if(!$dbh->{AutoCommit});};          # Data commit
+              eval {$dbh->commit() if(!$dbh->{AutoCommit});};                                        # Data commit
               if ($@) {
                   Log3($name, 2, "DbLog $name -> Error commit $history - $@");
               } 
