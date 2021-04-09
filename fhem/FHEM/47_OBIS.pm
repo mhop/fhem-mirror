@@ -418,8 +418,8 @@ sub OBIS_Parse_List
       # Signed (5) or Unsigned (6) Int
       my $num = 0;
       my $subme = 0;
-      if ($tltype==0x60 && $len>3 && $result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{DZGHACK}) {
-		$tltype = 0x50;
+      if ($tltype==0x50 && $len<4 && $isobis && $cntdown==2 && $result[0]=~/^1-0:16\.7\.0/ && $hash->{helper}{DZGHACK}) {
+		$tltype = 0x60;
       }
       if ($len==8) {
         $num = unpack($tltype = 0x50 ? 'q>' : 'Q>',
@@ -461,7 +461,7 @@ sub OBIS_Parse_List
   }
 
   my $line = $result[0] . "(" . $result[5] . ($result[3] eq "" ? "" : "*".$result[3]) . ")\r\n";
-  $hash->{helper}{DZGHACK} = 1 if ($line=~/^1-0:96\.50\.1\*255\(DZG\)/);
+  $hash->{helper}{DZGHACK} = 1 if ($line=~/^1-0:96\.50\.1\*.*\(DZG/);
   $_[1] .= $line;
   return undef;
 
