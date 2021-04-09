@@ -925,8 +925,9 @@ sub _setreset {                          ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no source specified for reset};
   
+  my $type  = $hash->{TYPE};
+  
   if($prop eq "pvHistory") {
-      my $type = $hash->{TYPE};
       delete $data{$type}{$name}{pvhist};
       delete $hash->{HELPER}{INITETOTAL};
       return;
@@ -954,6 +955,16 @@ sub _setreset {                          ## no critic "not used"
       readingsDelete($hash, "Current_GridFeedIn");
       delete $hash->{HELPER}{INITCONTOTAL};
       delete $hash->{HELPER}{INITFEEDTOTAL};
+      delete $data{$type}{$name}{current}{gridconsumption};
+      delete $data{$type}{$name}{current}{gridfeedin};
+      delete $data{$type}{$name}{current}{consumption};
+  }
+  
+  if($prop eq "currentBatteryDev") {
+      readingsDelete($hash, "Current_PowerBatIn");
+      readingsDelete($hash, "Current_PowerBatOut");
+      delete $data{$type}{$name}{current}{powerbatout};
+      delete $data{$type}{$name}{current}{powerbatin};
   }
   
   if($prop eq "currentInverterDev") {
