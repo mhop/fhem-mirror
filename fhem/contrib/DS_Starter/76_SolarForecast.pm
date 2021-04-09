@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
   "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
   "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
   "0.30.0" => "05.04.2021  estimate readings to the minute in sub _calcSummaries, new setter energyH4Trigger ",
@@ -649,6 +650,10 @@ sub _setmeterDevice {                    ## no critic "not used"
   
   if(!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }
+
+  if($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
+      return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
   }  
 
   readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
@@ -1787,17 +1792,31 @@ sub _transferMeterValues {
   return if(!$gc || !$gf || !$gt || !$ft);
   
   $gfunit //= $gcunit;
+  $gcunit //= $gfunit;
+  
   Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
   
-  my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
-  my $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
+  my $gco;
+  if ($gc ne "-gfeedin") {                                                                    # kein Spezialfall gcon bei neg. gfeedin
+      my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
+      $gco     = ReadingsNum ($medev, $gc, 0) * $gcuf;                                        # aktueller Bezug (W)
+  }
+  else {                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
+      if($gf <= 0) {
+          $gco = abs($gf);
+          $gf  = 0;
+      }
+      else {
+          $gco = 0;
+      }
+  }
   
   my $gfin;
   if ($gf ne "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
       my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
       $gfin    = ReadingsNum ($medev, $gf, 0) * $gfuf;                                        # aktuelle Einspeisung (W)
   }
-  else {                                                                                      # bei negativen gcon -> $gfin = abs($gco), $gco = 0
+  else {                                                                                      # Spezialfall: bei negativen gcon -> $gfin = abs($gco), $gco = 0
       if($gco <= 0) {
           $gfin = abs($gco);
           $gco  = 0;
@@ -2542,10 +2561,9 @@ sub forecastGraphic {                                                           
   }
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-
-  $hfcg->{0}{beam1} = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2} = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{diff}  = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
   $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
@@ -2615,16 +2633,15 @@ sub forecastGraphic {                                                           
       $hfcg->{$i}{time}  = $hfcg->{0}{time} + $i;
 
       while ($hfcg->{$i}{time} > 24) {
-          $hfcg->{$i}{time} -= 24; # wird bis zu 2x durchlaufen
+          $hfcg->{$i}{time} -= 24;                                                                      # wird bis zu 2x durchlaufen
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time});
 
-      my $nh;                                                                                          # next hour
+      my $nh;                                                                                           # next hour
 
       if ($offset < 0) {
-          if ($i <= abs($offset)) {
-              # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
+          if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
               my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i)));
               
               # Sonderfall Mitternacht
@@ -4011,7 +4028,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <a name="currentMeterDev"></a>
       <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
       
-      Legt ein beliebiges Device und seine Readings zur Energiemessung fest. 
+      Legt ein beliebiges Device und seine Readings zur Energiemessung fest. Der numerische Wert der Readings muss immer positiv 
+      sein.
       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
       <br>
       
@@ -4027,14 +4045,15 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       </ul> 
       <br>
       
-      <b>Sonderfall:</b> Sollte das Reading für gcon und gfeedin identisch, aber vorzeichenbehaftet sein 
-      (Netzbezug+, Netzeinspeisung-), kann gfeedin definiert werden als: <br><br>
+      <b>Sonderfälle:</b> Sollte das Reading für gcon und gfeedin identisch, aber vorzeichenbehaftet sein, 
+      können die Schlüssel gfeedin und gcon wie folgt definiert werden: <br><br>
       <ul>
-        gfeedin=-gcon
+        gfeedin=-gcon  &nbsp;&nbsp;&nbsp;(ein negativer Wert von gcon wird als gfeedin verwendet)  <br>
+        gcon=-gfeedin  &nbsp;&nbsp;&nbsp;(ein negativer Wert von gfeedin wird als gcon verwendet)
       </ul>
       <br>
       
-      Die Einheit entfällt in diesem Fall da mit gcon identisch. <br><br>
+      Die Einheit entfällt in dem jeweiligen Sonderfall. <br><br>
       
       <ul>
         <b>Beispiel: </b> <br>
@@ -4451,10 +4470,10 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        
        <ul>   
          <table>  
-           <colgroup> <col width=10%> <col width=90%> </colgroup>
-           <tr><td> <b>nicht gesetzt</b>  </td><td>- nur Stundenangabe ohne Minuten (default)</td></tr>
-           <tr><td> <b>:00</b>            </td><td>- Stunden sowie Minuten zweistellig, z.B. 10:00 </td></tr>
-           <tr><td> <b>:0</b>             </td><td>- Stunden sowie Minuten einstellig, z.B. 8:0 </td></tr>
+           <colgroup> <col width=30%> <col width=70%> </colgroup>
+           <tr><td> <b>nicht gesetzt</b>  </td><td>nur Stundenangabe ohne Minuten (default)                </td></tr>
+           <tr><td> <b>:00</b>            </td><td>Stunden sowie Minuten zweistellig, z.B. 10:00           </td></tr>
+           <tr><td> <b>:0</b>             </td><td>Stunden sowie Minuten einstellig, z.B. 8:0              </td></tr>
          </table>
        </ul>       
        </li>
