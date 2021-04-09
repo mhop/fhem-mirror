@@ -4,11 +4,11 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.017
+#  Version 4.8.025
 #
 #  Configuration parameters for HomeMatic devices.
 #
-#  (c) 2020 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
 #
 #########################################################################
 
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.017';
+$HMCCU_CONFIG_VERSION = '4.8.025';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -67,14 +67,26 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'ACOUSTIC_ALARM_ACTIVE', C => 'ACOUSTIC_ALARM_SELECTION', V => '', P => 2
 	},
+	'MOTIONDETECTOR_TRANSCEIVER' => {
+		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'on:1,off:0', P => 2
+	},
+	'PRESENCEDETECTOR_TRANSCEIVER' => {
+		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'on:1,off:0', P => 2
+	},
 	'SMOKE_DETECTOR' => {
-		F => 3, S => 'SMOKE_DETECTOR_ALARM_STATUS', C => '', V => '', P => 2
+		F => 3, S => 'BidCos-RF:STATE,SMOKE_DETECTOR_ALARM_STATUS', C => 'HmIP-RF:SMOKE_DETECTOR_COMMAND', V => '', P => 2
 	},
 	'LUXMETER' => {
 		F => 3, S => 'LUX', C => '', V => '', P => 2
 	},
-	'MOTIONDETECTOR_TRANSCEIVER' => {
-		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'on:true,off:false', P => 2
+	'BRIGHTNESS_TRANSMITTER' => {
+		F => 3, S => 'CURRENT_ILLUMINATION', C => '', V => '', P => 2
+	},
+	'POWERMETER' => {
+		F => 3, S => 'CURRENT', C => '', V => '', P => 1
+	},
+	'ENERGIE_METER_TRANSMITTER' => {
+		F => 3, S => 'CURRENT', C => '', V => '', P => 1
 	},
 	'KEY' => {
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
@@ -89,6 +101,9 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
+		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+	},
+	'SHUTTER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
 	},
 	'SWITCH' => {
@@ -123,51 +138,59 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		F => 3, S => 'ACTUAL_TEMPERATURE', C => 'SET_POINT_TEMPERATURE', V => 'on:30.5,off:4.5', P => 2
+	},
+	'CLIMATECONTROL_REGULATOR' => {
+		F => 3, S => 'LEVEL', C => 'SETPOINT', V => 'on:30.5,off:4.5', P => 2
 	}
 );
 
 ######################################################################
 # Add or rename readings
-# SC# = Placeholder for state channel
-# CC# = Placeholder for control channel
+# C# = Placeholder for state or control channel number 
 # DEFAULT should not be used, if a HMCCUDEV device has multiple
 # channels with identical datapoints (i.e. LEVEL)
 ######################################################################
 
 %HMCCU_READINGS = (
 	'BLIND' =>
-		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(C#\.)?LEVEL$:+pct',
 	'BLIND_VIRTUAL_RECEIVER' =>
-		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(C#\.)?LEVEL$:+pct',
+	'SHUTTER_VIRTUAL_RECEIVER' =>
+		'(C#\.)?LEVEL$:+pct',
 	'DIMMER' =>
-		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(C#\.)?LEVEL$:+pct',
 	'DIMMER_VIRTUAL_RECEIVER' =>
-		'(CC#\.)?LEVEL$:+pct;(CC#\.)?LEVEL$:+pct',
+		'(C#\.)?LEVEL$:+pct',
+	'PRESENCEDETECTOR_TRANSCEIVER' =>
+		'(C#\.)?ILLUMINATION:brightness;(C#\.)?PRESENCE_DETECTION_STATE:presence',
 	'WEATHER' =>
-		'(SC#\.)?TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?HUMIDITY$:+humidity',
+		'(C#\.)?TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?HUMIDITY$:+humidity',
 	'WEATHER_TRANSMIT' =>
-		'(SC#\.)?TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?HUMIDITY$:+humidity',
+		'(C#\.)?TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?HUMIDITY$:+humidity',
 	'CLIMATE_TRANSCEIVER' =>
-		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity',
+		'(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?ACTUAL_HUMIDITY$:+humidity',
 	'THERMALCONTROL_TRANSMIT' =>
-		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'(CC#\.)?SET_TEMPERATURE$:+desired-temp',
+		'(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'(C#\.)?SET_TEMPERATURE$:+desired-temp',
 	'CLIMATECONTROL_RT_TRANSCEIVER' =>
-		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'(CC#\.)?SET_TEMPERATURE$:+desired-temp',
+		'(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'(C#\.)?SET_TEMPERATURE$:+desired-temp',
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' =>
-		'(SC#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
-		'(SC#\.)?ACTUAL_HUMIDITY$:+humidity;'.
-		'(CC#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
+		'(C#\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'(C#\.)?ACTUAL_HUMIDITY$:+humidity;'.
+		'(C#\.)?SET_POINT_TEMPERATURE$:+desired-temp',
+	'CLIMATECONTROL_REGULATOR' =>
+		'(C#\.)?SETPOINT$:+desired-temp',
 	'DEFAULT' =>
 		'([0-9]{1,2}\.)?LEVEL$:+pct;'.
 		'([0-9]{1,2}\.)?SET_TEMPERATURE$:+desired-temp;'.
-		'([0-9]{1,2}\.)?ACTUAL_TEMPERATURE$:+measured-temp;'.
+		'^([0-9]{1,2}\.)?(ACTUAL_TEMPERATURE|TEMPERATURE)$:+measured-temp;'.
 		'([0-9]{1,2}\.)?SET_POINT_TEMPERATURE$:+desired-temp;'.
 		'([0-9]{1,2}\.)?ACTUAL_HUMIDITY$:+humidity'
 );
@@ -176,7 +199,7 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 # Set commands related to channel role
 #   Role => { Command-Definition, ... }
 # Command-Defintion:
-#   Command => 'Datapoint-Definition[:Function] [...]'
+#   Command[:InterfaceExpr] => 'Datapoint-Definition[:Function] [...]'
 # Function:
 #   A Perl function name
 # Datapoint-Definition:
@@ -198,8 +221,13 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 
 %HMCCU_ROLECMDS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		'on' => 'V:MOTION_DETECTION_ACTIVE:active=1',
-		'off' => 'V:MOTION_DETECTION_ACTIVE:active=0'
+		'on' => 'V:MOTION_DETECTION_ACTIVE:1',
+		'off' => 'V:MOTION_DETECTION_ACTIVE:0'
+	},
+	'PRESENCEDETECTOR_TRANSCEIVER' => {
+		'on' => 'V:PRESENCE_DETECTION_ACTIVE:1',
+		'off' => 'V:PRESENCE_DETECTION_ACTIVE:0',
+		'reset' => 'V:RESET_PRESENCE:1'
 	},
 	'SMOKE_DETECTOR' => {
 		'command' => 'V:SMOKE_DETECTOR_COMMAND:#command'
@@ -292,8 +320,8 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 		'off' => 'V:MANU_MODE:4.5',
 		'auto' => 'V:AUTO_MODE:1',
 		'boost' => 'V:BOOST_MODE:1',
-		'week-program' => 'D:WEEK_PROGRAM_POINTER:#program',
-		'get week-program' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
+		'week-program:VirtualDevices' => 'D:WEEK_PROGRAM_POINTER:#program',
+		'get week-program:VirtualDevices' => 'D:WEEK_PROGRAM_POINTER:#program:HMCCU_DisplayWeekProgram'
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'desired-temp' => 'V:SET_POINT_TEMPERATURE:?temperature',
@@ -303,6 +331,11 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 		'boost' => 'V:BOOST_MODE:1',
 		'on' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:30.5',
 		'off' => 'V:CONTROL_MODE:1 V:SET_POINT_TEMPERATURE:4.5'
+	},
+	'CLIMATECONTROL_REGULATOR' => {
+		'desired-temp' => 'V:SETPOINT:?temperature',
+		'on' => 'V:SETPOINT:30.5',
+		'off' => 'V:SETPOINT:4.5'		
 	}
 );
 
@@ -318,13 +351,19 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 	'SHUTTER_CONTACT_TRANSCEIVER' => {
 		'_none_' => ''
 	},
+	'MOTIONDETECTOR_TRANSCEIVER' => {
+		'cmdIcon' => 'on:general_an off:general_aus'
+	},
+	'PRESENCEDETECTOR_TRANSCEIVER' => {
+		'cmdIcon' => 'on:general_an off:general_aus'
+	},
 	'KEY' => {
-		'event-on-update-reading' => '.*',
+		'event-on-update-reading' => 'PRESS.*',
 		'cmdIcon' => 'press:taster',
 		'webCmd' => 'press'
 	},
 	'KEY_TRANSCEIVER' => {
-		'event-on-update-reading' => '.*',
+		'event-on-update-reading' => 'PRESS.*',
 		'cmdIcon' => 'press:taster',
 		'webCmd' => 'press'
 	},
@@ -381,16 +420,30 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 		'cmdIcon' => 'auto:sani_heating_automatic manu:sani_heating_manual boost:sani_heating_boost on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:auto:manu:boost:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
+	},
+	'CLIMATECONTROL_REGULATOR' => {
+		'substexcl' => 'desired-temp',
+		'cmdIcon' => 'on:general_an off:general_aus',
+		'webCmd' => 'desired-temp:on:off',
+		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
 	}
 );
 
 ######################################################################
 # Value conversions
+#   Role => {
+#     Datapoint => { Value => 'Conversion', ... },
+#     ...
+#   }
 ######################################################################
 
 %HMCCU_CONVERSIONS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' },
+	},
+	'PRESENCEDETECTOR_TRANSCEIVER' => {
+		'PRESENCE_DETECTION_STATE'  => { '0' => 'noPresence', 'false' => 'noPresence', '1' => 'presence', 'true' => 'presence' },
+		'PRESENCE_DETECTION_ACTIVE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true', 'on' }
 	},
 	'KEY' => {
 		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },
@@ -460,7 +513,11 @@ $HMCCU_CONFIG_VERSION = '4.8.017';
 	},
 	'HEATING_CLIMATECONTROL_TRANSCEIVER' => {
 		'SET_POINT_TEMPERATURE' => { '4.5' => 'off', '30.5' => 'on' },
+		'SET_POINT_MODE' =>        { '0' => 'auto', '1' => 'manual', '2' => 'boost', '3' => 'off' },
 		'WINDOW_STATE' =>          { '0' => 'closed', '1' => 'open', 'false' => 'closed', 'true' => 'open' }
+	},
+	'CLIMATECONTROL_REGULATOR' => {
+		'SETPOINT' => { '4.5' => 'off', '30.5' => 'on' }		
 	},
 	'DEFAULT' => {
 		'AES_KEY' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true' => 'on' },
@@ -1642,6 +1699,9 @@ string chnid;
 string sDPId;
 object odev = (dom.GetObject(ID_DEVICES)).Get("\$devname");
 if (odev) {
+  string intid=odev.Interface();
+  string intna=dom.GetObject(intid).Name();
+  WriteLine ("D;" # intna # ";" # odev.Address() # ";" # odev.Name() # ";" # odev.HssType());
   foreach (chnid, odev.Channels()) {
     object ochn = dom.GetObject(chnid);
     if (ochn) {
