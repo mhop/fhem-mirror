@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
   "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
   "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
   "0.31.0" => "06.04.2021  extend currentMeterDev by gfeedin, feedtotal ",
@@ -167,6 +168,7 @@ my %hset = (                                                                # Ha
   inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
+  currentBatteryDev       => { fn => \&_setbatteryDevice          },
   energyH4Trigger         => { fn => \&_setenergyH4Trigger        },
   powerTrigger            => { fn => \&_setpowerTrigger           },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
@@ -530,6 +532,7 @@ sub Set {
 
   $setlist = "Unknown argument $opt, choose one of ".
              "currentForecastDev:$fcd ".
+             "currentBatteryDev:textField-long ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
              "energyH4Trigger:textField-long ".
@@ -657,6 +660,41 @@ sub _setmeterDevice {                    ## no critic "not used"
   }  
 
   readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
+  createNotifyDev     ($hash);
+
+return;
+}
+
+################################################################
+#                      Setter currentBatteryDev
+################################################################
+sub _setbatteryDevice {                  ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+  
+  my ($a,$h) = parseParams ($arg);
+  my $badev  = $a->[0] // "";
+  
+  if(!$badev || !$defs{$badev}) {
+      return qq{The device "$badev" doesn't exist!};
+  }
+  
+  if(!$h->{pin} || !$h->{pout}) {
+      return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
+  }
+
+  if($h->{pin} eq "-pout" && $h->{pout} eq "-pin") {
+      return qq{Incorrect input. It is not allowed that the keys pin and pout refer to each other.};
+  }  
+
+  readingsSingleUpdate($hash, "currentBatteryDev", $arg, 1);
   createNotifyDev     ($hash);
 
 return;
@@ -913,6 +951,9 @@ sub _setreset {                          ## no critic "not used"
   
   if($prop eq "currentMeterDev") {
       readingsDelete($hash, "Current_GridConsumption");
+      readingsDelete($hash, "Current_GridFeedIn");
+      delete $hash->{HELPER}{INITCONTOTAL};
+      delete $hash->{HELPER}{INITFEEDTOTAL};
   }
   
   if($prop eq "currentInverterDev") {
@@ -1293,6 +1334,7 @@ sub centralTask {
           minute => $minute,
           chour  => $chour,
           day    => $day,
+          state  => "updated",
           daref  => \@da
       };
       
@@ -1306,6 +1348,7 @@ sub centralTask {
       _transferDWDForecastValues ($params);                                                        # Forecast Werte übertragen  
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);                                                        # Energy Meter auswerten    
+      _transferBatteryValues     ($params);                                                        # Batteriewerte einsammeln 
       _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren
       _calcSummaries             ($params);                                                        # Zusammenfassungen erstellen
 
@@ -1315,7 +1358,7 @@ sub centralTask {
       
       calcVariance ($params);                                                                      # Autokorrektur berechnen
       
-      readingsSingleUpdate($hash, "state", "updated", 1);                                          # Abschluß state      
+      readingsSingleUpdate($hash, "state", $params->{state}, 1);                                   # Abschluß state      
   }
   else {
       InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::centralTask", $hash, 0);
@@ -1796,27 +1839,30 @@ sub _transferMeterValues {
   
   Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
   
-  my $gco;
+  my ($gco,$gfin);
+  
+  my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
+  my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
+    
   if ($gc ne "-gfeedin") {                                                                    # kein Spezialfall gcon bei neg. gfeedin
-      my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
-      $gco     = ReadingsNum ($medev, $gc, 0) * $gcuf;                                        # aktueller Bezug (W)
+      $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
   }
   else {                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
-      if($gf <= 0) {
-          $gco = abs($gf);
-          $gf  = 0;
+      $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;
+      if($gfin <= 0) {
+          $gco  = abs($gfin);
+          $gfin = 0;
       }
       else {
           $gco = 0;
       }
   }
   
-  my $gfin;
   if ($gf ne "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
-      my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
-      $gfin    = ReadingsNum ($medev, $gf, 0) * $gfuf;                                        # aktuelle Einspeisung (W)
+      $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                           # aktuelle Einspeisung (W)
   }
   else {                                                                                      # Spezialfall: bei negativen gcon -> $gfin = abs($gco), $gco = 0
+      $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
       if($gco <= 0) {
           $gfin = abs($gco);
           $gco  = 0;
@@ -1914,6 +1960,74 @@ sub _transferMeterValues {
       delete $paref->{histname};
   }
       
+return;
+}
+
+################################################################
+#                    Batteriewerte sammeln
+################################################################
+sub _transferBatteryValues {               
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $daref = $paref->{daref};  
+
+  my $badev  = ReadingsVal($name, "currentBatteryDev", "");                                   # aktuelles Meter device für Batteriewerte
+  my ($a,$h) = parseParams ($badev);
+  $badev     = $a->[0] // "";
+  return if(!$badev || !$defs{$badev});
+  
+  my $type = $hash->{TYPE}; 
+  
+  my ($pin,$piunit) = split ":", $h->{pin};                                                    # Readingname/Unit für aktuelle Batterieladung
+  my ($pou,$pounit) = split ":", $h->{pout};                                                   # Readingname/Unit für aktuelle Batterieentladung
+  
+  return if(!$pin || !$pou);
+  
+  $pounit //= $piunit;
+  $piunit //= $pounit;
+  
+  Log3($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit)");
+  
+  my ($pbi,$pbo);
+  
+  my $piuf = $piunit =~ /^kW$/xi ? 1000 : 1;
+  my $pouf = $pounit =~ /^kW$/xi ? 1000 : 1;
+  
+  if ($pin ne "-pout") {                                                                       # kein Spezialfall pin bei neg. pout
+      $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                            # aktueller Batterieladung (W)
+  }
+  else {                                                                                       # Spezialfall: bei negativen pout -> $pbi = abs($pbo), $pbo = 0
+      $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                            # aktuelle Batterieentladung (W)
+      if($pbo <= 0) {
+          $pbi = abs($pbo);
+          $pbo = 0;
+      }
+      else {
+          $pbi = 0;
+      }
+  }
+  
+  if ($pou ne "-pin") {                                                                        # kein Spezialfall pout bei neg. pin
+      $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                            # aktuelle Batterieentladung (W)
+  }
+  else {                                                                                       # Spezialfall: bei negativen pin -> $pbo = abs($pbi), $pbi = 0
+      $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                            # aktueller Batterieladung (W)
+      if($pbi <= 0) {
+          $pbo = abs($pbi);
+          $pbi = 0;
+      }
+      else {
+          $pbo = 0;
+      }
+  }
+  
+  push @$daref, "Current_PowerBatIn<>".(int $pbi)." W";
+  $data{$type}{$name}{current}{powerbatin} = int $pbi;                                        # Hilfshash Wert aktuelle Batterieladung
+  
+  push @$daref, "Current_PowerBatOut<>".(int $pbo)." W";
+  $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
+        
 return;
 }
 
@@ -2069,7 +2183,10 @@ sub _calcSummaries {
   my $gcon    = CurrentVal ($hash, "gridconsumption", 0);                                               # Berechnung aktueller Verbrauch
   my $pvgen   = CurrentVal ($hash, "generation",      0);
   my $gfeedin = CurrentVal ($hash, "gridfeedin",      0);
-  my $consumption = $pvgen - $gfeedin + $gcon;
+  my $batin   = CurrentVal ($hash, "powerbatin",      0);                                               # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, "powerbatout",     0);                                               # aktuelle Batterieentladung
+  
+  my $consumption                           = $pvgen - $gfeedin + $gcon - $batin + $batout;
   $data{$type}{$name}{current}{consumption} = $consumption;
   
   push @$daref, "Current_Consumption<>".       $consumption.              " W";
@@ -3528,13 +3645,13 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",       0);
-          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",       0);
-          my $gcons   = HistoryVal ($hash, $day, $key, "gcons",      0);
-          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",    0);
-          my $wid     = HistoryVal ($hash, $day, $key, "weatherid", -1);
-          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",        0);
-          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",        0);
+          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",      "-");
+          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",      "-");
+          my $gcons   = HistoryVal ($hash, $day, $key, "gcons",     "-");
+          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",   "-");
+          my $wid     = HistoryVal ($hash, $day, $key, "weatherid", "-");
+          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",       "-");
+          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",       "-");
           $ret       .= "\n      " if($ret);
           $ret       .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $gcons, gfeedin: $gfeedin, weatherid: $wid, cloudcover: $wcc, rainprob: $wrp";
       }
@@ -3557,14 +3674,14 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc    = CircularVal ($hash, $idx, "pvfc",              0);
-          my $pvrl    = CircularVal ($hash, $idx, "pvrl",              0);
-          my $gcons   = CircularVal ($hash, $idx, "gcons",             0);
-          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",           0);
-          my $wid     = CircularVal ($hash, $idx, "weatherid",        -1);
-          my $wtxt    = CircularVal ($hash, $idx, "weathertxt",       "");
-          my $wccv    = CircularVal ($hash, $idx, "weathercloudcover", 0);
-          my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   0);
+          my $pvfc    = CircularVal ($hash, $idx, "pvfc",              "-");
+          my $pvrl    = CircularVal ($hash, $idx, "pvrl",              "-");
+          my $gcons   = CircularVal ($hash, $idx, "gcons",             "-");
+          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",           "-");
+          my $wid     = CircularVal ($hash, $idx, "weatherid",         "-");
+          my $wtxt    = CircularVal ($hash, $idx, "weathertxt",        "-");
+          my $wccv    = CircularVal ($hash, $idx, "weathercloudcover", "-");
+          my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   "-");
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, cloudcover: $wccv, rainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
       }
@@ -3576,12 +3693,12 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts  = NexthoursVal ($hash, $idx, "starttime",  qq{});
-          my $nhfc  = NexthoursVal ($hash, $idx, "pvforecast",    0);
-          my $wid   = NexthoursVal ($hash, $idx, "weatherid",    -1);
-          my $neff  = NexthoursVal ($hash, $idx, "cloudcover",    0);
-          my $r101  = NexthoursVal ($hash, $idx, "rainprob",      0);
-          my $rad1h = NexthoursVal ($hash, $idx, "Rad1h",         0);
+          my $nhts  = NexthoursVal ($hash, $idx, "starttime",  "-");
+          my $nhfc  = NexthoursVal ($hash, $idx, "pvforecast", "-");
+          my $wid   = NexthoursVal ($hash, $idx, "weatherid",  "-");
+          my $neff  = NexthoursVal ($hash, $idx, "cloudcover", "-");
+          my $r101  = NexthoursVal ($hash, $idx, "rainprob",   "-");
+          my $rad1h = NexthoursVal ($hash, $idx, "Rad1h",      "-");
           $sq      .= "\n" if($sq);
           $sq      .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101, Rad1h: $rad1h";
       }
@@ -3887,6 +4004,8 @@ return $def;
 #       genslidereg     - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg    - Schieberegister 4h PV Forecast (Array)
 #       gridconsumption - aktueller Netzbezug
+#       powerbatin      - Batterie Ladeleistung
+#       powerbatout     - Batterie Entladeleistung
 # $def: Defaultwert
 #
 ################################################################
@@ -3956,7 +4075,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <colgroup> <col width=35%> <col width=65%> </colgroup>
             <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Wetter- und Strahlungsdaten liefert  </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert            </td></tr>
-            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>         
+            <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>
+            <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert      </td></tr>            
          </table>
       </ul>
       <br>
@@ -3971,6 +4091,46 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
   <a name="SolarForecastset"></a>
   <b>Set</b> 
   <ul>
+  
+    <ul>
+      <a name="currentBatteryDev"></a>
+      <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
+      
+      Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. 
+      Der numerische Wert der Readings muss immer positiv sein.
+      Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
+      <br>
+      
+      <ul>   
+       <table>  
+       <colgroup> <col width=15%> <col width=85%> </colgroup>
+          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladung liefert       </td></tr>
+          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladung liefert    </td></tr>
+          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,kW)                              </td></tr>
+        </table>
+      </ul> 
+      <br>
+      
+      <b>Sonderfälle:</b> Sollte das Reading für pin und pout identisch, aber vorzeichenbehaftet sein, 
+      können die Schlüssel pin und pout wie folgt definiert werden: <br><br>
+      <ul>
+        pin=-pout  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pout wird als pin verwendet)  <br>
+        pout=-pin  &nbsp;&nbsp;&nbsp;(ein negativer Wert von pin wird als pout verwendet)
+      </ul>
+      <br>
+      
+      Die Einheit entfällt in dem jeweiligen Sonderfall. <br><br>
+      
+      <ul>
+        <b>Beispiel: </b> <br>
+        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin <br>
+        <br>
+        # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen
+      </ul>      
+      </li>
+    </ul>
+    <br>
+  
     <ul>
       <a name="currentForecastDev"></a>
       <li><b>currentForecastDev </b> <br><br> 
