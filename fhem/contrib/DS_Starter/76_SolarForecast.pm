@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection ",
   "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
   "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
   "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
@@ -542,7 +543,7 @@ sub Set {
              "moduleDirection ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on,off ".
-             "reset:currentForecastDev,currentInverterDev,currentMeterDev,energyH4Trigger,inverterStrings,powerTrigger,pvCorrection,pvHistory ".
+             "reset:currentBatteryDev,currentForecastDev,currentInverterDev,currentMeterDev,energyH4Trigger,inverterStrings,powerTrigger,pvCorrection,pvHistory ".
              "writeHistory:noArg ".
              $cf
              ;
@@ -1714,7 +1715,7 @@ sub _transferWeatherValues {
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}         = $wid;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt}        = $txt;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathercloudcover} = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}               = $neff;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherrainprob}   = $r101;
       }
       
@@ -3493,7 +3494,7 @@ sub calcFromHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
-  my $hour  = $paref->{hour};                                                             # Stunde für die der Durchschnitt bestimmt werden soll
+  my $hour  = $paref->{hour};                                                             # Stunde des Tages für die der Durchschnitt bestimmt werden soll
   
   $hour     = sprintf("%02d",$hour);
   
@@ -3522,18 +3523,51 @@ sub calcFromHistory {
       my $anzavg = scalar(@efa);
       
       if($anzavg) {
-          Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Days ($calcd) for calc: ".join " ",@efa); 
+          Log3 ($name, 4, "$name - PV History -> Raw Days ($calcd) for calc: ".join " ",@efa); 
       }
       else {                                                                              # vermeide Fehler: Illegal division by zero
           Log3 ($name, 4, "$name - PV History -> Day $day has index $idx. Use only current day for average calc");
           return;
       }
       
+      my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", "");                             # Wolkenbedeckung heute Stunde $hour
+      
+      if(!$chwcc) {
+          Log3 ($name, 4, "$name - Day $day has no cloudiness value set for hour $hour, no past averages can be calculated."); 
+          return;
+      }
+           
+      $chwcc           = int ($chwcc/10);   
+      
+      Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $chwcc");
+      
+      $anzavg          = 0;      
       my ($pvrl,$pvfc) = (0,0);
             
       for my $dayfa (@efa) {
-          $pvrl += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
-          $pvfc += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
+          my $histwcc = HistoryVal ($hash, $dayfa, $hour, "wcc", "");                     # historische Wolkenbedeckung
+          
+          if(!$histwcc) {
+              Log3 ($name, 4, "$name - PV History -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored."); 
+              next;
+          }  
+
+          $histwcc = int ($histwcc/10);
+
+          if($chwcc == $histwcc) {               
+              $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
+              $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
+              $anzavg++;
+              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range identical: $chwcc. Day/hour $dayfa/$hour included.");
+          }
+          else {
+              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range different: $chwcc/$histwcc. Day/hour $dayfa/$hour discarded.");
+          }
+      }
+      
+      if(!$anzavg) {
+          Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set, no historical averages calculated");
+          return;
       }
       
       my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
@@ -3691,7 +3725,7 @@ sub listDataPool {
           my $gfeedin = CircularVal ($hash, $idx, "gfeedin",           "-");
           my $wid     = CircularVal ($hash, $idx, "weatherid",         "-");
           my $wtxt    = CircularVal ($hash, $idx, "weathertxt",        "-");
-          my $wccv    = CircularVal ($hash, $idx, "weathercloudcover", "-");
+          my $wccv    = CircularVal ($hash, $idx, "wcc",               "-");
           my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   "-");
           $sq        .= "\n" if($sq);
           $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, cloudcover: $wccv, rainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
@@ -3950,7 +3984,7 @@ return $def;
 #             gfeedin           - reale Netzeinspeisung
 #             weatherid         - DWD Wetter id 
 #             weathertxt        - DWD Wetter Text
-#             weathercloudcover - DWD Wolkendichte
+#             wcc               - DWD Wolkendichte
 #             weatherrainprob   - DWD Regenwahrscheinlichkeit
 #    $def: Defaultwert
 #
@@ -4108,7 +4142,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
       
       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. 
-      Der numerische Wert der Readings muss immer positiv sein.
+      Das Modul geht davon aus dass der numerische Wert der Readings immer positiv ist.
       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
       <br>
       
@@ -4199,8 +4233,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <a name="currentMeterDev"></a>
       <li><b>currentMeterDev &lt;Meter Device Name&gt; gcon=&lt;Readingname&gt;:&lt;Einheit&gt; contotal=&lt;Readingname&gt;:&lt;Einheit&gt; gfeedin=&lt;Readingname&gt;:&lt;Einheit&gt; feedtotal=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
       
-      Legt ein beliebiges Device und seine Readings zur Energiemessung fest. Der numerische Wert der Readings muss immer positiv 
-      sein.
+      Legt ein beliebiges Device und seine Readings zur Energiemessung fest. 
+      Das Modul geht davon aus dass der numerische Wert der Readings immer positiv ist.
       Es kann auch ein Dummy Device mit entsprechenden Readings sein. Die Bedeutung des jeweiligen "Readingname" ist:
       <br>
       
@@ -4467,7 +4501,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>pvreal</b>            </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
             <tr><td> <b>gcons</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
             <tr><td> <b>gfeedin</b>           </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
-            <tr><td> <b>weathercloudcover</b> </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
+            <tr><td> <b>cloudcover</b>        </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
             <tr><td> <b>weatherrainprob</b>   </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
             <tr><td> <b>weatherid</b>         </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
             <tr><td> <b>weathertxt</b>        </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
