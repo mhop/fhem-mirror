@@ -934,13 +934,14 @@ HttpUtils_NonblockingGet($)
   $hash->{hu_blocking} = 0;
   my ($isFile, $fErr, $fContent) = HttpUtils_File($hash);
   return $hash->{callback}($hash, $fErr, $fContent) if($isFile);
+
+  my $st = stacktraceAsString(2);
   if($hash->{hu_inProgress}) {
-    my $m = "Another HttpUtils_NonblockingGet with the same hash is in progress";
-    Log 1, "ERROR: $m";
-    stacktrace();
-    return $hash->{callback}($hash, $m, undef);
+    Log 4, "WARNING: another HttpUtils_NonblockingGet with the same hash ".
+           "in progress. OLD:$hash->{hu_inProgress} CURRENT:$st";
   }
-  $hash->{hu_inProgress} = 1;
+  $hash->{hu_inProgress} = $st;
+
   my $err = HttpUtils_Connect($hash);
   if($err) {
     delete($hash->{hu_inProgress});
