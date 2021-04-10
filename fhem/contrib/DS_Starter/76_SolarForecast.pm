@@ -3530,9 +3530,9 @@ sub calcFromHistory {
           return;
       }
       
-      my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", "");                             # Wolkenbedeckung heute Stunde $hour
+      my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", undef);                          # Wolkenbedeckung heute Stunde $hour
       
-      if(!$chwcc) {
+      if(!defined $chwcc) {
           Log3 ($name, 4, "$name - Day $day has no cloudiness value set for hour $hour, no past averages can be calculated."); 
           return;
       }
@@ -3545,9 +3545,9 @@ sub calcFromHistory {
       my ($pvrl,$pvfc) = (0,0);
             
       for my $dayfa (@efa) {
-          my $histwcc = HistoryVal ($hash, $dayfa, $hour, "wcc", "");                     # historische Wolkenbedeckung
+          my $histwcc = HistoryVal ($hash, $dayfa, $hour, "wcc", undef);                   # historische Wolkenbedeckung
           
-          if(!$histwcc) {
+          if(!defined $histwcc) {
               Log3 ($name, 4, "$name - PV History -> Day $dayfa has no cloudiness value set for hour $hour, this history dataset is ignored."); 
               next;
           }  
