@@ -3409,7 +3409,9 @@ sub calcVariance {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $t     = $paref->{t};                                                              # aktuelle Unix-Zeit
   my $chour = $paref->{chour};
+  my $day   = $paref->{day};                                                            # aktueller Tag (01,02,03...31)
   
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
@@ -3461,10 +3463,11 @@ sub calcVariance {
       
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
-      $paref->{hour}     = $h;
-      my ($pvavg,$fcavg) = calcFromHistory ($paref);                                                      # historische PV / Forecast Vergleichswerte ermitteln
-      $pvval             = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                                       # Ertrag aktuelle Stunde berücksichtigen
-      $fcval             = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                                       # Vorhersage aktuelle Stunde berücksichtigen
+      $paref->{hour}             = $h;
+      my ($pvavg,$fcavg,$anzavg) = calcFromHistory ($paref);                                              # historische PV / Forecast Vergleichswerte ermitteln
+      $anzavg                  //= 0;
+      $pvval                     = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                               # Ertrag aktuelle Stunde berücksichtigen
+      $fcval                     = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                               # Vorhersage aktuelle Stunde berücksichtigen
       
       Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
       
@@ -3478,8 +3481,14 @@ sub calcVariance {
           Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, num history days for avg: $anzavg)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
+      
+      $paref->{pvcorrf}  = $factor;
+      $paref->{nhour}    = sprintf("%02d",$h);
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname};    
   }
   
   createReadingsFromArray ($hash, \@da, 1);
@@ -3492,15 +3501,14 @@ return;
 ################################################################
 sub calcFromHistory {               
   my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $t     = $paref->{t};                                                                # aktuelle Unix-Zeit          
+  my $hash  = $paref->{hash};         
   my $hour  = $paref->{hour};                                                             # Stunde des Tages für die der Durchschnitt bestimmt werden soll
+  my $day   = $paref->{day};                                                              # aktueller Tag
   
   $hour     = sprintf("%02d",$hour);
   
   my $name  = $hash->{NAME};
   my $type  = $hash->{TYPE};  
-  my $day   = strftime "%d", localtime($t);                                               # aktueller Tag
   my $pvhh  = $data{$type}{$name}{pvhist};
   
   my $calcd = AttrVal($name, "numHistDays", $calcmaxd);
@@ -3573,7 +3581,7 @@ sub calcFromHistory {
       my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
       my $fcavg = sprintf "%.2f", $pvfc / $anzavg;
       
-      return ($pvavg,$fcavg);
+      return ($pvavg,$fcavg,$anzavg);
   }
   
 return;
@@ -3598,6 +3606,7 @@ sub setPVhistory {
   my $wid        = $paref->{wid}           // -1;
   my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
   my $wrp        = $paref->{wrp}           // 0;                                                  # Wahrscheinlichkeit von Niederschlag
+  my $pvcorrf    = $paref->{pvcorrf}       // 1;                                                  # pvCorrectionFactor
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -3668,6 +3677,12 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{wrp}     = q{};       
   }
   
+  if($histname eq "pvcorrfactor") {                                                               # pvCorrectionFactor
+      $val = $pvcorrf;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvcorrf} = $pvcorrf;   
+      $data{$type}{$name}{pvhist}{$day}{99}{pvcorrf}     = q{};       
+  }
+  
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
     
 return;
@@ -3697,8 +3712,9 @@ sub listDataPool {
           my $wid     = HistoryVal ($hash, $day, $key, "weatherid", "-");
           my $wcc     = HistoryVal ($hash, $day, $key, "wcc",       "-");
           my $wrp     = HistoryVal ($hash, $day, $key, "wrp",       "-");
+          my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",   "-");
           $ret       .= "\n      " if($ret);
-          $ret       .= $key." => pvreal: $pvrl, pvforecast: $pvfc, gridcon: $gcons, gfeedin: $gfeedin, weatherid: $wid, cloudcover: $wcc, rainprob: $wrp";
+          $ret       .= $key." => pvrl: $pvrl, pvfc: $pvfc, gcon: $gcons, gfeedin: $gfeedin, wid: $wid, wcc: $wcc, wrp: $wrp, pvcorrf: $pvcorrf";
       }
       return $ret;
   };
@@ -3949,6 +3965,7 @@ return;
 #             weatherid - Wetter ID
 #             wcc       - Grad der Bewölkung
 #             wrp       - Niederschlagswahrscheinlichkeit
+#             pvcorrf   - PV Autokorrekturfaktor
 #    $def: Defaultwert
 #
 ################################################################
@@ -4473,14 +4490,15 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       
       <ul>
          <table>  
-         <colgroup> <col width=20%> <col width=80%> </colgroup>
-            <tr><td> <b>pvforecast</b>  </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde                         </td></tr>
-            <tr><td> <b>pvreal</b>      </td><td>reale PV Erzeugung der jeweiligen Stunde                                    </td></tr>
-            <tr><td> <b>gcons</b>       </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde               </td></tr>
-            <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung in das Stromnetz der jeweiligen Stunde                    </td></tr>
-            <tr><td> <b>weatherid</b>   </td><td>Identifikationsnummer des Wetters in der jeweiligen Stunde                  </td></tr>
-            <tr><td> <b>cloudcover</b>  </td><td>effektive Wolkenbedeckung der jeweiligen Stunde                             </td></tr>
-            <tr><td> <b>rainprob</b>    </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>pvfc</b>     </td><td>der prognostizierte PV Ertrag der jeweiligen Stunde                         </td></tr>
+            <tr><td> <b>pvrl</b>     </td><td>reale PV Erzeugung der jeweiligen Stunde                                    </td></tr>
+            <tr><td> <b>gcon</b>     </td><td>realer Leistungsbezug aus dem Stromnetz der jeweiligen Stunde               </td></tr>
+            <tr><td> <b>gfeedin</b>  </td><td>reale Einspeisung in das Stromnetz der jeweiligen Stunde                    </td></tr>
+            <tr><td> <b>wid</b>      </td><td>Identifikationsnummer des Wetters in der jeweiligen Stunde                  </td></tr>
+            <tr><td> <b>wcc</b>      </td><td>effektive Wolkenbedeckung der jeweiligen Stunde                             </td></tr>
+            <tr><td> <b>wrp</b>      </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
+            <tr><td> <b>pvcorrf</b>  </td><td>abgeleiteter Autokorrekturfaktor der jeweiligen Stunde                      </td></tr>
          </table>
       </ul>
       </li>      
