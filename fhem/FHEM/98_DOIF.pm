@@ -1399,6 +1399,9 @@ sub collect_setValue
       }
     }
   }
+  $hash->{collect}{"$name $reading"}{$hours}{max_value_plot}=(defined ${$va}[0] and ${$va}[0]>$maxVal) ? ${$va}[0]:$maxVal;
+  $hash->{collect}{"$name $reading"}{$hours}{min_value_plot}=(defined ${$va}[0] and ${$va}[0]<$minVal) ? ${$va}[0]:$minVal;
+  
   $hash->{collect}{"$name $reading"}{$hours}{max_value}=$maxVal;
   $hash->{collect}{"$name $reading"}{$hours}{max_value_time}=$maxValTime;
   $hash->{collect}{"$name $reading"}{$hours}{max_value_slot}=$maxValSlot;
@@ -4450,38 +4453,35 @@ sub get_color {
       $color=(1-$prop)*($minColor-$maxColor)+$maxColor;
     }
   }
-  return($color,$minColor,$maxColor);
+  return(int($color),$minColor,$maxColor);
 }
 
 sub card
 {
   my ($collect,$header,$icon,$min,$max,$minColor,$maxColor,$unit,$func,$decfont,$size,$model,$lightness) = @_;
-  
-  ##my ($collect,$icon,$header,$min$maxColor,$unit,$decfont,$light,$size)=@_;
   my $val=${$collect}{value};
   my $a=@{$collect}{values};
   my $maxVal = ${$collect}{max_value};
+  my $maxValPlot = ${$collect}{max_value_plot};
   my $maxValTime = ${$collect}{max_value_time};
   my $maxValSlot = ${$collect}{max_value_slot};
-  
   my $minVal = ${$collect}{min_value};
+  my $minValPlot = ${$collect}{min_value_plot};
   my $minValTime = ${$collect}{min_value_time};
   my $minValSlot = ${$collect}{min_value_slot};
   my $hours = ${$collect}{hours};
   my $time = ${$collect}{time};
-
+  $maxValPlot=$val if (!defined $maxValPlot);
+  $minValPlot=$val if (!defined $minValPlot);
+  
   my $bwidth=160;
   my $bheight=88;
   my $htrans=0;  
-  
-
-  my ($maxValColor)=get_color($maxVal,$min,$max,$minColor,$maxColor,$func);
-  my ($minValColor)=get_color($minVal,$min,$max,$minColor,$maxColor,$func); 
-  
+    
   my $out;
-  my $trans=0;
+ ## my $trans=0;
   my ($ic,$iscale,$ix,$iy,$rotate);
-  my $minCol=$minColor;
+  ##my $minCol=$minColor;
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4494,9 +4494,7 @@ sub card
    
   my ($format,$value);
   my ($lr,$lir,$lmm,$lu,$ln,$li);
-  
   ($lr,$lir,$lmm,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
-  
   $unit="" if (!defined $unit);
   
   if (defined $header) {
@@ -4504,7 +4502,7 @@ sub card
     $bheight += 28;
   }
 
-  my $height=$bheight;
+  ##my $height=$bheight;
 
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
@@ -4516,9 +4514,16 @@ sub card
   $value=$min if ($value<$min);
   $size=100 if (!defined $size);
   
+  
+  my ($maxValColor)=get_color($maxVal,$min,$max,$minColor,$maxColor,$func);
+  my ($minValColor)=get_color($minVal,$min,$max,$minColor,$maxColor,$func); 
+  
+  my ($maxValPlotColor)=get_color($maxValPlot,$min,$max,$minColor,$maxColor,$func);
+  my ($minValPlotColor)=get_color($minValPlot,$min,$max,$minColor,$maxColor,$func); 
+  
   my $currColor;
   ($currColor,$minColor,$maxColor)=get_color($value,$min,$max,$minColor,$maxColor,$func);
-
+  
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
     $rotate=0 if (!defined $rotate);
@@ -4532,27 +4537,62 @@ sub card
   my ($m,$n)=m_n($min,0,$max,50);
   my $xpos;
   my $nullColor;
+  my $nullProp;
+  my $topVal;
+  my $topOpacity;
+  my $bottomVal;
+  my $bottomOpacity;
+  my $nullOpacity;
   if ($min < 0 and $max > 0) {
     $xpos=50-int($n*10)/10;
-    ($nullColor,$minColor,$maxColor)=get_color(0,$min,$max,$minColor,$maxColor,$func);
+    $topVal=($maxValPlot > 0 ? $maxValPlot : 0);
+    $bottomVal=($minValPlot < 0 ? $minValPlot : 0);
+    ($nullColor)=get_color(0,$min,$max,$minColor,$maxColor,$func);
+    $nullProp=int ($maxValPlot/($maxValPlot-$minValPlot)*10)/10 if ($maxValPlot != $minValPlot);
+    $topOpacity=0.3;
+    $bottomOpacity=0.3;
+    $nullOpacity=0.05;
   } elsif ($max <= 0) {
     $xpos=0;
+    $topVal=$max;
+    $topOpacity=0.05;
+    $bottomOpacity=0.3;
+    $bottomVal=$minValPlot;
   } else {
     $xpos=50;
+    $topVal=$maxValPlot;
+    $topOpacity=0.3;
+    $bottomOpacity=0.05;
+    $bottomVal=$min;
   }
+  
   $ic="$ic\@".color($currColor,$ln) if (defined($icon) and $icon !~ /@/);
   
+  my ($topValColor)=get_color($topVal,$min,$max,$minColor,$maxColor,$func);
+  my ($bottomValColor)=get_color($bottomVal,$min,$max,$minColor,$maxColor,$func);
+  my ($color75)=get_color((($topVal-$bottomVal)*0.75+$bottomVal),$min,$max,$minColor,$maxColor,$func);
+  my ($color50)=get_color((($topVal-$bottomVal)*0.5+$bottomVal),$min,$max,$minColor,$maxColor,$func);
+  my ($color25)=get_color((($topVal-$bottomVal)*0.25+$bottomVal),$min,$max,$minColor,$maxColor,$func);
+
   $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" width="%d" height="%d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight,$svg_width,$svg_height,$svg_width,$svg_height);
   $out.= '<defs>';
-  $out.= '<linearGradient id="gradcardfont" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:white;stop-opacity:0.3"/><stop offset="1" style="stop-color:rgb(255, 255, 255);stop-opacity:0.1"/></linearGradient>';
-  $out.= '<linearGradient id="gradcardbackg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(48,48,48);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(48, 48, 48);stop-opacity:0.9"/></linearGradient>';
   $out.= '<linearGradient id="gradcardback" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
-  $out.= sprintf('<linearGradient id="gradcard_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:0.5"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),color($currColor,$lr),color($minColor,$lr));
-  $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:1"/><stop offset="1" style="stop-color:%s;stop-opacity:0.8"/></linearGradient>',$maxValColor,$minColor,(defined $lr ? $lr:0),color ($maxValColor,$lr),color($minColor,$lr));
-  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:%s;stop-opacity:0.3"/><stop offset="1" style="stop-color:%s;stop-opacity:0.0"/></linearGradient>',$maxValColor,$minColor,(defined $lr ? $lr:0),color($maxValColor,$lr),color($minColor,$lr));
+
+  $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topVal,$bottomVal,(defined $lr ? $lr:0));
+  $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:1"/>',color ($topValColor,$lr));
+  $out.= sprintf('<stop offset="0.25" style="stop-color:%s;stop-opacity:1"/>',color ($color75,$lr));
+  $out.= sprintf('<stop offset="0.5" style="stop-color:%s;stop-opacity:1"/>',color ($color50,$lr));
+  $out.= sprintf('<stop offset="0.75" style="stop-color:%s;stop-opacity:1"/>',color ($color25,$lr));
+  $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',color($bottomValColor,$lr));
+  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topVal,$bottomVal,(defined $lr ? $lr:0));
+
+  $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:%s"/>',color($topValColor,$lr),$topOpacity);
+  $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:%s"/>',$nullProp,color($nullColor,$lr),$nullOpacity) if (defined $nullProp);
+  $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:%s"/></linearGradient>',color($bottomValColor,$lr),$bottomOpacity);
   $out.= '</defs>';
-  
+  $out.= '<linearGradient id="gradcardback" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
+
   if (defined $header) {
     $out.= sprintf('<text text-anchor="start" x="14" y="23" style="fill:white; font-size:14px;%s">%s</text>',$header_style,$header_txt); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
@@ -4595,12 +4635,12 @@ sub card
   }
   $out.=sprintf('<polyline points="0,%s ',$xpos);
   $out.= $points;
-  $out.= sprintf('59,%s" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:1" />',$xpos,$maxValColor,$minColor,(defined $lr ? $lr:0),$maxValColor,$minColor,(defined $lr ? $lr:0));
+  $out.= sprintf('59,%s" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$xpos,$topVal,$bottomVal,(defined $lr ? $lr:0),$topVal,$bottomVal,(defined $lr ? $lr:0));
 
 
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal and $maxValSlot != 59);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minVal and $minValSlot != 59);
-  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/></circle>',(50-int((${$a}[59]*$m+$n)*10)/10),color($currColor,$ln));
+  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($val*$m+$n)*10)/10),color($currColor,$ln));
   
   $out.= sprintf('<text text-anchor="end" x="-2" y="3" style="fill:%s;font-size:8px;%s">%s</text>',color($maxColor,$lmm),"",$max);  
   $out.= sprintf('<text text-anchor="end" x="-2" y="53" style="fill:%s;font-size:8px;%s">%s</text>',color($minColor,$lmm),"",$min);
@@ -4612,13 +4652,8 @@ sub card
   $out.=sprintf('<text text-anchor="end" x="69" y="61" style="fill:white; font-size:8px">%s</text>',::strftime("%H:%M",localtime($time)));
   $out.= '</g>';
   $out.= '</svg>';
-  if (defined $header or !defined $icon) {
-    $out.='<g transform="translate(105,4)">';     #$out.='<g transform="translate(101,9)">';
-    $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness);
-  } else {
-    $out.='<g transform="translate(105,4)">';# '<g transform="translate(35,10)" opacity="0.9">'
-    $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness,undef,$icon);
-  }
+  $out.='<g transform="translate(105,4)">';
+  $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
 
   $out.='</g>';
   if (defined $maxVal) {
