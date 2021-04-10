@@ -47,7 +47,7 @@ desc: Tested with Foscam FI9831P
 order:foscam01
 par:USERNAME;Username
 par:PASSWORD;Password
-PAR:POS1;Name Position 1
+par:POS1;Name Position 1
 attr DEVICE cmd01 cmd=ptzStopRun&usr=USERNAME&pwd=PASSWORD
 attr DEVICE cmdPanLeft cmd=ptzMoveLeft&usr=USERNAME&pwd=PASSWORD
 attr DEVICE cmdPanRight cmd=ptzMoveRight&usr=USERNAME&pwd=PASSWORD
