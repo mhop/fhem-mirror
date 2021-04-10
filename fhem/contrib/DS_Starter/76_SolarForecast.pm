@@ -117,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection ",
+  "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection, some fixes ",
   "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
   "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
   "0.31.1" => "07.04.2021  write new values to pvhistory, change CO to Current_Consumption in graphic ",
@@ -1553,7 +1553,7 @@ sub _additionalActivities {
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
           push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts1;
           
-          deleteReadingspec ($hash, "Today_Hour.*_GridConsumption");
+          deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
           
