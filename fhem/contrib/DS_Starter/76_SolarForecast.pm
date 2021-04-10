@@ -987,9 +987,10 @@ sub _setwriteHistory {                   ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   
-  my $ret = writeCacheToFile ($hash, "pvhist", $pvhcache.$name);     # Cache File für PV History schreiben
+  my $ret;
   
-  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  $ret = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
 
 return $ret;
 }
@@ -1472,8 +1473,8 @@ sub periodicWriteCachefiles {
   
   return if(IsDisabled($name));
   
-  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
   writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
   
 return;
 }
@@ -1501,11 +1502,13 @@ sub writeCacheToFile {
   if ($error) {
       my $err = qq{ERROR writing cache file "$file": $error};
       Log3 ($name, 2, "$name - $err");
+      readingsSingleUpdate($hash, "state", "ERROR writing cache file $file - $error", 1);
       return $err;          
   }
   else {
       my $lw = gettimeofday(); 
       $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
+      readingsSingleUpdate($hash, "state", "wrote successfully cachefile $cachename", 1);
   }
    
 return; 
@@ -2567,7 +2570,7 @@ sub forecastGraphic {                                                           
           ## Update-Icon
           ##############
           my $upicon;
-          if ($upstate =~ /updated/ix) {
+          if ($upstate =~ /updated|successfully/ix) {
               $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
           } 
           elsif ($upstate =~ /running/ix) {
