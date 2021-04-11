@@ -996,8 +996,8 @@ sub CUL_HM_Attr(@) {#################################
         $hash->{helper}{io}{vccu} = $ioCCU if ($defs{$ioCCU} && AttrVal($ioCCU,"model","") eq "CCU-FHEM");
         if ($prefIO && $hash->{helper}{io}{vccu}) {
           my @prefIOA; 
-          if ($init_done){@prefIOA = grep /.+/,map{$defs{$_} ? $_ : ""} split(",",$prefIO);} 
-          else           {@prefIOA =                                    split(",",$prefIO);}#check is possible after init. Assume correct if not finished
+          if ($init_done){@prefIOA = grep /.+/,map{$defs{$_} || $_ eq 'none' ? $_ : ""} split(",",$prefIO);} 
+          else           {@prefIOA =                                                    split(",",$prefIO);}#check is possible after init. Assume correct if not finished
           $hash->{helper}{io}{prefIO} = \@prefIOA if (int(@prefIOA));
           my $attrValAssamble = "$ioCCU:".join(",",@prefIOA);
           if ($attrVal ne $attrValAssamble){# original setting not possible
@@ -3184,9 +3184,9 @@ sub CUL_HM_Parse($$) {#########################################################
                          sprintf("%02X",$vp*2)."0000";
     }
     elsif($mh{mTp} eq "02"){
-      if (defined($mh{dstH})                                 &&
-          $mh{dstH}->{helper}{prt}{rspWait}{mNo}             &&
-          $mh{dstH}->{helper}{prt}{rspWait}{mNo} eq $mh{mNo} ){
+      if (defined($mh{dstH})                                      &&
+          $mh{dstH}->{helper}{prt}{rspWait}{mNo}                  &&
+          $mh{dstH}->{helper}{prt}{rspWait}{mNo} == hex($mh{mNo}) ){
         #ack we waited for - stop Waiting
         CUL_HM_respPendRm($mh{dstH});
       }
@@ -3514,7 +3514,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     # hmPair set in IOdev or  eventually in ccu!
     my $ioOwn  = InternalVal($ioN,"owner_CCU","");
     my $hmPair = InternalVal($ioN,"hmPair"      ,InternalVal($ioOwn,"hmPair"      ,0 ));
-    my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",""));
+    my $hmPser = InternalVal($ioN,"hmPairSerial",InternalVal($ioOwn,"hmPairSerial",InternalVal($mhp->{devN},"hmPairSerial","")));
     
     Log3 $ioOwn,3,"CUL_HM received config CCU:$ioOwn device: $mhp->{devN}. PairForSec: ".($hmPair?"on":"off")." PairSerial: $hmPser";
 
@@ -3529,8 +3529,6 @@ sub CUL_HM_parseCommon(@){#####################################################
                       ."model $attr{$mhp->{devN}}{model} "
                       ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
         CUL_HM_RemoveHMPair("hmPairForSec:$ioOwn:noReading");# just in case...
-        delete $ioHash->{hmPair};
-        delete $ioHash->{hmPairSerial};
         CUL_HM_respPendRm($mhp->{devH}); # remove all pending messages
         delete $mhp->{devH}{cmdStack};
         delete $devHlpr->{prt}{rspWait};
@@ -3638,6 +3636,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_cfgStateDelay($chnName);#schedule check when finished
         }
         else{
+          $repeat = 1;
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
       }
@@ -3659,7 +3658,6 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
         delete $mhp->{cHash}{helper}{regCollect} if (        defined $mhp->{cHash}{helper}{regCollect} 
                                                       && not defined $mhp->{cHash}{helper}{regCollect}{$regLN});
-
         if    ($format eq "02"){ # list 2: format aa:dd aa:dd ...
           $data =~ s/(..)(..)/ $1:$2/g;
           foreach(split(" ",$data)){
@@ -3695,6 +3693,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
         }
         else{
+          $repeat = 1;
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
       }
@@ -3817,7 +3816,8 @@ sub CUL_HM_parseCommon(@){#####################################################
       push @evtEt,[$mhp->{cHash},1,"state:".$state." (to $mhp->{dstN})"] if ($mhp->{devH} ne $mhp->{cHash});
       if(   $mhp->{mFlgH} & 0x20
          && $mhp->{dst} ne "000000" 
-         && $mhp->{dst} ne $mhp->{id}){
+#         && $mhp->{dst} ne $mhp->{id}
+         ){
         push @evtEt,[$mhp->{cHash},1,"triggerTo_$mhp->{dstN}:".(ucfirst($long))."_$cnt"];
         $devHlpr->{ack}{$mhp->{dstN}} = "$mhp->{cName}:$mhp->{mNo}";
       }
@@ -6877,11 +6877,17 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
 ###############################################################################
   elsif($cmd  =~ m/^(pair|getVersion)$/) { ####################################
     $state = "";
-    my $serial = ReadingsVal($name, "D-serialNr", undef);
+    my $serial = ReadingsVal($name, "D-serialNr", AttrVal($name,'serialNr',""));
     return "serial $serial - wrong length or Reading D-serialNr not present"
           if(length($serial) != 10);
-    CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serial)));
-    $hash->{hmPairSerial} = $serial if ($cmd eq "pair");
+    my ($IO,undef)=split(":",AttrVal("laSwitch","IOgrp",AttrVal("laSwitch","IODev","")));
+    if ($cmd eq "pair"){
+      return "no IO defined - cannot issue command" if (!defined $IO || !defined $defs{$IO} );
+      CUL_HM_Set($defs{$IO},$IO,"hmPairSerial",$serial);
+    }
+    else{# just trigger command
+      CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serial)));
+    }
   }
   elsif($cmd eq "hmPairForSec") { #############################################
     $state = "";
@@ -6899,7 +6905,6 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     my $serial = $a[2]?$a[2]:"";
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(length($serial) != 10);
-
     CUL_HM_PushCmdStack($hash, "++8401${dst}000000010A".uc( unpack('H*', $serial)));
     CUL_HM_RemoveHMPair("hmPairForSec:$name:noReading");
     $hash->{hmPair} = 1;
@@ -7410,10 +7415,19 @@ sub CUL_HM_RemoveHMPair($) {####################################################
   my($in ) = shift;
   my(undef,$name,$setReading) = split(':',$in);
   return if (!$name || !defined $defs{$name});
-  RemoveInternalTimer("hmPairForSec:$name");
-  delete($defs{$name}{hmPair});
-  delete($defs{$name}{hmPairSerial});
-  CUL_HM_UpdtReadSingle($defs{$name},"hmPair","timeout",1) if(!$setReading || $setReading ne "noReading");
+  my %ioN => {$name => 1};
+  my $owner_CCU = InternalVal($name,"owner_CCU",$name);
+  $ioN{$_} = 1 foreach (grep {defined $_ && $_ !~ m/^$/ && defined $defs{$_}} (split(",",AttrVal($owner_CCU,"IOList",$name).",$owner_CCU")));
+  
+  foreach my $IOname (keys %ioN){
+    RemoveInternalTimer("hmPairForSec:$IOname");
+    if(  ($defs{$IOname}{hmPair} || $defs{$IOname}{hmPairSerial} )
+       &&(!$setReading || $setReading ne "noReading")){
+      CUL_HM_UpdtReadSingle($defs{$IOname},"hmPair","timeout",1);
+    }
+    delete($defs{$IOname}{hmPair});
+    delete($defs{$IOname}{hmPairSerial});
+  }
 }
 
 #+++++++++++++++++ Protocol stack, sending, repeat+++++++++++++++++++++++++++++
@@ -7894,7 +7908,6 @@ sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
   my ($hash) =  @_;
 
   return if (!defined($hash->{DEF}));
-
   $modules{CUL_HM}{prot}{rspPend}-- if($hash->{helper}{prt}{rspWait}{cmd});
   delete $hash->{helper}{prt}{rspWait};
   delete $hash->{helper}{prt}{wuReSent};
@@ -7909,7 +7922,7 @@ sub CUL_HM_respPendTout($) {
   my ($HMidIn) =  @_;
   my(undef,$HMid) = split(":",$HMidIn,2);
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
-   my $pHash = $hash->{helper}{prt};#shortcut
+  my $pHash = $hash->{helper}{prt};#shortcut
   if ($hash && $hash->{DEF} ne '000000'){# we know the device
     my $name = $hash->{NAME};
     $pHash->{awake} = 0 if (defined $pHash->{awake});# set to asleep
