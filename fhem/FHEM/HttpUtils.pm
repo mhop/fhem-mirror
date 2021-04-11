@@ -862,6 +862,7 @@ HttpUtils_ParseAnswer($)
  
     # Request the URL with the Digest response
     if($hash->{callback}) {
+      delete($hash->{hu_inProgress});
       HttpUtils_NonblockingGet($hash);
       return ("", "", 1);
     } else {
@@ -886,6 +887,7 @@ HttpUtils_ParseAnswer($)
       Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
           "Redirect to ".($hash->{hideurl} ? "<hidden>" : $hash->{url});
       if($hash->{callback}) {
+        delete($hash->{hu_inProgress});
         HttpUtils_NonblockingGet($hash);
         return ("", "", 1);
       } else {
