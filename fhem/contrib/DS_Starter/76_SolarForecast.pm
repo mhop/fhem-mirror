@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.34.1" => "11.04.2021  further improvement of cloud dependent calculation autocorrection ",
   "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection, some fixes ",
   "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
   "0.32.0" => "09.04.2021  currentMeterDev can have: gcon=-gfeedin ",
@@ -347,7 +348,7 @@ my $defslidenum = 3;                                                            
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 
-my $calcmaxd    = 7;                                                             # Anzahl Tage (default) für Durchschnittermittlung zur Vorhersagekorrektur
+my $calcmaxd    = 21;                                                            # Anzahl Tage (default) für Durchschnittermittlung zur Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
@@ -1590,6 +1591,7 @@ sub _transferDWDForecastValues {
   
   my ($time_str,$epoche);
   my $type = $hash->{TYPE};
+  my $uac  = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
   
   my @aneeded = checkdwdattr ($fcname);
   if (@aneeded) {
@@ -1616,6 +1618,7 @@ sub _transferDWDForecastValues {
           rad  => $rad,
           t    => $t,
           num  => $num,
+          uac  => $uac,
           fh   => $fh,
           fd   => $fd
       };
@@ -1715,11 +1718,11 @@ sub _transferWeatherValues {
       $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
       $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
       
-      if($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}         = $wid;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt}        = $txt;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}               = $neff;
-          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherrainprob}   = $r101;
+      if($num < 23 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $txt;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
       }
       
       if($fd == 0 && $fh1) {                                                                   # WeatherId in pvhistory speichern
@@ -3332,29 +3335,42 @@ sub calcPVforecast {
   my $name  = $paref->{name};
   my $rad   = $paref->{rad};               # Nominale Strahlung aus DWD Device
   my $num   = $paref->{num};               # Nexthour 
+  my $uac   = $paref->{uac};               # Nutze Autokorrektur (on/off)
   my $t     = $paref->{t};                 # aktueller Unix Timestamp
   my $fh    = $paref->{fh};
   my $fd    = $paref->{fd};
   
-  my $type = $hash->{TYPE};
-  my $stch = $data{$type}{$name}{strings};                                                            # String Configuration Hash
-  my $pr   = 1.0;                                                                                     # Performance Ratio (PR)
+  my $type  = $hash->{TYPE};
+  my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
+  my $pr    = 1.0;                                                                                    # Performance Ratio (PR)
   
-  my $chour = strftime "%H", localtime($t+($num*3600));                                               # aktuelle Stunde
-  my $reld  = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
+  my $chour      = strftime "%H", localtime($t+($num*3600));                                          # aktuelle Stunde
+  my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
+  
+  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);               # PV Korrekturfaktor (auto oder manuell)
+  my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
+  my $hcfound    = "use manual correction factor";
   
   my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
   my $raindamp   = AttrVal($name, "rainFactorDamping", $rdampdef);                                    # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
-  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke
+  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  my $range      = int ($cloudcover/10);                                                              # Range errechnen
   
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
   my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
 
-  my $kw     = AttrVal     ($name, 'Wh/kWh', 'Wh');
-  my $hc     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);                   # Korrekturfaktor der Stunde des Tages einbeziehen
+  ## Ermitteln des relevanten Autokorrekturfaktors
+  if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
+      $hcfound = "yes";                                                                               # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
+      $hc      = CircularAutokorrVal ($hash, sprintf("%02d",$fh+1), $range, undef);                   # Korrekturfaktor der Stunde des Tages der entsprechenden Bewölkungsrange
+      if (!defined $hc) {
+          $hcfound = "no - use raw correction factor";
+          $hc      = $pvcorr;                                                                         # nutze RAW-Korrekturfaktor  
+      }
+  } 
 
   my $pvsum  = 0;  
   
@@ -3364,7 +3380,6 @@ sub calcPVforecast {
       my $moddir = $stch->{"$st"}{dir};                                                               # Ausrichtung der Solarmodule
       
       my $af     = $hff{$ta}{$moddir} / 100;                                                          # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
-      $hc        = 1 if(1*$hc == 0);
       
       my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf * 1000);
   
@@ -3374,6 +3389,8 @@ sub calcPVforecast {
           "moduleTiltAngle"          => $ta,
           "Area factor"              => $af,
           "Cloudcover"               => $cloudcover,
+          "CloudRange"               => $range,
+          "CloudCorrFoundInStore"    => $hcfound,
           "CloudFactorDamping"       => $clouddamp." %",
           "Cloudfactor"              => $ccf,
           "Rainprob"                 => $rainprob,
@@ -3395,6 +3412,7 @@ sub calcPVforecast {
       $pvsum += $pv;
   }
   
+  my $kw = AttrVal ($name, 'Wh/kWh', 'Wh');
   if($kw eq "Wh") {
       $pvsum = int $pvsum;
   }
@@ -3430,9 +3448,8 @@ sub calcVariance {
   
   my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
   return if(!$idts);
-  $idts    = timestringToTimestamp ($hash, $idts);
   
-  my $t = time;                                                                         # aktuelle Unix-Zeit
+  $idts = timestringToTimestamp ($hash, $idts);
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
@@ -3474,8 +3491,7 @@ sub calcVariance {
       
       Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
       
-      my $factor         = sprintf "%.2f", ($pvval / $fcval);                                             # Faktorberechnung: reale PV / Prognose
-      
+      my $factor = sprintf "%.2f", ($pvval / $fcval);                                                     # Faktorberechnung: reale PV / Prognose
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
           Log3($name, 3, "$name - new limited Variance factor: $factor (old: $oldfac) for hour: $h");
@@ -3486,6 +3502,15 @@ sub calcVariance {
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, num history days for avg: $anzavg)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
+      
+      my $chwcc = HistoryVal ($hash, $day, sprintf("%02d",$h), "wcc", undef);                            # Wolkenbedeckung Tag / Stunde
+      if(defined $chwcc) {
+          my $range = int ($chwcc/10);                                                                   # Range errechnen
+          my $type  = $hash->{TYPE};         
+          Log3($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $chwcc");
+          
+          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
+      }
       
       $paref->{pvcorrf}  = $factor;
       $paref->{nhour}    = sprintf("%02d",$h);
@@ -3541,14 +3566,14 @@ sub calcFromHistory {
           return;
       }
       
-      my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", undef);                          # Wolkenbedeckung heute Stunde $hour
+      my $chwcc = HistoryVal ($hash, $day, $hour, "wcc", undef);                          # Wolkenbedeckung Heute & abgefragte Stunde
       
       if(!defined $chwcc) {
           Log3 ($name, 4, "$name - Day $day has no cloudiness value set for hour $hour, no past averages can be calculated."); 
           return;
       }
            
-      $chwcc           = int ($chwcc/10);   
+      $chwcc = int ($chwcc/10);   
       
       Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $chwcc");
       
@@ -3577,7 +3602,7 @@ sub calcFromHistory {
       }
       
       if(!$anzavg) {
-          Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set, no historical averages calculated");
+          Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set -> no historical averages calculated");
           return;
       }
       
@@ -3738,16 +3763,29 @@ sub listDataPool {
           return qq{Circular cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $pvfc    = CircularVal ($hash, $idx, "pvfc",              "-");
-          my $pvrl    = CircularVal ($hash, $idx, "pvrl",              "-");
-          my $gcons   = CircularVal ($hash, $idx, "gcons",             "-");
-          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",           "-");
-          my $wid     = CircularVal ($hash, $idx, "weatherid",         "-");
-          my $wtxt    = CircularVal ($hash, $idx, "weathertxt",        "-");
-          my $wccv    = CircularVal ($hash, $idx, "wcc",               "-");
-          my $wrprb   = CircularVal ($hash, $idx, "weatherrainprob",   "-");
-          $sq        .= "\n" if($sq);
-          $sq        .= $idx." => pvforecast: $pvfc, pvreal: $pvrl, gcons: $gcons, gfeedin: $gfeedin, cloudcover: $wccv, rainprob: $wrprb, weatherid: $wid, weathertxt: $wtxt";
+          my $pvfc    = CircularVal ($hash, $idx, "pvfc",       "-");
+          my $pvrl    = CircularVal ($hash, $idx, "pvrl",       "-");
+          my $gcons   = CircularVal ($hash, $idx, "gcons",      "-");
+          my $gfeedin = CircularVal ($hash, $idx, "gfeedin",    "-");
+          my $wid     = CircularVal ($hash, $idx, "weatherid",  "-");
+          my $wtxt    = CircularVal ($hash, $idx, "weathertxt", "-");
+          my $wccv    = CircularVal ($hash, $idx, "wcc",        "-");
+          my $wrprb   = CircularVal ($hash, $idx, "wrp",        "-");
+          my $pvcorrf = CircularVal ($hash, $idx, "pvcorrf",    "-");
+          
+          my $pvcf;
+          if(ref $pvcorrf eq "HASH") {
+              for my $f (sort keys %{$h->{$idx}{pvcorrf}}) {
+                  $pvcf .= " " if($pvcf);
+                  $pvcf .= "$f=".$h->{$idx}{pvcorrf}{$f};
+              }
+          }
+          else {
+              $pvcf = $pvcorrf;
+          }
+          
+          $sq .= "\n" if($sq);
+          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb, wid: $wid, corr: $pvcf, wtxt: $wtxt";
       }
   }
   
@@ -3954,7 +3992,7 @@ sub createNotifyDev {
 return;
 }
 
-################################################################
+######################################################################
 #    Wert des pvhist-Hash zurückliefern
 #    Usage:
 #    HistoryVal ($hash, $day, $hod, $key, $def)
@@ -3968,10 +4006,10 @@ return;
 #             weatherid - Wetter ID
 #             wcc       - Grad der Bewölkung
 #             wrp       - Niederschlagswahrscheinlichkeit
-#             pvcorrf   - PV Autokorrekturfaktor
+#             pvcorrf   - PV Autokorrekturfaktor f. Stunde des Tages
 #    $def: Defaultwert
 #
-################################################################
+######################################################################
 sub HistoryVal {
   my $hash = shift;
   my $day  = shift;
@@ -3994,18 +4032,22 @@ return $def;
 
 ################################################################
 #    Wert des circular-Hash zurückliefern
+#    Achtung: die Werte im circular-Hash haben nicht
+#             zwingend eine Beziehung zueinander !!
+#
 #    Usage:
 #    CircularVal ($hash, $hod, $key, $def)
 #
 #    $hod: Stunde des Tages (01,02,...,24)
-#    $key:    pvrl              - realer PV Ertrag
-#             pvfc              - PV Vorhersage
-#             gcons             - realer Netzbezug
-#             gfeedin           - reale Netzeinspeisung
-#             weatherid         - DWD Wetter id 
-#             weathertxt        - DWD Wetter Text
-#             wcc               - DWD Wolkendichte
-#             weatherrainprob   - DWD Regenwahrscheinlichkeit
+#    $key:    pvrl       - realer PV Ertrag
+#             pvfc       - PV Vorhersage
+#             gcons      - realer Netzbezug
+#             gfeedin    - reale Netzeinspeisung
+#             weatherid  - DWD Wetter id 
+#             weathertxt - DWD Wetter Text
+#             wcc        - DWD Wolkendichte
+#             wrp        - DWD Regenwahrscheinlichkeit
+#             pvcorrf    - PV Autokorrekturfaktoren (HASH)
 #    $def: Defaultwert
 #
 ################################################################
@@ -4022,6 +4064,36 @@ sub CircularVal {
      defined($data{$type}{$name}{circular}{$hod})        &&
      defined($data{$type}{$name}{circular}{$hod}{$key})) {
      return  $data{$type}{$name}{circular}{$hod}{$key};
+  }
+
+return $def;
+}
+
+################################################################
+#    Wert des Autokorrekturfaktors für eine bestimmte
+#    Bewölkungs-Range aus dem circular-Hash zurückliefern
+#    Usage:
+#    CircularAutokorrVal ($hash, $hod, $range, $def)
+#
+#    $hod:    Stunde des Tages (01,02,...,24)
+#    $range:  Range Bewölkung (1...10)
+#    $def:    Defaultwert
+#
+################################################################
+sub CircularAutokorrVal {
+  my $hash  = shift;
+  my $hod   = shift;
+  my $range = shift;
+  my $def   = shift;
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  if(defined($data{$type}{$name}{circular})                         &&
+     defined($data{$type}{$name}{circular}{$hod})                   &&
+     defined($data{$type}{$name}{circular}{$hod}{pvcorrf})          &&
+     defined($data{$type}{$name}{circular}{$hod}{pvcorrf}{$range})) {
+     return  $data{$type}{$name}{circular}{$hod}{pvcorrf}{$range};
   }
 
 return $def;
@@ -4417,8 +4489,9 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       Schaltet die automatische Vorhersagekorrektur ein / aus. <br>
       Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
       ein Korrekturfaktor der Solarvorhersage berechnet und auf die Erwartung des kommenden Tages angewendet.
-      Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde vergleichen und
-      daraus eine Korrektur abgeleitet. <br>      
+      Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde unter 
+      Berücksichtigung der Bewölkung verglichen, die Korrekturwerte historischer Tage einbezogen und daraus eine neue Korrektur 
+      abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>      
       (default: off)      
       </li>
     </ul>
@@ -4517,15 +4590,16 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       
       <ul>
          <table>  
-         <colgroup> <col width=20%> <col width=80%> </colgroup>
-            <tr><td> <b>pvforecast</b>        </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
-            <tr><td> <b>pvreal</b>            </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
-            <tr><td> <b>gcons</b>             </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
-            <tr><td> <b>gfeedin</b>           </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
-            <tr><td> <b>cloudcover</b>        </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
-            <tr><td> <b>weatherrainprob</b>   </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
-            <tr><td> <b>weatherid</b>         </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
-            <tr><td> <b>weathertxt</b>        </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>pvfc</b>     </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
+            <tr><td> <b>pvrl</b>     </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
+            <tr><td> <b>gcon</b>     </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
+            <tr><td> <b>gfeedin</b>  </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
+            <tr><td> <b>wcc</b>      </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
+            <tr><td> <b>wrp</b>      </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
+            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
+            <tr><td> <b>corr</b>     </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange 0..10                                       </td></tr>
+            <tr><td> <b>wtxt</b>     </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
          </table>
       </ul>
       
@@ -4764,7 +4838,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        <li><b>numHistDays </b><br>
          Anzahl der vergangenen Tage (historische Daten) die zur Autokorrektur der PV Vorhersage verwendet werden sofern
          aktiviert. <br>
-         (default: 7)
+         (default: 21)
        </li>
        <br>
        
