@@ -3775,7 +3775,7 @@ sub listDataPool {
           
           my $pvcf;
           if(ref $pvcorrf eq "HASH") {
-              for my $f (sort keys %{$h->{$idx}{pvcorrf}}) {
+              for my $f (sort {$a<=>$b} keys %{$h->{$idx}{pvcorrf}}) {
                   $pvcf .= " " if($pvcf);
                   $pvcf .= "$f=".$h->{$idx}{pvcorrf}{$f};
               }
@@ -4486,12 +4486,14 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <a name="pvCorrectionFactor_Auto"></a>
       <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br><br>  
       
-      Schaltet die automatische Vorhersagekorrektur ein / aus. <br>
+      Schaltet die automatische Vorhersagekorrektur ein/aus. <br>
       Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
       ein Korrekturfaktor der Solarvorhersage berechnet und auf die Erwartung des kommenden Tages angewendet.
-      Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde unter 
-      Berücksichtigung der Bewölkung verglichen, die Korrekturwerte historischer Tage einbezogen und daraus eine neue Korrektur 
-      abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>      
+      Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
+      die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
+      abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
+      Die automatische Vorhersagekorrektur ist lernend und benötigt etliche Tage um die Korrekturwerte zu optimieren.
+      Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten ! <br>
       (default: off)      
       </li>
     </ul>
