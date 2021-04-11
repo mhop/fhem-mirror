@@ -39,7 +39,7 @@ use vars qw{%attr %defs};
 sub Log($$);
 
 #-- globals on start
-my $version = "3.1";
+my $version = "3.3";
 
 #-- these we may get on request
 my %gets = (
@@ -62,8 +62,8 @@ my %setssw = (
 );
 
 my %setsrol = (
-  "closed:noArg"  => "C",
-  "open:noArg"    => "O",
+  "closed"        => "C",
+  "open"          => "O",
   "stop:noArg"    => "S",
   "config"        => "K",
   "password"      => "P",
@@ -671,27 +671,35 @@ sub Shelly_Set ($@) {
       return $msg
     }
     
-     #-- open 100% or 0% ?
-     my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
+    #-- open 100% or 0% ?
+    my $pctnormal = (AttrVal($name,"pct100","open") eq "open");
     
-     if( $cmd eq "stop" ){
+    if( $cmd eq "stop" ){
       Shelly_updown($hash,"?go=stop");
       # -- estimate pos here ???
       $hash->{DURATION} = 0;
-    }elsif( $cmd eq "closed" ){
-      $hash->{MOVING} = "moving_down";
-      $hash->{DURATION} = $max;
-      $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
-      Shelly_updown($hash,"?go=close");
-    }elsif( $cmd eq "open" ){
-      $hash->{MOVING} = "moving_up";
-      $hash->{DURATION} = $max;
-      $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
-      Shelly_updown($hash,"?go=open");
+    }elsif( $cmd =~ /(closed)|(open)/ ){
+     $hash->{DURATION} = (defined($value))?$value:$max;
+      if( $cmd eq "closed" ){
+        $hash->{MOVING} = "moving_down";
+        $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
+        $cmd = "?go=close";
+      }else{
+        $hash->{MOVING} = "moving_up";
+        $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
+        $cmd =" ?go=open";
+      }
+      $cmd .= "&duration=$value"
+        if(defined($value));
+      Shelly_updown($hash,$cmd);
     }elsif( $cmd eq "pct" ){
       my $targetpct = $value;
       my $pos  = ReadingsVal($name,"position","");
       my $pct  = ReadingsVal($name,"pct",undef);  
+      #-- check for sign
+      if( "$value" =~ /[\+-]\d*/ ){
+        $targetpct = eval($pos."$value");
+      }
 
       if( !$max ){
         Log3 $name,1,"[Shelly_Set] please set the maxtime attribute for proper operation";
@@ -1649,11 +1657,12 @@ sub Shelly_updown2($){
         <br/>For Shelly roller blind devices (model=shelly2/2.5 and mode=roller)  
         <ul>
             <li>
-                <code>set &lt;name&gt; open|closed|stop </code>
-                <br />drives the roller blind open, closed or to a stop.</li>      
+                <code>set &lt;name&gt; open|closed|stop [&lt;duration&gt;]</code>
+                <br />drives the roller blind open, closed or to a stop. The commands open and closed take a optional parameter that determines the drive time in seconds</li>      
             <li>
                 <code>set &lt;name&gt; pct &lt;integer percent value&gt; </code>
-                <br />drives the roller blind to a partially closed position (100=open, 0=closed)</li>    
+                <br />drives the roller blind to a partially closed position (normally 100=open, 0=closed, see attribute pct100). If the integer percent value
+                carries a sign + or - the following number will be added to the current value of the position to acquire the target value. </li>    
             <li>
                 <code>set &lt;name&gt; zero </code>
                 <br />calibration of roller device (only for model=shelly2/2.5)</li>      
