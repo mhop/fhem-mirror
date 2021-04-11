@@ -2214,8 +2214,10 @@ sub CheckRegistration {
   my ( $hash, $service, $cmd, $param, @successor ) = @_;
   my $name = $hash->{NAME};
 
-  if (ReadingsVal($name, "authCookie", "") ne "" and
-      ReadingsTimestamp($name, "authCookie", "") =~ m/^(\d{4})-(\d{2})-(\d{2}) ([0-2]\d):([0-5]\d):([0-5]\d)$/xms) {
+  my $authCookie = ReadingsVal($name, "authCookie", "");
+  my $authCookieTS = ReadingsTimestamp($name, "authCookie", "");
+  if ($authCookie ne "" and
+      $authCookieTS =~ m/^(\d{4})-(\d{2})-(\d{2})\ ([0-2]\d):([0-5]\d):([0-5]\d)$/xms) {
 
     my $time = fhemTimeLocal($6, $5, $4, $3, $2 - 1, $1 - 1900);
     # max age defaults to 14 days
@@ -2235,12 +2237,16 @@ sub CheckRegistration {
         $msg .= " $i: ";
         $msg .= join(",", map { defined($_) ? $_ : '' } @succ_item);
       }
-      Log3($name, 4, "BOTVAC created".$msg);
+      Log3($name, 4, "BRAVIA $name: created".$msg);
 
       SendCommand( $hash, "register", "renew", undef, @successor );
 
       return 1;
+    } else {
+      Log3($name, 5, "BRAVIA $name: registration valid until $authCookieTS");
     }
+  } else {
+      Log3($name, 4, "BRAVIA $name: authCookie not valid '$authCookie $authCookieTS'");
   }
   return;
 }
