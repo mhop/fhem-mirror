@@ -3483,11 +3483,11 @@ sub calcVariance {
       
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
-      $paref->{hour}             = $h;
-      my ($pvavg,$fcavg,$anzavg) = calcFromHistory ($paref);                                              # historische PV / Forecast Vergleichswerte ermitteln
-      $anzavg                  //= 0;
-      $pvval                     = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                               # Ertrag aktuelle Stunde berücksichtigen
-      $fcval                     = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                               # Vorhersage aktuelle Stunde berücksichtigen
+      $paref->{hour}                    = $h;
+      my ($pvavg,$fcavg,$anzavg,$range) = calcFromHistory ($paref);                                       # historische PV / Forecast Vergleichswerte ermitteln
+      $anzavg                         //= 0;
+      $pvval                            = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                        # Ertrag aktuelle Stunde berücksichtigen
+      $fcval                            = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                        # Vorhersage aktuelle Stunde berücksichtigen
       
       Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
       
@@ -3500,17 +3500,18 @@ sub calcVariance {
           Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, found history days for avg: $anzavg)";
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
-      
-      my $chwcc = HistoryVal ($hash, $day, sprintf("%02d",$h), "wcc", undef);                            # Wolkenbedeckung Tag / Stunde
-      if(defined $chwcc) {
-          my $range = int ($chwcc/10);                                                                   # Range errechnen
+      if(defined $range) {
           my $type  = $hash->{TYPE};         
-          Log3($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $chwcc");
+          Log3($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
       }
+      else {
+          $range = "";
+      }
+      
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, found history days in range: $anzavg)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
       
       $paref->{pvcorrf}  = $factor;
       $paref->{nhour}    = sprintf("%02d",$h);
@@ -3573,9 +3574,9 @@ sub calcFromHistory {
           return;
       }
            
-      $chwcc = int ($chwcc/10);   
+      my $range = int ($chwcc/10);   
       
-      Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $chwcc");
+      Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $range");
       
       $anzavg          = 0;      
       my ($pvrl,$pvfc) = (0,0);
@@ -3590,26 +3591,26 @@ sub calcFromHistory {
 
           $histwcc = int ($histwcc/10);
 
-          if($chwcc == $histwcc) {               
+          if($range == $histwcc) {               
               $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
               $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
               $anzavg++;
-              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range identical: $chwcc. Day/hour $dayfa/$hour included.");
+              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range identical: $range. Day/hour $dayfa/$hour included.");
           }
           else {
-              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range different: $chwcc/$histwcc. Day/hour $dayfa/$hour discarded.");
+              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range different: $range/$histwcc. Day/hour $dayfa/$hour discarded.");
           }
       }
       
       if(!$anzavg) {
           Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set -> no historical averages calculated");
-          return;
+          return (undef,undef,undef,$range);
       }
       
       my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
       my $fcavg = sprintf "%.2f", $pvfc / $anzavg;
       
-      return ($pvavg,$fcavg,$anzavg);
+      return ($pvavg,$fcavg,$anzavg,$range);
   }
   
 return;
