@@ -4492,8 +4492,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
-      Die automatische Vorhersagekorrektur ist lernend und benötigt etliche Tage um die Korrekturwerte zu optimieren.
-      Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten ! <br>
+      <b>Die automatische Vorhersagekorrektur ist lernend und benötigt etliche Tage um die Korrekturwerte zu optimieren.
+      Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)      
       </li>
     </ul>
