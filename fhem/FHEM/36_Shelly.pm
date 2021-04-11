@@ -679,7 +679,7 @@ sub Shelly_Set ($@) {
       # -- estimate pos here ???
       $hash->{DURATION} = 0;
     }elsif( $cmd =~ /(closed)|(open)/ ){
-     $hash->{DURATION} = (defined($value))?$value:$max;
+      $hash->{DURATION} = (defined($value))?$value:$max;
       if( $cmd eq "closed" ){
         $hash->{MOVING} = "moving_down";
         $hash->{TARGETPCT} = $pctnormal ? 0 : 100;
@@ -687,7 +687,7 @@ sub Shelly_Set ($@) {
       }else{
         $hash->{MOVING} = "moving_up";
         $hash->{TARGETPCT} = $pctnormal ? 100 : 0;
-        $cmd =" ?go=open";
+        $cmd ="?go=open";
       }
       $cmd .= "&duration=$value"
         if(defined($value));
