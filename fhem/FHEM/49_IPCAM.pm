@@ -1,4 +1,4 @@
-# $Id$
+#create $Id$
 # vim: ts=2:et
 ################################################################
 #
@@ -383,7 +383,7 @@ Get($@) {
     }
     $hash->{READINGS}{snapshots}{VAL} = 0;
     for (my $i=0;$i<$seqImages;$i++) {
-      InternalTimer(gettimeofday()+$seqWait, "IPCAM::getSnapshot", $hash, 0);
+      InternalTimer(gettimeofday()+$seqWait, "IPCAM::RequestSnapshot", $hash);
       $seqWait = $seqWait + $seqDelay;
     }
     return undef;
@@ -393,10 +393,7 @@ Get($@) {
     my $callbackCommand = join(" ", @a);
     Log3 $name, 3, "IPCAM ($name) - imageWithCallback command: $callbackCommand";
 
-    my $camUri = createSnapshotUrl($hash);
-    Log3 $name, 3, "IPCAM ($name) - imageWithCallback camUri: $camUri";
-  
-    RequestSnapshotWithCallback($hash, $camUri, $callbackCommand);
+    RequestSnapshotWithCallback($hash,$callbackCommand);
 
     return undef;    
 
@@ -409,12 +406,6 @@ Get($@) {
     }
 
   }
-}
-
-sub getSnapshot($$) {
-  my ($hash) = @_;
-  my $snapshotUrl = createSnapshotUrl($hash);
-  RequestSnapshot($hash, $snapshotUrl);
 }
 
 #####################################
@@ -473,16 +464,24 @@ createSnapshotUrl($) {
   return $camURI;
 }
 
-
 sub RequestSnapshot {
-  my ($hash, $camUrl) = @_;
+  my ($hash) = @_;
 
-  return RequestSnapshotWithCallback($hash, $camUrl, undef);
+  return ExecuteSnapshotRequest($hash, undef);
 }
 
 sub RequestSnapshotWithCallback {
-  my ($hash, $camUrl, $callbackCommand) = @_;
+  my ($hash, $callbackCommand) = @_;
+  
+  return ExecuteSnapshotRequest($hash, $callbackCommand);
+}
+
+sub ExecuteSnapshotRequest {
+  my ($hash, $callbackCommand) = @_;
   my $name = $hash->{NAME};
+
+  my $camUrl = createSnapshotUrl($hash);
+  Log3 $name, 3, "IPCAM ($name) - ExecuteSnapshotRequest camUrl: $camUrl";
 
   my $apiParam = {
     url => $camUrl,
@@ -493,7 +492,14 @@ sub RequestSnapshotWithCallback {
     timeout => AttrVal($name, 'httpTimeout', 4),
     callbackCommand => $callbackCommand
   };
-  HttpUtils_NonblockingGet($apiParam);
+
+  # trying to fix timeouts by wrapping this in internalTimer
+  if (defined $callbackCommand) {
+    InternalTimer(gettimeofday(), "main::HttpUtils_NonblockingGet", $apiParam);
+  } else {
+    # without callback command, the internal timer has been set before already.
+    HttpUtils_NonblockingGet($apiParam);    
+  }
   
   return undef;
 }
