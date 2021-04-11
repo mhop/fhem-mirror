@@ -4548,21 +4548,22 @@ sub card
     $topVal=($maxValPlot > 0 ? $maxValPlot : 0);
     $bottomVal=($minValPlot < 0 ? $minValPlot : 0);
     ($nullColor)=get_color(0,$min,$max,$minColor,$maxColor,$func);
-    $nullProp=int ($maxValPlot/($maxValPlot-$minValPlot)*10)/10 if ($maxValPlot != $minValPlot);
-    $topOpacity=0.3;
-    $bottomOpacity=0.3;
-    $nullOpacity=0.05;
+    ##$nullProp=int ($maxValPlot/($maxValPlot-$minValPlot)*10)/10 if ($maxValPlot != $minValPlot);
+    $nullProp=int ($topVal/($topVal-$bottomVal)*100)/100 if ($bottomVal<0 and $topVal>0);
+    $topOpacity=($topVal==0 ? 0 : 0.25);
+    $bottomOpacity=($bottomVal==0 ? 0: 0.25);
+    $nullOpacity=0.0;
   } elsif ($max <= 0) {
     $xpos=0;
     $topVal=$max;
-    $topOpacity=0.05;
-    $bottomOpacity=0.3;
+    $topOpacity=0.0;
+    $bottomOpacity=0.25;
     $bottomVal=$minValPlot;
   } else {
     $xpos=50;
     $topVal=$maxValPlot;
-    $topOpacity=0.3;
-    $bottomOpacity=0.05;
+    $topOpacity=0.25;
+    $bottomOpacity=0.0;
     $bottomVal=$min;
   }
   
@@ -4570,27 +4571,22 @@ sub card
   
   my ($topValColor)=get_color($topVal,$min,$max,$minColor,$maxColor,$func);
   my ($bottomValColor)=get_color($bottomVal,$min,$max,$minColor,$maxColor,$func);
-  my ($color75)=get_color((($topVal-$bottomVal)*0.75+$bottomVal),$min,$max,$minColor,$maxColor,$func);
-  my ($color50)=get_color((($topVal-$bottomVal)*0.5+$bottomVal),$min,$max,$minColor,$maxColor,$func);
-  my ($color25)=get_color((($topVal-$bottomVal)*0.25+$bottomVal),$min,$max,$minColor,$maxColor,$func);
-
   $out.= sprintf ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 %d %d" width="%d" height="%d" style="width:%dpx; height:%dpx;">',$bwidth,$bheight,$svg_width,$svg_height,$svg_width,$svg_height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradcardback" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
+  $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
 
-  $out.= sprintf('<linearGradient id="gradplot_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topVal,$bottomVal,(defined $lr ? $lr:0));
-  $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:1"/>',color ($topValColor,$lr));
-  $out.= sprintf('<stop offset="0.25" style="stop-color:%s;stop-opacity:1"/>',color ($color75,$lr));
-  $out.= sprintf('<stop offset="0.5" style="stop-color:%s;stop-opacity:1"/>',color ($color50,$lr));
-  $out.= sprintf('<stop offset="0.75" style="stop-color:%s;stop-opacity:1"/>',color ($color25,$lr));
-  $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',color($bottomValColor,$lr));
-  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topVal,$bottomVal,(defined $lr ? $lr:0));
+  for (my $i=0; $i<=1;$i+=0.10) {
+    my ($color)=get_color(($topVal-$bottomVal)*(1-$i)+$bottomVal,$min,$max,$minColor,$maxColor,$func);
+    $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:1"/>',$i,color($color,$lr));
+  }
+  $out.= '</linearGradient>';
 
+  $out.= sprintf('<linearGradient id="gradplotLight_%s_%s_%s" x1="0" y1="0" x2="0" y2="1">',$topValColor,$bottomValColor,(defined $lr ? $lr:0));
   $out.= sprintf('<stop offset="0" style="stop-color:%s;stop-opacity:%s"/>',color($topValColor,$lr),$topOpacity);
   $out.= sprintf('<stop offset="%s" style="stop-color:%s;stop-opacity:%s"/>',$nullProp,color($nullColor,$lr),$nullOpacity) if (defined $nullProp);
   $out.= sprintf('<stop offset="1" style="stop-color:%s;stop-opacity:%s"/></linearGradient>',color($bottomValColor,$lr),$bottomOpacity);
   $out.= '</defs>';
-  $out.= '<linearGradient id="gradcardback" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(32,32,32);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(64, 64, 64);stop-opacity:0.9"/></linearGradient>';
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
   if (defined $header) {
@@ -4625,6 +4621,7 @@ sub card
       $points.="$i,".(50-int((${$a}[$i]*$m+$n)*10)/10)." ";
     }
   }
+  
   $out.= sprintf('<polyline points="-0.5,%s 59.5,%s"  style="stroke:gray; stroke-width:1" />',$xpos,$xpos);
   $out.='<polyline points="0,-0.5 0,50"  style="stroke:gray; stroke-width:1" />';
   for (my $i=0;$i<=4;$i++) {
@@ -4633,9 +4630,9 @@ sub card
     $out.=sprintf('<polyline points="%d,%s %d,%s"  style="stroke:gray; stroke-width:1" />',$x,$xpos+1.5,$x,$xpos-1.5);
     $out.=sprintf('<polyline points="-0.5,%d 2,%d"  style="stroke:gray; stroke-width:1" />',$y,$y);
   }
-  $out.=sprintf('<polyline points="0,%s ',$xpos);
+  $out.=sprintf('<path d="M59,%s L',$xpos);
   $out.= $points;
-  $out.= sprintf('59,%s" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$xpos,$topVal,$bottomVal,(defined $lr ? $lr:0),$topVal,$bottomVal,(defined $lr ? $lr:0));
+  $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
 
 
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal and $maxValSlot != 59);
