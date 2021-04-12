@@ -1553,7 +1553,8 @@ sub _additionalActivities {
       next if(!defined $nhts || !defined $nhfc);
       
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
-      addCHANGED ($hash, "PVforecast: ".$nhfc, $dt." ".$h.":59:59");
+      push @$daref, "PVforecast<>".$nhfc." Wh<>".$dt." ".$h.":59:59";
+      # addCHANGED ($hash, "PVforecast: ".$nhfc, $dt." ".$h.":59:59");
   }
   
   DoTrigger($name, undef, 1);
