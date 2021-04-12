@@ -111,6 +111,7 @@ BEGIN {
       qw(
           Initialize
           pageAsHtml
+          NexthoursVal
         )
   );  
   
