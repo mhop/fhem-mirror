@@ -186,9 +186,9 @@ sub OBIS_Define($$)
   if ($hash->{helper}{DEVICES}[1]>0) {
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 $hash, 5, "OBIS ($name) - Internal timer set to ".FmtDateTime($t);
-	InternalTimer($t, "GetUpdate", $hash, 0);
+	InternalTimer($t, "OBIS_GetUpdate", $hash, 0);
   }
-  InternalTimer(gettimeofday()+60, "CheckNoData", $hash, 0) if ($hash->{helper}{NETDEV});
+  InternalTimer(gettimeofday()+60, "OBIS_CheckNoData", $hash, 0) if ($hash->{helper}{NETDEV});
   $hash->{helper}{EoM}=-1;
   
   Log3 $hash, 5, "OBIS ($name) - Opening device...";
@@ -238,7 +238,7 @@ sub OBIS_Get($@)
   my $opt = shift @a;
 	
   if ($opt eq "update") {
-  	GetUpdate($hash);
+  	OBIS_GetUpdate($hash);
   } else 
   
   {return "Unknown argument $opt, choose one of update";}
@@ -274,12 +274,12 @@ sub OBIS_Set($@)
 }
 
 # Update-Routine
-sub GetUpdate($)
+sub OBIS_GetUpdate($)
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
 	my $type= $hash->{MeterType};
-	RemoveInternalTimer($hash, "GetUpdate");
+	RemoveInternalTimer($hash, "OBIS_GetUpdate");
 
 	$hash->{helper}{EoM}=-1;
 	if ($hash->{helper}{DEVICES}[1] eq "") {return undef;}
@@ -289,15 +289,15 @@ sub GetUpdate($)
 	}
 	my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
     Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-	InternalTimer($t, "GetUpdate", $hash, 0)  if ($hash->{helper}{DEVICES}[1]>0);
+	InternalTimer($t, "OBIS_GetUpdate", $hash, 0)  if ($hash->{helper}{DEVICES}[1]>0);
 }
 
 # Periodic check for dead connections (no data send for some time)
-sub CheckNoData 
+sub OBIS_CheckNoData 
 {
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	RemoveInternalTimer($hash, "CheckNoData");
+	RemoveInternalTimer($hash, "OBIS_CheckNoData");
     my $t = gettimeofday();
     my $maxSilence = AttrVal($name,"resetAfterNoDataTime",90);
     if ( $hash->{helper}{LastPacketTime} && $hash->{helper}{LastPacketTime} < $t-$maxSilence) {
@@ -306,7 +306,7 @@ sub CheckNoData
 	  DevIo_CloseDev($hash);
       DevIo_OpenDev($hash, 1, "OBIS_Init", $hash->{helper}{NETDEV} ? "OBIS_Callback" : undef);
     }
-	InternalTimer($t+60, "CheckNoData", $hash);
+	InternalTimer($t+60, "OBIS_CheckNoData", $hash);
 }
 
 sub OBIS_Init($)
@@ -755,7 +755,7 @@ sub OBIS_Attr(@)
     if ($cmd eq "del") {
 		if ($aName eq "channels") { $hash->{helper}{Channels}=undef;}
 		if ($aName eq "pollingMode" || $aName eq "interval") {
-			RemoveInternalTimer($hash,"GetUpdate");
+			RemoveInternalTimer($hash,"OBIS_GetUpdate");
 			$hash->{helper}{DEVICES}[1]=0;
 			$hash->{helper}{EoM}=-1;
 #			delete($readyfnlist{"$name.$dev"});
@@ -795,14 +795,14 @@ Log3 $name, 3, "OBIS ($name) - Attr $aName Val $aVal, dopoll = $dopoll";
 #				delete($selectlist{"$name.$dev"});
 #				$readyfnlist{"$name.$dev"} = $hash;
 				$hash->{helper}{TRIGGERTIME}=gettimeofday();
-		  		RemoveInternalTimer($hash,"GetUpdate");
+		  		RemoveInternalTimer($hash,"OBIS_GetUpdate");
 				$hash->{helper}{DEVICES}[1]=($aName eq "interval" ? $aVal : AttrVal($name,"interval",0));
 				my $t=OBIS_adjustAlign($hash,AttrVal($name,"alignTime",undef),$hash->{helper}{DEVICES}[1]);
 			    Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t)) if ($hash->{helper}{DEVICES}[1]>0);
-				InternalTimer($t, "GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
+				InternalTimer($t, "OBIS_GetUpdate", $hash, 0) if ($hash->{helper}{DEVICES}[1]>0);
 				$hash->{helper}{EoM}=1;
 			} else {
-		  		RemoveInternalTimer($hash,"GetUpdate");
+		  		RemoveInternalTimer($hash,"OBIS_GetUpdate");
 #				delete($readyfnlist{"$name.$dev"});
 				$hash->{helper}{DEVICES}[1]=0;
 #				$selectlist{"$name.$dev"} = $hash;
@@ -814,11 +814,11 @@ Log3 $name, 3, "OBIS ($name) - Attr $aName Val $aVal, dopoll = $dopoll";
 		if ($aName eq "alignTime") {
 			 if ($hash->{helper}{DEVICES}[1]>0 || !$init_done) {
 			 	if ($aVal=~/\d+/) {
-			  		RemoveInternalTimer($hash,"GetUpdate");
+			  		RemoveInternalTimer($hash,"OBIS_GetUpdate");
 				    $hash->{helper}{TRIGGERTIME}=gettimeofday();
 					my $t=OBIS_adjustAlign($hash,$aVal,$hash->{helper}{DEVICES}[1]);
 				    Log3 ($hash,5,"OBIS ($name) - Internal timer set to ".FmtDateTime($t));
-					InternalTimer($t, "GetUpdate", $hash, 0);
+					InternalTimer($t, "OBIS_GetUpdate", $hash, 0);
 			 	} else {return "OBIS ($name): attr alignTime must be a Value >0"}
 			 } else {
 			 	if ($init_done) {
