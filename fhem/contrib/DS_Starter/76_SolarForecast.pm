@@ -1557,7 +1557,7 @@ sub _additionalActivities {
       # addCHANGED ($hash, "PVforecast: ".$nhfc, $dt." ".$h.":59:59");
   }
   
-  DoTrigger($name, undef, 1);
+  # DoTrigger($name, undef, 1);
 
   ## bestimmte einmalige Aktionen
   ##################################  
