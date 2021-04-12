@@ -38,6 +38,7 @@ eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # 
 
 use FHEM::SynoModules::SMUtils qw( evaljson  
                                    moduleVersion
+                                   addCHANGED
                                    trim
                                  );                       # Hilfsroutinen Modul
 
@@ -117,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.35.0" => "12.04.2021  create additional PVforecast events - PV forecast until the end of the coming day ",
   "0.34.1" => "11.04.2021  further improvement of cloud dependent calculation autocorrection ",
   "0.34.0" => "10.04.2021  only hours with the same cloud cover range are considered for pvCorrection, some fixes ",
   "0.33.0" => "09.04.2021  new setter currentBatteryDev, bugfix in _transferMeterValues ",
@@ -348,7 +350,7 @@ my $defslidenum = 3;                                                            
 my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 
-my $calcmaxd    = 21;                                                            # Anzahl Tage (default) für Durchschnittermittlung zur Vorhersagekorrektur
+my $calcmaxd    = 21;                                                            # Anzahl Tage (default) für Berechnung Vorhersagekorrektur
 my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
@@ -1525,9 +1527,10 @@ sub _additionalActivities {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
-  my $t     = $paref->{t};                                  # Epoche Zeit
+  my $t     = $paref->{t};                                                                     # Epoche Zeit
   
-  my $date  = strftime "%Y-%m-%d", localtime($t);           # aktuelles Datum
+  my $type  = $hash->{TYPE};
+  my $date  = strftime "%Y-%m-%d", localtime($t);                                              # aktuelles Datum
   
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
   
@@ -1542,24 +1545,40 @@ sub _additionalActivities {
   $gcon = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   push @$daref, "LastHourGridconsumptionReal<>".$gcon." Wh<>".$ts1;
   
-  my $tlim = "00";                                                                            # bestimmte Aktionen                    
+  ## zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
+  #############################################################################
+  for my $idx (sort keys %{$data{$type}{$name}{nexthours}}) {                                 
+      my $nhts = NexthoursVal ($hash, $idx, "starttime",  undef);
+      my $nhfc = NexthoursVal ($hash, $idx, "pvforecast", undef);
+      next if(!defined $nhts || !defined $nhfc);
+      
+      my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
+      addCHANGED ($hash, "PVforecast: ".$nhfc, $dt." ".$h.":59:59");
+  }
+  
+  DoTrigger($name, undef, 1);
+
+  ## bestimmte einmalige Aktionen
+  ##################################  
+  my $tlim = "00";                                                                                              
   if($chour =~ /^($tlim)$/x) {
       if(!exists $hash->{HELPER}{H00DONE}) {
           $date = strftime "%Y-%m-%d", localtime($t-7200);                                    # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
           
           $pvfc = ReadingsNum($name, "Today_Hour24_PVforecast", 0);  
-          push @$daref, "LastHourPVforecast<>".$pvfc."<>".$ts1;
+          push @$daref, "LastHourPVforecast<>".$pvfc."<>".$ts;
           
           $pvrl = ReadingsNum($name, "Today_Hour24_PVreal", 0);
-          push @$daref, "LastHourPVreal<>".$pvrl."<>".$ts1;
+          push @$daref, "LastHourPVreal<>".$pvrl."<>".$ts;
           
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
-          push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts1;
+          push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts;
           
           deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
+          deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
           
           delete $hash->{HELPER}{INITETOTAL};
           delete $hash->{HELPER}{INITCONTOTAL};
@@ -1625,15 +1644,12 @@ sub _transferDWDForecastValues {
       
       my $calcpv = calcPVforecast ($params);                                                  # Vorhersage gewichtet kalkulieren
                 
-      $time_str        = "NextHour".sprintf "%02d", $num;
-      $epoche          = $t + (3600*$num);                                                      
-      my ($ta,$realts) = TimeAdjust ($epoche);
-      
-      # push @$daref, "CurrentHourPVforecast<>".$calcpv." Wh<>".$realts if($num == 0);
-      #push @$daref, "${time_str}_Time<>"      .$ta;
+      $time_str               = "NextHour".sprintf "%02d", $num;
+      $epoche                 = $t + (3600*$num);                                                      
+      my ($ta,$tsdef,$realts) = TimeAdjust ($epoche);
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
-      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $ta;
+      $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $tsdef;
       $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                           # nur Info: original Vorhersage Strahlungsdaten
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
@@ -2640,16 +2656,10 @@ sub forecastGraphic {                                                           
   ##########################
   # Werte aktuelle Stunde
   ##########################
-
-  my $thishour;
-  my $month;
-  my $year;
-  my $day_str;
   my $day;
 
-  my $t = NexthoursVal ($hash, "NextHour00", "starttime", AttrVal('global', 'language', '') eq 'DE' ? '00.00.0000 24' : '0000-00-00 24');
-  ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  ($day_str,$month,$year,$thishour) = $t =~ m/(\d{2}).(\d{2}).(\d{4})\s(\d{2})/x if (AttrVal('global', 'language', '') eq 'DE');
+  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
+  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
   $thishour++;
   
@@ -3266,16 +3276,17 @@ sub TimeAdjust {
   my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                      # Standard f. z.B. Readingstimstamp
   $year += 1900;                                                                            
   $mon++;  
-  my $realts = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          
+  my $realts = sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);
+  my $tsdef  = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");        # engl. Variante für Logging-Timestamps etc.
   
   if(AttrVal("global","language","EN") eq "DE") {
       $ts = sprintf("%02d.%02d.%04d %02d:%s", $lday,$lmonth,$lyear,$lhour,"00:00");
   } 
   else {
-      $ts = sprintf("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");
+      $ts = $tsdef;
   }
   
-return ($ts,$realts);
+return ($ts,$tsdef,$realts);
 }
 
 ################################################################
@@ -3370,7 +3381,9 @@ sub calcPVforecast {
           $hcfound = "no - use raw correction factor";
           $hc      = $pvcorr;                                                                         # nutze RAW-Korrekturfaktor  
       }
-  } 
+  }
+
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc;  
 
   my $pvsum  = 0;  
   
@@ -3438,12 +3451,6 @@ sub calcVariance {
   if($dcauto =~ /^off/x) {
       Log3($name, 4, "$name - automatic Variance calculation is switched off."); 
       return;      
-  }
-  
-  my $tlim = "00";                                                                      # Stunde 00 -> löschen aller Autocalc Statusreadings des Tages                  
-  
-  if($chour =~ /^($tlim)$/x) {
-      deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
   
   my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
@@ -3796,14 +3803,15 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
-          my $nhts  = NexthoursVal ($hash, $idx, "starttime",  "-");
-          my $nhfc  = NexthoursVal ($hash, $idx, "pvforecast", "-");
-          my $wid   = NexthoursVal ($hash, $idx, "weatherid",  "-");
-          my $neff  = NexthoursVal ($hash, $idx, "cloudcover", "-");
-          my $r101  = NexthoursVal ($hash, $idx, "rainprob",   "-");
-          my $rad1h = NexthoursVal ($hash, $idx, "Rad1h",      "-");
-          $sq      .= "\n" if($sq);
-          $sq      .= $idx." => starttime: $nhts, pvforecast: $nhfc, weatherid: $wid, cloudcover: $neff, rainprob: $r101, Rad1h: $rad1h";
+          my $nhts    = NexthoursVal ($hash, $idx, "starttime",  "-");
+          my $nhfc    = NexthoursVal ($hash, $idx, "pvforecast", "-");
+          my $wid     = NexthoursVal ($hash, $idx, "weatherid",  "-");
+          my $neff    = NexthoursVal ($hash, $idx, "cloudcover", "-");
+          my $r101    = NexthoursVal ($hash, $idx, "rainprob",   "-");
+          my $rad1h   = NexthoursVal ($hash, $idx, "Rad1h",      "-");
+          my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-");
+          $sq        .= "\n" if($sq);
+          $sq        .= $idx." => starttime: $nhts, pvfc: $nhfc, wid: $wid, wcc: $neff, correff: $pvcorrf, wrp: $r101, Rad1h: $rad1h";
       }
   }
   
@@ -4196,7 +4204,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
   <br><br>
   
   <ul>
-    Ein SolarForecast Device wird einfach erstellt mit: <br><br>
+    Ein SolarForecast Device wird erstellt mit: <br><br>
     
     <ul>
       <b>define &lt;name&gt; SolarForecast </b>
@@ -4204,7 +4212,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
     <br>
     
     Nach der Definition des Devices ist zwingend ein Vorhersage-Device des Typs DWD_OpenData zuzuordnen sowie weitere 
-    anlagenspezifische Angaben mit dem entsprechenden set-Kommando vorzunehmen. <br>
+    anlagenspezifische Angaben mit den entsprechenden set-Kommandos vorzunehmen. <br>
     Mit nachfolgenden set-Kommandos werden die Quellendevices und Quellenreadings für maßgebliche Informationen 
     hinterlegt: <br><br>
 
@@ -4220,8 +4228,10 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <br>
       
     Um eine Anpassung an die persönliche Anlage zu ermöglichen, können Korrekturfaktoren manuell 
-    (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto) eingefügt 
-    werden.       
+    (set &lt;name&gt; pvCorrectionFactor_XX) bzw. automatisiert (set &lt;name&gt; pvCorrectionFactor_Auto on) bestimmt 
+    werden. <br>
+    Es wird empfohlen die automatische Vorhersagekorrektur unmittelbar einzuschalten, da das SolarForecast Device etliche Tage
+    benötigt um eine Optimierung der Korrekturfaktoren zu erreichen.    
  
     <br><br>
   </ul>
@@ -4489,11 +4499,12 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       
       Schaltet die automatische Vorhersagekorrektur ein/aus. <br>
       Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
-      ein Korrekturfaktor der Solarvorhersage berechnet und auf die Erwartung des kommenden Tages angewendet.
-      Dazu wird die tatsächliche Energierzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
+      ein Korrekturfaktor der Solarvorhersage berechnet und intern dauerhaft gespeichert.
+      Dazu wird die tatsächliche Energieerzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
-      <b>Die automatische Vorhersagekorrektur ist lernend und benötigt etliche Tage um die Korrekturwerte zu optimieren.
+      Zukünftig erwartete PV Erzeugungen werden mit den gespeicherten Korrekturfaktoren optimiert. <br> 
+      <b>Die automatische Vorhersagekorrektur ist lernend und benötigt einige Tage um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)      
       </li>
@@ -4555,7 +4566,19 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
     <ul>
       <a name="nextHours"></a>
       <li><b>nextHours </b> <br>  
-      Listet die erwarteten Werte der nächsten Stunden auf.
+      Listet die erwarteten Werte der kommenden Stunden auf. <br><br>
+      
+      <ul>
+         <table>  
+         <colgroup> <col width=10%> <col width=90%> </colgroup>
+            <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                               </td></tr>
+            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                        </td></tr> 
+            <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                                    </td></tr>
+            <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor abhängig vom vorhergesagten Grad der Bewölkung  </td></tr>
+            <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                      </td></tr>
+            <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                        </td></tr>
+         </table>
+      </ul>
       </li>      
     </ul>
     <br>
