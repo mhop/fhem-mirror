@@ -274,6 +274,9 @@
   <Manufacturer id="025D" name="Avadesign Technology Co."></Manufacturer>
   <Manufacturer id="0155" name="Avadesign Technology Co. Ltd"></Manufacturer>
   <Manufacturer id="0146" name="Axesstel Inc"></Manufacturer>
+  <Manufacturer id="0364" name="Axis">
+    <Product config="Axis/T8341.xml" id="0001" name="AXIS T8341 PIR Motion Sensor" type="0002"/>
+  </Manufacturer>
   <Manufacturer id="0018" name="Balboa Inst."></Manufacturer>
   <Manufacturer id="0236" name="Bandi Comm Tech Inc."></Manufacturer>
   <Manufacturer id="0204" name="Beijing Sino-American Boyi Software Development Co. Ltd"></Manufacturer>
