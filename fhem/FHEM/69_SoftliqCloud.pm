@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.04: ANother fix to avoid "garbage" in JSON
 #   0.1.03: Improve error handling
 #           Hide access- & refreshToken
 #   0.1.02: Suppress Log message "opening device..."
@@ -51,7 +52,7 @@ use utf8;
 use Digest::MD5 qw(md5);
 
 
-my $version = "0.1.03";
+my $version = "0.1.04";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -1937,6 +1938,9 @@ sub wsReadDevIo {
     }
     $buf =~ s///xsm;
     $buf =~ s/\\x\{1e\}//xsm;
+    if (!($buf =~ /}$/xsm)) {
+    	$buf = substr($buf, 0, rindex($buf,"}"));	
+    }
     if ( length($buf) == 0 ) {
         return;
     }
