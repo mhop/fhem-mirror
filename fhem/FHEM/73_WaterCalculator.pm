@@ -455,11 +455,23 @@ sub WaterCalculator_MidnightTimer($)
 	my ($WaterCountName, $WaterCountReadingRegEx) = split(":", $RegEx, 2);
 	my $WaterCountDev							  = $defs{$WaterCountName};
 	$WaterCountReadingRegEx						  =~ s/[\.\*]+$//;
-	my $WaterCountReadingRegExNeg					  = $WaterCountReadingRegEx . "_";
+	my $WaterCountReadingRegExNeg				  = $WaterCountReadingRegEx . "_";
 
 	my @WaterCountReadingNameListComplete = keys(%{$WaterCountDev->{READINGS}});
 	my @WaterCountReadingNameListFiltered;
 
+	### Create Log entries for debugging purpose
+	Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
+	Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
+
+	### If no RegEx is available, leave routine
+	if (($WaterCountReadingRegEx eq "") || ($WaterCountReadingRegExNeg eq "")) { 
+		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegEx        : " . $WaterCountReadingRegEx;
+		Log3 $WaterCalcName, 2, $WaterCalcName. " : WaterCalculator_MidnightTimer ReadingRegExNeg     : " . $WaterCountReadingRegExNeg;
+		return;
+	}
+	
 	foreach my $WaterCountReadingName (@WaterCountReadingNameListComplete) {
 		if (($WaterCountReadingName =~ m[$WaterCountReadingRegEx]) && ($WaterCountReadingName !~ m[$WaterCountReadingRegExNeg])) {
 			push(@WaterCountReadingNameListFiltered, $WaterCountReadingName);
