@@ -391,7 +391,7 @@ sub ElectricityCalculator_Set($@)
 		### Create Log entries for debugging
 		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " - Syncing Counter with :" . $value;
 		
-		### Sreach for the ReadingsName of the Current CounterValue
+		### Serach for the ReadingsName of the Current CounterValue
 		my @SearchResult = grep(/_CounterCurrent/, @cList);
 
 		### Get current CalculatorValue
@@ -422,7 +422,7 @@ sub ElectricityCalculator_Set($@)
 		$attr{$ElectricityCalcName}{ElectricityCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $ElectricityCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $ElectricityCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
