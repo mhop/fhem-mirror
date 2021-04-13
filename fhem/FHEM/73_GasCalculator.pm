@@ -460,6 +460,18 @@ sub GasCalculator_MidnightTimer($)
 	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
 	my @GasCountReadingNameListFiltered;
 
+	### Create Log entries for debugging purpose
+	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+
+	### If no RegEx is available, leave routine
+	if (($GasCountReadingRegEx eq "") || ($GasCountReadingRegExNeg eq "")) { 
+		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+		return;
+	}
+	
 	foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
 		if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
 			push(@GasCountReadingNameListFiltered, $GasCountReadingName);
