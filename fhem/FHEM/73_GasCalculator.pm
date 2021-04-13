@@ -422,7 +422,7 @@ sub GasCalculator_Set($@)
 		$attr{$GasCalcName}{GasCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $GasCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $GasCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
