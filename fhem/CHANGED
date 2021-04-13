@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  73_DoorBird: Event Video Routine
+ - bugfix:  73_ElectricityCalculator: Bugfix - Midnight-Crash
+ - bugfix:  73_WaterCalculator:       Bugfix - Midnight-Crash
+ - bugfix:  73_GasCalculator:         Bugfix - Midnight-Crash
  - bugfix:  70_BRAVIA: fix registration renewal
  - change:  49_IPCAM: imageWithCallback wrapped in internalTimer with 0 delay
  - bugfix:  47_OBIS: Reintegrate buggy DZG meters support
