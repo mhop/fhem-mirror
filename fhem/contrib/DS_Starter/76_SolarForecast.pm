@@ -4578,7 +4578,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                            </td></tr>
             <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor                                         </td></tr>
             <tr><td>                 </td><td>/m - manuell                                                                 </td></tr>
-            <tr><td>                 </td><td>/0 - Faktor nicht in Store gefunden - Vortagesfaktor der Stunde wird benutzt </td></tr>
+            <tr><td>                 </td><td>/0 - Faktor nicht in Store gefunden - pvCorrectionFactor_XX wird genutzt     </td></tr>
             <tr><td>                 </td><td>/1 - nutze Faktor aus Store                                                  </td></tr>
             <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                              </td></tr>
             <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                </td></tr>
