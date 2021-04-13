@@ -392,7 +392,7 @@ sub GasCalculator_Set($@)
 		Log3 $GasCalcName, 5, $GasCalcName. " - Syncing Counter with :" . $value;
 		
 		### Sreach for the ReadingsName of the Current CounterValue
-		my @SearchResult = grep(/_CounterCurrent/, @cList);
+		my @SearchResult = grep(/_Meter/, @cList);
 
 		### Get current CalculatorValue
 		my $CalculaterValueCurrent = ReadingsVal($GasCalcName, $SearchResult[0], 0); 
