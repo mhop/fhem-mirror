@@ -460,6 +460,18 @@ sub ElectricityCalculator_MidnightTimer($)
 	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
 	my @ElectricityCountReadingNameListFiltered;
 
+	### Create Log entries for debugging purpose
+	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+
+	### If no RegEx is available, leave routine
+	if (($ElectricityCountReadingRegEx eq "") || ($ElectricityCountReadingRegExNeg eq "")) { 
+		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+		return;
+	}
+	
 	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
 		if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
 			push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
