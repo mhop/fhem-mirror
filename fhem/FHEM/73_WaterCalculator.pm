@@ -391,7 +391,7 @@ sub WaterCalculator_Set($@)
 		### Create Log entries for debugging
 		Log3 $WaterCalcName, 5, $WaterCalcName. " - Syncing Counter with :" . $value;
 		
-		### Sreach for the ReadingsName of the Current CounterValue
+		### Serach for the ReadingsName of the Current CounterValue
 		my @SearchResult = grep(/_CounterCurrent/, @cList);
 
 		### Get current CalculatorValue
@@ -422,7 +422,7 @@ sub WaterCalculator_Set($@)
 		$attr{$WaterCalcName}{WaterCounterOffset} = $CounterOffsetNew;
 
 		### Create ReturnMessage
-		$ReturnMessage = $WaterCalcName . " - Successfully synchromized Counter and Calculator with : " . $value . " kWh";
+		$ReturnMessage = $WaterCalcName . " - Successfully synchronized Counter and Calculator with : " . $value . " kWh";
 	}
 	### For Test purpose only
 	# elsif ($reading eq "Test") 
