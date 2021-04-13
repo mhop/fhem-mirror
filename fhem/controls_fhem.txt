@@ -1,4 +1,4 @@
-REV 24223
+REV 24232
 DIR unused
 UPD 2021-04-12_07:45:03 360580 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -255,7 +255,7 @@ UPD 2020-04-25_07:45:03 57239 FHEM/46_TRX_LIGHT.pm
 UPD 2019-12-23_07:45:02 25474 FHEM/46_TRX_SECURITY.pm
 UPD 2018-12-31_07:45:03 58001 FHEM/46_TRX_WEATHER.pm
 UPD 2021-03-29_07:45:02 7053 FHEM/46_TeslaPowerwall2AC.pm
-UPD 2021-04-09_07:45:07 41910 FHEM/47_OBIS.pm
+UPD 2021-04-13_07:45:04 41985 FHEM/47_OBIS.pm
 UPD 2021-03-25_07:45:03 95637 FHEM/48_BlinkCamera.pm
 UPD 2021-03-06_07:45:08 69711 FHEM/48_MieleAtHome.pm
 UPD 2020-12-30_07:45:04 78521 FHEM/49_Arlo.pm
@@ -329,7 +329,7 @@ UPD 2020-08-02_07:45:03 69639 FHEM/66_EseraOneWire.pm
 UPD 2020-02-17_07:45:03 11076 FHEM/66_EseraShutter.pm
 UPD 2020-04-17_07:45:02 6333 FHEM/66_EseraTemp.pm
 UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
-UPD 2021-04-09_07:45:07 68157 FHEM/69_SoftliqCloud.pm
+UPD 2021-04-13_07:45:04 68292 FHEM/69_SoftliqCloud.pm
 UPD 2021-02-19_07:45:02 113316 FHEM/70_BOTVAC.pm
 UPD 2021-04-12_07:45:03 94150 FHEM/70_BRAVIA.pm
 UPD 2021-03-23_07:45:03 10753 FHEM/70_CanOverEthernet.pm
@@ -707,9 +707,9 @@ UPD 2017-05-15_07:45:02 9633 FHEM/lib/UPnP/sonos_playbar_round.png
 UPD 2015-07-28_14:05:30 5469 FHEM/lib/UPnP/sonos_playlist.jpg
 UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
-UPD 2021-01-26_07:45:02 24900 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
+UPD 2021-04-13_07:45:04 28796 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2019-10-04_07:45:03 529444 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2021-01-19_07:45:02 149982 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2021-04-13_07:45:04 150136 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2020-11-09_07:45:03 33380 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2017-01-11_07:45:02 22473 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2020-01-30_07:45:08 18902 FHEM/msgSchema.pm
@@ -737,8 +737,8 @@ UPD 2021-04-12_07:45:07 4488319 docs/commandref.html
 UPD 2021-04-08_07:45:10 2778592 docs/commandref_DE.html
 UPD 2021-04-03_07:45:03 82300 docs/commandref_frame.html
 UPD 2021-04-03_07:45:03 92175 docs/commandref_frame_DE.html
-UPD 2021-04-12_07:45:11 238626 docs/commandref_modular.html
-UPD 2021-04-12_07:45:12 249608 docs/commandref_modular_DE.html
+UPD 2021-04-13_07:45:11 238626 docs/commandref_modular.html
+UPD 2021-04-13_07:45:13 249608 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
