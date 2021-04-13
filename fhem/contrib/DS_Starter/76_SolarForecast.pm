@@ -1512,7 +1512,7 @@ sub writeCacheToFile {
   else {
       my $lw = gettimeofday(); 
       $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
-      readingsSingleUpdate($hash, "state", "wrote successfully cachefile $cachename", 1);
+      readingsSingleUpdate($hash, "state", "wrote cachefile $cachename successfully", 1);
   }
    
 return; 
@@ -1555,10 +1555,7 @@ sub _additionalActivities {
       
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
       push @$daref, "AllPVforecastsToEvent<>".$nhfc." Wh<>".$dt." ".$h.":59:59";
-      # addCHANGED ($hash, "PVforecast: ".$nhfc, $dt." ".$h.":59:59");
   }
-  
-  # DoTrigger($name, undef, 1);
 
   ## bestimmte einmalige Aktionen
   ##################################  
@@ -3363,6 +3360,7 @@ sub calcPVforecast {
   my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);               # PV Korrekturfaktor (auto oder manuell)
   my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
   my $hcfound    = "use manual correction factor";
+  my $hcfcode    = "m";
   
   my $clouddamp  = AttrVal($name, "cloudFactorDamping", $cldampdef);                                  # prozentuale Berücksichtigung des Bewölkungskorrekturfaktors
   my $raindamp   = AttrVal($name, "rainFactorDamping", $rdampdef);                                    # prozentuale Berücksichtigung des Regenkorrekturfaktors
@@ -3378,14 +3376,16 @@ sub calcPVforecast {
   ## Ermitteln des relevanten Autokorrekturfaktors
   if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
       $hcfound = "yes";                                                                               # Status ob Autokorrekturfaktor im Wertevorrat gefunden wurde         
+      $hcfcode = 1;
       $hc      = CircularAutokorrVal ($hash, sprintf("%02d",$fh+1), $range, undef);                   # Korrekturfaktor der Stunde des Tages der entsprechenden Bewölkungsrange
       if (!defined $hc) {
           $hcfound = "no - use raw correction factor";
           $hc      = $pvcorr;                                                                         # nutze RAW-Korrekturfaktor  
+          $hcfcode = 0;
       }
   }
 
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc;  
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hcfcode;  
 
   my $pvsum  = 0;  
   
@@ -4572,13 +4572,16 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       
       <ul>
          <table>  
-         <colgroup> <col width=10%> <col width=90%> </colgroup>
-            <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                               </td></tr>
-            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                        </td></tr> 
-            <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                                    </td></tr>
-            <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor abhängig vom vorhergesagten Grad der Bewölkung  </td></tr>
-            <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                      </td></tr>
-            <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                        </td></tr>
+         <colgroup> <col width=8%> <col width=92%> </colgroup>
+            <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                       </td></tr>
+            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                </td></tr> 
+            <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                            </td></tr>
+            <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor                                         </td></tr>
+            <tr><td>                 </td><td>/m - manuell                                                                 </td></tr>
+            <tr><td>                 </td><td>/0 - Faktor nicht in Store gefunden - Vortagesfaktor der Stunde wird benutzt </td></tr>
+            <tr><td>                 </td><td>/1 - nutze Faktor aus Store                                                  </td></tr>
+            <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                              </td></tr>
+            <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                </td></tr>
          </table>
       </ul>
       </li>      
