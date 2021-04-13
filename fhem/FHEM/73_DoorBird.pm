@@ -2965,10 +2965,18 @@ sub DoorBird_LastEvent_Image($$$) {
 		}
 	}
 	
-	### If the attribute VideoDurationDoorbell has been set and therefore an video shall be recorded
-	if ($hash->{helper}{VideoDurationDoorbell} > 0){
+	### If the attribute VideoDuration has been set and therefore an video shall be recorded
+	if    (($event =~ m/doorbell/ ) && ($hash->{helper}{VideoDurationDoorbell} > 0)){
 		### Call sub for Videorecording
 		DoorBird_Video_Request($hash, $hash->{helper}{VideoDurationDoorbell}, $VideoEvent, $httpHeader);
+	}
+	elsif (($event =~ m/motion/ )   && ($hash->{helper}{VideoDurationMotion}   > 0)){
+		### Call sub for Videorecording
+		DoorBird_Video_Request($hash, $hash->{helper}{VideoDurationMotion}, $VideoEvent, $httpHeader);
+	}
+	elsif (($event =~ m/keypad/ )   && ($hash->{helper}{VideoDurationKeypad}   > 0)){
+		### Call sub for Videorecording
+		DoorBird_Video_Request($hash, $hash->{helper}{VideoDurationKeypad}, $VideoEvent, $httpHeader);
 	}
 	return;
 }
