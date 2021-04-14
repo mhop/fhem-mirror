@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.36.1" => "14.04.2021  add dayname to pvHistory ",
   "0.36.0" => "14.04.2021  add con to pvHistory, add quality info to pvCircular, new reading nextPolltime ",
   "0.35.0" => "12.04.2021  create additional PVforecast events - PV forecast until the end of the coming day ",
   "0.34.1" => "11.04.2021  further improvement of cloud dependent calculation autocorrection ",
@@ -1343,20 +1344,22 @@ sub centralTask {
       }      
       
       my @da;
-      my $t      = time;                                                                           # aktuelle Unix-Zeit 
-      my $chour  = strftime "%H", localtime($t);                                                   # aktuelle Stunde
-      my $minute = strftime "%M", localtime($t);                                                   # aktuelle Minute
-      my $day    = strftime "%d", localtime($t);                                                   # aktueller Tag
+      my $t       = time;                                                                          # aktuelle Unix-Zeit 
+      my $chour   = strftime "%H", localtime($t);                                                  # aktuelle Stunde
+      my $minute  = strftime "%M", localtime($t);                                                  # aktuelle Minute
+      my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag
+      my $dayname = strftime "%a", localtime($t);                                                  # aktueller Wochentagsname
             
       my $params = {
-          hash   => $hash,
-          name   => $name,
-          t      => $t,
-          minute => $minute,
-          chour  => $chour,
-          day    => $day,
-          state  => "updated",
-          daref  => \@da
+          hash    => $hash,
+          name    => $name,
+          t       => $t,
+          minute  => $minute,
+          chour   => $chour,
+          day     => $day,
+          dayname => $dayname,
+          state   => "updated",
+          daref   => \@da
       };
       
       Log3 ($name, 4, "$name - ################################################################");
@@ -3664,6 +3667,7 @@ sub setPVhistory {
   my $t          = $paref->{t};                                                                   # aktuelle Unix-Zeit
   my $nhour      = $paref->{nhour};
   my $day        = $paref->{day};
+  my $dayname    = $paref->{dayname};                                                             # aktueller Wochentagsname
   my $histname   = $paref->{histname}      // qq{};
   my $ethishour  = $paref->{ethishour}     // 0;
   my $calcpv     = $paref->{calcpv}        // 0;
@@ -3677,6 +3681,8 @@ sub setPVhistory {
   
   my $type = $hash->{TYPE};
   my $val  = q{};
+  
+  $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname; 
 
   if($histname eq "pvrl") {                                                                       # realer Energieertrag
       $val = $ethishour;
@@ -3793,8 +3799,14 @@ sub listDataPool {
           my $wcc     = HistoryVal ($hash, $day, $key, "wcc",       "-");
           my $wrp     = HistoryVal ($hash, $day, $key, "wrp",       "-");
           my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",   "-");
+          my $dayname = HistoryVal ($hash, $day, $key, "dayname", undef);
           $ret       .= "\n      " if($ret);
-          $ret       .= $key." => pvrl: $pvrl, pvfc: $pvfc, gcon: $gcon, con: $con, gfeedin: $gfeedin, wid: $wid, wcc: $wcc, wrp: $wrp, pvcorrf: $pvcorrf";
+          $ret       .= $key." => pvrl: $pvrl, pvfc: $pvfc, gcon: $gcon, con: $con, gfeedin: $gfeedin";
+          $ret       .= ", wid: $wid"         if($wid);
+          $ret       .= ", wcc: $wcc"         if($wcc);
+          $ret       .= ", wrp: $wrp"         if($wrp);
+          $ret       .= ", pvcorrf: $pvcorrf" if($pvcorrf);
+          $ret       .= ", dayname: $dayname" if($dayname);
       }
       return $ret;
   };
