@@ -443,35 +443,38 @@ isday</pre>
   alternatives.  <br><br>
 
   sunrise() and sunset() return the absolute time of the next sunrise/sunset,
-  adding 24 hours if the next event is tomorrow, to use it in the timespec of
-  an at device or for the on-till command for FS20 devices.<br>
-
+  adding 24 hours if the next event is tomorrow<br>
   sunrise_rel() and sunset_rel() return the relative time to the next
   sunrise/sunset. <br>
   sunrise_abs() and sunset_abs() return the absolute time of the corresponding
   event today (no 24 hours added).<br>
   sunrise_abs_dat() and sunset_abs_dat() return the absolute time of the
-  corresponding event to a given date(no 24 hours added).<br>
+  corresponding event to a given date.<br>
 
-  All functions take up to three arguments:<br>
+  <b>Note:</b> use sunrise/sunset in the timespec of an at device or on-till
+  command as the _rel and _abs variants do not work correctly there.</br><br>
+
+  All functions take up to four arguments:<br>
   <ul>
-    <li>The first specifies an offset (in seconds), which will be added to the
-    event.</li>
-    <li>The second and third specify min and max values (format: "HH:MM").</li>
+    <li>altitude (optional)
+      altitude defines a horizon value which then is used instead of the
+      $defaultaltit in SUNRISE_EL.pm.<br> Possible values are: "REAL",
+      "CIVIL", "NAUTIC", "ASTRONOMIC" or a positive or negative number
+      prefixed with "HORIZON="<br>
+      REAL is 0, CIVIL is -6, NAUTIC is -12, ASTRONOMIC is -18 degrees above
+      horizon.<br>
+      </li>
+    <li>time-offset in seconds, which will be added to the event.
+      </li>
+    <li>min and max values (format: "HH:MM").
+      If min < max, than the day starts not before min, and ends not after max.
+      If min > max, than the day starts not after max, and ends not before min.
+      </li>
   </ul>
   <br>
   isday() can be used in some notify or at commands to check if the sun is up
-  or down. isday() ignores the seconds parameter, but respects min and max.
-  If min < max, than the day starts not before min, and ends not after max.
-  If min > max, than the day starts not after max, and ends not before min.
+  or down. isday() ignores the time-offset parameter, but respects min and max.
   <br><br>
-
-  Optionally, for all functions you can set first argument which defines a
-  horizon value which then is used instead of the $defaultaltit in
-  SUNRISE_EL.pm.<br> Possible values are: "REAL", "CIVIL", "NAUTIC",
-  "ASTRONOMIC" or a positive or negative number preceded by "HORIZON="<br> REAL
-  is 0, CIVIL is -6, NAUTIC is -12, ASTRONOMIC is -18 degrees above
-  horizon.<br><br>
 
   Examples:<br>
   <ul>
