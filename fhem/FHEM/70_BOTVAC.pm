@@ -251,8 +251,8 @@ sub Get {
         }
     }
     elsif ( $what =~ /^(statistics)$/x ) {
-        if ( defined( $hash->{helper}{MAPS} )
-            and @{ $hash->{helper}{MAPS} } > 0 )
+        if ( defined( $hash->{Helper}{MAPS} )
+            and @{ $hash->{Helper}{MAPS} } > 0 )
         {
             return GetStatistics($hash);
         }
@@ -368,7 +368,7 @@ sub Set {
     }
 
     # manual cleaning
-    if ( $hash->{HELPER}{WEBSOCKETS} ) {
+    if ( $hash->{Helper}{WEBSOCKETS} ) {
         $usage .=
 " wsCommand:brush-on,brush-off,eco-on,eco-off,turbo-on,turbo-off,vacuum-on,vacuum-off";
         $usage .=
@@ -376,8 +376,8 @@ sub Set {
     }
 
     my @robots;
-    if ( defined( $hash->{helper}{ROBOTS} ) ) {
-        @robots = @{ $hash->{helper}{ROBOTS} };
+    if ( defined( $hash->{Helper}{ROBOTS} ) ) {
+        @robots = @{ $hash->{Helper}{ROBOTS} };
         if ( @robots > 1 ) {
             $usage .= " setRobot:";
             for ( my $i = 0 ; $i < @robots ; $i++ ) {
@@ -391,8 +391,8 @@ sub Set {
         or GetServiceVersion( $hash, "maps" ) eq "basic-2"
         or GetServiceVersion( $hash, "maps" ) eq "macro-1" )
     {
-        if ( defined( $hash->{helper}{BoundariesList} ) ) {
-            my @Boundaries = @{ $hash->{helper}{BoundariesList} };
+        if ( defined( $hash->{Helper}{BoundariesList} ) ) {
+            my @Boundaries = @{ $hash->{Helper}{BoundariesList} };
             my @names;
             for ( my $i = 0 ; $i < @Boundaries ; $i++ ) {
                 my $boundaryName = $Boundaries[$i]->{name};
@@ -456,7 +456,7 @@ sub Set {
     elsif ( $a[1] eq "stop" ) {
         Log3( $name, 2, "BOTVAC set $name $arg" );
 
-        if ( $hash->{HELPER}{WEBSOCKETS} ) {
+        if ( $hash->{Helper}{WEBSOCKETS} ) {
             wsClose($hash);
         }
         else {
@@ -584,9 +584,9 @@ sub Set {
         if ( $a[2] =~ /^\{.*\}/x ) {
             $setBoundaries = $a[2];
         }
-        elsif ( defined( $hash->{helper}{BoundariesList} ) ) {
+        elsif ( defined( $hash->{Helper}{BoundariesList} ) ) {
             my @names      = split ",", $a[2];
-            my @Boundaries = @{ $hash->{helper}{BoundariesList} };
+            my @Boundaries = @{ $hash->{Helper}{BoundariesList} };
             for ( my $i = 0 ; $i < @Boundaries ; $i++ ) {
                 foreach my $name (@names) {
                     if ( $Boundaries[$i]->{name} eq $name ) {
@@ -768,12 +768,12 @@ sub Attr {
                 else {
                     push @areas, eval { decode_json $attr_value};
                 }
-                $hash->{helper}{BoundariesList} = \@areas;
+                $hash->{Helper}{BoundariesList} = \@areas;
             }
         }
     }
     else {
-        delete $hash->{helper}{BoundariesList}
+        delete $hash->{Helper}{BoundariesList}
           if ( $attr_name eq "boundaries" );
     }
     return $err ? $err : undef;
@@ -1122,9 +1122,9 @@ sub SendCommand {
     };
 
     if ($keepalive) {
-        map { $hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_} }
+        map { $hash->{Helper}{".HTTP_CONNECTION"}{$_} = $params->{$_} }
           keys %{$params};
-        ::HttpUtils_NonblockingGet( $hash->{helper}{".HTTP_CONNECTION"} );
+        ::HttpUtils_NonblockingGet( $hash->{Helper}{".HTTP_CONNECTION"} );
     }
     else {
         ::HttpUtils_NonblockingGet($params);
@@ -1658,7 +1658,7 @@ sub ReceiveCommand {
 
                         push( @robotList, $r );
                     }
-                    $hash->{helper}{ROBOTS} = \@robotList;
+                    $hash->{Helper}{ROBOTS} = \@robotList;
                     if (@robotList) {
                         SetRobot( $hash, ReadingsNum( $name, "robot", 0 ) );
                         push( @successor, [ "robots", "maps" ] );
@@ -1689,7 +1689,7 @@ sub ReceiveCommand {
                     };
                     push( @robotList, $r );
                 }
-                $hash->{helper}{ROBOTS} = \@robotList;
+                $hash->{Helper}{ROBOTS} = \@robotList;
                 if (@robotList) {
                     # follow registration procedure first
                     unshift( @successor, [ 'firmwares' ] );
@@ -1706,7 +1706,7 @@ sub ReceiveCommand {
         #firmwares
         elsif ( $service eq 'firmwares' ) {
             if ( ref($return) eq 'HASH' ) {
-                my @robotList = @{ $hash->{helper}{ROBOTS} };
+                my @robotList = @{ $hash->{Helper}{ROBOTS} };
                 foreach my $r ( @robotList ) {
                     my $firmware = $return->{ $r->{model} };
                     $r->{recentFirmware} = $firmware->{version} if defined($firmware);
@@ -1724,7 +1724,7 @@ sub ReceiveCommand {
                 if ( ref($return) eq "HASH" ) {
                     if ( ref( $return->{maps} ) eq "ARRAY" ) {
                         my @maps = @{ $return->{maps} };
-                        $hash->{helper}{MAPS} = $return->{maps};
+                        $hash->{Helper}{MAPS} = $return->{maps};
                         if (@maps) {
 
                             # take first - newest
@@ -1824,7 +1824,7 @@ sub ReceiveCommand {
 
         # loadmap
         elsif ( $service eq "loadmap" ) {
-            readingsBulkUpdate( $hash, ".map_cache", $data );
+            $hash->{Helper}{'.MAP_CACHE'} = $data;
         }
 
         # requestVerification
@@ -1875,12 +1875,12 @@ sub ReceiveCommand {
 
     readingsEndUpdate( $hash, 1 );
 
-    if ( defined( $hash->{helper}{".HTTP_CONNECTION"} )
+    if ( defined( $hash->{Helper}{".HTTP_CONNECTION"} )
         and ( ( $keepalive && $closeConnection ) || !@successor ) )
     {
         Log3( $name, 4, "BOTVAC $name: Close connection" );
-        ::HttpUtils_Close( $hash->{helper}{".HTTP_CONNECTION"} );
-        undef( $hash->{helper}{".HTTP_CONNECTION"} );
+        ::HttpUtils_Close( $hash->{Helper}{".HTTP_CONNECTION"} );
+        undef( $hash->{Helper}{".HTTP_CONNECTION"} );
     }
 
     if ($loadMap) {
@@ -1949,7 +1949,7 @@ sub SetRobot {
 
     Log3( $name, 4, "BOTVAC $name: set active robot $robot" );
 
-    my @robots = @{ $hash->{helper}{ROBOTS} };
+    my @robots = @{ $hash->{Helper}{ROBOTS} };
     readingsBulkUpdateIfChanged( $hash, "serial", $robots[$robot]->{serial} );
     readingsBulkUpdateIfChanged( $hash, "name",   $robots[$robot]->{name} );
     readingsBulkUpdateIfChanged( $hash, "model",  $robots[$robot]->{model} );
@@ -2380,8 +2380,10 @@ sub GetMap() {
         my $name   = $1;
         my $width  = $3;
         my $height = $5;
+        my $hash = $::defs{$name};
 
-        return ( "image/png", ReadingsVal( $name, ".map_cache", "" ) );
+        my $mapData = defined($hash->{Helper}{'.MAP_CACHE'}) ? $hash->{Helper}{'.MAP_CACHE'} : '';
+        return ( "image/png", $mapData );
     }
 
     return ( "text/plain; charset=utf-8",
@@ -2394,8 +2396,8 @@ sub ShowStatistics {
     my $hash = $::defs{$name};
 
     return "maps for statistics are not available yet"
-      if ( !defined( $hash->{helper}{MAPS} )
-        || @{ $hash->{helper}{MAPS} } == 0 );
+      if ( !defined( $hash->{Helper}{MAPS} )
+        || @{ $hash->{Helper}{MAPS} } == 0 );
 
     return GetStatistics($hash);
 }
@@ -2403,7 +2405,7 @@ sub ShowStatistics {
 sub GetStatistics {
     my ($hash)   = @_;
     my $name     = $hash->{NAME};
-    my $mapcount = @{ $hash->{helper}{MAPS} };
+    my $mapcount = @{ $hash->{Helper}{MAPS} };
     my $model    = ReadingsVal( $name, "model", "" );
     my $ret      = "";
 
@@ -2460,7 +2462,7 @@ sub GetStatistics {
     $ret .= '</tr>';
 
     for ( my $i = 0 ; $i < $mapcount ; $i++ ) {
-        my $map = \$hash->{helper}{MAPS}[$i];
+        my $map = \$hash->{Helper}{MAPS}[$i];
         my $t1  = GetSecondsFromString( $$map->{end_at} );
         my $t2  = GetSecondsFromString( $$map->{start_at} );
         my $dt =
@@ -2579,8 +2581,8 @@ sub wsClose {
     Log3( $name, 4, "BOTVAC(ws) $name: Closing socket connection" );
 
     wsEncode( $hash, $normal_closure, "close" );
-    delete $hash->{HELPER}{WEBSOCKETS};
-    delete $hash->{HELPER}{wsKey};
+    delete $hash->{Helper}{WEBSOCKETS};
+    delete $hash->{Helper}{wsKey};
     readingsSingleUpdate( $hash, 'state', 'ws_closed', 1 )
       if ( ::DevIo_CloseDev($hash) );
 
@@ -2615,7 +2617,7 @@ sub wsHandshake {
     Log3( $name, 4, "BOTVAC(ws) $name: Starting Websocket Handshake" );
     wsWrite( $hash, $wsHandshakeCmd );
 
-    $hash->{HELPER}{wsKey} = $wsKey;
+    $hash->{Helper}{wsKey} = $wsKey;
 
     return;
 }
@@ -2638,7 +2640,7 @@ sub wsCheckHandshake {
     if ( defined( $header{'sec-websocket-accept'} ) ) {
         my $keyAccept = $header{'sec-websocket-accept'};
         Log3( $name, 5, "BOTVAC(ws) $name: keyAccept: $keyAccept" );
-        my $wsKey            = $hash->{HELPER}{wsKey};
+        my $wsKey            = $hash->{Helper}{wsKey};
         my $expectedResponse = trim(
             encode_base64(
                 pack(
@@ -2654,7 +2656,7 @@ sub wsCheckHandshake {
 "BOTVAC(ws) $name: Successful WS connection to $hash->{DeviceName}"
             );
             readingsSingleUpdate( $hash, 'state', 'ws_connected', 1 );
-            $hash->{HELPER}{WEBSOCKETS} = '1';
+            $hash->{Helper}{WEBSOCKETS} = '1';
         }
         else {
             wsClose($hash);
@@ -2688,7 +2690,7 @@ sub wsRead {
     return Log3( $name, 3, "BOTVAC(ws) $name: no data received" )
       unless ( defined $buf );
 
-    if ( $hash->{HELPER}{WEBSOCKETS} ) {
+    if ( $hash->{Helper}{WEBSOCKETS} ) {
         Log3( $name, 4,
             "BOTVAC(ws) $name: received data, start response processing:\n"
               . sprintf( "%v02X", $buf ) );
@@ -2719,9 +2721,9 @@ sub wsCallback {
         Log3( $name, 5, "received callback with:\n$data" );
         my $parser = $param->{parser};
         &$parser( $hash, $data );
-        asyncOutput( $hash->{HELPER}{CLCONF}, $data )
-          if $hash->{HELPER}{CLCONF};
-        delete $hash->{HELPER}{CLCONF};
+        asyncOutput( $hash->{Helper}{CLCONF}, $data )
+          if $hash->{Helper}{CLCONF};
+        delete $hash->{Helper}{CLCONF};
     }
     else {
         Log3( $name, 2, "received callback without Data and Error String!!!" );
