@@ -2711,16 +2711,18 @@ FW_makeImage(@)
       $data =~ s/[\r\n]/ /g;
       $data =~ s/ *$//g;
       $data =~ s/<svg/<svg class="$class" data-txt="$txt"/; #52967
-      $name =~ m/(@.*)$/;
-      my $col;
-      $col = $1 if($1);
-      if($col) {
-        $col =~ s/@//;
-        $col = "#$col" if($col =~ m/^([A-F0-9]{6})$/);
-        $data =~ s/fill="#000000"/fill="$col"/g;
-        $data =~ s/fill:#000000/fill:$col/g;
-        $data =~ s/stroke="#000000"/stroke="$col"/g; # 120303
-        $data =~ s/stroke:#000000/stroke:$col/g;
+      if($name =~ m/@([^:]*)(:(.*))?$/) {
+        my ($fill, $stroke) = ($1, $3);
+        if($fill ne "") {
+          $fill = "#$fill" if($fill =~ m/^([A-F0-9]{6})$/);
+          $data =~ s/fill="#000000"/fill="$fill"/g;
+          $data =~ s/fill:#000000/fill:$fill/g;
+        }
+        if(defined($stroke)) {
+          $stroke = "#$stroke" if($stroke =~ m/^([A-F0-9]{6})$/);
+          $data =~ s/stroke="#000000"/stroke="$stroke"/g;
+          $data =~ s/stroke:#000000/stroke:$stroke/g;
+        }
       } else {
         $data =~ s/fill="#000000"//g;
         $data =~ s/fill:#000000//g;
@@ -3789,7 +3791,9 @@ FW_log($$)
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
         Note: if the image is referencing an SVG icon, then you can use the
-        @colorname suffix to color the image. E.g.:<br>
+        @fill:stroke suffix to color the image, where fill replaces the fill
+        color in the SVG (if it is specified as #000000) and the optional
+        stroke the stroke color (if it is specified as #000000). E.g.:<br>
         <ul>
         attr Fax devStateIcon on:control_building_empty@red
                               off:control_building_filled:278727
@@ -4556,8 +4560,11 @@ FW_log($$)
         attr lamp devStateIcon on::A0 off::AI<br>
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
-        Anmerkung: Wenn das Icon ein SVG Bild ist, kann das @colorname Suffix
-        verwendet werden um das Icon einzuf&auml;rben. Z.B.:<br>
+        Anmerkung: Wenn das Icon ein SVG Bild ist, kann das @fill:stroke
+        Suffix verwendet werden um das Icon einzuf&auml;rben, dabei wird in
+        der SVG die F&uuml;llfarbe durch das spezifizierte fill ersetzt, und
+        die Stiftfarbe durch das optionale stroke.
+        Z.B.:<br>
         <ul>
           attr Fax devStateIcon on:control_building_empty@red
           off:control_building_filled:278727
