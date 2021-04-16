@@ -2055,26 +2055,34 @@ LoadModule($;$)
 
 #####################################
 sub
+cmd_parseOpts($$$)
+{
+  my ($def, $optRegexp, $res) = @_;
+  while($def) {
+    last if($def !~ m/^\s*($optRegexp)\s+/);
+    my $o = $1;
+    $def =~ s/^\s*$o\s+//;
+    $o =~ s/^-//;
+    $res->{$o} = 1;
+  }
+  return $def;
+}
+
+sub
 CommandDefine($$)
 {
   my ($cl, $def) = @_;
-  my @a = split("[ \t]+", $def, 3);
-  my ($ignoreErr, $temporary);
 
-  # used by RSS in fhem.cfg.demo, with no GD installed
-  if($a[0] && $a[0] eq "-ignoreErr") {
-    $def =~ s/\s*-ignoreErr\s*//;
-    @a = split("[ \t][ \t]*", $def, 3);
-    $ignoreErr = 1;
-  }
-  if($a[0] && $a[0] eq "-temporary") { # Forum #39610, 46640
-    $def =~ s/\s*-temporary\s*//;
-    @a = split("[ \t][ \t]*", $def, 3);
-    $temporary = 1;
-  }
+  # ignoreErr ist used by RSS in fhem.cfg.demo, with no GD installed
+  # temporary #39610 #46640
+  # silent    #57691
+  my %opt;
+  my $optRegexp = '-ignoreErr|-temporary|-silent';
+  $def = cmd_parseOpts($def, $optRegexp, \%opt);
+  my @a = split("[ \t]+", $def, 3);
 
   my $name = $a[0];
-  return "Usage: define <name> <type> <type dependent arguments>"
+  return "Usage: define [$optRegexp] <name> <type> <type dependent arguments>"
                 if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
   return "Invalid characters in name (not A-Za-z0-9._): $name"
@@ -2090,7 +2098,7 @@ CommandDefine($$)
     }
   }
 
-  my $newm = LoadModule($m, $ignoreErr);
+  my $newm = LoadModule($m, $opt{ignoreErr});
   return "Cannot load module $m" if($newm eq "UNDEFINED");
   $m = $newm;
 
@@ -2108,7 +2116,7 @@ CommandDefine($$)
         if($currcfgfile ne AttrVal("global", "configfile", "") &&
           !configDBUsed());
   $hash{CL}    = $cl;
-  $hash{TEMPORARY} = 1 if($temporary);
+  $hash{TEMPORARY} = 1 if($opt{temporary});
 
   # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
@@ -2117,7 +2125,7 @@ CommandDefine($$)
   my $ret = CallFn($name, "DefFn", \%hash, 
                 $modules{$m}->{parseParams} ? parseParams($def) : $def);
   if($ret) {
-    Log 1, "define $def: $ret" if(!$ignoreErr);
+    Log 1, "define $def: $ret" if(!$opt{ignoreErr});
     delete $defs{$name};                            # Veto
     delete $attr{$name};
 
@@ -2131,12 +2139,12 @@ CommandDefine($$)
                 $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
     }
     %ntfyHash = ();
-    if(!$temporary && $init_done) {
-      addStructChange("define", $name, $def);
+    if(!$opt{temporary} && $init_done) {
+      addStructChange("define", $name, $def) if(!$opt{silent});
       DoTrigger("global", "DEFINED $name", 1);
     }
   }
-  return ($ret && $ignoreErr ?
+  return ($ret && $opt{ignoreErr} ?
         "Cannot define $name, remove -ignoreErr for details" : $ret);
 }
 
@@ -2145,6 +2153,9 @@ sub
 CommandModify($$)
 {
   my ($cl, $def) = @_;
+
+  my %opt;
+  $def = cmd_parseOpts($def, '-silent', \%opt);
   my @a = split("[ \t]+", $def, 2);
 
   return "Usage: modify <name> <type dependent arguments>"
@@ -2166,7 +2177,7 @@ CommandModify($$)
   if($ret) {
     $hash->{DEF} = $hash->{OLDDEF};
   } else {
-    addStructChange("modify", $a[0], $def);
+    addStructChange("modify", $a[0], $def) if(!$opt{silent});
     DoTrigger("global", "MODIFIED $a[0]", 1) if($init_done);
   }
 
@@ -2179,19 +2190,21 @@ sub
 CommandDefMod($$)
 {
   my ($cl, $def) = @_;
+  my %opt;
+  my $optRegexp = '-ignoreErr|-temporary|-silent';
+  $def = cmd_parseOpts($def, $optRegexp, \%opt);
   my @a = split("[ \t]+", $def, 3);
-  return "Usage: defmod <name> <type> <type dependent arguments>"
+
+  return "Usage: defmod [$optRegexp] <name> <type> <type dependent arguments>"
                 if(int(@a) < 2);
-  if($a[0] eq "-temporary" && $defs{$a[1]}) {
-    @a = split("[ \t]+", $def, 4);
-    shift @a;
-  }
   if($defs{$a[0]}) {
     $def = $a[2] ? "$a[0] $a[2]" : $a[0];
     return "defmod $a[0]: Cannot change the TYPE of an existing definition"
         if($a[1] ne $defs{$a[0]}{TYPE});
+    $def = "-".join(" -", keys %opt)." ".$def if(%opt);
     return CommandModify($cl, $def);
   } else {
+    $def = "-".join(" -", keys %opt)." ".$def if(%opt);
     return CommandDefine($cl, $def);
   }
 }

@@ -794,6 +794,9 @@ The following local attributes are used by a wider range of devices:
       be loaded. Used by fhem.cfg.demo, as using the RSS example requires the
       installation of several uncommon perl modules. 
       </li><br>
+    <li>-silent<br>
+      Do no enter the command in the "save ?" list.
+      </li><br>
   </ul>
 
 </ul>
@@ -802,8 +805,8 @@ The following local attributes are used by a wider range of devices:
 <a name="defmod"></a>
 <h3>defmod</h3>
 <ul>
-  <code>defmod [-temporary] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
-  <br>
+  <code>defmod [option] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code>
+  <br><br>
   Define a device or modify it, if it already exists. E.g. to switch off a lamp
   10 Minutes after the last message from the motion detector, you may use
   <ul><code>
@@ -811,7 +814,8 @@ The following local attributes are used by a wider range of devices:
   </code></ul>
   Using define here for the mdOff will generate an error if the motion detector
   triggers within the 10 minutes after the first event, as the mdOff at
-  definition still exists.
+  definition still exists.<br>
+  For the options see the define documentation.
   <br>
 </ul>
 <!-- defmod end -->
@@ -1046,7 +1050,7 @@ The following local attributes are used by a wider range of devices:
 <a name="modify"></a>
 <h3>modify</h3>
 <ul>
-  <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
+  <code>modify [-silent] &lt;name&gt; &lt;type-dependent-options&gt;</code>
   <br><br>
 
   Used to modify some definitions. Useful for changing some <a
@@ -1054,7 +1058,8 @@ The following local attributes are used by a wider range of devices:
   one argument to an at type definition, only the time part will be changed. In
   case of a notify type definition, only the regex part will be changed.  All
   other values (state, attributes, etc) will remain intact.
-  After modify, the global event "MODIFIED" will be generated.
+  After modify, the global event "MODIFIED" will be generated.<br>
+  With the -silent option the command is not recorded in the "save -?" list.
   <br><br>
   Example:
   <ul>

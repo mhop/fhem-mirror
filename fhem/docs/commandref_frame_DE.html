@@ -813,6 +813,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
       geladen werden kann. Wird in fhem.cfg.demo verwendet, da das RSS Beispiel
       etliche, normalerweise nicht installierte perl-Module ben&ouml;tigt.
       </li><br>
+    <li>-silent<br>
+      Der Befehl wird nicht in die "save -?" Liste eingetragen.
+      </li><br>
   </ul>
 </ul>
 <!-- define end -->
@@ -820,8 +823,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="defmod"></a>
 <h3>defmod</h3>
 <ul>
-  <code>defmod [-temporary] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
-  <br>
+  <code>defmod [option] &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code>
+  <br><br>
   Definiert ein Ger&auml;t, oder &auml;ndert es, falls es exisitiert. Um
   z.Bsp. eine Lampe 10 Minuten nach der letzten Meldung eines Bewegungsmelders
   abzuschalten, k&ouml;nnte man folgendes definieren:
@@ -830,7 +833,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   </code></ul>
   Falls man statt defmod ein define verwenden w&uuml;rde, dann w&uuml;rde eine
   Meldung innerhalb von 10 Minuten nach der letzten Meldung zu einem Fehler
-  f&uuml;hren, da mdOff noch existiert.
+  f&uuml;hren, da mdOff noch existiert.<br>
+  F&uuml;r die Optionen siehe die define Dokumentation.
   <br>
 </ul>
 <!-- defmod end -->
@@ -1101,7 +1105,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="modify"></a>
 <h3>modify</h3>
 <ul>
-  <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
+  <code>modify [-silent] &lt;name&gt; &lt;type-dependent-options&gt;</code>
   <br><br>
 
   Dieser Befehl wird benutzt, um Definitionen zu ver&auml;ndern. Er ist
@@ -1110,9 +1114,11 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   ver&auml;ndern, dann wird nur der f&uuml;r die Zeit zust&auml;ndige Teil
   ge&auml;ndert. Im Falle der Ver&auml;nderung einer Definition vom Typ
   &quot;notify&quot; wird nur der&nbsp; regex Teil ge&auml;ndert. Alle anderen
-  Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.
-  After modify, the global event "MODIFIED" will be generated.
-  Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.
+  Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.<br>
+  Nach modify wird das global MODIFIED Event erzeugt.<br>
+  Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.<br>
+  Mit der silent Option wird der modify Befehl nicht in die "save -?" Liste
+  eingetragen.
   <br><br>
 
   Beispiel:
