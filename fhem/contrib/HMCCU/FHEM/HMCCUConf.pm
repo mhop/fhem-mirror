@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.025
+#  Version 4.8.027
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.025';
+$HMCCU_CONFIG_VERSION = '4.8.027';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -67,11 +67,14 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 	'ALARM_SWITCH_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'ACOUSTIC_ALARM_ACTIVE', C => 'ACOUSTIC_ALARM_SELECTION', V => '', P => 2
 	},
+	'MOTION_DETECTOR' => {
+		F => 3, S => 'MOTION', C => '', V => '', P => 1
+	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'on:1,off:0', P => 2
+		F => 3, S => 'MOTION', C => 'MOTION_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
-		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'on:1,off:0', P => 2
+		F => 3, S => 'PRESENCE_DETECTION_STATE', C => 'PRESENCE_DETECTION_ACTIVE', V => 'active:1,inactive:0', P => 2
 	},
 	'SMOKE_DETECTOR' => {
 		F => 3, S => 'BidCos-RF:STATE,SMOKE_DETECTOR_ALARM_STATUS', C => 'HmIP-RF:SMOKE_DETECTOR_COMMAND', V => '', P => 2
@@ -141,6 +144,9 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 	},
 	'CLIMATECONTROL_REGULATOR' => {
 		F => 3, S => 'LEVEL', C => 'SETPOINT', V => 'on:30.5,off:4.5', P => 2
+	},
+	'CLIMATECONTROL_VENT_DRIVE' => {
+		F => 3, S => 'VALVE_STATE', C => '', V => '', P => 2
 	}
 );
 
@@ -162,8 +168,12 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 		'(C#\.)?LEVEL$:+pct',
 	'DIMMER_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
+	'MOTION_DETECTOR' =>
+		'^(C#\.)?BRIGHTNESS$:brightness;(C#\.)?MOTION:motion',
+	'MOTIONDETECTOR_TRANSCEIVER' =>
+		'^(C#\.)?ILLUMINATION$:brightness;^(C#\.)?MOTION$:motion;(C#\.)?MOTION_DETECTION_ACTIVE$:detection',
 	'PRESENCEDETECTOR_TRANSCEIVER' =>
-		'(C#\.)?ILLUMINATION:brightness;(C#\.)?PRESENCE_DETECTION_STATE:presence',
+		'^(C#\.)?ILLUMINATION$:brightness;(C#\.)?PRESENCE_DETECTION_STATE:presence;(C#\.)?PRESENCE_DETECTION_ACTIVE:detection',
 	'WEATHER' =>
 		'(C#\.)?TEMPERATURE$:+measured-temp;'.
 		'(C#\.)?HUMIDITY$:+humidity',
@@ -203,17 +213,18 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 # Function:
 #   A Perl function name
 # Datapoint-Definition:
-#   Paramset:Datapoint:[Parameter=]FixedValue[,FixedValue]
+#   Paramset:Datapoint:[Parameter=]FixedValue
 #   Paramset:Datapoint:?Parameter
 #   Paramset:Datapoint:?Parameter=Default-Value
-#   Paramset:Datapoint:#Parameter
+#   Paramset:Datapoint:#Parameter[=FixedValue,[...]]
 #   Paramset:Datapoint:*Parameter=Default-Value
 # Paramset:
 #   V=VALUES, M=MASTER (channel), D=MASTER (device), I=INTERNAL
 # Parameter characters:
 #   ? = any value is accepted
-#   # = datapoint must have type ENUM. Valid values are taken from
-#       parameter set description.
+#   # = If datapoint is of type ENUM, values are taken from
+#       parameter set description. Otherwise a list of values must
+#       be specified.
 #   * = internal value $hash->{hmccu}{values}{parameterName}
 # If Default-Value is preceeded by + or -, value is added to or 
 # subtracted from current datapoint value
@@ -221,12 +232,11 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 
 %HMCCU_ROLECMDS = (
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		'on' => 'V:MOTION_DETECTION_ACTIVE:1',
-		'off' => 'V:MOTION_DETECTION_ACTIVE:0'
+		'detection' => 'V:MOTION_DETECTION_ACTIVE:#detection=inactive,active',
+		'reset' => 'V:RESET_MOTION:1'
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
-		'on' => 'V:PRESENCE_DETECTION_ACTIVE:1',
-		'off' => 'V:PRESENCE_DETECTION_ACTIVE:0',
+		'detection' => 'V:PRESENCE_DETECTION_ACTIVE:#detection=inactive,active',
 		'reset' => 'V:RESET_PRESENCE:1'
 	},
 	'SMOKE_DETECTOR' => {
@@ -351,11 +361,16 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 	'SHUTTER_CONTACT_TRANSCEIVER' => {
 		'_none_' => ''
 	},
+	'MOTION_DETECTOR' => {
+		'_none_' => ''
+	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
-		'cmdIcon' => 'on:general_an off:general_aus'
+		'cmdIcon' => 'reset:rc_BACK',
+		'webCmd' => 'detection:reset'
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
-		'cmdIcon' => 'on:general_an off:general_aus'
+		'cmdIcon' => 'reset:rc_BACK',
+		'webCmd' => 'detection:reset'
 	},
 	'KEY' => {
 		'event-on-update-reading' => 'PRESS.*',
@@ -426,6 +441,9 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 		'cmdIcon' => 'on:general_an off:general_aus',
 		'webCmd' => 'desired-temp:on:off',
 		'widgetOverride' => 'desired-temp:slider,4.5,0.5,30.5,1'
+	},
+	'CLIMATECONTROL_VENT_DRIVE' => {
+		'_none_' => ''
 	}
 );
 
@@ -438,12 +456,16 @@ $HMCCU_CONFIG_VERSION = '4.8.025';
 ######################################################################
 
 %HMCCU_CONVERSIONS = (
+	'MOTION_DETECTOR' => {
+		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' }
+	},
 	'MOTIONDETECTOR_TRANSCEIVER' => {
 		'MOTION' => { '0' => 'noMotion', 'false' => 'noMotion', '1' => 'motion', 'true' => 'motion' },
+		'MOTION_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true', 'active' }
 	},
 	'PRESENCEDETECTOR_TRANSCEIVER' => {
 		'PRESENCE_DETECTION_STATE'  => { '0' => 'noPresence', 'false' => 'noPresence', '1' => 'presence', 'true' => 'presence' },
-		'PRESENCE_DETECTION_ACTIVE' => { '0' => 'off', 'false' => 'off', '1' => 'on', 'true', 'on' }
+		'PRESENCE_DETECTION_ACTIVE' => { '0' => 'inactive', 'false' => 'inactive', '1' => 'active', 'true', 'active' }
 	},
 	'KEY' => {
 		'PRESS_SHORT' => { '1' => 'pressed', 'true' => 'pressed' },

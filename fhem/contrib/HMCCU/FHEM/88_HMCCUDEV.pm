@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.045
+#  Version 4.4.046
 #
 #  (c) 2021 zap (zap01 <at> t-online <dot> de)
 #
@@ -139,7 +139,7 @@ sub HMCCUDEV_Define ($@)
 	else {
 		# CCU not ready during FHEM start
 		if (!defined($ioHash) || $ioHash->{ccustate} ne 'active') {
-			HMCCU_Log ($hash, 2, 'Cannot detect IO device, maybe CCU not ready. Trying later ...');
+			HMCCU_Log ($hash, 3, 'Cannot detect IO device, maybe CCU not ready. Trying later ...');
 			$hash->{ccudevstate} = 'pending';
 			return undef;
 		}
@@ -214,6 +214,8 @@ sub HMCCUDEV_InitDevice ($$)
 		if (!HMCCU_SetDefaultSCDatapoints ($ioHash, $devHash, $detect)) {
 			HMCCU_Log ($devHash, 2, "Cannot set default state- and control datapoints");
 		}
+
+		HMCCU_SetInitialAttributes ($ioHash, $name);
 
 		if (!exists($devHash->{hmccu}{nodefaults}) || $devHash->{hmccu}{nodefaults} == 0) {
 			my $chn = $detect->{defCCh} != -1 ? $detect->{defCCh} : $detect->{defSCh};
