@@ -725,7 +725,7 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr [-a] [-r] &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;]</code>
+  <code>attr [-a|-r|-silent] &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;]</code>
   <br>
 
   <br>
@@ -749,6 +749,8 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   anf&auml;ngt, dann wird es mit einem Leerzeichen angeh&auml;ngt.
   <br>
   Mit der -r Option kann man Teile eines Attributes wieder entfernen.<br>
+  Mit der silent Option wird der Befehl nicht in die "save -?" Liste
+  eingetragen.<br>
   <br>
 
   Beispiele:
@@ -1117,9 +1119,9 @@ Die folgenden lokalen Attribute werden von mehreren Ger&auml;ten verwendet:
   Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.<br>
   Nach modify wird das global MODIFIED Event erzeugt.<br>
   Nach der Durchf&uuml;hrung das globale Ereignis "MODIFIED" wird generiert.<br>
-  Mit der silent Option wird der modify Befehl nicht in die "save -?" Liste
-  eingetragen.
-  <br><br>
+  Mit der silent Option wird der Befehl nicht in die "save -?" Liste
+  eingetragen.<br>
+  <br>
 
   Beispiel:
   <ul>

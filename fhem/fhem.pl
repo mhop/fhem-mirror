@@ -2950,13 +2950,14 @@ CommandAttr($$)
 {
   my ($cl, $param) = @_;
   my ($ret, $append, $remove, @a);
+  my %opt;
+  my $optRegexp = '-a|-r|-silent';
+  $param = cmd_parseOpts($param, $optRegexp, \%opt);
 
-  $append = ($param =~ s/^-a //);
-  $remove = ($param =~ s/^-r //);
   @a = split(" ", $param, 3) if($param);
 
-  return "Usage: attr [-a|-r] <name> <attrname> [<attrvalue>]\n$namedef"
-           if(@a < 2 || ($append && $remove));
+  return "Usage: attr [$optRegexp] <name> <attrname> [<attrvalue>]\n$namedef"
+           if(@a < 2 || ($opt{a} && $opt{r}));
   my $a1 = $a[1];
   return "$a[0]: bad attribute name '$a1' (allowed chars: A-Za-z/\\d_\\.-)"
            if($featurelevel > 5.9 && !goodReadingName($a1) && $a1 ne "?");
@@ -2998,11 +2999,11 @@ CommandAttr($$)
       }
     }
 
-    if($append && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+    if($opt{a} && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       $attrVal = $attr{$sdev}{$attrName} . 
                         ($attrVal =~ m/^,/ ? $attrVal : " $attrVal");
     }
-    if($remove && $attr{$sdev} && $attr{$sdev}{$attrName}) {
+    if($opt{r} && $attr{$sdev} && $attr{$sdev}{$attrName}) {
       my $v = $attr{$sdev}{$attrName};
       $v =~ s/\b$attrVal\b//;
       $attrVal = $v;
@@ -3118,7 +3119,7 @@ CommandAttr($$)
       evalStateFormat($hash);
     }
     addStructChange("attr", $sdev, "$sdev $attrName $attrVal")
-        if(!defined($oVal) || $oVal ne $attrVal);
+        if(!$opt{silent} && (!defined($oVal) || $oVal ne $attrVal));
     DoTrigger("global", "ATTR $sdev $attrName $attrVal", 1) if($init_done);
 
   }
