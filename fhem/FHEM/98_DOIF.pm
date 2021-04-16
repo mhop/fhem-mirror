@@ -4598,7 +4598,7 @@ sub card
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
   if (defined $header) {
-    $out.= sprintf('<text text-anchor="start" x="14" y="23" style="fill:lightgray; font-size:14px;%s">%s</text>',$header_style,$header_txt); 
+    $out.= sprintf('<text text-anchor="start" x="14" y="23" style="fill:#CCCCCC; font-size:14px;%s">%s</text>',$header_style,$header_txt); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
       if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
@@ -4613,10 +4613,10 @@ sub card
     }
     $out.='<polyline points="11,27 169,27"  style="stroke:gray; stroke-width:1" />';
   }
-  $out.= sprintf('<g transform="translate(0,%d)" style="fill:lightgray">',$htrans);
+  $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
   $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:1" />';
   $out.= '<svg width="102" height="72">';
-  $out.= '<g transform="translate(32,8)" style="fill:lightgray">';
+  $out.= '<g transform="translate(32,8) scale(1) ">';
   my $points="";
   my $first=1;
   
@@ -4629,7 +4629,6 @@ sub card
       $points.="$i,".(50-int((${$a}[$i]*$m+$n)*10)/10)." ";
     }
   }
-  
   $out.= sprintf('<polyline points="-0.5,%s 59.5,%s"  style="stroke:gray; stroke-width:1" />',$xpos,$xpos);
   $out.='<polyline points="0,-0.5 0,50"  style="stroke:gray; stroke-width:1" />';
   for (my $i=0;$i<=4;$i++) {
@@ -4642,7 +4641,6 @@ sub card
   $out.= $points;
   $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
 
-
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal and $maxValSlot != 59);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minVal and $minValSlot != 59);
   $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($val*$m+$n)*10)/10),color($currColor,$ln));
@@ -4652,21 +4650,22 @@ sub card
   $out.= sprintf('<text text-anchor="end" x="-2" y="%s" style="fill:%s;font-size:8px;%s">%s</text>',$xpos+3,color($nullColor,$lmm),"",0) if (defined $nullColor);
   
 
-  $out.=sprintf('<text text-anchor="middle" x="0" y="61" style="font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*3600)));
-  $out.=sprintf('<text text-anchor="middle" x="29" y="61" style="font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*1800)));
-  $out.=sprintf('<text text-anchor="end" x="69" y="61" style="font-size:8px">%s</text>',::strftime("%H:%M",localtime($time)));
+  $out.=sprintf('<text text-anchor="middle" x="0" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*3600)));
+  $out.=sprintf('<text text-anchor="middle" x="29" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*1800)));
+  $out.=sprintf('<text text-anchor="end" x="69" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time)));
   $out.= '</g>';
   $out.= '</svg>';
+
   $out.='<g transform="translate(105,4)">';
   $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
-
   $out.='</g>';
+
   if (defined $maxVal) {
-    $out.= sprintf('<text text-anchor="start" x="13" y="85" style="font-size:10px">▲%s</text>',::strftime("%H:%M",localtime($maxValTime)));
+    $out.= sprintf('<text text-anchor="start" x="13" y="85" style="fill:#CCCCCC;font-size:10px">▲%s</text>',::strftime("%H:%M",localtime($maxValTime)));
     $out.= sprintf('<text text-anchor="end" x="85" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,$maxVal));
   }
   if (defined $minVal) {
-    $out.= sprintf('<text text-anchor="start" x="89" y="85" style="font-size:10px">• ▼%s</text>',::strftime("%H:%M",localtime($minValTime)));
+    $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:10px">• ▼%s</text>',::strftime("%H:%M",localtime($minValTime)));
     $out.= sprintf('<text text-anchor="end" x="165" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,$minVal));
   }
  	$out.='</g>';
