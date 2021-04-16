@@ -10,6 +10,7 @@
 #       - Matthias (Kenneth)    Thanks for Wiki entry
 #       - BioS                  Thanks for predefined start points Code
 #       - fettgu                Thanks for Debugging Irrigation Control data flow
+#       - Sebastian (BOFH)      Thanks for new Auth Code after API Change
 #
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -63,7 +64,7 @@ use POSIX;
 use FHEM::Meta;
 use Time::Local;
 
-use Data::Dumper;    # only for debugging
+#use Data::Dumper;    # only for debugging
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -203,9 +204,11 @@ sub Define {
     my $deviceId = $aArg->[2];
     my $category = $aArg->[3];
 
-    $hash->{DEVICEID}                = $deviceId;
-    $hash->{VERSION}                 = version->parse($VERSION)->normal;
-    $hash->{helper}{STARTINGPOINTID} = '';
+    $hash->{DEVICEID}                           = $deviceId;
+    $hash->{VERSION}                            = version->parse($VERSION)->normal;
+    $hash->{helper}{STARTINGPOINTID}            = '';
+    $hash->{helper}{schedules_paused_until_id}  = '';
+    $hash->{helper}{eco_mode_id}                = '';
 
     CommandAttr( undef,
         "$name IODev $modules{GardenaSmartBridge}{defptr}{BRIDGE}->{NAME}" )
@@ -269,37 +272,61 @@ sub Attr {
 }
 
 sub Set {
-    my $hash = shift // return;
-    my $aArg = shift // return;
+    my $hash                = shift // return;
+    my $aArg                = shift // return;
 
-    my $name = shift @$aArg;
-    my $cmd  = shift @$aArg // return qq{"set $name" needs at least one argument};
+    my $name                = shift @$aArg;
+    my $cmd                 = shift @$aArg // return qq{"set $name" needs at least one argument};
 
     my $payload;
-    my $abilities = '';
-
-    ### mower
+    my $abilities;
+    my $service_id;
+    my $mainboard_version   = ReadingsVal( $name, 'mower_type-mainboard_version', 0.0 );
+    ### mower  
+    # service_id (eco, parkuntilfurhternotice, startpoints)
     if ( lc $cmd eq 'parkuntilfurthernotice' ) {
         $payload = '"name":"park_until_further_notice"';
+        if ( $mainboard_version > 10.30 ) {
+          $payload = ' "settings":{"name":"schedules_paused_until","value":"2040-12-31T22:00:00.000Z","device":"'.$hash->{DEVICEID}.'"}';
+          $abilities = 'mower_settings'  ;
+          $service_id = $hash->{helper}{schedules_paused_until_id};
+        }
     }
-    elsif ( lc $cmd eq 'parkuntilnexttimer' ) {
+    elsif ( lc $cmd eq 'parkuntilnexttimer' ) { 
         $payload = '"name":"park_until_next_timer"';
-
+        if ( $mainboard_version > 10.30 ){
+          $payload = '"properties":{"name":"mower_timer","value":0}' ;
+          $abilities = 'mower_timer'; 
+        }
     }
     elsif ( lc $cmd eq 'startresumeschedule' ) {
         $payload = '"name":"start_resume_schedule"';
-
+        if ( $mainboard_version > 10.30 ) {
+          $payload = ' "settings":{"name":"schedules_paused_until","value":"","device":"'.$hash->{DEVICEID}.'"}';
+          $abilities = 'mower_settings'  ;
+          $service_id = $hash->{helper}{schedules_paused_until_id};
+        }
     }
     elsif ( lc $cmd eq 'startoverridetimer' ) {
         $payload = '"name":"start_override_timer","parameters":{"duration":'
           . $aArg->[0] * 60 . '}';
+        if ( $mainboard_version > 10.30 ){
+          $payload = '"properties":{"name":"mower_timer","value":'.$aArg->[0] * 60 .'}';
+          $abilities = 'mower_timer'; 
+        }
 
     }
     elsif ( lc $cmd eq 'startpoint' ) {
         my $err;
-
         ( $err, $payload, $abilities ) = SetPredefinedStartPoints( $hash, $aArg );
+        $service_id = $hash->{helper}{STARTINGPOINTID};
         return $err if ( defined($err) );
+    }
+    elsif ( lc $cmd eq 'eco' ) {
+        $payload = '"settings": {"name": "eco_mode", "value": '.$aArg->[0].', "device": "'.$hash->{DEVICEID}.'"}';
+        $abilities = 'mower_settings'  if ( $mainboard_version > 10.30 );
+        $service_id = $hash->{helper}{eco_mode_id};
+        #$abilities['service_id'] = $hash->{helper}{SCHEDULESID}  if ( $mainboard_version > 10.30 );
     }
     ### electronic_pressure_pump
     elsif ( lc $cmd eq 'pumptimer' ) {
@@ -399,10 +426,10 @@ sub Set {
 
         return "Unknown argument $cmd, choose one of $list";
     }
-
+    
     $abilities = 'mower'
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' )
-      && $abilities ne 'mower_settings';
+      && ($abilities !~ /mower_settings|mower_timer/);
     $abilities = 'watering'
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24'
         || AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
@@ -414,7 +441,7 @@ sub Set {
     $hash->{helper}{deviceAction} = $payload;
     readingsSingleUpdate( $hash, "state", "send command to gardena cloud", 1 );
 
-    IOWrite( $hash, $payload, $hash->{DEVICEID}, $abilities );
+    IOWrite( $hash, $payload, $hash->{DEVICEID}, $abilities, $service_id );
     Log3 $name, 4,
 "GardenaSmartBridge ($name) - IOWrite: $payload $hash->{DEVICEID} $abilities IODevHash=$hash->{IODev}";
 
@@ -573,7 +600,21 @@ sub WriteReadings {
     } while ( $abilities >= 0 );
 
     do {
+        #Log3 $name, 1, "Settings pro Device : ".$decode_json->{settings}[$settings]{name};
+        #Log3 $name, 1, " - KEIN ARRAY" if ( ref( $decode_json->{settings}[$settings]{value} ) ne "ARRAY");
+        #Log3 $name, 1, " - IST ARRAY" if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY");
 
+        if ( $decode_json->{settings}[$settings]{name} eq 'schedules_paused_until' 
+              || $decode_json->{settings}[$settings]{name} eq 'eco_mode'
+            )
+        {  
+            if ( $hash->{helper}{$decode_json->{settings}[$settings]{name}.'_id'} ne
+                $decode_json->{settings}[$settings]{id} )
+            {
+                $hash->{helper}{$decode_json->{settings}[$settings]{name}.'_id'} =
+                  $decode_json->{settings}[$settings]{id};
+            }
+        }
         if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY"
             && $decode_json->{settings}[$settings]{name} eq 'starting_points' )
         {
@@ -883,6 +924,7 @@ sub SetPredefinedStartPoints {
 
             $payload   = '"settings": ' . encode_json($decode_json_settings);
             $abilities = 'mower_settings';
+            #$abilities['service_id'] = $hash->{helper}{STARTINGPOINTID};
         }
         else {
             return
@@ -1213,7 +1255,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.0.3",
+  "version": "v2.2.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

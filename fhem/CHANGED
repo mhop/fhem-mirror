@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  74_GardenaDevice: add new API for mower
  - bugfix:  70_BOTVAC: transient map cache
  - bugfix:  73_DoorBird: Event Video Routine
  - bugfix:  73_ElectricityCalculator: Bugfix - Midnight-Crash

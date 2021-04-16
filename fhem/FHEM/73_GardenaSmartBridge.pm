@@ -57,7 +57,7 @@
 package FHEM::GardenaSmartBridge;
 use GPUtils qw(GP_Import GP_Export);
 
-# use Data::Dumper;    #only for Debugging
+#use Data::Dumper;    #only for Debugging
 
 use strict;
 use warnings;
@@ -194,6 +194,7 @@ sub Initialize {
 
     # Consumer
     $hash->{SetFn}    = \&Set;
+    $hash->{GetFn}    = \&Get;
     $hash->{DefFn}    = \&Define;
     $hash->{UndefFn}  = \&Undef;
     $hash->{DeleteFn} = \&Delete;
@@ -300,9 +301,9 @@ sub Attr {
     }
     elsif ( $attrName eq 'interval' ) {
         if ( $cmd eq 'set' ) {
-            RemoveInternalTimer($hash);
             return 'Interval must be greater than 0'
               if ( $attrVal == 0 );
+            RemoveInternalTimer($hash);
             $hash->{INTERVAL} = $attrVal;
             Log3 $name, 3,
               "GardenaSmartBridge ($name) - set interval: $attrVal";
@@ -394,6 +395,29 @@ sub Notify {
 
     return;
 }
+sub Get {
+    my $hash = shift // return;
+    my $aArg = shift // return;
+
+    my $name = shift @$aArg // return;
+    my $cmd  = shift @$aArg
+      // return qq{"get $name" needs at least one argument};
+
+    if ( lc $cmd eq 'debug_devices_list' ) {
+        $hash->{helper}{debug_device_list} = 'get';
+        #Log3 $name, 2, Dumper($hash->{helper});
+        #Write($hash, undef, undef, undef, undef);
+        
+        return 'coming soon';
+    } else {
+      my $list = "";
+      $list .= " debug_devices_list:noArg"
+        if ( AttrVal( $name, "debugJSON", "none") ne "none" );
+      
+      return "Unknown argument $cmd,choose one of $list";
+    
+    }
+}
 
 sub Set {
     my $hash = shift // return;
@@ -445,13 +469,13 @@ sub Set {
 }
 
 sub Write {
-    my ( $hash, $payload, $deviceId, $abilities ) = @_;
+    my ( $hash, $payload, $deviceId, $abilities, $service_id ) = @_;
     my $name = $hash->{NAME};
 
     my ( $session_id, $header, $uri, $method );
 
-    ( $payload, $session_id, $header, $uri, $method, $deviceId, $abilities ) =
-      createHttpValueStrings( $hash, $payload, $deviceId, $abilities );
+    ( $payload, $session_id, $header, $uri, $method, $deviceId, $service_id ) =
+      createHttpValueStrings( $hash, $payload, $deviceId, $abilities, $service_id );
 
     HttpUtils_NonblockingGet(
         {
@@ -491,7 +515,7 @@ sub ErrorHandling {
 
     my $dname = $dhash->{NAME};
 
-   Log3 $name, 2, "GardenaSmartBridge ($name) - Request: $data";
+    Log3 $name, 4, "GardenaSmartBridge ($name) - Request: $data";
    
     my $decode_json = eval { decode_json($data) };
     if ($@) {
@@ -749,6 +773,19 @@ sub ResponseProcessing {
 
         return;
     }
+    elsif ( exists($hash->{helper}{debug_device_list}) )  {
+        Log3 $name, 4, "Debug Devices List";
+        my $msg;
+        $msg = "test krams";
+        
+        my @buffer = split( '"devices":\[', $json );
+        my ( $json, $tail ) = ParseJSON( $hash, $buffer[1] );
+
+        $decode_json = eval { decode_json($json) };
+
+        delete $hash->{helper}{debug_device_list};
+        return $msg;
+    }
     elsif (defined( $decode_json->{devices} )
         && ref( $decode_json->{devices} ) eq 'ARRAY'
         && scalar( @{ $decode_json->{devices} } ) > 0 )
@@ -855,9 +892,8 @@ sub WriteReadings {
                         $decode_json->{abilities}[0]{properties}[$properties]
                           {name} . '-' . $t,
                         $v
-                      )
+                      )                     
                       if ($decode_json->{abilities}[0]{properties}[$properties]{name} !~ /ethernet_status|wifi_status/ );
-
                     if (
                         (
                             $decode_json->{abilities}[0]{properties}
@@ -885,7 +921,7 @@ sub WriteReadings {
                         {
                             #TODO: read valies if bridge connected to wifi
                             readingsBulkUpdateIfChanged( $hash,
-                             'wifi_status-ssid', $v->{ssid} )
+                              'wifi_status-ssid', $v->{ssid} )
                               if (ref($v->{ssid}) ne 'HASH');
                             readingsBulkUpdateIfChanged( $hash,
                                 'wifi_status-mac', $v->{mac} );
@@ -1129,7 +1165,7 @@ sub ParseJSON {
 }
 
 sub createHttpValueStrings {
-    my ( $hash, $payload, $deviceId, $abilities ) = @_;
+    my ( $hash, $payload, $deviceId, $abilities, $service_id ) = @_;
 
     my $session_id = $hash->{helper}{session_id};
     my $header     = "Content-Type: application/json";
@@ -1148,7 +1184,7 @@ sub createHttpValueStrings {
     if ( $payload eq '{}' ) {
         $method = 'GET';
         $payload = '';
-        $uri .= '/locations/?locatioId=null&user_id=' . $hash->{helper}{user_id}
+        $uri .= '/locations?locatioId=null&user_id=' . $hash->{helper}{user_id}
           if ( exists( $hash->{helper}{user_id} )
             && !defined( $hash->{helper}{locations_id} ) );
         readingsSingleUpdate( $hash, 'state', 'fetch locationId', 1 )
@@ -1159,21 +1195,37 @@ sub createHttpValueStrings {
             && defined( $hash->{helper}{locations_id} ) );
     }
 
-    $uri .= '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
+    $uri = '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
 
     if ( defined( $hash->{helper}{locations_id} ) ) {
         if ( defined($abilities) && $abilities eq 'mower_settings' ) {
 
             $method = 'PUT';
             my $dhash = $modules{GardenaSmartDevice}{defptr}{$deviceId};
+            
             $uri .=
                 '/devices/'
               . $deviceId
               . '/settings/'
-              . $dhash->{helper}{STARTINGPOINTID}
+              . $service_id
               if ( defined($abilities)
                 && defined($payload)
                 && $abilities eq 'mower_settings' );
+
+        } # park until next schedules or override
+        elsif (defined($abilities)
+            && defined($payload)
+            && $abilities eq 'mower_timer' )
+        {
+            my $valve_id;
+            $method = 'PUT';
+
+            $uri .=
+                '/devices/'
+              . $deviceId
+              . '/abilities/'
+              . $abilities
+              . '/properties/mower_timer';
 
         }
         elsif (defined($abilities)
@@ -1291,7 +1343,7 @@ sub DeletePassword {
     <li>longitude - Längengrad des Grundstücks</li>
     <li>name - Name of your Garden – Default „My Garden“</li>
     <li>state - State of the Bridge</li>
-    <li>token - SessionID</li> 
+    <li>token - SessionID</li>
   </ul>
   <br><br>
   <a name="GardenaSmartBridgeset"></a>
@@ -1393,7 +1445,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.1",
+  "version": "v2.2.2",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
