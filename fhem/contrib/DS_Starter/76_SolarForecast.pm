@@ -1008,6 +1008,7 @@ sub _setreset {                          ## no critic "not used"
       delete $hash->{HELPER}{INITCONTOTAL};
       delete $hash->{HELPER}{INITFEEDTOTAL};
       delete $data{$type}{$name}{current}{gridconsumption};
+      delete $data{$type}{$name}{current}{tomorrowconsumption};
       delete $data{$type}{$name}{current}{gridfeedin};
       delete $data{$type}{$name}{current}{consumption};
   }
@@ -2277,7 +2278,7 @@ sub _calcSummaries {
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
   
   my $gcon    = CurrentVal ($hash, "gridconsumption",     0);                                           # aktueller Netzbezug
-  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", 0);                                           # Verbrauchsprognose für morgigen Tag
+  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", undef);                                       # Verbrauchsprognose für folgenden Tag
   my $pvgen   = CurrentVal ($hash, "generation",          0);
   my $gfeedin = CurrentVal ($hash, "gridfeedin",          0);
   my $batin   = CurrentVal ($hash, "powerbatin",          0);                                           # aktuelle Batterieladung
@@ -2287,7 +2288,7 @@ sub _calcSummaries {
   $data{$type}{$name}{current}{consumption} = $consumption;
   
   push @$daref, "Current_Consumption<>".         $consumption.              " W";
-  push @$daref, "Tomorrow_ConsumptionForecast<>".$tconsum.                  " Wh";
+  push @$daref, "Tomorrow_ConsumptionForecast<>".$tconsum.                  " Wh" if(defined $tconsum);
   push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum03_PVforecast<>".  (int $next3HoursSum->{PV})." Wh";
@@ -2352,6 +2353,11 @@ sub estConsumptionForecast {
   my $name  = $paref->{name};
   my $chour = $paref->{chour}; 
   my $t     = $paref->{t};
+  
+  my $medev  = ReadingsVal($name, "currentMeterDev", "");                          # aktuelles Meter device
+  my ($a,$h) = parseParams ($medev);
+  $medev     = $a->[0] // "";
+  return if(!$medev || !$defs{$medev});
   
   my $type  = $hash->{TYPE};
  
