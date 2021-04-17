@@ -44,7 +44,7 @@ sub TCM_Initialize($) {
   $hash->{SetFn} = "TCM_Set";
   $hash->{NotifyFn} = "TCM_Notify";
   $hash->{AttrFn} = "TCM_Attr";
-  $hash->{AttrList} = "assignIODev:select,no,yes baseID blockSenderID:own,no comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
+  $hash->{AttrList} = "assignIODev:select,no,yes baseID .baseIDSaved blockSenderID:own,no .chipIDSaved comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
                       "msgCounter:select,off,on sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
@@ -107,7 +107,11 @@ sub TCM_InitSerialCom($) {
     #TCM_Read($hash);
     $hash->{PARTIAL} = '';
     delete $hash->{helper}{awaitCmdResp};
-    TCM_Set($hash, @setCmd);
+    if (TCM_Set($hash, @setCmd) ne '') {
+      $hash->{PARTIAL} = '';
+      delete $hash->{helper}{awaitCmdResp};
+      TCM_Set($hash, @setCmd);
+    }
   }
   # default attributes
   my %setAttrInit;
@@ -136,27 +140,34 @@ sub TCM_InitSerialCom($) {
     my @getBaseID = ("get", "baseID");
     if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
       $baseID = sprintf "%08X", hex $&;
+      $attr{$name}{".baseIDSaved"} = $baseID;
       $hash->{BaseID} = $baseID;
       $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
     } else {
-      $baseID = '0' x 8;
+      $baseID = AttrVal($name, ".baseIDSaved", '0' x 8);
       $hash->{BaseID} = $baseID;
-      $hash->{LastID} = '0' x 8;
+      $hash->{LastID} = $baseID eq '0' x 8 ? '0' x 8 : sprintf("%08X", (hex $baseID) + 127);
     }
   }
   if (defined $baseID) {
     push(@{$modules{"$hash->{TYPE}"}{BaseID}}, $baseID) if (!grep(/^$baseID$/, @{$modules{"$hash->{TYPE}"}{BaseID}}));
     @{$hash->{helper}{BaseID}} = @{$modules{"$hash->{TYPE}"}{BaseID}};
   }
+  my $chipID;
   if ($hash->{MODEL} eq "ESP3" && $comType ne "RS485" && $hash->{DeviceName} ne "none") {
     # get chipID
     my @getChipID = ('get', 'version');
     if (TCM_Get($hash, @getChipID) =~ m/ChipID:.([\dA-Fa-f]{8})/) {
-      my $chipID = sprintf "%08X", hex $1;
-      $hash->{ChipID} = $chipID;
-      push(@{$modules{"$hash->{TYPE}"}{ChipID}}, $hash->{ChipID}) if (!grep(/^$chipID$/, @{$modules{"$hash->{TYPE}"}{ChipID}}));
-      @{$hash->{helper}{ChipID}} = @{$modules{"$hash->{TYPE}"}{ChipID}};
+      $chipID = sprintf "%08X", hex $1;
+      $attr{$name}{".chipIDSaved"} = $chipID;
+    } else {
+      $chipID = AttrVal($name, ".chipIDSaved", undef);
     }
+  }
+  if (defined $chipID) {
+    $hash->{ChipID} = $chipID;
+    push(@{$modules{"$hash->{TYPE}"}{ChipID}}, $hash->{ChipID}) if (!grep(/^$chipID$/, @{$modules{"$hash->{TYPE}"}{ChipID}}));
+    @{$hash->{helper}{ChipID}} = @{$modules{"$hash->{TYPE}"}{ChipID}};
   }
   # default transceiver parameter
   if ($comType ne "RS485" && $hash->{DeviceName} ne "none") {
@@ -695,9 +706,7 @@ my %rc310 = (
 );
 
 # Parse TCM 310
-sub
-TCM_Parse310($$$)
-{
+sub TCM_Parse310($$$) {
   my ($hash,$rawmsg,$ptr) = @_;
   my $name = $hash->{NAME};
   Log3 $name, 5, "TCM $name TCM_Parse $rawmsg";
@@ -755,7 +764,7 @@ TCM_Parse310($$$)
     $msg = join(" ", @ans);
   }
   if ($msg eq "") {
-    Log3 $name, 2, "TCM $name RESPONSE: OK";
+    Log3 $name, 5, "TCM $name RESPONSE: OK";
   } else {
     Log3 $name, 2, "TCM $name RESPONSE: $msg";
   }
@@ -841,7 +850,6 @@ sub TCM_Get($@) {
       my $oCmdHex = '';
       $oCmdHex = $cmdhash->{oCmd} if (exists $cmdhash->{oCmd});
       $hash->{helper}{SetAwaitCmdResp} = 1;
-      #TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdHex)/2, $cmdhash->{packetType}), $cmdHex);
       TCM_Write($hash, $hash, sprintf("%04X%02X%02X", length($cmdHex)/2, length($oCmdHex)/2, $cmdhash->{packetType}), $cmdHex . $oCmdHex);
       ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
       $msg = TCM_Parse310($hash, $msg, $cmdhash) if(!$err);
@@ -853,24 +861,6 @@ sub TCM_Get($@) {
   }
   readingsSingleUpdate($hash, $cmd, $msg, 1);
   return $msg;
-}
-
-# clear teach in flag
-sub TCM_ClearTeach($) {
-  my $hash = shift;
-  foreach my $iName (keys %defs) {
-    delete $defs{$iName}{Teach} if ($defs{$iName}{TYPE} eq 'TCM');
-  }
-  #delete($hash->{Teach});
-  delete($modules{"$hash->{TYPE}"}{Teach});
-}
-
-# clear Smart ACK teach in flag
-sub TCM_ClearSmartAckLearn($) {
-  my $hash = shift;
-  delete($hash->{SmartAckLearn});
-  delete($modules{"$hash->{TYPE}"}{SmartAckLearn});
-  readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 00 Extended: 00", 1);
 }
 
 # Set commands TCM 120
@@ -908,8 +898,38 @@ my %sets310 = (
   "smartAckMailboxMax" => {packetType => 6, cmd => "08", arg => "\\d+"},
   "startupDelay" => {packetType => 5, cmd => "2F", arg => "[0-9A-F]{2}"},
   "subtel" => {packetType => 5, cmd => "11", arg => "0[0-1]"},
-  "teach" => {packetType => 5, arg=> "\\d+"},
+  "teach" => {packetType => 1, arg => "\\d+"},
 );
+
+# clear teach in flag
+sub TCM_ClearTeach($) {
+  my $hash = shift;
+  foreach my $iName (keys %defs) {
+    delete $defs{$iName}{Teach} if ($defs{$iName}{TYPE} eq 'TCM');
+  }
+  delete($modules{"$hash->{TYPE}"}{Teach});
+  Log3 $hash->{NAME}, 3, "TCM $hash->{NAME} set teach 0";
+  if($hash->{MODEL} ne 'ESP2') {
+    # signal telegram learn mode status
+    my $cmdhex = 'D011B' . 'F' x 17 . '0' x 10;
+    my ($err, $msg);
+    $hash->{helper}{SetAwaitCmdResp} = 1;
+    TCM_Write($hash, $hash, sprintf("%04X00%02X", length($cmdhex)/2, 1), $cmdhex);
+    ($err, $msg) = TCM_ReadAnswer($hash, "set teach");
+     if(!$err) {
+       $msg = TCM_Parse310($hash, $msg, $sets310{'teach'});
+     }
+  }
+  return;
+}
+
+# clear Smart ACK teach in flag
+sub TCM_ClearSmartAckLearn($) {
+  my $hash = shift;
+  delete($hash->{SmartAckLearn});
+  delete($modules{"$hash->{TYPE}"}{SmartAckLearn});
+  readingsSingleUpdate($hash, "smartAckLearnMode", "Enable: 00 Extended: 00", 1);
+}
 
 # Set
 sub TCM_Set($@) {
@@ -962,11 +982,13 @@ sub TCM_Set($@) {
     if ($arg == 0) {
       RemoveInternalTimer($hash, "TCM_ClearTeach");
       while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
-        Log3 $name, 3, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
+        #Log3 $name, 3, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
         delete $defs{"$iHash->{NAME}"}->{Teach};
       }
       delete $modules{"$hash->{TYPE}"}{Teach};
-      return;
+      return if ($hash->{MODEL} eq "ESP2");
+      # signal telegram learn mode status
+      $cmdHex = 'D011B' . 'F' x 17 . '0' x 10;
     } else {
       while (my ($iDev, $iHash) = each (%{$modules{"$hash->{TYPE}"}{devHash}})) {
         #Log3 $name, 2, "TCM $name clear Teach flag ioDev: $iDev ioHash: $iHash ioDevName: " . $defs{"$iHash->{NAME}"}->{NAME};
@@ -977,7 +999,11 @@ sub TCM_Set($@) {
       #Log3 $name, 2, "TCM $name set Teach flag ioHash: " . $modules{"$hash->{TYPE}"}{Teach};
       RemoveInternalTimer($hash, "TCM_ClearTeach");
       InternalTimer(gettimeofday() + $arg, "TCM_ClearTeach", $hash, 1);
-      return;
+      return if ($hash->{MODEL} eq "ESP2");
+      # signal telegram learn mode status
+      my $remainTime = $arg < 10 ? 1 : int($arg / 10);
+      $remainTime = $remainTime > 254 ? $remainTime : 254;
+      $cmdHex = 'D0114F' . sprintf("%02X", $remainTime) . 'F' x 14 . '0' x 10;
     }
   }
 
@@ -987,7 +1013,7 @@ sub TCM_Set($@) {
       DevIo_SimpleWrite($hash, "AA", 1);
       return "";
     }
-    $cmdHex .= "0"x(22-length($cmdHex));  # Padding with 0
+    $cmdHex .= "0" x (22 - length($cmdHex));  # Padding with 0
     TCM_Write($hash, $hash, "", $cmdHex);
     ($err, $msg) = TCM_ReadAnswer($hash, "get $cmd");
     $msg = TCM_Parse120($hash, $msg, 1) if(!$err);
@@ -1350,6 +1376,14 @@ sub TCM_Attr(@) {
     } else {
       $hash->{BaseID} = $attrVal;
       $hash->{LastID} = sprintf "%08X", (hex $attrVal) + 127;
+    }
+
+  } elsif ($attrName  =~ m/^\.(base|chip)IDSaved$/) {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^[Ff]{2}[\dA-Fa-f]{6}$/) {
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
     }
 
   } elsif ($attrName eq "blockSenderID") {
