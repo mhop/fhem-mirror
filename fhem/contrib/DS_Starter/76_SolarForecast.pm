@@ -4401,7 +4401,7 @@ return $def;
 <br>
 
 Das Modul SolarForecast erstellt auf Grundlage der Werte aus generischen Quellendevices eine 
-Vorhersage für den solaren Ertrag und weitere Informationen als Grundlage für abhängige Steuerungen. <br>
+Vorhersage für den solaren Ertrag und integriert weitere Informationen als Grundlage für darauf aufbauende Steuerungen. <br>
 Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem 
 <a href="https://wiki.fhem.de/wiki/FTUI_Widget_SMAPortalSPG">"SolarForecast Widget"</a> integriert werden. <br><br>
 
@@ -4424,15 +4424,16 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
     </ul>
     <br>
     
-    Nach der Definition des Devices ist zwingend ein Vorhersage-Device des Typs DWD_OpenData zuzuordnen sowie weitere 
-    anlagenspezifische Angaben mit den entsprechenden set-Kommandos vorzunehmen. <br>
+    Nach der Definition des Devices sind zwingend Vorhersage-Devices des Typs DWD_OpenData zuzuordnen sowie weitere 
+    anlagenspezifische Angaben mit den entsprechenden set-Kommandos zu hinterlegen. <br>
     Mit nachfolgenden set-Kommandos werden die Quellendevices und Quellenreadings für maßgebliche Informationen 
     hinterlegt: <br><br>
 
       <ul>
          <table>  
          <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Wetter- und Strahlungsdaten liefert  </td></tr>
+            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Wetterdaten liefert                  </td></tr>
+            <tr><td> <b>currentRadiationDev </b> </td><td>Device welches Strahlungsdaten liefert              </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert            </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>
             <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert      </td></tr>            
@@ -4739,6 +4740,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
       Zukünftig erwartete PV Erzeugungen werden mit den gespeicherten Korrekturfaktoren optimiert. <br> 
+      Bei aktivierter Autokorrektur wird das Attribut <a href="#cloudFactorDamping">cloudFactorDamping</a> übersteuert und hat
+      nur noch eine untergeordnete Bedeutung. <br>
       <b>Die automatische Vorhersagekorrektur ist lernend und benötigt einige Tage um die Korrekturwerte zu optimieren.
       Nach der Aktivierung sind nicht sofort optimale Vorhersagen zu erwarten !</b> <br>
       (default: off)      
