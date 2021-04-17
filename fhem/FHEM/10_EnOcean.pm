@@ -63,7 +63,7 @@ my %EnO_rorgname = (
   "C5" => "SYSEX",    # remote management >> packet type 7 used
   "C6" => "SMLRNREQ", # Smart Ack Learn Request
   "C7" => "SMLRNANS", # Smart Ack Learn Answer
-  "D0" => "SIGNAL",   # Smart Ack Mail Box Functions
+  "D0" => "SIGNAL",   # signal telegram
   "D1" => "MSC",      # MSC
   "D2" => "VLD",      # VLD
   "D4" => "UTE",      # UTE
@@ -394,6 +394,7 @@ my %EnO_eepConfig = (
   "D2.05.01" => {attr => {subType => "blindsCtrl.01", webCmd => "opens:stop:closes:position"}},
   "D2.05.02" => {attr => {subType => "blindsCtrl.00", defaultChannel => 1, webCmd => "opens:stop:closes:position"}, GPLOT => "EnO_position4angle4:Position/AnglePos,"},
   "D2.06.01" => {attr => {subType => "multisensor.01"}, GPLOT => "EnO_temp4humi4:Temp/Humi,EnO_brightness4:Brightness,"},
+  "D2.06.50" => {attr => {subType => "multisensor.50"}},
   "D2.10.00" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.10.01" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
   "D2.10.02" => {attr => {subType => "roomCtrlPanel.00", webCmd => "setpointTemp"}, GPLOT => "EnO_D2-10-xx:Temp/SPT/Humi,"},
@@ -787,7 +788,7 @@ sub EnOcean_Initialize($) {
                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
                       "blockTimeProgram:no,yes blockOccupancy:no,yes blockSetpointTemp:no,yes " .
                       "blockFanSpeed:no,yes blockKey:no,yes " .
-                      "brightnessDayNight brightnessDayNightCtrl:custom,sensor brightnessDayNightDelay " .
+                      "brightnessDayNight brightnessDayNightCtrl:custom,sensor brightnessDayNightDelay brightnessRefDev " .
                       "brightnessSunny brightnessSunnySouth brightnessSunnyWest brightnessSunnyEast " .
                       "brightnessSunnyDelay brightnessSunnySouthDelay brightnessSunnyWestDelay brightnessSunnyEastDelay " .
                       "calAtEndpoints:no,yes comMode:confirm,biDir,uniDir creator:autocreate,manual " .
@@ -812,7 +813,7 @@ sub EnOcean_Initialize($) {
                       "model:" . join(",", sort keys %EnO_models) . " " .
                       "observe:on,off observeCmdRepetition:1,2,3,4,5 observeErrorAction:textField-long observeInterval observeLogic:and,or " .
                       #observeCmds observeExeptions
-                      "observeRefDev pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
+                      "observeRefDev openLoopCtrlScale pidActorErrorAction:errorPos,freeze pidActorCallBeforeSetting pidActorErrorPos " .
                       "pidActorLimitLower pidActorLimitUpper pidActorTreshold pidCtrl:on,off pidDeltaTreshold pidFactor_D pidFactor_I " .
                       "pidFactor_P pidIPortionCallBeforeSetting pidSensorTimeout " .
                       "pollInterval postmasterID productID rampTime rcvRespAction:textField-long ".
@@ -1054,12 +1055,20 @@ sub EnOcean_Define($$) {
               $attr{$name}{teachMethod} = 'RPS';
               Log3 $name, 2, "EnOcean $name teach-in EEP F6-10-00 Manufacturer: no ID";
             }
+            # signal telegram learn mode status
+            $data = EnOcean_signalLearnModeStatus(0, 1, 0, 0, 0, $hash->{DEF}, $attr{$name}{eep});
+            EnOcean_SndRadio(undef, $hash, 1, 'D0', $data, '0' x 8, '00', 'F' x 8);
+
           } elsif ($attr{$name}{subType} eq "contact" && hex($data) & 8) {
             $attr{$name}{eep} = "D5-00-01";
             $attr{$name}{manufID} = "7FF";
             readingsSingleUpdate($hash, "teach", "1BS teach-in accepted EEP D5-00-01 Manufacturer: no ID", 1);
             $attr{$name}{teachMethod} = '1BS';
             Log3 $name, 2, "EnOcean $name teach-in EEP D5-00-01 Manufacturer: no ID";
+            # signal telegram learn mode status
+            $data = EnOcean_signalLearnModeStatus(0, 1, 0, 0, 0, $hash->{DEF}, $attr{$name}{eep});
+            EnOcean_SndRadio(undef, $hash, 1, 'D0', $data, '0' x 8, '00', 'F' x 8);
+
           } elsif ($attr{$name}{subType} eq "4BS" && hex(substr($data, 6, 2)) & 8) {
             $hash->{helper}{teachInWait} = "4BS";
             readingsSingleUpdate($hash, "teach", "4BS teach-in is missing", 1);
@@ -3474,6 +3483,7 @@ sub EnOcean_Set($@) {
           $updateState = 0;
           ($err, $subDef) = EnOcean_AssignSenderID(undef, $hash, "subDef", "confirm");
           EnOcean_setTeachConfirmWaitHash(undef, $hash);
+
         } elsif ($cmd eq "dim") {
           return "Usage: $cmd dim/% [rampTime/s lock|unlock]"
             if(@a < 2 || $a[1] !~ m/^\d+$/ || $a[1] < 0 || $a[1] > 100);
@@ -3552,6 +3562,12 @@ sub EnOcean_Set($@) {
           $setCmd = 8;
           $sendDimCmd = 1;
 
+        } elsif ($cmd eq "openLoopCtrl") {
+          $hash->{constLightCtrl} = 'openLoopCtrl';
+          $dimVal = $dimVal // 0;
+          $setCmd = $dimVal == 0 ? 8 : 9;
+          $sendDimCmd = 1;
+
         } elsif ($cmd eq "local") {
           if ($a[1]) {
             return "Usage: $cmd [learn]" if ($a[1] ne "learn");
@@ -3569,9 +3585,16 @@ sub EnOcean_Set($@) {
           $data = sprintf "%02X%02X%02X%02X", $gwCmdID, $dimVal, $rampTime, $setCmd;
 
         } else {
-          my $cmdList = "dim:slider,0,1,100 local:learn on:noArg off:noArg teach:noArg";
+          my $cmdList = "dim:slider,0,1,100 local:learn off:noArg on:noArg openLoopCtrl:noArg teach:noArg";
           return SetExtensions ($hash, $cmdList, $name, @a);
         }
+        $hash->{helper}{constLightCtrl}[0] = $hash;
+        $hash->{helper}{constLightCtrl}[1] = 'set';
+        $hash->{helper}{constLightCtrl}[2] = $cmd;
+        $hash->{helper}{constLightCtrl}[3] = $dimVal;
+        $hash->{helper}{constLightCtrl}[4] = 4;
+        $logLevel = EnOcean_constLightCtrl($hash->{helper}{constLightCtrl});
+######*
         if ($sendDimCmd) {
           readingsSingleUpdate($hash, "block", "unlock", 1);
           if (defined $a[1]) {
@@ -3965,7 +3988,7 @@ sub EnOcean_Set($@) {
       } else {
         return "Unknown Gateway command " . $cmd . ", choose one of ". $cmdList . join(" ", sort keys %EnO_gwCmd);
       }
-      Log3 $name, 3, "EnOcean set $name $cmd";
+      Log3 $name, $logLevel // 3, "EnOcean set $name $cmd";
 
     } elsif ($st eq "energyManagement.01") {
       # Energy Management, Demand Response (A5-37-01)
@@ -7279,7 +7302,6 @@ sub EnOcean_Parse($$) {
         # store changes
         EnOcean_CommandSave(undef, undef);
         readingsSingleUpdate($hash, 'teach', '4BS teach-in accepted', 1);
-        #push @event, "3:teach:4BS teach-in accepted";
         Log3 $name, 2, "EnOcean $name remote device with SenderID $senderID assigned";
         return '';
 
@@ -7365,9 +7387,9 @@ sub EnOcean_Parse($$) {
       "91" => "BASEID_MAX_REACHED",
     );
     my $rcTxt = $codes{$funcNumber} if($codes{$funcNumber});
+    $funcNumber = hex($funcNumber);
     if($hash) {
       $name = $hash->{NAME};
-      $funcNumber = hex($funcNumber);
       Log3 $name, $funcNumber == 0 ? 5 : 2, "EnOcean $name RESPONSE: $rcTxt DATA: $data ODATA: $odata";
       return $name;
     } else {
@@ -7756,6 +7778,7 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "switch.7F" && $manufID eq "00D") {
       $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
+      # 2nd action
       $msg .= "," . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
       $msg .= " released" if (!($db[0] & 0x10));
       push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
@@ -7777,10 +7800,17 @@ sub EnOcean_Parse($$) {
         } elsif ($st eq "liquidLeakage") {
           # liquid leakage sensor, not tested
           $msg = "wet" if ($db[0] == 0x11);
+#        } elsif (($db[0] & 7) == 6) {
+#          # bistable switch
+#          $msg  = ($db[0] & 0xE0) >> 5 == 2 ? 'BI' : 'B0';
+#          push @event, "3:buttons:pressed";
+#          push @event, "3:channelB:$msg";
+#          push @event, "3:$event:$msg";
         } else {
           # Theoretically there can be a released event with some of the A0, BI
           # pins set, but with the plastic cover on this wont happen.
           $msg  = $EnO_ptm200btn[($db[0] & 0xE0) >> 5];
+          # 2nd action
           $msg .= "," . $EnO_ptm200btn[($db[0] & 0x0E) >> 1] if ($db[0] & 1);
           $msg .= " released" if (!($db[0] & 0x10));
           push @event, "3:buttons:" . ($db[0] & 0x10 ? "pressed" : "released");
@@ -8024,6 +8054,10 @@ sub EnOcean_Parse($$) {
           $attr{$name}{subType} = "raw";
           $st = "raw";
         }
+
+        # signal telegram learn mode status
+        my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, $attr{$name}{eep} eq 'raw' ? 1 : 0, 0, $hash->{DEF}, $attr{$name}{eep} eq 'raw' ? 'FF-FF-FF' : $attr{$name}{eep});
+        EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
 
       } else {
         Log3 $name, 4, "EnOcean $name teach-in with subType $st locked, set transceiver in teach mode.";
@@ -9369,7 +9403,7 @@ sub EnOcean_Parse($$) {
 
     } elsif ($st eq "roomSensorControl.05") {
       # Room Sensor and Control Unit (EEP A5-10-01 ... A5-10-0D)
-      # [Eltako FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *, untested]
+      # [Eltako FTR55D, FTR55H, Thermokon SR04 *, Thanos SR *]
       # $db[3] is the fan speed or night reduction for Eltako
       # $db[2] is the setpoint where 0x00 = min ... 0xFF = max or
       # reference temperature for Eltako where 0x00 = 0°C ... 0xFF = 40°C
@@ -9404,6 +9438,12 @@ sub EnOcean_Parse($$) {
         }
       }
       push @event, "3:temperature:$temp";
+      readingsDelete($hash, "alarm");
+      if (AttrVal($name, "signOfLife", 'off') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 1320), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "roomSensorControl.01") {
       # Room Sensor and Control Unit (EEP A5-04-01, A5-10-10 ... A5-10-14)
@@ -10766,14 +10806,18 @@ sub EnOcean_Parse($$) {
         # $db[0]_bit_2 is store final value, not used, because
         # dimming value is always stored
         push @event, "3:rampTime:$db[1]";
-        push @event, "3:state:" . ($db[0] & 0x01 ? "on" : "off");
-        if ($db[0] & 4) {
-          # Relative Dimming Range
-          push @event, "3:dim:" . sprintf "%d", $db[2] * 100 / 255;
-        } else {
-          push @event, "3:dim:$db[2]";
-        }
-        push @event, "3:dimValueLast:$db[2]" if ($db[2] > 0);
+        push @event, "3:state:" . ($db[0] & 1 ? "on" : "off");
+        my $dim = $db[0] & 4 ? sprintf("%d", $db[2] * 100 / 255) : $db[2];
+        push @event, "3:dim:$dim";
+        push @event, "3:dimValueLast:$dim" if ($dim > 0);
+        # constLightCtrl
+        $hash->{helper}{constLightCtrl}[0] = $hash;
+        $hash->{helper}{constLightCtrl}[1] = 'parse';
+        $hash->{helper}{constLightCtrl}[2] = 'response';
+        $hash->{helper}{constLightCtrl}[3] = $dim;
+        $hash->{helper}{constLightCtrl}[4] = 4;
+        EnOcean_constLightCtrl($hash->{helper}{constLightCtrl});
+
       } elsif ($db[3] == 3) {
         # Setpoint shift
         # $db1 is setpoint shift where 0 = -12.7 K ... 255 = 12.8 K
@@ -11808,6 +11852,115 @@ sub EnOcean_Parse($$) {
         #EnOcean_multisensor_01Snd($ctrl, $hash, $packetType);
       }
 
+    } elsif ($st eq "multisensor.50") {
+      # Multisensor Windows Handle
+      # (D2-06-50)
+      # message type
+      my $msgType = hex(substr($data, 0, 2));
+      if ($msgType == 1) {
+        # windows status
+        push @event, "1:telegramType:" . ($db[6] & 0x80 ? "heartbeat" : "event");
+        my %handlePosition = (
+          0 => ["none", undef],
+          1 => ["closed", 'F0'],
+          2 => ["open", 'E0'],
+          3 => ["tilted", 'D0'],
+          4 => ["closed", 'F0'],
+          5 => ["open", 'E0'],
+          6 => ["tilted", 'D0'],
+          7 => ["closed", 'F0'],
+          8 => ["open", 'E0'],
+          9 => ["tilted", 'D0']
+        );
+        my %windowPosition = (
+          0 => ["none", undef],
+          1 => ["closed", '09'],
+          2 => ["closed", '09'],
+          3 => ["closed", '09'],
+          4 => ["open", '08'],
+          5 => ["open", '08'],
+          6 => ["open", '08'],
+          7 => ["tilted", '08'],
+          8 => ["tilted", '08'],
+          9 => ["tilted", '08']
+        );
+        my $position = $db[6] & 0x7F;
+        my $handle;
+        if (exists $handlePosition{$position}) {
+          $handle = $handlePosition{$position}[0];
+        } else {
+          $handle = "unknown";
+        }
+        push @event, "1:handle:$handle";
+        # forward handle position (RPS telegam)
+        if (defined($handlePosition{$position}[1]) && defined(AttrVal($name, "subDefH", undef))) {
+          EnOcean_SndRadio(undef, $hash, $packetType, "F6", $handlePosition{$position}[1], AttrVal($name, "subDefH", "0" x 8), '20', 'FFFFFFFF');
+        }
+        my $window;
+        if (exists $windowPosition{$position}) {
+          $window = $windowPosition{$position}[0];
+        } else {
+          $window = 'unknown';
+        }
+        push @event, "1:window:$window";
+        # forward window state (1BS telegam)
+        if (defined($windowPosition{$position}[1]) && defined(AttrVal($name, "subDefW", undef))) {
+          EnOcean_SndRadio(undef, $hash, $packetType, "D5", $windowPosition{$position}[1], AttrVal($name, "subDefW", "0" x 8), '00', 'FFFFFFFF');
+        }
+        push @event, "1:statusCntr:". substr($data, 4, 8);
+        my $battery = $db[1] & 0x80 ? 'low' : 'ok';
+        push @event, "1:battery:$battery";
+        push @event, "1:batteryPercent:". ($db[1] & 0x7F);
+        my %errorStatus = (
+          0 => "ok",
+          1 => "error",
+          2 => "not_supported",
+          3 => "reserved"
+        );
+        push @event, "1:statusMotion:" . $errorStatus{(($db[0] & 0xC0) >> 6)};
+        push @event, "1:statusAcceleration:" . $errorStatus{(($db[0] & 0x30) >> 4)};
+        push @event, "1:statusMagnetic:" . $errorStatus{(($db[0] & 0x0C) >> 2)};
+        push @event, "1:statusSystem:" . $errorStatus{($db[0] & 3)};
+        push @event, "1:state:W: $window H: $handle B: $battery";
+     } elsif ($msgType == 2) {
+        # alarm status
+         push @event, "1:burglaryAlarm:" . ($db[0] & 1 ? 'on' : 'off');
+      } elsif ($msgType == 0x11) {
+        # calibrate
+        my %calStatus = (
+          0 => "ok",
+          1 => "error",
+          2 => "invalid"
+        );
+        my $calStatus = $db[0] & 0xC0;
+        if (exists $calStatus{$calStatus}) {
+          push @event, "3:statusCalibration:$calStatus{$calStatus}";
+        } else {
+          push @event, "3:statusCalibration:unknown";
+        }
+        my %cal = (
+          0 => "none",
+          1 => "close_handle",
+          2 => "open_handle",
+          3 => "tilt_handle",
+          0x0A => "close_window"
+        );
+        my $cal = $db[0] & 0x3F;
+        if (exists $cal{$cal}) {
+          push @event, "3:calibrationStep:$cal{$cal}";
+        } else {
+          push @event, "3:calibrationStep:unknown";
+        }
+      } else {
+
+      }
+      readingsDelete($hash, "alarm");
+      if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        InternalTimer(gettimeofday() + AttrVal($name, "signOfLifeInterval", 990), 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+      }
+
     } elsif ($st eq "roomCtrlPanel.01") {
       # Room Control Panel
       # (D2-11-01 - D2-11-08)
@@ -12553,18 +12706,27 @@ sub EnOcean_Parse($$) {
       my $repeatingCounter = $db[0] & 0x0F;
       if ($repeatingCounter < 0x0F) {$hash->{Dev_RepeatingCounter} = $repeatingCounter};
     } elsif ($signalMID == 11) {
-      DoTrigger($name, "SIGNAL: DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached'), 1);
+      DoTrigger($name, "SIGNAL: DUTYCYCLE_LIMIT: " . (($db[0] & 0x0F) == 1 ? 'released' : 'reached'), 1);
       Log3 $name, 2, "EnOcean $name SIGNAL DUTYCYCLE_LIMIT: " . ($db[0] >> 4 == 1 ? 'released' : 'reached');
     } elsif ($signalMID == 12) {
       DoTrigger($name, "SIGNAL: Dev_CHANGED", 1);
       Log3 $name, 2, "EnOcean $name SIGNAL Dev_CHANGED";
     } elsif ($signalMID == 13) {
       my @harvester = ('very_good', 'good', 'average', 'bad', 'very_bad');
-      push @event, "3:harvester:" . $harvester[$db[0]];
+      push @event, "3:harvester:" . $harvester[$db[0] & 0x0F];
     } elsif ($signalMID == 14) {
       DoTrigger($name, "SIGNAL: TX_MODE_OFF", 1);
     } elsif ($signalMID == 15) {
       DoTrigger($name, "SIGNAL: TX_MODE_ON", 1);
+    } elsif ($signalMID == 16) {
+      if ($db[0] <= 100) {
+        push @event, "3:batteryPercentBackup:$db[0]";
+      } else {
+        readingsDelete($hash, "batteryPercentBackup");
+      }
+    } elsif ($signalMID == 17) {
+      # learn mode status
+      #push @event, "3:batteryPercent:$db[0]";
     }
 
   } elsif ($rorg eq "B2") {
@@ -12768,6 +12930,9 @@ sub EnOcean_Parse($$) {
       $mid = $EnO_manuf{$mid} if($EnO_manuf{$mid});
       push @event, "3:teach:GP teach-in accepted Manufacturer: $mid";
       Log3 $name, 2, "EnOcean $name GP teach-in accepted Manufacturer: $mid";
+      # signal telegram learn mode status
+      my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, 0, 0, $hash->{DEF}, $attr{$name}{eep});
+      EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
       # store attr subType, manufID, gpDef ...
       EnOcean_CommandSave(undef, undef);
 
@@ -12781,7 +12946,9 @@ sub EnOcean_Parse($$) {
         Log3 $name, 2, "EnOcean $name GP teach-in deletion response send to $senderID";
       }
       Log3 $name, 2, "EnOcean $name GP teach-in delete request executed";
-
+      # signal telegram learn mode status
+      my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, 4, 0, $hash->{DEF}, $attr{$name}{eep});
+      EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
     }
 
   } elsif ($rorg eq "B1" && $teach) {
@@ -12855,7 +13022,6 @@ sub EnOcean_Parse($$) {
 
   } elsif ($rorg eq "D4" && $teach) {
     # UTE - Universal Uni- and Bidirectional Teach-In / Teach-Out
-    #
     Log3 $name, 5, "EnOcean $name UTE teach-in received from $senderID";
     my $rorg = sprintf "%02X", $db[0];
     my $func = sprintf "%02X", $db[1];
@@ -12904,6 +13070,9 @@ sub EnOcean_Parse($$) {
             Log3 $name, 2, "EnOcean $name UTE teach-in response send to $senderID";
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in accepted EEP $rorg-$func-$type Manufacturer: $mid";
+          # signal telegram learn mode status
+          my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, 0, 0, $hash->{DEF}, $attr{$name}{eep});
+          EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
         } else {
           # Teach-In EEP not supported
           $attr{$name}{subType} = "raw";
@@ -12921,6 +13090,9 @@ sub EnOcean_Parse($$) {
             Log3 $name, 2, "EnOcean $name UTE teach-in response send to $senderID";
           }
           Log3 $name, 2, "EnOcean $name UTE teach-in accepted EEP $rorg-$func-$type not supported Manufacturer: $mid";
+          # signal telegram learn mode status
+          my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, 1, 0, $hash->{DEF}, "$rorg-$func-$type");
+          EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
         }
         # store attr subType, manufID ...
         EnOcean_CommandSave(undef, undef);
@@ -12936,6 +13108,9 @@ sub EnOcean_Parse($$) {
           Log3 $name, 2, "EnOcean $name UTE teach-in deletion response send to $senderID";
         }
         Log3 $name, 2, "EnOcean $name UTE teach-in delete request executed";
+        # signal telegram learn mode status
+        my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, 4, 0, $hash->{DEF}, $attr{$name}{eep});
+        EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
       }
     } else {
       # Teach-In Respose telegram received
@@ -14922,6 +15097,113 @@ sub EnOcean_Notify(@) {
     }
   }
   return undef;
+}
+
+#####*
+sub EnOcean_constLightCtrl($) {
+  my ($param) = @_;
+  my ($hash, $mode, $cmd, $dimSet) = @$param;
+  my $lightCtrl = $hash->{constLightCtrl} // return;
+  my $name = $hash->{NAME};
+  #Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 1 CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
+  RemoveInternalTimer($hash->{helper}{constLightCtrl}) if(exists $hash->{helper}{constLightCtrl});
+  # stop constLightCtrl
+  if (!defined($attr{$name}{brightnessRefDev}) || $cmd !~ m/^dim|response|openLoopCtrl|closedLoopCtrl$/) {
+    delete $hash->{constLightCtrl};
+    delete $hash->{helper}{constLightCtrl};
+    return;
+  }
+  # constLightCtrl command set dim is executed, lock recursion
+  return if (!defined($hash->{helper}{constLightCtrl}[6]) && $cmd eq 'dim');
+  my $brightness = ReadingsVal($attr{$name}{brightnessRefDev}, "brightness", undef);
+  # stop constLightCtrl
+  if (!defined($brightness)) {
+    delete $hash->{constLightCtrl};
+    delete $hash->{helper}{constLightCtrl};
+    return;
+  }
+  #Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 2 CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef');
+  my $dimCalc = $dimSet;
+  my $dimTemp;
+  my $logLevel = 3;
+  if ($hash->{constLightCtrl} eq 'openLoopCtrl') {
+    # calc dim
+    my $openLoopCtrlScale = $attr{$name}{openLoopCtrlScale} // '100:100 0:0';
+    my ($scaleHigh, $scaleLow) = split("[ \t][ \t]*", $openLoopCtrlScale);
+    my ($brightnessHigh, $dimHigh) = split(":", $scaleHigh);
+    my ($brightnessLow, $dimLow) = split(":", $scaleLow);
+    $brightnessHigh = $brightnessHigh // 100;
+    $brightnessLow = $brightnessLow // 0;
+    $dimHigh = $dimHigh // 100;
+    $dimLow = $dimLow // 0;
+    $dimCalc = ($dimLow*$brightnessHigh-$brightnessLow*$dimHigh)/($dimLow-$dimHigh)+
+               ($brightnessLow-$brightnessHigh)/($dimLow-$dimHigh)*$brightness;
+    #Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 3 BRIGHTNESS: $brightness DIM: $dimCalc";
+    $dimCalc = $dimCalc < 0 ? 0 : $dimCalc;
+    $dimCalc = $dimCalc > 100 ? 100 : $dimCalc;
+    $dimTemp = $dimCalc;
+    $dimCalc = int(EnOcean_EMA($hash, 'dim', $dimCalc, 0.25));
+  }
+  if ($cmd eq 'dim') {
+    if (abs($dimCalc - $dimSet) > 5) {
+      # constLightCtrl execute flag
+      $hash->{helper}{constLightCtrl}[6] = undef;
+      # maximum of two responses are expected
+      $hash->{helper}{constLightCtrl}[7] = 2;
+      my @setCmd = ($name, 'dim', $dimCalc);
+      if (defined $hash->{helper}{constLightCtrl}[4]) {
+        $setCmd[3] = $hash->{helper}{constLightCtrl}[4];
+        $setCmd[4] = $hash->{helper}{constLightCtrl}[5] if (defined $hash->{helper}{constLightCtrl}[5])
+      }
+      EnOcean_Set($hash, @setCmd);
+    } else {
+      # clear response flag
+      $hash->{helper}{constLightCtrl}[7] = undef;
+    }
+    $hash->{helper}{constLightCtrl}[6] = 5;
+  } elsif ($cmd eq 'response') {
+    if (defined $hash->{helper}{constLightCtrl}[7]) {
+      # continue constLightCtrl
+      $hash->{helper}{constLightCtrl}[2] = 'dim';
+      $hash->{helper}{constLightCtrl}[6] = 5;
+      # clear response flag
+      -- $hash->{helper}{constLightCtrl}[7] || ($hash->{helper}{constLightCtrl}[7] = undef);
+    } else {
+      # user interaction on the actuator terminates the constLightCtrl
+      delete $hash->{constLightCtrl};
+      delete $hash->{helper}{constLightCtrl};
+      return;
+    }
+  } else {
+    # start constLightCtrl
+    $hash->{helper}{constLightCtrl}[2] = 'dim';
+    $hash->{helper}{constLightCtrl}[6] = 2;
+    # maximum of two responses are expected
+    $hash->{helper}{constLightCtrl}[7] = 2;
+  }
+  InternalTimer(gettimeofday() + $hash->{helper}{constLightCtrl}[6], 'EnOcean_constLightCtrl', $hash->{helper}{constLightCtrl}, 0);
+  Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 4 B: $brightness D: $dimTemp >> $dimCalc CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
+  return $logLevel;
+}
+
+sub EnOcean_EMA($$$$) {
+  # exponential moving average (EMA)
+  # 0 < $wheight < 1
+  my ($hash, $readingName, $readingVal, $wheight) = @_;
+  my $average = exists($hash->{helper}{ema}{$readingName}{average}) ? $hash->{helper}{ema}{$readingName}{average} : $readingVal;
+  $average = $wheight * $readingVal + (1 - $wheight) * $average;
+  $hash->{helper}{ema}{$readingName}{average} = $average;
+  return $average;
+}
+
+sub EnOcean_signalLearnModeStatus($$$$$$$) {
+  my ($linkTable, $recTeachRequMsg, $learnModeType, $teachResult, $LearnModeTimeout, $devID, $eep) = @_;
+  my $data = '11';
+  $data .= sprintf "%02X%02X", $linkTable << 7 | $recTeachRequMsg << 6 | $learnModeType << 4 | $teachResult, $LearnModeTimeout;
+  $eep = defined($eep) ? $eep : 'FF-FF-FF';
+  $eep =~ m/^(..)-(..)-(..)$/;
+  $data .= $devID . $1 . $2 . $3;
+  return $data;
 }
 
 sub EnOcean_environmentAppCustomCmd($) {
@@ -18182,6 +18464,30 @@ sub EnOcean_Delete($$) {
   <br><br>
   </ul>
 
+  <b>Constant Light Controller</b><br>
+  <ul>
+    The constant light controller dims lamps depending on the ambient brightness. Two types of constant light
+    controller are used.<br><br>
+    For the closed loop control, the ambient brightness in the room itself is measured.
+    This value is entered as an actual value in the control. The sensor must measure the brightness,
+    for example, on the table top of the desk. For a stable control, changes in the brightness value
+    by the outside light and the lamps must be detected immediately and at short intervals.
+    Currently, the function of the closed loop control is not yet available in the EnOcean module.<br><br>
+    In the case of open loop control, the lamps are dimmed linearly depending on the outside light.
+    The brightness sensor must detect the outside brightness and must not be affected by the luminous flux
+    of the lamps itself. The open loop control is switched on by
+    <ul><br>
+      <code>set &lt;device&gt; openLoopCtrl</code><br>
+    </ul><br><br>
+    The automatic control can be turned off by any other command. If the dimmaktor reports its stats,
+    the control is also deactivated any manual input, for example on a wall switch.<br>
+    The straight-line characteristic is determined via the attribute <a href="#EnOcean_openLoopCtrlScale">openLoopCtrlScale</a>.
+    Below and above the characteristic thresholds, the dimming values remain constant at the value of dimHigh or dimLow.
+    The name of the brightness sensor must be specified in the <a href="#EnOcean_brightnessRefDev">brightnessRefDev</a> attribute.<br>
+    Currently, the constant light control is available for the gateway/dimming profile. More profiles will follow.
+  <br><br>
+  </ul>
+
   <b>Remote Management</b><br>
   <ul>
     Remote Management allows EnOcean devices to be configured and maintained over the air.
@@ -18302,6 +18608,7 @@ sub EnOcean_Delete($$) {
       <li>Energy harvesting and reporting</li>
       <li>Failure & issues reporting</li>
       <li>Radio link quality reporting</li>
+      <li>Learn Mode Status</li>
     </ul>
     The Signal Telegram function commands are activated by the attribute <a href="#EnOcean_signal">signal</a>.
     All commands are described in the signal telegram chapter of the <a href="#EnOcean_signalGet">get</a>-commands.
@@ -18336,21 +18643,35 @@ sub EnOcean_Delete($$) {
   <b>Security features</b><br>
   <ul>
     The receiving and sending of encrypted messages is supported. This module currently allows the secure operating mode of
-    a variety of sensors and PTM 215 based switches.<br>
+    a variety of sensors and PTM 210 / PTM 215 based switches.<br>
     To receive secured telegrams, you first have to start the teach in mode via<br><br>
     <code>set &lt;IODev&gt; teach &lt;t/s&gt;</code><br><br>
-    On the PTM 215 module doing the following:<br>
+    Since the beginning of 2021, the PTM 210 / PTM 215 modules offer a normal mode and two secure modes
+    <ul>
+      <li>Implicit RLC (legacy, not recommended)</li>
+      <li>Explicit RLC (recommended)</li><br>
+    </ul>
+    In the case of the Implicit RLC doing the following:<br>
     <ul>
       <li>Remove the switch cover of the module</li>
-      <li>Press both buttons of one rocker side (A0 & A1 or B0 & B1)</li>
-      <li>While keeping the buttons pressed actuate the energy bow twice.</li><br>
+      <li>Press both nipples of one rocker side (A0 & AI or B0 & BI)</li>
+      <li>While keeping the nipples pressed actuate the energy bow twice.</li><br>
     </ul>
     This generates two teach-in telegrams which create a Fhem device with the subType "switch.00" and synchronize the Fhem with
-    the PTM 215. Both the Fhem and the PTM 215 now maintain a counter which is used to generate a rolling code encryption scheme.
+    the PTM 210 / PTM 215. Both the Fhem and the PTM210 / PTM 215 now maintain a counter which is used to generate a rolling code encryption scheme.
     Also during teach-in, a private key is transmitted to the Fhem. The counter value is allowed to desynchronize for a maximum of
     128 counts, to allow compensating for missed telegrams, if this value is crossed you need to teach-in the PTM 215 again. Also
-    if your Fhem installation gets erased including the state information, you need to teach in the PTM 215 modules again (which
+    if your Fhem installation gets erased including the state information, you need to teach in the PTM 210 / PTM 215 modules again (which
     you would need to do anyway).<br><br>
+    In the case of the Explicit RLC doing the following:<br>
+    <ul>
+      <li>Remove the switch cover of the module</li>
+      <li>Press any 3 nipples</li>
+      <li>While keeping the nipples pressed actuate the energy bow twice.</li><br>
+    </ul>
+    In this mode, the PTM module sends the RLC value as part of every data telegram. With
+    transmission of the RLC in every data telegram a desynchronization of the RLC counters
+    between receivers and transmitter like described above cannot happen.<br><br>
 
     To send secured telegrams, you first have send a secure teach-in to the remode device<br><br>
     <ul>
@@ -18819,6 +19140,9 @@ sub EnOcean_Delete($$) {
       or to a setpoint deviation of +/- 3 K be limited. For this use the optional parameter
       [block] = lock|unlock, unlock is default.<br>
       The profile behaves like a master or slave, see <a href="#EnOcean_devMode">devMode</a>.<br>
+      A monitoring period can be set for signOfLife telegrams of the sensor, see
+      <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+      Default is "off" and an interval of 1320 sec.<br>
       The attr subType must be roomSensorControl.05 and attr manufID must be 00D.
       The attributes must be set manually.
     </li>
@@ -19246,7 +19570,9 @@ sub EnOcean_Delete($$) {
         for Eltako: t = 1 = fast dimming ... 255 = slow dimming or 0 = dimming speed on the dimmer used<br>
         The attr subType must be gateway and gwCmd must be dimming. This is done if the device was
         created by autocreate.<br>
-        For Eltako devices attributes must be set manually. Use the sensor type "PC/FVS" for Eltako devices.
+        For Eltako devices this attributes must be set manually. In addition, the attribute manufID must be set with 00D.
+        Alternatively, the Eltako device can be fully defined using the inofficial EEPs G5-38-08, H5-38-08 or I5-38-08.
+        Use the sensor type "PC/FVS" for Eltako devices.
      </li>
      <br><br>
 
@@ -20225,6 +20551,10 @@ sub EnOcean_Delete($$) {
       Set switching delay for reading dayNight based on the reading brightness. The reading dayNight is reset or set
       if the thresholds are permanently undershot or exceed during the delay time.
     </li>
+    <li><a name="EnOcean_brightnessRefDev">brightnessRefDev</a> &lt;name&gt;<br>
+      Name of the device whose reference value is read. The reference values is
+      the reading brightness.
+    </li>
     <li><a name="EnOcean_brightnessSunny">brightnessSunny</a> E_min/lx:E_max/lx,
      [brightnessSunny] = 0...99000:0...99000, 20000:40000 is default.<br>
      Set switching thresholds for reading isSunny based on the reading brightness.
@@ -20500,6 +20830,10 @@ sub EnOcean_Delete($$) {
     <li><a name="EnOcean_observeRefDev">observeRefDev</a> &lt;name&gt; [&lt;name&gt; [&lt;name&gt;]],
       [observeRefDev] = &lt;name of the own device&gt; is default<br>
       Names of the devices to be observed. The list must be separated by spaces.
+    </li>
+    <li><a name="EnOcean_openLoopCtrlScale">openLoopCtrlScale</a> &lt;dimHigh&gt;:&lt;brightness1&gt; &lt;dimLow&gt;:&lt;brightness2&gt;,
+      [openLoopCtrlScale] = 100:100 0:0 is default.<br>
+      Bases of the straight-line characteristic of the open loop control dimming function.
     </li>
     <li><a name="EnOcean_pidActorCallBeforeSetting">pidActorCallBeforeSetting</a>,
         [pidActorCallBeforeSetting] = not defined is default<br>
@@ -20935,7 +21269,8 @@ sub EnOcean_Delete($$) {
      </li>
      <br><br>
 
-     <li>Switch (EEP F6-02-01 ... F6-03-02)<br>
+     <li>Pushbutton Switch (EEP F6-02-01 ... F6-03-02)<br>
+         [EnOcean PTM 210, PTM 215 Module]<br>
      <ul>
          <li>A0</li>
          <li>AI</li>
@@ -21002,7 +21337,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Pushbutton Switch (EEP D2-03-00)<br>
-         [EnOcean PTM 215 Modul]<br>
+         [EnOcean PTM 210 / PTM 215 Module]<br>
      <ul>
          <li>A0</li>
          <li>AI</li>
@@ -21484,6 +21819,9 @@ sub EnOcean_Delete($$) {
        <a href="#scaleDecimals">scaleDecimals</a> for the additional scaled reading
        setpointScaled. Use attribut <a href="#userReadings">userReadings</a> to
        adjust the scaling alternatively.<br>
+       A monitoring period can be set for signOfLife telegrams of the sensor, see
+       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "off" and an interval of 1320 sec.<br>
        The attr subType must be roomSensorControl.05 and attr
        manufID must be 00D for Eltako Devices. This is done if the device was
        created by autocreate.
@@ -22581,6 +22919,7 @@ sub EnOcean_Delete($$) {
         see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
      </li>
      <br><br>
+
       <li>Multisensor Window Handle (D2-06-01)<br>
          [Soda GmbH]<br>
      <ul>
@@ -22588,16 +22927,16 @@ sub EnOcean_Delete($$) {
        <li>alarms: &lt;alarms&gt; (Range: alarms = 00000000 ... FFFFFFFF)</li>
        <li>battery: ok|low</li>
        <li>batteryLowClick: enabled|disabled</li>
-       <li>burglaryAlarm: off|on|invalid|not_supported|unknown</li>
-       <li>handle: up|down|left|right|invalid|not_supported|unknown</li>
        <li>blinkInterval: t/s|unknown (Range: t = 3 s ... 255 s)</li>
        <li>blinkIntervalSet: t/s|unknown (Range: t = 3 s ... 255 s)</li>
        <li>brightness: E/lx|over_range|invalid|not_supported|unknown (Sensor Range: E = 0 lx ... 60000 lx)</li>
+       <li>burglaryAlarm: off|on|invalid|not_supported|unknown</li>
        <li>buttonLeft: pressed|released|invalid|not_supported|unknown</li>
        <li>buttonLeftPresses: &lt;buttonLeftPresses&gt; (Range: buttonLeftPresses = 00000000 ... FFFFFFFF)</li>
        <li>buttonRight: pressed|released|invalid|not_supported|unknown</li>
        <li>buttonRightPresses: &lt;buttonRightPresses&gt; (Range: buttonRightPresses = 00000000 ... FFFFFFFF)</li>
        <li>energyStorage: 1/%|unknown</li>
+       <li>handle: up|down|left|right|invalid|not_supported|unknown</li>
        <li>handleClosedClick: enabled|disabled</li>
        <li>handleMoveClosed: &lt;handleMoveClosed&gt; (Range: handleMoveClosed = 00000000 ... FFFFFFFF)</li>
        <li>handleMoveOpend: &lt;handleMoveOpend&gt; (Range: handleMoveOpend = 00000000 ... FFFFFFFF)</li>
@@ -22618,6 +22957,41 @@ sub EnOcean_Delete($$) {
        The attr subType must be multisensor.01. This is done if the device was
        created by autocreate. To control the device, it must be bidirectional paired,
        see <a href="#EnOcean_teach-in">Bidirectional Teach-In / Teach-Out</a>.
+     </li>
+     <br><br>
+
+      <li>Window and Handle Position Multisensor (D2-06-50)<br>
+         [senso secure SIEGENIA-AUBI KG]<br>
+     <ul>
+       <li>closed|open|tilted</li>
+       <li>alarm: dead_sensor</li>
+       <li>battery: ok|low</li>
+       <li>batteryPercent: 0 ... 100/%</li>
+       <li>burglaryAlarm: off|on</li>
+       <li>calibrationStep: none|close_handle|open_handle|tilt_handle|close_window</li>
+       <li>handle: closed|open|tilted</li>
+       <li>statusAcceleration: ok|error|not_supported</li>
+       <li>statusCalibration: ok|error|invalid</li>
+       <li>statusCntr: &lt;statusCntr&gt; (Range: statusCntr = 00000000 ... FFFFFFFF)</li>
+       <li>statusMagnetic: ok|error|not_supported</li>
+       <li>statusMotion: ok|error|not_supported</li>
+       <li>statusSystem: ok|error|not_supported</li>
+       <li>telegramType: event|heartbeat</li>
+       <li>window: closed|open|tilted</li>
+       <li>state: W: closed|open|tilted H: closed|open|tilted B: ok|low</li>
+     </ul><br>
+      The multisensor is configured using the following attributes:<br>
+      <ul>
+        <li><a href="#EnOcean_subDefH">subDefH</a></li>
+        <li><a href="#EnOcean_subDefW">subDefW</a></li>
+      </ul>
+       A monitoring period can be set for signOfLife telegrams of the sensor, see
+       <a href="#EnOcean_signOfLife">signOfLife</a> and <a href="#EnOcean_signOfLifeInterval">signOfLifeInterval</a>.
+       Default is "on" and an interval of 990 sec.<br>
+       After the teach-in, the sensor must be calibrated immediately. The procedure is described in the user manual.
+       If calibration was successful, the reading calibrationStep displays none and statusCalibration ok.<br>
+       The attr subType must be multisensor.50. This is done if the device was
+       created by autocreate.
      </li>
      <br><br>
 
