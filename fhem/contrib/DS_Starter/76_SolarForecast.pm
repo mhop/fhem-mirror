@@ -119,6 +119,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.37.0" => "17.04.2021  estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
+                           "language sensitive setup hints ",
   "0.36.1" => "14.04.2021  add dayname to pvHistory ",
   "0.36.0" => "14.04.2021  add con to pvHistory, add quality info to pvCircular, new reading nextPolltime ",
   "0.35.0" => "12.04.2021  create additional PVforecast events - PV forecast until the end of the coming day ",
@@ -171,6 +173,7 @@ my %vNotesIntern = (
 
 my %hset = (                                                                # Hash der Set-Funktion
   currentForecastDev      => { fn => \&_setcurrentForecastDev     },
+  currentRadiationDev     => { fn => \&_setcurrentRadiationDev    },
   modulePeakString        => { fn => \&_setmodulePeakString       },
   inverterStrings         => { fn => \&_setinverterStrings        },
   currentInverterDev      => { fn => \&_setinverterDevice         },
@@ -203,14 +206,15 @@ my %hset = (                                                                # Ha
 );
 
 my %hget = (                                                                # Hash für Get-Funktion (needcred => 1: Funktion benötigt gesetzte Credentials)
-  data          => { fn => \&_getdata,           needcred => 0 },
-  html          => { fn => \&_gethtml,           needcred => 0 },
-  ftui          => { fn => \&_getftui,           needcred => 0 },
-  valCurrent    => { fn => \&_getlistCurrent,    needcred => 0 },
-  pvHistory     => { fn => \&_getlistPVHistory,  needcred => 0 },
-  pvCircular    => { fn => \&_getlistPVCircular, needcred => 0 },
-  nextHours     => { fn => \&_getlistNextHours,  needcred => 0 },
-  stringConfig  => { fn => \&_getstringConfig,   needcred => 0 },
+  data              => { fn => \&_getdata,              needcred => 0 },
+  html              => { fn => \&_gethtml,              needcred => 0 },
+  ftui              => { fn => \&_getftui,              needcred => 0 },
+  valCurrent        => { fn => \&_getlistCurrent,       needcred => 0 },
+  pvHistory         => { fn => \&_getlistPVHistory,     needcred => 0 },
+  pvCircular        => { fn => \&_getlistPVCircular,    needcred => 0 },
+  forecastQualities => { fn => \&_getForecastQualities, needcred => 0 },
+  nextHours         => { fn => \&_getlistNextHours,     needcred => 0 },
+  stringConfig      => { fn => \&_getstringConfig,      needcred => 0 },
 );
 
 my %hff = (                                                                                           # Flächenfaktoren 
@@ -225,6 +229,25 @@ my %hff = (                                                                     
   "70" => { N => 37,  NE => 50,  E => 74,  SE => 95,  S => 104, SW => 95,  W => 74,  NW => 50  },
   "80" => { N => 35,  NE => 46,  E => 67,  SE => 86,  S => 95,  SW => 86,  W => 67,  NW => 46  },
   "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
+);
+
+my %hqtxt = (                                                                                                 # Hash Setup Texte
+  cfd   => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"}, 
+             DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                },
+  crd   => { EN => qq{Please select the Radiation forecast device with "set LINK currentRadiationDev"},
+             DE => qq{Bitte geben sie das Strahlungsvorhersage Device mit "set LINK currentRadiationDev" an}           },
+  cid   => { EN => qq{Please select the Inverter device with "set LINK currentInverterDev"},
+             DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                  },
+  ist   => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
+             DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}        },
+  mps   => { EN => qq{Please specify the total peak power for every string with "set LINK modulePeakString"},
+             DE => qq{Bitte geben sie die Gesamtspitzenleistung für jeden String mit "set LINK modulePeakString" an}   },
+  mdr   => { EN => qq{Please specify the module  direction with "set LINK moduleDirection"},
+             DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
+  mta   => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
+             DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
+  awd   => { EN => qq{Awaiting data from Solar Forecast devices ...},
+             DE => qq{Warten auf Daten von Solarvorhersagegeräten ...}                                                 },
 );
 
 my %weather_ids = (
@@ -354,7 +377,8 @@ my $pvhcache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";  
 my $pvccache    = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 
 my $calcmaxd    = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
-my @dwdattrmust = qw(Rad1h TTT Neff R101 ww SunUp SunRise SunSet);               # Werte die im Attr forecastProperties des DWD_Opendata Devices mindestens gesetzt sein müssen
+my @dweattrmust = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
+my @draattrmust = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
 my $cldampdef   = 45;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
@@ -540,6 +564,7 @@ sub Set {
 
   $setlist = "Unknown argument $opt, choose one of ".
              "currentForecastDev:$fcd ".
+             "currentRadiationDev:$fcd ".
              "currentBatteryDev:textField-long ".
              "currentInverterDev:textField-long ".
              "currentMeterDev:textField-long ".
@@ -580,13 +605,32 @@ sub _setcurrentForecastDev {              ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $prop  = $paref->{prop} // return qq{no PV forecast device specified};
+  my $prop  = $paref->{prop} // return qq{no forecast device specified};
 
   if(!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData") {
-      return qq{Forecast device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
+      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
   }
 
   readingsSingleUpdate($hash, "currentForecastDev", $prop, 1);
+  createNotifyDev     ($hash);
+
+return;
+}
+
+################################################################
+#                      Setter currentRadiationDev
+################################################################
+sub _setcurrentRadiationDev {              ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $prop  = $paref->{prop} // return qq{no radiation device specified};
+
+  if(!$defs{$prop} || $defs{$prop}{TYPE} ne "DWD_OpenData") {
+      return qq{The device "$prop" doesn't exist or has no TYPE "DWD_OpenData"};                      #' :)
+  }
+
+  readingsSingleUpdate($hash, "currentRadiationDev", $prop, 1);
   createNotifyDev     ($hash);
 
 return;
@@ -1014,6 +1058,7 @@ sub Get {
  
   my $getlist = "Unknown argument $opt, choose one of ".
                 "data:noArg ".
+                "forecastQualities:noArg ".
                 "html:noArg ".
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
@@ -1075,14 +1120,11 @@ return pageAsHtml ($hash,"ftui");
 }
 
 ###############################################################
-#                       Getter listPVHistory
+#                       Getter pvHistory
 ###############################################################
 sub _getlistPVHistory {
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
   
   my $ret   = listDataPool ($hash, "pvhist");
                     
@@ -1096,25 +1138,31 @@ sub _getlistPVCircular {
   my $paref = shift;
   my $hash  = $paref->{hash};
   
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-  
   my $ret   = listDataPool ($hash, "circular");
                     
 return $ret;
 }
 
 ###############################################################
-#                       Getter listNextHours
+#                       Getter nextHours
 ###############################################################
 sub _getlistNextHours {
   my $paref = shift;
   my $hash  = $paref->{hash};
   
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
-  
   my $ret   = listDataPool ($hash, "nexthours");
+                    
+return $ret;
+}
+
+###############################################################
+#                       Getter pvQualities
+###############################################################
+sub _getForecastQualities {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  
+  my $ret   = listDataPool ($hash, "qualities");
                     
 return $ret;
 }
@@ -1125,9 +1173,6 @@ return $ret;
 sub _getlistCurrent {
   my $paref = shift;
   my $hash  = $paref->{hash};
-  
-  my $name  = $hash->{NAME};
-  my $type  = $hash->{TYPE};
   
   my $ret   = listDataPool ($hash, "current");
                     
@@ -1294,27 +1339,27 @@ return;
 ################################################################
 sub centralTask {
   my $hash = shift;
-  my $name = $hash->{NAME};                                         # Name des eigenen Devices 
+  my $name = $hash->{NAME};
   my $type = $hash->{TYPE};  
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
-  for my $i (keys %{$data{$type}{$name}{pvhist}}) {
-      delete $data{$type}{$name}{pvhist}{$i}{"00"};
-      delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
-  }
+  #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
+  #    delete $data{$type}{$name}{pvhist}{$i}{"00"};
+  #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
+  #}
   
-  deleteReadingspec ($hash, "Today_Hour.*_Consumption");
-  deleteReadingspec ($hash, "ThisHour_.*");
-  deleteReadingspec ($hash, "Today_PV");
-  deleteReadingspec ($hash, "Tomorrow_PV");
-  deleteReadingspec ($hash, "Next04Hours_PV");
-  deleteReadingspec ($hash, "Next.*HoursPVforecast");
-  deleteReadingspec ($hash, "moduleEfficiency");
-  deleteReadingspec ($hash, "RestOfDay_PV");
-  deleteReadingspec ($hash, "CurrentHourPVforecast");
-  deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
+  #deleteReadingspec ($hash, "Today_Hour.*_Consumption");
+  #deleteReadingspec ($hash, "ThisHour_.*");
+  #deleteReadingspec ($hash, "Today_PV");
+  #deleteReadingspec ($hash, "Tomorrow_PV");
+  #deleteReadingspec ($hash, "Next04Hours_PV");
+  #deleteReadingspec ($hash, "Next.*HoursPVforecast");
+  #deleteReadingspec ($hash, "moduleEfficiency");
+  #deleteReadingspec ($hash, "RestOfDay_PV");
+  #deleteReadingspec ($hash, "CurrentHourPVforecast");
+  #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
 
   my $interval = controlParams ($name); 
   
@@ -1380,8 +1425,9 @@ sub centralTask {
           createReadingsFromArray ($hash, \@da, 1);
       }
       
-      calcVariance          ($params);                                                             # Autokorrektur berechnen
-      saveEnergyConsumption ($params);                                                             # Energie Hausverbrauch speichern
+      calcVariance           ($params);                                                            # Autokorrektur berechnen
+      saveEnergyConsumption  ($params);                                                            # Energie Hausverbrauch speichern
+      estConsumptionForecast ($params); 
       
       readingsSingleUpdate($hash, "state", $params->{state}, 1);                                   # Abschluß state      
   }
@@ -1612,16 +1658,18 @@ sub _transferDWDForecastValues {
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   
-  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                   # aktuelles Forecast Device
-  return if(!$fcname || !$defs{$fcname});
+  my $raname = ReadingsVal($name, "currentRadiationDev", "");                                  # Radiation Forecast Device
+  return if(!$raname || !$defs{$raname});
   
   my ($time_str,$epoche);
   my $type = $hash->{TYPE};
   my $uac  = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
-  
-  my @aneeded = checkdwdattr ($fcname);
+    
+  my @aneeded = checkdwdattr ($raname,\@draattrmust);
   if (@aneeded) {
-      Log3($name, 2, qq{$name - ERROR - the attribute "forecastProperties" of device "$fcname" must contain: }.join ",",@aneeded);
+      my $err         = qq{ERROR - the attribute "forecastProperties" of device "$raname" must contain: }.join ",",@aneeded;
+      $paref->{state} = $err;
+      Log3($name, 2, "$name - $err");
   }
   
   for my $num (0..47) {      
@@ -1634,9 +1682,9 @@ sub _transferDWDForecastValues {
       
       my $fh1 = $fh+1;
       my $fh2 = $fh1 == 24 ? 23 : $fh1;
-      my $rad = ReadingsVal($fcname, "fc${fd}_${fh2}_Rad1h", 0);
+      my $rad = ReadingsVal($raname, "fc${fd}_${fh2}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect DWD forecast data: device=$fcname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
+      Log3($name, 5, "$name - collect Radiation data: device=$raname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
       
       my $params = {
           hash => $hash,
@@ -1692,8 +1740,15 @@ sub _transferWeatherValues {
   my $chour = $paref->{chour};
   my $daref = $paref->{daref};
   
-  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # aktuelles Forecast Device
+  my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
+  
+  my @aneeded = checkdwdattr ($fcname,\@dweattrmust);
+  if (@aneeded) {
+      my $err         = qq{ERROR - the attribute "forecastProperties" of device "$fcname" must contain: }.join ",",@aneeded;
+      $paref->{state} = $err;
+      Log3($name, 2, "$name - $err");
+  }
   
   my $type = $hash->{TYPE};
   my ($time_str);
@@ -2221,23 +2276,25 @@ sub _calcSummaries {
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
   limitArray ($data{$type}{$name}{current}{h4fcslidereg}, $defslidenum);
   
-  my $gcon    = CurrentVal ($hash, "gridconsumption", 0);                                               # Berechnung aktueller Verbrauch
-  my $pvgen   = CurrentVal ($hash, "generation",      0);
-  my $gfeedin = CurrentVal ($hash, "gridfeedin",      0);
-  my $batin   = CurrentVal ($hash, "powerbatin",      0);                                               # aktuelle Batterieladung
-  my $batout  = CurrentVal ($hash, "powerbatout",     0);                                               # aktuelle Batterieentladung
+  my $gcon    = CurrentVal ($hash, "gridconsumption",     0);                                           # aktueller Netzbezug
+  my $tconsum = CurrentVal ($hash, "tomorrowconsumption", 0);                                           # Verbrauchsprognose für morgigen Tag
+  my $pvgen   = CurrentVal ($hash, "generation",          0);
+  my $gfeedin = CurrentVal ($hash, "gridfeedin",          0);
+  my $batin   = CurrentVal ($hash, "powerbatin",          0);                                           # aktuelle Batterieladung
+  my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
   
   my $consumption                           = $pvgen - $gfeedin + $gcon - $batin + $batout;
   $data{$type}{$name}{current}{consumption} = $consumption;
   
-  push @$daref, "Current_Consumption<>".       $consumption.              " W";
-  push @$daref, "NextHours_Sum01_PVforecast<>".(int $next1HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum02_PVforecast<>".(int $next2HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum03_PVforecast<>".(int $next3HoursSum->{PV})." Wh";
-  push @$daref, "NextHours_Sum04_PVforecast<>".(int $next4HoursSum->{PV})." Wh";
-  push @$daref, "RestOfDayPVforecast<>".       (int $restOfDaySum->{PV}). " Wh";
-  push @$daref, "Tomorrow_PVforecast<>".       (int $tomorrowSum->{PV}).  " Wh";
-  push @$daref, "Today_PVforecast<>".          (int $todaySum->{PV}).     " Wh";
+  push @$daref, "Current_Consumption<>".         $consumption.              " W";
+  push @$daref, "Tomorrow_ConsumptionForecast<>".$tconsum.                  " Wh";
+  push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum03_PVforecast<>".  (int $next3HoursSum->{PV})." Wh";
+  push @$daref, "NextHours_Sum04_PVforecast<>".  (int $next4HoursSum->{PV})." Wh";
+  push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
+  push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
+  push @$daref, "Today_PVforecast<>".            (int $todaySum->{PV}).     " Wh";
   
 return;
 }
@@ -2279,6 +2336,46 @@ sub saveEnergyConsumption {
       delete $paref->{histname};
   }
    
+return;
+}
+
+################################################################
+#     Energieverbrauch Vorhersage kalkulieren
+#     
+#     Es werden nur gleiche Wochentage (Mo ... So) 
+#     zusammengefasst und der Durchschnitt ermittelt als 
+#     Vorhersage
+################################################################
+sub estConsumptionForecast {
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour}; 
+  my $t     = $paref->{t};
+  
+  my $type  = $hash->{TYPE};
+ 
+  ## Verbrauchsvorhersage für den nächsten Tag
+  ##############################################
+  my $tomorrow = strftime "%a", localtime($t+86400);                               # Wochentagsname morgen
+  my $totcon   = 0;
+  my $dnum     = 0;
+  
+  for my $n (1..31) {
+      my $hdn = HistoryVal ($hash, sprintf("%02d",$n), 99, "dayname", undef);
+      next if(!$hdn || $hdn ne $tomorrow);
+      
+      $totcon += HistoryVal ($hash, sprintf("%02d",$n), 99, "con", 0);
+      $dnum++;      
+  }
+  
+  if ($dnum) {
+       $data{$type}{$name}{current}{tomorrowconsumption} = $totcon/$dnum;         # Durchschnittsverbrauch aller gleicher Wochentage
+  }
+  else {
+      $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
+  }
+  
 return;
 }
 
@@ -2402,18 +2499,20 @@ sub forecastGraphic {                                                           
   $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
-  my $fcdev  = ReadingsVal ($name, "currentForecastDev", "");                              # aktuelles Forecast Device  
-  my $indev  = ReadingsVal ($name, "currentInverterDev", "");                              # aktuelles Inverter Device
+  my $lang   = AttrVal     ("global", "language",        "EN");
+  my $fcdev  = ReadingsVal ($name, "currentForecastDev",  "" );                            # Forecast Device (Wetter) 
+  my $radev  = ReadingsVal ($name, "currentRadiationDev", "" );                            # Forecast Device (Wetter) 
+  my $indev  = ReadingsVal ($name, "currentInverterDev",  "" );                            # Inverter Device
   my ($a,$h) = parseParams ($indev);
   $indev     = $a->[0] // "";
 
   my $pv0    = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);
-  my $is     = ReadingsVal  ($name, "inverterStrings",  undef);                            # String Konfig
-  my $peak   = ReadingsVal  ($name, "modulePeakString", undef);                            # String Peak
-  my $dir    = ReadingsVal  ($name, "moduleDirection",  undef);                            # Modulausrichtung Konfig
-  my $ta     = ReadingsVal  ($name, "moduleTiltAngle",  undef);                            # Modul Neigungswinkel Konfig
+  my $is     = ReadingsVal  ($name, "inverterStrings",          undef);                    # String Konfig
+  my $peak   = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
+  my $dir    = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
+  my $ta     = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
   
-  if(!$is || !$fcdev || !$indev || !$peak || !defined $pv0 || !$dir || !$ta) {
+  if(!$is || !$fcdev || !$radev || !$indev || !$peak || !defined $pv0 || !$dir || !$ta) {
       my $link = qq{<a href="/fhem?detail=$name">$name</a>};  
       $height  = AttrNum($name, 'beamHeight', 200);   
       $ret    .= "<table class='roomoverview'>";
@@ -2421,30 +2520,34 @@ sub forecastGraphic {                                                           
       $ret    .= "<td>";
       
       if(!$fcdev) {                                                                        ## no critic 'Cascading'
-          $ret .= qq{Please select a Solar Forecast device with "set $link currentForecastDev"};
+          $ret .= $hqtxt{cfd}{$lang};
+      }
+      elsif(!$radev) {
+          $ret .= $hqtxt{crd}{$lang};   
       }
       elsif(!$indev) {
-          $ret .= qq{Please select an Inverter device with "set $link currentInverterDev"};   
+          $ret .= $hqtxt{cid}{$lang}; 
       }
       elsif(!$is) {
-          $ret .= qq{Please define all of your used string names with "set $link inverterStrings".};
+          $ret .= $hqtxt{ist}{$lang}; 
       }
       elsif(!$peak) {
-          $ret .= qq{Please specify the total peak power for every string with "set $link modulePeakString"};   
+          $ret .= $hqtxt{mps}{$lang};  
       }
       elsif(!$dir) {
-          $ret .= qq{Please specify the module  direction with "set $link moduleDirection"};   
+          $ret .= $hqtxt{mdr}{$lang};
       }
       elsif(!$ta) {
-          $ret .= qq{Please specify the module tilt angle with "set $link moduleTiltAngle"};   
+          $ret .= $hqtxt{mta}{$lang};  
       }
       elsif(!defined $pv0) {
-          $ret .= qq{Awaiting data from selected Solar Forecast device ...};   
+          $ret .= $hqtxt{awd}{$lang};   
       }
       
       $ret   .= "</td>";
       $ret   .= "</tr>";
       $ret   .= "</table>";
+      $ret    =~ s/LINK/$link/gxs;
       return $ret;
   }
 
@@ -2539,15 +2642,15 @@ sub forecastGraphic {                                                           
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
   $icon    = FW_makeImage($icon) if (defined($icon));
-  my $co4h = ReadingsNum ($name,"Next04Hours_Consumption",    0);
-  my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",      0); 
-  my $coTo = ReadingsNum ($name,"Tomorrow_Consumption",       0);
-  my $coCu = ReadingsNum ($name,"Current_Consumption",        0);
+  my $co4h = ReadingsNum ($name,"Next04Hours_Consumption",       0);
+  my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",         0); 
+  my $coTo = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",  0);
+  my $coCu = ReadingsNum ($name,"Current_Consumption",           0);
 
-  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast", 0);
-  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",        0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",        0);
-  my $pvCu = ReadingsNum ($name,"Current_PV",                 0);
+  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast",    0);
+  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",           0); 
+  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",           0);
+  my $pvCu = ReadingsNum ($name,"Current_PV",                    0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
 
@@ -2576,9 +2679,7 @@ sub forecastGraphic {                                                           
   # Headerzeile generieren 
   ##########################  
   if ($header) {
-      my $lang    = AttrVal ("global", "language", "EN"  );
       my $alias   = AttrVal ($name,    "alias",    $name );                                         # Linktext als Aliasname
-      
       my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
       my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
@@ -3323,11 +3424,12 @@ return ($ts,$tsdef,$realts);
 ################################################################
 sub checkdwdattr {
   my $dwddev = shift;
+  my $amref  = shift;
   
   my @fcprop = map { trim($_) } split ",", AttrVal($dwddev, "forecastProperties", "pattern");
   
   my @aneeded;
-  for my $am (@dwdattrmust) {
+  for my $am (@$amref) {
       next if($am ~~ @fcprop);
       push @aneeded, $am;
   }
@@ -3885,6 +3987,21 @@ sub listDataPool {
       }
   }
   
+  if ($htol eq "qualities") {
+      $h = $data{$type}{$name}{nexthours};
+      if (!keys %{$h}) {
+          return qq{NextHours cache is empty.};
+      }
+      for my $idx (sort keys %{$h}) {
+          my $nhts    = NexthoursVal ($hash, $idx, "starttime",  undef);
+          my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    undef);
+          $pvcorrf  //= "-/-";
+          my ($f,$q)  = split "/", $pvcorrf;
+          $sq        .= "\n" if($sq);
+          $sq        .= "starttime: $nhts, quality: $q, used factor: $f";
+      }
+  }
+  
   if ($htol eq "current") {
       $h = $data{$type}{$name}{current};
       if (!keys %{$h}) {
@@ -4040,11 +4157,15 @@ sub createNotifyDev {
   
   if($init_done == 1) {
       my @nd;
-      my ($afc,$ain,$ame,$h);
+      my ($afc,$ara,$ain,$ame,$h);
       
-      my $fcdev = ReadingsVal($name, "currentForecastDev", "");              # Forecast Device
+      my $fcdev = ReadingsVal($name, "currentForecastDev", "");              # Weather forecast Device
       ($afc,$h) = parseParams ($fcdev);
       $fcdev    = $afc->[0] // "";      
+      
+      my $radev = ReadingsVal($name, "currentRadiationDev", "");             # Radiation forecast Device
+      ($ara,$h) = parseParams ($radev);
+      $radev    = $ara->[0] // "";
       
       my $indev = ReadingsVal($name, "currentInverterDev", "");              # Inverter Device
       ($ain,$h) = parseParams ($indev);
@@ -4056,6 +4177,7 @@ sub createNotifyDev {
       $medev    = $ame->[0] // "";
       
       push @nd, $fcdev;
+      push @nd, $radev if($radev ne $fcdev);
       push @nd, $indev;
       push @nd, $medev;
       
@@ -4086,6 +4208,7 @@ return;
 #             wcc       - Grad der Bewölkung
 #             wrp       - Niederschlagswahrscheinlichkeit
 #             pvcorrf   - PV Autokorrekturfaktor f. Stunde des Tages
+#             dayname   - Tagesname (Kürzel)
 #    $def: Defaultwert
 #
 ######################################################################
@@ -4367,18 +4490,18 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <a name="currentForecastDev"></a>
       <li><b>currentForecastDev </b> <br><br> 
       
-      Legt das Device (Typ DWD_OpenData) fest, welches die Daten der solaren Vorhersage liefert. Ist noch kein Device dieses Typs
-      vorhanden, muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+      Legt das Device (Typ DWD_OpenData) fest, welches die Wetterdaten (Bewölkung, Niederschlag, usw.) liefert. 
+      Ist noch kein Device dieses Typs vorhanden, muß es manuell definiert werden 
+      (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
 
       <ul>
          <table>  
          <colgroup> <col width=25%> <col width=75%> </colgroup>
-            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
-            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h,TTT,Neff,R101,ww,SunUp,SunRise,SunSet                                                   </td></tr>
-            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>         
-            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
-            <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte forecastStation muß Strahlungswerte (Rad1h Readings) liefern. </td></tr>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                   </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,R101,ww,SunUp,SunRise,SunSet               </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>         
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
          </table>
       </ul>      
       </li>
@@ -4454,6 +4577,28 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
         # Device Meter liefert den aktuellen Netzbezug im Reading "Wirkleistung" (W), 
           die Summe des Netzbezugs im Reading "BezWirkZaehler" (kWh), die aktuelle Einspeisung in "Wirkleistung" wenn "Wirkleistung" negativ ist,
           die Summe der Einspeisung im Reading "EinWirkZaehler" (kWh)
+      </ul>      
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="currentRadiationDev"></a>
+      <li><b>currentRadiationDev </b> <br><br> 
+      
+      Legt das Device (Typ DWD_OpenData) fest, welches die solaren Strahlungsdaten liefert. Ist noch kein Device dieses Typs
+      vorhanden, muß es manuell definiert werden (siehe <a href="http://fhem.de/commandref.html#DWD_OpenData">DWD_OpenData Commandref</a>). <br>
+      Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
+
+      <ul>
+         <table>  
+         <colgroup> <col width=25%> <col width=75%> </colgroup>
+            <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
+            <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
+            <tr><td> <b>forecastResolution</b>      </td><td>1                                                                                             </td></tr>         
+            <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;                                            </td></tr>
+            <tr><td>                                </td><td><b>Hinweis:</b> Die ausgewählte forecastStation muß Strahlungswerte (Rad1h Readings) liefern. </td></tr>
+         </table>
       </ul>      
       </li>
     </ul>
@@ -4630,19 +4775,30 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
   
   <a name="SolarForecastget"></a>
   <b>Get</b> 
-  <ul>
+  <ul>    
     <ul>
-      <a name="html"></a>
-      <li><b>html </b> <br>
-      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben.
+      <a name="data"></a>
+      <li><b>data </b> <br> 
+      Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
       </li>      
     </ul>
     <br>
     
     <ul>
-      <a name="data"></a>
-      <li><b>data </b> <br> 
-      Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
+      <a name="forecastQualities"></a>
+      <li><b>forecastQualities </b> <br>
+      Zeigt die aktuell verwendeten Korrekturfaktoren mit der jeweiligen Startzeit zur Bestimmung der PV Vorhersage sowie 
+      deren Qualitäten an.
+      Die Qualität ergibt sich aus der Anzahl der bereits in der Vergangenheit bewerteten Tage mit einer 
+      identischen Bewölkungsrange.  
+      </li>      
+    </ul>
+    <br>
+    
+    <ul>
+      <a name="html"></a>
+      <li><b>html </b> <br>
+      Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben.
       </li>      
     </ul>
     <br>
