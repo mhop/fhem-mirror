@@ -1343,7 +1343,7 @@ sub collect_setValue
   if (defined $hash->{collect}{"$name $reading"}{$hours}{last_slot}) {
     $diff_slots=$slot_nr-$hash->{collect}{"$name $reading"}{$hours}{last_slot};
     if ($diff_slots > 0) {
-      $hash->{collect}{"$name $reading"}{$hours}{last_value}=undef;
+     # $hash->{collect}{"$name $reading"}{$hours}{last_value}=undef;
       if ($diff_slots >= $dim) {
         for (my $i=@{$va}-1;$i>=0;$i--) {
           if (defined (${$va}[$i])) {
