@@ -1343,43 +1343,41 @@ sub collect_setValue
   if (defined $hash->{collect}{"$name $reading"}{$hours}{last_slot}) {
     $diff_slots=$slot_nr-$hash->{collect}{"$name $reading"}{$hours}{last_slot};
     if ($diff_slots > 0) {
+      $hash->{collect}{"$name $reading"}{$hours}{last_value}=undef;
       if ($diff_slots >= $dim) {
-        my $lastval;
-#       my $lasttime;
         for (my $i=@{$va}-1;$i>=0;$i--) {
           if (defined (${$va}[$i])) {
-            $lastval=${$va}[$i];
-#           $lasttime=${$ta}[$i];
+            $hash->{collect}{"$name $reading"}{$hours}{last_value}=${$va}[$i];
             last;
           }
         }
         @{$va}=();
         @{$ta}=();
-        if (defined $lastval) {
-          ${$va}[0]=$lastval;
-#         ${$ta}[0]=$lasttime;
-        }
       } else {  
         my @rv=splice (@{$va},0,$diff_slots);
         my @rt=splice (@{$ta},0,$diff_slots);
         if (!defined (${$va}[0])) {
           for (my $i=@rv-1;$i>=0;$i--) {
             if (defined ($rv[$i])) {
-              ${$va}[0]=$rv[$i];
+              $hash->{collect}{"$name $reading"}{$hours}{last_value}=$rv[$i];
               last;
- #            ${$ta}[0]=$rt[$i];
             }
           }
         }
+
       }
     }
   }
   if ($diff_slots > 0) {
     $hash->{collect}{"$name $reading"}{$hours}{last_slot}=$slot_nr;
   }
-  ${$va}[$dim-1]=$r;
+  
+  if ($diff_slots > 0 or $r > 0 and $r > ${$va}[$dim-1] or $r < 0 and $r < ${$va}[$dim-1]) {
+    ${$va}[$dim-1]=$r;
+    ${$ta}[$dim-1]=$seconds;
+  }
+  
   $hash->{collect}{"$name $reading"}{$hours}{value}=$r;
-  ${$ta}[$dim-1]=$seconds;
   $hash->{collect}{"$name $reading"}{$hours}{time}=$seconds;
 
   for (my $i=0;$i<@{$va};$i++) {
@@ -1399,8 +1397,8 @@ sub collect_setValue
       }
     }
   }
-  $hash->{collect}{"$name $reading"}{$hours}{max_value_plot}=(defined ${$va}[0] and ${$va}[0]>$maxVal) ? ${$va}[0]:$maxVal;
-  $hash->{collect}{"$name $reading"}{$hours}{min_value_plot}=(defined ${$va}[0] and ${$va}[0]<$minVal) ? ${$va}[0]:$minVal;
+##  $hash->{collect}{"$name $reading"}{$hours}{max_value_plot}=(defined ${$va}[0] and ${$va}[0]>$maxVal) ? ${$va}[0]:$maxVal;
+##  $hash->{collect}{"$name $reading"}{$hours}{min_value_plot}=(defined ${$va}[0] and ${$va}[0]<$minVal) ? ${$va}[0]:$minVal;
   
   $hash->{collect}{"$name $reading"}{$hours}{max_value}=$maxVal;
   $hash->{collect}{"$name $reading"}{$hours}{max_value_time}=$maxValTime;
@@ -4458,30 +4456,29 @@ sub get_color {
 
 sub card
 {
-  my ($collect,$header,$icon,$min,$max,$minColor,$maxColor,$unit,$func,$decfont,$size,$model,$lightness) = @_;
+  my ($collect,$header,$icon,$min,$max,$minColor,$maxColor,$unit,$func,$decfont,$sizePlot,$model,$lightness) = @_;
   my $val=${$collect}{value};
   my $a=@{$collect}{values};
+  my $last_value=${$collect}{last_value};
   my $maxVal = ${$collect}{max_value};
-  my $maxValPlot = ${$collect}{max_value_plot};
   my $maxValTime = ${$collect}{max_value_time};
   my $maxValSlot = ${$collect}{max_value_slot};
+
   my $minVal = ${$collect}{min_value};
-  my $minValPlot = ${$collect}{min_value_plot};
   my $minValTime = ${$collect}{min_value_time};
   my $minValSlot = ${$collect}{min_value_slot};
   my $hours = ${$collect}{hours};
   my $time = ${$collect}{time};
-  $maxValPlot=$val if (!defined $maxValPlot);
-  $minValPlot=$val if (!defined $minValPlot);
-  
   my $bwidth=160;
   my $bheight=88;
   my $htrans=0;  
+  
     
   my $out;
- ## my $trans=0;
   my ($ic,$iscale,$ix,$iy,$rotate);
-  ##my $minCol=$minColor;
+
+  my ($size,$plot);
+  ($size,$plot)=split (/,/,$sizePlot) if (defined $sizePlot);
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4498,11 +4495,10 @@ sub card
   $unit="" if (!defined $unit);
   
   if (defined $header) {
-    $htrans = 28;
-    $bheight += 28;
+    $htrans = 24;
+    $bheight += 24;
   }
 
-  ##my $height=$bheight;
 
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
@@ -4512,17 +4508,14 @@ sub card
   
   $value=$max if($value>$max);
   $value=$min if ($value<$min);
-  $size=100 if (!defined $size);
+  $size=130 if (!defined $size or $size eq "");
   
   
   my ($maxValColor)=get_color($maxVal,$min,$max,$minColor,$maxColor,$func);
   my ($minValColor)=get_color($minVal,$min,$max,$minColor,$maxColor,$func); 
   
-  my ($maxValPlotColor)=get_color($maxValPlot,$min,$max,$minColor,$maxColor,$func);
-  my ($minValPlotColor)=get_color($minValPlot,$min,$max,$minColor,$maxColor,$func); 
   
-  my $currColor;
-  ($currColor,$minColor,$maxColor)=get_color($value,$min,$max,$minColor,$maxColor,$func);
+
   
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
@@ -4542,21 +4535,28 @@ sub card
   my $bottomVal;
   my $bottomOpacity;
   my $nullOpacity;
-  my $minPlot=($min < 0 and $minValPlot > 0) ? 0:$min;
-  my $maxPlot=($max > 0 and $maxValPlot < 0) ? 0:$max;
+  my $minPlot;
+  my $maxPlot;
   
-  ##my $maxPlot=($maxValPlot < $max/2.1) ? $max/2:$max;
+##  if (defined $plot and $plot eq "autoscale" and $minVal ne $maxVal) {
+  if (!defined $plot and $minVal ne $maxVal) {
+    $minPlot=$minVal;
+    $maxPlot=$maxVal;
+  } else {
+    $minPlot=($min < 0 and $minVal > 0) ? 0:$min;
+    $maxPlot=($max > 0 and $maxVal < 0) ? 0:$max;
+  }
+  
   my ($m,$n)=m_n($minPlot,0,$maxPlot,50);
 
-  ($minColor)= get_color($minPlot,$min,$max,$minColor,$maxColor,$func); 
-  ($maxColor)= get_color($maxPlot,$min,$max,$minColor,$maxColor,$func); 
+   my $currColor;
+   ($currColor,$minColor,$maxColor)=get_color($value,$min,$max,$minColor,$maxColor,$func);
   
   if ($minPlot < 0 and $maxPlot > 0) {
     $xpos=50-int($n*10)/10;
-    $topVal=($maxValPlot > 0 ? $maxValPlot : 0);
-    $bottomVal=($minValPlot < 0 ? $minValPlot : 0);
+    $topVal=($maxVal > 0 ? $maxVal : 0);
+    $bottomVal=($minVal < 0 ? $minVal : 0);
     ($nullColor)=get_color(0,$min,$max,$minColor,$maxColor,$func);
-    ##$nullProp=int ($maxValPlot/($maxValPlot-$minValPlot)*10)/10 if ($maxValPlot != $minValPlot);
     $nullProp=int ($topVal/($topVal-$bottomVal)*100)/100 if ($bottomVal<0 and $topVal>0);
     $topOpacity=($topVal==0 ? 0 : 0.25);
     $bottomOpacity=($bottomVal==0 ? 0: 0.25);
@@ -4566,10 +4566,10 @@ sub card
     $topVal=$maxPlot;
     $topOpacity=0.0;
     $bottomOpacity=0.25;
-    $bottomVal=$minValPlot;
+    $bottomVal=$minVal;
   } else {
     $xpos=50;
-    $topVal=$maxValPlot;
+    $topVal=$maxVal;
     $topOpacity=0.25;
     $bottomOpacity=0.0;
     $bottomVal=$minPlot;
@@ -4598,67 +4598,105 @@ sub card
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
   if (defined $header) {
-    $out.= sprintf('<text text-anchor="start" x="14" y="23" style="fill:#CCCCCC; font-size:14px;%s">%s</text>',$header_style,$header_txt); 
+    $out.= sprintf('<text text-anchor="start" x="14" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',$header_style,$header_txt); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
-      if(!($svg_icon =~ s/\sheight="[^"]*"/ height="22"/)) {
-          $svg_icon =~ s/svg/svg height="22"/ 
+      if(!($svg_icon =~ s/\sheight="[^"]*"/ height="20"/)) {
+          $svg_icon =~ s/svg/svg height="20"/ 
       }
-      if(!($svg_icon =~ s/\swidth="[^"]*"/ width="22"/)) {
-          $svg_icon =~ s/svg/svg width="22"/ 
+      if(!($svg_icon =~ s/\swidth="[^"]*"/ width="20"/)) {
+          $svg_icon =~ s/svg/svg width="20"/ 
       }
-      $out.='<g transform="translate(143,2) scale('.$iscale.') rotate('.$rotate.',11,11) ">';
+      $out.='<g transform="translate(146,1) scale('.$iscale.') rotate('.$rotate.',10,10) ">';
       $out.= $svg_icon;
       $out.='</g>';
     }
-    $out.='<polyline points="11,27 169,27"  style="stroke:gray; stroke-width:1" />';
+    $out.='<polyline points="11,23 169,23"  style="stroke:gray; stroke-width:1" />';
   }
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
   $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:1" />';
   $out.= '<svg width="102" height="72">';
-  $out.= '<g transform="translate(32,8) scale(1) ">';
+  $out.= '<g transform="translate(35,8) scale(1) ">';
   my $points="";
-  my $first=1;
+  my $v;
+  my $last;
+  my $j=0;
   
-  for (my $i=0;$i<@{$a};$i++) {
-    if (defined ${$a}[$i]) {
-      if ($first) {
-        $points.="$i,$xpos ";
-        $first=0;
-      }
-      $points.="$i,".(50-int((${$a}[$i]*$m+$n)*10)/10)." ";
+  $out.='<polyline points="0,-0.25 0,50.25"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />';
+ 
+  if (@{$a} > 0) {
+    if (!defined ${$a}[0]) {
+      if (defined $last_value) {
+        $v=$last_value;
+      } else {
+        for ($j=0;$j<@{$a};$j++) {
+          if (defined ${$a}[$j]) {
+           $v=${$a}[$j];
+           last;
+          }
+        }
+      }   
+    } else {
+      $v=${$a}[0];
     }
+
+    $points.="$j,$xpos ";
+    $last=(50-int(($v*$m+$n)*10)/10);
+    $points.="$j,".$last." ";
+    $j++;
+    
+    for (my $i=$j;$i<@{$a};$i++) {
+      if (defined ${$a}[$i]) {
+        $points.="$i,".$last." " if (!defined ${$a}[$i-1]);
+        $last=(50-int((${$a}[$i]*$m+$n)*10)/10);
+        $points.="$i,".$last." ";
+      }
+    }
+    $points.="60,".(50-int(($val*$m+$n)*10)/10)." ";
+    $out.=sprintf('<path d="M59,%s L',$xpos);
+    $out.= $points;
+    $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
   }
-  $out.= sprintf('<polyline points="-0.5,%s 59.5,%s"  style="stroke:gray; stroke-width:1" />',$xpos,$xpos);
-  $out.='<polyline points="0,-0.5 0,50"  style="stroke:gray; stroke-width:1" />';
+  
   for (my $i=0;$i<=4;$i++) {
-    my $x=$i*15-0.5;
     my $y=($i)*12.5;
-    $out.=sprintf('<polyline points="%d,%s %d,%s"  style="stroke:gray; stroke-width:1" />',$x,$xpos+1.5,$x,$xpos-1.5);
-    $out.=sprintf('<polyline points="-0.5,%d 2,%d"  style="stroke:gray; stroke-width:1" />',$y,$y);
+    $out.=sprintf('<polyline points="0,%d 1.5,%d"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7"/>',$y,$y);
   }
-  $out.=sprintf('<path d="M59,%s L',$xpos);
-  $out.= $points;
-  $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
+
+  for (my $i=1;$i<=4;$i++) {
+    my $x=$i*15-0.5;
+    $out.=sprintf('<polyline points="%d,%s %d,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5);
+  }
+
+  $out.= sprintf('<polyline points="0,%s 59.5,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$xpos,$xpos);
 
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxVal and $maxValSlot != 59);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minVal and $minValSlot != 59);
-  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($val*$m+$n)*10)/10),color($currColor,$ln));
+  $out.=sprintf('<circle cx="60" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($val*$m+$n)*10)/10),color($currColor,$ln));
   
-  $out.= sprintf('<text text-anchor="end" x="-2" y="3" style="fill:%s;font-size:8px;%s">%s</text>',color($maxColor,$lmm),"",$maxPlot);  
-  $out.= sprintf('<text text-anchor="end" x="-2" y="53" style="fill:%s;font-size:8px;%s">%s</text>',color($minColor,$lmm),"",$minPlot);
-  $out.= sprintf('<text text-anchor="end" x="-2" y="%s" style="fill:%s;font-size:8px;%s">%s</text>',$xpos+3,color($nullColor,$lmm),"",0) if (defined $nullColor);
+  for (my $i=0;$i<=4;$i++) {
+    my $value=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
+    my ($color)= get_color($value,$min,$max,$minColor,$maxColor,$func); 
+    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf($format,$value)); 
+  } 
+ ## $out.= sprintf('<text text-anchor="end" x="-2" y="3" style="fill:%s;font-size:7px;%s">%s</text>',color($maxPlotColor,$lmm),"",$maxPlot);  
+ ## $out.= sprintf('<text text-anchor="end" x="-2" y="53" style="fill:%s;font-size:7px;%s">%s</text>',color($minPlotColor,$lmm),"",$minPlot);
+ ## $out.= sprintf('<text text-anchor="end" x="-2" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$xpos+3,color($nullColor,$lmm),"",0) if (defined $nullColor);
   
-
-  $out.=sprintf('<text text-anchor="middle" x="0" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*3600)));
-  $out.=sprintf('<text text-anchor="middle" x="29" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time-$hours*1800)));
-  $out.=sprintf('<text text-anchor="end" x="69" y="61" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M",localtime($time)));
+  for (my $i=0;$i<=4;$i++) {
+    $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:5.5px">%s</text>',$i*15-1,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i*0.25))));
+  }
+ # $out.=sprintf('<text text-anchor="middle" x="0" y="61" style="fill:#CCCCCC;font-size:7px">%s</text>',::strftime("%H:",localtime($time-$hours*3600)));
+ ## $out.=sprintf('<text text-anchor="middle" x="59" y="61" style="fill:#CCCCCC;font-size:7px">%s</text>',::strftime("%H:%M",localtime($time-$hours)));
   $out.= '</g>';
   $out.= '</svg>';
 
-  $out.='<g transform="translate(105,4)">';
+  $out.='<g transform="translate(105,3)">';
   $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,100,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
   $out.='</g>';
+  
+  $out.=sprintf('<text text-anchor="middle" x="136" y="69" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M:%S",localtime($time)));
+
 
   if (defined $maxVal) {
     $out.= sprintf('<text text-anchor="start" x="13" y="85" style="fill:#CCCCCC;font-size:10px">▲%s</text>',::strftime("%H:%M",localtime($maxValTime)));
