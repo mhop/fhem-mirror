@@ -2419,7 +2419,6 @@ sub estConsumptionForecast {
           
           $conh->{$nhhr} += HistoryVal ($hash, $m, $nhhr, "con", 0);  
           $dnum++;
-          Log3($name, 1, "$name - hdn: $hdn, $dnum, nhhr: $nhhr, ".$conh->{$nhhr});
       }
       if ($dnum) {
            $data{$type}{$name}{nexthours}{$k}{confc} = $conh->{$nhhr}/$dnum;    # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
