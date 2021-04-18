@@ -4540,8 +4540,8 @@ sub card
   
 ##  if (defined $plot and $plot eq "autoscale" and $minVal ne $maxVal) {
   if (!defined $plot and $minVal ne $maxVal) {
-    $minPlot=$minVal;
-    $maxPlot=$maxVal;
+    $minPlot=($val < $minVal ? $val : $minVal);
+    $maxPlot=($val > $maxVal ? $val : $maxVal);
   } else {
     $minPlot=($min < 0 and $minVal > 0) ? 0:$min;
     $maxPlot=($max > 0 and $maxVal < 0) ? 0:$max;
