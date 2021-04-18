@@ -119,6 +119,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
   "0.37.0" => "17.04.2021  estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
                            "language sensitive setup hints ",
   "0.36.1" => "14.04.2021  add dayname to pvHistory ",
@@ -381,10 +382,10 @@ my @dweattrmust = qw(TTT Neff R101 ww SunUp SunRise SunSet);                    
 my @draattrmust = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
 my $whistrepeat = 900;                                                           # Wiederholungsintervall Schreiben historische Daten
 
-my $cldampdef   = 45;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
+my $cldampdef   = 35;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. effektiver Bewölkung, siehe: https://www.energie-experten.org/erneuerbare-energien/photovoltaik/planung/sonnenstunden
 my $cloud_base  = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $rdampdef    = 20;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
+my $rdampdef    = 10;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
 # Information zu verwendeten internen Datenhashes
@@ -1778,6 +1779,7 @@ sub _transferWeatherValues {
       my $wid   = ReadingsNum($fcname, "fc${fd}_${fh2}_ww",  -1);
       my $neff  = ReadingsNum($fcname, "fc${fd}_${fh2}_Neff", 0);                              # Effektive Wolkendecke
       my $r101  = ReadingsNum($fcname, "fc${fd}_${fh2}_R101", 0);                              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
+      my $temp  = ReadingsNum($fcname, "fc${fd}_${fh2}_TTT",  0);                              # Außentemperatur
       
       my $fhstr = sprintf "%02d", $fh;                                                         # hier kann Tag/Nacht-Grenze verstellt werden
       
@@ -1790,21 +1792,27 @@ sub _transferWeatherValues {
       
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
 
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101");
+      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101, t=$temp");
       
       $time_str                                             = "NextHour".sprintf "%02d", $num;         
       $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
       $data{$type}{$name}{nexthours}{$time_str}{cloudcover} = $neff;
       $data{$type}{$name}{nexthours}{$time_str}{rainprob}   = $r101;
+      $data{$type}{$name}{nexthours}{$time_str}{temp}       = $temp;
       
       if($num < 23 && $fh < 24) {                                                              # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251        
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weatherid}  = $wid;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{weathertxt} = $txt;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wcc}        = $neff;
           $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{wrp}        = $r101;
+          $data{$type}{$name}{circular}{sprintf("%02d",$fh1)}{temp}       = $temp;
+          
+          if($num == 0) {                                                                      # aktuelle Außentemperatur
+              $data{$type}{$name}{current}{temp} = $temp;   
+          }          
       }
       
-      if($fd == 0 && $fh1) {                                                                   # WeatherId in pvhistory speichern
+      if($fd == 0 && $fh1) {                                                                   # Weather in pvhistory speichern
           $paref->{wid}      = $wid;
           $paref->{histname} = "weatherid";
           $paref->{nhour}    = sprintf("%02d",$fh1);
@@ -1816,6 +1824,10 @@ sub _transferWeatherValues {
           
           $paref->{wrp}      = $r101;
           $paref->{histname} = "weatherrainprob";
+          setPVhistory ($paref);
+          
+          $paref->{temp}     = $temp;
+          $paref->{histname} = "temperature";
           setPVhistory ($paref);
           
           delete $paref->{histname};
@@ -2266,12 +2278,12 @@ sub _calcSummaries {
           $next4HoursSum->{PV} += $pvfc / 60 * $minute if($h == 4); 
       }      
       
-      $restOfDaySum->{PV}  += $pvfc if($h <= $rdh);
-      $tomorrowSum->{PV}   += $pvfc if($h >  $rdh);
+      $restOfDaySum->{PV} += $pvfc if($h <= $rdh);
+      $tomorrowSum->{PV}  += $pvfc if($h >  $rdh);
   }
   
   for my $th (1..24) {
-      $todaySum->{PV}      += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
+      $todaySum->{PV} += ReadingsNum($name, "Today_Hour".sprintf("%02d",$th)."_PVforecast", 0);
   }
   
   push @{$data{$type}{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                         # Schieberegister 4h Summe Forecast
@@ -2360,18 +2372,19 @@ sub estConsumptionForecast {
   return if(!$medev || !$defs{$medev});
   
   my $type  = $hash->{TYPE};
+  my $hhist = $data{$type}{$name}{pvhist};
  
   ## Verbrauchsvorhersage für den nächsten Tag
   ##############################################
-  my $tomorrow = strftime "%a", localtime($t+86400);                               # Wochentagsname morgen
+  my $tomorrow = strftime "%a", localtime($t+86400);                               # Wochentagsname kommender Tag
   my $totcon   = 0;
   my $dnum     = 0;
   
-  for my $n (1..31) {
-      my $hdn = HistoryVal ($hash, sprintf("%02d",$n), 99, "dayname", undef);
+  for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+      my $hdn = HistoryVal ($hash, $n, 99, "dayname", undef);
       next if(!$hdn || $hdn ne $tomorrow);
       
-      $totcon += HistoryVal ($hash, sprintf("%02d",$n), 99, "con", 0);
+      $totcon += HistoryVal ($hash, $n, 99, "con", 0);
       $dnum++;      
   }
   
@@ -2380,6 +2393,38 @@ sub estConsumptionForecast {
   }
   else {
       $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
+  }
+  
+  ## Verbrauchsvorhersage für die nächsten Stunden
+  ##################################################
+  my $conh = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
+               "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+               "09" => 0, "10" => 0, "11" => 0, "12" => 0,
+               "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+               "17" => 0, "18" => 0, "19" => 0, "20" => 0,
+               "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+             };
+  
+  for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
+      my $nhts = NexthoursVal ($hash, $k, "starttime", undef);
+      next if(!$nhts);
+      
+      $dnum     = 0;
+      my $utime = timestringToTimestamp ($nhts);
+      my $nhday = strftime "%a", localtime($utime);                                           # Wochentagsname des NextHours Key
+      my $nhhr  = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);              # Stunde des Tages vom NextHours Key  (01,02,...24) 
+     
+      for my $m (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+          my $hdn = HistoryVal ($hash, $m, 99, "dayname", undef);
+          next if(!$hdn || $hdn ne $nhday);
+          
+          $conh->{$nhhr} += HistoryVal ($hash, $m, $nhhr, "con", 0);  
+          $dnum++;
+          Log3($name, 1, "$name - hdn: $hdn, $dnum, nhhr: $nhhr, ".$conh->{$nhhr});
+      }
+      if ($dnum) {
+           $data{$type}{$name}{nexthours}{$k}{confc} = $conh->{$nhhr}/$dnum;    # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+      }     
   }
   
 return;
@@ -3504,12 +3549,13 @@ sub calcPVforecast {
   my $raindamp   = AttrVal($name, "rainFactorDamping", $rdampdef);                                    # prozentuale Berücksichtigung des Regenkorrekturfaktors
   my @strings    = sort keys %{$stch};
   
-  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
-  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
-  my $range      = int ($cloudcover/10);                                                              # Range errechnen
-  
   my $rainprob   = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "rainprob", 0);              # Niederschlagswahrscheinlichkeit> 0,1 mm während der letzten Stunde
   my $rcf        = 1 - ((($rainprob - $rain_base)/100) * $raindamp/100);                              # Rain Correction Faktor mit Steilheit
+
+  my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
+  my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
+  
+  my $range      = int ($cloudcover/10);                                                              # Range errechnen
 
   ## Ermitteln des relevanten Autokorrekturfaktors
   if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
@@ -3596,7 +3642,7 @@ sub calcVariance {
   my $idts = ReadingsTimestamp($name, "currentInverterDev", "");                        # Definitionstimestamp des Inverterdevice
   return if(!$idts);
   
-  $idts = timestringToTimestamp ($hash, $idts);
+  $idts = timestringToTimestamp ($idts);
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
@@ -3621,7 +3667,7 @@ sub calcVariance {
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
       if($cdone eq "done") {
-          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h). " already calculated");
+          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
       }
 
@@ -3786,6 +3832,7 @@ sub setPVhistory {
   my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
   my $wrp        = $paref->{wrp}           // 0;                                                  # Wahrscheinlichkeit von Niederschlag
   my $pvcorrf    = $paref->{pvcorrf}       // 1;                                                  # pvCorrectionFactor
+  my $temp       = $paref->{temp};                                                                # Außentemperatur
   
   my $type = $hash->{TYPE};
   my $val  = q{};
@@ -3854,26 +3901,32 @@ sub setPVhistory {
   
   if($histname eq "weatherid") {                                                                  # Wetter ID
       $val = $wid;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;   
-      $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};       
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;
+      $data{$type}{$name}{pvhist}{$day}{99}{weatherid}     = q{};      
   }
   
   if($histname eq "weathercloudcover") {                                                          # Wolkenbedeckung
       $val = $wcc;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $wcc;   
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{wcc} = $wcc; 
       $data{$type}{$name}{pvhist}{$day}{99}{wcc}     = q{};       
   }
   
   if($histname eq "weatherrainprob") {                                                            # Niederschlagswahrscheinlichkeit
       $val = $wrp;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{wrp} = $wrp;   
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{wrp} = $wrp; 
       $data{$type}{$name}{pvhist}{$day}{99}{wrp}     = q{};       
   }
   
   if($histname eq "pvcorrfactor") {                                                               # pvCorrectionFactor
       $val = $pvcorrf;
-      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvcorrf} = $pvcorrf;   
-      $data{$type}{$name}{pvhist}{$day}{99}{pvcorrf}     = q{};       
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{pvcorrf} = $pvcorrf; 
+      $data{$type}{$name}{pvhist}{$day}{99}{pvcorrf}     = q{};      
+  }
+  
+  if($histname eq "temperature") {                                                                # Außentemperatur
+      $val = $temp;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{temp} = $temp; 
+      $data{$type}{$name}{pvhist}{$day}{99}{temp}     = q{};      
   }
   
   Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
@@ -3906,6 +3959,7 @@ sub listDataPool {
           my $wid     = HistoryVal ($hash, $day, $key, "weatherid", "-");
           my $wcc     = HistoryVal ($hash, $day, $key, "wcc",       "-");
           my $wrp     = HistoryVal ($hash, $day, $key, "wrp",       "-");
+          my $temp    = HistoryVal ($hash, $day, $key, "temp",    undef);
           my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",   "-");
           my $dayname = HistoryVal ($hash, $day, $key, "dayname", undef);
           $ret       .= "\n      " if($ret);
@@ -3913,6 +3967,7 @@ sub listDataPool {
           $ret       .= ", wid: $wid"         if($wid);
           $ret       .= ", wcc: $wcc"         if($wcc);
           $ret       .= ", wrp: $wrp"         if($wrp);
+          $ret       .= ", temp: $temp"       if($temp);
           $ret       .= ", pvcorrf: $pvcorrf" if($pvcorrf);
           $ret       .= ", dayname: $dayname" if($dayname);
       }
@@ -3943,6 +3998,7 @@ sub listDataPool {
           my $wtxt    = CircularVal ($hash, $idx, "weathertxt", "-");
           my $wccv    = CircularVal ($hash, $idx, "wcc",        "-");
           my $wrprb   = CircularVal ($hash, $idx, "wrp",        "-");
+          my $temp    = CircularVal ($hash, $idx, "temp",       "-");
           my $pvcorrf = CircularVal ($hash, $idx, "pvcorrf",    "-");
           my $quality = CircularVal ($hash, $idx, "quality",    "-");
           
@@ -3969,7 +4025,7 @@ sub listDataPool {
           }
           
           $sq .= "\n" if($sq);
-          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb, wid: $wid, wtxt: $wtxt\n";
+          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb, temp=$temp, wid: $wid, wtxt: $wtxt\n";
           $sq .= "      corr: $pvcf\n";
           $sq .= "      quality:$cfq";
       }
@@ -3988,8 +4044,10 @@ sub listDataPool {
           my $r101    = NexthoursVal ($hash, $idx, "rainprob",   "-");
           my $rad1h   = NexthoursVal ($hash, $idx, "Rad1h",      "-");
           my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    "-");
+          my $temp    = NexthoursVal ($hash, $idx, "temp",       "-");
+          my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");
           $sq        .= "\n" if($sq);
-          $sq        .= $idx." => starttime: $nhts, pvfc: $nhfc, wid: $wid, wcc: $neff, correff: $pvcorrf, wrp: $r101, Rad1h: $rad1h";
+          $sq        .= $idx." => starttime: $nhts, pvfc: $nhfc, confc: $confc, wid: $wid, wcc: $neff, wrp: $r101, correff: $pvcorrf, Rad1h: $rad1h, temp=$temp";
       }
   }
   
@@ -3999,6 +4057,8 @@ sub listDataPool {
           return qq{NextHours cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
+          my $nhfc    = NexthoursVal ($hash, $idx, "pvforecast", undef);
+          next if(!$nhfc);
           my $nhts    = NexthoursVal ($hash, $idx, "starttime",  undef);
           my $pvcorrf = NexthoursVal ($hash, $idx, "pvcorrf",    undef);
           $pvcorrf  //= "-/-";
@@ -4011,7 +4071,7 @@ sub listDataPool {
   if ($htol eq "current") {
       $h = $data{$type}{$name}{current};
       if (!keys %{$h}) {
-          return qq{current values cache is empty.};
+          return qq{Current values cache is empty.};
       }
       for my $idx (sort keys %{$h}) {
           if (ref $h->{$idx} ne "ARRAY") {
@@ -4097,9 +4157,7 @@ return;
 #  Timestamp umwandeln
 ################################################################
 sub timestringToTimestamp {            
-  my $hash    = shift;
   my $tstring = shift;
-  my $name    = $hash->{NAME};
 
   my($y, $mo, $d, $h, $m, $s) = $tstring =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;
   return if(!$mo || !$y);
@@ -4212,6 +4270,7 @@ return;
 #             gfeedin   - reale Netzeinspeisung
 #             weatherid - Wetter ID
 #             wcc       - Grad der Bewölkung
+#             temp      - Außentemperatur
 #             wrp       - Niederschlagswahrscheinlichkeit
 #             pvcorrf   - PV Autokorrekturfaktor f. Stunde des Tages
 #             dayname   - Tagesname (Kürzel)
@@ -4255,6 +4314,7 @@ return $def;
 #             weathertxt - DWD Wetter Text
 #             wcc        - DWD Wolkendichte
 #             wrp        - DWD Regenwahrscheinlichkeit
+#             temp       - Außentemperatur
 #             pvcorrf    - PV Autokorrekturfaktoren (HASH)
 #    $def: Defaultwert
 #
@@ -4359,12 +4419,14 @@ return $def;
 # Usage:
 # CurrentVal ($hash, $key, $def)
 #
-# $key: generation      - aktuelle PV Erzeugung
-#       genslidereg     - Schieberegister PV Erzeugung (Array)
-#       h4fcslidereg    - Schieberegister 4h PV Forecast (Array)
-#       gridconsumption - aktueller Netzbezug
-#       powerbatin      - Batterie Ladeleistung
-#       powerbatout     - Batterie Entladeleistung
+# $key: generation          - aktuelle PV Erzeugung
+#       genslidereg         - Schieberegister PV Erzeugung (Array)
+#       h4fcslidereg        - Schieberegister 4h PV Forecast (Array)
+#       gridconsumption     - aktueller Netzbezug
+#       powerbatin          - Batterie Ladeleistung
+#       powerbatout         - Batterie Entladeleistung
+#       temp                - aktuelle Außentemperatur
+#       tomorrowconsumption - Verbrauch des kommenden Tages
 # $def: Defaultwert
 #
 ################################################################
@@ -4829,6 +4891,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td>                 </td><td>/1...X - Korrekturfaktor aus Store genutzt (höhere Zahl = bessere Qualität)  </td></tr>
             <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                              </td></tr>
             <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                </td></tr>
+            <tr><td> <b>temp</b>     </td><td>vorhergesagte Außentemperatur                                                </td></tr>
          </table>
       </ul>
       </li>      
@@ -4876,6 +4939,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>gfeedin</b>  </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
             <tr><td> <b>wcc</b>      </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
             <tr><td> <b>wrp</b>      </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
+            <tr><td> <b>temp</b>     </td><td>Außentemperatur                                                                                                    </td></tr>
             <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                                                      </td></tr>
             <tr><td> <b>wtxt</b>     </td><td>Beschreibung des vorhergesagten Wetters                                                                            </td></tr>
             <tr><td> <b>corr</b>     </td><td>Autokorrekturfaktoren für die Stunde des Tages und der Bewölkungsrange (0..10)                                     </td></tr>
@@ -4994,7 +5058,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        <li><b>cloudFactorDamping </b><br>
          Prozentuale Berücksichtigung (Dämpfung) des Bewölkungprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
-         (default: 45)         
+         (default: 35)         
        </li>  
        <br>      
   
@@ -5126,7 +5190,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        <li><b>rainFactorDamping </b><br>
          Prozentuale Berücksichtigung (Dämpfung) des Regenprognosefaktors bei der solaren Vorhersage. <br>
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
-         (default: 20)         
+         (default: 10)         
        </li>  
        <br> 
    
