@@ -38,7 +38,6 @@ eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # 
 
 use FHEM::SynoModules::SMUtils qw( evaljson  
                                    moduleVersion
-                                   addCHANGED
                                    trim
                                  );                       # Hilfsroutinen Modul
 
