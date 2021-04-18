@@ -47,7 +47,7 @@ IPCAM_Initialize($$)
                       "cmd01data cmd02data cmd03data cmd04data cmd05data cmd06data cmd07data ".
                       "cmd08data cmd09data cmd10data cmd11data cmd12data cmd13data cmd14data cmd15data ".
                       "model do_not_notify:1,0 showtime:1,0 scheme:http,https ".
-                      "disable:0,1 ".
+                      "disable:0,1 unknownFormatRetryDelay handleAnyXmlAsSvg:0,1 unknownFormatRetryCount ".
                       $readingFnAttributes;
 }
 
@@ -515,13 +515,36 @@ sub RequestSnapshot_Callback {
   } elsif($snapshot ne "") {
 #    Log3 $name, 3, "IPCAM ($name) - snapshot response: $data";
 
-    my $imageFormat = guessFileFormat(\$snapshot);
+    my $imageFormat = guessFileFormat($name, \$snapshot);
 
     my @imageTypes = qw(JPEG PNG GIF TIFF BMP ICO PPM XPM XBM SVG);
 
     if( ! grep { $_ eq "$imageFormat"} @imageTypes) {
       Log3 $name, 1, "IPCAM ($name) - Wrong or not supported image format: $imageFormat";
       RemoveInternalTimer($hash);
+
+      my $retryCount = int(AttrVal($name, 'unknownFormatRetryCount', 0));
+      if ($retryCount > 0) {
+        my $nrRetries = $hash->{RETRIES_LEFT};
+        if (! defined ($nrRetries)) {
+          $nrRetries = $retryCount;
+        }
+         
+        if ($nrRetries > 0) {
+          my $retryInterval = AttrVal($name, 'unknownFormatRetryDelay', 2);
+
+          Log3 $name, 1, "IPCAM ($name) - Retrying for $nrRetries more time in $retryInterval seconds";
+          InternalTimer(gettimeofday()+$retryInterval, "main::HttpUtils_NonblockingGet", $param);
+
+          $hash->{RETRIES_LEFT} = $nrRetries -1;
+        } else {
+          $hash->{RETRIES_LEFT} = undef;
+
+          Log3 $name, 1, "IPCAM ($name) - No more retries";
+        }
+
+      }
+
       return undef;
     }
 
@@ -623,8 +646,8 @@ getScheme($) {
 
 #####################################
 sub
-guessFileFormat($) {
-  my ($src) = shift;
+guessFileFormat($$) {
+  my ($name,$src) = @_;
   my $header;
   my $srcHeader;
 
@@ -645,7 +668,12 @@ guessFileFormat($) {
   return "PPM"  if /^P[1-6]/;
   return "XPM"  if /(^\/\* XPM \*\/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)/;
   return "XBM"  if /^(?:\/\*.*\*\/\n)?#define\s/;
-  return "SVG"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
+  if (int(AttrVal($name, 'handleAnyXmlAsSvg', 0)) == 1) {
+    return "SVG"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
+  } else {
+    return "SVG" if /^(<\?xml version="1.0" encoding="UTF-8"\?>)?\r?\n?<svg/;
+  }
+
   return "unknown";
 }
 
@@ -919,6 +947,28 @@ DetailFn {
     <li><a href="#disable">disable</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>
+      handleAnyXmlAsSvg<br>
+      Previous versions of this module, any XML file was (maybe incorrectly) identified as SVG file.<br>
+      Now, only valid SVG files or SVG documents are identified as SVG, leading to a 'unknown format' response for any other XML file.<br>
+      If you rely on the previous behavior for any reason, setting this to 1 will handle any XML as valid SVG, writing it as .svg file to the storage.<br>
+      The default value is 0.
+    </li>
+    <li>
+      unknownFormatRetryCount<br>
+      If this module is unable to guess the correct file format, your camera might have been under heavy load and unable to respond with a proper image file.<br>
+      The file format will be 'unknown' in that case. Setting this to a positive integer allows you to define how often<br>
+      this module should re-try to grab an image.<br>
+      Default value is 0.<br>
+      Example: <code>attr ipcam3 unknownFormatRetryCount 3</code>
+    </li>
+    <li>
+      unknownFormatRetryDelay<br>
+      This defines the interval in seconds between retries, if [code]unknownFormatRetryCount[/code] is set to a positive integer.<br>
+      The following example sets a 5 seconds delay.<br>
+      Default is 2 seconds.<br>
+      Example: <code>attr ipcam3 unknownFormatRetryDelay 5</code>
+    </li>
     <li>
       path<br>
       Defines the path and query component of the complete <a href="http://de.wikipedia.org/wiki/Uniform_Resource_Identifier" target="_blank">URI</a> to get a snapshot of the
