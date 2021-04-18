@@ -2365,9 +2365,9 @@ sub estConsumptionForecast {
   my $chour = $paref->{chour}; 
   my $t     = $paref->{t};
   
-  my $medev  = ReadingsVal($name, "currentMeterDev", "");                          # aktuelles Meter device
-  my ($a,$h) = parseParams ($medev);
-  $medev     = $a->[0] // "";
+  my $medev    = ReadingsVal($name, "currentMeterDev", "");                         # aktuelles Meter device
+  my ($am,$hm) = parseParams ($medev);
+  $medev       = $am->[0] // "";
   return if(!$medev || !$defs{$medev});
   
   my $type  = $hash->{TYPE};
