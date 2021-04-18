@@ -156,6 +156,8 @@
 # 2020-07-02 - changed   code cleanup after last changes (remove debug code)
 #                        add "configdb attr ?" to show known attributes
 #
+# 2021-04-17 - bugfix    problem in File.* commands regarding case sensitivity
+#
 ##############################################################################
 =cut
 
@@ -378,7 +380,9 @@ sub cfgDB_FileRead {
 	Log3(undef, 4, "configDB reading file: $filename");
 	my ($err, @ret, $counter);
 	$fhem_dbh = _cfgDB_Connect unless $fhem_dbh;
-	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename LIKE '$filename'" );
+	my $read_cmd  = "SELECT content FROM fhemb64filesave WHERE filename = '$filename'";
+#	my $sth = $fhem_dbh->prepare( "SELECT content FROM fhemb64filesave WHERE filename LIKE '$filename'" );
+	my $sth = $fhem_dbh->prepare( $read_cmd );
 	$sth->execute();
 	my $blobContent = $sth->fetchrow_array();
 	$sth->finish();
