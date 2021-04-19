@@ -91,7 +91,6 @@ sub
 HttpUtils_Cleanup($)
 {
   my ($hash) = @_;
-  return;
   map { delete($hash->{$_}) if($_ =~ m/^hu_/) } sort keys %{$hash};
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
