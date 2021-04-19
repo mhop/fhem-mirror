@@ -118,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
   "0.37.0" => "17.04.2021  estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
                            "language sensitive setup hints ",
@@ -1951,11 +1952,11 @@ sub _transferMeterValues {
   
   my $gcuf = $gcunit =~ /^kW$/xi ? 1000 : 1;
   my $gfuf = $gfunit =~ /^kW$/xi ? 1000 : 1;
+  
+  $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                               # aktueller Bezug (W)
+  $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                               # aktuelle Einspeisung (W)
     
-  if ($gc ne "-gfeedin") {                                                                    # kein Spezialfall gcon bei neg. gfeedin
-      $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
-  }
-  else {                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
+  if ($gc eq "-gfeedin") {                                                                    # kein Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
       $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;
       if($gfin <= 0) {
           $gco  = abs($gfin);
@@ -1966,10 +1967,7 @@ sub _transferMeterValues {
       }
   }
   
-  if ($gf ne "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
-      $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                           # aktuelle Einspeisung (W)
-  }
-  else {                                                                                      # Spezialfall: bei negativen gcon -> $gfin = abs($gco), $gco = 0
+  if ($gf eq "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
       $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
       if($gco <= 0) {
           $gfin = abs($gco);
@@ -2102,10 +2100,10 @@ sub _transferBatteryValues {
   my $piuf = $piunit =~ /^kW$/xi ? 1000 : 1;
   my $pouf = $pounit =~ /^kW$/xi ? 1000 : 1;
   
-  if ($pin ne "-pout") {                                                                       # kein Spezialfall pin bei neg. pout
-      $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                            # aktueller Batterieladung (W)
-  }
-  else {                                                                                       # Spezialfall: bei negativen pout -> $pbi = abs($pbo), $pbo = 0
+  $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                                # aktuelle Batterieentladung (W)
+  $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                                # aktueller Batterieladung (W)
+  
+  if ($pin eq "-pout") {                                                                       # kein Spezialfall pin bei neg. pout
       $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                            # aktuelle Batterieentladung (W)
       if($pbo <= 0) {
           $pbi = abs($pbo);
@@ -2113,13 +2111,10 @@ sub _transferBatteryValues {
       }
       else {
           $pbi = 0;
-      }
+      }    
   }
   
-  if ($pou ne "-pin") {                                                                        # kein Spezialfall pout bei neg. pin
-      $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                            # aktuelle Batterieentladung (W)
-  }
-  else {                                                                                       # Spezialfall: bei negativen pin -> $pbo = abs($pbi), $pbi = 0
+  if ($pou eq "-pin") {                                                                        # kein Spezialfall pout bei neg. pin
       $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                            # aktueller Batterieladung (W)
       if($pbi <= 0) {
           $pbo = abs($pbi);
