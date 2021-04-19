@@ -370,6 +370,32 @@ my @out;
   return join ',', sort @out
 }
 
+# return json String for x_raw_payload for some advanced commands
+# sonos2mqtt_command ([<ServiceName.>cmdName]<,ValueName,Value,ValueName,Value>)
+# {sonos2mqtt_command ('SetLEDState','DesiredLEDState','On')}
+# {sonos2mqtt_command ('SetBass','DesiredBass',8)}
+# {sonos2mqtt_command ('SetEQ','EQType','DialogLevel','DesiredValue',1)}
+sub sonos2mqtt_command
+{
+use JSON;
+my (%h_value,%h_input) = ();
+my $acmd = shift // return 'error';
+   if ($acmd !~ /\w+\.\w+/) {
+     if ($acmd eq 'SetLEDState' or $acmd eq 'SetButtonLockState') {
+         $acmd = 'DevicePropertiesService.'.$acmd}
+      else {
+         $acmd = 'RenderingControlService.'.$acmd}
+   }
+   if ($acmd =~ /RenderingControlService/) {%h_value = ('InstanceID' => 0,'Channel' => 'Master')}
+   $h_input{'cmd'} = $acmd;
+   while (defined(my $key = shift)) {
+      my $val = shift;
+         $h_value{$key} = $val;
+         $h_input{'val'} = {%h_value}
+   }
+   return encode_json {'command' => 'adv-command','input' => {%h_input}};
+}
+
 1;
 =pod
 =begin html
