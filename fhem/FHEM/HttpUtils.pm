@@ -81,17 +81,20 @@ HttpUtils_Close($)
       stacktrace();
     }
   }
+  HttpUtils_Cleanup($hash);
   delete($hash->{conn});
-  delete($hash->{hu_inProgress});
-  delete($hash->{hu_sslAdded});
-  delete($hash->{hu_filecount});
-  delete($hash->{hu_blocking});
-  delete($hash->{hu_portSfx});
-  delete($hash->{hu_proxy});
-  delete($hash->{hu_port});
+  delete($hash->{compress}); # this is a potention user parameter
+}
+
+# Stuff we can delete before we return control from HttpUtils
+sub
+HttpUtils_Cleanup($)
+{
+  my ($hash) = @_;
+  return;
+  map { delete($hash->{$_}) if($_ =~ m/^hu_/) } sort keys %{$hash};
   delete($hash->{directReadFn});
   delete($hash->{directWriteFn});
-  delete($hash->{compress});
 }
 
 sub
@@ -412,7 +415,7 @@ HttpUtils_Connect($)
                       IO::Socket::INET6->new(Proto=>'tcp', Blocking=>0);
       if(!$hash->{conn}) {
         Log3 $hash, $hash->{loglevel}, "HttpUtils: Creating socket: $!";
-        delete($hash->{hu_inProgress});
+        HttpUtils_Cleanup($hash);
         return $hash->{callback}($hash, "Creating socket: $!", "");
       }
       my $sa = length($iaddr)==4 ?  sockaddr_in($port, $iaddr) : 
@@ -449,7 +452,7 @@ HttpUtils_Connect($)
             my $err = HttpUtils_Connect2($hash);
             if($err) {
               Log3 $hash, $hash->{loglevel}, "HttpUtils: $err";
-              delete($hash->{hu_inProgress});
+              HttpUtils_Cleanup($hash);
               $hash->{callback}($hash, $err, "");
             }
             return $err;
@@ -556,7 +559,7 @@ HttpUtils_Connect2($)
   }
 
   if($hash->{noConn2}) {
-    delete($hash->{hu_inProgress});
+    HttpUtils_Cleanup($hash);
     $hash->{callback}($hash);
     return undef;
   }
@@ -641,7 +644,7 @@ HttpUtils_Connect2($)
         RemoveInternalTimer(\%timerHash);
         my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
         if(!$redirect) {
-          delete($hash->{hu_inProgress});
+          HttpUtils_Cleanup($hash);
           $hash->{callback}($hash, $err, $ret);
         }
 
@@ -800,6 +803,8 @@ HttpUtils_ParseAnswer($)
   if(!$hash->{keepalive}) {
     $hash->{conn}->close();
     undef $hash->{conn};
+    delete($hash->{FD});
+    delete($selectlist{$hash});
   }
 
   if(!$hash->{buf} && !$hash->{httpheader}) {
@@ -862,7 +867,7 @@ HttpUtils_ParseAnswer($)
  
     # Request the URL with the Digest response
     if($hash->{callback}) {
-      delete($hash->{hu_inProgress});
+      HttpUtils_Cleanup($hash);
       HttpUtils_NonblockingGet($hash);
       return ("", "", 1);
     } else {
@@ -887,7 +892,7 @@ HttpUtils_ParseAnswer($)
       Log3 $hash, $hash->{loglevel}, "HttpUtils $hash->{displayurl}: ".
           "Redirect to ".($hash->{hideurl} ? "<hidden>" : $hash->{url});
       if($hash->{callback}) {
-        delete($hash->{hu_inProgress});
+        HttpUtils_Cleanup($hash);
         HttpUtils_NonblockingGet($hash);
         return ("", "", 1);
       } else {
@@ -946,7 +951,7 @@ HttpUtils_NonblockingGet($)
 
   my $err = HttpUtils_Connect($hash);
   if($err) {
-    delete($hash->{hu_inProgress});
+    HttpUtils_Cleanup($hash);
     $hash->{callback}($hash, $err, "");
   }
 }
