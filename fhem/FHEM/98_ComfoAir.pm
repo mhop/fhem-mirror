@@ -29,6 +29,12 @@
 ##############################################################################
 #   2014-04-18  initial version
 
+#
+# todo:
+# - tests for interval timer and queue timer 
+# - Timeout-Timer as feature in utils
+#
+
 package ComfoAir;
 
 use strict;
@@ -108,7 +114,7 @@ BEGIN {
     ));
 };
 
-my $Module_Version = '2.01 - 31.3.2021';
+my $Module_Version = '2.03 - 13.4.2021';
 
 # %parseInfo:
 # replyCode => msgHashRef
@@ -295,6 +301,7 @@ sub Initialize {
     $hash->{UndefFn} = \&ComfoAir::UndefFn;
     $hash->{SetFn}   = \&ComfoAir::SetFn;
     $hash->{GetFn}   = \&ComfoAir::GetFn;
+    $hash->{AttrFn}  = \&ComfoAir::AttrFn;
   
     @setList  = ();
     @getList  = ();
@@ -358,10 +365,10 @@ sub Initialize {
         }
     }
     $hash->{AttrList}= "do_not_notify:1,0 " . 
-        "queueDelay " .
-        "timeout " .
-        "queueMax " . 
-        #"minSendDelay " .
+        'queueDelay ' .
+        'timeout ' .
+        'queueMax ' . 
+        'alignTime' .
         join (" ", @pollList) . " " .                               # Def der zyklisch abzufragenden Nachrichten
         $main::readingFnAttributes;
     return;
@@ -387,12 +394,12 @@ sub DefineFn {
         DevIo_OpenDev($hash, 0, 0);
     }
     if (!$interval) {
-        $hash->{INTERVAL} = 0; 
+        $hash->{Interval} = 0; 
         Log3 $name, 3, "$name: interval is 0 or not specified - not sending requests - just listening!";
     } 
     else {
-        $hash->{INTERVAL} = $interval;
-        InternalTimer(gettimeofday()+1, "GetUpdate", $hash, 0);
+        $hash->{Interval} = $interval;
+        UpdateTimer($hash, \&ComfoAir::GetUpdate, 'start');
     }
     Log3 $name, 3, "$name: Defined with device $dev" . ($interval ? ", interval $interval" : '');
     return;
@@ -405,8 +412,38 @@ sub UndefFn {
     my $name = $hash->{NAME};
     DevIo_CloseDev($hash); 
     RemoveInternalTimer ("timeout:".$name);
-    RemoveInternalTimer ("queue:".$name); 
-    RemoveInternalTimer ($hash);
+    StopQueueTimer($hash, {silent => 1});     
+    UpdateTimer($hash, \&ComfoAir::GetUpdate, 'stop');
+    return;
+}
+
+
+#########################################################################
+# Attr command 
+# if validation fails, return something so CommandAttr in fhem.pl doesn't assign a value to $attr
+sub AttrFn {
+    my $cmd   = shift;                  # 'set' or 'del'
+    my $name  = shift;                  # the Fhem device name
+    my $aName = shift;                  # attribute name
+    my $aVal  = shift // '';            # attribute value
+    my $hash  = $defs{$name};           # reference to the Fhem device hash
+    
+    Log3 $name, 5, "$name: attr $name $aName $aVal";
+    if ($cmd eq 'set') {        
+        if ($aName eq 'alignTime') {
+            my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($aVal);
+            return "Invalid Format $aVal in $aName : $alErr" if ($alErr);
+            my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+            $hash->{'.TimeAlign'} = fhemTimeLocal($alSec, $alMin, $alHr, $mday, $mon, $year);
+            UpdateTimer($hash, \&ComfoAir::GetUpdate, 'start');      # change timer for alignment
+        } 
+    } 
+    elsif ($cmd eq 'del') {                             # Deletion of Attributes
+        #Log3 $name, 5, "$name: del attribute $aName";
+        if ($aName eq 'alignTime') {
+            delete $hash->{'.TimeAlign'};
+        }
+    }
     return;
 }
 
@@ -553,14 +590,13 @@ sub ParseFrames {
     } 
     # ACK?
     elsif ($frame =~ /\x07\xf3(.*)/s) {
-        my $level = ($hash->{INTERVAL} ? 4 : 5);
+        my $level = ($hash->{Interval} ? 4 : 5);
         Log3 $name, $level, "$name: read got Ack";
         $hash->{helper}{buffer} = $1;           # only keep the rest after the frame
         if (!$hash->{EXPECT}) {
             $hash->{BUSY} = 0;
             # es wird keine weitere Antwort erwartet -> gleich weiter Send Queue abarbeiten und nicht auf alten Timer warten
             RemoveInternalTimer ("timeout:".$name);
-            RemoveInternalTimer ("queue:".$name); 
             HandleSendQueue ("direct:".$name); # don't wait for next regular handle queue slot
         }
     } 
@@ -644,7 +680,7 @@ sub InterpretFrame {
             }
         }
     } else {
-        my $level = ($hash->{INTERVAL} ? 4 : 5);
+        my $level = ($hash->{Interval} ? 4 : 5);
         Log3 $name, $level, "$name: read: unknown cmd $hexcmd, len " . unpack ('C', $len) . 
             ", data $hexdata, chk $chk";
     }
@@ -652,19 +688,19 @@ sub InterpretFrame {
         # der letzte Request erwartet eine Antwort -> ist sie das?
         if ($hexcmd eq $hash->{EXPECT}) {
             $hash->{BUSY}   = 0;    
-            $hash->{EXPECT} = "";
+            $hash->{EXPECT} = '';
             Log3 $name, 5, "$name: read got expected reply ($hexcmd), setting BUSY=0";
         } else {
             Log3 $name, 3, "$name: read did not get expected reply (" . $hash->{EXPECT} . ") but $hexcmd";
         }
     }
-    SendAck($hash) if ($hash->{INTERVAL});
+    SendAck($hash) if ($hash->{Interval});
 
+    # todo: sowohl hier als auch am Ende von ParseFrames wird HandleSendQueue aufgerufen. Geht das nicht eleganter?
     if (!$hash->{EXPECT}) {
         # es wird keine Antwort mehr erwartet -> gleich weiter Send Queue abarbeiten und nicht auf Timer warten
         $hash->{BUSY}   = 0;    # zur Sicherheit falls ein Ack versäumt wurde
         RemoveInternalTimer ("timeout:".$name);
-        RemoveInternalTimer ("queue:".$name);       
         HandleSendQueue ("direct:".$name); # don't wait for next regular handle queue slot
     }
     return;
@@ -799,10 +835,11 @@ sub ReadyFn {
 
 #####################################
 sub GetUpdate {
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "GetUpdate", $hash, 0)
-        if ($hash->{INTERVAL});
+    my $arg  = shift;                               # called with a string type:$name
+    my ($calltype, $name) = split(':', $arg);
+    my $hash = $defs{$name};
+
+    UpdateTimer($hash, \&ComfoAir::GetUpdate, 'next');
     
     foreach my $msgHashRef (values %parseInfo) {
         if (defined($msgHashRef->{request})) {
@@ -881,21 +918,18 @@ sub HandleSendQueue {
     my $param = shift;
     my (undef,$name) = split(':',$param);
     my $hash = $defs{$name};
-    my $arr  = $hash->{QUEUE};
     my $now  = gettimeofday();
-    my $queueDelay = AttrVal($name, "queueDelay", 1);
-    Log3 $name, 5, "$name: handle send queue";
-    if(defined($arr) && @{$arr} > 0) {
+    my $arr  = $hash->{QUEUE};
+    my $qlen = ($arr ? scalar(@{ $arr }) : 0 );
+    Log3 $name, 5, "$name: HandleSendQueue called from " . FhemCaller() . ", qlen = $qlen";
+    StopQueueTimer($hash, {silent => 1});     
+    if($qlen) {
         if (!$init_done) {      # fhem not initialized, wait with IO
-            RemoveInternalTimer ("queue:".$name);
-            InternalTimer($now+$queueDelay, "ComfoAir::HandleSendQueue", "queue:".$name, 0);
-            Log3 $name, 3, "$name: init not done, delay writing from queue";
+            StartQueueTimer($hash, \&ComfoAir::HandleSendQueue, {log => 'init not done, delay sending from queue'});
             return;
         }
         if ($hash->{BUSY}) {  # still waiting for reply to last request
-            RemoveInternalTimer ("queue:".$name);
-            InternalTimer($now+$queueDelay, "ComfoAir::HandleSendQueue", "queue:".$name, 0);
-            Log3 $name, 5, "$name: send busy, delay writing from queue";
+            StartQueueTimer($hash, \&ComfoAir::HandleSendQueue, {log => 'send busy, delay writing from queue'});
             return;
         }
     
@@ -932,8 +966,7 @@ sub HandleSendQueue {
         if(@{$arr} == 0) {      # last item was sent -> delete queue
             delete($hash->{QUEUE});
         } else {                # more items in queue -> schedule next handle invocation
-            RemoveInternalTimer ("queue:".$name);
-            InternalTimer($now+$queueDelay, "ComfoAir::HandleSendQueue", "queue:".$name, 0);
+            StartQueueTimer($hash, \&ComfoAir::HandleSendQueue);
         }
     }
     return;
@@ -1126,6 +1159,10 @@ sub SendAck {
             max length of the send queue, defaults to 50<br>
         <li><b>timeout</b></li> 
             set the timeout for reads, defaults to 2 seconds <br>
+        <li><b>alignTime</b></li>
+            Aligns each periodic read request for the defined interval to this base time. This is typcally something like 00:00 (see the Fhem at command)
+        <br>
+
     </ul>
     <br>
 </ul>
