@@ -4673,7 +4673,7 @@ sub card
   for (my $i=0;$i<=4;$i++) {
     my $value=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
     my ($color)= get_color($value,$min,$max,$minColor,$maxColor,$func); 
-    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf(($scaling ? $format : "%s"),$value)); 
+    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf($format,$value)); 
   } 
   
   my $timebeginn=$time-$hours*3600;
