@@ -4687,7 +4687,7 @@ sub card
     my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
     my $beginhour=int($hour/$scale)*$scale;
     my $diffminutes=($hour-$beginhour)*60+$minutes;
-    my $pos=int ($diffminutes/($scale*60)*100)/10; 
+    my $pos=int ($diffminutes/($scale*60)*1000)/100; 
   
 #  for (my $i=1;$i<=4;$i++) {
 #    my $x=$i*15-0.5;
@@ -4697,8 +4697,8 @@ sub card
     for (my $i=0;$i<=5;$i++) {
       my $hour=$beginhour+($i+1)*$scale;
       $hour=($hour >= 24 ? $hour % 24:$hour);
-      my $x=$i*10-$pos+9.5;
-      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5);
+      my $x=$i*10-$pos+9;
+      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5) if ($x > 0);
       $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%02d</text>',$x,$hour);
     }
   } else {
