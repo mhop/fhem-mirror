@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
 #   0.1.03: Improve error handling
 #           Hide access- & refreshToken
@@ -52,7 +53,7 @@ use utf8;
 use Digest::MD5 qw(md5);
 
 
-my $version = "0.1.04";
+my $version = "0.1.05";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -501,27 +502,33 @@ sub setParam {
     my $hash  = shift;
     my $param = shift;
     my $value = shift;
-
+    my $body;
     my $name = $hash->{NAME};
-    my $body = encode_json( { $param => $value } );
+    if ($value =~ /^-?\d+\.?\d*$/xsm) {
+        my $num = $value*1;
+        $body = encode_json( { $param => $num } );
+    }
+    else {
+        $body = encode_json( { $param => $value } );   
+    }
+
     Log3 $name, LOG_SEND, qq([$name] Setting parameter $body);
 
     my $header = {
         "Host"   => "prod-eu-gruenbeck-api.azurewebsites.net",
-        "Accept" => "application/json, text/plain, */*",
+        "Accept" => "application/json",
         "User-Agent" =>
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 12_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+            "Gruenbeck/360 CFNetwork/1220.1 Darwin/20.3.0",
         "Authorization"   => "Bearer " . $hash->{helper}{accessToken},
         "Accept-Language" => "de-de",
         "cache-control"   => "no-cache",
         "Content-Type"    => "application/json",
-        "Origin"          => "file://"
-    };
+       };
     my $setparam = {
         header => $header,
-        url    => 'https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/'
+        url    => 'https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/softliQ.D/'
             . ReadingsVal( $name, 'id', $EMPTY )
-            . '/parameters?api-version=2019-08-09',
+            . '/parameters?api-version=2021-03-26',
         callback => \&parseParam,
         hash     => $hash,
         method   => 'PATCH',
@@ -529,7 +536,6 @@ sub setParam {
     };
     HttpUtils_NonblockingGet($setparam);
     return;
-
 }
 
 sub regenerate {
