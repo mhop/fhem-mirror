@@ -893,7 +893,7 @@ sub WeekdayTimer_SetTimer {
     #$tipHash    = $hash if !defined $tipHash;
     $modules{WeekdayTimer}{timerInThePastHash} = $tipHash;
 
-    resetRegisteredInternalTimer('delayed', time + 5, \&WeekdayTimer_delayedTimerInPast, $tipHash, 0);
+    resetRegisteredInternalTimer('delayed', time + 5 + AttrVal($name,'WDT_sendDelay',0), \&WeekdayTimer_delayedTimerInPast, $tipHash, 0);
 
   return;
 }
@@ -1395,8 +1395,8 @@ sub WeekdayTimer_SetParm {
 ################################################################################
 sub WeekdayTimer_SetAllParms {
   my $group = shift // q{all}; 
-  my @wdtNames = $group eq 'all' ? devspec2array('TYPE=WeekdayTimer')
-                                 : devspec2array("TYPE=WeekdayTimer:FILTER=WDT_Group=$group");
+  my @wdtNames = $group eq 'all' ? devspec2array('TYPE=WeekdayTimer:FILTER=disable!=1')
+                                 : devspec2array("TYPE=WeekdayTimer:FILTER=WDT_Group=$group:FILTER=disable!=1");
 
   for my $wdName ( @wdtNames ) {
     WeekdayTimer_SetParm($wdName);

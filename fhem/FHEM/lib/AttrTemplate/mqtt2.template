@@ -4482,7 +4482,48 @@ Input:currentTrack_TrackUri.* {sonos2mqtt_ur($name,'Input')}
 set DEVICE x_raw_payload {"command": "adv-command","input": {"cmd":"GetZoneInfo","reply":"ZoneInfo"}}
 setreading DEVICE attrTemplateVersion 20210303
 
+#####
+### roon via mqtt extension
+###
+#contributed by mferstl, https://forum.fhem.de/index.php/topic,94495.msg1149947.html#msg1149947
+name:roon
+filter:TYPE=MQTT2_DEVICE
+desc:See doku for roon mqtt extension https://github.com/fjgalesloot/roon-extension-mqttf. <br>Note: preliminary version
+# first set the ZONE
+par:ZONENAME;ZONENAME is the roon zone you want to control
+attr DEVICE devicetopic ZONENAME
 
+# define up to ten internet radio stations
+attr DEVICE userattr radios
+attr DEVICE radios BR-KLASSIK, MDR Klassik, Klassik Radio: Barock
+
+# set readings
+attr  DEVICE readingList .*roon.*/$\DEVICETOPIC/state:.* state\
+  .*roon.*/$\DEVICETOPIC/seek_position:.* track_position\
+  .*roon.*/$\DEVICETOPIC/now_playing/three_line/line1:.* track_name\
+  .*roon.*/$\DEVICETOPIC/now_playing/three_line/line2:.* track_artist\
+  .*roon.*/$\DEVICETOPIC/now_playing/three_line/line3:.* track_album\
+  .*roon.*/$\DEVICETOPIC/outputs/$\DEVICETOPIC/volume/value:.* volume\
+  .*roon.*/$\DEVICETOPIC/outputs/$\DEVICETOPIC/volume/is_muted:.* muted\
+  .*roon.*/$\DEVICETOPIC/settings/loop:.* loop\
+  .*roon.*/$\DEVICETOPIC/settings/shuffle:.* shuffle
+# setlist
+# Commands to use in FHEM are with capital first letter ; the "mute" setting is for alexa only
+attr DEVICE setList play roon/$\DEVICETOPIC/command play\
+  pause roon/$\DEVICETOPIC/command pause\
+  stop roon/$\DEVICETOPIC/command stop\
+  next roon/$\DEVICETOPIC/command next\
+  previous roon/$\DEVICETOPIC/command previous\
+  mute:on,off { my $mute = $EVTPART1 eq 'on' ? 'mute' : 'unmute';; "roon/$\DEVICETOPIC/outputs/$\DEVICETOPIC/volume/set $mute"}\
+  volume:slider,0,1,100 roon/$\DEVICETOPIC/outputs/$\DEVICETOPIC/volume/set $EVTPART1\
+  mute roon/$\DEVICETOPIC/outputs/$\DEVICETOPIC/volume/set mute\
+  channel:uzsuSelectRadio,1,2,3,4,5,6,7,8,9,10  { my @radios = split(/,/,AttrVal($NAME,"radios","BR-KLASSIK")) ;; "roon/$\DEVICETOPIC/browse/internet_radio ".$radios[$EVTPART1-1];; }
+
+# some Web commands
+attr DEVICE webCmd play:pause:stop:next:previous:mute:volume:radio
+
+set DEVICE attrTemplate speechcontrol_gdt_and_mapping  GENERICDEVTYPE=media HOMEBRIDGEMAPPING="On:cmdOn=play,cmdOff=stop PlaybackController:playback,values=play;pause;stop;previous;next ChannelController:reading=radio,cmd=radio Volume=volume,maxValue=60,minStep=3,delay=true Mute:reading=muted,cmd=mute"
+setreading DEVICE attrTemplateVersion 20210420
 
 ###########################################
 #source post: https://forum.fhem.de/index.php/topic,109946.0.html
