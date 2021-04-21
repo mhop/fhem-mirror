@@ -22,6 +22,7 @@
 ##############################################################################
 #   Changelog:
 #   0.1.06: Fixed reading the paramter list (119939/1151016)
+#           Another "garbage" fix 
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
 #   0.1.03: Improve error handling
@@ -1771,145 +1772,37 @@ sub parseWebsocketRead {
     my $hash = shift;
     my $buf  = shift;
     my $name = $hash->{NAME};
-    my $json = safe_decode_json( $hash, $buf );
-    if ( $json->{type} && $json->{type} ne '6' ) {
+    my @jsons = split(/\{}/xsm, $buf);
+    foreach my $j (@jsons) { 
+        my $json = safe_decode_json( $hash, $j );
+        if ( $json->{type} && $json->{type} ne '6' ) {
 
-        Log3 $name, LOG_RECEIVE, qq([$name] Received from socket: $buf);
-        readingsBeginUpdate($hash);
-        my @args = @{ $json->{arguments} };
-        my %info = %{ $args[0] };
-        my $i    = 0;
-        foreach my $key ( keys %info ) {
+            Log3 $name, LOG_RECEIVE, qq([$name] Received from socket: $buf);
+            readingsBeginUpdate($hash);
+            my @args = @{ $json->{arguments} };
+            my %info = %{ $args[0] };
+            my $i    = 0;
+            foreach my $key ( keys %info ) {
 
-            if ( $key eq 'type' ) {    # no use and there is already a type reading (machine type)
-                next;
+                if ( $key eq 'type' ) {    # no use and there is already a type reading (machine type)
+                    next;
+                }
+
+                if ( $key =~ /2$/x and AttrVal( $name, 'sq_duplex', '0' ) eq '0' ) {
+                    next;
+                }
+                if ( $key eq 'msaltusage' ) {
+                    my $diff = $info{$key} - ReadingsNum( $name, "lastRefill", 0 );
+                    readingsBulkUpdate( $hash, 'saltUsageSinceRefill', $diff );
+                }
+                readingsBulkUpdate( $hash, $key, $info{$key} );
             }
-
-            if ( $key =~ /2$/x and AttrVal( $name, 'sq_duplex', '0' ) eq '0' ) {
-                next;
-            }
-            if ( $key eq 'msaltusage' ) {
-                my $diff = $info{$key} - ReadingsNum( $name, "lastRefill", 0 );
-                readingsBulkUpdate( $hash, 'saltUsageSinceRefill', $diff );
-            }
-            readingsBulkUpdate( $hash, $key, $info{$key} );
-        }
-        readingsEndUpdate( $hash, 1 );
-
+            readingsEndUpdate( $hash, 1 );
+    }
     }
     return;
 }
 
-# sub wsHandshake {
-#     my $hash       = shift;
-#     my $name       = $hash->{NAME};
-#     my $tcp_socket = $hash->{TCPDev};
-#     my $url        = $hash->{helper}{url};
-
-#     # create a websocket protocol handler
-#     #  this doesn't actually "do" anything with the socket:
-#     #  it just encodes / decode WebSocket messages.  We have to send them ourselves.
-#     Log3 $name, LOG_RECEIVE, "[$name] Trying to create Protocol::WebSocket::Client handler for $url...";
-#     my $client = Protocol::WebSocket::Client->new(
-#         url     => $url,
-#         version => "13",
-#     );
-
-#     # Set up the various methods for the WS Protocol handler
-#     #  On Write: take the buffer (WebSocket packet) and send it on the socket.
-#     $client->on(
-#         write => sub {
-#             my $sclient = shift;
-#             my ($buf) = @_;
-
-#             syswrite $tcp_socket, $buf;
-#         }
-#     );
-
-#     # On Connect: this is what happens after the handshake succeeds, and we
-#     #  are "connected" to the service.
-#     $client->on(
-#         connect => sub {
-#             my $sclient = shift;
-
-#             # You may wish to set a global variable here (our $isConnected), or
-#             #  just put your logic as I did here.  Or nothing at all :)
-#             Log3 $name, LOG_RECEIVE, "[$name] Successfully connected to service!" . Dumper($hash);
-#             $sclient->write('{"protocol":"json","version":1}');
-
-#             #succesfully connected - start a timer
-#             my $next = int( gettimeofday() ) + MINUTESECONDS;
-#             InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsClose', $hash, 0 );
-#             return;
-
-#         }
-#     );
-
-#     # On Error, print to console.  This can happen if the handshake
-#     #  fails for whatever reason.
-#     $client->on(
-#         error => sub {
-#             my $sclient = shift;
-#             my ($buf) = @_;
-
-#             Log3 $name, LOG_ERROR, qq([$name] ERROR ON WEBSOCKET: $buf);
-#             $tcp_socket->close;
-#             return qq([$name] ERROR ON WEBSOCKET: $buf);
-#         }
-#     );
-
-#     # On Read: This method is called whenever a complete WebSocket "frame"
-#     #  is successfully parsed.
-#     # We will simply print the decoded packet to screen.  Depending on the service,
-#     #  you may e.g. call decode_json($buf) or whatever.
-#     $client->on(
-#         read => sub {
-#             my $sclient = shift;
-#             my ($buf) = @_;
-#             $buf =~ s///xsm;
-#             parseWebsocketRead( $hash, $buf );
-
-#             #Log3 $name, 3, "[$name] Received from socket: '$buf'";
-#             return;
-#         }
-#     );
-
-#     # Now that we've set all that up, call connect on $client.
-#     #  This causes the Protocol object to create a handshake and write it
-#     #  (using the on_write method we specified - which includes sysread $tcp_socket)
-#     Log3 $name, LOG_RECEIVE, "[$name] Calling connect on client...";
-#     $client->connect;
-
-#     # read until handshake is complete.
-#     while ( !$client->{hs}->is_done ) {
-#         my $recv_data;
-
-#         my $bytes_read = sysread $tcp_socket, $recv_data, TCPPACKETSIZE;
-
-#         if ( !defined $bytes_read ) {
-#             Log3 $name, LOG_ERROR, qq([$name] sysread on tcp_socket failed: $!);
-#             return qq([$name] sysread on tcp_socket failed: $!);
-#         }
-#         if ( $bytes_read == 0 ) {
-#             Log3 $name, LOG_ERROR, qq([$name] Connection terminated.);
-#             return qq([$name] Connection terminated.);
-#         }
-
-#         $client->read($recv_data);
-#     }
-
-#     # Create a Socket Set for Select.
-#     #  We can then test this in a loop to see if we should call read.
-#     # my $set = IO::Select->new($tcp_socket);
-
-#     #$hash->{helper}{wsSet}    = $set;
-#     $hash->{helper}{wsClient} = $client;
-
-#     # my $next = int( gettimeofday() ) + 1;
-#     # $hash->{helper}{wsCount} = 0;
-#     #InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsRead', $hash, 0 );
-#     return;
-# }
 
 sub wsFail {
     my $hash  = shift;
@@ -1946,7 +1839,7 @@ sub wsReadDevIo {
     $buf =~ s///xsm;
     $buf =~ s/\\x\{1e\}//xsm;
     if (!($buf =~ /}$/xsm)) {
-    	$buf = substr($buf, 0, rindex($buf,"}"));	
+    	$buf = substr($buf, 0, rindex($buf,"}"));
     }
     if ( length($buf) == 0 ) {
         return;
