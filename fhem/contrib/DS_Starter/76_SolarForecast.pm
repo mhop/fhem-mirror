@@ -2727,7 +2727,7 @@ sub forecastGraphic {                                                           
   
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
-  $pcq           =~ s/m/15/xs;
+  $pcq           =~ s/m/100/xs;
   my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvfc", undef);
 
   if ($kw eq 'kWh') {
@@ -2837,7 +2837,7 @@ sub forecastGraphic {                                                           
           $pcqicon = $pcq < 10 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
                      $pcq < 20 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
                      "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
-          $pcqicon = "-" if(!$pvfc00);
+          $pcqicon = "-" if(!$pvfc00 || $pcq == 100);
           
   
           ## erste Header-Zeilen
