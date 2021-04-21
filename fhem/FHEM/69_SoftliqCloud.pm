@@ -21,6 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.06: Fixed reading the paramter list (119939/1151016)
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
 #   0.1.03: Improve error handling
@@ -53,7 +54,7 @@ use utf8;
 use Digest::MD5 qw(md5);
 
 
-my $version = "0.1.05";
+my $version = "0.1.06";
 
 my $missingModul = '';
 eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
@@ -1262,7 +1263,7 @@ sub getParam {
         header => $header,
         url    => "https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/"
             . ReadingsVal( $name, 'id', $EMPTY )
-            . '/parameters?api-version=2020-08-03',
+            . '/parameters?api-version=2019-08-09',
         callback => \&parseParam,
         hash     => $hash
     };
