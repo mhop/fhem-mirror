@@ -646,9 +646,9 @@ HUEBridge_Set($@)
     return "starting update";
 
   } elsif($cmd eq 'autocreate') {
-    return "usage: autocreate" if( @args != 0 );
+    return "usage: autocreate [sensors]" if( $arg && $arg ne 'sensors' );
 
-    return HUEBridge_Autocreate($hash,1);
+    return HUEBridge_Autocreate($hash,1,$arg);
 
   } elsif($cmd eq 'autodetect') {
     return "usage: autodetect" if( @args != 0 );
@@ -1514,9 +1514,9 @@ HUEBridge_Parse($$)
 }
 
 sub
-HUEBridge_Autocreate($;$)
+HUEBridge_Autocreate($;$$)
 {
-  my ($hash,$force)= @_;
+  my ($hash,$force,$sensors)= @_;
   my $name = $hash->{NAME};
 
   if( !$force ) {
@@ -1578,7 +1578,7 @@ HUEBridge_Autocreate($;$)
 
     my $cmdret= CommandDefine(undef,$define);
     if($cmdret) {
-      Log3 $name, 1, "$name: Autocreate: An error occurred while creating device for id '$id': $cmdret";
+      Log3 $name, 1, "$name: Autocreate: An error occurred while creating group for id '$id': $cmdret";
     } else {
       $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
       $cmdret= CommandAttr(undef,"$devname room HUEDevice");
@@ -1589,6 +1589,40 @@ HUEBridge_Autocreate($;$)
       $defs{$devname}{helper}{fromAutocreate} = 1 ;
 
       $autocreated++;
+    }
+  }
+
+  if( $sensors || $hash->{websocket} ) {
+    $result =  HUEBridge_Call($hash,undef, 'sensors', undef);
+    foreach my $key ( keys %{$result} ) {
+      my $id= $key;
+
+      my $code = $name ."-S". $id;
+      if( defined($modules{HUEDevice}{defptr}{$code}) ) {
+        Log3 $name, 5, "$name: id '$id' already defined as '$modules{HUEDevice}{defptr}{$code}->{NAME}'";
+        next;
+      }
+
+      my $devname= "HUESensor" . $id;
+      $devname = $name ."_". $devname if( $hash->{helper}{count} );
+      my $define= "$devname HUEDevice sensor $id IODev=$name";
+
+      Log3 $name, 4, "$name: create new sensor '$devname' for address '$id'";
+
+      my $cmdret= CommandDefine(undef,$define);
+      if($cmdret) {
+        Log3 $name, 1, "$name: Autocreate: An error occurred while creating sensor for id '$id': $cmdret";
+      } else {
+        $cmdret= CommandAttr(undef,"$devname alias ".$result->{$id}{name});
+        $cmdret= CommandAttr(undef,"$devname room HUEDevice");
+        $cmdret= CommandAttr(undef,"$devname group HUESensor");
+        $cmdret= CommandAttr(undef,"$devname IODev $name");
+
+        HUEDeviceSetIcon($devname);
+        $defs{$devname}{helper}{fromAutocreate} = 1 ;
+
+        $autocreated++;
+      }
     }
   }
 
@@ -2177,7 +2211,7 @@ HUEBridge_Attr($$$)
   The actual hue bulbs, living colors or living whites devices are defined as <a href="#HUEDevice">HUEDevice</a> devices.
 
   <br><br>
-  All newly found devices and groups are autocreated at startup and added to the room HUEDevice.
+  All newly found lights and groups are autocreated at startup and added to the room HUEDevice.
 
   <br><br>
   Notes:
@@ -2234,8 +2268,8 @@ HUEBridge_Attr($$$)
   <a name="HUEBridge_Set"></a>
   <b>Set</b>
   <ul>
-    <li>autocreate<br>
-      Create fhem devices for all bridge devices.</li>
+    <li>autocreate [sensors]<br>
+      Create fhem devices for all light and group devices. sensors are autocreated only if sensors parameter is given.</li>
     <li>autodetect<br>
       Initiate the detection of new ZigBee devices. After aproximately one minute any newly detected
       devices can be listed with <code>get &lt;bridge&gt; devices</code> and the corresponding fhem devices
