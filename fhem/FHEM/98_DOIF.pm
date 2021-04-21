@@ -4512,6 +4512,13 @@ sub card
   $minVal=$value if (!defined $minVal);
   $maxVal=$value if (!defined $maxVal);
   
+  if (defined $last_value) {
+    if ($last_value> $maxVal) {
+      $maxVal=$last_value;
+    } elsif ($last_value <  $minVal) {
+      $minVal=$last_value;
+    }
+  }
   ##$value=$max if($value>$max);
   ##$value=$min if ($value<$min);
   
@@ -4721,11 +4728,11 @@ sub card
 
   if (defined $maxValTime) {
     $out.= sprintf('<text text-anchor="start" x="13" y="85" style="fill:#CCCCCC;font-size:10px">▲%s</text>',::strftime("%H:%M",localtime($maxValTime)));
-    $out.= sprintf('<text text-anchor="end" x="85" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,$maxVal));
+    $out.= sprintf('<text text-anchor="end" x="85" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
   }
   if (defined $minValTime) {
     $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:10px">• ▼%s</text>',::strftime("%H:%M",localtime($minValTime)));
-    $out.= sprintf('<text text-anchor="end" x="165" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,$minVal));
+    $out.= sprintf('<text text-anchor="end" x="165" y="85" style="fill:%s;font-size:10px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
   }
  	$out.='</g>';
   $out.= '</svg>';
