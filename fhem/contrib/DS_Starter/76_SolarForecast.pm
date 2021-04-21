@@ -2725,9 +2725,10 @@ sub forecastGraphic {                                                           
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
   
-  my $pvcorrf    = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
-  my ($pcf,$pcq) = split "/", $pvcorrf;
-  $pcq          =~ s/m/15/xs;
+  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
+  my ($pcf,$pcq) = split "/", $pvcorrf00;
+  $pcq           =~ s/m/15/xs;
+  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvfc", undef);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -2836,6 +2837,7 @@ sub forecastGraphic {                                                           
           $pcqicon = $pcq < 10 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
                      $pcq < 20 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
                      "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+          $pcqicon = "-" if(!$pvfc00);
           
   
           ## erste Header-Zeilen
