@@ -118,6 +118,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance ",
+  "0.38.2" => "20.04.2021  fix estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
   "0.37.0" => "17.04.2021  estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
@@ -1392,9 +1394,9 @@ sub centralTask {
       
       my @da;
       my $t       = time;                                                                          # aktuelle Unix-Zeit 
-      my $chour   = strftime "%H", localtime($t);                                                  # aktuelle Stunde
+      my $chour   = strftime "%H", localtime($t);                                                  # aktuelle Stunde 
       my $minute  = strftime "%M", localtime($t);                                                  # aktuelle Minute
-      my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag
+      my $day     = strftime "%d", localtime($t);                                                  # aktueller Tag  (range 01 to 31)
       my $dayname = strftime "%a", localtime($t);                                                  # aktueller Wochentagsname
             
       my $params = {
@@ -2242,38 +2244,55 @@ sub _calcSummaries {
   my $rdh              = 24 - $chour - 1;                                                             # verbleibende Anzahl Stunden am Tag beginnend mit 00 (abzüglich aktuelle Stunde)
   my $remainminutes    = 60 - $minute;                                                                # verbleibende Minuten der aktuellen Stunde
   
-  my $restofhour       = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
+  my $restofhourpvfc   = (NexthoursVal($hash, "NextHour00", "pvforecast", 0)) / 60 * $remainminutes;
+  my $restofhourconfc  = (NexthoursVal($hash, "NextHour00", "confc",      0)) / 60 * $remainminutes;
   
-  $next1HoursSum->{PV} = $restofhour;
-  $next2HoursSum->{PV} = $restofhour;
-  $next3HoursSum->{PV} = $restofhour;
-  $next4HoursSum->{PV} = $restofhour;
-  $restOfDaySum->{PV}  = $restofhour;
+  $next1HoursSum->{PV}          = $restofhourpvfc;
+  $next2HoursSum->{PV}          = $restofhourpvfc;
+  $next3HoursSum->{PV}          = $restofhourpvfc;
+  $next4HoursSum->{PV}          = $restofhourpvfc;
+  $restOfDaySum->{PV}           = $restofhourpvfc;
+  
+  $next1HoursSum->{Consumption} = $restofhourconfc;
+  $next2HoursSum->{Consumption} = $restofhourconfc;
+  $next3HoursSum->{Consumption} = $restofhourconfc;
+  $next4HoursSum->{Consumption} = $restofhourconfc;
+  $restOfDaySum->{Consumption}  = $restofhourconfc;
   
   for my $h (1..47) {
-      my $pvfc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
+      my $pvfc  = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "pvforecast", 0);
+      my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$h), "confc",      0);
          
       if($h == 1) {
-          $next1HoursSum->{PV} += $pvfc / 60 * $minute;
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
+          $next1HoursSum->{Consumption} += $confc / 60 * $minute;
       }
       
       if($h <= 2) {
-          $next2HoursSum->{PV} += $pvfc                if($h <  2);
-          $next2HoursSum->{PV} += $pvfc / 60 * $minute if($h == 2); 
+          $next2HoursSum->{PV}          += $pvfc                 if($h <  2);
+          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 2);
+          $next2HoursSum->{Consumption} += $confc                if($h <  2);
+          $next2HoursSum->{Consumption} += $confc / 60 * $minute if($h == 2); 
       }
       
       if($h <= 3) {
-          $next3HoursSum->{PV} += $pvfc                if($h <  3);
-          $next3HoursSum->{PV} += $pvfc / 60 * $minute if($h == 3); 
+          $next3HoursSum->{PV}          += $pvfc                 if($h <  3);
+          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 3); 
+          $next3HoursSum->{Consumption} += $confc                if($h <  3);
+          $next3HoursSum->{Consumption} += $confc / 60 * $minute if($h == 3); 
       }  
 
       if($h <= 4) {
-          $next4HoursSum->{PV} += $pvfc                if($h <  4);
-          $next4HoursSum->{PV} += $pvfc / 60 * $minute if($h == 4); 
+          $next4HoursSum->{PV}          += $pvfc                 if($h <  4);
+          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 4); 
+          $next4HoursSum->{Consumption} += $confc                if($h <  4);
+          $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
       }      
       
-      $restOfDaySum->{PV} += $pvfc if($h <= $rdh);
-      $tomorrowSum->{PV}  += $pvfc if($h >  $rdh);
+      $restOfDaySum->{PV}          += $pvfc  if($h <= $rdh);
+      $restOfDaySum->{Consumption} += $confc if($h <= $rdh);
+      
+      $tomorrowSum->{PV}           += $pvfc if($h >  $rdh);
   }
   
   for my $th (1..24) {
@@ -2294,7 +2313,7 @@ sub _calcSummaries {
   $data{$type}{$name}{current}{consumption} = $consumption;
   
   push @$daref, "Current_Consumption<>".         $consumption.              " W";
-  push @$daref, "Tomorrow_ConsumptionForecast<>".$tconsum.                  " Wh" if(defined $tconsum);
+  
   push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum03_PVforecast<>".  (int $next3HoursSum->{PV})." Wh";
@@ -2302,6 +2321,10 @@ sub _calcSummaries {
   push @$daref, "RestOfDayPVforecast<>".         (int $restOfDaySum->{PV}). " Wh";
   push @$daref, "Tomorrow_PVforecast<>".         (int $tomorrowSum->{PV}).  " Wh";
   push @$daref, "Today_PVforecast<>".            (int $todaySum->{PV}).     " Wh";
+  
+  push @$daref, "Tomorrow_ConsumptionForecast<>".           $tconsum.                          " Wh" if(defined $tconsum);
+  push @$daref, "NextHours_Sum04_ConsumptionForecast<>".   (int $next4HoursSum->{Consumption})." Wh";
+  push @$daref, "RestOfDayConsumptionForecast<>".          (int $restOfDaySum->{Consumption}). " Wh";
   
 return;
 }
@@ -2359,6 +2382,7 @@ sub estConsumptionForecast {
   my $name  = $paref->{name};
   my $chour = $paref->{chour}; 
   my $t     = $paref->{t};
+  my $day   = $paref->{day};
   
   my $medev    = ReadingsVal($name, "currentMeterDev", "");                         # aktuelles Meter device
   my ($am,$hm) = parseParams ($medev);
@@ -2400,15 +2424,16 @@ sub estConsumptionForecast {
              };
   
   for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $nhts = NexthoursVal ($hash, $k, "starttime", undef);
+      my $nhts = NexthoursVal ($hash, $k, "starttime", undef);                                # Startzeit
       next if(!$nhts);
       
       $dnum     = 0;
       my $utime = timestringToTimestamp ($nhts);
       my $nhday = strftime "%a", localtime($utime);                                           # Wochentagsname des NextHours Key
       my $nhhr  = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);              # Stunde des Tages vom NextHours Key  (01,02,...24) 
-     
+      
       for my $m (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+          next if($m eq $day);                                                                # next wenn gleicher Tag (Datum) wie heute
           my $hdn = HistoryVal ($hash, $m, 99, "dayname", undef);
           next if(!$hdn || $hdn ne $nhday);
           
@@ -2416,7 +2441,9 @@ sub estConsumptionForecast {
           $dnum++;
       }
       if ($dnum) {
-           $data{$type}{$name}{nexthours}{$k}{confc} = $conh->{$nhhr}/$dnum;    # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           my $conavg                                = $conh->{$nhhr}/$dnum;
+           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                               # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           Log3($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhts, con: $conavg, days for avg: $dnum");
       }     
   }
   
@@ -2686,15 +2713,15 @@ sub forecastGraphic {                                                           
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
   $icon    = FW_makeImage($icon) if (defined($icon));
-  my $co4h = ReadingsNum ($name,"Next04Hours_Consumption",       0);
-  my $coRe = ReadingsNum ($name,"RestOfDay_Consumption",         0); 
-  my $coTo = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",  0);
-  my $coCu = ReadingsNum ($name,"Current_Consumption",           0);
+  my $co4h = ReadingsNum ($name,"NextHours_Sum04_ConsumptionForecast", 0);
+  my $coRe = ReadingsNum ($name,"RestOfDayConsumptionForecast",        0); 
+  my $coTo = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",        0);
+  my $coCu = ReadingsNum ($name,"Current_Consumption",                 0);
 
-  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast",    0);
-  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",           0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",           0);
-  my $pvCu = ReadingsNum ($name,"Current_PV",                    0);
+  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast",          0);
+  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",                 0); 
+  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",                 0);
+  my $pvCu = ReadingsNum ($name,"Current_PV",                          0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
 
@@ -3651,7 +3678,7 @@ sub calcVariance {
 
   my @da;
   for my $h (1..23) {
-      next if(!$chour || $h >= $chour);
+      next if(!$chour || $h > $chour);
       my $fcval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
       next if(!$fcval);
  
@@ -4386,6 +4413,7 @@ return ($pvcorrf, $quality);
 #       cloudcover - DWD Wolkendichte
 #       rainprob   - DWD Regenwahrscheinlichkeit
 #       Rad1h      - Globalstrahlung (kJ/m2)
+#       confc      - Vorhersage Hausverbrauch (Wh)
 # $def: Defaultwert
 #
 ################################################################
@@ -4876,6 +4904,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <table>  
          <colgroup> <col width=8%> <col width=92%> </colgroup>
             <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                       </td></tr>
+            <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch                                                  </td></tr>
             <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                </td></tr> 
             <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                            </td></tr>
             <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor und dessen Qualität                     </td></tr>
