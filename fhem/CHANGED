@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - change:  move lib/FHEM/Core/Password/Utils.pm to
+            lib/FHEM/Core/Authentication/Passwords.pm
  - feature: 30_HUEBridge: enable autocreation of sensors for deconz
  - new:     lib/FHEM/Core/Password/Utils.pm: new modul for developer to save
             passwords or passphrase in fhem keystore

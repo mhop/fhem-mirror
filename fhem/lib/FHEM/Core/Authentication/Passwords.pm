@@ -25,7 +25,7 @@
 #
 ###############################################################################
 
-package FHEM::Core::Password::Utils;
+package FHEM::Core::Authentication::Passwords;
 
 use 5.008;
 
@@ -192,23 +192,23 @@ __END__
 
 =head1 NAME
 
-FHEM::Core::Password::Utils - FHEM extension for password handling
+FHEM::Core::Authentication::Passwords - FHEM extension for password handling
 
 =head1 VERSION
 
-This document describes FHEM::Core::Password::Utils version 0.3
+This document describes FHEM::Core::Authentication::Passwords version 0.9
 
 =head1 CONSTRUCTOR
 
-FHEM::Core::Password::Utils->new();
+FHEM::Core::Authentication::Passwords->new();
 
 =head1 SYNOPSIS
 
-  use FHEM::Core::Password::Utils qw(:ALL);
-  our $passwd = FHEM::Core::Password::Utils->new();
+  use FHEM::Core::Authentication::Passwords qw(:ALL);
+  our $passwd = FHEM::Core::Authentication::Passwords->new();
   
   you can also save the password object in the instance hash
-  our $hash->{helper}->{passwdobj} = FHEM::Core::Password::Utils->new();
+  our $hash->{helper}->{passwdobj} = FHEM::Core::Authentication::Passwords->new();
 
 =head1 DESCRIPTION
 
@@ -242,6 +242,6 @@ Marko Oldenburg E<lt>fhemdevelopment AT cooltux DOT netE<gt>
 
 =head1 LICENSE
 
-FHEM::Core::Password::Utils is released under the same license as FHEM.
+FHEM::Core::Authentication::Passwords is released under the same license as FHEM.
 
 =cut
