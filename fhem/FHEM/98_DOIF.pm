@@ -4412,7 +4412,7 @@ sub format_value {
     $value=$min;
   } elsif ($val  !~ /(-?\d+(\.\d+)?)/) {
     $format='%s';
-    $value=$min;
+    $value=0;
   } else {
     $format='%1.'.$dec.'f';
   }
@@ -4422,9 +4422,11 @@ sub format_value {
 sub get_color {
   my ($value,$min,$max,$minColor,$maxColor,$func)=@_;
   my $color;
-  if (!defined $value or $value eq "N/A") {
+  if (!defined $value or $value eq "N/A" or $value < $min ) {
     $value = $min;
-  }  
+  } elsif ($value > $max) {
+    $value = $max;
+  }
   if (ref($func) eq "CODE") {
     $minColor=&{$func}($min);
     $maxColor=&{$func}($max);
@@ -4471,8 +4473,7 @@ sub card
   my $bheight=88;
   my $htrans=0;  
   
-  $minVal=$val if (!defined $minVal);
-  $maxVal=$val if (!defined $maxVal);
+
   
   my $out;
   my ($ic,$iscale,$ix,$iy,$rotate);
@@ -4507,17 +4508,18 @@ sub card
   $dec=1 if (!defined $dec);
   
   ($format,$value,$val)=format_value($val,$min,$dec);
+    
+  $minVal=$value if (!defined $minVal);
+  $maxVal=$value if (!defined $maxVal);
   
-  $value=$max if($value>$max);
-  $value=$min if ($value<$min);
+  ##$value=$max if($value>$max);
+  ##$value=$min if ($value<$min);
+  
   $size=130 if (!defined $size or $size eq "");
   
   
   my ($maxValColor)=get_color($maxVal,$min,$max,$minColor,$maxColor,$func);
   my ($minValColor)=get_color($minVal,$min,$max,$minColor,$maxColor,$func); 
-  
-  
-
   
   if (defined ($icon)) {
     ($ic,$iscale,$ix,$iy,$rotate)=split(",",$icon);
@@ -4543,11 +4545,11 @@ sub card
   
   if ($plot ne "1" and $minVal ne $maxVal) {
       $scaling=1;
-      $minPlot=($val < $minVal ? $val : $minVal);
-      $maxPlot=($val > $maxVal ? $val : $maxVal);
+      $minPlot=($value < $minVal ? $value : $minVal);
+      $maxPlot=($value > $maxVal ? $value : $maxVal);
   } else {
-      $minPlot=($min < 0 and $minVal > 0) ? 0:$min;
-      $maxPlot=($max > 0 and $maxVal < 0) ? 0:$max;
+      $minPlot=($value < $min ? $value : ($min < 0 and $minVal > 0) ? 0 : ($minVal < $min) ? $minVal:$min);
+      $maxPlot=($value > $max ? $value : ($max > 0 and $maxVal < 0) ? 0 : ($maxVal > $max) ? $maxVal:$max);
   }
   
   my ($m,$n)=m_n($minPlot,0,$maxPlot,50);
@@ -4623,9 +4625,52 @@ sub card
   my $v;
   my $last;
   my $j=0;
-  
-  $out.='<polyline points="0,-0.25 0,50.25"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />';
  
+  $out.= '<rect x="0" y="-0.5" width="59.5" height="50" rx="1" ry="1" fill="url(#gradcardback)"/>';
+
+  $out.='<polyline points="0,0 0,50"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.5" />';
+  for (my $i=0;$i<=4;$i++) {
+    my $y=($i)*12.5;
+    ##$out.=sprintf('<polyline points="0,%d 1.5,%d"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7"/>',$y,$y);
+    $out.=sprintf('<polyline points="0,%d 60,%d"  style="stroke:#CCCCCC; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:0.5"/>',$y,$y);
+  }
+  
+  for (my $i=0;$i<=4;$i++) {
+    my $v=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
+    my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
+    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf($format,$v)); 
+  } 
+  
+  my $timebeginn=$time-$hours*3600;
+  
+  my $scale;
+  if  ($hours % 6 == 0) {
+    $scale=$hours/6;
+  }
+  if (defined $scale) {
+    my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
+    my $beginhour=int($hour/$scale)*$scale;
+    my $diffminutes=($hour-$beginhour)*60+$minutes;
+    my $pos=int ($diffminutes/($scale*60)*1000)/100; 
+  
+    $out.=sprintf('<text text-anchor="middle" x="-0.5" y="61" style="fill:#CCCCCC;font-size:7px">%02d</text>',$beginhour) if ($pos == 0);
+    for (my $i=0;$i<=5;$i++) {
+      my $hour=$beginhour+($i+1)*$scale;
+      $hour=($hour >= 24 ? $hour % 24:$hour);
+      my $x=$i*10-$pos+9;
+      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:0.5" />',$x,0,$x,50) if ($x > 0);;
+    #  $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5) if ($x > 0);
+      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%02d</text>',$x,$hour);
+    }
+  } else {
+    for (my $i=0;$i<=3;$i++) {
+      my $x=($i+1)*20-1;
+      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%s</text>',$i*20-1,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i/3))));
+     ## $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5);
+      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:0.5" />',$x,0,$x,50);
+    }
+  }
+
   if (@{$a} > 0) {
     if (!defined ${$a}[0]) {
       if (defined $last_value) {
@@ -4659,56 +4704,11 @@ sub card
     $out.= $points;
     $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
   }
-  
-  for (my $i=0;$i<=4;$i++) {
-    my $y=($i)*12.5;
-    $out.=sprintf('<polyline points="0,%d 1.5,%d"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7"/>',$y,$y);
-  }
+  $out.=sprintf('<polyline points="0,%s 59,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.5" />',$xpos,$xpos);
 
-  $out.= sprintf('<polyline points="0,%s 59.5,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$xpos,$xpos);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxValSlot and $maxValSlot != 59);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minValSlot and $minValSlot != 59);
-  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($val*$m+$n)*10)/10),color($currColor,$ln));
-  
-  for (my $i=0;$i<=4;$i++) {
-    my $value=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
-    my ($color)= get_color($value,$min,$max,$minColor,$maxColor,$func); 
-    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf($format,$value)); 
-  } 
-  
-  my $timebeginn=$time-$hours*3600;
-  
-  my $scale;
-  if  ($hours % 6 == 0) {
-    $scale=$hours/6;
-  }
- 
-  if (defined $scale) {
-    my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
-    my $beginhour=int($hour/$scale)*$scale;
-    my $diffminutes=($hour-$beginhour)*60+$minutes;
-    my $pos=int ($diffminutes/($scale*60)*1000)/100; 
-  
-#  for (my $i=1;$i<=4;$i++) {
-#    my $x=$i*15-0.5;
-#    $out.=sprintf('<polyline points="%d,%s %d,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5);
-#  }
-    $out.=sprintf('<text text-anchor="middle" x="-0.5" y="61" style="fill:#CCCCCC;font-size:7px">%02d</text>',$beginhour) if ($pos == 0);
-    for (my $i=0;$i<=5;$i++) {
-      my $hour=$beginhour+($i+1)*$scale;
-      $hour=($hour >= 24 ? $hour % 24:$hour);
-      my $x=$i*10-$pos+9;
-      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5) if ($x > 0);
-      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%02d</text>',$x,$hour);
-    }
-  } else {
-    for (my $i=0;$i<=3;$i++) {
-      my $x=($i+1)*20-0.5;
-      $out.=sprintf('<text text-anchor="middle" x="%s" y="61" style="fill:#CCCCCC;font-size:7px">%s</text>',$i*20-1,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i/3))));
-      $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:#CCCCCC; stroke-width:0.5; stroke-opacity:0.7" />',$x,$xpos+1.5,$x,$xpos-1.5);
-    }
-  }
-
+  $out.=sprintf('<circle cx="59" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite"/></circle>',(50-int(($value*$m+$n)*10)/10),color($currColor,$ln));
   $out.= '</g>';
   $out.= '</svg>';
 
