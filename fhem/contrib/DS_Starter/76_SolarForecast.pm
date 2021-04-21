@@ -118,7 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance ",
+  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality ",
   "0.38.2" => "20.04.2021  fix estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
@@ -2724,6 +2724,10 @@ sub forecastGraphic {                                                           
   my $pvCu = ReadingsNum ($name,"Current_PV",                          0);
   
   my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
+  
+  my $pvcorrf    = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
+  my ($pcf,$pcq) = split "/", $pvcorrf;
+  $pcq          =~ s/m/15/xs;
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
@@ -2755,7 +2759,8 @@ sub forecastGraphic {                                                           
       my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
       my $lupt    = "last update:";
-      my $autoct  = "automatic correction:";  
+      my $autoct  = "automatic correction:";
+      my $lbpcq   = "correction quality current hour:";      
       my $lblPv4h = "next&nbsp;4h:";
       my $lblPvRe = "remain today:";
       my $lblPvTo = "tomorrow:";
@@ -2763,7 +2768,8 @@ sub forecastGraphic {                                                           
      
       if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
           $lupt    = "Stand:";
-          $autoct  = "automatische Korrektur:";          
+          $autoct  = "automatische Korrektur:";
+          $lbpcq   = encode("utf8", "Korrekturqualität akt. Stunde:");          
           $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
           $lblPvRe = "Rest&nbsp;heute:";
           $lblPvTo = "morgen:";
@@ -2823,11 +2829,19 @@ sub forecastGraphic {                                                           
               $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
           }
           
+          ## Qualitäts-Icon
+          ######################
+          my $pcqicon;
+          
+          $pcqicon = $pcq < 10 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
+                     $pcq < 20 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
+                     "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+          
   
           ## erste Header-Zeilen
           #######################
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td></tr>";
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td></tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                </tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
       }
       
       ########################
