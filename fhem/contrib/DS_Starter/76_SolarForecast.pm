@@ -2728,7 +2728,7 @@ sub forecastGraphic {                                                           
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
   $pcq           =~ s/m/100/xs;
-  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvfc", undef);
+  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
 
   if ($kw eq 'kWh') {
       $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
