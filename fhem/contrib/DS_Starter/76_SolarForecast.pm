@@ -3715,7 +3715,7 @@ sub calcVariance {
       
       $paref->{hour}                    = $h;
       my ($pvavg,$fcavg,$anzavg,$range) = calcAvgFromHistory ($paref);                                    # historische PV / Forecast Vergleichswerte ermitteln
-      $anzavg                         //= 0;
+      $anzavg                         //= 1;                                                              # der aktuelle Wert ist dann der erste AVG im Store
       $pvval                            = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                        # Ertrag aktuelle Stunde berücksichtigen
       $fcval                            = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                        # Vorhersage aktuelle Stunde berücksichtigen
       
@@ -3744,7 +3744,7 @@ sub calcVariance {
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, found history days in range: $anzavg)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
       
-      $paref->{pvcorrf}  = $factor;
+      $paref->{pvcorrf}  = $factor."/".$anzavg;
       $paref->{nhour}    = sprintf("%02d",$h);
       $paref->{histname} = "pvcorrfactor";
       setPVhistory ($paref);
@@ -3868,7 +3868,7 @@ sub setPVhistory {
   my $wid        = $paref->{wid}           // -1;
   my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
   my $wrp        = $paref->{wrp}           // 0;                                                  # Wahrscheinlichkeit von Niederschlag
-  my $pvcorrf    = $paref->{pvcorrf}       // 1;                                                  # pvCorrectionFactor
+  my $pvcorrf    = $paref->{pvcorrf}       // "1/0";                                              # pvCorrectionFactor
   my $temp       = $paref->{temp};                                                                # Außentemperatur
   
   my $type = $hash->{TYPE};
