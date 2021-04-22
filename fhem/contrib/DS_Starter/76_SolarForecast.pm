@@ -2727,7 +2727,8 @@ sub forecastGraphic {                                                           
   
   my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
   my ($pcf,$pcq) = split "/", $pvcorrf00;
-  $pcq           =~ s/m/100/xs;
+  my $pvcanz     = "factor: $pcf / quality: $pcq";
+  $pcq           =~ s/m/-1/xs;
   my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
 
   if ($kw eq 'kWh') {
@@ -2837,13 +2838,13 @@ sub forecastGraphic {                                                           
           $pcqicon = $pcq < 10 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
                      $pcq < 20 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
                      "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
-          $pcqicon = "-" if(!$pvfc00 || $pcq == 100);
+          $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
           
   
           ## erste Header-Zeilen
           #######################
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                </tr>";
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                                    </tr>";
+          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td title='$pvcanz' colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
       }
       
       ########################
