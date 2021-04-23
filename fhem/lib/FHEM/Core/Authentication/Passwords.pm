@@ -32,6 +32,8 @@ use 5.008;
 use strict;
 use warnings;
 
+our $VERSION = 1.0;
+
 
 ### eigene Funktionen exportieren
 require Exporter;
@@ -57,10 +59,11 @@ our %EXPORT_TAGS = (
 
 
 sub new {
-    my $class = shift;
-    my $self  = {
-                  name  => undef,
-                };
+    my $class   = shift;
+    my $type    = shift;
+    my $self    = {
+                    TYPE  => $type,
+                  };
 
     bless $self, $class;
     return $self;
@@ -71,7 +74,7 @@ sub setStorePassword {
     my $name        = shift;
     my $password    = shift // return(undef,q{no password given});
 
-    my $index   = $::defs{$name}->{TYPE} . '_' . $name . '_passkey';
+    my $index   = $self->{TYPE} . '_' . $name . '_passkey';
     my ($x,$y)  = ::gettimeofday();
     my $salt    = substr(sprintf("%08X", rand($y)*rand($x)),0,8);
     my $key     = ::getUniqueId() . $index . $salt;
@@ -104,7 +107,7 @@ sub setDeletePassword {
     my $name = shift;
 
     my $err; 
-    $err = ::setKeyValue( $::defs{$name}->{TYPE} . '_' . $name . '_passkey', undef );
+    $err = ::setKeyValue( $self->{TYPE} . '_' . $name . '_passkey', undef );
 
     return(undef,$err)
       if ( defined($err) );
@@ -116,7 +119,7 @@ sub getReadPassword {
     my $self    = shift;
     my $name    = shift;
 
-    my $index   = $::defs{$name}->{TYPE} . '_' . $name . '_passkey';
+    my $index   = $self->{TYPE} . '_' . $name . '_passkey';
     my ( $password, $err, $salt );
 
     ::Log3($name, 4, qq{password Keystore handle for Device ($name) - Read password from file});
@@ -196,11 +199,11 @@ FHEM::Core::Authentication::Passwords - FHEM extension for password handling
 
 =head1 VERSION
 
-This document describes FHEM::Core::Authentication::Passwords version 0.9
+This document describes FHEM::Core::Authentication::Passwords version 1.0
 
 =head1 CONSTRUCTOR
 
-FHEM::Core::Authentication::Passwords->new();
+FHEM::Core::Authentication::Passwords->new(<INSTANZTYPE>);
 
 =head1 SYNOPSIS
 
@@ -213,13 +216,16 @@ FHEM::Core::Authentication::Passwords->new();
 =head1 DESCRIPTION
 
 Store new Password
-$hash->{helper}->{passwdobj}->setStorePassword('PASSWORD');
+$hash->{helper}->{passwdobj}->setStorePassword($name,'PASSWORD');
 
 Read Password
-$hash->{helper}->{passwdobj}->getReadPassword();
+$hash->{helper}->{passwdobj}->getReadPassword($name);
 
+Delete Password
+$hash->{helper}->{passwdobj}->setDeletePassword($name);
 
-
+Rename Password
+$hash->{helper}->{passwdobj}->getRename($newname,$oldname);
 
 =head1 EXPORT
 
