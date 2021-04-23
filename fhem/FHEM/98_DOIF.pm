@@ -437,6 +437,7 @@ sub parse_tpl
   
   $wcmd =~ s/\$TD\{(.*)?\}\{(.*)?\}.*(\".*\")/for my \$rowi ($1) \{for my \$coli ($2) \{\$hash->\{$table\}\{td\}\{\$rowi\}\{\$coli\} = $3\}\}/g;
   $wcmd =~ s/\$TABLE/\$hash->{$table}{tablestyle}/;
+  $wcmd =~ s/<\n/\.\"\<\/tbody><\/table><table class=\'block wide wrapcolumns\' style=\'\$hash->{$table}{tablestyle}\'><tbody>\"\n/g;
 
   $wcmd =~ s/\$VAR/\$hash->{var}/g;
   $wcmd =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
@@ -1602,10 +1603,11 @@ sub ReplaceReadingDoIf
              @{$hash->{accu}{"$name $reading"}{value}}=();
            }
         } elsif ($format =~ /^((col)(\d*))/) {
-           AddRegexpTriggerDoIf($hash,"collect","","collect",$name,$reading);
            $regExp =$1;
            my $hours=$3;
            $hours=24 if (!defined $hours or !$hours);
+           delete $hash->{collect}{"$name $reading"}{$hours};
+           AddRegexpTriggerDoIf($hash,"collect","","collect",$name,$reading);
            @{$hash->{collect}{"$name $reading"}{$hours}{values}}=();
            @{$hash->{collect}{"$name $reading"}{$hours}{times}}=();
            $hash->{collect}{"$name $reading"}{$hours}{hours}=$hours;
@@ -4721,11 +4723,11 @@ sub card
   $out.= '</g>';
   $out.= '</svg>';
 
-  $out.='<g transform="translate(105,5)">';
-  $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,95,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
+  $out.='<g transform="translate(105,6)">';
+  $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
   $out.='</g>';
   
-  $out.=sprintf('<text text-anchor="middle" x="134" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M:%S",localtime($time)));
+  $out.=sprintf('<text text-anchor="middle" x="133" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M:%S",localtime($time)));
 
 
   if (defined $maxValTime) {
