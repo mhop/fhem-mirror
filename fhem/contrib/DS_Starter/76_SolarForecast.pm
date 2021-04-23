@@ -118,7 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality ",
+  "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality, some more fixes ",
   "0.38.2" => "20.04.2021  fix estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
@@ -1349,10 +1349,10 @@ sub centralTask {
   RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
   
   ### nicht mehr benötigte Readings/Daten löschen - kann später wieder raus !!
-  #for my $i (keys %{$data{$type}{$name}{pvhist}}) {
+  for my $i (keys %{$data{$type}{$name}{pvhist}}) {
   #    delete $data{$type}{$name}{pvhist}{$i}{"00"};
-  #    delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
-  #}
+      delete $data{$type}{$name}{pvhist}{$i} if(!$i);               # evtl. vorhandene leere Schlüssel entfernen
+  }
   
   #deleteReadingspec ($hash, "Today_Hour.*_Consumption");
   #deleteReadingspec ($hash, "ThisHour_.*");
@@ -1698,7 +1698,8 @@ sub _transferDWDForecastValues {
           num  => $num,
           uac  => $uac,
           fh   => $fh,
-          fd   => $fd
+          fd   => $fd,
+          day  => $paref->{day}
       };
       
       my $calcpv              = calcPVforecast ($params);                                     # Vorhersage gewichtet kalkulieren
@@ -2464,7 +2465,7 @@ sub FwFn {
   my $link  = forecastGraphic ($d);
 
   my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = "<a href=\"/fhem?detail=$d\">$alias</a>"; 
+  my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$d">$alias</a>}; 
   
   my $ret = "";
   if(IsDisabled($d)) {
@@ -2472,7 +2473,7 @@ sub FwFn {
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
       $ret   .= "<td>";
-      $ret   .= "Solar forecast graphic device <a href=\"/fhem?detail=$d\">$d</a> is disabled"; 
+      $ret   .= qq{Solar forecast graphic device <a href="$FW_ME$FW_subdir?detail=$d">$d</a> is disabled}; 
       $ret   .= "</td>";
       $ret   .= "</tr>";
       $ret   .= "</table>";
@@ -2526,7 +2527,7 @@ sub pageAsHtml {
   my $link  = forecastGraphic ($name, $ftui);
 
   my $alias = AttrVal($name, "alias", $name);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = "<a href=\"/fhem?detail=$name\">$alias</a>"; 
+  my $dlink = "<a href=\"$FW_ME$FW_subdir?detail=$name\">$alias</a>";  
   
   my $ret = "<html>";
   if(IsDisabled($name)) {
@@ -2534,7 +2535,7 @@ sub pageAsHtml {
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
       $ret   .= "<td>";
-      $ret   .= "SMA Portal graphic device <a href=\"/fhem?detail=$name\">$name</a> is disabled"; 
+      $ret   .= qq{Solar Forecast Device <a href="$FW_ME$FW_subdir?detail=$name">$name</a> is disabled}; 
       $ret   .= "</td>";
       $ret   .= "</tr>";
       $ret   .= "</table>";
@@ -2584,7 +2585,7 @@ sub forecastGraphic {                                                           
   my $ta     = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
   
   if(!$is || !$fcdev || !$radev || !$indev || !$peak || !defined $pv0 || !$dir || !$ta) {
-      my $link = qq{<a href="/fhem?detail=$name">$name</a>};  
+      my $link = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
       $height  = AttrNum($name, 'beamHeight', 200);   
       $ret    .= "<table class='roomoverview'>";
       $ret    .= "<tr style='height:".$height."px'>";
@@ -2757,7 +2758,7 @@ sub forecastGraphic {                                                           
   ##########################  
   if ($header) {
       my $alias   = AttrVal ($name,    "alias",    $name );                                         # Linktext als Aliasname
-      my $dlink   = "<a href=\"/fhem?detail=$name\">$alias</a>";      
+      my $dlink   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};      
       my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
       my $lupt    = "last update:";
@@ -3573,6 +3574,7 @@ sub calcPVforecast {
   my $type  = $hash->{TYPE};
   my $stch  = $data{$type}{$name}{strings};                                                           # String Configuration Hash
   my $pr    = 1.0;                                                                                    # Performance Ratio (PR)
+  my $fh1   = $fh+1;
   
   my $chour      = strftime "%H", localtime($t+($num*3600));                                          # aktuelle Stunde
   my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
@@ -3606,8 +3608,16 @@ sub calcPVforecast {
       }
   }
 
-  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;  
+  $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
+  if($fd == 0 && $fh1) {
+      $paref->{pvcorrf}  = $hc."/".$hq;
+      $paref->{nhour}    = sprintf("%02d",$fh1);
+      $paref->{histname} = "pvcorrfactor";
+      setPVhistory ($paref);
+      delete $paref->{histname};  
+  }
+  
   my $pvsum  = 0;  
   
   for my $st (@strings) {                                                                             # für jeden String der Config ..
@@ -3708,16 +3718,19 @@ sub calcVariance {
           next;
       }
 
-      my $oldfac = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h),  1);                     # bisher definierter Korrekturfaktor
-      $oldfac    = 1 if(1*$oldfac == 0);
+      #my $oldfac   = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h), 1);                    # bisher definierter Korrekturfaktor
+      #$oldfac      = 1 if(1*$oldfac == 0);    
       
       Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
       $paref->{hour}                    = $h;
       my ($pvavg,$fcavg,$anzavg,$range) = calcAvgFromHistory ($paref);                                    # historische PV / Forecast Vergleichswerte ermitteln
-      $anzavg                         //= 1;                                                              # der aktuelle Wert ist dann der erste AVG im Store
+      $anzavg                         //= 0;                                                              # der aktuelle Wert ist dann der erste AVG im Store
       $pvval                            = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                        # Ertrag aktuelle Stunde berücksichtigen
       $fcval                            = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                        # Vorhersage aktuelle Stunde berücksichtigen
+      
+      my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
+      $oldfac             = 1 if(1*$oldfac == 0);
       
       Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
       
@@ -3742,13 +3755,7 @@ sub calcVariance {
       }
       
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, found history days in range: $anzavg)";
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";
-      
-      $paref->{pvcorrf}  = $factor."/".$anzavg;
-      $paref->{nhour}    = sprintf("%02d",$h);
-      $paref->{histname} = "pvcorrfactor";
-      setPVhistory ($paref);
-      delete $paref->{histname};    
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";    
   }
   
   createReadingsFromArray ($hash, \@da, 1);
@@ -3966,7 +3973,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{temp}     = q{};      
   }
   
-  Log3 ($name, 5, "$name - set PV History hour: $nhour, hash: $histname, val: $val");
+  Log3 ($name, 5, "$name - set PV History day: $day, hour: $nhour, hash: $histname, val: $val");
     
 return;
 }
