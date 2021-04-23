@@ -72,7 +72,7 @@ sub new {
 sub setStorePassword {
     my $self        = shift;
     my $name        = shift;
-    my $password    = shift // return(undef,q{no password given});
+    my $password    = shift // return(undef,q(no password given));
 
     my $index   = $self->{TYPE} . '_' . $name . '_passkey';
     my ($x,$y)  = ::gettimeofday();
@@ -122,14 +122,14 @@ sub getReadPassword {
     my $index   = $self->{TYPE} . '_' . $name . '_passkey';
     my ( $password, $err, $salt );
 
-    ::Log3($name, 4, qq{password Keystore handle for Device ($name) - Read password from file});
+    ::Log3($name, 4, qq(password Keystore handle for Device ($name) - Read password from file));
 
     ( $err, $password ) = ::getKeyValue($index);
 
     if ( defined($err) ) {
 
         ::Log3($name, 1,
-qq{password Keystore handle for Device ($name) - unable to read password from file: $err});
+qq(password Keystore handle for Device ($name) - unable to read password from file: $err));
 
         return undef;
     }
@@ -161,7 +161,7 @@ qq{password Keystore handle for Device ($name) - unable to read password from fi
     }
     else {
 
-        ::Log3($name, 1, qq{password Keystore handle for Device ($name) - No password in file});
+        ::Log3($name, 1, qq(password Keystore handle for Device ($name) - No password in file));
         return undef;
     }
 }
