@@ -2414,7 +2414,7 @@ sub _calcSummaries {
   my $batin   = CurrentVal ($hash, "powerbatin",          0);                                           # aktuelle Batterieladung
   my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
   
-  my $consumption                           = $pvgen - $gfeedin + $gcon - $batin + $batout;
+  my $consumption                           = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   $data{$type}{$name}{current}{consumption} = $consumption;
   
   push @$daref, "Current_Consumption<>".         $consumption.              " W";
