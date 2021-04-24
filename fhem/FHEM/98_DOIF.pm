@@ -437,7 +437,7 @@ sub parse_tpl
   
   $wcmd =~ s/\$TD\{(.*)?\}\{(.*)?\}.*(\".*\")/for my \$rowi ($1) \{for my \$coli ($2) \{\$hash->\{$table\}\{td\}\{\$rowi\}\{\$coli\} = $3\}\}/g;
   $wcmd =~ s/\$TABLE/\$hash->{$table}{tablestyle}/;
-  $wcmd =~ s/<\n/\.\"\<\/tbody><\/table><table class=\'block wide wrapcolumns\' style=\'\$hash->{$table}{tablestyle}\'><tbody>\"\n/g;
+  $wcmd =~ s/<\s*\n/\."<\/tbody><\/table>\$hash->{$table}{header}"\n/g;
 
   $wcmd =~ s/\$VAR/\$hash->{var}/g;
   $wcmd =~ s/\$_(\w+)/\$hash->\{var\}\{$1\}/g;
@@ -667,11 +667,12 @@ sub DOIF_RegisterEvalAll
   return undef if (!defined $hash->{$table}{table});
   #$ret =~ s/class\=\'block\'/$hash->{$table}{table}/ if($hash->{$table}{table});
   if ($table eq "uiTable") {
-    $ret .= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
+    $hash->{$table}{header}= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
       " doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'".
       " doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'".
       " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
-      ">"; 
+      ">";
+    $ret.=$hash->{$table}{header};
     #$ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>"; 
   } else {
    $ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'". 
