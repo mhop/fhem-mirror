@@ -2323,9 +2323,9 @@ sub CUL_HM_Parse($$) {#########################################################
     }
   }
   elsif($mh{st} =~ m/^(switch|dimmer|blindActuator|rgb)$/) {###################
+
     if (($mh{mTyp} eq "0201") ||  # handle Ack_Status
         ($mh{mTyp} eq "1006")) { #    or Info_Status message here
-
       my $rSUpdt = 0;# require status update
       my ($val,$err) = (hex($mI[2]),hex($mI[3]));
       $val /= 2 if ($mh{st} ne "rgb" || $mh{chn} != 3);
@@ -2392,10 +2392,12 @@ sub CUL_HM_Parse($$) {#########################################################
         $timedOn = "running";
         $stateExt = "-till" if(AttrVal($mh{cName},"param","") =~ m/showTimed/ );
       }
+      my $state = (($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs.$stateExt);
+
       push @evtEt,[$mh{cHash},1,"level:$val"];
       push @evtEt,[$mh{cHash},1,"pct:$val"]; # duplicate to level - necessary for "slider"
       push @evtEt,[$mh{cHash},1,"deviceMsg:$vs$target"] if($mh{chnM} ne "00");
-      push @evtEt,[$mh{cHash},1,"state:".(($physLvl ne $val)?"chn:$vs phys:$physLvl":$vs.$stateExt)];      
+      push @evtEt,[$mh{cHash},1,"state:".$state];      
       push @evtEt,[$mh{cHash},1,"timedOn:$timedOn"];
 
       if ($mh{cHash}->{helper}{dlvl} && defined $err){#are we waiting?
@@ -2419,18 +2421,19 @@ sub CUL_HM_Parse($$) {#########################################################
       }
       if ($mh{st} ne "switch"){
         my $eventName = "unknown"; # different names for events
-        if   ($mh{st} eq "blindActuator")    {$eventName = "motor" ;}  
+        if   ($mh{st} eq "blindActuator")   {$eventName = "motor" ;}  
         elsif($mh{st} =~ m/^(dimmer|rgb)$/) {$eventName = "dim"   ;}
         my $dir = ($err >> 4) & 3;
         my %dirName = ( 0=>"stop" ,1=>"up" ,2=>"down" ,3=>"err" );
-        push @evtEt,[$mh{cHash},1,"$eventName:$dirName{$dir}:$vs"  ];
+        my $dirNm = $dirName{$dir};
+        push @evtEt,[$mh{cHash},1,"$eventName:$dirNm:$vs"  ];
         $mh{cHash}->{helper}{dir}{rct} = $mh{cHash}->{helper}{dir}{cur} 
                   if($mh{cHash}->{helper}{dir}{cur} &&
-                     $mh{cHash}->{helper}{dir}{cur} ne $dirName{$dir});
-        $mh{cHash}->{helper}{dir}{cur} = $dirName{$dir};
+                     $mh{cHash}->{helper}{dir}{cur} ne $dirNm);
+        $mh{cHash}->{helper}{dir}{cur} = $dirNm;
       }
       if (!$rSUpdt){#dont touch if necessary for dimmer
-        if(($err&0x70) == 0x10 || ($err&0x70) == 0x20){
+        if(($err & 0x70) == 0x10 || ($err & 0x70) == 0x20){
           my $wt = $mh{cHash}->{helper}{stateUpdatDly}
                          ?$mh{cHash}->{helper}{stateUpdatDly}
                          :120;
@@ -2464,6 +2467,14 @@ sub CUL_HM_Parse($$) {#########################################################
         if ($mh{chn} == 2){
           push @evtEt,[$mh{cHash},1,"color:$val"]; # duplicate to color - necessary for "colorpicker"
           push @evtEt,[$mh{cHash},1,"rgb:".(($val==100)?("FFFFFF"):(Color::hsv2hex($val/100,1,1)))];
+          delete $mh{cHash}->{helper}{dlvl};
+        }
+        elsif($mh{chn} == 1){
+          my $ch2Name = InternalVal($mh{devH}->{NAME},"channel_02","");
+          if ($ch2Name && defined $defs{$ch2Name}  && defined $defs{$ch2Name}{helper}{dlvl}){
+            CUL_HM_stateUpdatDly($ch2Name,2);
+            delete $mh{$ch2Name}{helper}{dlvl};
+          }
         }
         push @evtEt,[$mh{cHash},1,"colProgram:$val"] if ($mh{chn} == 3); # duplicate to colProgram - necessary for "slider"
       }
@@ -5747,7 +5758,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
                                                                  or $colVal < 0 or $colVal > 200);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     $ramp = CUL_HM_encodeTime16($ramp);
-
+    $hash->{helper}{dlvl} = $colVal;
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.
                            sprintf("%02X%02X",$bright,$colVal).$ramp.$tval);
   }
@@ -5756,7 +5767,7 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
     return "cmd requires color[0..100] step 0.5" if (!defined $colVal 
                                                 ||$colVal < 0 ||$colVal > 100);
     $colVal = int($colVal*2);# convert percent to [0..200]
-
+    $hash->{helper}{dlvl} = $colVal;
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
                            sprintf("%02X",$colVal)."00A0");
   }
@@ -7415,7 +7426,7 @@ sub CUL_HM_RemoveHMPair($) {####################################################
   my($in ) = shift;
   my(undef,$name,$setReading) = split(':',$in);
   return if (!$name || !defined $defs{$name});
-  my %ioN => {$name => 1};
+  my %ioN = ($name => 1);
   my $owner_CCU = InternalVal($name,"owner_CCU",$name);
   $ioN{$_} = 1 foreach (grep {defined $_ && $_ !~ m/^$/ && defined $defs{$_}} (split(",",AttrVal($owner_CCU,"IOList",$name).",$owner_CCU")));
   
@@ -10590,11 +10601,10 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         CUL_HM_Set($defs{$eN},$eN,"getConfig");
       }
       else{
-         if (!CUL_HM_getAttrInt($eN,"ignore")){
-           CUL_HM_Set($defs{$eN},$eN,"statusRequest");
-           InternalTimer(gettimeofday()+20,"CUL_HM_readStateTo","sUpdt:$eN",0);
-         }
-         CUL_HM_unQEntity($eN,"qReqStat") if (!$dq->{$q});
+         my $ign = CUL_HM_getAttrInt($eN,'ignore');
+         CUL_HM_Set($defs{$eN},$eN,'statusRequest') if (!$ign);
+         CUL_HM_unQEntity($eN,'qReqStat') if (!$dq->{$q});
+         InternalTimer(gettimeofday()+20,'CUL_HM_readStateTo','sUpdt:'.$eN,0) if (!$ign);
       }
       $Qexec = $q;
       last; # execute only one!
@@ -10850,7 +10860,6 @@ sub CUL_HM_cleanShadowReg($){
   return $dirty;
 }
 
-
 #+++++++++++++++++ templates ++++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_tempListTmpl(@) { ##################################################
   # $name is comma separated list of names
@@ -11010,6 +11019,90 @@ sub CUL_HM_tempListTmpl(@) { ##################################################
 #  close(aSave);
   return $ret;
 }
+sub CUL_HM_getIcon($) { ####################################################### {my $s = gettimeofday();;return join("\n",map{$_.":\t".CUL_HM_getIcon($_)}devspec2array("TYPE=CUL_HM"))."\ntime: ".(gettimeofday() - $s)}
+  my $name = shift;
+  # only for CUL_HM
+  return "" if(!defined $name || !defined $defs{$name} || $defs{$name}{TYPE} ne "CUL_HM");
+  
+  # handle virtual - no idea so far
+  return ".*:HomeMatic.svg" if(defined $defs{$name}->{helper}{role}{vrt}); 
+  
+  # prio 1: Device is dead. Will apply to all channels
+  return ".*:dead.svg"      if("dead" eq ReadingsVal(CUL_HM_getDeviceName($name),"Activity","alive"));
+  
+  my ($state,$chn) = 
+           (ReadingsVal     ($name,"state"   ,""  )
+           ,InternalVal     ($name,"chanNo"  ,"00")
+           );
+
+  if($chn eq "00"){#execute device-only entites. Prio: 1)communication 3)battery
+    my ($bat) = 
+               (ReadingsVal     ($name,"battery"   ,"ok"  )
+               );
+    return ".*:"
+            .( $state   =~ m/^CMDs_.*err/   ? "rc_RED"
+              :$state   =~ m/^CMDs_process/ ? "rc_YELLOW"
+              :$bat     ne "ok"             ? "measure_battery_0"
+              :$state   eq "CMDs_done"      ? "rc_GREEN"
+              :                               "rc_RED"
+             ).".svg";
+  }
+
+  my ($level,$subType) = 
+             (ReadingsVal     ($name,"level"   ,""  )
+             ,CUL_HM_getAttr  ($name,"subType" ,""  )
+             );
+
+  if(CUL_HM_SearchCmd($name,"on")){# devices with 'on' cmd are major light switches - but not all
+    if(CUL_HM_SearchCmd($name,"color")){
+      return ".*:"
+              .( $level     < 5    ? "rc_RED"
+                :$level     < 15   ? "rc_YELLOW"
+                :$level     < 45   ? "rc_GREEN"
+                :$level     < 82   ? "rc_BLUE"
+                :                    "rc_RED"
+               ).".svg";
+    }
+    if($subType eq "blindActuator"){
+      my ($dir) = split(":",ReadingsVal($name,"motor"     ,""));
+      return ".*:"
+              .( $state    =~ m /^set_(.*)/ ? ($1 eq "off" ? "set_off" :"set_on")
+                :$level    == 0             ? "shutter_open"
+                :$level    >= 99            ? "shutter_closed"
+                :$dir      =~ m/^(up|down)$/? "black_$1"
+                :"shutter_".int($level/14.5+0.99)
+               ).".png";
+    }
+    my ($timedOn) = 
+             (ReadingsVal     ($name,"timedOn" ,""  )
+             );
+    if(1){#any with cmd on, not blind and not color
+      my ($dir) = split(":",ReadingsVal($name,"dim"     ,""));
+      return ".*:"
+              .( $state    =~ m /^set_(.*)/ ? ($1 eq "off" ? "set_off" :"set_on")
+                :$level    == 0             ? "off"
+                :$level    == 100           ? ($timedOn eq "running" ? "on-till" : "on")
+                :$dir      =~ m/^(up|down)$/? "dim$1"
+                :$level    < 6              ? "dim06%"
+                :"dim".int(int(($level+6)/6.25)*6.25)."%"
+               ).".png";
+    }
+  }
+  if($subType eq "smokeDetector"){
+    my ($bat) = 
+               (ReadingsVal     ($name,"battery"   ,"ok"  )
+               );
+    return ".*:"
+            .( $state   ne "off"            ? "icoHEIZUNG.png"
+              :$bat     ne "ok"             ? "measure_battery_0.svg"
+              :                               "light_ceiling_off.svg"
+             );
+  }
+
+  #sani_heating_level_0/10/.../100.svg
+}
+
+
 
 1;
 
