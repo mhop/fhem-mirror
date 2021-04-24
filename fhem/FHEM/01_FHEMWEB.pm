@@ -457,7 +457,8 @@ FW_Read($$)
   @FW_httpheader = split(/[\r\n]+/, $hash->{HDR});
   %FW_httpheader = map {
                          my ($k,$v) = split(/: */, $_, 2);
-                         $k =~ s/(\w+)/\u$1/g; # Forum #39203
+                         $k = lc($k);          #88205
+                         $k =~ s/(\w+)/\u$1/g; #39203
                          $k=>(defined($v) ? $v : 1);
                        } @FW_httpheader;
   delete($hash->{HDR});
@@ -542,9 +543,9 @@ FW_Read($$)
   if($FW_use{sha} && $method eq 'GET' &&
      $FW_httpheader{Connection} && $FW_httpheader{Connection} =~ /Upgrade/i &&
      $FW_httpheader{Upgrade} && $FW_httpheader{Upgrade} =~ /websocket/i &&
-     $FW_httpheader{'Sec-WebSocket-Key'}) {
+     $FW_httpheader{'Sec-Websocket-Key'}) {
 
-    my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-WebSocket-Key'}.
+    my $shastr = Digest::SHA::sha1_base64($FW_httpheader{'Sec-Websocket-Key'}.
                                 "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
     TcpServer_WriteBlocking($FW_chash,
