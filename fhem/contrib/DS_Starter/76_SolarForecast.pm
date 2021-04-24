@@ -118,11 +118,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc ",
   "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality, some more fixes ",
-  "0.38.2" => "20.04.2021  fix estConsumptionForecast, add consumption values to graphic ",
+  "0.38.2" => "20.04.2021  fix _estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
   "0.38.0" => "18.04.2021  consumption forecast for the next hours prepared ",
-  "0.37.0" => "17.04.2021  estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
+  "0.37.0" => "17.04.2021  _estConsumptionForecast, new getter forecastQualities, new setter currentRadiationDev ".
                            "language sensitive setup hints ",
   "0.36.1" => "14.04.2021  add dayname to pvHistory ",
   "0.36.0" => "14.04.2021  add con to pvHistory, add quality info to pvCircular, new reading nextPolltime ",
@@ -446,6 +447,7 @@ sub Initialize {
                                 "maxValBeam ".
                                 "numHistDays:slider,1,1,30 ".
                                 "rainFactorDamping:slider,0,1,100 ".
+                                "sameWeekdaysForConsfc:1,0 ".
                                 "showDiff:no,top,bottom ".
                                 "showHeader:1,0 ".
                                 "showLink:1,0 ".
@@ -1197,8 +1199,12 @@ return $ret;
 
 ################################################################
 sub Attr {
-    my ($cmd,$name,$aName,$aVal) = @_;
-    my $hash = $defs{$name};
+    my $cmd   = shift;
+    my $name  = shift;
+    my $aName = shift;
+    my $aVal  = shift;
+    my $hash  = $defs{$name};
+    
     my ($do,$val);
       
     # $cmd can be "del" or "set"
@@ -1422,7 +1428,8 @@ sub centralTask {
       _transferInverterValues    ($params);                                                        # WR Werte übertragen
       _transferMeterValues       ($params);                                                        # Energy Meter auswerten    
       _transferBatteryValues     ($params);                                                        # Batteriewerte einsammeln 
-      _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren
+      _estConsumptionForecast    ($params);                                                        # erwarteten Verbrauch berechnen
+      _evaluateThresholds        ($params);                                                        # Schwellenwerte bewerten und signalisieren  
       _calcSummaries             ($params);                                                        # Zusammenfassungen erstellen
 
       if(@da) {
@@ -1431,7 +1438,6 @@ sub centralTask {
       
       calcVariance           ($params);                                                            # Autokorrektur berechnen
       saveEnergyConsumption  ($params);                                                            # Energie Hausverbrauch speichern
-      estConsumptionForecast ($params); 
       
       readingsSingleUpdate($hash, "state", $params->{state}, 1);                                   # Abschluß state      
   }
@@ -2138,6 +2144,104 @@ return;
 }
 
 ################################################################
+#     Energieverbrauch Vorhersage kalkulieren
+#     
+#     Es werden nur gleiche Wochentage (Mo ... So) 
+#     zusammengefasst und der Durchschnitt ermittelt als 
+#     Vorhersage
+################################################################
+sub _estConsumptionForecast {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $chour   = $paref->{chour}; 
+  my $t       = $paref->{t};
+  my $day     = $paref->{day};                                                      # aktuelles Tagdatum (01...31)
+  my $dayname = $paref->{dayname};                                                  # aktueller Tagname
+  
+  my $medev    = ReadingsVal($name, "currentMeterDev", "");                         # aktuelles Meter device
+  my $swdfcfc  = AttrVal    ($name, "sameWeekdaysForConsfc", 0);                    # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my ($am,$hm) = parseParams ($medev);
+  $medev       = $am->[0] // "";
+  return if(!$medev || !$defs{$medev});
+  
+  my $type  = $hash->{TYPE};
+  my $hhist = $data{$type}{$name}{pvhist};
+ 
+  ## Verbrauchsvorhersage für den nächsten Tag
+  ##############################################
+  my $tomorrow = strftime "%a", localtime($t+86400);                                # Wochentagsname kommender Tag
+  my $totcon   = 0;
+  my $dnum     = 0;
+  
+  for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+      next if ($n eq $dayname);                                                     # aktuellen (unvollständigen) Tag nicht berücksichtigen
+      
+      if ($swdfcfc) {                                                               # nur gleiche Tage (Mo...So) einbeziehen
+          my $hdn = HistoryVal ($hash, $n, 99, "dayname", undef);
+          next if(!$hdn || $hdn ne $tomorrow);
+      }
+      
+      my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
+      next if(!$dcon);
+      
+      $totcon += $dcon;
+      $dnum++;      
+  }
+  
+  if ($dnum) {
+       my $tomavg                                        = sprintf("%02d", $totcon/$dnum);
+       $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                 # Durchschnittsverbrauch aller (gleicher) Wochentage
+       Log3($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
+  }
+  else {
+      $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
+  }
+  
+  ## Verbrauchsvorhersage für die nächsten Stunden
+  ##################################################
+  my $conh = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
+               "05" => 0, "06" => 0, "07" => 0, "08" => 0,
+               "09" => 0, "10" => 0, "11" => 0, "12" => 0,
+               "13" => 0, "14" => 0, "15" => 0, "16" => 0,
+               "17" => 0, "18" => 0, "19" => 0, "20" => 0,
+               "21" => 0, "22" => 0, "23" => 0, "24" => 0,
+             };
+  
+  for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
+      my $nhts = NexthoursVal ($hash, $k, "starttime", undef);                                # Startzeit
+      next if(!$nhts);
+      
+      $dnum     = 0;
+      my $utime = timestringToTimestamp ($nhts);
+      my $nhday = strftime "%a", localtime($utime);                                           # Wochentagsname des NextHours Key
+      my $nhhr  = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);              # Stunde des Tages vom NextHours Key  (01,02,...24) 
+      
+      for my $m (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
+          next if($m eq $day);                                                                # next wenn gleicher Tag (Datum) wie heute
+          
+          if ($swdfcfc) {                                                                     # nur gleiche Tage (Mo...So) einbeziehen
+              my $hdn = HistoryVal ($hash, $m, 99, "dayname", undef);
+              next if(!$hdn || $hdn ne $nhday);
+          }
+          
+          my $hcon = HistoryVal ($hash, $m, $nhhr, "con", 0);  
+          next if(!$hcon);
+          
+          $conh->{$nhhr} += $hcon;  
+          $dnum++;
+      }
+      if ($dnum) {
+           my $conavg                                = sprintf("%02d", $conh->{$nhhr}/$dnum);
+           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                               # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           Log3($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhts, con: $conavg, days for avg: $dnum");
+      }     
+  }
+  
+return;
+}
+
+################################################################
 #     Schwellenwerte auswerten und signalisieren
 ################################################################
 sub _evaluateThresholds {
@@ -2367,87 +2471,6 @@ sub saveEnergyConsumption {
       delete $paref->{histname};
   }
    
-return;
-}
-
-################################################################
-#     Energieverbrauch Vorhersage kalkulieren
-#     
-#     Es werden nur gleiche Wochentage (Mo ... So) 
-#     zusammengefasst und der Durchschnitt ermittelt als 
-#     Vorhersage
-################################################################
-sub estConsumptionForecast {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my $chour = $paref->{chour}; 
-  my $t     = $paref->{t};
-  my $day   = $paref->{day};
-  
-  my $medev    = ReadingsVal($name, "currentMeterDev", "");                         # aktuelles Meter device
-  my ($am,$hm) = parseParams ($medev);
-  $medev       = $am->[0] // "";
-  return if(!$medev || !$defs{$medev});
-  
-  my $type  = $hash->{TYPE};
-  my $hhist = $data{$type}{$name}{pvhist};
- 
-  ## Verbrauchsvorhersage für den nächsten Tag
-  ##############################################
-  my $tomorrow = strftime "%a", localtime($t+86400);                               # Wochentagsname kommender Tag
-  my $totcon   = 0;
-  my $dnum     = 0;
-  
-  for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
-      my $hdn = HistoryVal ($hash, $n, 99, "dayname", undef);
-      next if(!$hdn || $hdn ne $tomorrow);
-      
-      $totcon += HistoryVal ($hash, $n, 99, "con", 0);
-      $dnum++;      
-  }
-  
-  if ($dnum) {
-       $data{$type}{$name}{current}{tomorrowconsumption} = $totcon/$dnum;         # Durchschnittsverbrauch aller gleicher Wochentage
-  }
-  else {
-      $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
-  }
-  
-  ## Verbrauchsvorhersage für die nächsten Stunden
-  ##################################################
-  my $conh = { "01" => 0, "02" => 0, "03" => 0, "04" => 0,
-               "05" => 0, "06" => 0, "07" => 0, "08" => 0,
-               "09" => 0, "10" => 0, "11" => 0, "12" => 0,
-               "13" => 0, "14" => 0, "15" => 0, "16" => 0,
-               "17" => 0, "18" => 0, "19" => 0, "20" => 0,
-               "21" => 0, "22" => 0, "23" => 0, "24" => 0,
-             };
-  
-  for my $k (sort keys %{$data{$type}{$name}{nexthours}}) {
-      my $nhts = NexthoursVal ($hash, $k, "starttime", undef);                                # Startzeit
-      next if(!$nhts);
-      
-      $dnum     = 0;
-      my $utime = timestringToTimestamp ($nhts);
-      my $nhday = strftime "%a", localtime($utime);                                           # Wochentagsname des NextHours Key
-      my $nhhr  = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);              # Stunde des Tages vom NextHours Key  (01,02,...24) 
-      
-      for my $m (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
-          next if($m eq $day);                                                                # next wenn gleicher Tag (Datum) wie heute
-          my $hdn = HistoryVal ($hash, $m, 99, "dayname", undef);
-          next if(!$hdn || $hdn ne $nhday);
-          
-          $conh->{$nhhr} += HistoryVal ($hash, $m, $nhhr, "con", 0);  
-          $dnum++;
-      }
-      if ($dnum) {
-           my $conavg                                = $conh->{$nhhr}/$dnum;
-           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                               # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
-           Log3($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhts, con: $conavg, days for avg: $dnum");
-      }     
-  }
-  
 return;
 }
 
@@ -5239,6 +5262,15 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          (default: 10)         
        </li>  
        <br> 
+       
+       <a name="sameWeekdaysForConsfc"></a>
+       <li><b>sameWeekdaysForConsfc </b><br>
+         Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen. <br>
+         Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet. <br>
+         (default: 0)
+       </li>
+       <br>
+       
    
        <a name="showDiff"></a>
        <li><b>showDiff &lt;no | top | bottom&gt; </b><br>
