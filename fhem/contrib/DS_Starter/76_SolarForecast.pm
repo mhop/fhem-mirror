@@ -2417,7 +2417,8 @@ sub _calcSummaries {
   
   my $consumption                           = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption                       = int ($pvgen - $gfeedin);
-  my $selfconsumptionrate                   = sprintf("%.0f", $selfconsumption / $pvgen * 100);
+  my $selfconsumptionrate                   = 0;
+  $selfconsumptionrate                   = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
   my $autarkyrate                           = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100);
   
   $data{$type}{$name}{current}{consumption}         = $consumption;
