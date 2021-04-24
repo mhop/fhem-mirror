@@ -2415,11 +2415,12 @@ sub _calcSummaries {
   my $batin   = CurrentVal ($hash, "powerbatin",          0);                                           # aktuelle Batterieladung
   my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
   
-  my $consumption                           = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption                       = int ($pvgen - $gfeedin);
-  my $selfconsumptionrate                   = 0;
-  $selfconsumptionrate                   = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
-  my $autarkyrate                           = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100);
+  my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
+  my $selfconsumption     = int ($pvgen - $gfeedin);
+  my $selfconsumptionrate = 0;
+  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
+  my $autarkyrate         = 0;
+  $autarkyrate            = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
   
   $data{$type}{$name}{current}{consumption}         = $consumption;
   $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
