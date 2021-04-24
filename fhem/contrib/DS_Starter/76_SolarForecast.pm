@@ -118,7 +118,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionQuote ",
+  "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
+                           "Current_AutarkyRate ",
   "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality, some more fixes ",
   "0.38.2" => "20.04.2021  fix _estConsumptionForecast, add consumption values to graphic ",
   "0.38.1" => "19.04.2021  bug fixing ",
@@ -2416,15 +2417,18 @@ sub _calcSummaries {
   
   my $consumption                           = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption                       = int ($pvgen - $gfeedin);
-  my $selfconsumptionquote                  = sprintf("%.0f", $selfconsumption / $pvgen * 100);
+  my $selfconsumptionrate                   = sprintf("%.0f", $selfconsumption / $pvgen * 100);
+  my $autarkyrate                           = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100);
   
-  $data{$type}{$name}{current}{consumption}          = $consumption;
-  $data{$type}{$name}{current}{selfconsumption}      = $selfconsumption;
-  $data{$type}{$name}{current}{selfconsumptionquote} = $selfconsumptionquote;
+  $data{$type}{$name}{current}{consumption}         = $consumption;
+  $data{$type}{$name}{current}{selfconsumption}     = $selfconsumption;
+  $data{$type}{$name}{current}{selfconsumptionrate} = $selfconsumptionrate;
+  $data{$type}{$name}{current}{autarkyrate}         = $autarkyrate;
   
   push @$daref, "Current_Consumption<>".         $consumption.              " W";
   push @$daref, "Current_SelfConsumption<>".     $selfconsumption.          " W";
-  push @$daref, "Current_SelfConsumptionQuote<>".$selfconsumptionquote.     " %";
+  push @$daref, "Current_SelfConsumptionRate<>". $selfconsumptionrate.      " %";
+  push @$daref, "Current_AutarkyRate<>".         $autarkyrate.              " %";
   
   push @$daref, "NextHours_Sum01_PVforecast<>".  (int $next1HoursSum->{PV})." Wh";
   push @$daref, "NextHours_Sum02_PVforecast<>".  (int $next2HoursSum->{PV})." Wh";
