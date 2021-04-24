@@ -4288,9 +4288,9 @@ sub createNotifyDev {
   
   if($init_done == 1) {
       my @nd;
-      my ($afc,$ara,$ain,$ame,$h);
+      my ($afc,$ara,$ain,$ame,$aba,$h);
       
-      my $fcdev = ReadingsVal($name, "currentForecastDev", "");              # Weather forecast Device
+      my $fcdev = ReadingsVal($name, "currentForecastDev",  "");             # Weather forecast Device
       ($afc,$h) = parseParams ($fcdev);
       $fcdev    = $afc->[0] // "";      
       
@@ -4298,19 +4298,23 @@ sub createNotifyDev {
       ($ara,$h) = parseParams ($radev);
       $radev    = $ara->[0] // "";
       
-      my $indev = ReadingsVal($name, "currentInverterDev", "");              # Inverter Device
+      my $indev = ReadingsVal($name, "currentInverterDev",  "");             # Inverter Device
       ($ain,$h) = parseParams ($indev);
       $indev    = $ain->[0] // "";
       
-      my $medev = ReadingsVal($name, "currentMeterDev",    "");              # Meter Device
-      
+      my $medev = ReadingsVal($name, "currentMeterDev",     "");             # Meter Device
       ($ame,$h) = parseParams ($medev);
       $medev    = $ame->[0] // "";
+      
+      my $badev = ReadingsVal($name, "currentBatteryDev",     "");           # Battery Device
+      ($aba,$h) = parseParams ($badev);
+      $badev    = $aba->[0] // "";
       
       push @nd, $fcdev;
       push @nd, $radev if($radev ne $fcdev);
       push @nd, $indev;
       push @nd, $medev;
+      push @nd, $badev;
       
       if(@nd) {
           $hash->{NOTIFYDEV} = join ",", @nd;
