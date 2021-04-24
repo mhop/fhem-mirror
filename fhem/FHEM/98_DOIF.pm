@@ -667,12 +667,12 @@ sub DOIF_RegisterEvalAll
   return undef if (!defined $hash->{$table}{table});
   #$ret =~ s/class\=\'block\'/$hash->{$table}{table}/ if($hash->{$table}{table});
   if ($table eq "uiTable") {
-    $hash->{$table}{header}= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
+    $ret.= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
       " doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'".
       " doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'".
       " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
       ">";
-    $ret.=$hash->{$table}{header};
+    $hash->{$table}{header}= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='border-top:none;".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>";
     #$ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>"; 
   } else {
    $ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'". 
@@ -4629,10 +4629,10 @@ sub card
       $out.= $svg_icon;
       $out.='</g>';
     }
-    $out.='<polyline points="11,23 169,23"  style="stroke:gray; stroke-width:1" />';
+    $out.='<polyline points="11,23 169,23"  style="stroke:gray; stroke-width:0.7" />';
   }
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
-  $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:1" />';
+  $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:0.7" />';
   $out.= '<svg width="104" height="72">';
   $out.= '<g transform="translate(35,8) scale(1) ">';
   my $points="";
