@@ -761,7 +761,7 @@ sub HMinfo_paramCheck(@) { ####################################################
           $ioHmId = $defs{$ioCCU}{DEF};
           if ($prefIO){
             my @pIOa = split(",",$prefIO);
-            push @perfIoUndef,"$eName:\t ->$_"  foreach ( grep {!$defs{$_}} @pIOa);
+            push @perfIoUndef,"$eName:\t ->$_"  foreach ( grep {!$defs{$_}} grep !/^none$/,@pIOa);
           }            
         }
       }
