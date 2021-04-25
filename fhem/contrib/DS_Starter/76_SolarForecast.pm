@@ -118,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.40.0" => "25.04.2021  change checkdwdattr, new attr follow70percentRule ",
   "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
                            "Current_AutarkyRate ",
   "0.38.3" => "21.04.2021  minor fixes in sub calcVariance, Traffic light indicator for prediction quality, some more fixes ",
@@ -434,6 +435,7 @@ sub Initialize {
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
+                                "follow70percentRule:1,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
                                 "headerDetail:all,co,pv,pvco,statusLink ".
@@ -1676,12 +1678,8 @@ sub _transferDWDForecastValues {
   my $type = $hash->{TYPE};
   my $uac  = ReadingsVal($name, "pvCorrectionFactor_Auto", "off");                             # Auto- oder manuelle Korrektur
     
-  my @aneeded = checkdwdattr ($raname,\@draattrmust);
-  if (@aneeded) {
-      my $err         = qq{ERROR - the attribute "forecastProperties" of device "$raname" must contain: }.join ",",@aneeded;
-      $paref->{state} = $err;
-      Log3($name, 2, "$name - $err");
-  }
+  my $err         = checkdwdattr ($name,$raname,\@draattrmust);
+  $paref->{state} = $err if($err);
   
   for my $num (0..47) {      
       my ($fd,$fh) = _calcDayHourMove ($chour, $num);
@@ -1755,12 +1753,8 @@ sub _transferWeatherValues {
   my $fcname = ReadingsVal($name, "currentForecastDev", "");                                    # Weather Forecast Device
   return if(!$fcname || !$defs{$fcname});
   
-  my @aneeded = checkdwdattr ($fcname,\@dweattrmust);
-  if (@aneeded) {
-      my $err         = qq{ERROR - the attribute "forecastProperties" of device "$fcname" must contain: }.join ",",@aneeded;
-      $paref->{state} = $err;
-      Log3($name, 2, "$name - $err");
-  }
+  my $err         = checkdwdattr ($name,$fcname,\@dweattrmust);
+  $paref->{state} = $err if($err);
   
   my $type = $hash->{TYPE};
   my ($time_str);
@@ -2418,8 +2412,8 @@ sub _calcSummaries {
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin);
   my $selfconsumptionrate = 0;
-  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
   my $autarkyrate         = 0;
+  $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
   $autarkyrate            = sprintf("%.0f", $selfconsumption / ($selfconsumption + $gcon) * 100) if($selfconsumption);
   
   $data{$type}{$name}{current}{consumption}         = $consumption;
@@ -3548,10 +3542,13 @@ return ($ts,$tsdef,$realts);
 #      benötigte Attribute im DWD Device checken
 ################################################################
 sub checkdwdattr {
+  my $name   = shift;
   my $dwddev = shift;
   my $amref  = shift;
   
   my @fcprop = map { trim($_) } split ",", AttrVal($dwddev, "forecastProperties", "pattern");
+  my $fcr    = AttrVal($dwddev, "forecastResolution", 3);
+  my $err;
   
   my @aneeded;
   for my $am (@$amref) {
@@ -3559,7 +3556,18 @@ sub checkdwdattr {
       push @aneeded, $am;
   }
   
-return @aneeded;
+  if (@aneeded) {
+      $err = qq{ERROR - device "$dwddev" -> attribute "forecastProperties" must contain: }.join ",",@aneeded;
+  }
+  
+  if($fcr != 1) {
+      $err .= ", " if($err);
+      $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
+  }
+  
+  Log3($name, 2, "$name - $err") if($err);
+  
+return $err;
 }
 
 ##################################################################################################
@@ -3654,7 +3662,8 @@ sub calcPVforecast {
       delete $paref->{histname};  
   }
   
-  my $pvsum  = 0;  
+  my $pvsum   = 0;      
+  my $peaksum = 0;                                                                                    # Summe der installierten Peak Leistung
   
   for my $st (@strings) {                                                                             # für jeden String der Config ..
       my $peak   = $stch->{"$st"}{peak};                                                              # String Peak (kWp)
@@ -3691,15 +3700,22 @@ sub calcPVforecast {
 
       Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
       
-      $pvsum += $pv;
+      $pvsum   += $pv;
+      $peaksum += $peak * 1000;                                                                      # kWp in Wp umrechnen
   }
   
-  my $kw = AttrVal ($name, 'Wh/kWh', 'Wh');
-  if($kw eq "Wh") {
-      $pvsum = int $pvsum;
-  }
+  my $logao = qq{};
+  if (AttrVal ($name, "follow70percentRule", 0)) {
+      my $max70 = $peaksum/100 * 70;
+      if($pvsum > $max70) {
+          $pvsum = $max70;
+          $logao = qq{(reduced by 70 percent rule)};
+      }
+  } 
   
-  Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum");
+  $pvsum  = int $pvsum;
+  
+  Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum ".$logao);
  
 return $pvsum;
 }
@@ -5151,6 +5167,12 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        <a name="disable"></a>
        <li><b>disable</b><br>
          Aktiviert/deaktiviert das Device.
+       </li>
+       <br>
+       
+       <a name="follow70percentRule"></a>
+       <li><b>follow70percentRule</b><br>
+         Wenn gesetzt, wird die prognostizierte Leistung auf maximal 70% aller installierten Strings begrenzt.
        </li>
        <br>
      
