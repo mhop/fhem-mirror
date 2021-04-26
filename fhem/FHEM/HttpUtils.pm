@@ -95,14 +95,14 @@ HttpUtils_Close($)
 }
 
 sub
-HttpUtils_Err($)
+HttpUtils_TimeoutErr($)
 {
-  my ($lhash, $errtxt) = @_;
+  my ($lhash) = @_;
   my $hash = $lhash->{hash};
 
   if($lhash->{sts} && $lhash->{sts} == $selectTimestamp) { # busy loop check
     Log 4, "extending '$lhash->{msg} $hash->{addr}' timeout due to busy loop";
-    InternalTimer(gettimeofday()+1, "HttpUtils_Err", $lhash);
+    InternalTimer(gettimeofday()+1, "HttpUtils_TimeoutErr", $lhash);
     return;
   }
   return if(!defined($hash->{FD})); # Already closed
@@ -310,7 +310,7 @@ HttpUtils_gethostbyname($$$$)
     my ($dh) = @_;
     $dh->{dnsTo} *= 2 if($dh->{lSelectTs} != $selectTimestamp);
     $dh->{lSelectTs} = $selectTimestamp;
-    return HttpUtils_Err({ hash=>$dh, msg=>"DNS"})
+    return HttpUtils_TimeoutErr({ hash=>$dh, msg=>"DNS"})
         if($dh->{dnsTo} > $dh->{origHash}->{timeout}/2);
     my $ret = syswrite $dh->{conn}, $dh->{qry};
     if(!$ret || $ret != $dh->{ql}) {
@@ -335,7 +335,8 @@ HttpUtils_Connect($)
   $hash->{displayurl} = $hash->{hideurl} ? "<hidden>" : $hash->{url};
   $hash->{sslargs}    = {} if(!defined($hash->{sslargs}));
 
-  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}";
+  Log3 $hash, $hash->{loglevel}+1, "HttpUtils url=$hash->{displayurl}"
+    .($hash->{callback} ? " NonBlocking":" Blocking");
 
   if($hash->{url} !~ /
       ^(http|https):\/\/                # $1: proto
@@ -457,7 +458,7 @@ HttpUtils_Connect($)
           $hash->{NAME}="" if(!defined($hash->{NAME}));#Delete might check it
           $selectlist{$hash} = $hash;
           InternalTimer(gettimeofday()+$hash->{timeout},
-                        "HttpUtils_Err", \%timerHash);
+                        "HttpUtils_TimeoutErr", \%timerHash);
           return undef;
 
         } else {
@@ -555,7 +556,7 @@ HttpUtils_Connect2($)
     return "$hash->{displayurl}: Can't connect(2) to $hash->{addr}: $err"; 
   }
 
-  if($hash->{noConn2}) {
+  if($hash->{noConn2}) { # Used e.g. by DevIo.pm for a "plain" TCP connection
     delete($hash->{hu_inProgress});
     $hash->{callback}($hash);
     return undef;
@@ -648,7 +649,7 @@ HttpUtils_Connect2($)
       } elsif($hash->{incrementalTimeout}) {    # Forum #85307
         RemoveInternalTimer(\%timerHash);
         InternalTimer(gettimeofday()+$hash->{timeout},
-                      "HttpUtils_Err", \%timerHash);
+                      "HttpUtils_TimeoutErr", \%timerHash);
       }
     };
 
@@ -669,11 +670,12 @@ HttpUtils_Connect2($)
         RemoveInternalTimer(\%timerHash);
         $timerHash{msg} = "read from";
         InternalTimer(gettimeofday()+$hash->{timeout},
-                      "HttpUtils_Err", \%timerHash);
+                      "HttpUtils_TimeoutErr", \%timerHash);
       }
     };
     $selectlist{$hash} = $hash;
-    InternalTimer(gettimeofday()+$hash->{timeout}, "HttpUtils_Err",\%timerHash);
+    InternalTimer(gettimeofday()+$hash->{timeout},
+                      "HttpUtils_TimeoutErr", \%timerHash);
     return undef;
 
   } else {
