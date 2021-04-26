@@ -2,6 +2,10 @@
 #
 ##############################################
 #
+# 2021.04.26 v0.2.10
+# - CHANGE:  Logeintrag "[Echodevice] [echodevice_SendCommand] [12] IGNORIERE Command=activities Abfrage in CMD_Queue schon vorhanden!" auf Loglevel 4 geändert
+# - FEATURE: Unterstützung AIPK7MM90V7TB Echo Show Gen3
+#
 # 2021.02.10 v0.2.9
 # - BUG:     Probleme wenn getbehavior keine Antwort liefert.
 # - CHANGE:  CMD_Queue check
@@ -878,7 +882,7 @@ sub echodevice_Set($@) {
 		$usage .= 'info:Beliebig_Auf_Wiedersehen,Beliebig_Bestaetigung,Beliebig_Geburtstag,Beliebig_Guten_Morgen,Beliebig_Gute_Nacht,Beliebig_Ich_Bin_Zuhause,Beliebig_Kompliment,Erzaehle_Geschichte,Erzaehle_Was_Neues,Erzaehle_Witz,Kalender_Heute,Kalender_Morgen,Kalender_Naechstes_Ereignis,Nachrichten,Singe_Song,Verkehr,Wetter sounds:glocken,kirchenglocke,summer,tuerklingel_1,tuerklingel_2,tuerklingel_3,jubelnde_menschenmenge,publikumsapplaus,flugzeug,katastrophenalarm,motoren_an,schilde_hoch,sirenen,zappen,boing_1,boing_2,kamera,lufthupe,quitschende_tuer,tickende_uhr,trompete,hahn,hundegebell,katzenmauzen,loewengebruell,wolfsgeheul,gruselig_quitschende_tuer,weihnachtsglocken tunein primeplaylist primeplaysender primeplayeigene primeplayeigeneplaylist alarm_normal alarm_repeat reminder_normal reminder_repeat speak speak_ssml tts tts_translate:textField-long playownmusic:textField-long saveownplaylist:textField-long ';
 		$usage .= 'textcommand ';
 
-		$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2"); 
+		$usage .= 'homescreen ' if ($hash->{model} eq "Echo Show 5" || $hash->{model} eq "Echo Show 8" || $hash->{model} eq "Echo Show" || $hash->{model} eq "Echo Show Gen2" || $hash->{model} eq "Echo Show Gen3"); 
 			
 		# startownplaylist
 		$usage .= echodevice_GetOwnPlaylist($hash);
@@ -2140,12 +2144,14 @@ sub echodevice_SendCommand($$$) {
 	
 	my $QueueSize = scalar  @{$hash->{helper}{CMD_QUEUE}};
 	my $FoundCMDQueue = 0;
+	my $Loglevel = 3;
 	my @GetSettings = ("getnotifications","alarmvolume","bluetoothstate","getdnd","wakeword","listitems_task","listitems_shopping","getdevicesettings","getisonline","devices","namedListsIDs","devicesstate","account","cookielogin6","activities","getbehavior","getsettingstraffic");
 	# Doppelte Queue Einträge herausfiltern
 	foreach my $CMDQueue (@{$hash->{helper}{CMD_QUEUE}}) { 
 		if ($CMDQueue->{type} eq $type) {
 			if ((grep { $_ eq $type } @GetSettings)) {
-				Log3 $name, 3, "[$name] [echodevice_SendCommand] [$QueueSize] IGNORIERE Command=" . $type . ' Abfrage in CMD_Queue schon vorhanden!';
+				$Loglevel = 4 if ($type eq "activities");
+				Log3 $name, $Loglevel, "[$name] [echodevice_SendCommand] [$QueueSize] IGNORIERE Command=" . $type . ' Abfrage in CMD_Queue schon vorhanden!';
 				$FoundCMDQueue = 1;
 			last;
 			}
@@ -4323,6 +4329,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A10A33FOX2NUBK" || $ModelNumber eq "Echo Spot")				{return "Echo Spot";}
 	elsif($ModelNumber eq "A1NL4BVLQ4L3N3" || $ModelNumber eq "Echo Show")				{return "Echo Show";}
 	elsif($ModelNumber eq "AWZZ5CVHX2CD"   || $ModelNumber eq "Echo Show")				{return "Echo Show Gen2";}
+	elsif($ModelNumber eq "AIPK7MM90V7TB"  || $ModelNumber eq "Echo Show")				{return "Echo Show Gen3";}
 	elsif($ModelNumber eq "A4ZP7ZC4PI6TO"  || $ModelNumber eq "Echo Show 5")            {return "Echo Show 5";}
 	elsif($ModelNumber eq "A1Z88NGR2BK6A2" || $ModelNumber eq "Echo Show 8")            {return "Echo Show 8";}
 	elsif($ModelNumber eq "A2M35JJZWCQOMZ" || $ModelNumber eq "Echo Plus")				{return "Echo Plus";}
