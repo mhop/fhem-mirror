@@ -1268,7 +1268,7 @@ sub DbLogSplit {
   my $device = shift;
   my ($reading, $value, $unit) = ("","","");
 
-  if($event =~ /\sk?Wh?$/xs) {
+  if($event =~ /\s(k?Wh?|%)$/xs) {
       my @parts = split(/\s/x, $event, 3);
       $reading  = $parts[0];
       $reading  =~ tr/://d;
