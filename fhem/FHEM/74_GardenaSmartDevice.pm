@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2019 Copyright: Marko Oldenburg (leongaultier at gmail dot com)
+#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -604,9 +604,10 @@ sub WriteReadings {
         #Log3 $name, 1, " - KEIN ARRAY" if ( ref( $decode_json->{settings}[$settings]{value} ) ne "ARRAY");
         #Log3 $name, 1, " - IST ARRAY" if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY");
 
-        if ( $decode_json->{settings}[$settings]{name} eq 'schedules_paused_until' 
-              || $decode_json->{settings}[$settings]{name} eq 'eco_mode'
-            )
+        if (   exists($decode_json->{settings}[$settings]{name})
+          && ( $decode_json->{settings}[$settings]{name} eq 'schedules_paused_until' 
+            || $decode_json->{settings}[$settings]{name} eq 'eco_mode' )
+           )
         {  
             if ( $hash->{helper}{$decode_json->{settings}[$settings]{name}.'_id'} ne
                 $decode_json->{settings}[$settings]{id} )
@@ -615,6 +616,7 @@ sub WriteReadings {
                   $decode_json->{settings}[$settings]{id};
             }
         }
+        
         if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY"
             && $decode_json->{settings}[$settings]{name} eq 'starting_points' )
         {
@@ -687,7 +689,7 @@ sub WriteReadings {
 
     readingsEndUpdate( $hash, 1 );
 
-    Log3 $name, 4, "GardenaSmartDevice ($name) - readings was written}";
+    Log3 $name, 4, "GardenaSmartDevice ($name) - readings was written";
 
     return;
 }
@@ -1255,7 +1257,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.2",
+  "version": "v2.2.3",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
