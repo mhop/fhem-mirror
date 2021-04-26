@@ -1,6 +1,6 @@
-REV 24330
+REV 24333
 DIR unused
-UPD 2021-04-23_07:45:03 361599 ./CHANGED
+UPD 2021-04-26_07:45:03 361707 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-03-28_07:45:04 43114 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
@@ -517,7 +517,7 @@ UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
 UPD 2019-12-23_07:45:02 43987 FHEM/98_archetype.pm
 UPD 2021-02-13_09:02:50 35431 FHEM/98_autocreate.pm
 UPD 2018-03-01_07:45:03 9884 FHEM/98_average.pm
-UPD 2020-11-03_07:45:03 11366 FHEM/98_backup.pm
+UPD 2021-04-26_07:45:03 3440 FHEM/98_backup.pm
 UPD 2017-01-09_07:45:02 10293 FHEM/98_cloneDummy.pm
 UPD 2018-03-02_07:47:09 3985 FHEM/98_cmdalias.pm
 UPD 2020-07-04_07:45:03 20803 FHEM/98_configdb.pm
@@ -733,12 +733,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-04-22_07:45:07 4496047 docs/commandref.html
+UPD 2021-04-26_07:45:07 4496049 docs/commandref.html
 UPD 2021-04-17_07:45:10 2779091 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-04-25_07:45:10 238991 docs/commandref_modular.html
-UPD 2021-04-25_07:45:11 250006 docs/commandref_modular_DE.html
+UPD 2021-04-26_07:45:10 238991 docs/commandref_modular.html
+UPD 2021-04-26_07:45:11 250006 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -760,6 +760,7 @@ UPD 2021-01-30_07:45:03 4025 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2021-04-23_07:45:03 6019 lib/FHEM/Core/Authentication/Passwords.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
+UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2021-04-09_07:45:07 39454 lib/FHEM/HTTPMOD/Utils.pm
 UPD 2021-03-14_07:45:04 12201 lib/FHEM/Modbus/TestUtils.pm
 UPD 2020-09-24_07:45:02 9127 lib/FHEM/SynoModules/API.pm
