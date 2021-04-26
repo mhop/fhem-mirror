@@ -21,8 +21,7 @@
 #
 ##############################################################################
 #   Changelog:
-#   0.1.06: Fixed reading the paramter list (119939/1151016)
-#           Another "garbage" fix 
+#   0.1.06: - 2021-04-26 - Split JSON strings to avoid processing multiple root nodes
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
 #   0.1.03: Improve error handling
@@ -54,12 +53,14 @@ use B qw(svref_2object);
 use utf8;
 use Digest::MD5 qw(md5);
 
+use FHEM::Core::Authentication::Passwords qw(:ALL);
 
 my $version = "0.1.06";
 
 my $missingModul = '';
-eval 'use MIME::Base64::URLSafe;1'       or $missingModul .= 'MIME::Base64::URLSafe ';
-eval 'use Digest::SHA qw(sha256);1;'     or $missingModul .= 'Digest::SHA ';
+eval 'use MIME::Base64::URLSafe;1'   or $missingModul .= 'MIME::Base64::URLSafe ';
+eval 'use Digest::SHA qw(sha256);1;' or $missingModul .= 'Digest::SHA ';
+
 #eval 'use Protocol::WebSocket::Client;1' or $missingModul .= 'Protocol::WebSocket::Client ';
 
 # Taken from RichardCZ https://gl.petatech.eu/root/HomeBot/snippets/2
@@ -280,17 +281,29 @@ sub Define {
 
     Log3 $name, LOG_SEND, "[$name] SoftliqCloud defined $name";
 
-    $hash->{NAME} = $name;
-    $hash->{USER} = $user;
+    $hash->{NAME}    = $name;
+    $hash->{USER}    = $user;
     $hash->{VERSION} = $version;
 
-    if (ReadingsVal($name,"accessToken",$EMPTY) ne $EMPTY) {
+    if ( ReadingsVal( $name, "accessToken", $EMPTY ) ne $EMPTY ) {
         CommandDeleteReading( undef, $name . " accessToken" );
     }
-    if (ReadingsVal($name,"refreshToken",$EMPTY) ne $EMPTY) {
+    if ( ReadingsVal( $name, "refreshToken", $EMPTY ) ne $EMPTY ) {
         CommandDeleteReading( undef, $name . " refreshToken" );
     }
-    
+
+    $hash->{helper}->{passObj} = FHEM::Core::Authentication::Passwords->new( $hash->{TYPE} );
+
+    # get password form old storage and save to new format
+    if ( !defined(ReadPassword($hash)) ) {
+        if ( defined( ReadPasswordOld($hash) ) ) {
+            my ( $passResp, $passErr ) = $hash->{helper}->{passObj}->setStorePassword( $name, ReadPasswordOld($hash) );
+            if ( defined($passErr) ) {
+                Log3( $name, LOG_CRITICAL, qq([$name] Error while saving the password - $passErr) );
+            }
+        }
+    }
+
     #start timer
     if ( !IsDisabled($name) && $init_done && defined( ReadPassword($hash) ) ) {
         my $next = int( gettimeofday() ) + 1;
@@ -331,9 +344,9 @@ sub Set {
     my $val  = shift;
 
     #delete $hash->{helper}{cmdQueue};
-    
+
     if ( $cmd eq 'param' ) {
-    
+
         return qq(Usage is 'set $name $cmd <parameter> <value>') if ( !$cmd || !$val );
 
         if ( any {/^$arg$/xsm} @{ $hash->{helper}{params} } ) {
@@ -506,26 +519,25 @@ sub setParam {
     my $value = shift;
     my $body;
     my $name = $hash->{NAME};
-    if ($value =~ /^-?\d+\.?\d*$/xsm) {
-        my $num = $value*1;
+    if ( $value =~ /^-?\d+\.?\d*$/xsm ) {
+        my $num = $value * 1;
         $body = encode_json( { $param => $num } );
     }
     else {
-        $body = encode_json( { $param => $value } );   
+        $body = encode_json( { $param => $value } );
     }
 
     Log3 $name, LOG_SEND, qq([$name] Setting parameter $body);
 
     my $header = {
-        "Host"   => "prod-eu-gruenbeck-api.azurewebsites.net",
-        "Accept" => "application/json",
-        "User-Agent" =>
-            "Gruenbeck/360 CFNetwork/1220.1 Darwin/20.3.0",
+        "Host"            => "prod-eu-gruenbeck-api.azurewebsites.net",
+        "Accept"          => "application/json",
+        "User-Agent"      => "Gruenbeck/360 CFNetwork/1220.1 Darwin/20.3.0",
         "Authorization"   => "Bearer " . $hash->{helper}{accessToken},
         "Accept-Language" => "de-de",
         "cache-control"   => "no-cache",
         "Content-Type"    => "application/json",
-       };
+    };
     my $setparam = {
         header => $header,
         url    => 'https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/softliQ.D/'
@@ -768,7 +780,7 @@ sub login {
     my $newdata = {
         "request_type"    => 'RESPONSE',
         "logonIdentifier" => InternalVal( $name, 'USER', $EMPTY ),
-        "signInName"	  => InternalVal( $name, 'USER', $EMPTY ),
+        "signInName"      => InternalVal( $name, 'USER', $EMPTY ),
         "password"        => ReadPassword($hash),
     };
 
@@ -806,7 +818,7 @@ sub parseLogin {
     # $data should be {"status":"200"}
     Log3 $name, LOG_RECEIVE, $err . " / " . $data . Dumper($header);
     my $json = safe_decode_json( $hash, $data );
-    if ($json->{status} ne "200") {
+    if ( $json->{status} ne "200" ) {
         readingsBeginUpdate($hash);
         readingsBulkUpdate( $hash, "error",             $json->{status} );
         readingsBulkUpdate( $hash, "error_description", $json->{message} );
@@ -889,10 +901,9 @@ sub initToken {
     my $hash = shift;
     my $name = $hash->{NAME};
 
-    if (!$hash->{helper}{tenant}) {
-        $hash->{helper}{tenant} = ReadingsVal($name,"tenant",undef);
+    if ( !$hash->{helper}{tenant} ) {
+        $hash->{helper}{tenant} = ReadingsVal( $name, "tenant", undef );
     }
-
 
     my $newparam->{header} = {
         "Host"                     => "gruenbeckb2c.b2clogin.com",
@@ -961,8 +972,8 @@ sub parseRefreshToken {
     readingsBeginUpdate($hash);
     readingsBulkUpdate( $hash, ".accessToken",  $data->{access_token} );
     readingsBulkUpdate( $hash, ".refreshToken", $data->{refresh_token} );
-    readingsBulkUpdate( $hash, "not_before",   strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{not_before} ) ) );
-    readingsBulkUpdate( $hash, "expires_on",   strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{expires_on} ) ) );
+    readingsBulkUpdate( $hash, "not_before",    strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{not_before} ) ) );
+    readingsBulkUpdate( $hash, "expires_on",    strftime( "%Y-%m-%d %H:%M:%S", localtime( $data->{expires_on} ) ) );
 
     readingsEndUpdate( $hash, 1 );
 
@@ -1032,10 +1043,9 @@ sub getDevices {
     my $name = $hash->{NAME};
 
     my $header = {
-        "Host"   => "prod-eu-gruenbeck-api.azurewebsites.net",
-        "Accept" => "application/json, text/plain, */*",
-        "User-Agent" =>
-            "Gruenbeck/358 CFNetwork/1220.1 Darwin/20.3.0",
+        "Host"            => "prod-eu-gruenbeck-api.azurewebsites.net",
+        "Accept"          => "application/json, text/plain, */*",
+        "User-Agent"      => "Gruenbeck/358 CFNetwork/1220.1 Darwin/20.3.0",
         "Authorization"   => "Bearer " . $hash->{helper}{accessToken},
         "Accept-Language" => "de-de",
         "cache-control"   => "no-cache"
@@ -1094,10 +1104,9 @@ sub getMeasurements {
     my $name = $hash->{NAME};
 
     my $header = {
-        "Host"   => "prod-eu-gruenbeck-api.azurewebsites.net",
-        "Accept" => "application/json, text/plain, */*",
-        "User-Agent" =>
-            "Gruenbeck/358 CFNetwork/1220.1 Darwin/20.3.0",
+        "Host"            => "prod-eu-gruenbeck-api.azurewebsites.net",
+        "Accept"          => "application/json, text/plain, */*",
+        "User-Agent"      => "Gruenbeck/358 CFNetwork/1220.1 Darwin/20.3.0",
         "Authorization"   => "Bearer " . $hash->{helper}{accessToken},
         "Accept-Language" => "de-de",
         "cache-control"   => "no-cache"
@@ -1264,7 +1273,7 @@ sub getParam {
         header => $header,
         url    => "https://prod-eu-gruenbeck-api.azurewebsites.net/api/devices/"
             . ReadingsVal( $name, 'id', $EMPTY )
-            . '/parameters?api-version=2019-08-09',
+            . '/parameters?api-version=2020-08-03',
         callback => \&parseParam,
         hash     => $hash
     };
@@ -1534,7 +1543,7 @@ sub safe_decode_json {
         1;
     } or do {
         my $error = $@ || 'Unknown failure';
-        Log3 $name, LOG_ERROR, "[$name] - Received invalid JSON: $error".Dumper($data);
+        Log3 $name, LOG_ERROR, "[$name] - Received invalid JSON: $error" . Dumper($data);
 
     };
     return $json;
@@ -1564,30 +1573,42 @@ sub StorePassword {
     my $password = shift;
     my $name     = $hash->{NAME};
 
-    my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
-    my $key     = getUniqueId() . $index;
-    my $enc_pwd = $EMPTY;
+    my ( $passResp, $passErr );
+    ( $passResp, $passErr ) = $hash->{helper}->{passObj}->setStorePassword( $name, $password );
 
-    if ( eval "use Digest::MD5;1" ) {
+    # my $index   = $hash->{TYPE} . "_" . $name . "_passwd";
+    # my $key     = getUniqueId() . $index;
+    # my $enc_pwd = $EMPTY;
 
-        $key = Digest::MD5::md5_hex( unpack "H*", $key );
-        $key .= Digest::MD5::md5_hex($key);
+    # if ( eval "use Digest::MD5;1" ) {
+
+    #     $key = Digest::MD5::md5_hex( unpack "H*", $key );
+    #     $key .= Digest::MD5::md5_hex($key);
+    # }
+
+    # for my $char ( split //, $password ) {
+
+    #     my $encode = chop($key);
+    #     $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+    #     $key = $encode . $key;
+    # }
+
+    # my $err = setKeyValue( $index, $enc_pwd );
+    if ( defined($passErr) ) {
+        return "error while saving the password - $passErr";
     }
-
-    for my $char ( split //, $password ) {
-
-        my $encode = chop($key);
-        $enc_pwd .= sprintf( "%.2x", ord($char) ^ ord($encode) );
-        $key = $encode . $key;
-    }
-
-    my $err = setKeyValue( $index, $enc_pwd );
-    return "error while saving the password - $err" if ( defined($err) );
 
     return "password successfully saved";
 }
 
 sub ReadPassword {
+    my $hash = shift;
+    my $name = $hash->{NAME};
+
+    return $hash->{helper}->{passObj}->getReadPassword($name);
+}
+
+sub ReadPasswordOld {
     my $hash = shift;
     my $name = $hash->{NAME};
 
@@ -1639,16 +1660,24 @@ sub Rename {
     my $old = shift;
 
     my $hash = $defs{$new};
+    my $name = $hash->{NAME};
 
-    StorePassword( $hash, $new, ReadPassword( $hash, $old ) );
-    setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+    my $oldhash = $defs{$old};
+    Log3( $name, 1, Dumper($oldhash) );
 
+    my ( $passResp, $passErr ) = $hash->{helper}->{passObj}->setRename( $new, $old );
+
+    if ( defined($passErr) ) {
+        Log3( $name, LOG_WARNING,
+            "[$name]error while saving the password after rename - $passErr. Please set the password again." );
+    }
     return;
 }
 
 sub wsConnect2 {
     my ( $hash, $url ) = @_;
     my $name = $hash->{NAME};
+
     #$hash->{loglevel} = 1;
     return if ( DevIo_IsOpen($hash) );
 
@@ -1684,8 +1713,8 @@ sub wsConnect2 {
 
     #$url =~ s/wss:\/\//wss:/;
     #$hash->{DeviceName} = $url;
-    $hash->{DeviceName} = 'wss:' . $host . ':' . $port . $path;
-    $hash->{SSL}        = 1;
+    $hash->{DeviceName}    = 'wss:' . $host . ':' . $port . $path;
+    $hash->{SSL}           = 1;
     $hash->{devioLoglevel} = LOG_RECEIVE;
     DevIo_OpenDev( $hash, 0, "FHEM::Gruenbeck::SoftliqCloud::wsStart", "FHEM::Gruenbeck::SoftliqCloud::wsFail" );
 
@@ -1772,37 +1801,145 @@ sub parseWebsocketRead {
     my $hash = shift;
     my $buf  = shift;
     my $name = $hash->{NAME};
-    my @jsons = split(/\{}/xsm, $buf);
-    foreach my $j (@jsons) { 
-        my $json = safe_decode_json( $hash, $j );
-        if ( $json->{type} && $json->{type} ne '6' ) {
+    my $json = safe_decode_json( $hash, $buf );
+    if ( $json->{type} && $json->{type} ne '6' ) {
 
-            Log3 $name, LOG_RECEIVE, qq([$name] Received from socket: $buf);
-            readingsBeginUpdate($hash);
-            my @args = @{ $json->{arguments} };
-            my %info = %{ $args[0] };
-            my $i    = 0;
-            foreach my $key ( keys %info ) {
+        Log3 $name, LOG_RECEIVE, qq([$name] Received from socket: $buf);
+        readingsBeginUpdate($hash);
+        my @args = @{ $json->{arguments} };
+        my %info = %{ $args[0] };
+        my $i    = 0;
+        foreach my $key ( keys %info ) {
 
-                if ( $key eq 'type' ) {    # no use and there is already a type reading (machine type)
-                    next;
-                }
-
-                if ( $key =~ /2$/x and AttrVal( $name, 'sq_duplex', '0' ) eq '0' ) {
-                    next;
-                }
-                if ( $key eq 'msaltusage' ) {
-                    my $diff = $info{$key} - ReadingsNum( $name, "lastRefill", 0 );
-                    readingsBulkUpdate( $hash, 'saltUsageSinceRefill', $diff );
-                }
-                readingsBulkUpdate( $hash, $key, $info{$key} );
+            if ( $key eq 'type' ) {    # no use and there is already a type reading (machine type)
+                next;
             }
-            readingsEndUpdate( $hash, 1 );
-    }
+
+            if ( $key =~ /2$/x and AttrVal( $name, 'sq_duplex', '0' ) eq '0' ) {
+                next;
+            }
+            if ( $key eq 'msaltusage' ) {
+                my $diff = $info{$key} - ReadingsNum( $name, "lastRefill", 0 );
+                readingsBulkUpdate( $hash, 'saltUsageSinceRefill', $diff );
+            }
+            readingsBulkUpdate( $hash, $key, $info{$key} );
+        }
+        readingsEndUpdate( $hash, 1 );
+
     }
     return;
 }
 
+# sub wsHandshake {
+#     my $hash       = shift;
+#     my $name       = $hash->{NAME};
+#     my $tcp_socket = $hash->{TCPDev};
+#     my $url        = $hash->{helper}{url};
+
+#     # create a websocket protocol handler
+#     #  this doesn't actually "do" anything with the socket:
+#     #  it just encodes / decode WebSocket messages.  We have to send them ourselves.
+#     Log3 $name, LOG_RECEIVE, "[$name] Trying to create Protocol::WebSocket::Client handler for $url...";
+#     my $client = Protocol::WebSocket::Client->new(
+#         url     => $url,
+#         version => "13",
+#     );
+
+#     # Set up the various methods for the WS Protocol handler
+#     #  On Write: take the buffer (WebSocket packet) and send it on the socket.
+#     $client->on(
+#         write => sub {
+#             my $sclient = shift;
+#             my ($buf) = @_;
+
+#             syswrite $tcp_socket, $buf;
+#         }
+#     );
+
+#     # On Connect: this is what happens after the handshake succeeds, and we
+#     #  are "connected" to the service.
+#     $client->on(
+#         connect => sub {
+#             my $sclient = shift;
+
+#             # You may wish to set a global variable here (our $isConnected), or
+#             #  just put your logic as I did here.  Or nothing at all :)
+#             Log3 $name, LOG_RECEIVE, "[$name] Successfully connected to service!" . Dumper($hash);
+#             $sclient->write('{"protocol":"json","version":1}');
+
+#             #succesfully connected - start a timer
+#             my $next = int( gettimeofday() ) + MINUTESECONDS;
+#             InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsClose', $hash, 0 );
+#             return;
+
+#         }
+#     );
+
+#     # On Error, print to console.  This can happen if the handshake
+#     #  fails for whatever reason.
+#     $client->on(
+#         error => sub {
+#             my $sclient = shift;
+#             my ($buf) = @_;
+
+#             Log3 $name, LOG_ERROR, qq([$name] ERROR ON WEBSOCKET: $buf);
+#             $tcp_socket->close;
+#             return qq([$name] ERROR ON WEBSOCKET: $buf);
+#         }
+#     );
+
+#     # On Read: This method is called whenever a complete WebSocket "frame"
+#     #  is successfully parsed.
+#     # We will simply print the decoded packet to screen.  Depending on the service,
+#     #  you may e.g. call decode_json($buf) or whatever.
+#     $client->on(
+#         read => sub {
+#             my $sclient = shift;
+#             my ($buf) = @_;
+#             $buf =~ s///xsm;
+#             parseWebsocketRead( $hash, $buf );
+
+#             #Log3 $name, 3, "[$name] Received from socket: '$buf'";
+#             return;
+#         }
+#     );
+
+#     # Now that we've set all that up, call connect on $client.
+#     #  This causes the Protocol object to create a handshake and write it
+#     #  (using the on_write method we specified - which includes sysread $tcp_socket)
+#     Log3 $name, LOG_RECEIVE, "[$name] Calling connect on client...";
+#     $client->connect;
+
+#     # read until handshake is complete.
+#     while ( !$client->{hs}->is_done ) {
+#         my $recv_data;
+
+#         my $bytes_read = sysread $tcp_socket, $recv_data, TCPPACKETSIZE;
+
+#         if ( !defined $bytes_read ) {
+#             Log3 $name, LOG_ERROR, qq([$name] sysread on tcp_socket failed: $!);
+#             return qq([$name] sysread on tcp_socket failed: $!);
+#         }
+#         if ( $bytes_read == 0 ) {
+#             Log3 $name, LOG_ERROR, qq([$name] Connection terminated.);
+#             return qq([$name] Connection terminated.);
+#         }
+
+#         $client->read($recv_data);
+#     }
+
+#     # Create a Socket Set for Select.
+#     #  We can then test this in a loop to see if we should call read.
+#     # my $set = IO::Select->new($tcp_socket);
+
+#     #$hash->{helper}{wsSet}    = $set;
+#     $hash->{helper}{wsClient} = $client;
+
+#     # my $next = int( gettimeofday() ) + 1;
+#     # $hash->{helper}{wsCount} = 0;
+#     #InternalTimer( $next, 'FHEM::Gruenbeck::SoftliqCloud::wsRead', $hash, 0 );
+#     return;
+# }
 
 sub wsFail {
     my $hash  = shift;
@@ -1833,19 +1970,25 @@ sub wsReadDevIo {
     my $client = $hash->{helper}{wsClient};
 
     my $buf = DevIo_SimpleRead($hash);
-    if (!$buf) {
-    	return;
+    if ( !$buf ) {
+        return;
     }
     $buf =~ s///xsm;
     $buf =~ s/\\x\{1e\}//xsm;
-    if (!($buf =~ /}$/xsm)) {
-    	$buf = substr($buf, 0, rindex($buf,"}"));
-    }
+    #if ( !( $buf =~ /}$/xsm ) ) {
+    #    $buf = substr( $buf, 0, rindex( $buf, "}" ) );
+    #}
     if ( length($buf) == 0 ) {
         return;
     }
     Log3( $name, LOG_DEBUG, qq([$name] Received from DevIo: $buf) );
-    parseWebsocketRead( $hash, $buf );
+    
+    my @bufs = split (/}\{/xsm, $buf);
+
+    foreach my $bufi (@bufs) {
+        Log3 ($name, LOG_RECEIVE, "[$name] - Extracted".$bufi );
+        parseWebsocketRead( $hash, $bufi );
+    }
 
     #    $client->read($buf);
 
