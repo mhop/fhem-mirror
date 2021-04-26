@@ -4174,11 +4174,11 @@ par:DEV_ID;the MAC of the Mower (Device Info);{ AttrVal("DEVICE","readingList","
 par:ICON;ICON as set, defaults to audio_volume_low;{ AttrVal("DEVICE","icon","scene_robo_lawnmower") }
 attr DEVICE icon ICON
 attr DEVICE readingList BASE_TOPIC/DEV_ID/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:SerialNumber\
+attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:serialNumber\
 dat_le:mowerErrorIndex dat_ls:mowerStatusIndex\
 cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection\
 dat_bt_t:batteryTemperature dat_bt_v:batteryVoltage dat_bt_p:batteryPercent dat_bt_nr:batteryChargeCycle dat_bt_c:batteryCharging\
-dat_st_b:bladeTimeCounter dat_st_d:totalDistance dat_st_wt:totalTime\
+dat_st_b:totalBladeTime dat_st_d:totalDistance dat_st_wt:totalTime dat_st_bl:borderLength\
 dat_dmp_1:directionPitch dat_dmp_2:directionRoll dat_dmp_3:directionYaw
 attr DEVICE setList mowerRainDelay:slider,0,30,1440 BASE_TOPIC/DEV_ID/commandIn {"rd":$EVTPART1}\
   mowerTimeCorrection:slider,-100,1,100 BASE_TOPIC/DEV_ID/commandIn {"sc":{"p":$EVTPART1}}\
@@ -4189,7 +4189,11 @@ attr DEVICE setList mowerRainDelay:slider,0,30,1440 BASE_TOPIC/DEV_ID/commandIn 
   pauseMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":2}\
   stopMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":3}\
   x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/commandIn $payload)}
-attr DEVICE userReadings mowerActive:mowerActiveIndex.* {ReadingsVal($name,"mowerActiveIndex","0") ? "true" : "false"},\
+attr DEVICE userReadings mowerActive:mowerActiveIndex.* {my %activeState = (\
+ 0 => "No",\
+ 1 => "Yes",\
+ 2 => "Party"\
+); $activeState{ReadingsVal($name,"mowerActiveIndex","0")}},\
 mowerStatusTxt:mowerStatusIndex.* {my %stateCodes = (\
  0 => "Idle",\
  1 => "Home",\
@@ -4231,7 +4235,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  17 => "Battery temp out of range"\
 ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
 attr DEVICE model worx_landroid_mover
-setreading DEVICE attrTemplateVersion 20200701
+setreading DEVICE attrTemplateVersion 20210426
 
 
 ###########################################
