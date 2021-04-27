@@ -435,7 +435,7 @@ sub Initialize {
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
-                                "follow70percentRule:1,0 ".
+                                "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
                                 "headerDetail:all,co,pv,pvco,statusLink ".
@@ -3703,21 +3703,45 @@ sub calcPVforecast {
       $pvsum   += $pv;
       $peaksum += $peak * 1000;                                                                      # kWp in Wp umrechnen
   }
-  
-  my $logao = qq{};
-  if (AttrVal ($name, "follow70percentRule", 0)) {
-      my $max70 = $peaksum/100 * 70;
-      if($pvsum > $max70) {
-          $pvsum = $max70;
-          $logao = qq{(reduced by 70 percent rule)};
-      }
-  } 
-  
-  $pvsum  = int $pvsum;
+    
+  my $logao         = qq{};
+  $paref->{pvsum}   = $pvsum;
+  $paref->{peaksum} = $peaksum;
+  ($pvsum, $logao)  = _70percentRule ($paref); 
   
   Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum ".$logao);
  
 return $pvsum;
+}
+
+################################################################
+#                 70% Regel kalkulieren
+################################################################
+sub _70percentRule {
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $pvsum   = $paref->{pvsum};
+  my $peaksum = $paref->{peaksum};
+  my $num     = $paref->{num};                                                          # Nexthour 
+  
+  my $logao = qq{};
+  my $confc = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "confc", 0);
+  my $max70 = $peaksum/100 * 70;
+  
+  if(AttrVal ($name, "follow70percentRule", "0") eq "1" && $pvsum > $max70) {      
+      $pvsum = $max70;
+      $logao = qq{(reduced by 70 percent rule)};
+  }  
+
+  if(AttrVal ($name, "follow70percentRule", "0") eq "dynamic" && $pvsum > $max70 + $confc) {
+      $pvsum = $max70 + $confc;
+      $logao = qq{(reduced by 70 percent dynamic rule)};
+  }  
+  
+  $pvsum = int $pvsum;
+ 
+return ($pvsum, $logao);
 }
 
 ################################################################
@@ -4123,7 +4147,7 @@ sub listDataPool {
           $sq .= "\n" if($sq);
           $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb, temp=$temp, wid: $wid, wtxt: $wtxt\n";
           $sq .= "      corr: $pvcf\n";
-          $sq .= "      quality:$cfq";
+          $sq .= "      quality: $cfq";
       }
   }
   
@@ -5172,7 +5196,17 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
        
        <a name="follow70percentRule"></a>
        <li><b>follow70percentRule</b><br>
-         Wenn gesetzt, wird die prognostizierte Leistung auf maximal 70% aller installierten Strings begrenzt.
+         Wenn gesetzt, wird die prognostizierte Leistung entsprechend der 70% Regel begrenzt. <br><br>
+         
+         <ul>   
+         <table>  
+         <colgroup> <col width=15%> <col width=85%> </colgroup>
+            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                             </td></tr>
+            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung begrenzt  </td></tr>
+            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                </td></tr>
+            <tr><td>                </td><td>Stringleistung zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
+         </table>
+         </ul> 
        </li>
        <br>
      
