@@ -557,7 +557,7 @@ sub XiaomiDevice_Set($$@) {
     $list  .=  " on:noArg off:noArg mode:auto,fan,silent,favorite favorite:slider,0,1,14 level:slider,0,1,3 buzzer:on,off led:bright,dim,off child_lock:on,off";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "SmartMiAirPurifier"){
-    $list  .=  " on:noArg off:noArg mode:auto,sleep,favorite favorite:slider,0,1,14 buzzer:on,off led:bright,dim,off child_lock:on,off";
+    $list  .=  " on:noArg off:noArg mode:auto,night,favorite favorite:slider,0,1,14 buzzer:on,off led:bright,dim,off child_lock:on,off";
   }
   elsif( defined($attr{$name}) && defined($attr{$name}{subType}) && $attr{$name}{subType} eq "Humidifier"){
     $list  .=  " on:noArg off:noArg mode:idle,silent,medium,high buzzer:on,off led:bright,dim,off child_lock:on,off limit_hum:slider,30,1,80";
@@ -1561,11 +1561,11 @@ sub XiaomiDevice_Set($$@) {
     }
 
 
-    $hash->{helper}{packet}{$packetid} = ($arg[0] eq 'idle') ? 'mode_idle' : ($arg[0] eq 'auto') ? 'mode_auto' : ($arg[0] eq 'silent') ? 'mode_silent' : ($arg[0] eq 'sleep') ? 'mode_sleep' : ($arg[0] eq 'medium') ? 'mode_medium' : ($arg[0] eq 'high') ? 'mode_high' : 'mode_favorite';
+    $hash->{helper}{packet}{$packetid} = ($arg[0] eq 'idle') ? 'mode_idle' : ($arg[0] eq 'auto') ? 'mode_auto' : ($arg[0] eq 'silent') ? 'mode_silent' : ($arg[0] eq 'night') ? 'mode_night' : ($arg[0] eq 'medium') ? 'mode_medium' : ($arg[0] eq 'high') ? 'mode_high' : 'mode_favorite';
 
     if (defined($attr{$name}) && defined($attr{$name}{subType}) && ($attr{$name}{subType} eq "AirPurifier3H" || $attr{$name}{subType} eq "SmartMiAirPurifier"))
     {
-      my $cmd_set = $arg[0] eq 'auto' ? '0' : $arg[0] eq 'sleep' ? '1' : $arg[0] eq 'favorite' ? '2' : '3';
+      my $cmd_set = $arg[0] eq 'auto' ? '0' : $arg[0] eq 'night' ? '1' : $arg[0] eq 'favorite' ? '2' : '3';
       XiaomiDevice_WriteJSON($hash, '{"id":'.$packetid.',"method":"set_properties","params":[{"did": "mode", "siid": 2, "piid": 5, "value": '.$cmd_set.'}]}' );
       return undef;
     }
