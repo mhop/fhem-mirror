@@ -35,6 +35,7 @@ MQTT2_CLIENT_Initialize($)
     autocreate:no,simple,complex
     clientId
     clientOrder
+    connectTimeout
     disable:1,0
     disabledForIntervals
     disconnectAfter
@@ -292,6 +293,11 @@ MQTT2_CLIENT_Attr(@)
   if($attrName eq "clientId") {
     delete($hash->{clientId});
     $hash->{clientId} = $param[0] if($type eq "set");
+  }
+
+  if($attrName eq "connectTimeout") {
+    delete($hash->{TIMEOUT});
+    $hash->{TIMEOUT} = $param[0] if($type eq "set");
   }
 
   if($attrName eq "sslargs") {
@@ -732,6 +738,12 @@ MQTT2_CLIENT_getStr($$)
       relevant when autocreate is active, and the default order
       (MQTT2_DEVICE MQTT_GENERIC_BRIDGE) is not adequate.
       Note: Changing the attribute affects _all_ MQTT2_CLIENT instances.
+      </li></br>
+
+    <a id="MQTT2_CLIENT-attr-connectTimeout"></a>
+    <li>connectTimeout &lt;seconds&gt;<br>
+      change the HTTP connect timeout, default is 4 seconds. This seems to be
+      necessary for some MQTT servers in robotic vacuum cleaners.
       </li></br>
 
     <li><a href="#disable">disable</a><br>
