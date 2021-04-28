@@ -4,9 +4,6 @@
 #       76_SolarForecast.pm
 #
 #       (c) 2020-2021 by Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
-#
-#       This Module is used by module 76_SMAPortal to create graphic devices.
-#       It can't be used standalone without any SMAPortal-Device.
 # 
 #       This script is part of fhem.
 #
@@ -118,6 +115,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.41.0" => "28.04.2021  _estConsumptionForecast: implement Smoothing difference ",
   "0.40.0" => "25.04.2021  change checkdwdattr, new attr follow70percentRule ",
   "0.39.0" => "24.04.2021  new attr sameWeekdaysForConsfc, readings Current_SelfConsumption, Current_SelfConsumptionRate, ".
                            "Current_AutarkyRate ",
@@ -2168,6 +2166,8 @@ sub _estConsumptionForecast {
   my $tomorrow = strftime "%a", localtime($t+86400);                                # Wochentagsname kommender Tag
   my $totcon   = 0;
   my $dnum     = 0;
+  my $min      =  (~0 >> 1);
+  my $max      = -(~0 >> 1);
   
   for my $n (sort{$a<=>$b} keys %{$data{$type}{$name}{pvhist}}) {
       next if ($n eq $dayname);                                                     # aktuellen (unvollständigen) Tag nicht berücksichtigen
@@ -2180,13 +2180,17 @@ sub _estConsumptionForecast {
       my $dcon = HistoryVal ($hash, $n, 99, "con", 0);
       next if(!$dcon);
       
+      $min = $dcon if($dcon < $min);
+      $max = $dcon if($dcon > $max);
+      
       $totcon += $dcon;
       $dnum++;      
   }
   
   if ($dnum) {
-       my $tomavg                                        = sprintf("%02d", $totcon/$dnum);
-       $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                 # Durchschnittsverbrauch aller (gleicher) Wochentage
+       my $ddiff                                         = ($max - $min)/$dnum;                          # Glättungsdifferenz
+       my $tomavg                                        = sprintf("%02d", ($totcon/$dnum)-$ddiff);
+       $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # Durchschnittsverbrauch aller (gleicher) Wochentage
        Log3($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum");
   }
   else {
@@ -2208,6 +2212,8 @@ sub _estConsumptionForecast {
       next if(!$nhts);
       
       $dnum     = 0;
+      $min      =  (~0 >> 1);
+      $max      = -(~0 >> 1);
       my $utime = timestringToTimestamp ($nhts);
       my $nhday = strftime "%a", localtime($utime);                                           # Wochentagsname des NextHours Key
       my $nhhr  = sprintf("%02d", (int (strftime "%H", localtime($utime))) + 1);              # Stunde des Tages vom NextHours Key  (01,02,...24) 
@@ -2223,12 +2229,16 @@ sub _estConsumptionForecast {
           my $hcon = HistoryVal ($hash, $m, $nhhr, "con", 0);  
           next if(!$hcon);
           
+          $min = $hcon if($hcon < $min);
+          $max = $hcon if($hcon > $max);
+          
           $conh->{$nhhr} += $hcon;  
           $dnum++;
       }
       if ($dnum) {
-           my $conavg                                = sprintf("%02d", $conh->{$nhhr}/$dnum);
-           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                               # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
+           my $hdiff                                 = ($max - $min)/$dnum;                              # Glättungsdifferenz
+           my $conavg                                = sprintf("%02d", ($conh->{$nhhr}/$dnum)-$hdiff);
+           $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                                          # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
            Log3($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhts, con: $conavg, days for avg: $dnum");
       }     
   }
@@ -5201,10 +5211,10 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                             </td></tr>
-            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung begrenzt  </td></tr>
-            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                </td></tr>
-            <tr><td>                </td><td>Stringleistung zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
+            <tr><td> <b>0</b>       </td><td>keine Begrenzung der prognostizierten PV-Erzeugung (default)                                 </td></tr>
+            <tr><td> <b>1</b>       </td><td>die prognostizierte PV-Erzeugung wird auf 70% der installierten Stringleistung(en) begrenzt  </td></tr>
+            <tr><td> <b>dynamic</b> </td><td>die prognostizierte PV-Erzeugung wird begrenzt wenn 70% der installierten                    </td></tr>
+            <tr><td>                </td><td>Stringleistung(en) zzgl. des prognostizierten Verbrauchs überschritten wird                  </td></tr>
          </table>
          </ul> 
        </li>
