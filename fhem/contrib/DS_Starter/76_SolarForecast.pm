@@ -4094,11 +4094,11 @@ sub listDataPool {
           my $dayname = HistoryVal ($hash, $day, $key, "dayname", undef);
           $ret       .= "\n      " if($ret);
           $ret       .= $key." => pvrl: $pvrl, pvfc: $pvfc, gcon: $gcon, con: $con, gfeedin: $gfeedin";
-          $ret       .= ", wid: $wid"         if($wid);
-          $ret       .= ", wcc: $wcc"         if($wcc);
-          $ret       .= ", wrp: $wrp"         if($wrp);
+          $ret       .= ", wid: $wid";
+          $ret       .= ", wcc: $wcc";
+          $ret       .= ", wrp: $wrp";
           $ret       .= ", temp: $temp"       if($temp);
-          $ret       .= ", pvcorrf: $pvcorrf" if($pvcorrf);
+          $ret       .= ", pvcorrf: $pvcorrf";
           $ret       .= ", dayname: $dayname" if($dayname);
       }
       return $ret;
