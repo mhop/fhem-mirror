@@ -450,6 +450,9 @@ sub Delete {
     my $prefix = $hash->{prefix} // return;
     RemoveInternalTimer($hash);
 
+# DELETE POD AFTER TESTS ARE COMPLETED    
+=begin comment
+    
     #Beta-User: globale Attribute löschen
     for (devspec2array("${prefix}Mapping=.+")) {
         delFromDevAttrList($_,"${prefix}Mapping:textField-long");
@@ -472,7 +475,8 @@ sub Delete {
     for (devspec2array("${prefix}Group=.+")) {
         delFromDevAttrList($_,"${prefix}Group");
     }
-
+=end comment
+=cut
     return;
 }
 
