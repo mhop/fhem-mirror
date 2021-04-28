@@ -330,7 +330,7 @@ my @globalAttrList = qw(
   blockingCallMax
   commandref:modular,full
   configfile
-  disableFeatures:multiple-strict,attrTemplate,securityCheck
+  disableFeatures:multiple-strict,attrTemplate,securityCheck,saveuuid
   dnsHostsFile
   dnsServer
   dupTimeout
@@ -1725,6 +1725,7 @@ CommandSave($$)
 
   my %devByNr;
   map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
+  my $dumpUuid = (AttrVal("global", "disableFeatures", "") !~ m/\bsaveuuid\b/i);
 
   for(my $i = 0; $i < $devcount; $i++) {
 
@@ -1759,7 +1760,7 @@ CommandSave($$)
       next;
     }
 
-    my @arr = GetDefAndAttr($d, 1);
+    my @arr = GetDefAndAttr($d, $dumpUuid);
     print $fh join("\n", @arr)."\n" if(@arr);
 
   }
@@ -2217,38 +2218,37 @@ AssignIoPort($;$)
   my ($hash, $proposed) = @_;
   my $ht = $hash->{TYPE};
   my $hn = $hash->{NAME};
-  my $hasIODevAttr = ($ht &&
-                      $modules{$ht}{AttrList} &&
-                      $modules{$ht}{AttrList} =~ m/IODev/);
 
-  $proposed = $attr{$hn}{IODev}
-        if(!$proposed && $attr{$hn} && $attr{$hn}{IODev});
+  $proposed = AttrVal($hn,     "IODev", undef) if(!$proposed);
+  $proposed = ReadingsVal($hn, "IODev", undef) if(!$proposed);
   
   if($proposed && $defs{$proposed} && IsDisabled($proposed) != 1) {
     $hash->{IODev} = $defs{$proposed};
-    $attr{$hn}{IODev} = $proposed if($hasIODevAttr);
-    delete($defs{$proposed}{".clientArray"});
-    return;
-  }
-  # Set the I/O device, search for the last compatible one.
-  for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
-    next if(IsDisabled($p) == 1);
-    next if($defs{$p}{TEMPORARY}); # e.g. server clients
-    my $cl = $defs{$p}{Clients};
-    $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
+  } else {
+    # Set the I/O device, search for the last compatible one.
+    for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
 
-    if($cl && $defs{$p}{NAME} ne $hn) {      # e.g. RFR
-      my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
-      if(@fnd) {
-        $hash->{IODev} = $defs{$p};
-        delete($defs{$p}{".clientArray"}); # Force a recompute
-        last;
+      next if(IsDisabled($p) == 1);
+      next if($defs{$p}{TEMPORARY}); # e.g. server clients
+      my $cl = $defs{$p}{Clients};
+      $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
+
+      if($cl && $defs{$p}{NAME} ne $hn) {      # e.g. RFR
+        my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
+        if(@fnd) {
+          $hash->{IODev} = $defs{$p};
+          $proposed = $p;
+          last;
+        }
       }
     }
   }
-  if($hash->{IODev}) {
-    $attr{$hn}{IODev} = $hash->{IODev}{NAME} if($hasIODevAttr);
+
+  if($hash->{IODev} && $proposed) {
+    setReadingsVal($hash, "IODev", $proposed, TimeNow()); # 120603
+    delete($defs{$proposed}{".clientArray"});
+    return;
 
   } else {
     if($init_done) {
@@ -2946,6 +2946,30 @@ GlobalAttr($$$$)
 
 #####################################
 sub
+fhem_setIoDev($$)
+{
+  my ($hash, $val) = @_;
+
+Log 1, "IO: $hash->{NAME} $val";
+  if(!$val || !defined($defs{$val})) {
+    if(!$init_done) {
+      $hash->{IODevMissing} = 1;
+      $hash->{IODevName} = $val;
+    }
+    return "unknown IODev $val specified";
+  }
+
+  $hash->{IODev} = $defs{$val};
+  delete($defs{$val}{".clientArray"}); # Force a recompute
+  if(!$init_done) {
+    delete($hash->{IODevMissing});
+    delete($hash->{IODevName});
+  }
+
+  return undef;
+}
+
+sub
 CommandAttr($$)
 {
   my ($cl, $param) = @_;
@@ -3099,20 +3123,15 @@ CommandAttr($$)
     $attr{$sdev}{$attrName} = $attrVal;
 
     if($attrName eq "IODev") {
-      if(!$attrVal || !defined($defs{$attrVal})) {
-        if($init_done) {
-          push @rets,"$sdev: unknown IODev $attrVal specified";
-        } else {
-          $hash->{IODevMissing} = 1;
-          $hash->{IODevName} = $attrVal;
-        }
+      my $ret = fhem_setIoDev($hash, $attrVal);
+      if($ret) {
+        push @rets, $ret if($init_done);
         next;
+      } else {
+        setReadingsVal($hash, "IODev", $attrVal, TimeNow());
       }
-
-      my $ioname = $attrVal;
-      $hash->{IODev} = $defs{$ioname};
-      delete($defs{$ioname}{".clientArray"}); # Force a recompute
     }
+
     if($attrName eq "stateFormat" && $init_done) {
       my $err = perlSyntaxCheck($attrVal, ("%name"=>""));
       return $err if($err);
@@ -3186,6 +3205,14 @@ CommandSetstate($$)
          $d->{READINGS}{$sname}{TIME} lt $tim) {
         $d->{READINGS}{$sname}{VAL} = $sval;
         $d->{READINGS}{$sname}{TIME} = $tim;
+      }
+
+      if($sname eq "IODev") {
+        my $ret = fhem_setIoDev($d, $sval);
+        if($ret) {
+          push @rets, $ret if($init_done);
+          next;
+        }
       }
 
     } else {
