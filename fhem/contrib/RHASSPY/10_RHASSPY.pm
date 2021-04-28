@@ -409,7 +409,7 @@ sub initialize_prefix {
     my $prefix =  shift // q{rhasspy};
     my $old_prefix = $hash->{prefix}; #Beta-User: Marker, evtl. müssen wir uns was für Umbenennungen überlegen...
     
-    return if $prefix eq $old_prefix;
+    return if defined $old_prefix && $prefix eq $old_prefix;
     # provide attributes "rhasspyName" etc. for all devices
     addToAttrList("${prefix}Name");
     addToAttrList("${prefix}Room");
@@ -450,9 +450,6 @@ sub Delete {
     my $prefix = $hash->{prefix} // return;
     RemoveInternalTimer($hash);
 
-# DELETE POD AFTER TESTS ARE COMPLETED    
-=begin comment
-    
     #Beta-User: globale Attribute löschen
     for (devspec2array("${prefix}Mapping=.+")) {
         delFromDevAttrList($_,"${prefix}Mapping:textField-long");
@@ -476,9 +473,6 @@ sub Delete {
         delFromDevAttrList($_,"${prefix}Group");
     }
 
-=end comment
-
-=cut
     return;
 }
 
@@ -996,7 +990,7 @@ sub _analyze_genDevType {
         my $r = $defs{$device}{READINGS};
         if($r) {
             for (sort keys %{$r}) {
-                if ( $_ =~ m{\A(?<id>temperature|humidity)\z} ) {
+                if ( $_ =~ m{\A(?<id>temperature|humidity)\z}x ) {
                     $currentMapping->{GetNumeric}->{$+{id}} = {currentVal => $+{id}, type => $+{id} };
                 }
             }
@@ -1681,14 +1675,15 @@ sub analyzeAndRunCmd {
         Log3($hash->{NAME}, 5, "$cmd has quotes...");
 
         # Anführungszeichen entfernen
-        $cmd = $+{inner};
+        $cmd = $+{inner} // q{};
 
         # Variablen ersetzen?
         if ( !eval { $cmd =~ s{(\$\w+)}{$1}eegx; 1 } ) {
-            Log3($hash->{NAME}, 1, "$cmd returned Error: $@") 
-        };
+            Log3($hash->{NAME}, 1, "$cmd returned Error: $@");
+            return;
+        }
         # [DEVICE:READING] Einträge ersetzen
-        $returnVal =    ($hash, $cmd);
+        $returnVal = _ReplaceReadingsVal($hash, $cmd);
         # Escapte Kommas wieder durch normale ersetzen
         $returnVal =~ s{\\,}{,}x;
         Log3($hash->{NAME}, 5, "...and is now: $cmd ($returnVal)");
@@ -2142,8 +2137,8 @@ sub updateSlots {
         my @devs = devspec2array("$hash->{devspec}");
         for my $device (@devs) {
             if (AttrVal($device, 'genericDeviceType', '') eq $gdt) {
-                push @names, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{names};
-                push @groupnames, split m{,}, $hash->{helper}{devicemap}{devices}{$device}->{groups};
+                push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names};
+                push @groupnames, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{groups};
             }
         }
         @names = get_unique(\@names);
@@ -3121,7 +3116,6 @@ sub _runSetColorCmd {
     my $mapping = $hash->{helper}{devicemap}{devices}{$device}{intents}{SetColorParms} // return $inBulk ?undef : respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, getResponse($hash, 'NoMappingFound'));
 
     my $error;
-    my $success;
 
     #shortcuts: hue, sat or CT are directly addressed and possible commands
     my $keywords = {hue => 'Hue', sat => 'Saturation', ct => 'Colortemp'};
@@ -3241,11 +3235,11 @@ sub _ct2rgb {
         : 288.1221695283 * ($temp - 60) ** -0.0755148492;
     $g = max( 0, min ( $g , 255 ) );
 
-    my $b = $temp <= 19 ? 0 : 255;
-    $b = 138.5177312231 * log($temp-10) - 305.0447927307 if $temp < 66;
-    $b = max( 0, min ( $b , 255 ) );
+    my $bl = $temp <= 19 ? 0 : 255;
+    $bl = 138.5177312231 * log($temp-10) - 305.0447927307 if $temp < 66;
+    $bl = max( 0, min ( $b , 255 ) );
 
-    return( $r, $g, $b );
+    return( $r, $g, $bl );
 }
 
 sub handleIntentSetColorGroup {
