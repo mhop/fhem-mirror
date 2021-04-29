@@ -455,28 +455,40 @@ sub ElectricityCalculator_MidnightTimer($)
 	my ($ElectricityCountName, $ElectricityCountReadingRegEx)	= split(":", $RegEx, 2);
 	my $ElectricityCountDev							  			= $defs{$ElectricityCountName};
 	$ElectricityCountReadingRegEx						  		=~ s/[\.\*]+$//;
+	$ElectricityCountReadingRegEx						  		=~ s/[:]+$//;
 	my $ElectricityCountReadingRegExNeg							= $ElectricityCountReadingRegEx . "_";
 	
 	my @ElectricityCountReadingNameListComplete = keys(%{$ElectricityCountDev->{READINGS}});
 	my @ElectricityCountReadingNameListFiltered;
 
 	### Create Log entries for debugging purpose
-	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
-	Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ElectricityCountName: " . $ElectricityCountName;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer RegEx               : " . $RegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
 
 	### If no RegEx is available, leave routine
 	if (($ElectricityCountReadingRegEx eq "") || ($ElectricityCountReadingRegExNeg eq "")) { 
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
-		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegEx        : " . $ElectricityCountReadingRegEx;
+		Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer ReadingRegExNeg     : " . $ElectricityCountReadingRegExNeg;
 		return;
 	}
 	
-	foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
-		if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
-			push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
+	### Check whether system failure threat is given or log error message
+	eval {
+		### For each valid RegEx entry given in the list of existing devices
+		foreach my $ElectricityCountReadingName (@ElectricityCountReadingNameListComplete) {
+			if (($ElectricityCountReadingName =~ m[$ElectricityCountReadingRegEx]) && ($ElectricityCountReadingName !~ m[$ElectricityCountReadingRegExNeg])) {
+				push(@ElectricityCountReadingNameListFiltered, $ElectricityCountReadingName);
+			}
 		}
-	}
+		1;
+	} or do {
+		my $ErrorMessage = $@;
+		Log3 $ElectricityCalcName, 2, $ElectricityCalcName. " : Something went wrong with the RegEx : " . $ErrorMessage;
+		return;
+	};
 
 	### Create Log entries for debugging purpose
 	Log3 $ElectricityCalcName, 5, $ElectricityCalcName. " : ElectricityCalculator_MidnightTimer__________________________________________________________";
