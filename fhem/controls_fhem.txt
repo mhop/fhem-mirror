@@ -1,11 +1,11 @@
-REV 24344
+REV 24352
 DIR unused
-UPD 2021-04-27_07:45:02 361783 ./CHANGED
+UPD 2021-04-29_07:45:03 361895 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-03-28_07:45:04 43114 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2021-04-17_07:45:13 167689 ./fhem.pl
+UPD 2021-04-29_07:45:12 168091 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-02-13_09:02:50 57899 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -21,7 +21,7 @@ UPD 2019-12-31_07:45:05 17105 FHEM/00_KNXTUL.pm
 UPD 2019-01-06_07:45:02 3796 FHEM/00_LIRC.pm
 UPD 2016-04-26_07:45:11 33379 FHEM/00_MAXLAN.pm
 UPD 2020-05-28_07:45:03 31677 FHEM/00_MQTT.pm
-UPD 2021-03-07_07:45:03 24135 FHEM/00_MQTT2_CLIENT.pm
+UPD 2021-04-29_07:45:02 24535 FHEM/00_MQTT2_CLIENT.pm
 UPD 2021-03-18_07:45:02 22201 FHEM/00_MQTT2_SERVER.pm
 UPD 2021-01-03_07:45:02 32807 FHEM/00_MYSENSORS.pm
 UPD 2017-09-07_07:45:02 25519 FHEM/00_NetzerI2C.pm
@@ -733,12 +733,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-04-26_07:45:07 4496049 docs/commandref.html
+UPD 2021-04-29_07:45:07 4496304 docs/commandref.html
 UPD 2021-04-17_07:45:10 2779091 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-04-28_07:45:11 238991 docs/commandref_modular.html
-UPD 2021-04-28_07:45:12 250006 docs/commandref_modular_DE.html
+UPD 2021-04-29_07:45:11 239024 docs/commandref_modular.html
+UPD 2021-04-29_07:45:12 250039 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -748,7 +748,7 @@ UPD 2021-01-30_07:45:03 74370 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2020-06-23_07:45:04 2701 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2021-01-30_07:45:03 11787 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2020-06-23_07:45:04 7300 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
-UPD 2021-01-30_07:45:03 110445 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
+UPD 2021-04-29_07:45:03 110563 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
 UPD 2021-03-13_07:45:12 40675 lib/FHEM/Automation/ShuttersControl/Helper.pm
 UPD 2020-07-27_07:45:02 2545 lib/FHEM/Automation/ShuttersControl/Roommate.pm
 UPD 2021-01-30_07:45:03 25647 lib/FHEM/Automation/ShuttersControl/Shading.pm
