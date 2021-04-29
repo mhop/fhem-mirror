@@ -30,7 +30,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
-  "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE ",
+  "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
   "4.12.2"  => "08.04.2021 change standard splitting ",
   "4.12.1"  => "07.04.2021 improve escaping the pipe ",
   "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
@@ -2442,8 +2442,8 @@ sub DbLog_writeFileIfCacheOverflow {
   
   my $name    = $hash->{NAME};
   my $success = 0;
-  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);              # Steuerung exportCache statt schreiben in DB
-  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                 # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
+  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);                                 # Steuerung exportCache statt schreiben in DB
+  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                                    # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
   
   my $overflowstate = "normal";
   my $overflownum; 
@@ -2466,7 +2466,8 @@ sub DbLog_writeFileIfCacheOverflow {
       Log3 ($name, 2, "DbLog $name -> WARNING - Cache is exported to file instead of logging it to database");
       my $error = CommandSet (undef, qq{$name exportCache purgecache});
       
-      if($error) {                                                       # Fehler beim Export Cachefile
+      if($error) {                                                                          # Fehler beim Export Cachefile
+          Log3 ($name, 1, "DbLog $name -> ERROR - while exporting Cache file: $error");
           DbLog_setReadingstate ($hash, $error);                   
           return $success;
       }
@@ -3689,7 +3690,7 @@ sub DbLog_Get {
           $stm .= "ORDER BY TIMESTAMP";
       }
 
-      Log3 ($name, 4, "$name - Processing Statement:\n$stm");
+      Log3 ($name, 4, "$name - PID: $$, Processing Statement:\n$stm");
 
       my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
       my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
@@ -3709,12 +3710,14 @@ sub DbLog_Get {
       ####################################################################################
       #                              Select Auswertung      
       ####################################################################################
+      my $rv = 0;
       while($sth->fetch()) {
-          no warnings 'uninitialized';                                                            # geändert V4.8.0 / 14.10.2019
-          my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
-          Log3 ($name, 5, "$name - SQL-result -> $ds");                                           # geändert V4.8.0 / 14.10.2019
-          use warnings;                                                                           # geändert V4.8.0 / 14.10.2019      
-          $writeout = 0;                                                                          # eingefügt V4.8.0 / 14.10.2019
+          $rv++;
+          no warnings 'uninitialized';                                                                     # geändert V4.8.0 / 14.10.2019
+          my $ds = "PID: $$, TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
+          Log3 ($name, 5, "$name - SQL-result -> $ds");                                                    # geändert V4.8.0 / 14.10.2019
+          use warnings;                                                                                    # geändert V4.8.0 / 14.10.2019      
+          $writeout = 0;                                                                                   # eingefügt V4.8.0 / 14.10.2019
 
           ############ Auswerten des 5. Parameters: Regexp ###################
           # die Regexep wird vor der Function ausgewertet und der Wert im Feld
@@ -3947,8 +3950,10 @@ sub DbLog_Get {
               }
               $lastd[$i] = $sql_timestamp;
           }
-      }                                                                   ##### while fetchrow Ende ##### 
-
+      } 
+                                                                  ##### while fetchrow Ende ##### 
+      Log3 ($name, 4, "$name - PID: $$, rows count: $rv");
+      
       ######## den letzten Abschlusssatz rausschreiben ##########
       
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
