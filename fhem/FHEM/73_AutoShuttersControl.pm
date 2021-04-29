@@ -1263,11 +1263,11 @@ sub Initialize {
     "Rollo",
     "Control"
   ],
-  "release_status": "testing",
+  "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.10.12",
+  "version": "v0.10.13",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
   "x_fhem_maintainer": [
     "CoolTux"

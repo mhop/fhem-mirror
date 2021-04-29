@@ -300,8 +300,14 @@ sub EventProcessingWindowRec {
                 $FHEM::Automation::ShuttersControl::shutters->getVentilatePos
                 || $FHEM::Automation::ShuttersControl::shutters->getStatus ==
                 $FHEM::Automation::ShuttersControl::shutters->getComfortOpenPos
-#                 || $FHEM::Automation::ShuttersControl::shutters->getStatus ==
-#                 $FHEM::Automation::ShuttersControl::shutters->getOpenPos                  Logikfehler? siehe Forum https://forum.fhem.de/index.php/topic,120390.msg1149463.html#msg1149463
+                || (   $FHEM::Automation::ShuttersControl::shutters->getStatus ==
+                       $FHEM::Automation::ShuttersControl::shutters->getOpenPos
+                    && $FHEM::Automation::ShuttersControl::shutters->getLastDrive
+                      eq 'ventilate - window open'
+                    && $FHEM::Automation::ShuttersControl::shutters->getSubTyp
+                      eq 'twostate'
+                    && $FHEM::Automation::ShuttersControl::shutters->getVentilateOpen
+                      eq 'on' )
                 || ( $FHEM::Automation::ShuttersControl::shutters->getStatus ==
                     $FHEM::Automation::ShuttersControl::shutters
                     ->getPrivacyDownPos
