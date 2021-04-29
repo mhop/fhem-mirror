@@ -455,28 +455,40 @@ sub GasCalculator_MidnightTimer($)
 	my ($GasCountName, $GasCountReadingRegEx) = split(":", $RegEx, 2);
 	my $GasCountDev							  = $defs{$GasCountName};
 	$GasCountReadingRegEx					  =~ s/[\.\*]+$//;
+	$GasCountReadingRegEx					  =~ s/[:]+$//;
 	my $GasCountReadingRegExNeg				  = $GasCountReadingRegEx . "_";
 
 	my @GasCountReadingNameListComplete = keys(%{$GasCountDev->{READINGS}});
 	my @GasCountReadingNameListFiltered;
 
 	### Create Log entries for debugging purpose
-	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
-	Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer GasCountName        : " . $GasCountName;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer RegEx               : " . $RegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
 
 	### If no RegEx is available, leave routine
 	if (($GasCountReadingRegEx eq "") || ($GasCountReadingRegExNeg eq "")) { 
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
-		Log3 $GasCalcName, 2, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer                     : ERROR! No RegEx has been previously stored! Beaking midnight routine.";
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegEx        : " . $GasCountReadingRegEx;
+		Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer ReadingRegExNeg     : " . $GasCountReadingRegExNeg;
 		return;
 	}
 	
-	foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
-		if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
-			push(@GasCountReadingNameListFiltered, $GasCountReadingName);
+	### Check whether system failure threat is given or log error message
+	eval {
+		### For each valid RegEx entry given in the list of existing devices
+		foreach my $GasCountReadingName (@GasCountReadingNameListComplete) {
+			if (($GasCountReadingName =~ m[$GasCountReadingRegEx]) && ($GasCountReadingName !~ m[$GasCountReadingRegExNeg])) {
+				push(@GasCountReadingNameListFiltered, $GasCountReadingName);
+			}
 		}
-	}
+		1;
+	} or do {
+		my $ErrorMessage = $@;
+		Log3 $GasCalcName, 2, $GasCalcName. " : Something went wrong with the RegEx : " . $ErrorMessage;
+		return;
+	};
 
 	### Create Log entries for debugging purpose
 	Log3 $GasCalcName, 5, $GasCalcName. " : GasCalculator_MidnightTimer__________________________________________________________";
