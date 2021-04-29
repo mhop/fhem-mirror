@@ -780,9 +780,9 @@ sub EnOcean_Initialize($) {
   $hash->{GetFn} = "EnOcean_Get";
   $hash->{NotifyFn} = "EnOcean_Notify";
   $hash->{AttrFn} = "EnOcean_Attr";
-  $hash->{AttrList} = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                      "showtime:1,0 " .
-                      "actualTemp angleMax:slider,-180,20,180 alarmAction " .
+  $hash->{AttrList} = "IODev do_not_notify:select,0,1 ignore:0,1 dummy:0,1 " .
+                      "showtime:select,0,1 " .
+                      "actualTemp angleMax:slider,-180,20,180 alarmAction alwaysUpdateReadings:select,0,1 " .
                       "angleMin:slider,-180,20,180 " .
                       "angleTime setCmdTrigger:man,refDev blockUnknownMSC:no,yes blockMotion:no,yes " .
                       "blockTemp:no,yes blockDisplay:no,yes blockDateTime:no,yes " .
@@ -10324,15 +10324,13 @@ sub EnOcean_Parse($$) {
       # 2 = x/100, 3 = x/1000
       my $dataType = ($db[0] & 4) >> 2;
       my $divisor = $db[0] & 3;
-      my $meterReading;
+      my $meterReading = $db[3] << 16 | $db[2] << 8 | $db[1];
       if ($divisor == 3) {
-        $meterReading = sprintf "%.3f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 1000;
+        $meterReading = sprintf "%.3f", $meterReading / 1000;
       } elsif ($divisor == 2) {
-        $meterReading = sprintf "%.2f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 100;
+        $meterReading = sprintf "%.2f", $meterReading / 100;
       } elsif ($divisor == 1) {
-        $meterReading = sprintf "%.1f", ($db[3] << 16 | $db[2] << 8 | $db[1]) / 10;
-      } else {
-        $meterReading = $db[3] << 16 | $db[2] << 8 | $db[1];
+        $meterReading = sprintf "%.1f", $meterReading / 10;
       }
       my $channel = $db[0] >> 4;
 
@@ -10366,7 +10364,7 @@ sub EnOcean_Parse($$) {
             $serialNumber = sprintf "%4s%01x%01x%01x%01x", $serialNumber,
                             $db[2] >> 4, $db[2] & 0x0F, $db[3] >> 4, $db[3] & 0x0F;
           }
-          push @event, "3:serialNumber:$serialNumber";
+          push @event, "1:serialNumber:$serialNumber";
         } elsif ($dataType == 1) {
           # momentary power
           push @event, "3:power:$meterReading";
@@ -10376,7 +10374,7 @@ sub EnOcean_Parse($$) {
         } else {
           # power consumption
           push @event, "3:energy$channel:$meterReading";
-          push @event, "3:currentTariff:$channel";
+          push @event, "1:currentTariff:$channel";
         }
       } elsif ($st eq "autoMeterReading.02" || $st eq "autoMeterReading.03") {
         # Automated meter reading (AMR), Gas, Water (EEP A5-12-02, A5-12-03)
@@ -10387,7 +10385,7 @@ sub EnOcean_Parse($$) {
         } else {
           # cumulative counter
           push @event, "3:consumption$channel:$meterReading";
-          push @event, "3:currentTariff:$channel";
+          push @event, "1:currentTariff:$channel";
         }
       }
 
@@ -13697,7 +13695,7 @@ sub EnOcean_Parse($$) {
   for(my $i = 0; $i < int(@event); $i++) {
     # Flag & 1: reading, Flag & 2: always update
     my ($flag, $vn, $vv) = split(':', $event[$i], 3);
-    if ($flag + 0 & 2) {
+    if ($flag + 0 & 2 || $attr{$name}{alwaysUpdateReadings}) {
       readingsBulkUpdate($hash, $vn, $vv);
     } else {
       readingsBulkUpdateIfChanged($hash, $vn, $vv);
@@ -13801,6 +13799,13 @@ sub EnOcean_Attr(@) {
       }
 
     } else {
+      $err = "attribute-value [$attrName] = $attrVal wrong";
+    }
+
+  } elsif ($attrName eq "alwaysUpdateReadings") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^[0-1]$/) {
       $err = "attribute-value [$attrName] = $attrVal wrong";
     }
 
@@ -15182,7 +15187,7 @@ sub EnOcean_constLightCtrl($) {
     $hash->{helper}{constLightCtrl}[7] = 2;
   }
   InternalTimer(gettimeofday() + $hash->{helper}{constLightCtrl}[6], 'EnOcean_constLightCtrl', $hash->{helper}{constLightCtrl}, 0);
-  Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 4 B: $brightness D: $dimTemp >> $dimCalc CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
+  #Log3 $hash->{NAME}, 3, "EnOcean $hash->{NAME} constLightCtrl: 4 B: $brightness D: $dimTemp >> $dimCalc CMD: $hash->{helper}{constLightCtrl}[2] " . "CTRL: " . ($hash->{helper}{constLightCtrl}[6] // 'undef') . " RESPONSE: " . ($hash->{helper}{constLightCtrl}[7] // 'undef');
   return $logLevel;
 }
 
@@ -20491,6 +20496,9 @@ sub EnOcean_Delete($$) {
       Action that is executed before the actuator is entering the "alarm" mode.<br>
       Notice subType blindsCrtl.00, blindsCrtl.01: The attribute can only be set while the actuator is online.
     </li>
+    <li><a name="EnOcean_alwaysUpdateReadings">alwaysUpdateReadings</a> 0|1, [alwaysUpdateReadings] = 0 is default.<br>
+      The readings of the device are always updated if alwaysUpdateReadings is set.
+    </li>
     <li><a name="angleMax">angleMax</a> &alpha;s/&#176, [&alpha;s] = -180 ... 180, 90 is default.<br>
       Slat angle end position maximum.<br>
       angleMax is supported for shutter.
@@ -20508,31 +20516,31 @@ sub EnOcean_Delete($$) {
     </li>
     <li><a name="EnOcean_blockDateTime">blockDateTime</a> yes|no, [blockDateTime] = no is default.<br>
       blockDateTime is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockDisplay">blockDisplay</a> yes|no, [blockDisplay] = no is default.<br>
       blockDisplay is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockFanSpeed">blockFanSpeed</a> yes|no, [blockFanSpeed] = no is default.<br>
       blockFanSpeed is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockKey">blockKey</a> yes|no, [blockKey] = no is default.<br>
       blockKey is supported for roomCtrlPanel.00 and hvac.04.
-      </li>
+    </li>
     <li><a name="EnOcean_blockMotion">blockMotion</a> yes|no, [blockMotion] = no is default.<br>
       blockMotion is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockOccupany">blockOccupancy</a> yes|no, [blockOccupancy] = no is default.<br>
       blockOccupancy is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockTemp">blockTemp</a> yes|no, [blockTemp] = no is default.<br>
       blockTemp is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockTimeProgram">blockTimeProgram</a> yes|no, [blockTimeProgram] = no is default.<br>
       blockTimeProgram is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockSetpointTemp">blockSetpointTemp</a> yes|no, [blockSetpointTemp] = no is default.<br>
       blockSetPointTemp is supported for roomCtrlPanel.00.
-      </li>
+    </li>
     <li><a name="EnOcean_blockUnknownMSC">blockUnknownMSC</a> yes|no,
       [blockUnknownMSC] = no is default.<br>
       If the structure of the MSC telegrams can not interpret the raw data to be output. Setting this attribute to yes,
@@ -21266,6 +21274,18 @@ sub EnOcean_Delete($$) {
          <li>smartAckMailbox: empty|not_exists|reset</li>
          <li>swVersion: 00000000...FFFFFFFF</li>
      </ul>
+     </li>
+     <br><br>
+
+     <li>Bistable Switch (EEP F6-02-01 ... F6-02-04)<br>
+         [EnOcean PTM 202 Module]<br>
+     <ul>
+         <li>B0</li>
+         <li>BI</li>
+         <li>channelB: B0|BI</li>
+         <li>state: B0|BI</li>
+     </ul><br>
+         Single rocker operation only (Button B0 or BI) and energy bow pressed only, no release telegram.
      </li>
      <br><br>
 
@@ -22151,15 +22171,15 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Automated meter reading (AMR), Electricity (EEP A5-12-01)<br>
-         [Eltako FSS12, DSZ14DRS, DSZ14WDRS, Thermokon SR-MI-HS, untested]<br>
-         [Eltako FWZ12-16A tested]<br>
+         [Eltako DSZ14WDRS, FSS12, Thermokon SR-MI-HS, untested]<br>
+         [Eltako DSZ14DRS, FWZ12-16A tested]<br>
      <ul>
        <li>P/W</li>
        <li>power: P/W</li>
        <li>energy<0 ... 15>: E/kWh</li>
        <li>currentTariff: 0 ... 15</li>
        <li>serialNumber: S-&lt;nnnnnn&gt;</li>
-      <li>state: P/W</li>
+       <li>state: P/W</li>
      </ul><br>
         The attr subType must be autoMeterReading.01 and attr
         manufID must be 00D for Eltako Devices. This is done if the device was
