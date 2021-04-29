@@ -715,9 +715,9 @@ use B;
 my ($escape, $reverse);
 
 BEGIN {
-	eval "use JSON::XS;1;" or do {
+	eval "use Cpanel::JSON::XS;1;" or do {
 		if (not $main::_JSON_PP_WARN) {
-			main::Log3 (undef, 3, sprintf('json [%s] is PP. Consider installing JSON::XS', __PACKAGE__));
+			main::Log3 (undef, 3, sprintf('json [%s] is pure perl. Consider installing Cpanel::JSON::XS', __PACKAGE__));
 			$main::_JSON_PP_WARN = 1;
 		};			
 	};
@@ -754,8 +754,8 @@ sub parse {
 	my ($self, $data) = @_;
 	my $stream;
 
-	# use JSON::XS if available
-	my $xs = eval 'JSON::XS::encode_json($data)';
+	# use Cpanel::JSON::XS if available
+	my $xs = eval 'Cpanel::JSON::XS::encode_json($data)';
 	return $xs if ($xs);
 
 	if (my $ref = ref $data) {
@@ -811,9 +811,9 @@ use warnings;
 use utf8;
 
 BEGIN {
-	eval "use JSON::XS;1;" or do {
+	eval "use Cpanel::JSON::XS;1;" or do {
 		if (not $main::_JSON_PP_WARN) {
-			main::Log3 (undef, 3, sprintf('json [%s] is PP. Consider installing JSON::XS', __PACKAGE__));
+			main::Log3 (undef, 3, sprintf('json [%s] is pure perl. Consider installing Cpanel::JSON::XS', __PACKAGE__));
 			$main::_JSON_PP_WARN = 1;
 		};			
 	};
@@ -975,8 +975,8 @@ sub parse {
 		return $@;
 	};
 
-	# use JSON::XS if available
-	my $xs = eval 'JSON::XS::decode_json($in)';
+	# use Cpanel::JSON::XS if available
+	my $xs = eval 'Cpanel::JSON::XS::decode_json($in)';
 	return $xs if ($xs);
 
 	my $err = _decode(\my $value, $in, 1);
@@ -1341,6 +1341,7 @@ sub get {
 	my $filter;
 	$filter = extract_codeblock($filterText, '()', '\?') 
 		and $filter = substr($filter, 1, (length($filter)-2));
+	die('wrong syntax for JsonPath filter: '.$filterText) unless length($filter);
 
 	my ($delim, $list, $idx) = (0, 0, 0);
 	my @parts;
@@ -1361,6 +1362,7 @@ sub get {
 		'\s*>=\s*',
 		'\s*>\s*',
 		'\s+in\s+',
+		'\s*=~\s*',
 	);
 	my $rex = join('|', @operators);
 	$rex = qr/^($rex)/;
@@ -1405,7 +1407,7 @@ sub get {
 
 sub filter {
 	my ($self, $left, $operater, $right) = @_;
-	
+
 	my $result = [];
 
 	# fn ref as test for: numeric, string, list
@@ -1418,6 +1420,7 @@ sub filter {
 		'>'			=>	[sub {$a > $b}, sub {$a gt $b}, undef],
 		'>='		=>	[sub {$a >= $b}, sub {$a ge $b}, undef],
 		'in'		=>	[undef, undef, sub {any {$_ eq $a} @b}],
+		'=~'		=>	[undef, sub {$a =~ m/$b/}, undef],
 	};
 
 	# todo: test if right is filter!!!
