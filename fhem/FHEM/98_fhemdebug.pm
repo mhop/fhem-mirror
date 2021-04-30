@@ -119,8 +119,11 @@ fhemdebug_timerList($)
       my $cv = svref_2object($fnName);
       $fnName = $cv->GV->NAME if($cv); # get function name
     }
-    push(@res, sprintf("%s.%05d %s%s",
-      FmtDateTime($tt), int(($tt-int($tt))*100000), $fnName,
+    push(@res, sprintf("%s.%05d %s %s %s",
+      FmtDateTime($tt), int(($tt-int($tt))*100000), 
+      $fnName,
+      ($h->{ARG} && ref($h->{ARG}) eq "HASH" && $h->{ARG}{NAME} ? 
+       $h->{ARG}{NAME} : ""),
       $h->{STACKTRACE} ? $h->{STACKTRACE} : ""));
   }
   return join("\n", @res);
