@@ -1,4 +1,4 @@
-REV 24361
+REV 24363
 DIR unused
 UPD 2021-04-30_07:45:03 361953 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -527,7 +527,7 @@ UPD 2019-03-11_07:45:02 35510 FHEM/98_dewpoint.pm
 UPD 2019-12-07_07:45:02 5815 FHEM/98_dummy.pm
 UPD 2018-09-12_07:45:02 11093 FHEM/98_expandJSON.pm
 UPD 2018-07-17_07:45:04 49521 FHEM/98_feels_like.pm
-UPD 2020-04-15_07:45:02 4048 FHEM/98_fhemdebug.pm
+UPD 2021-05-01_07:45:02 4156 FHEM/98_fhemdebug.pm
 UPD 2020-04-01_07:45:03 11448 FHEM/98_fheminfo.pm
 UPD 2020-05-24_07:45:03 73953 FHEM/98_freezemon.pm
 UPD 2020-12-03_07:45:02 9193 FHEM/98_help.pm
@@ -737,8 +737,8 @@ UPD 2021-04-30_07:45:07 4496860 docs/commandref.html
 UPD 2021-04-17_07:45:10 2779091 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-04-30_07:45:11 239053 docs/commandref_modular.html
-UPD 2021-04-30_07:45:12 250068 docs/commandref_modular_DE.html
+UPD 2021-05-01_07:45:10 239053 docs/commandref_modular.html
+UPD 2021-05-01_07:45:11 250068 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
