@@ -374,7 +374,7 @@ FW_displayHelp(devName, sel, selType, val, level)
     $("#content > #workbench").remove();
 
     if(!$(aTag).length) {
-      var ma = val.match(/(.*?)[0-9]+$/);
+      var ma = val.match(/(.*?)[\\.*0-9]+$/);
       while(++level <= 4) {
         if(level == 2 && ma)
           return FW_displayHelp(devName, sel, selType, ma[1], level);
