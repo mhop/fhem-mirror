@@ -342,7 +342,7 @@ FW_displayHelp(devName, sel, selType, val, level)
 
     var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
     if(!mtype)
-      mtype = $("#content > #workbench a[name]").attr("name"), aTag;
+      mtype = $("#content > #workbench a[name]").attr("name");
     if(level == 3) // commandref
       mtype = "";
 
