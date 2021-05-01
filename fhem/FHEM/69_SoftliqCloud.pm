@@ -21,6 +21,8 @@
 #
 ##############################################################################
 #   Changelog:
+#   0.1.07: - 2021-04-30 - Split JSON strings to avoid processing multiple root nodes, part 2
+#                        - Changed password storage to (new) common package
 #   0.1.06: - 2021-04-26 - Split JSON strings to avoid processing multiple root nodes
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
@@ -91,6 +93,7 @@ use constant {
 };
 my $EMPTY = q{};
 my $SPACE = q{ };
+my $COMMA = q{,};
 
 ## Import der FHEM Funktionen
 BEGIN {
@@ -1983,7 +1986,15 @@ sub wsReadDevIo {
     }
     Log3( $name, LOG_DEBUG, qq([$name] Received from DevIo: $buf) );
     
-    my @bufs = split (/}\{/xsm, $buf);
+    my @bufs;
+    my $index = index($buf, '}{');
+    if ($index > 0) {
+    	Log3 ($name, LOG_RECEIVE, "[$name] - Splitting double-JSON buffer");
+    	@bufs = split(/,/xsm,join($COMMA,substr($buf,0,$index),Substr($buf,$index+1)));
+    }
+    else {
+    	push(@bufs,$buf);
+    }
 
     foreach my $bufi (@bufs) {
         Log3 ($name, LOG_RECEIVE, "[$name] - Extracted".$bufi );
