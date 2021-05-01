@@ -2950,7 +2950,6 @@ fhem_setIoDev($$)
 {
   my ($hash, $val) = @_;
 
-Log 1, "IO: $hash->{NAME} $val";
   if(!$val || !defined($defs{$val})) {
     if(!$init_done) {
       $hash->{IODevMissing} = 1;
