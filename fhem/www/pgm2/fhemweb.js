@@ -346,15 +346,15 @@ FW_displayHelp(devName, sel, selType, val, level)
     if(level == 3) // commandref
       mtype = "";
 
-    if(mtype) {           // old style #1 syntax: MODULETYPEattrname
+    if(mtype) {             // current syntax: FHEMWEB-attr-webCmd
       var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
       aTag = $("#content > #workbench").find("a[id="+mv+"]");
-      if(!$(aTag).length) {
+      if(!$(aTag).length) { // old style #1 syntax: FHEMWEBwebCmd
         mv = (""+mtype+val).replace(/[^a-z0-9_-]/ig,'_');
         aTag = $("#content > #workbench").find("a[name="+mv+"]");
       }
     }
-    if(!$(aTag).length) { // old style #2 syntax without type
+    if(!$(aTag).length) { // old style #2 syntax : webCmd
       var v = (val).replace(/[^a-z0-9_-]/ig,'_');
       aTag = $("#content > #workbench").find("a[name="+v+"]");
     }
@@ -374,10 +374,15 @@ FW_displayHelp(devName, sel, selType, val, level)
     $("#content > #workbench").remove();
 
     if(!$(aTag).length) {
-      if(devName != "FHEMWEB" && level == 1)
-        return FW_displayHelp("FHEMWEB", sel, selType, val, 2);
-      if(devName != "commandref" && level < 3)
-        return FW_displayHelp("commandref", sel, selType, val, 3);
+      var ma = val.match(/(.*?)[0-9]+$/);
+      while(++level <= 4) {
+        if(level == 2 && ma)
+          return FW_displayHelp(devName, sel, selType, ma[1], level);
+        if(level == 3 && devName != "FHEMWEB")
+          return FW_displayHelp("FHEMWEB", sel, selType, val, level);
+        if(level == 4 && devName != "commandref")
+          return FW_displayHelp("commandref", sel, selType, val, level);
+      }
     }
   });
 }
