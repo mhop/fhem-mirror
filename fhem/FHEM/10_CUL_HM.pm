@@ -321,6 +321,7 @@ sub CUL_HM_updateConfig($){##########################
       $hash->{helper}{role}{dev} = 1;
       delete $hash->{helper}{mId};
       delete $hash->{helper}{rxType};#will update rxType and mId
+      CUL_HM_getMId($hash); # need to set regLst in helper
       next;
     }
     CUL_HM_Attr("set",$name,"peerIDs",$attr{$name}{peerIDs}) if (defined $attr{$name}{peerIDs});# set attr again to update namings
@@ -4172,7 +4173,6 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
 
   my $devHash = CUL_HM_getDeviceHash($hash);
   Log3 $name,(defined $modules{CUL_HM}{helper}{verbose}{allGet} ? 0:4),"CUL_HM get $name " . join(" ", @a[1..$#a]);
-
   #----------- now start processing --------------
   if   ($cmd eq "param") {  ###################################################
     my $p = $a[2];
@@ -4375,7 +4375,7 @@ sub CUL_HM_Get($@) {#+++++++++++++++++ get command+++++++++++++++++++++++++++++
     close(aSave);
   }
   elsif($cmd eq "listDevice"){  ###############################################
-    if      ($md eq "CCU-FHEM"){
+    if    ($md eq "CCU-FHEM"){
       my @dl = grep !/^$/,
                map{AttrVal($_,"IOgrp","") =~ m/^$name/ ? $_ : ""}
                keys %defs;
