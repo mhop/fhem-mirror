@@ -282,6 +282,9 @@ sub CUL_HM_updateConfig($){##########################
       delete($attr{$name}{IOList}) if (AttrVal($name,"model","") ne "CCU-FHEM");
       CUL_HM_Attr("set",$name,"IOgrp",AttrVal($name,"IOgrp","")) if(AttrVal($name,"IOgrp","") ne "");# update helper by set attr again
       my $h = $defs{$name};
+      delete $h->{helper}{io}{restoredIO} if (   defined($h->{helper}{io})
+                                              && defined($h->{helper}{io}{restoredIO})
+                                              && !defined($defs{$h->{helper}{io}{restoredIO}})); # cleanup undefined restored IO
       if (!CUL_HM_operIObyIOHash($h->{IODev})) { # noansi: assign IO, if no currently operational IO assigned
         CUL_HM_assignIO($h);
         delete($h->{IODev}{'.clientArray'}) if ($h->{IODev}); # Force a recompute
@@ -1279,7 +1282,7 @@ sub CUL_HM_Notify(@){#################################
 
 sub CUL_HM_setupHMLAN(@){#################################
   foreach (devspec2array("TYPE=CUL_HM:FILTER=DEF=......:FILTER=subType!=virtual")){
-    $defs{$_}{helper}{io}{newChn} = 0;
+    $defs{$_}{helper}{io}{newChn} = "";
     CUL_HM_hmInitMsg($defs{$_}); #update device init msg for HMLAN
   }
 }
@@ -1405,7 +1408,7 @@ sub CUL_HM_Parse($$) {#########################################################
       my ($evntCnt,undef) = split(' last_at:',$mh{dstH}->{"prot"."ErrIoId_$mh{src}"},2);
       push @evtEt,[$mh{dstH},1,"sabotageAttackId_ErrIoId_$mh{src}: cnt:$evntCnt"];
     }
-    my $tm = substr($mh{msg},8);
+    my $tm = substr($mh{msg},7);
     if( !defined $mh{dstH}->{helper}{cSnd} || 
           $mh{dstH}->{helper}{cSnd} !~ m/$tm/){
       if (   !defined $mh{dstH}->{"prot"."ErrIoAttack"} 
@@ -3281,6 +3284,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   my $ret = "";
   my $rspWait = $devHlpr->{prt}{rspWait};
   my $pendType = $rspWait->{Pending} ? $rspWait->{Pending} : "";
+  my $mNoInt = hex($mhp->{mNo});
   #------------ parse message flag for start processing command Stack
   # TC wakes up with 8270, not with A258
   # VD wakes up with 8202
@@ -3299,7 +3303,7 @@ sub CUL_HM_parseCommon(@){#####################################################
             if (!(   $mhp->{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack was automatically sent
                   || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s )
                 ) {
-              CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #nonasi: Ack with wakeup bit set for CUL
+              CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #noansi: Ack with wakeup bit set for CUL
             }
             $devHlpr->{prt}{sleeping} = 0;
             CUL_HM_ProcessCmdStack($mhp->{devH});
@@ -3313,7 +3317,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           if (!(   $mhp->{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up does it automatically if configured to lazy config
                 || $mhp->{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) #HMLAN and HMUARTLGW does it automatically if configured to lazy config
               ) {
-            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #nonasi: Ack with wakeup bit set for CUL
+            CUL_HM_SndCmd($mhp->{devH}, $mhp->{mNo}.'8102'.CUL_HM_IoId($mhp->{devH}).$mhp->{src}.'00'); #noansi: Ack with wakeup bit set for CUL
           }
           CUL_HM_ProcessCmdStack($mhp->{devH});
         }
@@ -3347,7 +3351,7 @@ sub CUL_HM_parseCommon(@){#####################################################
     my $success;
 
     if ($devHlpr->{prt}{rspWait}{brstWu}){
-      if ($devHlpr->{prt}{rspWait}{mNo} == hex($mhp->{mNo}) &&
+      if ($devHlpr->{prt}{rspWait}{mNo} == $mNoInt &&
           $mhp->{mStp} eq "00"){
         if ($devHlpr->{prt}{awake} && $devHlpr->{prt}{awake}==4){#re-burstWakeup
           delete $devHlpr->{prt}{rspWait};#clear burst-wakeup values
@@ -3530,7 +3534,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     Log3 $ioOwn,3,"CUL_HM received config CCU:$ioOwn device: $mhp->{devN}. PairForSec: ".($hmPair?"on":"off")." PairSerial: $hmPser";
 
     if ( $hmPair ){# pairing is active
-      if (!$hmPser || $hmPser eq ReadingsVal($mhp->{devN},"D-serialNr","")){
+      my $regser = ReadingsVal($mhp->{devN},"D-serialNr",AttrVal($mhp->{devN},'serialNr',''));
+      if (!$hmPser || $hmPser eq $regser){
 
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
@@ -3538,7 +3543,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         Log3 $ioOwn    ,3, "CUL_HM pair: $mhp->{devN} "
                       ."$attr{$mhp->{devN}}{subType}, "
                       ."model $attr{$mhp->{devN}}{model} "
-                      ."serialNr ".ReadingsVal($mhp->{devN},"D-serialNr","");
+                      ."serialNr ".$regser;
         CUL_HM_RemoveHMPair("hmPairForSec:$ioOwn:noReading");# just in case...
         CUL_HM_respPendRm($mhp->{devH}); # remove all pending messages
         delete $mhp->{devH}{cmdStack};
@@ -3546,7 +3551,7 @@ sub CUL_HM_parseCommon(@){#####################################################
         delete $devHlpr->{prt}{rspWaitSec};
         delete $mhp->{devH}{READINGS}{"RegL_00."};
         delete $mhp->{devH}{READINGS}{".RegL_00."};
-        push @evtEt,[$defs{$ioOwn},1,"hmPair:name:$mhp->{devN} SN:".ReadingsVal($mhp->{devN},"D-serialNr","")." model:$attr{$mhp->{devN}}{model}"];
+        push @evtEt,[$defs{$ioOwn},1,"hmPair:name:$mhp->{devN} SN:".$regser." model:$attr{$mhp->{devN}}{model}"];
         if (!$modules{CUL_HM}{helper}{hmManualOper}){
           $attr{$mhp->{devN}}{IODev} = $ioN;
           $attr{$mhp->{devN}}{IOgrp} = "$ioOwn:$ioHash->{NAME}" if($ioOwn);
@@ -3582,7 +3587,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($mhp->{mTp} eq "10"){######################################
     CUL_HM_m_setCh($mhp,substr($mhp->{p},2,2));
-    Log3 $mhp->{devH},4,"wait:$pendType got:$mhp->{mStp} :\n          "
+    Log3 $mhp->{devH},4,"mTp:$mhp->{mTp} wait:$pendType got mStp:$mhp->{mStp} mNo:".hex($mhp->{mNo})." :\n          "
              .join("\n          ",map{"$_:$rspWait->{$_}"}keys %{$rspWait});
     
     if   ($mhp->{mStp} eq "00"){ #SerialRead====================================
@@ -3593,12 +3598,11 @@ sub CUL_HM_parseCommon(@){#####################################################
       $ret = "done";
     }
     elsif($mhp->{mStp} eq "01"){ #storePeerList=================================
-      my $mNoInt = hex($mhp->{mNo}); 
       my $mNoWait = $rspWait->{mNo}; # hex($rspWait->{mNo}); 
       if ($pendType eq "PeerList"  && 
           ($mNoWait == $mNoInt || $mNoInt == ($mNoWait+1)%256)){ #noWait +1 modulo 256
         $rspWait->{mNo} = $mNoInt;
-
+        $repeat = 1; #prevent stop for messagenumber match below, we match above
         my $chn = $devHlpr->{prt}{rspWait}{forChn};
         my $chnhash = $modules{CUL_HM}{defptr}{$mhp->{src}.$chn};
         $chnhash = $mhp->{devH} if (!$chnhash);
@@ -3612,11 +3616,13 @@ sub CUL_HM_parseCommon(@){#####################################################
           (undef,@peers) = unpack 'A2(A8)*',$mhp->{p};
         }
 
-        $_ = '00000000' foreach (grep /^000000/ ,@peers);#correct bad term(6 chars) from rain sens)
-        $_ .= '0x'      foreach (grep /^......$/,@peers);#if channel is unknown we assume at least a device
-        $chnhash->{helper}{peerIDsRaw} .= ",".join(",",@peers);
+        if (scalar(@peers)) {
+          $_ = '00000000' foreach (grep /^000000/ ,@peers);#correct bad term(6 chars) from rain sens)
+          $_ .= '0x'      foreach (grep /^......$/,@peers);#if channel is unknown we assume at least a device
+          $chnhash->{helper}{peerIDsRaw} .= ",".join(",",@peers);
 
-        CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
+          CUL_HM_ID2PeerList ($chnName,$_,1) foreach (@peers);
+        }
         if (grep /00000000/,@peers) {# last entry, peerList is complete
           # check for request to get List3 data
           my $reqPeer = $chnhash->{helper}{getCfgList};
@@ -3629,32 +3635,36 @@ sub CUL_HM_parseCommon(@){#####################################################
               next if (!$l);
               my $listNo = "0".$l;
               foreach my $peer (@peerID){
-                next if ($peer =~ m/0x$/ || $peer eq "unread");
+                next if ($peer =~ m/0x$/ || $peer eq "peerUnread");
                 $peer .="01" if (length($peer) == 6); # add the default
                 if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
-                  CUL_HM_PushCmdStack($mhp->{devH},sprintf("++%s01%s%s%s04%s%s",
+                  CUL_HM_PushCmdStack($mhp->{devH},sprintf("##%s01%s%s%s04%s%s",
                           $flag,$ioId,$mhp->{src},$chn,$peer,$listNo));# List3 or 4
                   $readCont = 1;
                 }
               }
             }
+            CUL_HM_respPendRm($mhp->{devH});
+            delete $chnhash->{helper}{getCfgList};
+            delete $chnhash->{helper}{getCfgListNo};
+            CUL_HM_rmOldRegs($chnName,$readCont);
+            $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
+            CUL_HM_cfgStateDelay($chnName);#schedule check when finished
           }
-          CUL_HM_respPendRm($mhp->{devH});
-          delete $chnhash->{helper}{getCfgList};
-          delete $chnhash->{helper}{getCfgListNo};
-          CUL_HM_rmOldRegs($chnName,$readCont);
-          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
-          CUL_HM_cfgStateDelay($chnName);#schedule check when finished
+          else{
+            CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
+          }
         }
         else{
-          $repeat = 1;
-          CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
+          Log3 $mhp->{devH},4,'waiting for Peerlist: msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
         }
+      }
+      else {
+        Log3 $mhp->{devH},4,'got unexpected PeerList, expected '.$pendType?$pendType:'';
       }
       $ret = "done";
     }
     elsif($mhp->{mStp} eq "02" ||$mhp->{mStp} eq "03"){ #ParamResp==============
-      my $mNoInt = hex($mhp->{mNo}); 
       my $mNoWait = $rspWait->{mNo}; 
       if ( $pendType eq "RegisterRead" && 
           ($mNoWait == $mNoInt || $mNoInt == ($mNoWait+1)%256)){ #noWait +1 modulo 256
@@ -3667,8 +3677,8 @@ sub CUL_HM_parseCommon(@){#####################################################
         my $peer = $rspWait->{forPeer};
         my $regLNp = "RegL_".$list.".".$peer;# pure, no expert
         my $regLN = ($mhp->{cHash}{helper}{expert}{raw}?"":".").$regLNp;
-        delete $mhp->{cHash}{helper}{regCollect} if (        defined $mhp->{cHash}{helper}{regCollect} 
-                                                      && not defined $mhp->{cHash}{helper}{regCollect}{$regLN});
+        delete $mhp->{cHash}{helper}{regCollect} if (     defined $mhp->{cHash}{helper}{regCollect} 
+                                                      && !defined $mhp->{cHash}{helper}{regCollect}{$regLN});
         if    ($format eq "02"){ # list 2: format aa:dd aa:dd ...
           $data =~ s/(..)(..)/ $1:$2/g;
           foreach(split(" ",$data)){
@@ -3681,7 +3691,7 @@ sub CUL_HM_parseCommon(@){#####################################################
           my $addr;
           ($addr,$data) = (hex($1),$2) if ($data =~ m/(..)(.*)/);
           if ($addr == 0){
-           $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'}='00';
+            $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'} = '00';
           }
           else{
             foreach my $d1 (unpack'(A2)*',$data){
@@ -3689,8 +3699,8 @@ sub CUL_HM_parseCommon(@){#####################################################
             }
           }
         }
-        if ( defined $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'}
-            &&       $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'} eq "00"){ # this was the last message in the block
+        if (   defined $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'}
+            &&         $mhp->{cHash}{helper}{regCollect}{$regLN}{'00'} eq "00"){ # this was the last message in the block
           my $dat;
           $dat .= " $_:".$mhp->{cHash}{helper}{regCollect}{$regLN}{$_} foreach(sort(keys%{$mhp->{cHash}{helper}{regCollect}{$regLN}}));
           delete $mhp->{cHash}{helper}{regCollect}{$regLN};
@@ -3704,12 +3714,11 @@ sub CUL_HM_parseCommon(@){#####################################################
           CUL_HM_updtRegDisp($mhp->{cHash},$list,CUL_HM_peerChId($peer,$mhp->{devH}{DEF}));
         }
         else{
-          $repeat = 1;
           CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
         }
       }
       else{
-        Log 4,"waiting for: $pendType, got:RegisterRead # await msgNo:".(defined $rspWait->{mNo} ? $rspWait->{mNo} :"-no msgNo").", rec:$mNoInt";
+        Log3 $mhp->{devH},4,"waiting for: $pendType, got:RegisterRead # await msgNo:".(defined $rspWait->{mNo} ? $rspWait->{mNo} :"-no msgNo").", rec:$mNoInt";
       }
       $ret = "done";
     }
@@ -3857,7 +3866,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($mhp->{mTp} eq "70"){ #Time to trigger TC##################
     #send wakeup and process command stack
   }
-  if (defined($rspWait->{mNo})       &&
+  if (defined($rspWait->{mNo})            &&
       $rspWait->{mNo} == hex($mhp->{mNo}) &&
       !$repeat){
     #response we waited for - stop Waiting
@@ -5207,13 +5216,13 @@ sub CUL_HM_Set($@) {#+++++++++++++++++ set command+++++++++++++++++++++++++++++
         foreach my $channel (@chnIdList){
           my $chnNo = substr($channel,6,2);
           if ($list =~ m/^0[34]$/){#getPeers to see if list3 is available
-            CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'03');
+            CUL_HM_PushCmdStack($hash,'##'.$flag.'01'.$id.$dst.$chnNo.'03');
             my $chnHash = CUL_HM_id2Hash($channel);
             $chnHash->{helper}{getCfgList} = $peerID.$peerChn;#list3 regs
             $chnHash->{helper}{getCfgListNo} = int($list);
           }
           else{
-            CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'04'
+            CUL_HM_PushCmdStack($hash,'##'.$flag.'01'.$id.$dst.$chnNo.'04'
                                           .$peerID.$peerChn.$list);
           }
         }
@@ -7247,6 +7256,7 @@ sub CUL_HM_updtDeviceModel($$@) {#change the model for a device - obey overwrite
   my($name,$model,$fromUpdate) = @_;
   my $hash = $defs{$name};
   $attr{$name}{model} = $model;
+  delete $hash->{helper}{mId};
   delete $hash->{helper}{rxType};
   CUL_HM_getRxType($hash); #will update rxType
   my $mId = CUL_HM_getMId($hash);# set helper valiable and use result
@@ -7343,7 +7353,7 @@ sub CUL_HM_getConfig($){
               $cHash->{helper}{getCfgListNo} .= ",".$listNo;
             }
             if (!$pReq){#get peers first, but only once per channel
-              CUL_HM_PushCmdStack($cHash,sprintf("++%s01%s%s%s03"
+              CUL_HM_PushCmdStack($cHash,'##'.sprintf("%s01%s%s%s03"
                                          ,$flag,$id,$dst,$chn));
               $pReq = 1;
             }
@@ -7351,7 +7361,7 @@ sub CUL_HM_getConfig($){
           else{
             my $ln = sprintf("%02X",$listNo);
             my $mch = CUL_HM_lstCh($cHash,$ln,$chn);
-            CUL_HM_PushCmdStack($cHash,"++$flag"."01$id$dst$mch"."0400000000$ln");
+            CUL_HM_PushCmdStack($cHash,"##$flag"."01$id$dst$mch"."0400000000$ln");
           }
         }
       }
@@ -7840,9 +7850,14 @@ sub CUL_HM_SndCmd($$) {
   }
 
   my ($mn, $cmd2) =  unpack 'A2A*',$cmd;
-  if($mn eq "++") {
+  if   ($mn eq "++") {
     $mn = ($hash->{helper}{HM_CMDNR} + 1) & 0xff;
     $hash->{helper}{HM_CMDNR} = $mn;
+  }
+  elsif($mn eq '##') { #noansi: all changes with respect to https://forum.fhem.de/index.php/topic,119122.msg1149902.html#msg1149902
+    $mn = ($hash->{helper}{HM_CMDNR} + 16) & 0xff; #noansi: larger change in mNo for blocks of data expected (register read, peer read),
+    $hash->{helper}{HM_CMDNR} = $mn;               #        2 is minimum to overcome known problem with early zero 'end' in register data from
+                                                   #        HM-LC-DIM1TPBU-FM or HM-MOD-RE-8 due to random register reported
   }
   elsif($cmd =~ m/^[+-]/){; #continue pure
     IOWrite($hash, "", $cmd);
@@ -8234,7 +8249,7 @@ sub CUL_HM_protState($$){
   }
   $hash->{protState} = $state;
   
-  CUL_HM_UpdtReadSingle($defs{$_},"commState",$state,1) foreach(CUL_HM_getAssChnNames($name));
+  CUL_HM_UpdtReadSingle($defs{$_},"commState",$state,1) foreach(CUL_HM_getAssChnNames($name));#trigger for all channels required due to bad hierarchical structure of FHEM
   if (!$hash->{helper}{role}{chn}){
     CUL_HM_UpdtReadSingle($hash,"state",$state,
                           ($hash->{helper}{prt}{sProc} == 1)?0:1);
@@ -9019,8 +9034,10 @@ sub CUL_HM_updtRegDisp($$$) {
   my $regLN = ($hash->{helper}{expert}{raw}?"":".")
               .sprintf("RegL_%02X.",$listNo)
               .($peerId ? CUL_HM_peerChName($peerId,$devId) : "");
-  if (($md eq "HM-MOD-RE-8") && $listNo == 0){#handle Fw bug 
-    CUL_HM_ModRe8($hash,$regLN);
+  if ($listNo == 0) {
+    if    ($md eq "HM-MOD-RE-8") {#handle Fw bug 
+      CUL_HM_ModRe8($hash,$regLN);
+    }
   }
   foreach my $rgN (@regArr){
     next if ($culHmRegDefine->{$rgN}->{l} ne $listNo);
@@ -9789,7 +9806,8 @@ sub CUL_HM_repReadings($) {   # parse repeater
 sub CUL_HM_ModRe8($$)     {   # repair FW bug
   #Register 18 may come with a wrong address - we will corrent that
   my ($hash,$regN)=@_;
-  my $rl0 = ReadingsVal($hash->{NAME},$regN,"empty");
+  my $name = $hash->{NAME};
+  my $rl0 = ReadingsVal($name,$regN,'');
   return if(  $rl0 !~ m/00:00/ # not if List is incomplete
             ||$rl0 =~ m/12:/ ); # reg 18 present, dont touch
   foreach my $ad (split(" ",$rl0)){
@@ -10346,21 +10364,23 @@ sub CUL_HM_UpdtCentralState($){
                                     ,"IOopen:$xo");
   return "$xo : $state";
 }
-sub CUL_HM_operIObyIOHash($){ # noansi: return iohash if IO is operational, else undef
+sub CUL_HM_operIObyIOHash($){ # noansi: in iohash, return iohash if IO is operational, else undef
   return if (!defined($_[0]));
   my $ioname = $_[0]->{NAME};
   return if (   !$ioname
              || InternalVal($ioname,'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
              || ReadingsVal($ioname,'state','disconnected') eq 'disconnected' # CUL
+             || IsDummy($ioname)
             );
   return $_[0];
 }
-sub CUL_HM_operIObyIOName($){ # noansi: return iohash if IO is operational, else undef
+sub CUL_HM_operIObyIOName($){ # noansi: in ioname, return iohash if IO is operational, else undef
   return if (!$_[0]);
   my $iohash = $defs{$_[0]};
   return if (   !defined($iohash)
              || InternalVal($_[0],'XmitOpen',1) == 0                        # HMLAN/HMUSB/TSCUL
              || ReadingsVal($_[0],'state','disconnected') eq 'disconnected' # CUL
+             || IsDummy($_[0])                                                                                                
             );
   return $iohash;
 }
@@ -10409,7 +10429,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
   if (!defined $newIODevH) {# not assigned thru CCU - try normal
     $newIODevH = $oldIODevH; # try keep the last one, if defined and operational
     my $dIo = AttrVal($hash->{NAME},"IODev",""); # if no VCCU is used, attr IODev is the first choice. But if VCCU is used, attr IODev must not be used for restore to work! Then it should be removed from attributes!
-    if ($defs{$dIo}) {
+    if (CUL_HM_operIObyIOName($dIo)) {
       if (   !defined($oldIODevH)
           || ($oldIODevH->{NAME} ne $dIo) ) {
         $newIODevH = $defs{$dIo}; # assign according to Attribut
@@ -10436,6 +10456,7 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
           || ($oldIODevH != $newIODevH) ) ) {
     my $ID = CUL_HM_hash2Id($hash);
     if ($haveIOList) {
+      my $lastIODevH = $hash->{IODev};
       my $lIODevH;
       foreach my $ioLd (@ioccu) { # remove on all unassigend IOs to ensure a consistant state of assignments in IO devices!
                                   # IO has to keep track about and really remove just if required
@@ -10444,8 +10465,8 @@ sub CUL_HM_assignIO($){ #check and assign IO, returns 1 if IO changed
                  || ($lIODevH == $newIODevH) );
         if (ReadingsVal($ioLd,"state","") ne "disconnected") {
           if (   $lIODevH->{helper}{VTS_AES} #if this unselected IO is TSCUL 0.14+ we have to remove the device from IO, as it starts with "historical" assignment data
-              || (   defined($oldIODevH)
-                  && ($lIODevH == $oldIODevH) # HMLAN/HMUARTLGW always start with clean peerlist? At least it tries to.
+              || (   defined($lastIODevH)
+                  && ($lIODevH == $lastIODevH) # HMLAN/HMUARTLGW always start with clean peerlist? At least it tries to.
                   && $lIODevH->{TYPE}
                   && $lIODevH->{TYPE} =~ m/^(HMLAN|HMUARTLGW)$/s
                   ) #if this unselected IO is HMLAN we have to remove the device from IO
@@ -10572,7 +10593,7 @@ sub CUL_HM_procQs($){#process non-wakeup queues
         $devH = $defs{$devNtmp};
         CUL_HM_assignIO($devH); 
         if(   defined($devH->{IODev}) # noansi: IODev may be undefined
-           && defined $devH->{IODev}->{NAME}
+           && $devH->{IODev}->{NAME}
            && (  (   ReadingsVal($devH->{IODev}->{NAME},"cond","ok") =~ m/^(ok|Overload-released|Warning-HighLoad|init)$/
                   && $q eq "qReqStat")
                ||(   CUL_HM_autoReadReady($devH->{IODev}->{NAME})
@@ -11041,7 +11062,7 @@ sub CUL_HM_getIcon($) { ####################################################### 
                );
     return ".*:"
             .( $state   =~ m/^CMDs_.*err/   ? "rc_RED"
-              :$state   =~ m/^CMDs_process/ ? "rc_YELLOW"
+              :$state   =~ m/^CMDs_(process|pending)/ ? "rc_YELLOW"
               :$bat     ne "ok"             ? "measure_battery_0"
               :$state   eq "CMDs_done"      ? "rc_GREEN"
               :                               "rc_RED"
