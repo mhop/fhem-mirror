@@ -338,25 +338,34 @@ FW_displayHelp(devName, sel, selType, val, level)
   FW_getHelp(devName, function(data) { // show either the next or the outer li
     $("#content")
       .append("<div id='workbench' style='display:none'></div>");
-    $("#content > #workbench").html(data);
+    var wb = $("#content > #workbench");
+    wb.html(data);
 
-    var mtype = $("#content > #workbench a[id]").attr("id"), aTag;
+    var mtype = wb.find("a[id]").attr("id"), aTag;
     if(!mtype)
-      mtype = $("#content > #workbench a[name]").attr("name");
+      mtype = wb.find("a[name]").attr("name");
     if(level == 3) // commandref
       mtype = "";
 
     if(mtype) {             // current syntax: FHEMWEB-attr-webCmd
       var mv = (""+mtype+"-"+selType+"-"+val).replace(/[^a-z0-9_-]/ig,'_');
-      aTag = $("#content > #workbench").find("a[id="+mv+"]");
+      aTag = wb.find("a[id="+mv+"]");
       if(!$(aTag).length) { // old style #1 syntax: FHEMWEBwebCmd
         mv = (""+mtype+val).replace(/[^a-z0-9_-]/ig,'_');
-        aTag = $("#content > #workbench").find("a[name="+mv+"]");
+        aTag = wb.find("a[name="+mv+"]");
       }
     }
     if(!$(aTag).length) { // old style #2 syntax : webCmd
       var v = (val).replace(/[^a-z0-9_-]/ig,'_');
-      aTag = $("#content > #workbench").find("a[name="+v+"]");
+      aTag = wb.find("a[name="+v+"]");
+    }
+
+    if(!$(aTag).length) { // regexp attributes, like backend_.*
+      wb.find("a[id^='"+mtype+"-"+selType+"-'][data-pattern]").each(
+        function() {
+          if(val.match($(this).attr("data-pattern")))
+            aTag = this;
+        });
     }
 
     if($(aTag).length) {
@@ -371,16 +380,13 @@ FW_displayHelp(devName, sel, selType, val, level)
         $("#devSpecHelp").html($(liTag).html());
       }
     }
-    $("#content > #workbench").remove();
+    wb.remove();
 
     if(!$(aTag).length) {
-      var ma = val.match(/(.*?)[\\.*0-9]+$/);
-      while(++level <= 4) {
-        if(level == 2 && ma)
-          return FW_displayHelp(devName, sel, selType, ma[1], level);
-        if(level == 3 && devName != "FHEMWEB")
+      while(++level <= 3) {
+        if(level == 2 && devName != "FHEMWEB")
           return FW_displayHelp("FHEMWEB", sel, selType, val, level);
-        if(level == 4 && devName != "commandref")
+        if(level == 3 && devName != "commandref")
           return FW_displayHelp("commandref", sel, selType, val, level);
       }
     }
