@@ -33,7 +33,7 @@ use warnings;
 use IO::Socket::INET;
 use POSIX qw(strftime);
 
-my $version = "1.2.1";
+my $version = "1.3.0";
 
 #------------------------------------------------------------------------------------------------------
 # global constants
@@ -75,29 +75,29 @@ use constant REQUESTS => {
 use constant HAS_TIME => 0x40;
 use constant HAS_DATE => 0x80;
 use constant VALUES => {
-		0x01 => {"name" => "temperatureInside",  "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    }, # °C  ## x / 10.0 - 40.0
-		0x02 => {"name" => "temperature",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    }, # °C  ## x / 10.0 - 40.0
-		0x03 => {"name" => "dewPoint",           "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    }, # °C  ## x / 10.0 - 40.0
-		0x04 => {"name" => "windChill",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    }, # °C  ## x / 10.0 - 40.0
-		0x05 => {"name" => "heatIndex",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    }, # °C  ## x / 10.0 - 40.0
-		0x06 => {"name" => "humidityInside",     "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "%"     }, # %
-		0x07 => {"name" => "humidity",           "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "%"     }, # %
-		0x08 => {"name" => "pressureAbs",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "hPa"   }, # hPa
-		0x09 => {"name" => "pressureRel",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "hPa"   }, # hPa
-		0x0A => {"name" => "windDirection",      "bytes" => 2, "factor" =>  1, "format" => "%d"  , "unit" => "deg"   }, # °
-		0x0B => {"name" => "wind",               "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "m/s"   }, # m/s
-		0x0C => {"name" => "windGusts",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "m/s"   }, # m/s
-		0x0D => {"name" => "rainEvent",          "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x0E => {"name" => "rainRate",           "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x0F => {"name" => "rainPerHour",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, #
-		0x10 => {"name" => "rainPerDay",         "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x11 => {"name" => "rainPerWeek",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x12 => {"name" => "rainPerMonth",       "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x13 => {"name" => "rainPerYear",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x14 => {"name" => "rainTotal",          "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    }, # mm
-		0x15 => {"name" => "brightness",         "bytes" => 4, "factor" => 10, "format" => "%d"  , "unit" => "lux"   }, # lux
-		0x16 => {"name" => "uv",                 "bytes" => 2, "factor" =>  1, "format" => "%d"  , "unit" => "uW/m^2"}, # uW/m^2
-		0x17 => {"name" => "uvIndex",            "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "uvi"   }, # 0-15 index ??
+		0x01 => {"name" => "temperatureInside",  "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    , "error" => 0x7FFF    }, # °C  ## x / 10.0 - 40.0
+		0x02 => {"name" => "temperature",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    , "error" => 0x7FFF    }, # °C  ## x / 10.0 - 40.0
+		0x03 => {"name" => "dewPoint",           "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    , "error" => 0x7FFF    }, # °C  ## x / 10.0 - 40.0
+		0x04 => {"name" => "windChill",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    , "error" => 0x7FFF    }, # °C  ## x / 10.0 - 40.0
+		0x05 => {"name" => "heatIndex",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "°C"    , "error" => 0x7FFF    }, # °C  ## x / 10.0 - 40.0
+		0x06 => {"name" => "humidityInside",     "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "%"     , "error" => 0xFF      }, # %
+		0x07 => {"name" => "humidity",           "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "%"     , "error" => 0xFF      }, # %
+		0x08 => {"name" => "pressureAbs",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "hPa"   , "error" => 0xFFFF    }, # hPa   err=?
+		0x09 => {"name" => "pressureRel",        "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "hPa"   , "error" => 0xFFFF    }, # hPa   err=?
+		0x0A => {"name" => "windDirection",      "bytes" => 2, "factor" =>  1, "format" => "%d"  , "unit" => "deg"   , "error" => 0x0FFF    }, # °
+		0x0B => {"name" => "wind",               "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "m/s"   , "error" => 0xFFFF    }, # m/s
+		0x0C => {"name" => "windGusts",          "bytes" => 2, "factor" => 10, "format" => "%.1f", "unit" => "m/s"   , "error" => 0xFFFF    }, # m/s
+		0x0D => {"name" => "rainEvent",          "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x0E => {"name" => "rainRate",           "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x0F => {"name" => "rainPerHour",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, #       err=?
+		0x10 => {"name" => "rainPerDay",         "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x11 => {"name" => "rainPerWeek",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x12 => {"name" => "rainPerMonth",       "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x13 => {"name" => "rainPerYear",        "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x14 => {"name" => "rainTotal",          "bytes" => 4, "factor" => 10, "format" => "%.1f", "unit" => "mm"    , "error" => 0xFFFFFFFF}, # mm    err=?
+		0x15 => {"name" => "brightness",         "bytes" => 4, "factor" => 10, "format" => "%d"  , "unit" => "lux"   , "error" => 0x00FFFFFF}, # lux
+		0x16 => {"name" => "uv",                 "bytes" => 2, "factor" =>  1, "format" => "%d"  , "unit" => "uW/m^2", "error" => 0xFFFF    }, # uW/m^2
+		0x17 => {"name" => "uvIndex",            "bytes" => 1, "factor" =>  1, "format" => "%d"  , "unit" => "uvi"   , "error" => 0xFF      }, # 0-15 index ??
 };
 
 use constant UNIT_CONVERSIONS => {
@@ -521,6 +521,8 @@ sub WS980_handleMultiValuesUpdate($$$)
 
 	WS980_Log($hash, 5, "decoding block: " . WS980_hexDump($buf));
 
+	my $showRawBuffer = AttrVal($name, "showRawBuffer", "0") eq "1" ? 1 : 0;
+
 	for (my $i = 0; $i < length($buf); )
 	{
 		my $id = unpack("x[$i] C", $buf);
@@ -555,19 +557,15 @@ sub WS980_handleMultiValuesUpdate($$$)
 		my $factor = VALUES->{$id}{"factor"};
 		my $format = VALUES->{$id}{"format"};
 		my $unit   = VALUES->{$id}{"unit"};
+		my $errVal = VALUES->{$id}{"error"};
 
-		my $ffff   = "\xff"x($bytes);
-
-		my $value = substr($buf, $i, $bytes);
+		my $rawValue = substr($buf, $i, $bytes);
 		$i += $bytes;
 
-		# just print the hex values if $format is "raw"
-		if ($format eq "raw") {
-			$value = WS980_hexDump($value);
-		} elsif ($value eq $ffff) {
+		my $value = hex(WS980_binToHex($rawValue));
+		if ($value eq $errVal) {
 			$value = "n/a";
 		} else {
-			$value = hex(WS980_binToHex($value));
 			# convert negative values
 			my $lbit = 1 << ($bytes * 2 * 4) - 1;
 			if ($value & $lbit) {
@@ -590,6 +588,9 @@ sub WS980_handleMultiValuesUpdate($$$)
 			# and format
 			$value = sprintf($format, $value)
 		}
+
+		# append raw if ($showRawBuffer)
+		$value .= " " . WS980_hexDump($rawValue) if ($showRawBuffer);
 
 		my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime();
 		if ($hasDate) {

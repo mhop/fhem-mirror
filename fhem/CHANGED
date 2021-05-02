@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it.
+ - bugfix:  10_WS980: v1.3.0 - fix invalid values like 0xffff
  - bugfix:  73_AutoShuttersControl: roolback fix #1149463
  - bugfix:  73_AutoShuttersControl: fix logic error in EventProcessing 
                          Forum #1149463
