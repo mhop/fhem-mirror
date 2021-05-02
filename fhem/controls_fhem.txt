@@ -1,11 +1,11 @@
-REV 24363
+REV 24369
 DIR unused
 UPD 2021-04-30_07:45:03 361953 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-04-30_07:45:03 43180 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
-UPD 2021-04-29_07:45:12 168091 ./fhem.pl
+UPD 2021-05-02_07:45:13 168058 ./fhem.pl
 UPD 2018-03-11_07:45:03 22076 FHEM/00_CM11.pm
 UPD 2021-02-13_09:02:50 57899 FHEM/00_CUL.pm
 UPD 2018-03-04_07:45:03 76990 FHEM/00_DFPlayerMini.pm
@@ -329,7 +329,7 @@ UPD 2020-08-02_07:45:03 69639 FHEM/66_EseraOneWire.pm
 UPD 2020-02-17_07:45:03 11076 FHEM/66_EseraShutter.pm
 UPD 2020-04-17_07:45:02 6333 FHEM/66_EseraTemp.pm
 UPD 2016-12-27_07:45:02 26568 FHEM/67_ECMDDevice.pm
-UPD 2021-04-27_07:45:02 69847 FHEM/69_SoftliqCloud.pm
+UPD 2021-05-02_07:45:04 70272 FHEM/69_SoftliqCloud.pm
 UPD 2021-04-15_07:45:26 113409 FHEM/70_BOTVAC.pm
 UPD 2021-04-12_07:45:03 94150 FHEM/70_BRAVIA.pm
 UPD 2021-03-23_07:45:03 10753 FHEM/70_CanOverEthernet.pm
@@ -737,8 +737,8 @@ UPD 2021-04-30_07:45:07 4496860 docs/commandref.html
 UPD 2021-04-17_07:45:10 2779091 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-01_07:45:10 239053 docs/commandref_modular.html
-UPD 2021-05-01_07:45:11 250068 docs/commandref_modular_DE.html
+UPD 2021-05-02_07:45:12 239053 docs/commandref_modular.html
+UPD 2021-05-02_07:45:13 250068 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2298,7 +2298,7 @@ UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
 UPD 2021-03-22_07:45:03 31177 www/pgm2/f18.js
 UPD 2021-02-26_07:45:03 10104 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
-UPD 2021-03-16_07:45:03 64865 www/pgm2/fhemweb.js
+UPD 2021-05-02_07:45:04 65089 www/pgm2/fhemweb.js
 UPD 2020-11-02_07:45:03 13935 www/pgm2/fhemweb_colorpicker.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
