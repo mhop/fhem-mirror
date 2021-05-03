@@ -10,7 +10,6 @@ use IO::Socket::SSL;
 use HTTP::Request;
 use HTTP::Cookies;
 use LWP::UserAgent;
-use Mail::IMAPClient;
 use MIME::Base64;
 use HttpUtils;
 use JSON;
@@ -191,12 +190,8 @@ sub Arlo_Set($) {
  	    Arlo_ReadModes($hash);
     } elsif ($opt eq 'updateReadings') {
       Arlo_UpdateReadings($hash);
-    } elsif ($opt eq 'loginSecondFactor') {
-      Arlo_LoginSecondFactor($hash, $value);
-    } elsif ($opt eq 'checkMail') {
-      Arlo_Check2FAMail($hash);
     } else {
-      return "Unknown argument $opt, choose one of autocreate:noArg checkMail:noArg loginSecondFactor readModes:noArg reconnect:noArg updateReadings:noArg ";
+      return "Unknown argument $opt, choose one of autocreate:noArg readModes:noArg reconnect:noArg updateReadings:noArg ";
     }
   } elsif ($subtype eq 'BASESTATION' || $subtype eq 'ROUTER') {
     if (!Arlo_SetBasestationCmd($hash, $opt, $value)) {
@@ -422,25 +417,19 @@ sub Arlo_PrepareRequest($$;$$$$) {
   my $cookies = $account->{helper}{cookies};
   my $serviceHeaders;
   
-  if (substr($url, 0, 1) eq '/') { # Request für normale API
-    $url = 'https://myapi.arlo.com/hmsweb'.$url;
-    $serviceHeaders = "Auth-Version: 2\r\nschemaVersion: 1";
-  } else { # bei Requests an ocapi-app.arlo.com muss der Token Base64-encoded werden 
-    $token = encode_base64($token, '') if (defined($token));
-    $serviceHeaders = 'source: arloCamWeb';
-  }
-
-  my $headers = '';
+  $url = 'https://myapi.arlo.com/hmsweb'.$url;
+  
+  my $headers = "Accept: application/json\r\nAuth-Version: 2\r\n";
   $headers = $headers."Authorization: $token\r\n" if (defined($token)); 
   $headers = $headers."Cookie: $cookies\r\n" if (defined($cookies)); 
-  $headers = $headers."Content-Type: application/json; charset=utf-8\r\nReferer: https://myapi.arlo.com\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0";
-  $headers = $headers."\r\n".$serviceHeaders;
+  $headers = $headers."Content-Type: application/json; charset=utf-8\r\nOrigin: https://myapi.arlo.com\r\nReferer: https://myapi.arlo.com\r\nschemaVersion: 1\r\n";
+  $headers = $headers."User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36";
   $headers = $headers."\r\n".$additionalHeader if (defined($additionalHeader));
   Log3 $name, 5, "Arlo header: $headers";
   
   Log3 $name, 4, "Arlo URL: $url";
 
-  my $request = {url => $url, method => $method, header => $headers, keepalive => 1, httpversion => '1.1'};
+  my $request = {url => $url, method => $method, header => $headers, keepalive => 1, httpversion => '1.1', loglevel => 4};
   
   if (defined($body)) {
     my $bodyJson = encode_json $body;
@@ -488,15 +477,13 @@ sub Arlo_HttpRead($) {
 
   my ($rout, $rin) = ('', '');
   vec($rin, $hash->{conn}->fileno(), 1) = 1;
-  Log3 $hash, 4, "Read http response from $hash->{url}";
+  Log3 $hash, $hash->{loglevel}, "Read http response from $hash->{url}";
   my $nfound = select($rout=$rin, undef, undef, 0.1);
   while ($nfound > 0) {
     my $buf = '';
     my $len = sysread($hash->{conn}, $buf, 65536);
     if (!defined($len) || $len <= 0) {
-      Log3 $hash, 4, "Arlo read http ended";
       my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
-      Log3 $hash, 5, "Arlo data: $ret";
       $hash->{callbackArlo}($hash, $err, $ret);
       return;
     }
@@ -505,9 +492,8 @@ sub Arlo_HttpRead($) {
   }
   
   if (HttpUtils_DataComplete($hash)) {
-    Log3 $hash, 4, "Arlo read http DataComplete";
+    Log3 $hash, $hash->{loglevel}, "Arlo read http DataComplete";
     my ($err, $ret, $redirect) = HttpUtils_ParseAnswer($hash);
-    Log3 $hash, 5, "Arlo data: $ret";
     $hash->{callbackArlo}($hash, $err, $ret);
     return;
   } 
@@ -571,7 +557,6 @@ sub Arlo_DefaultCallback($$$) {
 		      } elsif ($data->{error} eq '1022' && $data->{reason} eq 'Access token is invalid') {
   			    Log3 $name, 3, "Arlo access token was invalid. Reconnect to Arlo.";
 	  		    if ($account->{STATE} eq 'active') {
-		  	      $account->{RETRY} = 1;
               Arlo_Login($account);
             }
 			      $logLevel = 5;
@@ -585,6 +570,9 @@ sub Arlo_DefaultCallback($$$) {
       Log3 $name, 3, 'Invalid Arlo callback response: '.$jsonData;
     }
     return $response;
+  } else {
+    Log3 $name, 2, 'Arlo callback response code '.$hash->{code};
+    Log3 $name, 4, 'Arlo callback response header '.$hash->{header};
   }
 }
 
@@ -1128,145 +1116,76 @@ sub Arlo_Login($) {
     return;
   }
 
-  $hash->{STATE} = 'login';
+  $hash->{STATE} = 'python-login';
   delete $hash->{EXPIRY};
   delete $hash->{helper}{followUpRequest};
   
-  my $password = encode_base64($hash->{helper}{password}, '');
-  my $postData = {email => $hash->{helper}{username}, password => $password, EnvSource => 'prod', language => 'de'};
-  delete $hash->{helper}{token};
   delete $hash->{helper}{cookies};
-  Arlo_Request($hash, "https://ocapi-app.arlo.com/api/auth", 'POST', $postData, undef, \&Arlo_LoginCallback);
-}
-
-sub Arlo_DefaultAuthCallback($$$;$) {
-  my ($hash, $err, $jsonData, $tryReconnect) = @_;
-  my $account = $modules{$MODULE}{defptr}{"account"};
-  my $name = $account->{NAME};
-  if ($err) {
-    Log3 $name, 2, "Error occured when calling Arlo authentication url $hash->{url}: $err";
-    Log3 $name, 3, $jsonData;
-    $account->{STATE} = 'login failed';
-    if ($tryReconnect && defined($hash->{RETRY})) {
-      Log3 $name, 3, 'Retry Arlo Login in 60 seconds.s';
-      InternalTimer(gettimeofday() + 60, "Arlo_Login", $hash);
-    }
-    return undef;
-  } elsif ($jsonData) {
-    my $response;
-    eval {
-      $response = decode_json $jsonData;
-      if ($response->{meta}{code} == 200) {
-        Arlo_SetCookies($account, $hash->{httpheader});
-        Log3 $name, 5, "Response from Arlo authentication: $jsonData";
-      } else {
-        delete $hash->{RETRY};
-        Log3 $name, 2, "Arlo authentictaion call was not successful: $jsonData";
-        $response = undef;
-      }
-    };
-    if ($@) {
-      Log3 $name, 3, 'Invalid Arlo auth callback response: '.$jsonData;
-    }
-    return $response;
+  delete $hash->{helper}{token};
+  my $mailServer = AttrVal($name, 'mailServer', '');
+  if ($mailServer eq '') {
+    Log3 $name, 1, 'Bei 2-Faktor-Authentifizierung muss das Attribut mailServer gesetzt sein, damit die Mail mit dem Authentifizerungs-Code abgerufen werden kann.';
+    return;
   }
+  
+  my $tmpFile = '/tmp/arlo';
+  system "python3 contrib/49_Arlo.py $hash->{helper}{username} $hash->{helper}{password} $mailServer $hash->{helper}{mailUser} $hash->{helper}{mailPassword} > $tmpFile &";
+
+  open(my $fh, '<', $tmpFile);
+  $hash->{helper}{pythonFh} = $fh;
+  $hash->{helper}{pythonTimeout} = gettimeofday() + 120;
+  InternalTimer(gettimeofday() + 1, "Arlo_ReadPythonResult", $hash);
 }
 
-sub Arlo_LoginCallback($$$) {
-  my ($hash, $err, $jsonData) = @_;
-  my $response = Arlo_DefaultAuthCallback($hash, $err, $jsonData, 1);
-  if (defined($response)) {
-    my $account = $modules{$MODULE}{defptr}{"account"};
-    my $data = $response->{data};
-    if (!$data->{authCompleted}) {
-      Log3 $account->{NAME}, 3, 'Request second factor.';
-      $account->{helper}{token} = $data->{token};
-      $account->{STATE} = 'getFactors';
-      if (defined($account->{helper}{factorId})) {
-        Arlo_StartAuth($account);
-      } else {
-        my $validateData = $data->{authenticated};
-        Arlo_Request($account, "https://ocapi-app.arlo.com/api/getFactors?data=$validateData", 'GET', undef, undef, \&Arlo_ReadFactorsCallback);
-      }
-    } else {
-      Arlo_ValidateAccessToken($account, $data);
-    }
-  }
-}
-
-sub Arlo_ReadFactorsCallback($$$) {
-  my ($hash, $err, $jsonData) = @_;
-  my $response = Arlo_DefaultAuthCallback($hash, $err, $jsonData);
-  if (defined($response)) {
-    my $account = $modules{$MODULE}{defptr}{"account"};
-    my @items = @{$response->{data}{items}};
-    foreach my $item (@items) {
-      if ($item->{factorType} eq 'EMAIL') {
-        my $factorId = $item->{factorId};
-        $account->{helper}{factorId} = $factorId;
-        Arlo_StartAuth($account);
-        return;
-      }
-    }
-	}
-}
-
-sub Arlo_StartAuth($) {
+sub Arlo_ReadPythonResult($) {
   my ($hash) = @_;
-  my $postData = {factorId => $hash->{helper}{factorId}};
-  $hash->{STATE} = 'startAuth';
-  Arlo_Request($hash, 'https://ocapi-app.arlo.com/api/startAuth', 'POST', $postData, undef, \&Arlo_StartAuthCallback);
-}
-
-sub Arlo_StartAuthCallback($$$) {
-  my ($hash, $err, $jsonData) = @_;
-  my $response = Arlo_DefaultAuthCallback($hash, $err, $jsonData);
-  if (defined($response)) {
-    my $account = $modules{$MODULE}{defptr}{"account"};
-    $account->{STATE} = 'awaiting2FA';
-    $account->{helper}{factorAuthCode} = $response->{data}{factorAuthCode};
-    Log3 $account->{NAME}, 3, 'Arlo Login is waiting for second factor.';
-    InternalTimer(gettimeofday() + 5, "Arlo_Check2FAMail", $account);
+  if (gettimeofday() > $hash->{helper}{pythonTimeout}) {
+    $hash->{STATE} = 'login timeout';
+    Arlo_ClosePythonFile($hash);
+    return;
   }
-}
-
-sub Arlo_LoginSecondFactor($$) {
-  my ($hash, $code) = @_;
-  my $factorAuthCode = $hash->{helper}{factorAuthCode};
-  if (defined($factorAuthCode)) {
-    my $postData = {factorAuthCode => $factorAuthCode, otp => $code};
-    Arlo_Request($hash, 'https://ocapi-app.arlo.com/api/finishAuth', 'POST', $postData, undef, \&Arlo_FinishAuthCallback);
-  } else {
-    Log3 $hash->{NAME}, 3, "FactorAuthCode is empty, can't login second factor.";
+  my $fh = $hash->{helper}{pythonFh};
+  my $line = <$fh>;
+  while (defined($line)) {
+    $line =~ s/\s+$//;
+    if ($line eq "end") {
+      Arlo_ClosePythonFile($hash);
+      Arlo_Request($hash, '/users/session/v2', 'GET', undef, undef, \&Arlo_FinishLogin);
+      return;
+    }
+    my $p = index($line, ': ');
+    my $key = substr($line, 0, $p);
+    my $value = substr($line, $p + 2);
+    if ($key eq 'error') {
+      $hash->{STATE} = 'login failed';
+      Log3 $hash->{NAME}, 2, "Arlo: $value";
+      Arlo_ClosePythonFile($hash);
+      return;
+    } elsif ($key eq 'log') {
+      Log3 $hash->{NAME}, 3, "Arlo: $value";
+    } elsif ($key eq 'status') {
+      $hash->{STATE} = $value;
+    } elsif ($key eq 'cookies') {
+      $hash->{helper}{cookies} = $value;
+    } elsif ($key eq 'token') {
+      $hash->{helper}{token} = $value;
+    } elsif ($key eq 'userId') {
+      $hash->{helper}{userId} = $value;
+    } else {
+      Log3 $hash->{NAME}, 2, "Arlo: unknown command $line";
+    }
+    $line = <$fh>;
   }
+  InternalTimer(gettimeofday() + 1, "Arlo_ReadPythonResult", $hash);
 }
 
-sub Arlo_FinishAuthCallback($$$) {
-  my ($hash, $err, $jsonData) = @_;
-  my $response = Arlo_DefaultAuthCallback($hash, $err, $jsonData);
-  if (defined($response)) {
-    my $account = $modules{$MODULE}{defptr}{"account"};
-    my $data = $response->{data};
-    Arlo_ValidateAccessToken($account, $data);
-    delete $account->{hash}{factorAuthCode};
-  }
-}
-
-sub Arlo_ValidateAccessToken($$) {
-	my ($hash, $data) = @_;
-  $hash->{helper}{token} = $data->{token};
-	$hash->{helper}{userId} = $data->{userId};
-	my $validateData = $data->{authenticated};
-  Arlo_Request($hash, "https://ocapi-app.arlo.com/api/validateAccessToken?data=$validateData", 'GET', undef, undef, \&Arlo_ValidateAccessTokenCallback);
-}
-
-sub Arlo_ValidateAccessTokenCallback($$$) {
-  my ($hash, $err, $jsonData) = @_;
-  my $response = Arlo_DefaultAuthCallback($hash, $err, $jsonData);
-  if (defined($response)) {
-      my $account = $modules{$MODULE}{defptr}{"account"};
-      Arlo_Request($account, '/users/session/v2', 'GET', undef, undef, \&Arlo_FinishLogin);
-	}
+sub Arlo_ClosePythonFile($) {
+  my ($hash) = @_;
+  my $fh = $hash->{helper}{pythonFh};
+  close($fh);
+  unlink('/tmp/arlo');
+  delete $hash->{helper}{pythonFh};
+  delete $hash->{helper}{pythonTimeout};
 }
 
 sub Arlo_FinishLogin($$$) {
@@ -1275,7 +1194,6 @@ sub Arlo_FinishLogin($$$) {
   if (defined($response)) {
     my $account = $modules{$MODULE}{defptr}{"account"};
 		$account->{SSE_STATUS} = 200;
-		delete $account->{RETRY};
 		$account->{STATE} = 'active';
 		Arlo_Request($account, '/users/devices');
     
@@ -1309,9 +1227,10 @@ sub Arlo_EventQueue($) {
   my $token = $hash->{helper}{token};
   delete $hash->{RESPONSE_TIMEOUT};
 
-  my $headers = "Authorization: ".$token."\r\nAccept: text/event-stream\r\nReferer: https://myapi.arlo.com\r\n".
-          "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:69.0) Gecko/20100101 Firefox/69.0\r\nCookie: ".$cookies;
-  my $con = {url => 'https://myapi.arlo.com/hmsweb/client/subscribe', method => "GET", header => $headers, keepalive => 1, host => 'myapi.arlo.com', httpversion => '1.1'};
+  my $headers = {'Auth-Version' => 2, Authorization => $token, Accept => 'text/event-stream', 'Access-Control-Request-Headers' => 'auth-version,authorization',
+    'Access-Control-Request-Method' => 'GET', Cookie => $cookies, Origin => 'https://my.arlo.com', Referer => 'https://myapi.arlo.com',
+    'User-Agent' => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36' };
+  my $con = {url => 'https://myapi.arlo.com/hmsweb/client/subscribe', method => "GET", header => $headers, keepalive => 1, host => 'myapi.arlo.com', httpversion => '1.1', loglevel => 4};
   my $err = HttpUtils_Connect($con);
   if ($err) {
     Log3 $name, 2, "Error in Arlo event queue: $err";
@@ -1377,16 +1296,19 @@ sub Arlo_EventPolling($) {
     }
   } else {
     if ($sseStatus == 299) {
-      $hash->{RETRY} = 1;
       InternalTimer(gettimeofday() + 60, "Arlo_Login", $hash);
+      return;
+    } elsif ($sseStatus == 298) {
+      $hash->{SSE_STATUS} = 0;
+      InternalTimer(gettimeofday() + 5, "Arlo_EventQueue", $hash);
       return;
     } else {
       if (defined($timeout) && $timeout < gettimeofday()) {
-          $hash->{SSE_STATUS} = 0;
-          Log3 $name, 3, "Arlo connection timeout, try to restart event listener.";
-          HttpUtils_Close($con);
-          Arlo_EventQueue($hash);
-		  return;
+        $hash->{SSE_STATUS} = 0;
+        Log3 $name, 3, "Arlo connection timeout, try to restart event listener.";
+        HttpUtils_Close($con);
+        Arlo_EventQueue($hash);
+		    return;
       }
     }
   }
@@ -1435,7 +1357,10 @@ sub Arlo_ProcessResponse($$) {
           Log3 $hash->{NAME}, 2, "Arlo event queue error: session lost.";
           $hash->{SSE_STATUS} = 299;
         }
-      } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' 
+      } elsif ($check eq 'Vary:') {
+          Log3 $hash->{NAME}, 3, "Arlo event queue error: subscription declined (Header $line). Retry event subscription.";
+          $hash->{SSE_STATUS} = 298;
+      } elsif ($check ne 'event' && $check ne 'Cache' && $check ne 'Conte' && $check ne 'Date:' && $check ne 'Pragm' && $check ne 'Server' && $check ne 'Acces'
           && substr($check, 0, 2) ne 'X-' && $check ne 'trans' && $check ne 'Serve' && $check ne 'Expir' && $check ne 'Stric' && $check ne 'Trans'
           && $check ne 'Expec' && $check ne 'CF-RA' && $check ne 'CF-Ca' && $check ne 'reque' && $check ne 'x-tra' && $check ne 'cf-re') {
         Log3 $hash->{NAME}, 2, "Invalid Arlo event response: $line";
@@ -1536,71 +1461,6 @@ sub Arlo_ProcessEvent($$) {
   }
 }
 
-
-sub Arlo_Check2FAMail($) {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  if ($hash->{STATE} ne 'awaiting2FA') {
-    return;
-  }
-  
-  my $mailServer = AttrVal($name, 'mailServer', '');
-  if ($mailServer eq '') {
-    Log3 $name, 1, 'Bei 2-Faktor-Authentifizierung muss das Attribut mailServer gesetzt sein, damit die Mail mit dem Authentifizerungs-Code abgerufen werden kann.';
-    return;
-  }
-
-  my $mail_user = $hash->{helper}{mailUser};
-  my $mail_password = $hash->{helper}{mailPassword};
-  my $socket = IO::Socket::SSL->new(PeerAddr => $mailServer, PeerPort => 993, Timeout => 10);
-  my $client = Mail::IMAPClient->new(Socket => $socket, User => $mail_user, Password => $mail_password,	Timeout => 10);
-  
-  if (!$client->IsAuthenticated()) {
-    Log3 $name, 2, "E-Mail authentication error.";
-    $client->done();
-    return;
-  }
-
-	if (!$client->select("INBOX")) {
-    Log3 $name, 2, "Could not select email inbox.";
-    $client->done();
-    return;
-  }
-  
-  my $expunge = 0;
-  my $code = undef;
-  for ($client->search('FROM', 'do_not_reply@arlo.com')) {
-    my $date = $client->date($_);
-    my $subject = $client->subject($_);
-    my $body = $client->body_string($_);
-    $body =~ /\s(\d{6})\s/g;
-    my $parsedCode = $1;
-    if ($parsedCode) {
-		  $client->delete_message($_);
-      if (defined($code)) {
-        Log3 $name, 3, "Discarding old 2FA code $parsedCode";
-      }
-      $code = $parsedCode;
-      $expunge = 1;
-    } else {
-      Log3 $name, 4, "Ignoring Arlo mail from $date, subject: $subject";
-    }
-  }
-  if ($expunge > 0) {
-    $client->expunge("INBOX");
-  }
-  $client->done();
-  
-  if (defined($code)) {
-    Log3 $name, 3, "Trying to complete 2FA Login with code $code";
-    Arlo_LoginSecondFactor($hash, $code);
-  }
-
-  InternalTimer(gettimeofday() + 5, "Arlo_Check2FAMail", $hash);
-}
-
-
 #
 # Helper
 #
@@ -1671,14 +1531,6 @@ sub Arlo_decrypt($) {
   <ul>
 		<li>autocreate (subtype ACCOUNT)<br>
 		    Reads all devices which are assigned to the Arlo account and creates FHEM devices, if the devices don't exist in FHEM.
-		</li>
-    <li>checkMail (Subtype ACCOUNT)<br>
-      If the login process is in status "awaiting2FA" this method checks whether there is a 2FA mail from Arlo. If so the code of this mail will be used to login.
-			You don't have to call "checkMail" manually because this is done automatically during the login process.
-		</li>
-		<li>loginSecondFactor (Subtype ACCOUNT)<br>
-      If you use 2-factor-authorization you have to provide a code sent by Arlo after logging on with your username and password This code can be given to the 
-      login process here. If you have set your email password an mail server in the cloud device, you don't have to call "loginSecondFactor" because it's then done automatically.
 		</li>
 		<li>reconnect (subtype ACCOUNT)<br>
 		    Connect or reconnect to the Arlo server. First FHEM logs in, then a SSE connection is established. This method is only used if the connection
@@ -1848,15 +1700,6 @@ sub Arlo_decrypt($) {
   <ul>
 		<li>autocreate (Subtype ACCOUNT)<br>
 			Liest alle dem Arlo-Account zugeordneten Geräte und legt dafür FHEM-Devices an, falls es diese nicht schon gibt.
-		</li>
-		<li>checkMail (Subtype ACCOUNT)<br>
-			Falls der Login-Vorgang im Status "awaiting2FA" ist, wird geprüft, ob es eine 2FA-Mail von Arlo gibt. Falls ja, wird versucht, sich mit dem Code aus der neuesten Mail 
-      anzumelden. "checkMail" muss normal nicht manuell aufgerufen werden, der Aufruf erfolgt automatisch im Login-Prozess.
-		</li>
-		<li>loginSecondFactor (Subtype ACCOUNT)<br>
-			Bei der 2FA-Anmeldung muss nach der Anmeldung mit Passwort ein zweiter Login-Schritt mit einem Code erfolgen, der für den Login-Vorgang erzeugt wird. Dieser Code
-      kann hier übergeben werden. Falls man das E-Mail-Passwort und den Mailserver hinterlegt, muss "loginSecondFactor" nicht selbst aufgerufen werden, da dies
-      dann automatisch im Login-Vorgang erfolgt.
 		</li>
 		<li>reconnect (Subtype ACCOUNT)<br>
 			Neuaufbau der Verbindung zum Arlo-Server. Zunächst loggt sich FHEM neu bei Arlo ein, danach wird die SSE-Verbindung aufgebaut. Wird nur benötigt, 
