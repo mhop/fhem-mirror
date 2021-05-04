@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.9";
+my $version = "1.3.10";
 
 my $srandUsed;
 
@@ -635,6 +635,8 @@ sub todoist_CreateTask($$) {
   my @tmp = split( ":", join(" ",@$a) );
   
   my $title=encode_utf8($tmp[0]);
+  
+  $title = $h->{"title"} if ($h->{"title"});
   
   my $check=1;
   
