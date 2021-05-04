@@ -1342,7 +1342,7 @@ DUOFERN_Parse($$)
     }
   
   #Umweltsensor Wetter
-  } elsif ($msg =~ m/0F011322.{36}/) {  
+  } elsif ($msg =~ m/0F..1322.{36}/) {  
     $def01 = $modules{DUOFERN}{defptr}{$code."00"};
     if(!$def01) {
       DoTrigger("global","UNDEFINED DUOFERN_$code"."_sensor DUOFERN $code"."00");
