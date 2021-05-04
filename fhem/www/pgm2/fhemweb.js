@@ -264,6 +264,7 @@ FW_jqueryReadyFn()
             $(sel).append('<option value="'+attrName+'">'+attrName+'</option>');
           $(sel).val(attrName);
           FW_detailSelect(sel, true);
+          $(sel).trigger("change");
         });
     });
 
@@ -374,6 +375,7 @@ FW_displayHelp(devName, sel, selType, val, level)
         liTag = $(aTag).parent("li");
       if(!$(liTag).length)
         liTag = $(aTag).parent().next("li");
+      $("#devSpecHelp").remove(); // shown only one if FHEM is slow
       if($(liTag).length) {
         $(sel).closest("div[cmd='"+selType+"']")
            .after('<div class="makeTable" id="devSpecHelp"></div>')
