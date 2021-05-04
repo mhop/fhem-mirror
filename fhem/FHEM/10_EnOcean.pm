@@ -8055,6 +8055,7 @@ sub EnOcean_Parse($$) {
           $st = "raw";
         }
 
+#####*
         # signal telegram learn mode status
         my $signalData = EnOcean_signalLearnModeStatus(0, 1, 0, $attr{$name}{eep} eq 'raw' ? 1 : 0, 0, $hash->{DEF}, $attr{$name}{eep} eq 'raw' ? 'FF-FF-FF' : $attr{$name}{eep});
         EnOcean_SndRadio(undef, $hash, 1, 'D0', $signalData, defined($attr{$name}{subDef}) ? $attr{$name}{subDef} : '0' x 8, '00', 'F' x 8);
@@ -8067,20 +8068,11 @@ sub EnOcean_Parse($$) {
     } elsif ($st eq "hvac.01" || $st eq "MD15") {
       # Battery Powered Actuator (EEP A5-20-01)
       # [Kieback&Peter MD15-FTL-xx]
-      push @event, "3:energyInput:" . (($db[2] & 0x40) ? "enabled" : "disabled");
+      push @event, "1:energyInput:" . (($db[2] & 0x40) ? "enabled" : "disabled");
       my $battery = ($db[2] & 0x10) ? "ok" : "low";
-      my $energyStorage;
-      if ($db[2] & 0x20) {
-        $energyStorage = 'charged';
-        $battery = 'ok';
-      } else {
-        $energyStorage = 'empty';
-      }
-      if (!exists($hash->{helper}{battery}) || $hash->{helper}{battery} ne $battery) {
-        push @event, "3:battery:$battery";
-        $hash->{helper}{battery} = $battery;
-      }
-      push @event, "3:energyStorage:$energyStorage";
+      push @event, "1:battery:$battery";
+      my $energyStorage = ($db[2] & 0x20) ? 'charged' : 'empty';
+      push @event, "1:energyStorage:$energyStorage";
       my $roomTemp = ReadingsVal($name, "roomTemp", 20);
       if ($db[2] & 4) {
         readingsDelete($hash, "roomTemp");
@@ -8096,11 +8088,11 @@ sub EnOcean_Parse($$) {
 #      } else {
 #        $maintenanceMode = 'off';
 #      }
-      push @event, "3:cover:" . (($db[2] & 8) ? "open" : "closed");
+      push @event, "1:cover:" . (($db[2] & 8) ? "open" : "closed");
       my $window = ($db[2] & 2) ? "open" : "closed";
-      push @event, "3:window:$window";
-      push @event, "3:actuatorState:". (($db[2] & 1) ? "obstructed" : "ok");
-      push @event, "3:selfCtrl:" . (($db[0] & 4) ? "on" : "off");
+      push @event, "1:window:$window";
+      push @event, "1:actuatorState:". (($db[2] & 1) ? "obstructed" : "ok");
+      push @event, "1:selfCtrl:" . (($db[0] & 4) ? "on" : "off");
       my $functionSelect = 0;
       my $setpointSelect = 0;
       my $setpointSet = ReadingsVal($name, "setpointSetRestore", ReadingsVal($name, "setpointSet", $setpoint));
@@ -8213,8 +8205,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveOpend:runInit";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveOpend:runInit";
+        push @event, "1:operationMode:off";
         readingsDelete($hash, "setpointSet");
         readingsDelete($hash, "setpointTemp");
         readingsDelete($hash, "setpointTempSet");
@@ -8230,16 +8222,16 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $setpointSet = 0;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:valveClosed";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:valveClosed";
+          push @event, "1:operationMode:off";
           readingsDelete($hash, "waitingCmds");
           $functionSelect = 1;
           $waitingCmds = 0x10;
@@ -8259,9 +8251,9 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:runInit";
-        push @event, "3:operationMode:off";
-        push @event, "3:waitingCmds:$operationMode";
+        push @event, "1:maintenanceMode:runInit";
+        push @event, "1:operationMode:off";
+        push @event, "1:waitingCmds:$operationMode";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8278,9 +8270,9 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:listSet";
-        push @event, "3:operationMode:off";
-        push @event, "3:waitingCmds:$operationMode";
+        push @event, "1:maintenanceMode:listSet";
+        push @event, "1:operationMode:off";
+        push @event, "1:waitingCmds:$operationMode";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8295,14 +8287,14 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $db[2] = (40 - $temperature) * 255 / 40;
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           readingsDelete($hash, "setpointTemp");
           readingsDelete($hash, "setpointTempSet");
           readingsDelete($hash, "waitingCmds");
@@ -8316,8 +8308,8 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:runInit";
-          push @event, "3:operationMode:off";
+          push @event, "1:maintenanceMode:runInit";
+          push @event, "1:operationMode:off";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
@@ -8335,8 +8327,8 @@ sub EnOcean_Parse($$) {
           $setpointTemp = $setpointTempSet;
           $db[2] = (40 - $temperature) * 255 / 40;
           push @event, "3:setpointTemp:" . sprintf("%0.1f", $setpointTemp);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           readingsDelete($hash, "waitingCmds");
           $waitingCmds = 0;
         }
@@ -8350,8 +8342,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:off";
-        push @event, "3:operationMode:summerMode";
+        push @event, "1:maintenanceMode:off";
+        push @event, "1:operationMode:summerMode";
         #readingsDelete($hash, "setpointSet");
         readingsDelete($hash, "setpointTemp");
         readingsDelete($hash, "setpointTempSet");
@@ -8365,14 +8357,14 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
           $db[2] = (40 - $temperature) * 255 / 40;
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpoint";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpoint";
           $waitingCmds = 0;
         }
 
@@ -8383,8 +8375,8 @@ sub EnOcean_Parse($$) {
           $setpointSet = 100;
           $db[2] = 0x20;
           readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           $functionSelect = 1;
           $waitingCmds = 0x80;
         } else {
@@ -8402,8 +8394,8 @@ sub EnOcean_Parse($$) {
           $db[2] = (40 - $temperature) * 255 / 40;
           $setpointTemp = $setpointTempSet;
           push @event, "3:setpointTemp:" . sprintf("%.1f", $setpointTemp);
-          push @event, "3:maintenanceMode:off";
-          push @event, "3:operationMode:setpointTemp";
+          push @event, "1:maintenanceMode:off";
+          push @event, "1:operationMode:setpointTemp";
           $waitingCmds = 0;
         }
 
@@ -8413,8 +8405,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = $setpointSummerMode;
         $db[2] = (40 - $temperature) * 255 / 40;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:off";
-        push @event, "3:operationMode:summerMode";
+        push @event, "1:maintenanceMode:off";
+        push @event, "1:operationMode:summerMode";
         $waitingCmds = 0;
 
        } elsif ($maintenanceMode eq "valveOpend:runInit") {
@@ -8423,8 +8415,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 100;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveOpend:runInit";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveOpend:runInit";
+        push @event, "1:operationMode:off";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8438,8 +8430,8 @@ sub EnOcean_Parse($$) {
         $setpointSet = 0;
         $db[2] = 0x20;
         readingsSingleUpdate($hash, 'setpointSet', $setpointSet, 1);
-        push @event, "3:maintenanceMode:valveClosed";
-        push @event, "3:operationMode:off";
+        push @event, "1:maintenanceMode:valveClosed";
+        push @event, "1:operationMode:off";
         #readingsDelete($hash, "setpointSet");
         #readingsDelete($hash, "setpointTemp");
         #readingsDelete($hash, "setpointTempSet");
@@ -8451,7 +8443,7 @@ sub EnOcean_Parse($$) {
         $db[2] = (40 - $temperature) * 255 / 40;
         $waitingCmds = 0;
       }
-      push @event, "3:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
+      push @event, "1:state:T: " . sprintf("%0.1f", $temperature) . " SPT: " . sprintf("%.1f", $setpointTemp) . " SP: $setpoint";
       # sent message to the actuator
       $data = sprintf "%02X%02X%02X08", $setpointSet, $db[2], $waitingCmds | $summerMode | $setpointSelect | $functionSelect;
       EnOcean_SndRadio(undef, $hash, $packetType, "A5", $data, $subDef, "00", $hash->{DEF});
