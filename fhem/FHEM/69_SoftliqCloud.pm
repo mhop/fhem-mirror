@@ -21,8 +21,6 @@
 #
 ##############################################################################
 #   Changelog:
-#   0.1.07: - 2021-04-30 - Split JSON strings to avoid processing multiple root nodes, part 2
-#                        - Changed password storage to (new) common package
 #   0.1.06: - 2021-04-26 - Split JSON strings to avoid processing multiple root nodes
 #   0.1.05: Fixed setting numeric parameters
 #   0.1.04: ANother fix to avoid "garbage" in JSON
@@ -1990,7 +1988,7 @@ sub wsReadDevIo {
     my $index = index($buf, '}{');
     if ($index > 0) {
     	Log3 ($name, LOG_RECEIVE, "[$name] - Splitting double-JSON buffer");
-    	@bufs = split(/,/xsm,join($COMMA,substr($buf,0,$index),Substr($buf,$index+1)));
+    	@bufs = split(/,/xsm,join($COMMA,substr($buf,0,$index),substr($buf,$index+1)));
     }
     else {
     	push(@bufs,$buf);
