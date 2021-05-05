@@ -17,7 +17,7 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.10";
+my $version = "1.3.11";
 
 my $srandUsed;
 
@@ -636,7 +636,7 @@ sub todoist_CreateTask($$) {
   
   my $title=encode_utf8($tmp[0]);
   
-  $title = $h->{"title"} if ($h->{"title"});
+  $title = encode_utf8($h->{"title"}) if ($h->{"title"});
   
   my $check=1;
   
@@ -2348,6 +2348,7 @@ sub todoist_genUUID() {
         <code>set &lt;DEVICE&gt; addTask &lt;TASK_TITLE&gt;[:&lt;DUE_DATE&gt;]</code><br ><br />
         Additional Parameters are:<br />
         <ul>
+         <li>title="&lt;TITLE&gt;" (string)</li>
          <li>dueDate (due_date)=&lt;DUE_DATE&gt; (can be free form text or format: YYYY-MM-DDTHH:MM)</li>
          <li>priority=the priority of the task (a number between 1 and 4, 4 for very urgent and 1 for natural).</li>
          <li>responsibleUid=the todoist-ID of the user who is responsible for accomplishing the current task</li>
