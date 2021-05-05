@@ -905,6 +905,7 @@ sub EnOcean_Define($$) {
         if (defined $ioDev) {
           AssignIoPort($hash, $ioDev);
           $hash->{IODev}{NAME} = $ioDev;
+          $attr{$name}{IODev} = $ioDev;
 	} else {
 	  AssignIoPort($hash);
           # find IODev name
@@ -912,6 +913,7 @@ sub EnOcean_Define($$) {
 	    if ($iHash eq $hash->{IODev}) {
 	      $ioDev = $defs{$iName}{NAME};
 	      $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	      $attr{$name}{IODev} = $defs{$iName}{NAME};
 	      Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	      last;
 	    }
@@ -960,6 +962,7 @@ sub EnOcean_Define($$) {
             if (defined $ioDev) {
               AssignIoPort($hash, $ioDev);
               $hash->{IODev}{NAME} = $ioDev;
+              $attr{$name}{IODev} = $ioDev;
             } else {
               AssignIoPort($hash);
               # find IODev name
@@ -967,6 +970,7 @@ sub EnOcean_Define($$) {
                 if ($iHash eq $hash->{IODev}) {
                   $ioDev = $defs{$iName}{NAME};
 	          $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	          $attr{$name}{IODev} = $defs{$iName}{NAME};
 	          Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	          last;
 	        }
@@ -1012,6 +1016,7 @@ sub EnOcean_Define($$) {
           if (defined $ioDev) {
             AssignIoPort($hash, $ioDev);
             $hash->{IODev}{NAME} = $ioDev;
+            $attr{$name}{IODev} = $ioDev;
 	  } else {
 	    AssignIoPort($hash);
             # find IODev name
@@ -1019,6 +1024,7 @@ sub EnOcean_Define($$) {
 	      if ($iHash eq $hash->{IODev}) {
 	        $ioDev = $defs{$iName}{NAME};
 	        $hash->{IODev}{NAME} = $defs{$iName}{NAME};
+	        $attr{$name}{IODev} = $defs{$iName}{NAME};
 	        Log3 $name, 3, "EnOcean $name define defsName: $iName defsHash: $iHash IOHash: $hash->{IODev}";
 	        last;
 	      }
@@ -1132,6 +1138,7 @@ sub EnOcean_Define($$) {
         # no device infos
         if (!exists $hash->{IODev}) {
 	  (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	  $attr{$name}{IODev} = $hash->{IODev}{NAME};
 	}
         # assign defptr
         if (exists $hash->{OLDDEF}) {
@@ -1167,6 +1174,7 @@ sub EnOcean_Define($$) {
 
         if (!exists $hash->{IODev}) {
           (defined $ioDev) ? AssignIoPort($hash, $ioDev) : AssignIoPort($hash);
+	  $attr{$name}{IODev} = $hash->{IODev}{NAME};
         }
         if (exists($hash->{OLDDEF}) && $hash->{OLDDEF} =~ m/^[A-Fa-f0-9]{8}$/i) {
           delete $modules{EnOcean}{defptr}{$hash->{OLDDEF}};
