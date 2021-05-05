@@ -140,13 +140,14 @@ sub TCM_InitSerialCom($) {
     my @getBaseID = ("get", "baseID");
     if (TCM_Get($hash, @getBaseID) =~ /[Ff]{2}[\dA-Fa-f]{6}/) {
       $baseID = sprintf "%08X", hex $&;
+      $baseID = $baseID eq 'F' x 8 ? '0' x 8 : $baseID;
       $attr{$name}{".baseIDSaved"} = $baseID;
       $hash->{BaseID} = $baseID;
-      $hash->{LastID} = sprintf "%08X", (hex $&) + 127;
+      $hash->{LastID} = sprintf "%08X", (hex $baseID) + 127;
     } else {
       $baseID = AttrVal($name, ".baseIDSaved", '0' x 8);
       $hash->{BaseID} = $baseID;
-      $hash->{LastID} = $baseID eq '0' x 8 ? '0' x 8 : sprintf("%08X", (hex $baseID) + 127);
+      $hash->{LastID} = sprintf("%08X", (hex $baseID) + 127);
     }
   }
   if (defined $baseID) {
