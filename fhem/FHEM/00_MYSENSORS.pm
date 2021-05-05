@@ -1000,75 +1000,81 @@ __END__
 
 =begin html
 
-<a name="MYSENSORS"></a>
+<a id="MYSENSORS"></a>
 <h3>MYSENSORS</h3>
+<p>connects fhem to <a href="http://MYSENSORS.org">MYSENSORS</a>.</p>
+<p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> clients.<br>
+  Each <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> represents a mysensors node.</p>
+
+<a id="MYSENSORS-define"></a>
+<h4>Define</h4>
+<p><code>define &lt;name&gt; MYSENSORS &lt;serial device&gt;|&lt;ip:port&gt;</code></p>
+<p>Specifies the MYSENSORS device.</p>
+
+<a id="MYSENSORS-set"></a>
+<h4>Set</h4>
 <ul>
-  <p>connects fhem to <a href="http://MYSENSORS.org">MYSENSORS</a>.</p>
-  <p>A single MYSENSORS device can serve multiple <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> clients.<br/>
-     Each <a href="#MYSENSORS_DEVICE">MYSENSORS_DEVICE</a> represents a mysensors node.<br/>
-  <a name="MYSENSORSdefine"></a>
-  <p><b>Define</b></p>
-  <ul>
-    <p><code>define &lt;name&gt; MYSENSORS &lt;serial device&gt|&lt;ip:port&gt;</code></p>
-    <p>Specifies the MYSENSORS device.</p>
-  </ul>
-  <a name="MYSENSORSset"></a>
-  <p><b>Set</b></p>
-  <ul>
-    <li>
-      <p><code>set &lt;name&gt; connect</code><br/>
-         (re-)connects the MYSENSORS-device to the MYSENSORS-gateway</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; disconnect</code><br/>
-         disconnects the MYSENSORS-device from the MYSENSORS-gateway</p>
-    </li>
-    <li>
-      <p><code>set &lt;name&gt; inclusion-mode on|off</code><br/>
-         turns the gateways inclusion-mode on or off</p>
-    </li>
-  </ul>
-  <a name="MYSENSORSattr"></a>
-  <p><b>Attributes</b></p>
-  <ul>
-    <li>
-      <p><code>attr &lt;name&gt; autocreate</code><br/>
-         enables auto-creation of MYSENSOR_DEVICE-devices on receival of presentation-messages</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; requestAck</code><br/>
-         request acknowledge from nodes.<br/>
-         if set the Readings of nodes are updated not before requested acknowledge is received<br/>
-         if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).
-         May also be configured for individual nodes if not set for gateway.</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; first-sensorid <&lt;number &lth; 255&gt;></code><br/>
-         configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
-    </li>
-    <li>
-      <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code><br/>
-         specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a>
-         (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
-         in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
-      <p><code>#Type,Name,Version,File,Comments</code><br/>
-         <code>10,Blink,1,Blink.hex,blinking example</code><br/></p>
-      <p>The meaning of the columns is the following:</br>
-         <dl>
-           <dt><code>Type</code></dt>
-           <dd>a numeric value (range 0 .. 65536) - each node will be assigned a firmware type</dd>
-           <dt><code>Name</code></dt>
-           <dd>a short name for this type</dd>
-           <dt><code>Version</code></dt> 
-           <dd>a numeric value (range 0 .. 65536) - the version of the firmware (may be different 
-               to the value that is send during the node presentation)</dd>
-           <dt><code>File</code></dt>
-           <dd>the filename containing the firmware - must also be stored in the folder FHEM/firmware</dd>
-           <dt><code>Comments</code></dt>
-           <dd>a description / comment for the firmware</dd>
-         </dl></p>
-    </li>
-  </ul>
+  <li>
+    <p><a id="MYSENSORS-set-connect"></a><b>connect</b></p>
+    <p><code>set &lt;name&gt; connect</code></p>
+    <p>(re-)connects the MYSENSORS-device to the MYSENSORS-gateway</p>
+  </li>
+  <li>
+    <p><a id="MYSENSORS-set-disconnect"></a><b>disconnect</b></p>
+    <p><code>set &lt;name&gt; disconnect</code></p>
+    <p>disconnects the MYSENSORS-device from the MYSENSORS-gateway</p>
+  </li>
+  <li>
+    <p><a id="MYSENSORS-set-inclusion-mode"></a><b>inclusion-mode</b></p>
+    <p><code>set &lt;name&gt; inclusion-mode on|off</code></p>
+    <p>turns the gateways inclusion-mode on or off</p>
+  </li>
+</ul>
+
+<a id="MYSENSORS-attr"></a>
+<h4>Attributes</h4>
+<ul>
+  <li>
+    <p><a id="MYSENSORS-attr-autocreate"></a><b>autocreate</b></p>
+    <p><code>attr &lt;name&gt; autocreate</code></p>
+    <p>enables auto-creation of MYSENSOR_DEVICE-devices on receival of presentation-messages</p>
+  </li>
+  <li>
+    <p><a id="MYSENSORS-attr-requestack"></a><b>requestAck</b></p>
+    <p><code>attr &lt;name&gt; requestAck</code></p>
+    <p>request acknowledge from nodes.</p>
+    <p>if set the Readings of nodes are updated not before requested acknowledge is received<br>
+      if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).</p>
+    <p>May also be configured for individual nodes if not set for gateway.</p>
+  </li>
+  <li>
+    <p><a id="MYSENSORS-attr-first-sensorid"></a><b>first-sensorid</b></p>
+    <p><code>attr &lt;name&gt; first-sensorid &lt;number &lt;h;255&gt;&gt;</code></p>
+    <p>configures the lowest node-id assigned to a mysensor-node on request (defaults to 20)</p>
+  </li>
+  <li>
+    <p><a id="MYSENSORS-attr-ota_firmwareconfig"></a><b>OTA_firmwareConfig</b></p>
+    <p><code>attr &lt;name&gt; OTA_firmwareConfig &lt;filename&gt;</code></p>
+    <p>specifies a configuration file for the <a href="https://www.mysensors.org/about/fota">FOTA</a> 
+      (firmware over the air - wireless programming of the nodes) configuration. It must be stored 
+      in the folder FHEM/firmware. The format of the configuration file is the following (csv):</p>
+    <p><code>#Type,Name,Version,File,Comments</code><br/>
+      <code>10,Blink,1,Blink.hex,blinking example</code></p>
+    <p>The meaning of the columns is the following:</p>
+      <dl>
+        <dt><code>Type</code></dt>
+        <dd>a numeric value (range 0 .. 65536) - each node will be assigned a firmware type</dd>
+        <dt><code>Name</code></dt>
+        <dd>a short name for this type</dd>
+        <dt><code>Version</code></dt> 
+        <dd>a numeric value (range 0 .. 65536) - the version of the firmware (may be different 
+            to the value that is send during the node presentation)</dd>
+        <dt><code>File</code></dt>
+        <dd>the filename containing the firmware - must also be stored in the folder FHEM/firmware</dd>
+        <dt><code>Comments</code></dt>
+        <dd>a description / comment for the firmware</dd>
+      </dl>
+  </li>
 </ul>
 
 =end html
