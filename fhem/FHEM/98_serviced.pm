@@ -16,7 +16,7 @@ use Blocking;
 use Time::HiRes;
 use vars qw{%defs};
 
-my $servicedVersion = "1.2.7";
+my $servicedVersion = "1.2.8";
 
 sub serviced_shutdownwait($);
 
@@ -31,6 +31,7 @@ sub serviced_Initialize($)
   $hash->{ShutdownFn} = "serviced_Shutdown";
   $hash->{UndefFn}    = "serviced_Undef";
   $hash->{AttrList}   = "disable:1,0 ".
+                        "disabledForIntervals ".
                         "serviceAutostart ".
                         "serviceAutostop ".
                         "serviceGetStatusOnInit:0,1 ".
@@ -76,8 +77,8 @@ sub serviced_Define($$)
       $attr{$name}{homebridgeMapping} = "On=state,valueOff=/stopped|failed/,cmdOff=stop,cmdOn=start\n".
                                         "StatusJammed=state,values=/error|failed/:JAMMED;/.*/:NOT_JAMMED";
     }
+    readingsSingleUpdate($hash,"state","Initialized",1);
   }
-  readingsSingleUpdate($hash,"state","Initialized",1) if ($init_done);
   return undef;
 }
 
@@ -86,7 +87,7 @@ sub serviced_Undef($$)
   my ($hash,$name) = @_;
   RemoveInternalTimer($hash);
   BlockingKill($hash->{helper}{RUNNING_PID}) if ($hash->{helper}{RUNNING_PID});
-  return undef;                  
+  return undef;
 }
 
 sub serviced_Notify($$)
@@ -99,10 +100,10 @@ sub serviced_Notify($$)
   return if (!$events);
   if ($devname eq "global" && grep /^INITIALIZED$/,@{$events})
   {
-    if (AttrNum($name,"serviceGetStatusOnInit",1) && !AttrNum($name,"serviceStatusInterval",0))
+    if (AttrNum($name,"serviceGetStatusOnInit",1) || AttrNum($name,"serviceStatusInterval",0))
     {
-      Log3 $name,3,"$name: get status of service \"$hash->{SERVICENAME}\" due to startup";
-      serviced_Set($hash,$name,"status");
+      Log3 $name,4,"$name: get status of service \"$hash->{SERVICENAME}\" due to startup and/or interval";
+      serviced_GetUpdate($hash);
     }
     my $delay = AttrVal($name,"serviceAutostart",0);
     $delay = $delay > 300 ? 300 : $delay;
@@ -464,13 +465,13 @@ sub serviced_shutdownwait($)
 =item summary_DE lokale/entfernte Dienste Verwaltung
 =begin html
 
-<a name="serviced"></a>
+<a id="serviced"></a>
 <h3>serviced</h3>
 <ul>
   With <i>serviced</i> you are able to control running services either running on localhost or a remote host.<br>
   The usual command are available: start/restart/stop/status.<br>
   <br>
-  <a name="serviced_define"></a>
+  <a id="serviced-define"></a>
   <p><b>Define</b></p>
   <ul>
     <code>define &lt;name&gt; serviced &lt;service name&gt; [&lt;user@ip-address&gt;]</code><br>
@@ -506,127 +507,122 @@ sub serviced_shutdownwait($)
   <br><br>
   If you have homebridgeMapping in your attributes an appropriate mapping will be added, genericDeviceType as well.
   <br>
-  <a name="serviced_set"></a>
+  <a id="serviced-set"></a>
   <p><b>Set</b></p>
   <ul>
     <li>
-      <i>start</i><br>
+      <a id="serviced-set-start">start</a><br>
       start the stopped service
     </li>
     <li>
-      <i>stop</i><br>
+      <a id="serviced-set-stop">stop</a><br>
       stop the started service
     </li>
     <li>
-      <i>restart</i><br>
+      <a id="serviced-set-restart">restart</a><br>
       restart the service
     </li>
     <li>
-      <i>status</i><br>
+      <a id="serviced-set-status">status</a><br>
       get status of service
     </li>
   </ul>  
   <br>
-  <a name="serviced_get"></a>
+  <a id="serviced-get"></a>
   <p><b>Get</b></p>
   <ul>
     <li>
-      <i>status</i><br>
+      <a id="serviced-get-status">status</a><br>
       get status of service<br>
       same like 'set status'
     </li>
   </ul>
   <br>
-  <a name="serviced_attr"></a>
+  <a id="serviced-attr"></a>
   <p><b>Attributes</b></p>
   <ul>
     <li>
-      <i>disable</i><br>
-      stop polling and disable device completely<br>
-      default: 0
-    </li>
-    <li>
-      <i>serviceAutostart</i><br>
+      <a id="serviced-attr-serviceAutostart">serviceAutostart</a><br>
       delay in seconds to automatically (re)start service after start of FHEM<br>
       default:
     </li>
     <li>
-      <i>serviceAutostop</i><br>
+      <a id="serviced-attr-serviceAutostop">serviceAutostop</a><br>
       timeout in seconds to automatically stop service while shutdown of FHEM<br>
       default:
     </li>
     <li>
-      <i>serviceGetStatusOnInit</i><br>
+      <a id="serviced-attr-serviceGetStatusOnInit">serviceGetStatusOnInit</a><br>
       get status of service automatically on FHEM start<br>
       default: 1
     </li>
     <li>
-      <i>serviceInitd</i><br>
+      <a id="serviced-attr-serviceInitd">serviceInitd</a><br>
       use initd (system) instead of systemd (systemctl)<br>
       default: 0
     </li>
     <li>
-      <i>serviceLogin</i><br>
+      <a id="serviced-attr-serviceLogin">serviceLogin</a><br>
       ssh login string for services running on remote hosts<br>
       passwordless ssh is mandatory<br>
       default:
     </li>
     <li>
-      <i>servicePort</i><br>
+      <a id="serviced-attr-servicePort">servicePort</a><br>
       ssh port to use if other than default port (22)<br>
       default: 22
     </li>
     <li>
-      <i>serviceRegexFailed</i><br>
+      <a id="serviced-attr-serviceRegexFailed">serviceRegexFailed</a><br>
       regex for failed status<br>
       default: dead|failed|exited
     </li>
     <li>
-      <i>serviceRegexStarted</i><br>
+      <a id="serviced-attr-serviceRegexStarted">serviceRegexStarted</a><br>
       regex for running status<br>
       default: running|active
     </li>
     <li>
-      <i>serviceRegexStarting</i><br>
+      <a id="serviced-attr-serviceRegexStarting">serviceRegexStarting</a><br>
       regex for starting status<br>
       default: activating|starting
     </li>
     <li>
-      <i>serviceRegexStopped</i><br>
+      <a id="serviced-attr-serviceRegexStopped">serviceRegexStopped</a><br>
       regex for stopped status<br>
       default: inactive|stopped
     </li>
     <li>
-      <i>serviceStatusInterval</i><br>
+      <a id="serviced-attr-serviceStatusInterval">serviceStatusInterval</a><br>
       interval of getting status automatically<br>
       default:
     </li>
     <li>
-      <i>serviceStatusLine</i><br>
+      <a id="serviced-attr-serviceStatusLine">serviceStatusLine</a><br>
       line number of status output containing the status information<br>
       default: 3
     </li>
     <li>
-      <i>serviceSudo</i><br>
+      <a id="serviced-attr-serviceSudo">serviceSudo</a><br>
       use sudo<br>
       default: 1
     </li>
   </ul>
   <br>
-  <a name="serviced_read"></a>
+  <a id="serviced-read"></a>
   <p><b>Readings</b></p>
   <p>All readings updates will create events.</p>
   <ul>
     <li>
-      <i>error</i><br>
+      <a id="serviced-read-error">error</a><br>
       last occured error, none if no error occured<br>
     </li>
     <li>
-      <i>state</i><br>
+      <a id="serviced-read-state">state</a><br>
       current state
     </li>
     <li>
-      <i>status</i><br>
+      <a id="serviced-read-status">status</a><br>
       last status line from 'get/set status'
     </li>
   </ul>
@@ -635,13 +631,13 @@ sub serviced_shutdownwait($)
 =end html
 =begin html_DE
 
-<a name="serviced"></a>
+<a id="serviced"></a>
 <h3>serviced</h3>
 <ul>
   Mit <i>serviced</i> k&ouml;nnen lokale und entfernte Dienste verwaltet werden.<br>
   Die &uuml;blichen Kommandos sind verf&uuml;gbar: start/restart/stop/status.<br>
   <br>
-  <a name="serviced_define"></a>
+  <a id="serviced-define"></a>
   <p><b>Define</b></p>
   <ul>
     <code>define &lt;name&gt; serviced &lt;Dienst Name&gt; [&lt;user@ip-adresse&gt;]</code><br>
@@ -677,127 +673,122 @@ sub serviced_shutdownwait($)
   <br><br>
   Wenn homebridgeMapping in der Attributliste ist, so wird ein entsprechendes Mapping hinzugef&uuml;gt, ebenso genericDeviceType.
   <br>
-  <a name="serviced_set"></a>
+  <a id="serviced-set"></a>
   <p><b>Set</b></p>
   <ul>
     <li>
-      <i>start</i><br>
+      <a id="serviced-set-start">start</a><br>
       angehaltenen Dienst starten
     </li>
     <li>
-      <i>stop</i><br>
+      <a id="serviced-set-stop">stop</a><br>
       laufenden Dienst anhalten
     </li>
     <li>
-      <i>restart</i><br>
+      <a id="serviced-set-restart">restart</a><br>
       Dienst neu starten
     </li>
     <li>
-      <i>status</i><br>
+      <a id="serviced-set-status">status</a><br>
       Status des Dienstes abrufen
     </li>
   </ul>  
   <br>
-  <a name="serviced_get"></a>
+  <a id="serviced-get"></a>
   <p><b>Get</b></p>
   <ul>
     <li>
-      <i>status</i><br>
+      <a id="serviced-get-status">status</a><br>
       Status des Dienstes abrufen<br>
       identisch zu 'set status'
     </li>
   </ul>
   <br>
-  <a name="serviced_attr"></a>
+  <a id="serviced-attr"></a>
   <p><b>Attribute</b></p>
   <ul>
     <li>
-      <i>disable</i><br>
-      Anhalten der automatischen Abfrage und komplett deaktivieren<br>
-      Voreinstellung: 0
-    </li>
-    <li>
-      <i>serviceAutostart</i><br>
+      <a id="serviced-attr-serviceAutostart">serviceAutostart</a><br>
       Verz&ouml;gerung in Sekunden um den Dienst nach Start von FHEM (neu) zu starten<br>
       Voreinstellung:
     </li>
     <li>
-      <i>serviceAutostop</i><br>
+      <a id="serviced-attr-serviceAutostop">serviceAutostop</a><br>
       Timeout in Sekunden um den Dienst bei Beenden von FHEM ebenso zu beenden<br>
       Voreinstellung:
     </li>
     <li>
-      <i>serviceGetStatusOnInit</i><br>
+      <a id="serviced-attr-serviceGetStatusOnInit">serviceGetStatusOnInit</a><br>
       beim Start von FHEM automatisch den Status des Dienstes abrufen<br>
       Voreinstellung: 1
     </li>
     <li>
-      <i>serviceInitd</i><br>
+      <a id="serviced-attr-serviceInitd">serviceInitd</a><br>
       benutze initd (system) statt systemd (systemctl)<br>
       Voreinstellung: 0
     </li>
     <li>
-      <i>serviceLogin</i><br>
+      <a id="serviced-attr-serviceLogin">serviceLogin</a><br>
       SSH Anmeldedaten f&uuml;r entfernten Dienst<br>
       passwortloser SSH Zugang ist Grundvoraussetzung<br>
       Voreinstellung:
     </li>
     <li>
-      <i>servicePort</i><br>
+      <a id="serviced-attr-servicePort">servicePort</a><br>
       SSH Port falls ein anderer als der Standard Port (22) verwendet wird<br>
       Voreinstellung: 22
     </li>
     <li>
-      <i>serviceRegexFailed</i><br>
+      <a id="serviced-attr-serviceRegexFailed">serviceRegexFailed</a><br>
       Regex f&uuml;r failed Status<br>
       Voreinstellung: dead|failed|exited
     </li>
     <li>
-      <i>serviceRegexStarted</i><br>
+      <a id="serviced-attr-serviceRegexStarted">serviceRegexStarted</a><br>
       Regex f&uuml;r running Status<br>
       Voreinstellung: running|active
     </li>
     <li>
-      <i>serviceRegexStarting</i><br>
+      <a id="serviced-attr-serviceRegexStarting">serviceRegexStarting</a><br>
       Regex f&uuml;r starting Status<br>
       Voreinstellung: activating|starting
     </li>
     <li>
-      <i>serviceRegexStopped</i><br>
+      <a id="serviced-attr-serviceRegexStopped">serviceRegexStopped</a><br>
       Regex f&uuml;r stopped Status<br>
       Voreinstellung: inactive|stopped
     </li>
     <li>
-      <i>serviceStatusInterval</i><br>
+      <a id="serviced-attr-serviceStatusInterval">serviceStatusInterval</a><br>
       Interval um den Status automatisch zu aktualisieren<br>
       Voreinstellung:
     </li>
     <li>
-      <i>serviceStatusLine</i><br>
+      <a id="serviced-attr-serviceStatusLine">serviceStatusLine</a><br>
       Zeilennummer der Status R&uuml;ckgabe welche die Status Information enth&auml;lt<br>
       Voreinstellung: 3
     </li>
     <li>
-      <i>serviceSudo</i><br>
+      <a id="serviced-attr-serviceSudo">serviceSudo</a><br>
       sudo benutzen<br>
       Voreinstellung: 1
     </li>
   </ul>
   <br>
-  <a name="serviced_read"></a>
+  <a id="serviced-read"></a>
   <p><b>Readings</b></p>
   <p>Alle Aktualisierungen der Readings erzeugen Events.</p>
   <ul>
     <li>
-      <i>error</i><br>
+      <a id="serviced-read-error">error</a><br>
       letzter aufgetretener Fehler, none wenn kein Fehler aufgetreten ist
     </li>
     <li>
-      <i>state</i><br>
+      <a id="serviced-read-state">state</a><br>
       aktueller Zustand
     </li>
     <li>
-      <i>status</i><br>
+      <a id="serviced-read-status">status</a><br>
       letzte Statuszeile von 'get/set status'
     </li>
   </ul>
