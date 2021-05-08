@@ -5124,14 +5124,17 @@ sub color {
    return ($hue);
   }
   my $l;
+  my $diff;
   if (defined $lightness and $lightness ne "") {
-    $l=$lightness;
+    $diff=$lightness-50;
   } else {
-    if ($hue>180 and $hue<290) {
-      $l=70;
-    } else {
-      $l=50;
-    }
+    $diff=0;
+  }
+  
+  if ($hue>180 and $hue<290) {
+    $l=70+$diff;
+  } else {
+    $l=50+$diff;
   }
   return ("hsl($hue,100%,".$l."%)");
 }
