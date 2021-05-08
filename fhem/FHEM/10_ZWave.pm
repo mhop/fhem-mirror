@@ -4864,6 +4864,57 @@ ZWave_addToSendStack($$$)
   return undef;
 }
 
+sub
+ZWAVE_parseRouteInfo($$$)
+{
+  my ($ioName, $hash, $arg) = @_;
+  my $repeaters = hex(substr($arg,4,2));
+  my @list;
+  my $maxlen = $repeaters * 2 + 8;
+  my $i;
+
+  for(my $off=6; $off<$maxlen; $off+=2,$i++) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $msg = "reservedValue";
+    if(     $dec == 127) { $msg = "N/A";
+    } elsif($dec == 126) { $msg = "aboveMaxPower";
+    } elsif($dec == 125) { $msg = "belowReceiverSensitivity";
+    } elsif($dec > 161 && $dec < 225) {
+      $msg = unpack('c', pack('C', $dec))." dBm";
+    }
+    push(@list, "rssi$i:$msg");
+  }
+  my $rssi = join(" ", @list);
+
+  my $ackCh  = hex(substr($arg,16,2));
+  my $lastCh = hex(substr($arg,18,2));
+  my $scheme = hex(substr($arg,20,2));
+  my $homeId = $hash->{homeId};
+  my @list2;
+
+  for(my $off=22; $off<($repeaters*2+22); $off+=2) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $hex = sprintf("%02x", $dec);
+    my $h = ($hex eq $hash->{nodeIdHex} ?
+                  $hash : $modules{ZWave}{defptr}{"$homeId $hex"});
+    push @list2, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
+  }
+
+  my $f = substr($arg, 30, 2);
+  push @list2, ("at ".($f==1 ? "9.6": ($f==2 ? "40":"100"))."kbps")
+    if(@list2 && $f =~ m/[123]/);
+  my $routefor = join(" ", @list2);
+
+  my $tries      = hex(substr($arg,32,2));
+  my $lastfailed = hex(substr($arg,34,4));
+  my $timeToCb   = hex(substr($arg,0,4))/100;
+  my $msg = "timeToCb:$timeToCb repeaters:$repeaters $rssi ".
+            "ackCh:$ackCh lastCh:$lastCh scheme:$scheme ".
+            "rep:$routefor routeTries:$tries lastFailed:$lastfailed";
+  Log3 $ioName, 5, $msg;
+  readingsSingleUpdate($hash, "routeInfo", $msg, 1);
+}
+
 
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
@@ -5106,6 +5157,7 @@ ZWave_Parse($$@)
     if($id eq "00") {
       my $name="";
       if($hash) {
+        ZWAVE_parseRouteInfo($ioName, $hash, $arg) if(length($arg) == 38);
         ZWave_processSendStack($hash, "ack", $callbackid);
         readingsSingleUpdate($hash, "transmit", $lmsg, 0);
 
