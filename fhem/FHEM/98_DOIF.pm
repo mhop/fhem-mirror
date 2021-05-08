@@ -4550,10 +4550,12 @@ sub card
   my $out;
   my ($ic,$iscale,$ix,$iy,$rotate);
 
-  my ($size,$plot,$steps);
-  ($size,$plot,$steps)=split (/,/,$prop) if (defined $prop);
+  my ($size,$plot,$steps,$noFooter);
+  ($size,$plot,$steps,$noFooter)=split (/,/,$prop) if (defined $prop);
   $plot = "" if (!defined $plot);
   $steps = "" if (!defined $steps);
+  $noFooter = "" if (!defined $noFooter);
+  
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4573,7 +4575,10 @@ sub card
     $htrans = 24;
     $bheight += 24;
   }
-
+  
+  if ($noFooter) {
+    $bheight-=15;
+  }
 
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
@@ -4702,7 +4707,7 @@ sub card
     $out.='<polyline points="11,23 169,23"  style="stroke:gray; stroke-width:0.7" />';
   }
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
-  $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:0.7" />';
+  $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:0.7" />' if (!$noFooter);
   $out.= sprintf('<svg width="%s" height="72">',$dim+44);
   $out.= '<g transform="translate(35,8) scale(1) ">';
   my $points="";
@@ -4830,22 +4835,23 @@ sub card
   
   $out.=sprintf('<text text-anchor="middle" x="139" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M:%S",localtime($time)));
 
-
-  if (defined $maxValTime) {
-    if ($hours > 168) {
-      $out.= sprintf('<text text-anchor="start" x="12" y="85" style="fill:#CCCCCC;font-size:7px">▲%s</text>',::strftime("%d.%m %H:%M",localtime($maxValTime)));
-    } else {
-      $out.= sprintf('<text text-anchor="start" x="12" y="85" style="fill:#CCCCCC;font-size:8px">▲%s</text>',::strftime("%a %H:%M",localtime($maxValTime)));
+  if ($noFooter ne "1") {
+    if (defined $maxValTime) {
+      if ($hours > 168) {
+        $out.= sprintf('<text text-anchor="start" x="12" y="85" style="fill:#CCCCCC;font-size:7px">▲%s</text>',::strftime("%d.%m %H:%M",localtime($maxValTime)));
+      } else {
+        $out.= sprintf('<text text-anchor="start" x="12" y="85" style="fill:#CCCCCC;font-size:8px">▲%s</text>',::strftime("%a %H:%M",localtime($maxValTime)));
+      }
+      $out.= sprintf('<text text-anchor="end" x="87" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
-    $out.= sprintf('<text text-anchor="end" x="87" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
-  }
-  if (defined $minValTime) {
-    if ($hours > 168) {
-      $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',::strftime("%d.%m %H:%M",localtime($minValTime)));
-    } else {
-      $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',::strftime("%a %H:%M",localtime($minValTime)));
+    if (defined $minValTime) {
+      if ($hours > 168) {
+        $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',::strftime("%d.%m %H:%M",localtime($minValTime)));
+      } else {
+        $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',::strftime("%a %H:%M",localtime($minValTime)));
+      }
+      $out.= sprintf('<text text-anchor="end" x="167" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
     }
-    $out.= sprintf('<text text-anchor="end" x="167" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
   }
  	$out.='</g>';
   $out.= '</svg>';
