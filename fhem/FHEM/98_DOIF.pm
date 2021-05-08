@@ -5310,6 +5310,7 @@ sub ring
   $lir=40 if (!defined $lir or $lir eq "");
   $lmm=40 if (!defined $lmm or $lmm eq "");
   $lu=40 if (!defined $lu or $lu eq "");
+  $ln=50 if (!defined $ln or $ln eq "");
   $li=40 if (!defined $li or $li eq "");
 
   $ln=$lnum if (defined $lnum);
@@ -5484,15 +5485,15 @@ sub ring2
   
   my ($lr,$lir,$lmm,$lu,$ln,$li);
   
-  ($lr,$lir,$lmm,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
+  ($lr,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
   
   $lr=50 if (!defined $lr or $lr eq "");
-  $lir=40 if (!defined $lir or $lir eq "");
-  $lmm=40 if (!defined $lmm or $lmm eq "");
   $lu=40 if (!defined $lu or $lu eq "");
+  $ln=50 if (!defined $ln or $ln eq "");
   $li=40 if (!defined $li or $li eq "");
 
   $ln=$lnum if (defined $lnum);
+
   $min=0 if (!defined $min);
   $max=100 if (!defined $max);
   $dec=1 if (!defined $dec);
