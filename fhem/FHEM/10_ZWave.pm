@@ -4871,7 +4871,7 @@ ZWAVE_parseRouteInfo($$$)
   my $repeaters = hex(substr($arg,4,2));
   my @list;
   my $maxlen = $repeaters * 2 + 8;
-  my $i;
+  my $i=0;
 
   for(my $off=6; $off<$maxlen; $off+=2,$i++) {
     my $dec = hex(substr($arg, $off, 2));
@@ -4902,7 +4902,7 @@ ZWAVE_parseRouteInfo($$$)
 
   my $f = substr($arg, 30, 2);
   push @list2, ("at ".($f==1 ? "9.6": ($f==2 ? "40":"100"))."kbps")
-    if(@list2 && $f =~ m/[123]/);
+    if($f =~ m/[123]/);
   my $routefor = join(" ", @list2);
 
   my $tries      = hex(substr($arg,32,2));
