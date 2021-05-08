@@ -1341,9 +1341,10 @@ sub DOIF_collect_save_values {
       for (@va) { $_ = "" if (!defined $_); };
       for (@ta) { $_ = "" if (!defined $_); };
       my $dim=$hash->{collect}{$dev_reading}{$hours}{dim};
-      $dev_reading =~ s/ /_/g;
-      ::readingsSingleUpdate($hash,".col_".$dim."_".$dev_reading."_".$hours."_values",join(",",@va),0);
-      ::readingsSingleUpdate($hash,".col_".$dim."_".$dev_reading."_".$hours."_times",join(",",@ta),0);
+      my $devReading=$dev_reading;
+      $devReading =~ s/ /_/g;
+      ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_values",join(",",@va),0);
+      ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_times",join(",",@ta),0);
     }
   }
 } 
@@ -1381,7 +1382,7 @@ sub collect_setValue
       } else {
         my @rv=splice (@{$va},0,$diff_slots);
         my @rt=splice (@{$ta},0,$diff_slots);
-        if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and ${$collect}{value} != ${$va}[$dim-$diff_slots-1]) {
+        if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{value} and ${$collect}{value} != ${$va}[$dim-$diff_slots-1]) {
           ${$va}[$dim-$diff_slots]=${$collect}{value};
           ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*60*$seconds_per_slot;
         }
