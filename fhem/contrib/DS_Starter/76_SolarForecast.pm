@@ -2479,7 +2479,8 @@ sub __planSwitchTimes {
       }      
   }
   
-  Log3($name, 3, qq{$name - Consumer "$calias" planned: }.ConsumerVal ($hash, $c, "planstate", ""));
+  my $planstate = ConsumerVal ($hash, $c, "planstate", "");
+  Log3($name, 3, qq{$name - Consumer "$calias" planned: $planstate}) if($planstate);
   
 return;
 }
