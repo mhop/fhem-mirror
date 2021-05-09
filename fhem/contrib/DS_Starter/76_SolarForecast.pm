@@ -115,6 +115,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.43.0" => "08.05.2021  plan Consumers ",
   "0.42.0" => "01.05.2021  new attr consumerXX, currentMeterDev is mandatory, new getter valConsumerMaster ".
                            "new commandref ancor syntax ",
   "0.41.0" => "28.04.2021  _estConsumptionForecast: implement Smoothing difference ",
@@ -594,7 +595,8 @@ sub Set {
   my ($setlist,@fcdevs,@cfs);
   my ($fcd,$ind,$med,$cf) = ("","","","");
   
-  my @re = qw( currentBatteryDev 
+  my @re = qw( consumerPlanning
+               currentBatteryDev 
                currentForecastDev
                currentInverterDev
                currentMeterDev
@@ -1015,8 +1017,17 @@ sub _setreset {                          ## no critic "not used"
   my $type  = $hash->{TYPE};
   
   if($prop eq "pvHistory") {
-      delete $data{$type}{$name}{pvhist};
-      delete $hash->{HELPER}{INITETOTAL};
+      my $day = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
+
+      if ($day) {
+          delete $data{$type}{$name}{pvhist}{$day};
+          Log3($name, 3, qq{$name - Day "$day" of pvHistory deleted});
+      }
+      else {
+          delete $data{$type}{$name}{pvhist};
+          delete $hash->{HELPER}{INITETOTAL};
+          Log3($name, 3, qq{$name - all days of pvHistory deleted});
+      }      
       return;
   }
   
@@ -1060,6 +1071,23 @@ sub _setreset {                          ## no critic "not used"
       deleteReadingspec ($hash, ".*_PVreal" );
       delete $hash->{HELPER}{INITETOTAL};
   }
+  
+  if($prop eq "consumerPlanning") {                                      # Verbraucherplanung resetten
+      my $c = $paref->{prop1} // "";                                     # bestimmten Verbraucher setzen falls angegeben
+      
+      if ($c) {
+          deleteConsumerPlanning ($hash, $c);
+          my $calias = ConsumerVal ($hash, $c, "alias", "");
+          Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+      }
+      else {
+          for my $cs (keys %{$data{$type}{$name}{consumers}}) {
+              deleteConsumerPlanning ($hash, $cs);
+              my $calias = ConsumerVal ($hash, $cs, "alias", "");
+              Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+          }           
+      }
+  }  
   
   createNotifyDev ($hash);
 
@@ -1331,13 +1359,13 @@ sub _attrconsumer {                      ## no critic "not used"
           return qq{The mode "$h->{mode}" isn't allowed!}
       }
   } 
-  else {
-      readingsDelete($hash, $aName);
-      
+  else {      
       my $day  = strftime "%d", localtime(time);                                           # aktueller Tag  (range 01 to 31)
       my $type = $hash->{TYPE};
       my ($no) = $aName =~ /consumer([0-9]+)/xs;
   
+      deleteReadingspec ($hash, "consumer${no}.*");
+      
       for my $i (1..24) {                                                                  # Consumer aus History löschen
           delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${no}"};
           delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${no}"};
@@ -1765,7 +1793,18 @@ sub _additionalActivities {
           delete $hash->{HELPER}{INITETOTAL};
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
+          
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag löschen
+          Log3($name, 3, qq{$name - history day "$day" deleted});
+          
+          for my $c (keys %{$data{$type}{$name}{consumers}}) {
+              deleteConsumerPlanning ($hash, $c);
+              my $calias = ConsumerVal ($hash, $c, "alias", "");
+              Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+          }
+          
+          deleteReadingspec ($hash, "consumer.*_planned.*");          
+          
           $hash->{HELPER}{H00DONE} = 1;
       }
   }
@@ -1832,6 +1871,7 @@ sub _transferDWDForecastValues {
       
       $data{$type}{$name}{nexthours}{$time_str}{pvforecast} = $calcpv;
       $data{$type}{$name}{nexthours}{$time_str}{starttime}  = $tsdef;
+      $data{$type}{$name}{nexthours}{$time_str}{today}      = $fd == 0 ? 1 : 0;
       $data{$type}{$name}{nexthours}{$time_str}{Rad1h}      = $rad;                           # nur Info: original Vorhersage Strahlungsdaten
       
       if($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350          
@@ -2256,19 +2296,34 @@ sub _manageConsumerData {
       }
 
       if ($dnum) {   
-          $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);              # Durchschnittsverbrauch eines Tages aus History  
+          $data{$type}{$name}{consumers}{$c}{avgenergy} = ceil ($consumerco/$dnum);             # Durchschnittsverbrauch eines Tages aus History  
           $data{$type}{$name}{consumers}{$c}{mintime}   = (ceil($runhours/$dnum)) * 60;         # Durchschnittslaufzeit in Minuten 
       }
       
       __calcEnergyPieces ($hash, $c);                                                           # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
+      __planSwitchTimes  ($hash, $c);                                                           # Consumer Switch Zeiten planen
       
       ## consumer Hash ergänzen, Reading generieren 
       ###############################################
-      my $costate = ReadingsVal ($consumer, "state", "");
+      my $costate = ReadingsVal ($consumer, "state",     "");
+      my $pstate  = ConsumerVal ($hash, $c, "planstate", "");
+      
+      $pstate     = $pstate =~ /planned/xs       ? "planned"  : 
+                    $pstate =~ /switched\son/xs  ? "started"  :
+                    $pstate =~ /switched\soff/xs ? "finished" :
+                    "unknown";
+      
+      my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
+      my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
+    
+      my (undef,$starttime) = TimeAdjust ($startts) if($startts);
+      my (undef,$stoptime)  = TimeAdjust ($stopts)  if($stopts);
       
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
-      push @$daref, "consumer${c}<>"."name='$alias' state=$costate";                            # Consumer Infos      
+      push @$daref, "consumer${c}<>"              ."name='$alias' state='$costate' planningstate='$pstate' "; # Consumer Infos 
+      push @$daref, "consumer${c}_planned_start<>"."$starttime" if($startts);                                 # Consumer Start geplant
+      push @$daref, "consumer${c}_planned_stop<>". "$stoptime"  if($stopts);                                  # Consumer Stop geplant            
   }
     
 return;
@@ -2319,6 +2374,112 @@ sub __calcEnergyPieces {
       
       $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = $he;      
   }
+  
+return;
+}
+
+###################################################################
+#    Consumer Schaltzeiten planen
+###################################################################
+sub __planSwitchTimes {
+  my $hash = shift;
+  my $c    = shift; 
+  
+  return if(ConsumerVal ($hash, $c, "planstate", undef));                          # Verbraucher ist schon geplant/gestartet/fertig
+  
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  my $nh     = $data{$type}{$name}{nexthours};
+  my $maxkey = (scalar keys %{$data{$type}{$name}{nexthours}}) - 1;
+  my %max;
+  my %mtimes;
+  
+  ## max. Überschuß ermitteln
+  #############################
+  for my $idx (sort keys %{$nh}) {
+      my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
+      my $confc   = NexthoursVal ($hash, $idx, "confc",      0 );
+      my $surplus = $pvfc-$confc;                                                  # Energieüberschuß
+      next if($surplus <= 0);
+      
+      my ($hour) = $idx =~ /NextHour(\d+)/xs;
+      $max{$surplus}{starttime} = NexthoursVal ($hash, $idx, "starttime", "");
+      $max{$surplus}{today}     = NexthoursVal ($hash, $idx, "today",      0);
+      $max{$surplus}{nexthour}  = int ($hour);
+  }
+  
+  my $order = 1;
+  for my $k (reverse sort{$a<=>$b} keys %max) {
+      $max{$order}{surplus}   = $k;
+      $max{$order}{starttime} = $max{$k}{starttime};
+      $max{$order}{nexthour}  = $max{$k}{nexthour};
+      $max{$order}{today}     = $max{$k}{today};
+      
+      my $ts = timestringToTimestamp ($max{$k}{starttime});
+      $mtimes{$ts}{surplus}   = $k;
+      $mtimes{$ts}{starttime} = $max{$k}{starttime};
+      $mtimes{$ts}{nexthour}  = $max{$k}{nexthour};
+      $mtimes{$ts}{today}     = $max{$k}{today};
+      
+      delete $max{$k};
+      
+      $order++;
+  }
+  
+  #for my $o (sort{$a<=>$b} keys %max) {                                                   # nur für Debugging
+  #    Log3($name, 1, "$name - maxkey: $maxkey, $o, $max{$o}{surplus}, $max{$o}{starttime}, $max{$o}{nexthour}, $max{$o}{today}");
+  #}
+  
+  my $epiece1 = (~0 >> 1);
+  my $epieces = ConsumerVal ($hash, $c, "epieces", "");
+  if(ref $epieces eq "HASH") {
+      $epiece1 = $data{$type}{$name}{consumers}{$c}{epieces}{1};
+  }
+  else {
+      return;
+  }
+  
+  my $mode     = ConsumerVal ($hash, $c, "mode",          "can");
+  my $calias   = ConsumerVal ($hash, $c, "alias",            "");
+  my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
+  my $stopdiff = ceil($mintime / 60) * 3600;
+  
+  my ($startts,$stopts,$stoptime);
+  
+  if($mode eq "can") {                                                                     # Verbraucher kann geplant werden
+      for my $ts (sort{$a<=>$b} keys %mtimes) {
+          if($mtimes{$ts}{surplus} >= $epiece1) {                                          # die früheste Startzeit sofern Überschuß größer als Bedarf 
+              $startts          = timestringToTimestamp ($mtimes{$ts}{starttime});         # Unix Timestamp für geplanten Switch on
+              $stopts           = $startts + $stopdiff;
+              (undef,$stoptime) = TimeAdjust ($stopts);
+              
+              $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;
+              $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;
+              $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$mtimes{$ts}{starttime}." - ".$stoptime;             
+              last;
+          }
+      }
+  }
+  else {                                                                                   # Verbraucher _muß_ geplant werden
+      for my $o (sort{$a<=>$b} keys %max) {
+          next if(!$max{$o}{today});                                                       # der max-Wert ist _nicht_ heute
+          
+          my $maxts             = timestringToTimestamp ($max{$o}{starttime});             # Unix Timestamp des max. Überschusses heute
+          my $half              = ceil ($mintime / 2 / 60);                                # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
+          $startts              = $maxts - ($half * 3600); 
+          my (undef,$starttime) = TimeAdjust ($startts);
+          $stopts               = $startts + $stopdiff;
+          (undef,$stoptime)     = TimeAdjust ($stopts);
+          
+          $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
+          $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                    # Unix Timestamp für geplanten Switch on       
+          $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                     # Unix Timestamp für geplanten Switch off
+          last;
+      }      
+  }
+  
+  Log3($name, 3, qq{$name - Consumer "$calias" planned: }.ConsumerVal ($hash, $c, "planstate", ""));
   
 return;
 }
@@ -2503,6 +2664,7 @@ sub _estConsumptionForecast {
           $conh->{$nhhr} += $hcon;  
           $dnum++;
       }
+      
       if ($dnum) {
            my $hdiff                                 = ($max - $min)/$dnum;                         # Glättungsdifferenz
            my $conavg                                = int(($conh->{$nhhr}/$dnum)-$hdiff);
@@ -4285,7 +4447,7 @@ sub setPVhistory {
   my $calcpv     = $paref->{calcpv}        // 0;
   my $gcthishour = $paref->{gctotthishour} // 0;                                                  # Netzbezug
   my $fithishour = $paref->{gftotthishour} // 0;                                                  # Netzeinspeisung
-  my $con        = $paref->{con}           // 0;                                                  # Haus Verbrauch
+  my $con        = $paref->{con}           // 0;                                                  # realer Hausverbrauch Energie
   my $consumerco = $paref->{consumerco};                                                          # Verbrauch eines Verbrauchers
   my $wid        = $paref->{wid}           // -1;
   my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
@@ -4569,7 +4731,8 @@ sub listDataPool {
       }
       for my $idx (sort keys %{$h}) {
           my $nhts    = NexthoursVal ($hash, $idx, "starttime",  "-");
-          my $nhfc    = NexthoursVal ($hash, $idx, "pvforecast", "-");
+          my $today   = NexthoursVal ($hash, $idx, "today",      "-");
+          my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", "-");
           my $wid     = NexthoursVal ($hash, $idx, "weatherid",  "-");
           my $neff    = NexthoursVal ($hash, $idx, "cloudcover", "-");
           my $r101    = NexthoursVal ($hash, $idx, "rainprob",   "-");
@@ -4578,7 +4741,7 @@ sub listDataPool {
           my $temp    = NexthoursVal ($hash, $idx, "temp",       "-");
           my $confc   = NexthoursVal ($hash, $idx, "confc",      "-");
           $sq        .= "\n" if($sq);
-          $sq        .= $idx." => starttime: $nhts, pvfc: $nhfc, confc: $confc, wid: $wid, wcc: $neff, wrp: $r101, correff: $pvcorrf, Rad1h: $rad1h, temp=$temp";
+          $sq        .= $idx." => starttime: $nhts, today: $today, pvfc: $pvfc, confc: $confc, wid: $wid, wcc: $neff, wrp: $r101, correff: $pvcorrf, Rad1h: $rad1h, temp=$temp";
       }
   }
   
@@ -4796,6 +4959,23 @@ sub createNotifyDev {
 return;
 }
 
+################################################################
+#   Planungsdaten Consumer löschen
+#   $c - Consumer Nummer
+################################################################
+sub deleteConsumerPlanning {
+  my $hash = shift;
+  my $c    = shift;  
+  
+  my $type = $hash->{TYPE};
+  my $name = $hash->{NAME};
+  
+  delete $data{$type}{$name}{consumers}{$c}{planstate};
+  delete $data{$type}{$name}{consumers}{$c}{planswitchon};
+
+return;
+}
+
 #############################################################################
 #    Wert des pvhist-Hash zurückliefern
 #    Usage:
@@ -4886,7 +5066,7 @@ return $def;
 #    ($f,$q) = CircularAutokorrVal ($hash, $hod, $range, $def)
 #
 #    $f:      Korrekturfaktor f. Stunde des Tages
-#    $q:      Qualität des KOrrekturfaktors
+#    $q:      Qualität des Korrekturfaktors
 #
 #    $hod:    Stunde des Tages (01,02,...,24)
 #    $range:  Range Bewölkung (1...10)
@@ -4935,6 +5115,7 @@ return ($pvcorrf, $quality);
 #       rainprob   - DWD Regenwahrscheinlichkeit
 #       Rad1h      - Globalstrahlung (kJ/m2)
 #       confc      - Vorhersage Hausverbrauch (Wh)
+#       today      - 1 wenn heute
 # $def: Defaultwert
 #
 ################################################################
@@ -5408,7 +5589,20 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <a id="SolarForecast-set-reset"></a>
       <li><b>reset </b> <br><br> 
        
-       Löscht die aus der Drop-Down Liste gewählte Datenquelle bzw. zu der Funktion gehörende Readings. <br>    
+       Löscht die aus der Drop-Down Liste gewählte Datenquelle, zu der Funktion gehörende Readings oder weitere interne 
+       Datenstrukturen. Die Bedeutung der Argumente ist: <br><br>
+
+      <ul>
+         <table>  
+         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                            </td></tr>         
+            <tr><td> <b>consumerPlanning</b>  </td><td>löscht die Planungsdaten aller registrierten Verbraucher                </td></tr>
+            <tr><td>                          </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:   </td></tr>
+            <tr><td>                          </td><td>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt;       </td></tr>
+            <tr><td> <b>pvHistory</b>         </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                 </td></tr>
+            <tr><td>                          </td><td>Um nur einen bestimmten historischen Tag zu löschen:                    </td></tr>
+            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt;                            </td></tr>
+         </table>
+      </ul>      
       </li>
     </ul>
     <br>
@@ -5466,6 +5660,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <table>  
          <colgroup> <col width=8%> <col width=92%> </colgroup>
             <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                       </td></tr>
+            <tr><td> <b>today</b>    </td><td>=1 wenn Startdatum am aktuellen Tag                                           </td></tr>
             <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch                                                  </td></tr>
             <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                </td></tr> 
             <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                            </td></tr>
@@ -5495,7 +5690,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>pvfc</b>        </td><td>der prognostizierte PV Ertrag (Wh) der jeweiligen Stunde                    </td></tr>
             <tr><td> <b>pvrl</b>        </td><td>reale PV Erzeugung (Wh) der jeweiligen Stunde                               </td></tr>
             <tr><td> <b>gcon</b>        </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz der jeweiligen Stunde          </td></tr>
-            <tr><td> <b>con</b>         </td><td>Energieverbrauch (Wh) des Hauses der jeweiligen Stunde                      </td></tr>
+            <tr><td> <b>con</b>         </td><td>realer Energieverbrauch (Wh) des Hauses der jeweiligen Stunde               </td></tr>
             <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung (Wh) in das Stromnetz der jeweiligen Stunde               </td></tr>
             <tr><td> <b>wid</b>         </td><td>Identifikationsnummer des Wetters in der jeweiligen Stunde                  </td></tr>
             <tr><td> <b>wcc</b>         </td><td>effektive Wolkenbedeckung der jeweiligen Stunde                             </td></tr>
