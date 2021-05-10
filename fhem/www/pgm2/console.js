@@ -59,7 +59,11 @@ consUpdate(evt)
   }
   if(new_content == undefined || new_content.length == 0)
     return;
-  log("Console Rcvd: "+new_content);
+  if(new_content.length < 120)
+    log("console Rcvd: "+new_content);
+  else
+    log("console Rcvd: "+new_content.substr(0,120)+
+        "..., truncated, original length "+new_content.length);
 
   // Extract the FHEM-Log, to avoid escaping its formatting (Forum #104842)
   var logContent = "";
@@ -70,12 +74,11 @@ consUpdate(evt)
     return "";
   });
 
-  // replace space with nbsp to preserve formatting
   var isTa = $("#console").is("textarea"); // 102773
-  new_content = new_content.replace(/(.*)<br>[\r\n]/g, function(all,p1) {
-    return p1.replace(/[<> ]/g, function(a){return rTab[a]})+(isTa?"\n":"<br>");
-  });
-  $("#console").append(logContent+new_content);
+  var ncA = new_content.split(/<br>[\r\n]/);
+  for(var i1=0; i1<ncA.length; i1++)
+    ncA[i1] = ncA[i1].replace(/[<> ]/g, function(a){return rTab[a]});
+  $("#console").append(logContent+ncA.join(isTa?"\n":"<br>");
     
   if(mustScroll)
     $("#console").scrollTop($("#console")[0].scrollHeight);
