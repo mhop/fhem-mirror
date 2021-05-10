@@ -748,6 +748,7 @@ ZWave_Initialize($)
     dummy:1,0
     eventForRaw
     extendedAlarmReadings:0,1,2
+    generateRouteInfoEvents:1,0
     ignore:1,0
     ignoreDupMsg:1,0
     neighborListPos
@@ -4888,7 +4889,13 @@ ZWAVE_parseRouteInfo($$$)
 
   my $ackCh  = hex(substr($arg,16,2));
   my $lastCh = hex(substr($arg,18,2));
-  my $scheme = hex(substr($arg,20,2));
+
+  my @schemeEncoding = qw( Idle DirectTransmission ApplicationStaticRoute 
+                           LastWorkingRoute NextToLastWorkingRoute 
+                           ReturnRoutOrControllerAutoRoute DirectResort 
+                           ExplorerFrame );
+  my $scheme= $schemeEncoding[hex(substr($arg,20,2))];
+
   my $homeId = $hash->{homeId};
   my @list2;
 
@@ -4907,12 +4914,26 @@ ZWAVE_parseRouteInfo($$$)
 
   my $tries      = hex(substr($arg,32,2));
   my $lastfailed = hex(substr($arg,34,4));
+  my @list3;
+
+  for(my $off=34; $off<=38; $off+=2) {
+    my $dec = hex(substr($arg, $off, 2));
+    my $hex = sprintf("%02x", $dec);
+    my $h = ($hex eq $hash->{nodeIdHex} ?
+                  $hash : $modules{ZWave}{defptr}{"$homeId $hex"});
+    push @list3, ($h ? $h->{NAME} : "UNKNOWN_$dec") if($dec);
+  }
+  $lastfailed=join(" ", @list3);
+
   my $timeToCb   = hex(substr($arg,0,4))/100;
   my $msg = "timeToCb:$timeToCb repeaters:$repeaters $rssi ".
             "ackCh:$ackCh lastCh:$lastCh scheme:$scheme ".
             "rep:$routefor routeTries:$tries lastFailed:$lastfailed";
-  Log3 $ioName, 5, $msg;
-  readingsSingleUpdate($hash, "routeInfo", $msg, 1);
+  Log3 $ioName, 5, "$hash->{NAME}: $msg";
+  if(AttrVal($hash->{NAME}, "generateRouteInfoEvents", 0)) {
+    DoTrigger($hash->{NAME}, $msg);
+  }
+  readingsSingleUpdate($hash, "routeInfo", $msg, 0);
 }
 
 

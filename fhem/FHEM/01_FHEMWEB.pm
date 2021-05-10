@@ -2385,18 +2385,24 @@ FW_fileNameToPath($)
   my $cfgFileName = $1;
   if($name eq $cfgFileName) {
     return $attr{global}{configfile};
+
   } elsif($name =~ m/.*(js|css|_defs.svg)$/) {
     return "$FW_cssdir/$name";
+
   } elsif($name =~ m/.*(png|svg)$/) {
     my $d="";
     map { $d = $_ if(!$d && -d "$FW_icondir/$_") } @FW_iconDirs;
     return "$FW_icondir/$d/$name";
+
   } elsif($name =~ m/.*gplot$/) {
     return "$FW_gplotdir/$name";
+
   } elsif($name =~ m/.*log$/) {
     return Logdir()."/$name";
+
   } else {
     return "$MW_dir/$name";
+
   }
 }
 
@@ -2924,6 +2930,7 @@ FW_iconName($)
   my $name = $oname;
   $name =~ s/@.*//;
   foreach my $pe (@FW_iconDirs) {
+Log 1, "iconName: $pe / $name" if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
     return $oname if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
   }
   return undef;
