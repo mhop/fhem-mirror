@@ -4164,6 +4164,46 @@ farewell:template has been applied successfully. <br>NOTE: additional code has b
 attr DEVICE model roborock
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+# The rockrobo device for valetudo RE
+name:roborockRE
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*valetudo[/].*
+desc:use this for a rooted Xiamoni Vacuum / Roborock with valetudo RE installed. For details visit https://github.com/rand256/valetudo/wiki<br>NOTE: Only tested with Gen1, Forum Board MQTT<br> 
+order:X_03a
+par:BASE_TOPIC; is typically valetudo; {(split '/',ReadingsVal("DEVICE",'subscriptions','valetudo/rockrobo'))[0]}
+par:DEV_ID;     is typically rockrobo; {(split '/',ReadingsVal("DEVICE",'subscriptions','valetudo/rockrobo'))[1]}
+par:ICON;ICON as set defaults to vacuum_top;{ AttrVal("DEVICE","icon","vacuum_top") }
+{ Svn_GetFile("contrib/AttrTemplate/99_roborockUtils.pm", "FHEM/99_roborockUtils.pm", sub(){CommandReload(undef, "99_roborockUtils")}) }
+defmod DEVICE MQTT2_\DEVICE DEV_ID
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE alias DEV_ID
+attr DEVICE readingList\
+homeassistant/vacuum/BASE_TOPIC_DEV_ID/config:.* {}\
+$\DEVICETOPIC/state:.* { json2nameValue($EVENT) }\
+$\DEVICETOPIC/attributes:.* { json2nameValue($EVENT) }\
+$\DEVICETOPIC/map_data:.* {}\
+$\DEVICETOPIC/command_status:.* { json2nameValue($EVENT) }\
+$\DEVICETOPIC/destinations:.* { valetudoREdest($EVENT) }
+attr DEVICE setList\
+charge:noArg $\DEVICETOPIC/command return_to_base\
+fan_power:whisper,min,medium,high,max,mop $\DEVICETOPIC/set_fan_speed $EVTPART1\
+locate:noArg $\DEVICETOPIC/command locate\
+pause:noArg $\DEVICETOPIC/command pause\
+spot:noArg $\DEVICETOPIC/command clean_spot\
+start:noArg $\DEVICETOPIC/command start\
+stop:noArg $\DEVICETOPIC/command stop\
+get_dest:noArg { $\DEVICETOPIC.valetudoRE($EVENT) }\
+goto:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
+map:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
+reset_consumable:main,side,filter,sensor { $\DEVICETOPIC.valetudoRE($EVENT) }\
+zone:textField { $\DEVICETOPIC.valetudoRE($EVENT) }\
+x_raw_payload:textField { $\DEVICETOPIC.valetudoRE($EVENT) }
+attr DEVICE userReadings autoReturn:valetudo_state_name:.Idle {fhem("sleep $name:bin_in_time:.0 waitbin;set $name charge");return 'return'}
+attr DEVICE setStateList charge fan_power get_dest goto locate map pause reset_consumable spot start stop zone x_raw_payload
+attr DEVICE event-on-change-reading .*
+attr DEVICE model roborockRE
+setreading DEVICE attrTemplateVersion 20210510
+
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
 desc:Template for a Worx Landroid mower.<br>The complete setup is described in this <a href="https://forum.fhem.de/index.php/topic,111959.0.html">Forum Thread</a><br>Not all features may be available on all models and firmwares!
