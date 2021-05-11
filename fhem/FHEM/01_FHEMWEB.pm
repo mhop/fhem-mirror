@@ -2930,7 +2930,6 @@ FW_iconName($)
   my $name = $oname;
   $name =~ s/@.*//;
   foreach my $pe (@FW_iconDirs) {
-Log 1, "iconName: $pe / $name" if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
     return $oname if($pe && $FW_icons{$pe} && $FW_icons{$pe}{$name});
   }
   return undef;
