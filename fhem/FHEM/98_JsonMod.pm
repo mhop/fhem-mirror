@@ -261,7 +261,11 @@ sub JsonMod_DoReadings {
 		my ($r, $v) = @_;
 
 		# convert into valid reading
-		#printf "0 %s %s %s %s\n", $r, length($r), $v, length($v);
+		# special treatment of "umlaute"
+		my %umlaute = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
+		my $umlautkeys = join ("|", keys(%umlaute));
+		$r =~ s/($umlautkeys)/$umlaute{$1}/g;
+		# normalize remaining special chars
 		$r = Unicode::Normalize::NFD($r);
 		utf8::encode($r) if utf8::is_utf8($r);
 		$r =~ s/\s/_/g;	# whitespace 
@@ -287,6 +291,7 @@ sub JsonMod_DoReadings {
 
 	# processing attr readingList
 	my $readingList = AttrVal($name, 'readingList', '');
+	$readingList =~ s/\s+$//s; # rtrim
 	utf8::decode($readingList); # data from "ouside"
 
 	while ($readingList) {
@@ -561,7 +566,7 @@ sub JsonMod_ApiRequest {
 			my $data;
 			open(my $fh, '<', $filename) or do {
 				$hash->{'SOURCE'} = sprintf('%s (%s)', $filename,  (stat $filename)[7]);
-				$hash->{'API__LAST_MSG'} = $!;
+				$hash->{'API_LAST_MSG'} = $!;
 				return;
 			};
 			{
@@ -572,11 +577,11 @@ sub JsonMod_ApiRequest {
 			my $json = JsonMod::JSON::StreamReader->new()->parse($data);
 			JsonMod_DoReadings($hash, $json);
 			$hash->{'SOURCE'} = sprintf('%s (%s)', $filename,  (stat $filename)[7]);
-			$hash->{'API__LAST_MSG'} = 200;
+			$hash->{'API_LAST_MSG'} = 200;
 			return;
 		} else {
 			$hash->{'SOURCE'} = sprintf('%s', $filename);
-			$hash->{'API__LAST_MSG'} = 404;
+			$hash->{'API_LAST_MSG'} = 404;
 		};
 	};
 
@@ -625,13 +630,13 @@ sub JsonMod_ApiResponse {
 	};
 
 	$hash->{'SOURCE'} = sprintf('%s (%s)', $url, $param->{'code'} //= '');
-	$hash->{'API__LAST_MSG'} = $param->{'code'} //= 'failed';
+	$hash->{'API_LAST_MSG'} = $param->{'code'} //= 'failed';
 
 	my sub doError {
 		my ($msg) = @_;
-		$hash->{'API__LAST_MSG'} = $msg;
+		$hash->{'API_LAST_MSG'} = $msg;
 		my $next = Time::HiRes::time() + 600;
-		#$hash->{'API__NEXT_REQ'} = $next;
+		#$hash->{'API_NEXT_REQ'} = $next;
 		return InternalTimer($next, \&JsonMod_ApiRequest, $hash);
 	};
 
@@ -979,7 +984,7 @@ sub parse {
 	my $xs = eval 'Cpanel::JSON::XS::decode_json($in)';
 	return $xs if ($xs);
 
-	my $err = _decode(\my $value, $in, 1);
+	my $err = _decode(\my $value, $in, 0);
 	return defined $err ? $err : $value;
 };
 
@@ -1197,8 +1202,10 @@ sub get {
 		foreach my $child (@childList) {
 			$self->getSingle($child, $property, $deep, $path, $normalized, $query);
 		};
-	} elsif ($property =~ /^\d+$/) {
+	} elsif ($property =~ m/^\d+$/) {
 		$self->getSingle($property, $property, $deep, $path, $normalized, $query);
+	} elsif ($property =~ m/^\s*\d+\s*,\s*\d+\s*(?:,\s*\d+\s*)*$/) {	# [n,n(,n)]
+
 	} else {
 		die ("JsonPath filter property $property failure");
 	};
