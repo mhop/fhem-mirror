@@ -78,7 +78,7 @@ consUpdate(evt)
   var ncA = new_content.split(/<br>[\r\n]/);
   for(var i1=0; i1<ncA.length; i1++)
     ncA[i1] = ncA[i1].replace(/[<> ]/g, function(a){return rTab[a]});
-  $("#console").append(logContent+ncA.join(isTa?"\n":"<br>");
+  $("#console").append(logContent+ncA.join(isTa?"\n":"<br>"));
     
   if(mustScroll)
     $("#console").scrollTop($("#console")[0].scrollHeight);
