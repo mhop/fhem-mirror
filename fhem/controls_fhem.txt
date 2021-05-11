@@ -1,4 +1,4 @@
-REV 24411
+REV 24413
 DIR unused
 UPD 2021-05-07_07:45:02 362261 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -737,8 +737,8 @@ UPD 2021-05-11_07:45:06 4498144 docs/commandref.html
 UPD 2021-05-11_07:45:09 2778830 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-11_07:45:10 240533 docs/commandref_modular.html
-UPD 2021-05-11_07:45:11 251548 docs/commandref_modular_DE.html
+UPD 2021-05-11_09:43:45 240533 docs/commandref_modular.html
+UPD 2021-05-11_09:43:47 251548 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2284,7 +2284,7 @@ UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
-UPD 2021-05-11_07:45:02 10379 www/pgm2/console.js
+UPD 2021-05-11_09:43:38 10380 www/pgm2/console.js
 UPD 2020-01-27_07:45:02 1096 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2018-10-08_07:45:02 5419 www/pgm2/darksmallscreenstyle.css
