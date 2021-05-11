@@ -1,4 +1,4 @@
-REV 24404
+REV 24411
 DIR unused
 UPD 2021-05-07_07:45:02 362261 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -39,7 +39,7 @@ UPD 2021-04-08_07:45:04 143701 FHEM/00_THZ.pm
 UPD 2017-12-16_07:45:02 35823 FHEM/00_TUL.pm
 UPD 2018-04-05_07:45:03 21475 FHEM/00_ZWCUL.pm
 UPD 2021-02-13_09:02:50 45791 FHEM/00_ZWDongle.pm
-UPD 2021-04-24_10:36:46 166728 FHEM/01_FHEMWEB.pm
+UPD 2021-05-11_07:45:02 166817 FHEM/01_FHEMWEB.pm
 UPD 2016-09-07_07:45:12 15690 FHEM/02_FRAMEBUFFER.pm
 UPD 2020-10-03_07:45:14 43003 FHEM/02_FTUISRV.pm
 UPD 2019-09-06_07:45:02 7946 FHEM/02_HTTPSRV.pm
@@ -77,7 +77,7 @@ UPD 2020-09-28_07:45:03 67511 FHEM/10_SOMFY.pm
 UPD 2020-09-20_07:45:03 8181 FHEM/10_SchellenbergHandle.pm
 UPD 2019-12-21_07:45:03 18318 FHEM/10_UNIRoll.pm
 UPD 2021-05-03_07:45:03 55089 FHEM/10_WS980.pm
-UPD 2021-05-09_07:45:06 265300 FHEM/10_ZWave.pm
+UPD 2021-05-11_07:45:02 266070 FHEM/10_ZWave.pm
 UPD 2020-07-29_07:45:02 33780 FHEM/10_pilight_ctrl.pm
 UPD 2020-11-19_07:45:02 46883 FHEM/11_FHT.pm
 UPD 2017-08-14_07:45:02 8037 FHEM/11_FHT8V.pm
@@ -306,7 +306,7 @@ UPD 2020-01-03_07:45:03 35093 FHEM/59_HCS.pm
 UPD 2020-11-25_07:45:03 26811 FHEM/59_LuftdatenInfo.pm
 UPD 2018-03-19_07:45:04 25560 FHEM/59_OPENWEATHER.pm
 UPD 2021-01-02_07:45:03 40665 FHEM/59_PROPLANTA.pm
-UPD 2021-03-22_07:45:03 62891 FHEM/59_Twilight.pm
+UPD 2021-05-11_07:45:02 62735 FHEM/59_Twilight.pm
 UPD 2020-04-17_07:45:02 21167 FHEM/59_WUup.pm
 UPD 2015-07-28_14:05:31 19347 FHEM/59_WWO.pm
 UPD 2020-10-18_07:45:03 51082 FHEM/59_Weather.pm
@@ -733,12 +733,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-05-07_07:45:06 4498148 docs/commandref.html
-UPD 2021-05-07_07:45:09 2778844 docs/commandref_DE.html
+UPD 2021-05-11_07:45:06 4498144 docs/commandref.html
+UPD 2021-05-11_07:45:09 2778830 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-10_07:45:10 240527 docs/commandref_modular.html
-UPD 2021-05-10_07:45:12 251542 docs/commandref_modular_DE.html
+UPD 2021-05-11_07:45:10 240533 docs/commandref_modular.html
+UPD 2021-05-11_07:45:11 251548 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1292,6 +1292,7 @@ UPD 2015-07-28_14:05:32 2027 www/images/fhemSVG/IR.svg
 UPD 2015-07-28_14:05:32 3699 www/images/fhemSVG/Icon_Fisch.svg
 UPD 2020-11-24_07:45:03 5555 www/images/fhemSVG/PlayStation.svg
 UPD 2017-11-14_07:45:02 21240 www/images/fhemSVG/RPi.svg
+UPD 2021-05-11_07:45:02 3256 www/images/fhemSVG/RadioA.svg
 UPD 2020-11-24_07:45:03 64098 www/images/fhemSVG/Siemens_synco_QAX910.svg
 UPD 2017-10-29_07:45:02 13843 www/images/fhemSVG/Todoist.svg
 UPD 2017-10-04_07:45:02 4361 www/images/fhemSVG/Ventilator_fett.svg
@@ -1319,6 +1320,7 @@ UPD 2015-07-28_14:05:32 11079 www/images/fhemSVG/bag.svg
 UPD 2020-07-26_07:45:03 15078 www/images/fhemSVG/balkon_icon.svg
 UPD 2015-07-28_14:05:32 2402 www/images/fhemSVG/batterie.svg
 UPD 2015-07-28_14:05:32 2379 www/images/fhemSVG/bluetooth.svg
+UPD 2021-05-11_07:45:02 8960 www/images/fhemSVG/briefkasten.svg
 UPD 2017-11-14_07:45:02 5364 www/images/fhemSVG/building_carport.svg
 UPD 2017-11-14_07:45:02 6536 www/images/fhemSVG/building_carport_light.svg
 UPD 2017-11-14_07:45:02 7727 www/images/fhemSVG/building_carport_socket.svg
@@ -1373,6 +1375,7 @@ UPD 2019-02-14_07:45:03 2949 www/images/fhemSVG/file_pod.svg
 UPD 2019-02-14_07:45:03 1293 www/images/fhemSVG/file_test-generic.svg
 UPD 2019-02-14_07:45:03 369 www/images/fhemSVG/file_unknown.svg
 UPD 2019-02-14_07:45:03 1944 www/images/fhemSVG/finder.svg
+UPD 2021-05-11_07:45:02 3378 www/images/fhemSVG/flamme.svg
 UPD 2015-07-28_14:05:32 3850 www/images/fhemSVG/floor.svg
 UPD 2019-02-14_07:45:03 3325 www/images/fhemSVG/flux.svg
 UPD 2020-03-02_07:45:03 21991 www/images/fhemSVG/freezer.svg
@@ -1555,6 +1558,7 @@ UPD 2019-02-14_07:45:03 716 www/images/fhemSVG/npm-old.svg
 UPD 2019-02-14_07:45:03 497 www/images/fhemSVG/npm.svg
 UPD 2019-06-21_07:45:02 4804 www/images/fhemSVG/nuki_bridge.svg
 UPD 2019-06-21_07:45:02 5610 www/images/fhemSVG/nuki_lock.svg
+UPD 2021-05-11_07:45:02 4024 www/images/fhemSVG/oeltank.svg
 UPD 2015-07-28_14:05:32 8453 www/images/fhemSVG/outside_socket.svg
 UPD 2015-07-28_14:05:32 2926 www/images/fhemSVG/people_sensor.svg
 UPD 2019-02-14_07:45:03 1861 www/images/fhemSVG/perl.svg
@@ -2280,7 +2284,7 @@ UPD 2015-07-28_14:05:34 331 www/pgm2/RSS.js
 UPD 2018-09-24_07:45:03 12353 www/pgm2/alarm.js
 UPD 2018-05-11_07:45:02 13108 www/pgm2/babble.js
 UPD 2017-02-18_07:45:02 6202 www/pgm2/brightstyle.css
-UPD 2019-12-26_07:45:03 10270 www/pgm2/console.js
+UPD 2021-05-11_07:45:02 10379 www/pgm2/console.js
 UPD 2020-01-27_07:45:02 1096 www/pgm2/darkCommon.css
 UPD 2015-07-28_14:05:34 4334 www/pgm2/darkfloorplanstyle.css
 UPD 2018-10-08_07:45:02 5419 www/pgm2/darksmallscreenstyle.css
