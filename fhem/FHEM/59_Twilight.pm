@@ -1084,7 +1084,7 @@ __END__
   <br>
   <a id="Twilight-general"></a>
   <b>General Remarks</b><br>
-  This module profited much from the use of the yahoo weather API. Unfortunately, this service is no longer available, so Twilight functionality is very limited nowerdays. To some extend, the use of <a href="#Twilightattr">useExtWeather</a> may compensate to dect cloudy skys. If you just want to have astronomical data available, consider using Astro instead.<br><br>
+  This module profited much from the use of the yahoo weather API. Unfortunately, this service is no longer available, so Twilight functionality is very limited nowerdays. To some extend, the use of <a href="#Twilight-attr-useExtWeather">useExtWeather</a> may compensate to dect cloudy skys. If you just want to have astronomical data available, consider using Astro instead.<br><br>
   <a id="Twilight-define"></a>
   <b>Define</b>
   <ul>
@@ -1202,6 +1202,7 @@ __END__
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <a id="Twilight-attr-useExtWeather"></a>
     <li><b>useExtWeather &lt;device&gt;[:&lt;reading&gt;] [&lt;usercode&gt;]</b></li>
     use data from other devices to calculate <b>twilight_weather</b>.<br/>
     The reading used shoud be in the range of 0 to 100 like the reading <b>c_clouds</b>    in an <b><a href="#openweathermap">openweathermap</a></b> device, where 0 is clear sky and 100 are overcast clouds.<br/>
@@ -1368,7 +1369,8 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
   <b>Attributes</b>
   <ul>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt; [&lt;usercode&gt;]</b></li>
+    <a id="Twilight-attr-useExtWeather"></a>
+    <li><b>useExtWeather &lt;device&gt;:&lt;reading&gt; [&lt;usercode&gt;]</b>
     Nutzt Daten von einem anderen Device um <b>twilight_weather</b> zu berechnen.<br/>
     Das Reading sollte sich im Intervall zwischen 0 und 100 bewegen, z.B. das Reading <b>c_clouds</b> in einem<b> <a href="#openweathermap">openweathermap</a></b> device, bei dem 0 heiteren und 100 bedeckten Himmel bedeuten.
     Wettereffekte wie Starkregen oder Gewitter k&umlnnen derzeit f&uumlr die Berechnung von <b>twilight_weather</b> nicht mehr herangezogen werden.<br>
@@ -1390,6 +1392,7 @@ Wissenswert dazu ist, dass die Sonne, abh&auml;gnig vom Breitengrad, bestimmte E
         $ret .= ":".ReadingsVal($weatherName,"cloudCover_evening",65);
         return $ret; 
     }
+    </li>
   </ul>
   <br>
 
