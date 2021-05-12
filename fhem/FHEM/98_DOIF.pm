@@ -104,7 +104,7 @@ sub DOIF_Initialize($)
   $hash->{FW_deviceOverview} = 1;
   $hash->{FW_addDetailToSummary} = 1;
   $hash->{FW_detailFn} = "DOIF_detailFn";
-  #hash->{FW_summaryFn}  = "DOIF_summaryFn";
+  $hash->{FW_summaryFn}  = "DOIF_summaryFn";
   #$hash->{FW_atPageEnd} = 1;
 
   $data{FWEXT}{DOIF}{SCRIPT} = "doif.js";
@@ -412,21 +412,18 @@ sub parse_tpl
   my ($hash,$wcmd,$table) = @_;
   my $d=$hash->{NAME};
   my $err="";
-##  while ($wcmd =~ /(?:^|\n)\s*IMPORT\s*(.*)(\n|$)/g) {
+  $hash->{$table}{header}="";
+
   while ($wcmd =~ /\s*IMPORT\s*(.*)(\n|$)/g) {
     $err=import_tpl($hash,$1,$table);
     return ($err,"") if ($err);
   }
-  
-  #$wcmd =~ s/(^|\n)\s*\#.*(\n|$)/\n/g;
-  #$wcmd =~ s/(#.*\n)|(#.*$)|\n/ /g;
+
   $wcmd =~ s/(##.*\n)|(##.*$)/\n/g;
-  ##$wcmd =~ s/(^|\n)\s*IMPORT.*(\n|$)//g;
+
   $wcmd =~ s/\s*IMPORT.*(\n|$)//g;
 
   $wcmd =~ s/\$TPL\{/\$hash->\{$table\}\{template\}\{/g;
-  #$wcmd =~ s/\$TD{/\$hash->{$table}{td}{/g;
-  #$wcmd =~ s/\$TC{/\$hash->{$table}{tc}{/g;
   $wcmd =~ s/\$ATTRIBUTESFIRST/\$hash->{$table}{attributesfirst}/;
   
   $wcmd =~ s/\$TC\{/\$hash->{$table}{tc}\{/g;
@@ -665,23 +662,27 @@ sub DOIF_RegisterEvalAll
   my $ret = "";
   my $reg=1;
   return undef if (!defined $hash->{$table}{table});
-  #$ret =~ s/class\=\'block\'/$hash->{$table}{table}/ if($hash->{$table}{table});
+
   if ($table eq "uiTable") {
-    $ret.= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'".
-      " doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'".
-      " doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'".
-      " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
-      ">";
+    $ret.= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'";
+    $ret.=" doifnostate='".($hash->{$table}{shownostate} ? $hash->{$table}{shownostate} : "")."'";
+    $ret.=" doifnodevline='".($hash->{$table}{shownodeviceline} ? $hash->{$table}{shownodeviceline} : "")."'";
+    $ret.=" doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'";
+    $ret.= ">";
     $hash->{$table}{header}= "\n<table uitabid='DOIF-$d' class=' block wide ".$table."doif doif-$d ' style='border-top:none;".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>";
-    #$ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>"; 
   } else {
-   $ret .= "\n<table uitabid='DOIF-$d' class=' ".$table."doif doif-$d ' style='".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'". 
-      " doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'".
-      ">"; 
+    $ret.= "\n<table uitabid='DOIF-$d' class=' wide ".$table."doif doif-$d ' style='border:none;".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'";
+    $ret.=" doifattrfirst='".($hash->{$table}{attributesfirst} ? $hash->{$table}{attributesfirst} : "")."'";
+    $ret.= ">";
+    $hash->{$table}{header}= "\n<table uitabid='DOIF-$d' class=' wide ".$table."doif doif-$d ' style='border-top:none;".($hash->{$table}{tablestyle} ? $hash->{$table}{tablestyle} : "")."'>";
   }
+  
+  my $class="";
   my $lasttr =scalar keys %{$hash->{$table}{table}};
   for (my $i=0;$i < $lasttr;$i++){
-    my $class = ($i&1)?"class='odd'":"class='even'";
+    if ($table eq "uiTable") {
+      $class = ($i&1)?"class='odd'":"class='even'";
+    }
     $ret .="<tr ";
     $ret .=((defined $hash->{$table}{tr}{$i}) ? $hash->{$table}{tr}{$i}:"");
     $ret .=" ".(($i&1) ? $hash->{$table}{tr}{odd}:"") if (defined $hash->{$table}{tr}{odd});
@@ -3707,7 +3708,7 @@ DOIF_Define($$$)
   } else {
     $hash->{MODEL}="Perl";
     #$defs{$hash->{NAME}}{".AttrList"}  = "disable:0,1 loglevel:0,1,2,3,4,5,6 startup state initialize notexist checkReadingEvent:1,0 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long uiTable:textField-long ".$readingFnAttributes;
-    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiTable:textField-long ".$readingFnAttributes);
+    setDevAttrList($hash->{NAME},"disable:0,1 loglevel:0,1,2,3,4,5,6 notexist checkReadingEvent:0,1 addStateEvent:1,0 weekdays setList:textField-long readingList DOIF_Readings:textField-long event_Readings:textField-long uiState:textField-long uiTable:textField-long ".$readingFnAttributes);
     ($msg,$err)=CmdDoIfPerl($hash,$cmd);
   }  
   if ($err ne "") {
@@ -4354,18 +4355,19 @@ sub widget {
  }
  
  sub shutter {
-   my ($value,$color,$type)=@_;
+   my ($value,$color,$type,$coloroff)=@_;
    $color="\@darkorange" if (!defined ($color) or $color eq "");
+   $coloroff="" if (!defined ($coloroff));
    if (!defined ($type) or $type == 3) {
-     return ($value,"","iconRadio,$color,100,fts_shutter_10,30,fts_shutter_70,0,fts_shutter_100","set");
+       return ($value,"","iconRadio,$color,100,fts_shutter_10$coloroff,30,fts_shutter_70$coloroff,0,fts_shutter_100$coloroff","set");
    } elsif ($type == 4) {
-       return ($value,"","iconRadio,$color,100,fts_shutter_10,50,fts_shutter_50,30,fts_shutter_70,0,fts_shutter_100","set");
+       return ($value,"","iconRadio,$color,100,fts_shutter_10$coloroff,50,fts_shutter_50$coloroff,30,fts_shutter_70$coloroff,0,fts_shutter_100$coloroff","set");
      } elsif ($type == 5) {
-         return ($value,"","iconRadio,$color,100,fts_shutter_10,70,fts_shutter_30,50,fts_shutter_50,30,fts_shutter_70,0,fts_shutter_100","set");
+         return ($value,"","iconRadio,$color,100,fts_shutter_10$coloroff,70,fts_shutter_30$coloroff,50,fts_shutter_50$coloroff,30,fts_shutter_70,0,fts_shutter_100$coloroff","set");
        } elsif ($type >= 6) {
-           return ($value,"","iconRadio,$color,100,fts_shutter_10,70,fts_shutter_30,50,fts_shutter_50,30,fts_shutter_70,20,fts_shutter_80,0,fts_shutter_100","set");
+           return ($value,"","iconRadio,$color,100,fts_shutter_10$coloroff,70,fts_shutter_30$coloroff,50,fts_shutter_50$coloroff,30,fts_shutter_70$coloroff,20,fts_shutter_80$coloroff,0,fts_shutter_100$coloroff","set");
          } elsif ($type == 2) {
-             return ($value,"","iconRadio,$color,100,fts_shutter_10,0,fts_shutter_100","set");
+             return ($value,"","iconRadio,$color,100,fts_shutter_10$coloroff,0,fts_shutter_100$coloroff","set");
          }
  } 
  
@@ -7264,9 +7266,19 @@ attr di_web setList myInput:first,second</code><br>
 <a name="uiTable"></a>
 Mit dem Attribut uiTable kann innerhalb eines DOIF-Moduls ein Web-Interface zur Visualisierung und Steuerung von Geräten in Form einer Tabelle erstellt werden.<br> 
 <br> 
-Die Dokumentation zu diesem Attribut wurde mit bebilderten Beispielen im FHEM-Wiki erstellt: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable Dokumentation</a><br>
+Die Dokumentation zu diesem Attribut wurde mit bebilderten Beispielen im FHEM-Wiki erstellt: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable/uiState Dokumentation</a><br>
 <br>
 Anwendungsbeispiele für Fortgeschrittene: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable">uiTable für Fortgeschrittene im FHEM-Wiki</a><br>
+<br>
+</li><li><a name="DOIF_uiState"></a>
+<b>uiState</a></b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
+<br>
+<a name="uiState"></a>
+Die Syntax des uiState-Attributes entspicht der des uiTable-Attributes. Die definierte Tabelle wird jedoch in der Statuszeile des DOIF-Devices dargestellt.<br>
+<br> 
+Dieses Attribut ist nur im Perl-Modus verfügbar.<br>
+<br> 
+Siehe Dokumentation: <a href="https://wiki.fhem.de/wiki/DOIF/uiTable_Schnelleinstieg">uiTable/uiState Dokumentation</a><br>
 <br>
 </li><li><a name="DOIF_cmdState"></a>
 <b>Status des Moduls</b>&nbsp;&nbsp;&nbsp;<a href="#DOIF_Inhaltsuebersicht">back</a><br>
@@ -8267,6 +8279,7 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
   <a href="#DOIF_setList__readingList">readingList</a> &nbsp;
   <a href="#DOIF_setList__readingList">setList</a> &nbsp;
   <a href="#DOIF_uiTable">uiTable</a> &nbsp;
+  <a href="#DOIF_uiState">uiState</a> &nbsp;
   <a href="#DOIF_weekdays">weekdays</a> &nbsp;
   <br><a href="#readingFnAttributes">readingFnAttributes</a> &nbsp;
 </ul>
@@ -8288,11 +8301,11 @@ Wenn <i>&lt;blocking function&gt;</i>, <i>&lt;finish function&gt;</i> und <i>&lt
 <a name="DOIF_Treppenhauslicht mit Bewegungsmelder"></a><br>
 <u>Treppenhauslicht mit Bewegungsmelder</u><br>
 <br><code>
-define&nbsp;di_light&nbsp;DOIF&nbsp;{<br>
-&nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;on")&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");&nbsp;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem_set("lamp&nbsp;off")');&nbsp;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern<br>
-&nbsp;&nbsp;}<br>
+defmod&nbsp;di_light&nbsp;DOIF&nbsp;{\<br>
+&nbsp;&nbsp;if&nbsp;(["FS:motion"])&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bei&nbsp;Bewegung\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("lamp&nbsp;on")&nbsp;if&nbsp;([?lamp]&nbsp;ne&nbsp;"on");;&nbsp;&nbsp;#&nbsp;Lampe&nbsp;einschalten,&nbsp;wenn&nbsp;sie&nbsp;nicht&nbsp;an&nbsp;ist\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("off",30,'fhem_set("lamp&nbsp;off")');;&nbsp;#&nbsp;Timer&nbsp;namens&nbsp;"off"&nbsp;für&nbsp;das&nbsp;Ausschalten&nbsp;der&nbsp;Lampe&nbsp;auf&nbsp;30&nbsp;Sekunden&nbsp;setzen&nbsp;bzw.&nbsp;verlängern\<br>
+&nbsp;&nbsp;}\<br>
 }<br>
 </code>
 <a name="DOIF_Einknopf_Fernbedienung"></a><br>
@@ -8301,13 +8314,13 @@ define&nbsp;di_light&nbsp;DOIF&nbsp;{<br>
 Anforderung: Wenn eine Taste innerhalb von zwei Sekunden zwei mal betätig wird, soll der Rollladen nach oben, bei einem Tastendruck nach unten.<br>
 <br>
 <code>
-define&nbsp;di_shutter&nbsp;DOIF&nbsp;{<br>
-&nbsp;&nbsp;if&nbsp;(["FS:^on$"]&nbsp;and&nbsp;!get_Exec("shutter")){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Taste&nbsp;betätigt&nbsp;wird&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem_set("shutter&nbsp;down")');&nbsp;#&nbsp;Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen<br>
-&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;läuft,&nbsp;d.h.&nbsp;ein&nbsp;weitere&nbsp;Tastendruck&nbsp;innerhalb&nbsp;von&nbsp;zwei&nbsp;Sekunden<br>
-&nbsp;&nbsp;&nbsp;&nbsp;del_Exec("shutter");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen<br>
-&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("shutter&nbsp;up");&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch<br>
-&nbsp;&nbsp;}<br>
+defmod&nbsp;di_shutter&nbsp;DOIF&nbsp;{\<br>
+&nbsp;&nbsp;if&nbsp;(["FS:^on$"]&nbsp;and&nbsp;!get_Exec("shutter")){&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Taste&nbsp;betätigt&nbsp;wird&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("shutter",2,'fhem_set("shutter&nbsp;down")');;#Timer&nbsp;zum&nbsp;shutter&nbsp;down&nbsp;auf&nbsp;zwei&nbsp;Sekunden&nbsp;setzen\<br>
+&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;läuft,&nbsp;d.h.&nbsp;ein&nbsp;weitere&nbsp;Tastendruck&nbsp;innerhalb&nbsp;von&nbsp;zwei&nbsp;Sekunden\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;del_Exec("shutter");;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Timer&nbsp;löschen\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fhem_set("shutter&nbsp;up");;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Rollladen&nbsp;hoch\<br>
+&nbsp;&nbsp;}\<br>
 }<br>
 </code>
 <br>
@@ -8316,13 +8329,13 @@ define&nbsp;di_shutter&nbsp;DOIF&nbsp;{<br>
 Im folgenden Beispiel wird die Nutzung von Device-Variablen demonstriert.<br>
 <br>
 <code>
-define&nbsp;di_count&nbsp;DOIF&nbsp;{<br>
-&nbsp;&nbsp;if&nbsp;(["FS:on"]&nbsp;and&nbsp;!get_Exec("counter"))&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Ereignis&nbsp;(hier&nbsp;"FS:on")&nbsp;eintritt&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft<br>
-&nbsp;&nbsp;&nbsp;&nbsp;$_count=1;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;setze&nbsp;count-Variable&nbsp;auf&nbsp;1<br>
-&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("counter",3600,'Log&nbsp;(3,"count:&nbsp;$_count&nbsp;action")&nbsp;if&nbsp;($_count&nbsp;>&nbsp;10)');&nbsp;&nbsp;#&nbsp;setze&nbsp;Timer&nbsp;auf&nbsp;eine&nbsp;Stunde&nbsp;zum&nbsp;Protokollieren&nbsp;der&nbsp;Anzahl&nbsp;der&nbsp;Ereignisse,&nbsp;wenn&nbsp;sie&nbsp;über&nbsp;10&nbsp;ist<br>
-&nbsp;&nbsp;}&nbsp;else&nbsp;{<br>
-&nbsp;&nbsp;&nbsp;&nbsp;$_count++;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;bereits&nbsp;läuft&nbsp;zähle&nbsp;Ereignis<br>
-&nbsp;&nbsp;}<br>
+defmod&nbsp;di_count&nbsp;DOIF&nbsp;{\<br>
+&nbsp;&nbsp;if&nbsp;(["FS:on"]&nbsp;and&nbsp;!get_Exec("counter"))&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Ereignis&nbsp;(hier&nbsp;"FS:on")&nbsp;eintritt&nbsp;und&nbsp;kein&nbsp;Timer&nbsp;läuft\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$_count=1;;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;setze&nbsp;count-Variable&nbsp;auf&nbsp;1\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;set_Exec("counter",3600,'Log&nbsp;(3,"count:&nbsp;$_count&nbsp;action")&nbsp;if&nbsp;($_count&nbsp;>&nbsp;10)');;&nbsp;#&nbsp;setze&nbsp;Timer&nbsp;auf&nbsp;eine&nbsp;Stunde&nbsp;zum&nbsp;Protokollieren&nbsp;der&nbsp;Anzahl&nbsp;der&nbsp;Ereignisse,&nbsp;wenn&nbsp;sie&nbsp;über&nbsp;10&nbsp;ist\<br>
+&nbsp;&nbsp;}&nbsp;else&nbsp;{\<br>
+&nbsp;&nbsp;&nbsp;&nbsp;$_count++;;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;wenn&nbsp;Timer&nbsp;bereits&nbsp;läuft&nbsp;zähle&nbsp;Ereignis\<br>
+&nbsp;&nbsp;}\<br>
 }<br>
 </code>
 </ul>
