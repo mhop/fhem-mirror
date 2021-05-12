@@ -4,7 +4,7 @@
 #
 # 89_AndroidDB
 #
-# Version 0.1
+# Version 0.2
 #
 # FHEM Integration for Android Devices
 #
@@ -43,8 +43,6 @@ package AndroidDB;
 
 use strict;
 use warnings;
-
-use Data::Dumper;
 
 use SetExtensions;
 
@@ -178,7 +176,7 @@ sub Get ($@)
 	$opt = lc($opt);
 	
 	if ($opt eq 'presets') {
-		return Dumper (\%PRESET);
+		return "Command not implemented";
 	}
 	else {
 		return "Unknown argument $opt, choose one of $options";

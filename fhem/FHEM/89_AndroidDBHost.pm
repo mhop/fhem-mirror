@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.1
+# Version 0.2
 #
 # FHEM Integration for Android Debug Bridge
 #
@@ -199,7 +199,7 @@ sub Set ($@)
 	my $opt = shift @$a // return 'No set command specified';
 
 	# Preprare list of available commands
-	my $options = 'start:noArg stop:noArg';
+	my $options = 'command start:noArg stop:noArg';
 
 	$opt = lc($opt);
 
@@ -219,6 +219,11 @@ sub Set ($@)
 		else {
 			return "ADB server still running. Please try again.";
 		}
+	}
+	elsif ($opt eq 'command') {
+		my $command = shift @$a // return "Usage: set $name $opt Command [Args]";
+		my ($rc, $result, $error) = Execute ($hash, $command, '.*', @$a);
+		return $result.$error;
 	}
 	else {
 		return "Unknown argument $opt, choose one of $options";
@@ -324,8 +329,8 @@ sub IsConnected ($)
 	my ($rc, $result, $error) = Execute ($ioHash, 'devices', 'list');
 	return -1 if ($rc == 0);
 
-	my @devices = $result =~ /device$/g;
-	if (scalar(@devices) == 1 && $result =~ /$clHash->{ADBDevice}/) {
+	my @devices = $result =~ /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]+)/g;
+	if (scalar(@devices) == 1 && $devices[0] eq $clHash->{ADBDevice}) {
 		return 1;
 	}
 	elsif (scalar(@devices) > 1) {
@@ -466,6 +471,9 @@ sub TCPConnect ($$$)
 <a name="AndroidDBHostset"></a>
 <b>Set</b><br/><br/>
 <ul>
+	<li><b>set &lt;name&gt; command &lt;Command&gt; [&lt;Args&gt;]</b><br/>
+		Execute ADB command.
+	</li><br/>
 	<li><b>set &lt;name&gt; start</b><br/>
 		Start ADB server.
 	</li><br/>
