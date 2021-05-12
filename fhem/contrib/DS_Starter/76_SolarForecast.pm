@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic ",
   "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
   "0.43.0" => "08.05.2021  plan Consumers ",
   "0.42.0" => "01.05.2021  new attr consumerXX, currentMeterDev is mandatory, new getter valConsumerMaster ".
@@ -228,10 +229,7 @@ my %hget = (                                                                # Ha
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
-  consumer01 => { fn => \&_attrconsumer },
-  consumer02 => { fn => \&_attrconsumer },
-  consumer03 => { fn => \&_attrconsumer },
-  consumer04 => { fn => \&_attrconsumer },
+  consumer => { fn => \&_attrconsumer },
 );
 
 my %hff = (                                                                                           # Flächenfaktoren 
@@ -406,7 +404,7 @@ my $cloud_base  = 0;                                                            
 my $rdampdef    = 10;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $maxconsumer = keys %hattr;                                                   # maximale Anzahl der möglichen Consumer (Attribut) 
+my $maxconsumer = 4;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
 my @ctypes      = qw(dishwasher dryer washingmachine heater other);              # erlaubte Consumer Typen
 my $defmintime  = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype    = "other";                                                       # default Verbrauchertyp
@@ -1318,7 +1316,8 @@ sub Attr {
       aName => $aName,
       aVal  => $aVal
   };
-    
+  
+  $aName = "consumer" if($aName =~ /consumer/xs);
   if($hattr{$aName} && defined &{$hattr{$aName}{fn}}) {
       my $ret = q{};
       $ret    = &{$hattr{$aName}{fn}} ($params); 
@@ -2743,7 +2742,9 @@ sub _estConsumptionForecast {
            my $conavg                                = int(($conh->{$nhhr}/$dnum)-$hdiff);
            $data{$type}{$name}{nexthours}{$k}{confc} = $conavg;                                     # Durchschnittsverbrauch aller gleicher Wochentage pro Stunde
            
-           if(NexthoursVal ($hash, $k, "today", 0)) {                                               # nur Werte des aktuellen Tag speichern
+           if (NexthoursVal ($hash, $k, "today", 0)) {                                              # nur Werte des aktuellen Tag speichern
+               $data{$type}{$name}{circular}{sprintf("%02d",$nhhr)}{confc} = $conavg; 
+               
                $paref->{confc}    = $conavg;
                $paref->{nhour}    = sprintf("%02d",$nhhr);
                $paref->{histname} = "confc";
@@ -3527,6 +3528,7 @@ sub forecastGraphic {                                                           
       $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvfc",  0);
       $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
       $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
+      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "confc", 0);
 
       # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
       $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "weatherid", undef);
@@ -3535,6 +3537,7 @@ sub forecastGraphic {                                                           
       $val1  = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
       $val2  = CircularVal ($hash, $hfcg->{0}{time_str}, "pvrl",  0);
       $val3  = CircularVal ($hash, $hfcg->{0}{time_str}, "gcons", 0);
+      $val4  = CircularVal ($hash, $hfcg->{0}{time_str}, "confc", 0);
 
       $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
       #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
@@ -3625,11 +3628,13 @@ sub forecastGraphic {                                                           
               my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i)));
               
               # Sonderfall Mitternacht
-              $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
+              $ds                  = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
               
               $val1                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
               $val2                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
               $val3                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
+              $val4                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
+              
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", undef);
           }
           else {
@@ -3642,6 +3647,7 @@ sub forecastGraphic {                                                           
 
       if (defined($nh)) {
           $val1                = NexthoursVal ($hash, 'NextHour'.$nh, "pvforecast",    0);
+          $val4                = NexthoursVal ($hash, 'NextHour'.$nh, "confc",         0);
           $hfcg->{$i}{weather} = NexthoursVal ($hash, 'NextHour'.$nh, "weatherid", undef);
           #$val4   = (ReadingsVal($name,"NextHour".$ii."_IsConsumptionRecommended",'no') eq 'yes') ? $icon : undef;
       }
@@ -4754,6 +4760,7 @@ sub listDataPool {
       for my $idx (sort keys %{$h}) {
           my $pvfc    = CircularVal ($hash, $idx, "pvfc",       "-");
           my $pvrl    = CircularVal ($hash, $idx, "pvrl",       "-");
+          my $confc   = CircularVal ($hash, $idx, "confc",      "-");
           my $gcons   = CircularVal ($hash, $idx, "gcons",      "-");
           my $gfeedin = CircularVal ($hash, $idx, "gfeedin",    "-");
           my $wid     = CircularVal ($hash, $idx, "weatherid",  "-");
@@ -4787,7 +4794,7 @@ sub listDataPool {
           }
           
           $sq .= "\n" if($sq);
-          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
+          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
           $sq .= "      temp=$temp, wid: $wid, wtxt: $wtxt\n";
           $sq .= "      corr: $pvcf\n";
           $sq .= "      quality: $cfq";
@@ -5132,6 +5139,7 @@ return $def;
 #    $hod: Stunde des Tages (01,02,...,24)
 #    $key:    pvrl       - realer PV Ertrag
 #             pvfc       - PV Vorhersage
+#             confc      - Vorhersage Hausverbrauch (Wh)
 #             gcons      - realer Netzbezug
 #             gfeedin    - reale Netzeinspeisung
 #             weatherid  - DWD Wetter id 
@@ -5793,7 +5801,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>pvfc</b>        </td><td>der prognostizierte PV Ertrag (Wh)                                          </td></tr>
             <tr><td> <b>pvrl</b>        </td><td>reale PV Erzeugung (Wh)                                                     </td></tr>
             <tr><td> <b>gcon</b>        </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                </td></tr>
-            <tr><td> <b>confc</b>       </td><td>erwarteter Energieverbrauch                                                 </td></tr>
+            <tr><td> <b>confc</b>       </td><td>erwarteter Energieverbrauch (Wh)                                            </td></tr>
             <tr><td> <b>con</b>         </td><td>realer Energieverbrauch (Wh) des Hauses                                     </td></tr>
             <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung (Wh) in das Stromnetz                                     </td></tr>
             <tr><td> <b>wid</b>         </td><td>Identifikationsnummer des Wetters                                           </td></tr>
@@ -5821,6 +5829,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <colgroup> <col width=10%> <col width=90%> </colgroup>
             <tr><td> <b>pvfc</b>     </td><td>PV Vorhersage für die nächsten 24h ab aktueller Stunde des Tages                                                   </td></tr>
             <tr><td> <b>pvrl</b>     </td><td>reale PV Erzeugung der letzten 24h (Achtung: pvforecast und pvreal beziehen sich nicht auf den gleichen Zeitraum!) </td></tr>
+            <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
             <tr><td> <b>gcon</b>     </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
             <tr><td> <b>gfeedin</b>  </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
             <tr><td> <b>wcc</b>      </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
