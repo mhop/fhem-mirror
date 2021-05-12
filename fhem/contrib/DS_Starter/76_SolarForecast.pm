@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic ",
+  "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
   "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
   "0.43.0" => "08.05.2021  plan Consumers ",
   "0.42.0" => "01.05.2021  new attr consumerXX, currentMeterDev is mandatory, new getter valConsumerMaster ".
@@ -455,10 +455,10 @@ sub Initialize {
   $hash->{AttrList}           = "autoRefresh:selectnumbers,120,0.2,1800,0,log10 ".
                                 "autoRefreshFW:$fwd ".
                                 "beam1Color:colorpicker,RGB ".
-                                "beam1Content:forecast,real,gridconsumption,consumptionForecast ".
+                                "beam1Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
                                 "beam1FontColor:colorpicker,RGB ".
                                 "beam2Color:colorpicker,RGB ".
-                                "beam2Content:forecast,real,gridconsumption,consumptionForecast ".
+                                "beam2Content:pvForecast,pvReal,gridconsumption,consumptionForecast ".
                                 "beam2FontColor:colorpicker,RGB ".
                                 "beamHeight ".
                                 "beamWidth ".
@@ -3297,8 +3297,8 @@ sub forecastGraphic {                                                           
   my $fcolor1    =  AttrVal ($name, 'beam1FontColor',     'C4C4A7');
   my $fcolor2    =  AttrVal ($name, 'beam2FontColor',     '000000');
              
-  my $beam1cont  =  AttrVal ($name, 'beam1Content',     'forecast');
-  my $beam2cont  =  AttrVal ($name, 'beam2Content',     'forecast'); 
+  my $beam1cont  =  AttrVal ($name, 'beam1Content',   'pvForecast');
+  my $beam2cont  =  AttrVal ($name, 'beam2Content',   'pvForecast'); 
 
   my $icon       =  AttrVal ($name, 'consumerAdviceIcon', undef   );
   my $html_start =  AttrVal ($name, 'htmlStart',          undef   );                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
@@ -3316,7 +3316,7 @@ sub forecastGraphic {                                                           
   my $show_night =  AttrNum ($name, 'showNight',              0   );                      # alle Balken (Spalten) anzeigen ?
   my $show_diff  =  AttrVal ($name, 'showDiff',            'no'   );                      # zusätzliche Anzeige $di{} in allen Typen
   my $weather    =  AttrNum ($name, 'showWeather',            1   );
-  my $colorw     =  AttrVal ($name, 'weatherColor',    'FFFFFF'   );                      # Wetter Icon Farbe
+  my $colorw     =  AttrVal ($name, 'weatherColor',      'FFFFFF' );                      # Wetter Icon Farbe
   my $colorwn    =  AttrVal ($name, 'weatherColorNight',  $colorw );                      # Wetter Icon Farbe Nacht
 
   my $wlalias    =  AttrVal ($name, 'alias',              $name   );
@@ -3544,8 +3544,8 @@ sub forecastGraphic {                                                           
   }
 
   $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
 
   $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
@@ -3653,8 +3653,8 @@ sub forecastGraphic {                                                           
       }
 
       $hfcg->{$i}{time_str} = sprintf('%02d', $hfcg->{$i}{time}-1).$hourstyle;
-      $hfcg->{$i}{beam1}    = ($beam1cont eq 'forecast') ? $val1 : ($beam1cont eq 'real') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-      $hfcg->{$i}{beam2}    = ($beam2cont eq 'forecast') ? $val1 : ($beam2cont eq 'real') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+      $hfcg->{$i}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
 
       # sicher stellen das wir keine undefs in der Liste haben !
       $hfcg->{$i}{beam1} //= 0;
@@ -5913,8 +5913,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>forecast</b>            </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>real</b>                </td><td>reale PV-Erzeugung                     </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
          </table>
@@ -5935,8 +5935,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
          <ul>   
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
-            <tr><td> <b>forecast</b>            </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
-            <tr><td> <b>real</b>                </td><td>reale PV-Erzeugung                     </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default) </td></tr>
+            <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung                     </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energie Bezug aus dem Netz             </td></tr>
             <tr><td> <b>consumptionForecast</b> </td><td>prognostizierter Energieverbrauch      </td></tr>
          </table>
