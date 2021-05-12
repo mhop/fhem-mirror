@@ -1080,6 +1080,10 @@ sub FULLY_Ping ($$)
 			Audio output of <i>text</i>. If <i>text</i> contains blanks it must be enclosed
 			in double quotes. The text can contain device readings in format [device:reading].
 		</li><br/>
+		<li><b>set &lt;name&gt; startApp &lt;PackageName&gt;</b><br/>
+			Start an app. App must be installed on the tablet and package name (not appname!)
+			must be specified.
+		</li><br/>
 		<li><b>set &lt;name&gt; startURL &lt;URL&gt;</b><br/>
 			Show this URL when FULLY starts.<br/>
 		</li><br/>
