@@ -171,7 +171,7 @@ sub FULLY_Attr ($@)
 
 	if ($cmd eq 'set') {
 		if ($attrname eq 'pollInterval') {
-			if ($attrval >= $FULLY_POLL_RANGE[0]  && $attrval <= $FULLY_POLL_RANGE[1]) {
+			if ($attrval >= $FULLY_POLL_RANGE[0] && $attrval <= $FULLY_POLL_RANGE[1]) {
 				FULLY_SetPolling ($hash, 1, $attrval);
 			}
 			elsif ($attrval == 0) {
@@ -218,6 +218,9 @@ sub FULLY_Attr ($@)
 sub FULLY_SetPolling ($$;$)
 {
 	my ($hash, $mode, $interval) = @_;
+	
+	return if (!$init_done);
+	
 	my $name = $hash->{NAME};
 	$interval //= AttrVal ($name, 'pollInterval', $hash->{fully}{interval} // $FULLY_POLL_INTERVAL);
 	
