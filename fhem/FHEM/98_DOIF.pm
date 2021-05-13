@@ -5617,7 +5617,7 @@ sub ring2
  }
 
  
-  $out.=sprintf('<g stroke="url(#grad2_ring2_%d_%d_%d)" fill="none" stroke-width="2">',$currColor2,$minColor2,(defined $lr ? $lr:0));
+  $out.=sprintf('<g stroke="url(#grad2_ring2_%s_%s_%s)" fill="none" stroke-width="2">',$currColor2,$minColor2,(defined $lr ? $lr:0));
   $out.=describeArc(41, 30, 25.5, 0, int($prop2*280));
   $out.='</g>';
 
