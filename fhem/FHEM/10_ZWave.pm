@@ -7302,13 +7302,18 @@ ZWave_firmwareUpdateParse($$$)
       </li>
 
     <li><a name="generateRouteInfoEvents">generateRouteInfoEvents</a><br>
-      if set (to 1) events for txStatusReport of ZW_SendData Callback are
-      generated. ReadingFnAttributes are not supported for this events.<br>
-      Controller with SDK 6.60 or higher is required. 
-      (tested with UZB1/Razberry firmware 5.27)
-      Additional Information in Silicon Lab documents:
+      if set (to 1) a timeToCb event with additional information regarding the
+      controller to device communication is generated, after sending data to
+      the device.<br>
+      Notes:
+      <ul>
+      <li>A controller with SDK 6.60 or higher is required. 
+        (tested with UZB1/Razberry firmware 5.27)</li>
+      <li>Additional Information in Silicon Lab documents:
       "Appl. Programmers Guide" and 
-      "Z-Wave Network Installation and maintenance Procedures User Guide"
+      "Z-Wave Network Installation and maintenance Procedures User Guide"</li>
+      <li>ReadingFnAttributes are not supported for this event.</li>
+      </ul>
     </li>
 
     <li><a href="#ignore">ignore</a></li>
