@@ -6158,9 +6158,9 @@ ZWave_firmwareUpdateParse($$$)
   This module is used to control ZWave devices via FHEM, see <a
   href="http://www.z-wave.com">www.z-wave.com</a> for details for this device
   family. The full specification of ZWave command classes can be found here:
-  <a href="http://zwavepublic.com/specifications" 
+  <a href="https://www.silabs.com/wireless/z-wave/specification" 
   title="website with the full specification of ZWave command classes">
-  http://zwavepublic.com/specifications</a>.
+  https://www.silabs.com/wireless/z-wave/specification</a>.
   This module is a client of the <a href="#ZWDongle">ZWDongle</a>
   module, which is directly attached to the controller via USB or TCP/IP.  To
   use the SECURITY features, the Crypt-Rijndael perl module is needed.
@@ -7300,6 +7300,16 @@ ZWave_firmwareUpdateParse($$$)
       the seperate readings at the same time, this should only be used
       if really needed as duplicate events are generated.
       </li>
+
+    <li><a name="generateRouteInfoEvents">generateRouteInfoEvents</a><br>
+      if set (to 1) events for txStatusReport of ZW_SendData Callback are
+      generated. ReadingFnAttributes are not supported for this events.<br>
+      Controller with SDK 6.60 or higher is required. 
+      (tested with UZB1/Razberry firmware 5.27)
+      Additional Information in Silicon Lab documents:
+      "Appl. Programmers Guide" and 
+      "Z-Wave Network Installation and maintenance Procedures User Guide"
+    </li>
 
     <li><a href="#ignore">ignore</a></li>
     <li><a name="ignoreDupMsg">ignoreDupMsg</a><br>
