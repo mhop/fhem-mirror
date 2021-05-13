@@ -4481,16 +4481,17 @@ sub format_value {
   my ($val,$min,$dec)=@_;
   my $format;
   my $value=$val;
-
   if ($val eq "") {
     $val="N/A";
     $format='%s';
-    $value=$min;
-  } elsif ($val  !~ /(-?\d+(\.\d+)?)/) {
+    $value=0;
+  } elsif ($val =~ /(-?\d+(\.\d+)?)/) {
+    $format='%1.'.$dec.'f';
+    $value=$1;
+    $val=$value;
+  } else {
     $format='%s';
     $value=0;
-  } else {
-    $format='%1.'.$dec.'f';
   }
   return($format,$value,$val);
 }
@@ -5385,7 +5386,7 @@ sub ring
     <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($minColor,$lr));
   } 
   if (defined $innerRing and $innerRing and ref($func) ne "ARRAY") {
-    $out.= sprintf('<linearGradient id="grad_ring_max_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+    $out.= sprintf('<linearGradient id="grad_ring_max_%s_%s_%s" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
     <stop offset="1" style="stop-color:%s;stop-opacity:1"/></linearGradient>',$minCol,$maxColor,(defined $lir ? $lir:0),100,0,0,0,color($maxColor,$lir),color($minCol,$lir));
   }
   $out.= '<linearGradient id="grad_ring1stroke" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.9"/>\
@@ -5584,10 +5585,10 @@ sub ring2
   $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(24,24,24);stop-opacity:0.9"/></linearGradient>';
-  $out.= sprintf('<linearGradient id="grad2_ring1_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  $out.= sprintf('<linearGradient id="grad2_ring1_%s_%s_%s" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
   <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor,$minColor,(defined $lr ? $lr:0),$x1,$y1,$x2,$y2,color($currColor,$lr),color($currColor,$lr));
   
-  $out.= sprintf('<linearGradient id="grad2_ring2_%d_%d_%d" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
+  $out.= sprintf('<linearGradient id="grad2_ring2_%s_%s_%s" x1="%d%%" y1="%d%%" x2="%d%%" y2="%d%%"><stop offset="0" style="stop-color:%s; stop-opacity:1"/>\
   <stop offset="1" style="stop-color:%s;stop-opacity:0.4"/></linearGradient>',$currColor2,$minColor2,(defined $lr ? $lr:0),$x12,$y12,$x22,$y22,color($currColor2,$lr),color($currColor2,$lr));
  
   $out.= '<linearGradient id="grad_ring2stroke" x1="1" y1="0" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(80,80,80); stop-opacity:0.9"/>\
@@ -5600,7 +5601,7 @@ sub ring2
   $out.='</g>';
   
   
-  $out.=sprintf('<g stroke="url(#grad2_ring1_%d_%d_%d)" fill="none" stroke-width="2.3">',$currColor,$minColor,(defined $lr ? $lr:0));
+  $out.=sprintf('<g stroke="url(#grad2_ring1_%s_%s_%s)" fill="none" stroke-width="2.3">',$currColor,$minColor,(defined $lr ? $lr:0));
   $out.=describeArc(41, 30, 28.2, 0, int($prop*280));
   $out.='</g>';
   
