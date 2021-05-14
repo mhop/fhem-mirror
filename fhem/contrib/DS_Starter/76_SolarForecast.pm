@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ",
   "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
   "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
   "0.43.0" => "08.05.2021  plan Consumers ",
@@ -715,7 +716,6 @@ sub _setinverterDevice {                 ## no critic "not used"
       return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
   }  
 
-  delete $hash->{HELPER}{INITETOTAL};
   readingsSingleUpdate($hash, "currentInverterDev", $arg, 1);
   createNotifyDev     ($hash);
 
@@ -1025,7 +1025,6 @@ sub _setreset {                          ## no critic "not used"
       }
       else {
           delete $data{$type}{$name}{pvhist};
-          delete $hash->{HELPER}{INITETOTAL};
           Log3($name, 3, qq{$name - all days of pvHistory deleted});
       }      
       return;
@@ -1072,7 +1071,6 @@ sub _setreset {                          ## no critic "not used"
   if($prop eq "currentInverterDev") {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
-      delete $hash->{HELPER}{INITETOTAL};
   }
   
   if($prop eq "consumerPlanning") {                                      # Verbraucherplanung resetten
@@ -1794,7 +1792,6 @@ sub _additionalActivities {
           deleteReadingspec ($hash, "powerTrigger_.*");
           deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
           
-          delete $hash->{HELPER}{INITETOTAL};
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
           
@@ -2040,46 +2037,40 @@ sub _transferInverterValues {
   my $etuf   = $etunit =~ /^kWh$/xi ? 1000 : 1;
   my $etotal = ReadingsNum ($indev, $edread, 0) * $etuf;                                      # Erzeugung total (Wh) 
   
-  my $edaypast = 0;
+  my $nhour  = $chour+1;
   
-  for my $hour (0..int $chour) {                                                              # alle bisherigen Erzeugungen des Tages summieren                                            
-      $edaypast += ReadingsNum ($name, "Today_Hour".sprintf("%02d",$hour)."_PVreal", 0);
-  }
+  my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "etotal", undef);           # etotal zu Beginn einer Stunde
   
-  my $do = 0;
-  if ($edaypast == 0) {                                                                       # Management der Stundenberechnung auf Basis Totalwerte
-      if (defined $hash->{HELPER}{INITETOTAL}) {
-          $do = 1;
-      }
-      else {
-          $hash->{HELPER}{INITETOTAL} = $etotal;
-      }
-  }
-  elsif (!defined $hash->{HELPER}{INITETOTAL}) {
-      $hash->{HELPER}{INITETOTAL} = $etotal-$edaypast-ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal", 0);
-  }
-  else {
-      $do = 1;
-  }
-  
-  if ($do) {
-      my $ethishour = int ($etotal - ($edaypast + $hash->{HELPER}{INITETOTAL}));
-      
-      if($ethishour < 0) {
-          $ethishour = 0;
-      }
-      
-      my $nhour = $chour+1;
-      push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal<>".$ethishour." Wh";       
-      $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;          # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-      
-      $paref->{ethishour} = $ethishour;
-      $paref->{nhour}     = sprintf("%02d",$nhour);
-      $paref->{histname}  = "pvrl";
+  my $ethishour;
+  if(!defined $histetot) {                                                                    # etotal der aktuelle Stunde gesetzt ?                                          
+      $paref->{etotal}   = $etotal;
+      $paref->{nhour}    = sprintf("%02d",$nhour);
+      $paref->{histname} = "etotal";
       setPVhistory ($paref);
       delete $paref->{histname};
+      
+      my $etot   = $data{$type}{$name}{current}{etotal} // $etotal;
+      $ethishour = int ($etotal - $etot);
   }
-    
+  else {
+      $ethishour = int ($etotal - $histetot);
+  }
+  
+  $data{$type}{$name}{current}{etotal} = $etotal;                                             # aktuellen etotal des WR speichern
+  
+  if($ethishour < 0) {
+      $ethishour = 0;
+  }
+  
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_PVreal<>".$ethishour." Wh";       
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{pvrl} = $ethishour;                   # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  
+  $paref->{ethishour} = $ethishour;
+  $paref->{nhour}     = sprintf("%02d",$nhour);
+  $paref->{histname}  = "pvrl";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+
 return;
 }
 
@@ -4505,6 +4496,7 @@ sub setPVhistory {
   my $dayname    = $paref->{dayname};                                                             # aktueller Wochentagsname
   my $histname   = $paref->{histname}      // qq{};
   my $ethishour  = $paref->{ethishour}     // 0;
+  my $etotal     = $paref->{etotal};
   my $calcpv     = $paref->{calcpv}        // 0;
   my $gcthishour = $paref->{gctotthishour} // 0;                                                  # Netzbezug
   my $fithishour = $paref->{gftotthishour} // 0;                                                  # Netzeinspeisung
@@ -4594,7 +4586,7 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{con} = $consum;       
   }
   
-  if($histname =~ /csm[et][0-9]+$/xs) {                                                           # Verbrauch eines Verbrauchers
+  if($histname =~ /csm[et][0-9]+$/xs) {                                                          # Verbrauch eines Verbrauchers
       $val = $consumerco;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{$histname} = $consumerco;  
 
@@ -4612,6 +4604,12 @@ sub setPVhistory {
           $data{$type}{$name}{pvhist}{$day}{99}{$histname}         = $sum;
           $data{$type}{$name}{pvhist}{$day}{99}{"hours".$histname} = $hours;        
       }      
+  }
+  
+  if($histname eq "etotal") {                                                                     # etotal des Wechselrichters
+      $val = $etotal;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{etotal} = $etotal;
+      $data{$type}{$name}{pvhist}{$day}{99}{etotal}     = q{};      
   }
   
   if($histname eq "weatherid") {                                                                  # Wetter ID
@@ -4678,9 +4676,12 @@ sub listDataPool {
           my $temp    = HistoryVal ($hash, $day, $key, "temp",    undef);
           my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",   "-");
           my $dayname = HistoryVal ($hash, $day, $key, "dayname", undef);
+          my $etotal  = HistoryVal ($hash, $day, $key, "etotal",    "-");
           
           $ret .= "\n      " if($ret);
-          $ret .= $key." => pvfc: $pvfc, pvrl: $pvrl, confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
+          $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl"; 
+          $ret .= "\n            ";
+          $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
           $ret .= "\n            ";
           $ret .= "wid: $wid";
           $ret .= ", wcc: $wcc";
