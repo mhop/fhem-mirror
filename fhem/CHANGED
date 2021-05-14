@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - change:  doif.js: tolerate dots in element id, cleanup
  - feature: 89_FULLY: Implemented some new commands
  - bugfix:  98_serviced: interval not starting after FHEM start
  - feature: 98_serviced: add attr disabledForIntervals
