@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ",
+  "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
+                           "fix createNotifyDev for currentBatteryDev ",
   "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
   "0.44.0" => "10.05.2021  consumptionForecast for attr beamXContent, consumer are switched on/off ",
   "0.43.0" => "08.05.2021  plan Consumers ",
@@ -5052,6 +5053,7 @@ sub createNotifyDev {
       push @nd, $radev if($radev ne $fcdev);
       push @nd, $indev;
       push @nd, $medev;
+      push @nd, $badev;
       push @nd, $co01dev;
       
       if(@nd) {
