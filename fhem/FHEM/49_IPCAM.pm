@@ -381,10 +381,13 @@ Get($@) {
         
       }
     }
+
+    InternalTimer(gettimeofday(), "IPCAM::RequestSnapshot", $hash);
+
     $hash->{READINGS}{snapshots}{VAL} = 0;
-    for (my $i=0;$i<$seqImages;$i++) {
-      InternalTimer(gettimeofday()+$seqWait, "IPCAM::RequestSnapshot", $hash);
+    for (my $i=1;$i<$seqImages;$i++) {
       $seqWait = $seqWait + $seqDelay;
+      InternalTimer(gettimeofday()+$seqWait, "IPCAM::RequestSnapshot", $hash);
     }
     return undef;
 
@@ -395,7 +398,7 @@ Get($@) {
 
     RequestSnapshotWithCallback($hash,$callbackCommand);
 
-    return undef;    
+    return undef;
 
   } elsif(defined($hash->{READINGS}{$arg})) {
 
@@ -517,7 +520,7 @@ sub RequestSnapshot_Callback {
 
     my $imageFormat = guessFileFormat($name, \$snapshot);
 
-    my @imageTypes = qw(JPEG PNG GIF TIFF BMP ICO PPM XPM XBM SVG);
+    my @imageTypes = qw(jpg png gif tiff bmp ico ppm xpm xbm svg);
 
     if( ! grep { $_ eq "$imageFormat"} @imageTypes) {
       Log3 $name, 1, "IPCAM ($name) - Wrong or not supported image format: $imageFormat";
@@ -549,9 +552,25 @@ sub RequestSnapshot_Callback {
     }
 
     Log3 $name, 3, "IPCAM ($name) - Snapshot Image Format: $imageFormat";
-
     readingsBeginUpdate($hash);
     
+    my $lastSnapshot = $name."_snapshot.".$imageFormat;
+    my $modpath = $attr{global}{modpath};
+    my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
+    if(!open(FH, ">$storage/$lastSnapshot")) {
+      Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$lastSnapshot: $!";
+      RemoveInternalTimer($hash);
+      readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
+      return undef;
+    }
+    print FH $snapshot;
+    close(FH);
+    
+    my $dateTime = TimeNow();
+    $hash->{STATE} = "last: $dateTime";
+    readingsBulkUpdate($hash, "last", $lastSnapshot, 1);
+    Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$lastSnapshot written.";
+
     my $seq = int(defined($hash->{SEQ}) ? $hash->{SEQ} : 0);
     my $seqImages = int(AttrVal($name,'snapshots',1));
 
@@ -560,33 +579,19 @@ sub RequestSnapshot_Callback {
 
       my $seqL = length($seqImages);
       my $seqF = sprintf("%0${seqL}d", $seq);
-      $imageFormat = "JPG" if($imageFormat eq "JPEG");
-    
-      my $lastSnapshot = $name."_snapshot.".lc($imageFormat);
-      my $dateTime = TimeNow();
+      
       my $timestamp = $dateTime;
       $timestamp =~ s/ /_/g;
       $timestamp =~ s/(:|-)//g;
 
       my $imageFile;
-      if(defined($attr{$name}{timestamp}) && $attr{$name}{timestamp} == 1) {
-        $imageFile = $name."_".$timestamp.".".lc($imageFormat);
+      my $useTimestamp = AttrVal($name, 'timestamp', 0);
+      if($useTimestamp == 1) {
+        $imageFile = $name."_".$timestamp.".".$imageFormat;
       } else {
-        $imageFile = $name."_snapshot_".$seqF.".".lc($imageFormat);
+        $imageFile = $name."_snapshot_".$seqF.".".$imageFormat;
       }
 
-      my $modpath = $attr{global}{modpath};
-      my $storage = AttrVal($name,'storage',"$modpath/www/snapshots");
-      if(!open(FH, ">$storage/$lastSnapshot")) {
-        Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$lastSnapshot: $!";
-        RemoveInternalTimer($hash);
-        readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));
-        return undef;
-      }
-      print FH $snapshot;
-      close(FH);
-
-      Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$lastSnapshot written.";
       if(!open(FH, ">$storage/$imageFile")) {
         Log3 $name, 0, "IPCAM ($name) - Can't write $storage/$imageFile: $!";
         RemoveInternalTimer($hash);
@@ -597,8 +602,7 @@ sub RequestSnapshot_Callback {
       close(FH);
 
       Log3 $name, 4, "IPCAM ($name) - snapshot $storage/$imageFile written.";
-      readingsBulkUpdate($hash, "last", $lastSnapshot, 1);
-      $hash->{STATE} = "last: $dateTime";
+
       readingsBulkUpdate($hash, "snapshot$seqF", $imageFile, 1);
 
       Log3 $name, 4, "IPCAM ($name) - image: $imageFile";
@@ -658,20 +662,20 @@ guessFileFormat($$) {
   return "error while reading source image: $!" if(!$reading);
 
   local($_) = $srcHeader;
-  return "JPEG" if /^\xFF\xD8/;
-  return "PNG"  if /^\x89PNG\x0d\x0a\x1a\x0a/;
-  return "GIF"  if /^GIF8[79]a/;
-  return "TIFF" if /^MM\x00\x2a/;
-  return "TIFF" if /^II\x2a\x00/;
-  return "BMP"  if /^BM/;
-  return "ICO"  if /^\000\000\001\000/;
-  return "PPM"  if /^P[1-6]/;
-  return "XPM"  if /(^\/\* XPM \*\/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)/;
-  return "XBM"  if /^(?:\/\*.*\*\/\n)?#define\s/;
+  return "jpg" if /^\xFF\xD8/;
+  return "png"  if /^\x89PNG\x0d\x0a\x1a\x0a/;
+  return "gif"  if /^GIF8[79]a/;
+  return "tiff" if /^MM\x00\x2a/;
+  return "tiff" if /^II\x2a\x00/;
+  return "bmp"  if /^BM/;
+  return "ico"  if /^\000\000\001\000/;
+  return "ppm"  if /^P[1-6]/;
+  return "xpm"  if /(^\/\* XPM \*\/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)/;
+  return "xbm"  if /^(?:\/\*.*\*\/\n)?#define\s/;
   if (int(AttrVal($name, 'handleAnyXmlAsSvg', 0)) == 1) {
-    return "SVG"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
+    return "svg"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
   } else {
-    return "SVG" if /^(<\?xml version="1.0" encoding="UTF-8"\?>)?\r?\n?<svg/;
+    return "svg" if /^(<\?xml version="1.0" encoding="UTF-8"\?>)?\r?\n?<svg/;
   }
 
   return "unknown";
