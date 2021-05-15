@@ -578,7 +578,7 @@ sub
 MQTT2_DEVICE_delReading($)
 {
   my ($name) = @_;
-  my $cid = $defs{$name}{CID};
+  my $cid = $defs{$name} ? $defs{$name}{CID} : undef;
   $cid = "" if(!defined($cid));
   for my $key1 (sort keys %{$modules{MQTT2_DEVICE}{defptr}}) {
     next if($key1 !~ m/^re/);
