@@ -144,6 +144,7 @@ attr DEVICE readingList\
   $\DEVICETOPIC/bridge/config/rename:.* { json2nameValue($EVENT, 'rename_') }\
   $\DEVICETOPIC/bridge/log:.*\"type\".\"devices\".\"message\".* devices\
   $\DEVICETOPIC/bridge/log:.* log\
+  $\DEVICETOPIC/bridge/logging:.* { json2nameValue($EVENT,'log_') }\
   $\DEVICETOPIC/bridge/networkmap:.* {}\
   $\DEVICETOPIC/bridge/networkmap/graphviz:.* graphviz\
   $\DEVICETOPIC/bridge/networkmap/raw:.* raw\
@@ -173,7 +174,7 @@ attr DEVICE comment To check for new updates of the deamon software, you might w
 #set DEVICE attrTemplate do_general_mqtt_cleanup ADD_TO_IO_IGNOREREGEXP=BASE_TOPIC/[A-Za-z0-9._]+/set
 set DEVICE attrTemplate do_general_mqtt_cleanup
 attr DEVICE model zigbee2mqtt_bridge
-setreading DEVICE attrTemplateVersion 20201215
+setreading DEVICE attrTemplateVersion 20210515
 # Based on https://forum.fhem.de/index.php/topic,94060.msg872371.html#msg872371 
 
 
@@ -960,7 +961,7 @@ attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add on-for-timer option running on the device. The following is limited to 1h max duration, but will not affect future simple "on" commands:<br>on-for-timer {my $duration = $EVTPART1*10; 'cmnd/CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}<br>See the "Praxisbeispiele" in the wiki for "pulseTime1" alternative option and it's restrictions.
 attr DEVICE autocreate 0
 attr DEVICE model tasmota_basic_state_power1
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
@@ -984,7 +985,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
@@ -1013,7 +1014,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
   STATTOPIC/POWER2:.* POWER2\
@@ -1032,7 +1033,7 @@ attr DEVICE devStateIcon {\
     ) . "</div>"\
   }
 attr DEVICE model tasmota_1ch+motion+SI7021
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 name:tasmota_POW
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1132,14 +1133,14 @@ attr DEVICE setList \
   11:noArg CMNDTOPIC/Backlog IRsend MULTIPLE1CMD;CMNDTOPIC/delay 8;CMNDTOPIC/IRsend MULTIPLE2CMD\
   irsend:textField CMNDTOPIC/irsend {"Protocol":"$EVTPART1","Bits":$EVTPART2,"Data":"0x$EVTPART3","Repeat": 2}
 attr DEVICE readingList \
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/RESULT:.* { $EVENT =~ m,..IrReceived....Protocol...([A-Za-z0-9]+)...Bits..([\d]+)..Data...([A-Za-z0-9]+)..., ? {"$1_$2"=>$3} : json2nameValue($EVENT) }
 attr DEVICE stateFormat state\
 <br>\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE event-on-change-reading .*
 attr DEVICE model tasmota_ir
-setreading DEVICE attrTemplateVersion 20201202
+setreading DEVICE attrTemplateVersion 20210515
 
 #tasmota device with rf-circuit
 name:tasmota_rf
@@ -1157,7 +1158,7 @@ attr DEVICE setList \
   volumeup:noArg CMNDTOPIC/RFsend VOLUMEUPCMD\
   rfsend:textField CMNDTOPIC/RFsend {"Protocol":"$EVTPART1","Bits":$EVTPART2,"Data":"0x$EVTPART3"}
 attr DEVICE readingList \
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/RESULT:.* { $EVENT =~ m,..RfReceived....Sync..([A-Za-z0-9]+)..Low..([\d]+)..High..([\d]+)..Data...([A-Za-z0-9]+)...RfKey...([^"]+)..., ? {"json_raw"=>$EVENT} : undef }\
   TELETOPIC/RESULT:.* { $EVENT =~ m,..RfReceived....Sync..([A-Za-z0-9]+)..Low..([\d]+)..High..([\d]+)..Data...([A-Za-z0-9]+)...RfKey...([^"]+)..., ? {"Data"=>"$4"} : undef }
 attr DEVICE stateFormat state\
@@ -1165,7 +1166,7 @@ attr DEVICE stateFormat state\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE event-on-change-reading .*
 attr DEVICE model tasmota_rf
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 
 name:tasmota_rf_keys_example
@@ -1181,7 +1182,7 @@ par:ICON;ICON as set, defaults to mqtt_bridge_2;{ AttrVal("DEVICE","icon","mqtt_
 defmod DEVICE_KEY1_2 MQTT2_\DEVICE tasmotaRF
 attr DEVICE_KEY1_2 devStateIcon Online:mqtt_bridge_2@#1de223 Offline:mqtt_bridge_2@red
 attr DEVICE_KEY1_2 icon ICON
-attr DEVICE_KEY1_2 readingList TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+attr DEVICE_KEY1_2 readingList TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1197,7 +1198,7 @@ attr DEVICE_KEY1_2 room NEWDEVROOM
 attr DEVICE_KEY1_2 setStateList on off
 attr DEVICE_KEY1_2 userReadings state:RfKey[12].* { ReadingsAge($name,"RfKey2",10000) > ReadingsAge($name,"RfKey1",10000) ? "on" : "off" }
 attr DEVICE_KEY1_2 model tasmota_rf_keys_example
-setreading DEVICE_KEY1_2 attrTemplateVersion 20200727
+setreading DEVICE_KEY1_2 attrTemplateVersion 20210515
 
 
 # forum: https://forum.fhem.de/index.php/topic,104475.0.html
@@ -1207,12 +1208,12 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 order:A_01d2
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 attr DEVICE readingList \
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { my %ret; while ($EVENT =~ /.Id...([A-F0-9]{12})...Temperature..([-]?[\d]+\.[\d]+)./g) { $ret{"Temperatur_".$1}=$2; }; return \%ret; }\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 farewell:template has been applied successfully. You might want to edit readingList attribute to avoid double info or let autocreate add more entries. 
 attr DEVICE model tasmota_use_DS18x20_id
-setreading DEVICE attrTemplateVersion 20201201
+setreading DEVICE attrTemplateVersion 20210515
 
 # tasmota 2ch as one FHEM device.
 name:tasmota_2ch_unified
@@ -1233,7 +1234,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }\
   STATTOPIC/POWER1:.* POWER1\
@@ -1245,7 +1246,7 @@ attr DEVICE stateFormat LWT\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2
 attr DEVICE model tasmota_2ch_unified
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 # sonoff 2 channel device flashed with Tasmota.
 name:tasmota_2channel_split
@@ -1313,7 +1314,7 @@ attr DEVICE readingList \
    TELETOPIC/RESULT:.* { json2nameValue($EVENT) }\
    TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
    TELETOPIC/SENSOR:.* { json2nameValue($EVENT) }\
-   TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+   TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
    TELETOPIC/UPTIME:.* { json2nameValue($EVENT) }
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_100 0:fts_shutter_10 9\d.*:fts_shutter_90 8\d.*:fts_shutter_80 7\d.*:fts_shutter_70 6\d.*:fts_shutter_60 5\d.*:fts_shutter_50 4\d.*:fts_shutter_40 3\d.*:fts_shutter_30 2\d.*:fts_shutter_20 1\d.*:fts_shutter_10 \b\d\b.*:fts_shutter_10 set_.*:fts_shutter_updown
 attr DEVICE cmdIcon open:fts_shutter_up close:fts_shutter_down stop:fts_shutter_manual half:fts_shutter_50
@@ -1332,7 +1333,7 @@ commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
-setreading DEVICE attrTemplateVersion 20201221
+setreading DEVICE attrTemplateVersion 20210515
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
@@ -1527,7 +1528,7 @@ state\
 <a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1586,19 +1587,19 @@ attr DEVICE_USB setList \
 #
 attr DEVICE_CH2 readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
   STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER2:.* state
 attr DEVICE_CH3 readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
   STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER3:.* state
 attr DEVICE_USB readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'state_',$JSONMAP) }\
   STATTOPIC/STATUS:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER4:.* state
@@ -1621,7 +1622,7 @@ set IO_DEV publish CMNDTOPIC/status
 set IO_DEV publish CMNDTOPIC/restart 1
 farewell:Template has been applied successfully. Wait some seconds for reboot to complete and watch readings get populated.
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB model tasmota_3socketUSB_channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB attrTemplateVersion 20200522 or prior
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB attrTemplateVersion 20210515
 
 
 # tasmota 4ch as one FHEM device.
@@ -1643,7 +1644,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* POWER1\
@@ -1658,7 +1659,7 @@ attr DEVICE stateFormat LWT\
 <br><a href="http://IPAddress" target="_blank">IPAddress</a>
 attr DEVICE webCmd POWER1:POWER2:POWER3:POWER4
 attr DEVICE model tasmota_4ch_unified_icon
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 # tasmota 4ch as one FHEM device.
 name:tasmota_4ch_unified_basic_text
@@ -1673,7 +1674,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE setList \
   POWER1:on,off,toggle CMNDTOPIC/POWER1 $EVTPART1\
@@ -1684,7 +1685,7 @@ attr DEVICE setStateList on off toggle
 attr DEVICE stateFormat P1: POWER1 P2: POWER2 P3: POWER3 P4: POWER4
 attr DEVICE webCmd POWER1 toggle:POWER2 toggle:POWER3 toggle:POWER4 toggle
 attr DEVICE model tasmota_4ch_unified_basic_text
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 # contributed by hummeruli, https://forum.fhem.de/index.php/topic,94495.msg1026611.html#msg1026611
 # tasmota 8ch as one FHEM device.
@@ -1710,7 +1711,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* POWER1\
@@ -1732,7 +1733,7 @@ attr DEVICE stateFormat LWT\
 7:POWER7\
 8:POWER8
 attr DEVICE model tasmota_8ch_unified_icon
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 
 name:tasmota_8channel_split
@@ -1845,7 +1846,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { $EVENT =~ m,HSBColor...(\d+)\,(\d+)\,(\d+), ? $2 eq ReadingsVal($NAME,"saturation","unknown") ? return : { "saturation"=>$2 } : return }\
@@ -1859,7 +1860,7 @@ attr DEVICE devStateIcon {Color::devStateIcon($name,"rgb","Color","pct","state")
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_rgbw_led
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 name:tasmota_rgbcct_light
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
@@ -1913,7 +1914,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state
@@ -1923,7 +1924,7 @@ attr DEVICE devStateIcon {Color::devStateIcon($name,"dimmer",'',"pct","state")}
 attr DEVICE setStateList on off toggle
 set DEVICE attrTemplate speechcontrol_type_light
 attr DEVICE model tasmota_cct_led
-setreading DEVICE attrTemplateVersion 20200522 or prior
+setreading DEVICE attrTemplateVersion 20210515
 
 #source post: https://forum.fhem.de/index.php/topic,105364.0.html
 name:tasmota_TuyaMCU_dimmer
@@ -1973,7 +1974,7 @@ attr DEVICE setList \
 attr DEVICE devStateIcon Online:10px-kreis-gruen Offline:10px-kreis-rot
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT) }\
   STATTOPIC/POWER:.* state\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1983,7 +1984,7 @@ attr DEVICE readingList \
 attr DEVICE stateFormat LWT\
 state
 attr DEVICE model tasmota_window_sensor_MC400A
-setreading DEVICE attrTemplateVersion 20200910
+setreading DEVICE attrTemplateVersion 20210515
 
 
 name:tasmota_set_lowercase_texts_and_state1
@@ -2039,7 +2040,7 @@ attr DEVICE bridgeRegexp \
   TELETOPIC/([^/]+)/SENSOR:.* "z2t_$1"
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/STATE:.* { json2nameValue($EVENT) }\
   TELETOPIC/RESULT:.* { json2nameValue($EVENT) }\
@@ -2052,7 +2053,7 @@ attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@re
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20201201
+setreading DEVICE attrTemplateVersion 20210515
 { AttrTemplate_Initialize() }
 
 
@@ -4533,6 +4534,7 @@ setreading DEVICE attrTemplateVersion 20210303
 name:roon
 filter:TYPE=MQTT2_DEVICE
 desc:See doku for roon mqtt extension https://github.com/fjgalesloot/roon-extension-mqttf. <br>Note: preliminary version
+order:M_06
 # first set the ZONE
 par:ZONENAME;ZONENAME is the roon zone you want to control
 attr DEVICE devicetopic ZONENAME
@@ -4629,3 +4631,28 @@ deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE model go_eCharger
 setreading DEVICE attrTemplateVersion 20200522 or prior
 
+
+###########################################
+# provided as mqtt2_siedle.template by hydrotec
+name:SiedleGateway
+desc: <br> &nbsp;&nbsp;&nbsp; This gateway connects Siedle In-Home Bus intercoms to home automation systems. <br> &nbsp;&nbsp;&nbsp; FHEM Forum: <a href="https://forum.fhem.de/index.php/topic,70273.msg859539.html#msg859539"target="_blank"> <i> <u> Siedle SSS Türsprechanlage/Türöffner mit FHEM steuern </u> </i> </a> <br> &nbsp;&nbsp;&nbsp; NOTE: without guarantee <br> <br> &nbsp;&nbsp;&nbsp; Dieses Gateway bindet Siedle In-Home Bus Gegensprechanlagen an Hausautomatisierungssysteme an. <br> &nbsp;&nbsp;&nbsp; FHEM Forum: <a href="https://forum.fhem.de/index.php/topic,70273.msg859539.html#msg859539" target="_blank"> <i> <u> Siedle SSS Türsprechanlage/Türöffner mit FHEM steuern </u> </i> </a> <br> &nbsp;&nbsp;&nbsp; HINWEIS: ohne Gewähr
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~SiedleGateway.*
+order:S_743353_01
+farewell:*template has been applied successfully*Vorlage wurde erfolgreich angewendet*
+par:BASE_TOPIC;base topic set in gateway;{ AttrVal("DEVICE","devicetopic","") =~ m,[\b]?([^/:]+)(/.+)?, ? $1 : AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+defmod DEVICE MQTT2_\DEVICE SiedleGateway
+attr DEVICE devicetopic BASE_TOPIC
+attr DEVICE readingList\
+$\DEVICETOPIC/state:.* state\
+$\DEVICETOPIC/cmnd:.* {}\
+$\DEVICETOPIC/cmnd/datagram:.* { json2nameValue($EVENT, 'cmnd_', $JSONMAP) }\
+$\DEVICETOPIC/result:.* {}\
+$\DEVICETOPIC/result/datagram:.* { json2nameValue($EVENT, 'exec_', $JSONMAP) }
+attr DEVICE event-on-change-reading .*
+attr DEVICE setList\
+light:noArg $\DEVICETOPIC/exec $EVTPART0\
+open:noArg $\DEVICETOPIC/exec $EVTPART0\
+ring $\DEVICETOPIC/exec $EVTPART0_$EVTPART1\
+playAudio $\DEVICETOPIC/playAudio $EVTPART1
+attr DEVICE model SiedleGateway
+setreading DEVICE attrTemplateVersion 20210515
