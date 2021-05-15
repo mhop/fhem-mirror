@@ -1,6 +1,6 @@
-REV 24435
+REV 24438
 DIR unused
-UPD 2021-05-13_07:45:03 362313 ./CHANGED
+UPD 2021-05-15_07:45:04 362371 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-04-30_07:45:03 43180 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
@@ -739,8 +739,8 @@ UPD 2021-05-14_07:45:07 4503081 docs/commandref.html
 UPD 2021-05-13_07:45:09 2779923 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-14_07:45:11 241148 docs/commandref_modular.html
-UPD 2021-05-14_07:45:12 252143 docs/commandref_modular_DE.html
+UPD 2021-05-15_07:45:12 241148 docs/commandref_modular.html
+UPD 2021-05-15_07:45:14 252143 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2301,7 +2301,7 @@ UPD 2015-07-28_14:05:34 14236 www/pgm2/dashboard_ios7.css
 UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2020-01-27_07:45:02 5941 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
-UPD 2017-12-04_07:45:02 2286 www/pgm2/doif.js
+UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
 UPD 2021-03-22_07:45:03 31177 www/pgm2/f18.js
 UPD 2021-02-26_07:45:03 10104 www/pgm2/f18style.css
 UPD 2019-12-08_20:09:25 7967 www/pgm2/fhemdoc_modular.js
