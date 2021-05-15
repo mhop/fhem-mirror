@@ -1475,7 +1475,7 @@ sub Delete {
   my $error = FileDelete($file);      
 
   if ($error) {
-      Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
+      Log3 ($name, 1, qq{$name - ERROR deleting cache file "$file": $error}); 
   }
   
   $error = qq{};
@@ -1483,7 +1483,7 @@ sub Delete {
   $error = FileDelete($file); 
   
   if ($error) {
-      Log3 ($name, 2, qq{$name - ERROR deleting cache file "$file": $error}); 
+      Log3 ($name, 1, qq{$name - ERROR deleting cache file "$file": $error}); 
   }
       
 return;
@@ -1717,7 +1717,7 @@ sub writeCacheToFile {
   
   if ($error) {
       my $err = qq{ERROR writing cache file "$file": $error};
-      Log3 ($name, 2, "$name - $err");
+      Log3 ($name, 1, "$name - $err");
       readingsSingleUpdate($hash, "state", "ERROR writing cache file $file - $error", 1);
       return $err;          
   }
@@ -1796,12 +1796,12 @@ sub _additionalActivities {
           delete $hash->{HELPER}{INITFEEDTOTAL};
           
           delete $data{$type}{$name}{pvhist}{$day};                                         # den (alten) aktuellen Tag löschen
-          Log3($name, 3, qq{$name - history day "$day" deleted});
+          Log3 ($name, 3, qq{$name - history day "$day" deleted});
           
           for my $c (keys %{$data{$type}{$name}{consumers}}) {
               deleteConsumerPlanning ($hash, $c);
               my $calias = ConsumerVal ($hash, $c, "alias", "");
-              Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+              Log3 ($name, 3, qq{$name - Consumer planning of "$calias" deleted});
           }
           
           deleteReadingspec ($hash, "consumer.*_planned.*");          
@@ -1850,7 +1850,7 @@ sub _transferDWDForecastValues {
       my $fh2 = $fh1 == 24 ? 23 : $fh1;
       my $rad = ReadingsVal($raname, "fc${fd}_${fh2}_Rad1h", 0);
       
-      Log3($name, 5, "$name - collect Radiation data: device=$raname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
+      Log3 ($name, 5, "$name - collect Radiation data: device=$raname, rad=fc${fd}_${fh2}_Rad1h, Rad1h=$rad");
       
       my $params = {
           hash => $hash,
@@ -1954,7 +1954,7 @@ sub _transferWeatherValues {
       
       my $txt = ReadingsVal($fcname, "fc${fd}_${fh2}_wwd", '');
 
-      Log3($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101, t=$temp");
+      Log3 ($name, 5, "$name - collect Weather data: device=$fcname, wid=fc${fd}_${fh1}_ww, val=$wid, txt=$txt, cc=$neff, rp=$r101, t=$temp");
       
       $time_str                                             = "NextHour".sprintf "%02d", $num;         
       $data{$type}{$name}{nexthours}{$time_str}{weatherid}  = $wid;
@@ -2023,7 +2023,7 @@ sub _transferInverterValues {
   
   return if(!$pvread || !$edread);
   
-  Log3($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
+  Log3 ($name, 5, "$name - collect Inverter data: device=$indev, pv=$pvread ($pvunit), etotal=$edread ($etunit)");
   
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
   my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
@@ -2102,7 +2102,7 @@ sub _transferMeterValues {
   $gfunit //= $gcunit;
   $gcunit //= $gfunit;
   
-  Log3($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
+  Log3 ($name, 5, "$name - collect Meter data: device=$medev, gcon=$gc ($gcunit), gfeedin=$gf ($gfunit) ,contotal=$gt ($ctunit), feedtotal=$ft ($ftunit)");
   
   my ($gco,$gfin);
   
@@ -2430,7 +2430,7 @@ sub __planSwitchTimes {
   }
   
   #for my $o (sort{$a<=>$b} keys %max) {                                                   # nur für Debugging
-  #    Log3($name, 1, "$name - maxkey: $maxkey, $o, $max{$o}{surplus}, $max{$o}{starttime}, $max{$o}{nexthour}, $max{$o}{today}");
+  #    Log3 ($name, 1, "$name - maxkey: $maxkey, $o, $max{$o}{surplus}, $max{$o}{starttime}, $max{$o}{nexthour}, $max{$o}{today}");
   #}
   
   my $epiece1 = (~0 >> 1);
@@ -2483,7 +2483,7 @@ sub __planSwitchTimes {
   }
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
-  Log3($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
+  Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
   
 return;
 }
@@ -2527,7 +2527,7 @@ sub __switchConsumer {
           $data{$type}{$name}{consumers}{$c}{planswitchon}  = $t;
           $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t + $stopdiff;
           $state                                            = qq{Consumer "$calias" switched on};
-          Log3($name, 3, "$name - $state");
+          Log3 ($name, 2, "$name - $state");
       }
   }
   
@@ -2539,7 +2539,7 @@ sub __switchConsumer {
       (undef,undef,undef,$stoptime)                 = timestampToTimestring ($t);
       $data{$type}{$name}{consumers}{$c}{planstate} = "switched off: ".$stoptime;
       $state                                        = qq{Consumer "$calias" switched off};
-      Log3($name, 3, "$name - $state");
+      Log3 ($name, 2, "$name - $state");
   } 
   
   $paref->{state} = $state;
@@ -2571,7 +2571,7 @@ sub _transferBatteryValues {
   $pounit //= $piunit;
   $piunit //= $pounit;
   
-  Log3($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit)");
+  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit)");
   
   my ($pbi,$pbo);
   
@@ -2676,7 +2676,7 @@ sub _estConsumptionForecast {
        my $tomavg                                        = int (($totcon/$dnum)-$ddiff);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # Durchschnittsverbrauch aller (gleicher) Wochentage
     
-       Log3($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
+       Log3 ($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
   }
   else {
       $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
@@ -2743,7 +2743,7 @@ sub _estConsumptionForecast {
                delete $paref->{histname};  
            }          
            
-           Log3($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
+           Log3 ($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
       }     
   }
   
@@ -3090,7 +3090,7 @@ sub FwFn {
   my $al = AttrVal($d, "autoRefresh", 0);
   if($al) {  
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      Log3 ($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
 
 return $ret;
@@ -3109,7 +3109,7 @@ sub pageRefresh {
   
   if($al) {      
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      Log3 ($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   } 
   else {
       RemoveInternalTimer($hash, \&pageRefresh);
@@ -3590,7 +3590,7 @@ sub forecastGraphic {                                                           
       else { 
           $_ .= ":24:24"; 
       } 
-      Log3($name, 4, "$name - Consumer planned data: $_");
+      Log3 ($name, 4, "$name - Consumer planned data: $_");
   }
 
   $maxVal    = !$maxVal ? $hfcg->{0}{beam1} : $maxVal;                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
@@ -3658,7 +3658,7 @@ sub forecastGraphic {                                                           
       $minDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff} < $minDif);
   }
 
-  #Log3($hash,3,Dumper($hfcg));
+  #Log3 ($hash,3,Dumper($hfcg));
   ######################################
   # Tabellen Ausgabe erzeugen
   ######################################
@@ -3700,14 +3700,14 @@ sub forecastGraphic {                                                           
           # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
           if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
               my ($icon_name, $title) = $hfcg->{$i}{weather} > 100 ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
-              Log3($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
+              Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
 
               $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
               $val        = FW_makeImage($icon_name);
 
               if ($val eq $icon_name) {                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
                   $val = '<b>???<b/>';                                                       
-                  Log3($name, 3, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
+                  Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
               
               $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
@@ -3999,7 +3999,7 @@ sub consinject {
   for (@pgCDev) {
       if ($_) {
           my ($cons,$im,$start,$end) = split (':', $_);
-          Log3($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
+          Log3 ($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
           
           if ($im && ($i >= $start) && ($i <= $end)) {
               $ret .= FW_makeImage($im);
@@ -4117,7 +4117,7 @@ sub checkdwdattr {
       $err .= qq{ERROR - device "$dwddev" -> attribute "forecastResolution" must be set to "1"};
   }
   
-  Log3($name, 2, "$name - $err") if($err);
+  Log3 ($name, 2, "$name - $err") if($err);
   
 return $err;
 }
@@ -4250,7 +4250,7 @@ sub calcPVforecast {
           $sq .= $idx." => ".$lh->{$idx}."\n";             
       }
 
-      Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
+      Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
       
       $pvsum   += $pv;
       $peaksum += $peak * 1000;                                                                      # kWp in Wp umrechnen
@@ -4261,7 +4261,7 @@ sub calcPVforecast {
   $paref->{peaksum} = $peaksum;
   ($pvsum, $logao)  = _70percentRule ($paref); 
   
-  Log3($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum ".$logao);
+  Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum ".$logao);
  
 return $pvsum;
 }
@@ -4310,7 +4310,7 @@ sub calcVariance {
   
   my $dcauto = ReadingsVal ($name, "pvCorrectionFactor_Auto", "off");                   # nur bei "on" automatische Varianzkalkulation
   if($dcauto =~ /^off/x) {
-      Log3($name, 4, "$name - automatic Variance calculation is switched off."); 
+      Log3 ($name, 4, "$name - automatic Variance calculation is switched off."); 
       return;      
   }
   
@@ -4321,7 +4321,7 @@ sub calcVariance {
 
   if($t - $idts < 86400) {
       my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
-      Log3($name, 4, "$name - Variance calculation in standby. It starts in $rmh hours."); 
+      Log3 ($name, 4, "$name - Variance calculation in standby. It starts in $rmh hours."); 
       readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
   }
@@ -4342,14 +4342,14 @@ sub calcVariance {
       
       my $cdone = ReadingsVal ($name, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc", "");
       if($cdone eq "done") {
-          Log3($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
+          Log3 ($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
       }
 
       #my $oldfac   = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h), 1);                    # bisher definierter Korrekturfaktor
       #$oldfac      = 1 if(1*$oldfac == 0);    
       
-      Log3($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
+      Log3 ($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
       $paref->{hour}                    = $h;
       my ($pvavg,$fcavg,$anzavg,$range) = calcAvgFromHistory ($paref);                                    # historische PV / Forecast Vergleichswerte ermitteln
@@ -4365,15 +4365,15 @@ sub calcVariance {
       my $factor = sprintf "%.2f", ($pvval / $fcval);                                                     # Faktorberechnung: reale PV / Prognose
       if(abs($factor - $oldfac) > $maxvar) {
           $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + $maxvar : $oldfac - $maxvar);
-          Log3($name, 3, "$name - new limited Variance factor: $factor (old: $oldfac) for hour: $h");
+          Log3 ($name, 3, "$name - new limited Variance factor: $factor (old: $oldfac) for hour: $h");
       }
       else {
-          Log3($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
+          Log3 ($name, 3, "$name - new Variance factor: $factor (old: $oldfac) for hour: $h calculated") if($factor != $oldfac);
       }
       
       if(defined $range) {
           my $type  = $hash->{TYPE};         
-          Log3($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
+          Log3 ($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Korrekturfaktor für Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $anzavg;                  # Korrekturfaktor Qualität
