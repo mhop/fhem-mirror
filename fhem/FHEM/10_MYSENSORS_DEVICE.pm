@@ -231,15 +231,15 @@ sub Define {
     my $hash = shift;
     my $def  = shift // return;
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
-    my ($name, $type, $radioId) = split m{\s+}xms, $def; # split("[ \t]+", $def);
-    return "requires 1 parameter!" if (!defined $radioId || $radioId eq "");
+    my ($name, $type, $radioId) = split m{\s+}xms, $def;
+    return 'requires 1 parameter!' if (!defined $radioId || $radioId eq '');
     $hash->{radioId} = $radioId;
     $hash->{sets} = {
-      'time'   => "noArg",
-      'reboot' => "noArg",
-      'clear'  => "noArg",
-      'flash'  => "noArg",
-      'fwType' => "",
+      time   => 'noArg',
+      reboot => 'noArg',
+      clear  => 'noArg',
+      flash  => 'noArg',
+      fwType => '',
     };
 
     $hash->{ack} = 0;
@@ -261,17 +261,17 @@ sub Set {
     return "At least one parameter is needed!" if !defined $command;
     return "Node is disabled!" if IsDisabled( $hash->{NAME} );
     if(!defined($hash->{sets}->{$command})) {
-      $hash->{sets}->{fwType} = join(",", MYSENSORS::getFirmwareTypes($hash->{IODev}));
-      my $list = join(" ", map {
-        $hash->{sets}->{$_} ne "" ? "$_:$hash->{sets}->{$_}" 
+      $hash->{sets}->{fwType} = join q{,}, MYSENSORS::getFirmwareTypes( $hash->{IODev} );
+      my $list = join( q{ }, map {
+        $hash->{sets}->{$_} ne '' ? "$_:$hash->{sets}->{$_}" 
                                        : $_
                                } sort keys %{$hash->{sets}});
-      $hash->{sets}->{fwType} = "";
+      $hash->{sets}->{fwType} = q{};
       return SetExtensions($hash, $list, $name, $command, @values);
     }
     
     if ($command =~ m{\A(time|reboot|clear|flash|fwType)\z}xms) {
-      if ($command eq "time") {
+      if ($command eq 'time') {
         my $t = timegm_nocheck(localtime(time));
         return sendClientMessage($hash, 
                                  childId => 255, 
@@ -282,8 +282,8 @@ sub Set {
                                  );
       }
       
-      if ($command eq "reboot") {
-        (AttrVal($name, "OTA_BL_Type", 0) or ReadingsVal($name, "BL_VERSION", 0)) 
+      if ($command eq 'reboot') {
+        (AttrVal($name, 'OTA_BL_Type', 0) or ReadingsVal($name, 'BL_VERSION', 0)) 
           ? return sendClientMessage($hash, 
                                      childId => 255, 
                                      cmd => C_INTERNAL, 
@@ -293,7 +293,7 @@ sub Set {
             : return;
       }
       
-      if ($command eq "clear") {
+      if ($command eq 'clear') {
         Log3 ($name,3,"MYSENSORS_DEVICE $name: clear");
         return sendClientMessage($hash, 
                                  childId => 255, 
@@ -304,25 +304,25 @@ sub Set {
                                  );
       }
       
-      if ($command eq "flash") {
-        my $blVersion = ReadingsVal($name, "BL_VERSION", "");
-        my $blType = AttrVal($name, "OTA_BL_Type", "");
-        my $fwType = ReadingsNum($name, "FW_TYPE", -1);
+      if ($command eq 'flash') {
+        my $blVersion = ReadingsVal($name, 'BL_VERSION', '');
+        my $blType = AttrVal($name, 'OTA_BL_Type', '');
+        my $fwType = ReadingsNum($name, 'FW_TYPE', -1);
         if ($fwType == -1) {
           Log3 ($name,3,"Firmware type not defined (FW_TYPE) for $name, update not started");
           return "$name: Firmware type not defined (FW_TYPE)";
         } 
-        if ($blVersion eq "3.0" or $blType eq "Optiboot") {
-          Log3 ($name,4,"Startet flashing Firmware: Optiboot method");
+        if ($blVersion eq '3.0' or $blType eq 'Optiboot') {
+          Log3 ($name,4,'Startet flashing Firmware: Optiboot method');
           return flashFirmware($hash, $fwType);
         } 
-        if ($blType eq "MYSBootloader") {
+        if ($blType eq 'MYSBootloader') {
           $hash->{OTA_requested} = 1;
           Log3 ($name,4,"Send reboot command to MYSBootloader node to start update");
           return sendClientMessage($hash, 
                                    childId => 255, 
                                    cmd => C_INTERNAL, 
-                                   ack => 1, 
+                                   ack => 0, 
                                    subType => I_REBOOT
                                    );
         } else {
@@ -335,7 +335,8 @@ sub Set {
       if ($command eq 'fwType') {
         my $type = shift @values // return;
         return "fwType must be numeric, but got >$type<." if ($type !~ m{^[0-9]{2,20}$}xms);
-        return readingsSingleUpdate($hash, 'FW_TYPE', $type, 1);
+        readingsSingleUpdate($hash, 'FW_TYPE', $type, 1);
+        return;
       }
     }
     
@@ -1352,38 +1353,38 @@ __END__
 <a id="MYSENSORS_DEVICE-set"></a>
 <h4>Set</h4>
 <ul>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-update"></a><b>AttrTemplate</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-attrTemplate"></a>
+    <p><b>AttrTemplate</b></p>
     <p>Helps to easily configure your devices. Just get a list of all available attrTremplates by issuing<br>
     <code>set &lt;name&gt; attrTemplate ?</code></p>
     <p>Have a look at the descriptions and choose a suitable one. Then use the drop-down list and click "set" or use<br>
     <code>set &lt;name&gt; attrTemplate A_02a_atmospheric_pressure</code></p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-clear"></a><b>clear</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-clear"></a>
+    <p><b>clear</b></p>
     <p><code>set &lt;name&gt; clear</code></p>
     <p>clears MySensors EEPROM area and reboot (i.e. &quot;factory&quot; reset) - requires MY_SPECIAL_DEBUG</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-flash"></a><b>flash</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-flash"></a>
+    <p><b>flash</b></p>
     <p><code>set &lt;name&gt; flash</code></p>
     <p>Checks whether a newer firmware version is available. If a newer firmware version is
     available the flash procedure is started. The sensor node must support FOTA for
     this.</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-fwType"></a><b>fwType</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-fwType"></a>
+    <p><b>fwType</b></p>
     <p><code>set &lt;name&gt; fwType &lt;value&gt;</code></p>
     <p>assigns a firmware type to this node (must be a numeric value in the range 0 .. 65536).<br>
-    Should be contained in the <a href="#MYSENSORS-attr-ota_firmwareconfig">FOTA configuration file</a>.</p>
+    Should be contained in the <a href="#MYSENSORS-attr-ota_firmwareconfig">FOTA configuration file</a></p>. <p>Note: Firmware config file by default only is read at startup. If you change it later, just issue a <i>connect</i> command to the GW to update also Internal values.</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-time"></a><b>time</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-time"></a>
+    <p><b>time</b></p>
     <p><code>set &lt;name&gt; time</code></p>
     <p>sets time for nodes (that support it)</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-set-reboot"></a><b>reboot</b></p>
+  <li><a id="MYSENSORS_DEVICE-set-reboot"></a>
+    <p><b>reboot</b></p>
     <p><code>set &lt;name&gt; reboot</code></p>
     <p>reboots a node (requires a bootloader that supports it).<br/>Attention: Nodes that run the standard arduino-bootloader will enter a bootloop!<br/>Dis- and reconnect the nodes power to restart in this case.</p>
   </li>
@@ -1392,20 +1393,20 @@ __END__
 <a id="MYSENSORS_DEVICE-get"></a>
 <h4>Get</h4>
 <ul>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-get-extended_debug"></a><b>Extended_DEBUG</b></p>
+  <li><a id="MYSENSORS_DEVICE-get-Extended_DEBUG"></a>
+    <p><b>Extended_DEBUG</b></p>
     <p><code>get &lt;name&gt; Extended_DEBUG</code></p>
     <p>requires MY_SPECIAL_DEBUG<br>
     retrieves the CPU frequency, CPU voltage and free memory of the sensor</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-get-readingsfromcomment"></a><b>ReadingsFromComment</b></p>
+  <li><a id="MYSENSORS_DEVICE-get-ReadingsFromComment"></a>
+    <p><b>ReadingsFromComment</b></p>
     <p><code>get &lt;name&gt; ReadingsFromComment</code></p>
     <p>rebuild reding names from comments of presentation messages if available<br>
     After issuing this get check the log for changes.</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-get-rssi"></a><b>RSSI</b></p>
+  <li><a id="MYSENSORS_DEVICE-get-RSSI"></a>
+    <p><b>RSSI</b></p>
     <p><code>get &lt;name&gt; RSSI</code></p>
     <p>requires MY_SIGNAL_REPORT_ENABLED, not supported by all transportation layers<br>
     delievers a set of Signal Quality information.</p>
@@ -1415,38 +1416,38 @@ __END__
 <a id="MYSENSORS_DEVICE-attr"></a>
 <h4>Attributes</h4>
 <ul>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-config"></a><b>config</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-config"></a>
+    <p><b>config</b></p>
     <p><code>attr &lt;name&gt; config [&lt;M|I&gt;]</code></p>
     <p>configures metric (M) or inch (I). Defaults to 'M'</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-ota_autoUpdate"></a><b>OTA_autoUpdate</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_autoUpdate"></a>
+    <p><b>OTA_autoUpdate</b></p>
     <p><code>attr &lt;name&gt; OTA_autoUpdate [&lt;0|1&gt;]</code></p>
     <p>specifies whether an automatic update of the sensor node should be performed (1) during startup of the node or not (0). Defaults to 0</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-setcommands"></a><b>setCommands</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-setCommands">
+    <p></a><b>setCommands</b></p>
     <p><code>attr &lt;name&gt; setCommands [&lt;command:reading:value&gt;]*</code></p>
     <p>configures one or more commands that can be executed by set.</p>
     <p>e.g.:<br>
       <code>attr &lt;name&gt; setCommands on:switch_1:on off:switch_1:off</code></p>
     <p>if list of commands contains both 'on' and 'off' <a href="#setExtensions">set extensions</a> are supported</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-setreading"></a><b>setReading_&lt;reading&gt;</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-setReading_ " data-pattern="setReading_.*"></a>
+    <p><b>setReading_&lt;reading&gt;</b></p>
     <p><code>attr &lt;name&gt; setReading_&lt;reading&gt; [&lt;value&gt;]*</code></p>
     <p>configures a reading that can be modified by set-command</p>
     <p>e.g.:<br>
       <code>attr &lt;name&gt; setReading_switch_1 on,off</code></p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-setextensionsevent"></a><b>setExtensionsEvent</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-setExtensionsEvent"></a>
+    <p><b>setExtensionsEvent</b></p>
     <p><code>attr &lt;name&gt; setExtensionsEvent</code></p>
     <p>If set, the event will contain the command implemented by SetExtensions (e.g. on-for-timer 10), else the executed command (e.g. on).</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-mapreading"></a><b>mapReading_&lt;reading&gt;</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-mapReading_" data-pattern="mapReading_.*"></a>
+    <p><b>mapReading_&lt;reading&gt;</b></p>
     <p><code>attr &lt;name&gt; mapReading_&lt;reading&gt; &lt;childId&gt; &lt;readingtype&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code></p>
     <p>configures the reading-name for a given childId and sensortype</p>
     <p>e.g.:<br>
@@ -1454,39 +1455,40 @@ __END__
       <code>attr xxx mapReading_leftwindow 10 status 1:closed 0:open</code></p>
     <p>See also mapReadingType for setting defaults for types without predefined defaults</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-requestack"></a><b>requestAck</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-requestAck"></a>
+    <p><b>requestAck</b></p>
     <p><code>attr &lt;name&gt; requestAck</code></p>
     <p>request acknowledge from nodes.<br>
     if set the Readings of nodes are updated not before requested acknowledge is received<br>
     if not set the Readings of nodes are updated immediatly (not awaiting the acknowledge).<br>
     May also be configured on the gateway for all nodes at once</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-mapreadingtype"></a><b>mapReadingType_&lt;reading&gt;</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-mapReadingType_" data-pattern="mapReadingType_.*"></a>
+    <p><b>mapReadingType_&lt;reading&gt;</b></p>
     <p><code>attr &lt;name&gt; mapReadingType_&lt;reading&gt; &lt;new reading name&gt; [&lt;value&gt;:&lt;mappedvalue&gt;]*</code></p>
     <p>configures reading type names that should be used instead of technical names</p>
     <p>e.g.:<br>
       <code>attr xxx mapReadingType_LIGHT switch 0:on 1:off</code></p>
     <p>to be used for mysensor Variabletypes that have no predefined defaults (yet)</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-ota_bl_type"></a><b>OTA_BL_Type</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_BL_Type"></a>
+    <p><b>OTA_BL_Type</b></p>
     <p><code>attr &lt;name&gt; OTA_BL_Type &lt;either Optiboot or MYSBootloader&gt;*</code></p>
     <p>For other bootloaders than Optiboot V3.0 OTA updates will only work if bootloader type is specified - MYSBootloader will reboot node if firmware update is started, so make sure, node will really recover</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-ota_chan76_iodev"></a><b>OTA_Chan76_IODev</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-OTA_Chan76_IODev">
+    <p></a><b>OTA_Chan76_IODev</b></p>
     <p><code>attr &lt;name&gt; OTA_Chan76_IODev </code></p>
     <p>As MYSBootloader per default uses nRF24 channel 76, you may specify a different IODev for OTA data using channel 76</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-timeoutack"></a><b>timeoutAck</b></p>
+  <li><a id="MYSENSORS_DEVICE-attr-timeoutAck"></a>
+    <p><b>timeoutAck</b></p>
     <p><code>attr &lt;name&gt; timeoutAck &lt;time in seconds&gt;*</code></p>
     <p>configures timeout to set device state to NACK in case not all requested acks are received</p>
   </li>
-  <li>
-    <p><a id="MYSENSORS_DEVICE-attr-timeoutalive"></a><b>timeoutAlive</b></p>
+  
+  <li><a id="MYSENSORS_DEVICE-attr-timeoutAlive"></a>
+    <p><b>timeoutAlive</b></p>
     <p><code>attr &lt;name&gt; timeoutAlive &lt;time in seconds&gt;*</code></p>
     <p>configures timeout to set device state to alive or dead. If messages from node are received within timout spec, state will be alive, otherwise dead. If state is NACK (in case timeoutAck is also set), state will only be changed to alive, if there are no outstanding messages to be sent.</p>
   </li>
