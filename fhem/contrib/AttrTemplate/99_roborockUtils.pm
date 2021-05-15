@@ -41,7 +41,7 @@ my ($cmd,$load) = split(q{ }, $EVENT,2);
 if (@_) {Log 1,"sub valetudoRE - Befehl:$cmd Load:$load";return q{}}
 my (@zid,@l,%consum);
 
-if ($cmd eq 'zoned_cleanup') {@zid = split q{,},$load}
+if ($cmd eq 'zone') {@zid = split q{,},$load}
 if ($cmd eq 'map') {@l = split q{ },$load}
 for (qw(main_brush_work_time side_brush_work_time filter_work_time sensor_dirty_time))
     {$consum{(split q{_})[0]}=$_};
