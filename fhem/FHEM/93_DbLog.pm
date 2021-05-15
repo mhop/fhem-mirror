@@ -30,6 +30,8 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "4.12.3"  => "20.04.2021 change sub DbLog_ConnectNewDBH for SQLITE, change error Logging in DbLog_writeFileIfCacheOverflow ",
+  "4.12.2"  => "08.04.2021 change standard splitting ",
   "4.12.1"  => "07.04.2021 improve escaping the pipe ",
   "4.12.0"  => "29.03.2021 new attributes SQLiteCacheSize, SQLiteJournalMode ",
   "4.11.0"  => "20.02.2021 new attr cacheOverflowThreshold, reading CacheOverflowLastNum/CacheOverflowLastState, ".
@@ -1080,7 +1082,7 @@ sub DbLog_ParseEvent {
 
   # split the event into reading, value and unit
   # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-  my @parts = split(/: /,$event);
+  my @parts = split(/: /,$event, 2);
   $reading  = shift @parts;
   if(@parts == 2) { 
     $value = $parts[0];
@@ -1777,7 +1779,7 @@ sub DbLog_Push {
   my $doins     = 0;                                                                  # Hilfsvariable, wenn "1" sollen inserts in Tabelle current erfolgen (updates schlugen fehl) 
   my $dbh;
   
-  my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
+  my $nh = ($hash->{MODEL} ne 'SQLITE') ? 1 : 0;
   # Unterscheidung $dbh um Abbrüche in Plots (SQLite) zu vermeiden und 
   # andererseite kein "MySQL-Server has gone away" Fehler
   if ($nh) {
@@ -2440,8 +2442,8 @@ sub DbLog_writeFileIfCacheOverflow {
   
   my $name    = $hash->{NAME};
   my $success = 0;
-  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);              # Steuerung exportCache statt schreiben in DB
-  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                 # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
+  my $coft    = AttrVal($name, "cacheOverflowThreshold", 0);                                 # Steuerung exportCache statt schreiben in DB
+  $coft       = ($coft && $coft < $clim) ? $clim : $coft;                                    # cacheOverflowThreshold auf cacheLimit setzen wenn kleiner als cacheLimit
   
   my $overflowstate = "normal";
   my $overflownum; 
@@ -2464,7 +2466,8 @@ sub DbLog_writeFileIfCacheOverflow {
       Log3 ($name, 2, "DbLog $name -> WARNING - Cache is exported to file instead of logging it to database");
       my $error = CommandSet (undef, qq{$name exportCache purgecache});
       
-      if($error) {                                                       # Fehler beim Export Cachefile
+      if($error) {                                                                          # Fehler beim Export Cachefile
+          Log3 ($name, 1, "DbLog $name -> ERROR - while exporting Cache file: $error");
           DbLog_setReadingstate ($hash, $error);                   
           return $success;
       }
@@ -3321,6 +3324,24 @@ sub DbLog_ConnectNewDBH {
   if($dbh) {
       $dbh->{RaiseError} = 0; 
       $dbh->{PrintError} = 1;
+      
+      if ($hash->{MODEL} eq "SQLITE") {         # Forum: https://forum.fhem.de/index.php/topic,120237.0.html
+        $dbh->do("PRAGMA temp_store=MEMORY");
+        $dbh->do("PRAGMA synchronous=FULL");    # For maximum reliability and for robustness against database corruption, 
+                                                # SQLite should always be run with its default synchronous setting of FULL.
+                                                # https://sqlite.org/howtocorrupt.html
+        
+        if (AttrVal($name, "SQLiteJournalMode", "WAL") eq "off") {
+            $dbh->do("PRAGMA journal_mode=off");
+        }
+        else {
+            $dbh->do("PRAGMA journal_mode=WAL");
+        }
+        
+        my $cs = AttrVal($name, "SQLiteCacheSize", "4000");
+        $dbh->do("PRAGMA cache_size=$cs");
+      }
+      
       return $dbh;
   } 
   else {
@@ -3495,7 +3516,7 @@ sub DbLog_Get {
   Log3 $name, 4, "DbLog $name -> ################################################################";
   Log3($name, 4, "DbLog $name -> main PID: $hash->{PID}, secondary PID: $$");
   
-  my $nh = ($hash->{MODEL} ne 'SQLITE')?1:0;
+  my $nh = ($hash->{MODEL} ne 'SQLITE') ? 1 : 0;
   if ($nh || $hash->{PID} != $$) {                                # 17.04.2019 Forum: https://forum.fhem.de/index.php/topic,99719.0.html
       $dbh = DbLog_ConnectNewDBH($hash);
       return "Can't connect to database." if(!$dbh);
@@ -3669,7 +3690,7 @@ sub DbLog_Get {
           $stm .= "ORDER BY TIMESTAMP";
       }
 
-      Log3 ($name, 4, "$name - Processing Statement:\n$stm");
+      Log3 ($name, 4, "$name - PID: $$, Processing Statement:\n$stm");
 
       my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
       my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
@@ -3689,12 +3710,14 @@ sub DbLog_Get {
       ####################################################################################
       #                              Select Auswertung      
       ####################################################################################
+      my $rv = 0;
       while($sth->fetch()) {
-          no warnings 'uninitialized';                                                            # geändert V4.8.0 / 14.10.2019
-          my $ds = "TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
-          Log3 ($name, 5, "$name - SQL-result -> $ds");                                           # geändert V4.8.0 / 14.10.2019
-          use warnings;                                                                           # geändert V4.8.0 / 14.10.2019      
-          $writeout = 0;                                                                          # eingefügt V4.8.0 / 14.10.2019
+          $rv++;
+          no warnings 'uninitialized';                                                                     # geändert V4.8.0 / 14.10.2019
+          my $ds = "PID: $$, TS: $sql_timestamp, DEV: $sql_device, RD: $sql_reading, VAL: $sql_value";     # geändert V4.8.0 / 14.10.2019
+          Log3 ($name, 5, "$name - SQL-result -> $ds");                                                    # geändert V4.8.0 / 14.10.2019
+          use warnings;                                                                                    # geändert V4.8.0 / 14.10.2019      
+          $writeout = 0;                                                                                   # eingefügt V4.8.0 / 14.10.2019
 
           ############ Auswerten des 5. Parameters: Regexp ###################
           # die Regexep wird vor der Function ausgewertet und der Wert im Feld
@@ -3927,8 +3950,10 @@ sub DbLog_Get {
               }
               $lastd[$i] = $sql_timestamp;
           }
-      }                                                                   ##### while fetchrow Ende ##### 
-
+      } 
+                                                                  ##### while fetchrow Ende ##### 
+      Log3 ($name, 4, "$name - PID: $$, rows count: $rv");
+      
       ######## den letzten Abschlusssatz rausschreiben ##########
       
       if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
@@ -6085,7 +6110,7 @@ return $ret;
 }
 
 ################################################################
-#  Dropdown-Menü cuurent-Tabelle SVG-Editor
+#  Dropdown-Menü current-Tabelle SVG-Editor
 ################################################################
 sub DbLog_sampleDataFn {
   my ($dlName, $dlog, $max, $conf, $wName) = @_;
@@ -6526,11 +6551,10 @@ sub DbLog_setVersionInfo {
   $hash->{HELPER}{PACKAGE} = __PACKAGE__;
   $hash->{HELPER}{VERSION} = $v;
   
-  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
-      # META-Daten sind vorhanden
+  if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
       if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id$ im Kopf komplett! vorhanden )
-          $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       } 
       else {
           $modules{$type}{META}{x_version} = $v; 
