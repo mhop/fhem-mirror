@@ -2451,7 +2451,7 @@ sub __planSwitchTimes {
   my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
   my $stopdiff = ceil($mintime / 60) * 3600;
   
-  my ($startts,$stopts,$stoptime);
+  my ($startts,$stopts,$stoptime,$starttime,$maxts,$half);
   
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       for my $ts (sort{$a<=>$b} keys %mtimes) {
@@ -2467,21 +2467,37 @@ sub __planSwitchTimes {
           }
       }
   }
-  else {                                                                                               # Verbraucher _muß_ geplant werden
+  else {                                                                                                   # Verbraucher _muß_ geplant werden
       for my $o (sort{$a<=>$b} keys %max) {
-          next if(!$max{$o}{today});                                                                   # der max-Wert ist _nicht_ heute
+          next if(!$max{$o}{today});                                                                       # der max-Wert ist _nicht_ heute
           
-          my $maxts                         = timestringToTimestamp ($max{$o}{starttime});             # Unix Timestamp des max. Überschusses heute
-          my $half                          = ceil ($mintime / 2 / 60);                                # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
-          $startts                          = $maxts - ($half * 3600); 
-          my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
-          $stopts                           = $startts + $stopdiff;
-          (undef,undef,undef,$stoptime)     = timestampToTimestring ($stopts);
+          $maxts                         = timestringToTimestamp ($max{$o}{starttime});                    # Unix Timestamp des max. Überschusses heute
+          $half                          = ceil ($mintime / 2 / 60);                                       # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
+          $startts                       = $maxts - ($half * 3600); 
+          (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+          $stopts                        = $startts + $stopdiff;
+          (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
           
           $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
-          $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                    # Unix Timestamp für geplanten Switch on       
-          $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                     # Unix Timestamp für geplanten Switch off
+          $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                    # Unix Timestamp für geplanten Switch on       
+          $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                     # Unix Timestamp für geplanten Switch off
           last;
+      }
+
+      if(!ConsumerVal ($hash, $c, "planstate", undef)) {                                                   # es konnte keine Planung für den aktuellen Tag erstellt werden
+          for my $p (sort{$a<=>$b} keys %max) {
+              $maxts                         = timestringToTimestamp ($max{$p}{starttime});                # Unix Timestamp des max. Überschusses heute
+              $half                          = ceil ($mintime / 2 / 60);                                   # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
+              $startts                       = $maxts - ($half * 3600); 
+              (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+              $stopts                        = $startts + $stopdiff;
+              (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
+              
+              $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
+              $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                # Unix Timestamp für geplanten Switch on       
+              $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                 # Unix Timestamp für geplanten Switch off
+              last;
+          }
       }      
   }
   
@@ -2504,19 +2520,18 @@ sub __switchConsumer {
   
   my $type  = $hash->{TYPE};
   
-  my $pstate  = ConsumerVal ($hash, $c, "planstate",     "");
-  my $cname   = ConsumerVal ($hash, $c, "name",          "");             # Consumer Device Name
-  my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");             # geplante Unix Startzeit
-  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");             # geplante Unix Stopzeit
-  my $calias  = ConsumerVal ($hash, $c, "alias",         "");             # Consumer Device Alias
+  my $startts = ConsumerVal ($hash, $c, "planswitchon",  undef);             # geplante Unix Startzeit
+  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);             # geplante Unix Stopzeit  
+  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
+  my $cname   = ConsumerVal ($hash, $c, "name",             "");             # Consumer Device Name
+  my $calias  = ConsumerVal ($hash, $c, "alias",            "");             # Consumer Device Alias
   
   my $stoptime;
   
   ## Verbraucher einschalten
   ############################
   my $oncom  = ConsumerVal ($hash, $c, "oncom", "");                      # Set Command für "on"
-  if($oncom && $pstate =~ /planned/xs && $t >= $startts) {                # Verbraucher Start ist geplant && Startzeit überschritten
-      
+  if($oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {    # Verbraucher Start ist geplant && Startzeit überschritten
       my $surplus = CurrentVal  ($hash, "surplus",          0);           # aktueller Überschuß
       my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);           # Consumer Planungsmode
       my $power   = ConsumerVal ($hash, $c, "power",        0);           # Consumer nominale Leistungsaufnahme (W)
@@ -2536,8 +2551,8 @@ sub __switchConsumer {
   
   ## Verbraucher ausschalten
   ############################
-  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                     # Set Command für "off"
-  if($offcom && $pstate !~ /switched\soff/xs && $t >= $stopts) {          # Verbraucher nicht switched off && Stopzeit überschritten
+  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                # Set Command für "off"
+  if($offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {          # Verbraucher nicht switched off && Stopzeit überschritten
       CommandSet(undef,"$cname $offcom");
       (undef,undef,undef,$stoptime)                 = timestampToTimestring ($t);
       $data{$type}{$name}{consumers}{$c}{planstate} = "switched off: ".$stoptime;
