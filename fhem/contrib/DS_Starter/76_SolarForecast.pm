@@ -2927,7 +2927,9 @@ sub _calcSummaries {
   
   my $type   = $hash->{TYPE};
   $minute    = (int $minute) + 1;                                                                     # Minute Range umsetzen auf 1 bis 60
-
+  
+  ## Vorhersagen
+  ################
   my $next1HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $next2HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
   my $next3HoursSum = { "PV" => 0, "Consumption" => 0, "Total" => 0, "ConsumpRcmd" => 0 };
@@ -3088,8 +3090,10 @@ sub saveEnergyConsumption {
   my $pvrl    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          0);
   my $gfeedin = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      0);
   my $gcon    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
+  my $batin   = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatIn",           0);
+  my $batout  = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_BatOut",          0);
   
-  my $con = $pvrl - $gfeedin + $gcon;
+  my $con = $pvrl - $gfeedin + $gcon - $batin + $batout;
       
   $paref->{con}      = $con;
   $paref->{nhour}    = sprintf("%02d",$chour+1);
@@ -5962,16 +5966,16 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>
          <table>  
          <colgroup> <col width=20%> <col width=80%> </colgroup>
-            <tr><td> <b>etotal</b>      </td><td>totaler Energieertrag (Wh)                                                  </td></tr>
+            <tr><td> <b>etotal</b>      </td><td>totaler Energieertrag (Wh) zu Beginn der Stunde                             </td></tr>
             <tr><td> <b>pvfc</b>        </td><td>der prognostizierte PV Ertrag (Wh)                                          </td></tr>
             <tr><td> <b>pvrl</b>        </td><td>reale PV Erzeugung (Wh)                                                     </td></tr>
             <tr><td> <b>gcon</b>        </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                </td></tr>
             <tr><td> <b>confc</b>       </td><td>erwarteter Energieverbrauch (Wh)                                            </td></tr>
             <tr><td> <b>con</b>         </td><td>realer Energieverbrauch (Wh) des Hauses                                     </td></tr>
             <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung (Wh) in das Stromnetz                                     </td></tr>
-            <tr><td> <b>batintotal</b>  </td><td>totale Batterieladung (Wh)                                                  </td></tr>
+            <tr><td> <b>batintotal</b>  </td><td>totale Batterieladung (Wh) zu Beginn der Stunde                             </td></tr>
             <tr><td> <b>batin</b>       </td><td>Batterieladung der Stunde (Wh)                                              </td></tr>
-            <tr><td> <b>batouttotal</b> </td><td>totale Batterieentladung (Wh)                                               </td></tr>
+            <tr><td> <b>batouttotal</b> </td><td>totale Batterieentladung (Wh) zu Beginn der Stunde                          </td></tr>
             <tr><td> <b>batout</b>      </td><td>Batterieentladung der Stunde (Wh)                                           </td></tr>
             <tr><td> <b>wid</b>         </td><td>Identifikationsnummer des Wetters                                           </td></tr>
             <tr><td> <b>wcc</b>         </td><td>effektive Wolkenbedeckung                                                   </td></tr>
