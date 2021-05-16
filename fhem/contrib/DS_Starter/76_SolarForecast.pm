@@ -2376,7 +2376,7 @@ sub __calcEnergyPieces {
       
       $he    = $epiecef + $epiecel + $epiecem if($h == $hours && $hours == 1);                 # kalk. Energieverbrauch wenn max. 1 Stunde Laufzeit
       
-      $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = $he;      
+      $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = sprintf('%.2f', $he);      
   }
   
 return;
