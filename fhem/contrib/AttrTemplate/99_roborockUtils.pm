@@ -21,7 +21,7 @@ roborockUtils_Initialize {
 sub valetudoREdest {
 my $EVENT = shift;
 my ($text,%h);
-$text=decode_json($EVENT);
+$text=from_json($EVENT);
 for ('spots','zones') {
     my @a;
     for my $i (0..$#{$text->{$_}}) {
