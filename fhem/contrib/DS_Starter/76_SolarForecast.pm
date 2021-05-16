@@ -2453,6 +2453,10 @@ sub __planSwitchTimes {
   
   my ($startts,$stopts,$stoptime,$starttime,$maxts,$half);
   
+  $paref->{maxref}   = \%max;
+  $paref->{mintime}  = $mintime;
+  $paref->{stopdiff} = $stopdiff;
+  
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       for my $ts (sort{$a<=>$b} keys %mtimes) {
           if($mtimes{$ts}{surplus} >= $epiece1) {                                                      # die früheste Startzeit sofern Überschuß größer als Bedarf 
@@ -2470,40 +2474,50 @@ sub __planSwitchTimes {
   else {                                                                                                   # Verbraucher _muß_ geplant werden
       for my $o (sort{$a<=>$b} keys %max) {
           next if(!$max{$o}{today});                                                                       # der max-Wert ist _nicht_ heute
-          
-          $maxts                         = timestringToTimestamp ($max{$o}{starttime});                    # Unix Timestamp des max. Überschusses heute
-          $half                          = ceil ($mintime / 2 / 60);                                       # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
-          $startts                       = $maxts - ($half * 3600); 
-          (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
-          $stopts                        = $startts + $stopdiff;
-          (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
-          
-          $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
-          $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                    # Unix Timestamp für geplanten Switch on       
-          $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                     # Unix Timestamp für geplanten Switch off
+          $paref->{elem} = $o;
+          ___planMust ($paref);        
           last;
       }
 
       if(!ConsumerVal ($hash, $c, "planstate", undef)) {                                                   # es konnte keine Planung für den aktuellen Tag erstellt werden
-          for my $p (sort{$a<=>$b} keys %max) {
-              $maxts                         = timestringToTimestamp ($max{$p}{starttime});                # Unix Timestamp des max. Überschusses heute
-              $half                          = ceil ($mintime / 2 / 60);                                   # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
-              $startts                       = $maxts - ($half * 3600); 
-              (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
-              $stopts                        = $startts + $stopdiff;
-              (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
-              
-              $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
-              $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                # Unix Timestamp für geplanten Switch on       
-              $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                 # Unix Timestamp für geplanten Switch off
-              last;
-          }
-      }      
+              my $p = (sort{$a<=>$b} keys %max)[0];
+              $paref->{elem} = $p;
+              ___planMust ($paref);
+      }              
   }
   
   my $planstate = ConsumerVal ($hash, $c, "planstate", "");
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
   
+return;
+}
+
+################################################################
+#          Consumer Zeiten MUST planen
+################################################################
+sub ___planMust {
+  my $paref    = shift;
+  my $hash     = $paref->{hash};
+  my $name     = $paref->{name};
+  my $c        = $paref->{consumer};
+  my $maxref   = $paref->{maxref};
+  my $elem     = $paref->{elem};
+  my $mintime  = $paref->{mintime};
+  my $stopdiff = $paref->{stopdiff};
+
+  my $type     = $hash->{TYPE};
+  
+  my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
+  my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
+  my $startts                       = $maxts - ($half * 3600); 
+  my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+  my $stopts                        = $startts + $stopdiff;
+  my (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
+  
+  $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime; 
+  $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;                                      # Unix Timestamp für geplanten Switch on       
+  $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                       # Unix Timestamp für geplanten Switch off
+
 return;
 }
 
