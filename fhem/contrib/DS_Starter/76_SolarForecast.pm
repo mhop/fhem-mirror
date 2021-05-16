@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
                            "fix createNotifyDev for currentBatteryDev ",
   "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
@@ -1790,6 +1791,7 @@ sub _additionalActivities {
           
           deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
+          deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
           deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
           
@@ -2050,7 +2052,7 @@ sub _transferInverterValues {
       setPVhistory ($paref);
       delete $paref->{histname};
       
-      my $etot   = $data{$type}{$name}{current}{etotal} // $etotal;
+      my $etot   = CurrentVal ($hash, "etotal", $etotal);
       $ethishour = int ($etotal - $etot);
   }
   else {
@@ -2113,7 +2115,7 @@ sub _transferMeterValues {
   $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                               # aktueller Bezug (W)
   $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                               # aktuelle Einspeisung (W)
     
-  if ($gc eq "-gfeedin") {                                                                    # kein Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
+  if ($gc eq "-gfeedin") {                                                                    # Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
       $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;
       if($gfin <= 0) {
           $gco  = abs($gfin);
@@ -2124,7 +2126,7 @@ sub _transferMeterValues {
       }
   }
   
-  if ($gf eq "-gcon") {                                                                       # kein Spezialfall gfeedin bei neg. gcon
+  if ($gf eq "-gcon") {                                                                       # Spezialfall gfeedin bei neg. gcon
       $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
       if($gco <= 0) {
           $gfin = abs($gco);
@@ -2555,6 +2557,8 @@ sub _transferBatteryValues {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
   my $daref = $paref->{daref};  
 
   my $badev  = ReadingsVal($name, "currentBatteryDev", "");                                   # aktuelles Meter device für Batteriewerte
@@ -2564,52 +2568,128 @@ sub _transferBatteryValues {
   
   my $type = $hash->{TYPE}; 
   
-  my ($pin,$piunit) = split ":", $h->{pin};                                                    # Readingname/Unit für aktuelle Batterieladung
-  my ($pou,$pounit) = split ":", $h->{pout};                                                   # Readingname/Unit für aktuelle Batterieentladung
-  
+  my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
+  my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
+  my ($bin,$binunit)   = split ":", $h->{intotal};                                            # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
+  my ($bout,$boutunit) = split ":", $h->{outtotal};                                           # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
+
   return if(!$pin || !$pou);
   
-  $pounit //= $piunit;
-  $piunit //= $pounit;
+  $pounit   //= $piunit;
+  $piunit   //= $pounit;
+  $boutunit //= $binunit;
+  $binunit  //= $boutunit;
   
-  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit)");
+  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit), totalin: $bin ($binunit), totalout: $bout ($boutunit)");
   
-  my ($pbi,$pbo);
+  my $piuf   = $piunit   =~ /^kW$/xi  ? 1000 : 1;
+  my $pouf   = $pounit   =~ /^kW$/xi  ? 1000 : 1;
+  my $binuf  = $binunit  =~ /^kWh$/xi ? 1000 : 1;
+  my $boutuf = $boutunit =~ /^kWh$/xi ? 1000 : 1;  
   
-  my $piuf = $piunit =~ /^kW$/xi ? 1000 : 1;
-  my $pouf = $pounit =~ /^kW$/xi ? 1000 : 1;
+  my $pbo     = ReadingsNum ($badev, $pou,  0) * $pouf;                                        # aktuelle Batterieentladung (W)
+  my $pbi     = ReadingsNum ($badev, $pin,  0) * $piuf;                                        # aktueller Batterieladung (W)
+  my $btotout = ReadingsNum ($badev, $bout, 0) * $boutuf;                                      # totale Batterieentladung (Wh)
+  my $btotin  = ReadingsNum ($badev, $bin,  0) * $binuf;                                       # totale Batterieladung (Wh)
   
-  $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                                # aktuelle Batterieentladung (W)
-  $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                                # aktueller Batterieladung (W)
+  my $params;
   
-  if ($pin eq "-pout") {                                                                       # kein Spezialfall pin bei neg. pout
-      $pbo = ReadingsNum ($badev, $pou, 0) * $pouf;                                            # aktuelle Batterieentladung (W)
-      if($pbo <= 0) {
-          $pbi = abs($pbo);
-          $pbo = 0;
-      }
-      else {
-          $pbi = 0;
-      }    
+  if ($pin eq "-pout") {                                                                       # Spezialfall pin bei neg. pout
+      $params = {
+          dev  => $badev,
+          rdg  => $pou,
+          rdgf => $pouf
+      };     
+      
+      ($pbo,$pbi) = substSpecialCases ($params);   
   }
   
-  if ($pou eq "-pin") {                                                                        # kein Spezialfall pout bei neg. pin
-      $pbi = ReadingsNum ($badev, $pin, 0) * $piuf;                                            # aktueller Batterieladung (W)
-      if($pbi <= 0) {
-          $pbo = abs($pbi);
-          $pbi = 0;
-      }
-      else {
-          $pbo = 0;
-      }
+  if ($pou eq "-pin") {                                                                        # Spezialfall pout bei neg. pin
+      $params = {
+          dev  => $badev,
+          rdg  => $pin,
+          rdgf => $piuf
+      };     
+      
+      ($pbi,$pbo) = substSpecialCases ($params);
+  }
+
+  my $nhour        = $chour+1; 
+
+######
+
+  my $histbatintot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batintotal", undef);   # totale Betterieladung zu Beginn einer Stunde
+  
+  my $batinthishour;
+  if(!defined $histbatintot) {                                                                # totale Betterieladung der aktuelle Stunde gesetzt ?                                          
+      $paref->{batintotal} = $btotin;
+      $paref->{nhour}      = sprintf("%02d",$nhour);
+      $paref->{histname}   = "batintotal";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+      
+      my $bitot      = CurrentVal ($hash, "batintotal", $btotin);  
+      $batinthishour = int ($btotin - $bitot);
+  }
+  else {
+      $batinthishour = int ($btotin - $histbatintot);
+  }
+
+  if($batinthishour < 0) {
+      $batinthishour = 0;
   }
   
-  push @$daref, "Current_PowerBatIn<>".(int $pbi)." W";
-  $data{$type}{$name}{current}{powerbatin} = int $pbi;                                        # Hilfshash Wert aktuelle Batterieladung
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batin} = $batinthishour;           # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
   
+  $paref->{batinthishour} = $batinthishour;
+  $paref->{nhour}         = sprintf("%02d",$nhour);
+  $paref->{histname}      = "batinthishour";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+
+######
+
+  my $histbatouttot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), "batouttotal", undef);   # totale Betterieladung zu Beginn einer Stunde
+  
+  my $batoutthishour;
+  if(!defined $histbatouttot) {                                                                 # totale Betterieladung der aktuelle Stunde gesetzt ?                                          
+      $paref->{batouttotal} = $btotout;
+      $paref->{nhour}       = sprintf("%02d",$nhour);
+      $paref->{histname}    = "batouttotal";
+      setPVhistory ($paref);
+      delete $paref->{histname};
+      
+      my $botot      = CurrentVal ($hash, "batouttotal", $btotout);  
+      $batoutthishour = int ($btotout - $botot);
+  }
+  else {
+      $batoutthishour = int ($btotout - $histbatouttot);
+  }
+
+  if($batoutthishour < 0) {
+      $batoutthishour = 0;
+  }
+  
+  $data{$type}{$name}{circular}{sprintf("%02d",$nhour)}{batout} = $batoutthishour;             # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  
+  $paref->{batoutthishour} = $batoutthishour;
+  $paref->{nhour}          = sprintf("%02d",$nhour);
+  $paref->{histname}       = "batoutthishour";
+  setPVhistory ($paref);
+  delete $paref->{histname};
+  
+######
+  
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatIn<>". $batinthishour. " Wh";
+  push @$daref, "Today_Hour".sprintf("%02d",$nhour)."_BatOut<>".$batoutthishour." Wh";  
+  push @$daref, "Current_PowerBatIn<>". (int $pbi)." W";
   push @$daref, "Current_PowerBatOut<>".(int $pbo)." W";
+  
+  $data{$type}{$name}{current}{powerbatin}  = int $pbi;                                       # Hilfshash Wert aktuelle Batterieladung
   $data{$type}{$name}{current}{powerbatout} = int $pbo;                                       # Hilfshash Wert aktuelle Batterieentladung
-        
+  $data{$type}{$name}{current}{batintotal}  = int $btotin;                                    # totale Batterieladung
+  $data{$type}{$name}{current}{batouttotal} = int $btotout;                                   # totale Batterieentladung
+  
 return;
 }
 
@@ -2974,6 +3054,30 @@ return ($fd,$fh);
 }
 
 ################################################################
+#    Spezialfall auflösen wenn Wert von $val2 dem 
+#    Redingwert von $val1 entspricht sofern $val1 negativ ist
+################################################################
+sub substSpecialCases {
+  my $paref = shift; 
+  my $dev   = $paref->{dev};
+  my $rdg   = $paref->{rdg};
+  my $rdgf  = $paref->{rdgf};
+
+  my $val1  = ReadingsNum ($dev, $rdg, 0) * $rdgf;
+  my $val2;
+  
+  if($val1 <= 0) {
+      $val2 = abs($val1);
+      $val1 = 0;
+  }
+  else {
+      $val2 = 0;
+  }
+ 
+return ($val1,$val2);
+}
+
+################################################################
 #     Energieverbrauch des Hauses in History speichern
 ################################################################
 sub saveEnergyConsumption {
@@ -2981,19 +3085,17 @@ sub saveEnergyConsumption {
   my $name  = $paref->{name};
   my $chour = $paref->{chour};  
   
-  my $pvrl    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          undef);
-  my $gfeedin = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      undef);
-  my $gcon    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", undef);
+  my $pvrl    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_PVreal",          0);
+  my $gfeedin = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridFeedIn",      0);
+  my $gcon    = ReadingsNum($name, "Today_Hour".sprintf("%02d",$chour+1)."_GridConsumption", 0);
   
-  if(defined $pvrl || defined $gfeedin || defined $gcon) {
-      my $con = $pvrl - $gfeedin + $gcon;
-          
-      $paref->{con}      = $con;
-      $paref->{nhour}    = sprintf("%02d",$chour+1);
-      $paref->{histname} = "con";
-      setPVhistory ($paref);              
-      delete $paref->{histname};
-  }
+  my $con = $pvrl - $gfeedin + $gcon;
+      
+  $paref->{con}      = $con;
+  $paref->{nhour}    = sprintf("%02d",$chour+1);
+  $paref->{histname} = "con";
+  setPVhistory ($paref);              
+  delete $paref->{histname};
    
 return;
 }
@@ -3367,18 +3469,18 @@ sub forecastGraphic {                                                           
       my $dlink   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};      
       my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
-      my $lupt    = "last update:";
-      my $autoct  = "automatic correction:";
-      my $lbpcq   = "correction quality current hour:";      
+      my $lupt    = "last&nbsp;update:";
+      my $autoct  = "automatic&nbsp;correction:";
+      my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
       my $lblPv4h = "next&nbsp;4h:";
-      my $lblPvRe = "remain today:";
+      my $lblPvRe = "remain&nbsp;today:";
       my $lblPvTo = "tomorrow:";
       my $lblPvCu = "actual";
      
       if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
           $lupt    = "Stand:";
-          $autoct  = "automatische Korrektur:";
-          $lbpcq   = encode("utf8", "Korrekturqualität akt. Stunde:");          
+          $autoct  = "automatische&nbsp;Korrektur:";
+          $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
           $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
           $lblPvRe = "Rest&nbsp;heute:";
           $lblPvTo = "morgen:";
@@ -3442,8 +3544,8 @@ sub forecastGraphic {                                                           
           ######################
           my $pcqicon;
           
-          $pcqicon = $pcq < 10 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
-                     $pcq < 20 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
+          $pcqicon = $pcq < 3 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
+                     $pcq < 5 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
                      "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
           $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
           
@@ -4488,33 +4590,61 @@ return;
 #   Berechnung des Korrekturfaktors über mehrere Tage
 ################################################################
 sub setPVhistory {               
-  my $paref      = shift;
-  my $hash       = $paref->{hash};
-  my $name       = $paref->{name};
-  my $t          = $paref->{t};                                                                   # aktuelle Unix-Zeit
-  my $nhour      = $paref->{nhour};
-  my $day        = $paref->{day};
-  my $dayname    = $paref->{dayname};                                                             # aktueller Wochentagsname
-  my $histname   = $paref->{histname}      // qq{};
-  my $ethishour  = $paref->{ethishour}     // 0;
-  my $etotal     = $paref->{etotal};
-  my $calcpv     = $paref->{calcpv}        // 0;
-  my $gcthishour = $paref->{gctotthishour} // 0;                                                  # Netzbezug
-  my $fithishour = $paref->{gftotthishour} // 0;                                                  # Netzeinspeisung
-  my $con        = $paref->{con}           // 0;                                                  # realer Hausverbrauch Energie
-  my $confc      = $paref->{confc}         // 0;                                                  # Verbrauchsvorhersage        
-  my $consumerco = $paref->{consumerco};                                                          # Verbrauch eines Verbrauchers
-  my $wid        = $paref->{wid}           // -1;
-  my $wcc        = $paref->{wcc}           // 0;                                                  # Wolkenbedeckung
-  my $wrp        = $paref->{wrp}           // 0;                                                  # Wahrscheinlichkeit von Niederschlag
-  my $pvcorrf    = $paref->{pvcorrf}       // "1/0";                                              # pvCorrectionFactor
-  my $temp       = $paref->{temp};                                                                # Außentemperatur
+  my $paref          = shift;
+  my $hash           = $paref->{hash};
+  my $name           = $paref->{name};
+  my $t              = $paref->{t};                                        # aktuelle Unix-Zeit
+  my $nhour          = $paref->{nhour};
+  my $day            = $paref->{day};
+  my $dayname        = $paref->{dayname};                                  # aktueller Wochentagsname
+  my $histname       = $paref->{histname}      // qq{};
+  my $ethishour      = $paref->{ethishour}     // 0;
+  my $etotal         = $paref->{etotal};
+  my $batinthishour  = $paref->{batinthishour};                            # Batterieladung in Stunde
+  my $btotin         = $paref->{batintotal};                               # totale Batterieladung
+  my $batoutthishour = $paref->{batoutthishour};                           # Batterieentladung in Stunde
+  my $btotout        = $paref->{batouttotal};                              # totale Batterieentladung  
+  my $calcpv         = $paref->{calcpv}        // 0;
+  my $gcthishour     = $paref->{gctotthishour} // 0;                       # Netzbezug
+  my $fithishour     = $paref->{gftotthishour} // 0;                       # Netzeinspeisung
+  my $con            = $paref->{con}           // 0;                       # realer Hausverbrauch Energie
+  my $confc          = $paref->{confc}         // 0;                       # Verbrauchsvorhersage        
+  my $consumerco     = $paref->{consumerco};                               # Verbrauch eines Verbrauchers
+  my $wid            = $paref->{wid}           // -1;
+  my $wcc            = $paref->{wcc}           // 0;                       # Wolkenbedeckung
+  my $wrp            = $paref->{wrp}           // 0;                       # Wahrscheinlichkeit von Niederschlag
+  my $pvcorrf        = $paref->{pvcorrf}       // "1/0";                   # pvCorrectionFactor
+  my $temp           = $paref->{temp};                                     # Außentemperatur
   
   my $type = $hash->{TYPE};
   my $val  = q{};
   
   $data{$type}{$name}{pvhist}{$day}{99}{dayname} = $dayname; 
 
+  if($histname eq "batinthishour") {                                                              # Batterieladung
+      $val = $batinthishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{batin} = $batinthishour;  
+      
+      my $batinsum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $batinsum += HistoryVal ($hash, $day, $k, "batin", 0);
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{batin} = $batinsum;      
+  }
+  
+  if($histname eq "batoutthishour") {                                                             # Batterieentladung
+      $val = $batoutthishour;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{batout} = $batoutthishour;  
+      
+      my $batoutsum = 0;
+      for my $k (keys %{$data{$type}{$name}{pvhist}{$day}}) {
+          next if($k eq "99");
+          $batoutsum += HistoryVal ($hash, $day, $k, "batout", 0);
+      }
+      $data{$type}{$name}{pvhist}{$day}{99}{batout} = $batoutsum;      
+  }
+  
   if($histname eq "pvrl") {                                                                       # realer Energieertrag
       $val = $ethishour;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{pvrl} = $ethishour;  
@@ -4613,6 +4743,18 @@ sub setPVhistory {
       $data{$type}{$name}{pvhist}{$day}{99}{etotal}     = q{};      
   }
   
+  if($histname eq "batintotal") {                                                                 # totale Batterieladung
+      $val = $btotin;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{batintotal} = $btotin;
+      $data{$type}{$name}{pvhist}{$day}{99}{batintotal}     = q{};      
+  }
+  
+  if($histname eq "batouttotal") {                                                                # totale Batterieentladung
+      $val = $btotout;
+      $data{$type}{$name}{pvhist}{$day}{$nhour}{batouttotal} = $btotout;
+      $data{$type}{$name}{pvhist}{$day}{99}{batouttotal}     = q{};      
+  }
+  
   if($histname eq "weatherid") {                                                                  # Wetter ID
       $val = $wid;
       $data{$type}{$name}{pvhist}{$day}{$nhour}{weatherid} = $wid;
@@ -4665,24 +4807,30 @@ sub listDataPool {
       my $day = shift;
       my $ret;          
       for my $key (sort{$a<=>$b} keys %{$h->{$day}}) {
-          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",      "-");
-          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",      "-");
-          my $gcon    = HistoryVal ($hash, $day, $key, "gcons",     "-");
-          my $con     = HistoryVal ($hash, $day, $key, "con",       "-");
-          my $confc   = HistoryVal ($hash, $day, $key, "confc",     "-");
-          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",   "-");
-          my $wid     = HistoryVal ($hash, $day, $key, "weatherid", "-");
-          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",       "-");
-          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",       "-");
-          my $temp    = HistoryVal ($hash, $day, $key, "temp",    undef);
-          my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",   "-");
-          my $dayname = HistoryVal ($hash, $day, $key, "dayname", undef);
-          my $etotal  = HistoryVal ($hash, $day, $key, "etotal",    "-");
+          my $pvrl    = HistoryVal ($hash, $day, $key, "pvrl",        "-");
+          my $pvfc    = HistoryVal ($hash, $day, $key, "pvfc",        "-");
+          my $gcon    = HistoryVal ($hash, $day, $key, "gcons",       "-");
+          my $con     = HistoryVal ($hash, $day, $key, "con",         "-");
+          my $confc   = HistoryVal ($hash, $day, $key, "confc",       "-");
+          my $gfeedin = HistoryVal ($hash, $day, $key, "gfeedin",     "-");
+          my $wid     = HistoryVal ($hash, $day, $key, "weatherid",   "-");
+          my $wcc     = HistoryVal ($hash, $day, $key, "wcc",         "-");
+          my $wrp     = HistoryVal ($hash, $day, $key, "wrp",         "-");
+          my $temp    = HistoryVal ($hash, $day, $key, "temp",      undef);
+          my $pvcorrf = HistoryVal ($hash, $day, $key, "pvcorrf",     "-");
+          my $dayname = HistoryVal ($hash, $day, $key, "dayname",   undef);
+          my $etotal  = HistoryVal ($hash, $day, $key, "etotal",      "-");
+          my $btotin  = HistoryVal ($hash, $day, $key, "batintotal",  "-");
+          my $batin   = HistoryVal ($hash, $day, $key, "batin",       "-");
+          my $btotout = HistoryVal ($hash, $day, $key, "batouttotal", "-");
+          my $batout  = HistoryVal ($hash, $day, $key, "batout",      "-");
           
           $ret .= "\n      " if($ret);
           $ret .= $key." => etotal: $etotal, pvfc: $pvfc, pvrl: $pvrl"; 
           $ret .= "\n            ";
           $ret .= "confc: $confc, con: $con, gcon: $gcon, gfeedin: $gfeedin";
+          $ret .= "\n            ";
+          $ret .= "batintotal: $btotin, batin: $batin, batouttotal: $btotout, batout: $batout";
           $ret .= "\n            ";
           $ret .= "wid: $wid";
           $ret .= ", wcc: $wcc";
@@ -4772,6 +4920,8 @@ sub listDataPool {
           my $temp    = CircularVal ($hash, $idx, "temp",       "-");
           my $pvcorrf = CircularVal ($hash, $idx, "pvcorrf",    "-");
           my $quality = CircularVal ($hash, $idx, "quality",    "-");
+          my $batin   = CircularVal ($hash, $idx, "batin",      "-");
+          my $batout  = CircularVal ($hash, $idx, "batout",     "-");
           
           my $pvcf;
           if(ref $pvcorrf eq "HASH") {
@@ -4796,8 +4946,9 @@ sub listDataPool {
           }
           
           $sq .= "\n" if($sq);
-          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
-          $sq .= "      temp=$temp, wid: $wid, wtxt: $wtxt\n";
+          $sq .= $idx." => pvfc: $pvfc, pvrl: $pvrl, batin: $batin, batout: $batout\n";
+          $sq .= "      confc: $confc, gcon: $gcons, gfeedin: $gfeedin, wcc: $wccv, wrp: $wrprb\n";
+          $sq .= "      temp: $temp, wid: $wid, wtxt: $wtxt\n";
           $sq .= "      corr: $pvcf\n";
           $sq .= "      quality: $cfq";
       }
@@ -5088,29 +5239,34 @@ sub deleteConsumerPlanning {
 return;
 }
 
-#############################################################################
+###############################################################################
 #    Wert des pvhist-Hash zurückliefern
 #    Usage:
 #    HistoryVal ($hash, $day, $hod, $key, $def)
 #
 #    $day: Tag des Monats (01,02,...,31)
 #    $hod: Stunde des Tages (01,02,...,24,99)
-#    $key:    pvrl      - realer PV Ertrag
-#             pvfc      - PV Vorhersage
-#             confc     - Vorhersage Hausverbrauch (Wh)
-#             gcons     - realer Netzbezug
-#             gfeedin   - reale Netzeinspeisung
-#             weatherid - Wetter ID
-#             wcc       - Grad der Bewölkung
-#             temp      - Außentemperatur
-#             wrp       - Niederschlagswahrscheinlichkeit
-#             pvcorrf   - PV Autokorrekturfaktor f. Stunde des Tages
-#             dayname   - Tagesname (Kürzel)
-#             csmt${c}  - Totalconsumption Consumer $c (1..$maxconsumer)
-#             csme${c}  - Consumption Consumer $c (1..$maxconsumer) in $hod
+#    $key:    etotal      - totale PV Erzeugung (Wh)
+#             pvrl        - realer PV Ertrag
+#             pvfc        - PV Vorhersage
+#             confc       - Vorhersage Hausverbrauch (Wh)
+#             gcons       - realer Netzbezug
+#             gfeedin     - reale Netzeinspeisung
+#             batintotal  - totale Batterieladung (Wh)
+#             batin       - Batterieladung der Stunde (Wh)
+#             batouttotal - totale Batterieentladung (Wh)
+#             batout      - Batterieentladung der Stunde (Wh)
+#             weatherid   - Wetter ID
+#             wcc         - Grad der Bewölkung
+#             temp        - Außentemperatur
+#             wrp         - Niederschlagswahrscheinlichkeit
+#             pvcorrf     - PV Autokorrekturfaktor f. Stunde des Tages
+#             dayname     - Tagesname (Kürzel)
+#             csmt${c}    - Totalconsumption Consumer $c (1..$maxconsumer)
+#             csme${c}    - Consumption Consumer $c (1..$maxconsumer) in $hod
 #    $def: Defaultwert
 #
-#############################################################################
+###############################################################################
 sub HistoryVal {
   my $hash = shift;
   my $day  = shift;
@@ -5145,6 +5301,8 @@ return $def;
 #             confc      - Vorhersage Hausverbrauch (Wh)
 #             gcons      - realer Netzbezug
 #             gfeedin    - reale Netzeinspeisung
+#             batin      - Batterieladung (Wh)
+#             batout     - Batterieentladung (Wh)
 #             weatherid  - DWD Wetter id 
 #             weathertxt - DWD Wetter Text
 #             wcc        - DWD Wolkendichte
@@ -5396,7 +5554,7 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
   
     <ul>
       <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt;   </b> <br><br> 
+      <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt; outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;]  </b> <br><br> 
       
       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. 
       Das Modul geht davon aus dass der numerische Wert der Readings immer positiv ist.
@@ -5406,9 +5564,11 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>   
        <table>  
        <colgroup> <col width=15%> <col width=85%> </colgroup>
-          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladung liefert       </td></tr>
-          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladung liefert    </td></tr>
-          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,kW)                              </td></tr>
+          <tr><td> <b>pin</b>       </td><td>Reading welches die aktuelle Batterieladung liefert                         </td></tr>
+          <tr><td> <b>pout</b>      </td><td>Reading welches die aktuelle Batterieentladung liefert                      </td></tr>
+          <tr><td> <b>intotal</b>   </td><td>Reading welches die totale Batterieladung liefert (fortlaufender Zähler)    </td></tr>
+          <tr><td> <b>outtotal</b>  </td><td>Reading welches die totale Batterieentladung liefert (fortlaufender Zähler) </td></tr>
+          <tr><td> <b>Einheit</b>   </td><td>die jeweilige Einheit (W,Wh,kW,kWh)                                         </td></tr>
         </table>
       </ul> 
       <br>
@@ -5425,9 +5585,10 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       
       <ul>
         <b>Beispiel: </b> <br>
-        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin <br>
+        set &lt;name&gt; currentBatteryDev BatDummy pin=BatVal:W pout=-pin intotal=BatInTot:Wh outtotal=BatOutTot:Wh  <br>
         <br>
-        # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen
+        # Device BatDummy liefert die aktuelle Batterieladung im Reading "BatVal" (W), die Batterieentladung im gleichen Reading mit negativen Vorzeichen, <br>
+        # die summarische Ladung im Reading "intotal" (Wh), sowie die summarische Entladung im Reading "outtotal" (Wh)
       </ul>      
       </li>
     </ul>
@@ -5801,12 +5962,17 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>
          <table>  
          <colgroup> <col width=20%> <col width=80%> </colgroup>
+            <tr><td> <b>etotal</b>      </td><td>totaler Energieertrag (Wh)                                                  </td></tr>
             <tr><td> <b>pvfc</b>        </td><td>der prognostizierte PV Ertrag (Wh)                                          </td></tr>
             <tr><td> <b>pvrl</b>        </td><td>reale PV Erzeugung (Wh)                                                     </td></tr>
             <tr><td> <b>gcon</b>        </td><td>realer Leistungsbezug (Wh) aus dem Stromnetz                                </td></tr>
             <tr><td> <b>confc</b>       </td><td>erwarteter Energieverbrauch (Wh)                                            </td></tr>
             <tr><td> <b>con</b>         </td><td>realer Energieverbrauch (Wh) des Hauses                                     </td></tr>
             <tr><td> <b>gfeedin</b>     </td><td>reale Einspeisung (Wh) in das Stromnetz                                     </td></tr>
+            <tr><td> <b>batintotal</b>  </td><td>totale Batterieladung (Wh)                                                  </td></tr>
+            <tr><td> <b>batin</b>       </td><td>Batterieladung der Stunde (Wh)                                              </td></tr>
+            <tr><td> <b>batouttotal</b> </td><td>totale Batterieentladung (Wh)                                               </td></tr>
+            <tr><td> <b>batout</b>      </td><td>Batterieentladung der Stunde (Wh)                                           </td></tr>
             <tr><td> <b>wid</b>         </td><td>Identifikationsnummer des Wetters                                           </td></tr>
             <tr><td> <b>wcc</b>         </td><td>effektive Wolkenbedeckung                                                   </td></tr>
             <tr><td> <b>wrp</b>         </td><td>Wahrscheinlichkeit von Niederschlag > 0,1 mm während der jeweiligen Stunde  </td></tr>
@@ -5835,6 +6001,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
             <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch (Wh)                                                                                   </td></tr>
             <tr><td> <b>gcon</b>     </td><td>realer Leistungsbezug aus dem Stromnetz                                                                            </td></tr>
             <tr><td> <b>gfeedin</b>  </td><td>reale Leistungseinspeisung in das Stromnetz                                                                        </td></tr>
+            <tr><td> <b>batin</b>    </td><td>Batterieladung                                                                                                     </td></tr>
+            <tr><td> <b>batout</b>   </td><td>Batterieentladung                                                                                                  </td></tr>
             <tr><td> <b>wcc</b>      </td><td>Grad der Wolkenüberdeckung                                                                                         </td></tr>
             <tr><td> <b>wrp</b>      </td><td>Grad der Regenwahrscheinlichkeit                                                                                   </td></tr>
             <tr><td> <b>temp</b>     </td><td>Außentemperatur                                                                                                    </td></tr>
