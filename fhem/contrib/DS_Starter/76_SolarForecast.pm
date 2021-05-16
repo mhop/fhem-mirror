@@ -5188,12 +5188,13 @@ return;
 sub createNotifyDev {
   my $hash = shift;
   my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
   
   RemoveInternalTimer($hash, "FHEM::SolarForecast::createNotifyDev");
   
   if($init_done == 1) {
       my @nd;
-      my ($afc,$ara,$ain,$ame,$aba,$a01,$h);
+      my ($afc,$ara,$ain,$ame,$aba,$h);
       
       my $fcdev = ReadingsVal($name, "currentForecastDev",  "");             # Weather forecast Device
       ($afc,$h) = parseParams ($fcdev);
@@ -5214,17 +5215,20 @@ sub createNotifyDev {
       my $badev = ReadingsVal($name, "currentBatteryDev",   "");             # Battery Device
       ($aba,$h) = parseParams ($badev);
       $badev    = $aba->[0] // "";
-      
-      my $co01dev = AttrVal($name, "consumer01",   "");                      # Consumer01 Device
-      ($a01,$h)   = parseParams ($co01dev);
-      $co01dev    = $a01->[0] // "";
+                                                  
+      for my $c (sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}}) {     # Consumer Devices
+          my $codev    = AttrVal($name, "consumer${c}", "");                            
+          my ($ac,$hc) = parseParams ($codev);
+          $codev       = $ac->[0] // ""; 
+          
+          push @nd, $codev if($codev);       
+      }
       
       push @nd, $fcdev;
       push @nd, $radev if($radev ne $fcdev);
       push @nd, $indev;
       push @nd, $medev;
       push @nd, $badev;
-      push @nd, $co01dev;
       
       if(@nd) {
           $hash->{NOTIFYDEV} = join ",", @nd;
