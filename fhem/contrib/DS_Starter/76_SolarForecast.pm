@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev ",
+  "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
                            "fix createNotifyDev for currentBatteryDev ",
   "0.45.0" => "12.05.2021  integrate consumptionForecast to graphic, change beamXContent to pvForecast, pvReal ",
@@ -407,7 +407,7 @@ my $cloud_base  = 0;                                                            
 my $rdampdef    = 10;                                                            # Dämpfung (%) des Korrekturfaktors bzgl. Niederschlag (R101)
 my $rain_base   = 0;                                                             # Fußpunktverschiebung bzgl. effektiver Bewölkung 
 
-my $maxconsumer = 4;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
+my $maxconsumer = 9;                                                             # maximale Anzahl der möglichen Consumer (Attribut) 
 my @ctypes      = qw(dishwasher dryer washingmachine heater other);              # erlaubte Consumer Typen
 my $defmintime  = 60;                                                            # default min. Einschalt- bzw. Zykluszeit in Minuten
 my $defctype    = "other";                                                       # default Verbrauchertyp
