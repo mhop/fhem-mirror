@@ -79,7 +79,7 @@ sub CUL_HM_qAutoRead($$);
 sub CUL_HM_Get($@);
 sub CUL_HM_Set($@);
 sub CUL_HM_valvePosUpdt(@);
-sub CUL_HM_infoUpdtDevData($$$);
+sub CUL_HM_infoUpdtDevData($$$$);
 sub CUL_HM_infoUpdtChanData(@);
 sub CUL_HM_getConfig($);
 sub CUL_HM_SndCmd($$);
@@ -1706,7 +1706,11 @@ sub CUL_HM_Parse($$) {#########################################################
             delete($mh{devH}->{helper}{aesAuthBytes});
           }
           if ($wulzy && ($m =~ m/^..(..)02/s)) { #noansi: wakeup replacement for acks
-            my $flr = sprintf("%02X", hex($1)|0x01);
+            my $flr = $1;
+            next if (   ($flr eq '80')
+                     && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
+                         || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
+            $flr = sprintf("%02X", hex($flr)|0x01);
             $m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement
           }
           CUL_HM_SndCmd($h, $m);
@@ -3257,7 +3261,11 @@ sub CUL_HM_Parse($$) {#########################################################
         delete($mh{devH}->{helper}{aesAuthBytes});
       }
       if ($wulzy && ($m =~ m/^..(..)02/s)) { #noansi: wakeup replacement for acks
-        my $flr = sprintf("%02X", hex($1)|0x01);
+        my $flr = $1;
+        next if (   ($flr eq '80')
+                 && (   $mh{devH}->{IODev}->{helper}{VTS_LZYCFG} # for TSCUL VTS0.34 up, wakeup Ack automatically sent
+                     || $mh{devH}->{IODev}->{TYPE} =~ m/^(?:HMLAN|HMUARTLGW)$/s ) ); # also for HMLAN/HMUARTLGW?
+        $flr = sprintf("%02X", hex($flr)|0x01);
         $m =~ s/^(..)../$1$flr/s; #noansi: wakeup replacement
       }
       CUL_HM_SndCmd($h, $m);
@@ -3524,8 +3532,6 @@ sub CUL_HM_parseCommon(@){#####################################################
     $devHlpr->{supp_Pair_Rep} = 1; # noansi: suppress next handling of a repeated pair request (if nothing else arrives in between from device)
 
     my $paired = 0; #internal flag
-    CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH},$mhp->{p})
-                  if (!$modules{CUL_HM}{helper}{hmManualOper});
     my $ioN = $ioHash->{NAME};
     # hmPair set in IOdev or  eventually in ccu!
     my $ioOwn  = InternalVal($ioN,"owner_CCU","");
@@ -3537,6 +3543,8 @@ sub CUL_HM_parseCommon(@){#####################################################
     if ( $hmPair ){# pairing is active
       my $regser = ReadingsVal($mhp->{devN},"D-serialNr",AttrVal($mhp->{devN},'serialNr',''));
       if (!$hmPser || $hmPser eq $regser){
+        CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH}, $mhp->{p}, 1)
+                  if (!$modules{CUL_HM}{helper}{hmManualOper});
 
         # pairing requested - shall we?      
         my $ioId = CUL_HM_h2IoId($ioHash);
@@ -3575,10 +3583,14 @@ sub CUL_HM_parseCommon(@){#####################################################
         $paired = 1;
       }
     }
-    if($paired == 0 && CUL_HM_getRxType($mhp->{devH}) & 0x14){#no pair -send config?
-      CUL_HM_appFromQ($mhp->{devN},"cf");   # stack cmds if waiting
-      my $ioId = CUL_HM_h2IoId($mhp->{devH}{IODev});
-      $respRemoved = 1;#force command stack processing
+    if (!$paired) {
+      CUL_HM_infoUpdtDevData($mhp->{devN}, $mhp->{devH}, $mhp->{p}, 0)
+                if (!$modules{CUL_HM}{helper}{hmManualOper});
+      if (CUL_HM_getRxType($mhp->{devH}) & 0x14) {#no pair -send config?
+        CUL_HM_appFromQ($mhp->{devN},"cf") if (   !$mhp->{devH}->{cmdStack}
+                                               || !scalar @{$mhp->{devH}->{cmdStack}}); # stack cmds if waiting and cmd stack empty, for pressing config button to continue in queue on config devices
+        $respRemoved = 1;#force command stack processing
+      }
     }
 
     $devHlpr->{HM_CMDNR} += 0x27;  # force new setting. Send will take care of module 255
@@ -3645,23 +3657,21 @@ sub CUL_HM_parseCommon(@){#####################################################
                 }
               }
             }
-            CUL_HM_respPendRm($mhp->{devH});
-            delete $chnhash->{helper}{getCfgList};
-            delete $chnhash->{helper}{getCfgListNo};
-            CUL_HM_rmOldRegs($chnName,$readCont);
-            $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
-            CUL_HM_cfgStateDelay($chnName);#schedule check when finished
           }
-          else{
-            CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
-          }
+          CUL_HM_respPendRm($mhp->{devH});
+          delete $chnhash->{helper}{getCfgList};
+          delete $chnhash->{helper}{getCfgListNo};
+          CUL_HM_rmOldRegs($chnName,$readCont);
+          $chnhash->{READINGS}{".peerListRDate"}{VAL} = $chnhash->{READINGS}{".peerListRDate"}{TIME} = $mhp->{tmStr};
+          CUL_HM_cfgStateDelay($chnName);#schedule check when finished
         }
         else{
+          CUL_HM_respPendToutProlong($mhp->{devH});#wasn't last - reschedule timer
           Log3 $mhp->{devH},4,'waiting for Peerlist: msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
         }
       }
       else {
-        Log3 $mhp->{devH},4,'got unexpected PeerList, expected '.$pendType?$pendType:'';
+        Log3 $mhp->{devH},4,'got unexpected PeerList, expected '.$pendType?$pendType.' ':''.'msgNo:'.$rspWait->{mNo}.'+, rec:'.hex($mhp->{mNo});
       }
       $ret = "done";
     }
@@ -7230,18 +7240,19 @@ sub CUL_HM_weather(@) {#periodically send weather data
   InternalTimer(gettimeofday()+150,"CUL_HM_weather","weather:$name",0);
 }
 
-sub CUL_HM_infoUpdtDevData($$$) {#autoread config
-  my($name,$hash,$p) = @_;
+sub CUL_HM_infoUpdtDevData($$$$) {#autoread config
+  my($name,$hash,$p,$muf) = @_;
   my($fw1,$fw2,$mId,$serNo,$stc,$devInfo) = unpack('A1A1A4A20A2A*', $p);
   
-  my $md = $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name}:"unknown";# original model 
+  my $md = AttrVal($name, 'modelForce', $culHmModel->{$mId}{name} ? $culHmModel->{$mId}{name} : "unknown");# original model or forced model
   my $serial = pack('H*',$serNo);
   my $fw = sprintf("%d.%d", hex($fw1),hex($fw2));
   $attr{$name}{".mId"}     = $mId;
   $attr{$name}{serialNr}   = $serial;  # to be removed from attributes
   $attr{$name}{firmware}   = $fw;      # to be removed from attributes
 
-  CUL_HM_updtDeviceModel($name,AttrVal($name,"modelForce",$md));#model may be overwritten by modelForce
+  CUL_HM_updtDeviceModel($name, $md) if (   $muf
+                                         || $md ne AttrVal($name,"model","unknown"));#model may be overwritten by modelForce
   CUL_HM_complConfigTest($name) if(ReadingsVal($name,"D-firmware","") ne $fw     # force read register
                                  ||ReadingsVal($name,"D-serialNr","") ne $serial
                                  ||ReadingsVal($name,".D-devInfo","") ne $devInfo
@@ -9073,23 +9084,26 @@ sub CUL_HM_updtRegDisp($$$) {
   }
   CUL_HM_cfgStateDelay($name);#schedule check when finished
 }
-sub CUL_HM_cfgStateDelay($) {#update cfgState timer 
+sub CUL_HM_cfgStateDelay($) {#update cfgState: schedule for devices
   my $name = shift;
-  $name = CUL_HM_getDeviceName($name);
-#  stacktrace();
-  RemoveInternalTimer("cfgStateUpdate:$name");
-  if (InternalVal($name,"protCmdPend","none"   ) eq "none"){
-    CUL_HM_cfgStateUpdate("cfgStateUpdate:$name");
-  }
-  else{
-    InternalTimer(gettimeofday()+ 60,"CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0);     
-  }
+  CUL_HM_cfgStateUpdate("cfgStateUpdate:".CUL_HM_getDeviceName($name));
 }
 sub CUL_HM_cfgStateUpdate($) {#update cfgState
   my $tmrId = shift;
   my (undef,$name) = split(':',$tmrId,2);
-  my ($hm) = devspec2array("TYPE=HMinfo");
-  HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if(defined $hm);  
+  return if (!defined $defs{$name} );
+  RemoveInternalTimer("cfgStateUpdate:$name") if($defs{$name}{helper}{cfgStateUpdt});#could be direct call or timeout
+  if (   !$evtDly                      #noansi: first Readings must be set, helps also not to disturb others
+      && !$defs{$name}{helper}{prt}{sProc} #not busy with commands?
+      ){
+    $defs{$name}{helper}{cfgStateUpdt} = 0;
+    my ($hm) = devspec2array("TYPE=HMinfo");
+    HMinfo_GetFn($defs{$hm},$hm,"configCheck","-f","^(".join("|",(CUL_HM_getAssChnNames($name),$name)).")\$") if (defined $hm);
+  }
+  else{
+    $defs{$name}{helper}{cfgStateUpdt} = 1;  # use to remove duplicate timer                                                                       
+    InternalTimer(gettimeofday() + 60, "CUL_HM_cfgStateUpdate","cfgStateUpdate:$name", 0); # try later
+  }
 }
 
 sub CUL_HM_rmOldRegs($$){ # remove register i outdated
