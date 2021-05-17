@@ -5543,8 +5543,13 @@ Die Solargrafik kann ebenfalls in FHEM Tablet UI mit dem
 Die solare Vorhersage basiert auf der durch den Deutschen Wetterdienst (DWD) prognostizierten Globalstrahlung am 
 Anlagenstandort. Im zugeordneten DWD_OpenData Device ist die passende Wetterstation mit dem Attribut "forecastStation" 
 festzulegen um eine Prognose für diesen Standort zu erhalten. <br>
-Abhängig von der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.) wird die 
-verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. <br>
+Abhängig von den DWD-Daten und der physikalischen Anlagengestaltung (Ausrichtung, Winkel, Aufteilung in mehrere Strings, u.a.)
+wird auf Grundlage der prognostizierten Globalstrahlung eine wahrscheinliche PV Erzeugung der kommenden Stunden ermittelt. <br>
+Darüber hinaus werden Verbrauchswerte bzw. Netzbezugswerte erfasst und für eine Verbrauchsprognose verwendet. <br>
+Das Modul errechnet aus den Prognosewerten einen zukünftigen Energieüberschuß der zur Betriebsplanung von Verbrauchern
+genutzt wird. Der Nutzer kann Verbraucher (z.B. Schaltsteckdosen) direkt im Modul registrieren und die Planung der 
+Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen lassen.
+
 
 <ul>
   <a id="SolarForecast-define"></a>
@@ -5567,8 +5572,8 @@ verfügbare Globalstrahlung ganz spezifisch in elektrische Energie umgewandelt. 
       <ul>
          <table>  
          <colgroup> <col width=35%> <col width=65%> </colgroup>
-            <tr><td> <b>currentForecastDev</b>   </td><td>Device welches Wetterdaten liefert                  </td></tr>
-            <tr><td> <b>currentRadiationDev </b> </td><td>Device welches Strahlungsdaten liefert              </td></tr>
+            <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches Wetterdaten liefert     </td></tr>
+            <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert </td></tr>
             <tr><td> <b>currentInverterDev</b>   </td><td>Device welches PV Leistungsdaten liefert            </td></tr>
             <tr><td> <b>currentMeterDev</b>      </td><td>Device welches Netz I/O-Daten liefert               </td></tr>
             <tr><td> <b>currentBatteryDev</b>    </td><td>Device welches Batterie Leistungsdaten liefert      </td></tr>            
