@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - feature: 73_AutoShuttersControl: new RainProtection package
  - change:  49_IPCAM: allow zero for snapshots attribute, and some cleanup.
  - change:  93_DbLog: some minor changes, e.g. PID Info in Log Output
  - change:  doif.js: tolerate dots in element id, cleanup

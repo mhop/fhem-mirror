@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2018-2020 Copyright: Marko Oldenburg (fhemsupport@cooltux.net)
+#  (c) 2018-2021 Copyright: Marko Oldenburg (fhemdevelopment@cooltux.net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -49,6 +49,7 @@ use Data::Dumper;    #only for Debugging
 
 use FHEM::Automation::ShuttersControl::Helper qw (:ALL);
 use FHEM::Automation::ShuttersControl::Shading qw (:ALL);
+use FHEM::Automation::ShuttersControl::Rainprotection qw (:ALL);
 
 require Exporter;
 our @ISA       = qw(Exporter);
@@ -1276,70 +1277,12 @@ sub EventProcessingRain {
           $FHEM::Automation::ShuttersControl::ascDev->getRainTriggerMax;
         my $triggerMin =
           $FHEM::Automation::ShuttersControl::ascDev->getRainTriggerMin;
-        my $closedPos = $FHEM::Automation::ShuttersControl::ascDev
-          ->getRainSensorShuttersClosedPos;
 
         if    ( $1 eq 'rain' ) { $val = $triggerMax + 1 }
         elsif ( $1 eq 'dry' )  { $val = $triggerMin }
         else                   { $val = $1 }
 
-        RainProtection( $hash, $val, $triggerMax, $triggerMin, $closedPos );
-    }
-
-    return;
-}
-
-sub RainProtection {
-    my ( $hash, $val, $triggerMax, $triggerMin, $closedPos ) = @_;
-
-    for my $shuttersDev ( @{ $hash->{helper}{shuttersList} } ) {
-        $FHEM::Automation::ShuttersControl::shutters->setShuttersDev(
-            $shuttersDev);
-
-        next
-          if (
-            $FHEM::Automation::ShuttersControl::shutters->getRainProtection eq
-            'off' );
-
-        if (   $val > $triggerMax
-            && $FHEM::Automation::ShuttersControl::shutters->getStatus !=
-            $closedPos
-            && $FHEM::Automation::ShuttersControl::shutters
-            ->getRainProtectionStatus eq 'unprotected' )
-        {
-            $FHEM::Automation::ShuttersControl::shutters->setLastDrive(
-                'rain protected');
-            $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
-                $closedPos);
-            $FHEM::Automation::ShuttersControl::shutters
-              ->setRainProtectionStatus('protected');
-        }
-        elsif ( ( $val == 0 || $val < $triggerMin )
-            && $FHEM::Automation::ShuttersControl::shutters->getStatus ==
-            $closedPos
-            && IsAfterShuttersManualBlocking($shuttersDev)
-            && $FHEM::Automation::ShuttersControl::shutters
-            ->getRainProtectionStatus eq 'protected' )
-        {
-            $FHEM::Automation::ShuttersControl::shutters->setLastDrive(
-                'rain un-protected');
-            $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
-                (
-                      $FHEM::Automation::ShuttersControl::shutters->getIsDay
-                    ? $FHEM::Automation::ShuttersControl::shutters->getLastPos
-                    : (
-                        $FHEM::Automation::ShuttersControl::shutters
-                          ->getPrivacyDownStatus == 2
-                        ? $FHEM::Automation::ShuttersControl::shutters
-                          ->getPrivacyDownPos
-                        : $FHEM::Automation::ShuttersControl::shutters
-                          ->getClosedPos
-                    )
-                )
-            );
-            $FHEM::Automation::ShuttersControl::shutters
-              ->setRainProtectionStatus('unprotected');
-        }
+        RainProcessing( $hash, $val, $triggerMax, $triggerMin );
     }
 
     return;

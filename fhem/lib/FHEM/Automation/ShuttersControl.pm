@@ -1058,8 +1058,8 @@ sub CreateSunRiseSetShuttersTimer {
     );
 
     my $name            = $hash->{NAME};
-    my $shuttersDevHash = $defs{$shuttersDev} // Log3( $hash->{NAME}, 1,
-"AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDevHash given"
+    my $shuttersDevHash = $defs{$shuttersDev} // return Log3( $hash->{NAME}, 1,
+"AutoShuttersControl ($hash->{NAME}) - Error in function  CreateSunRiseSetShuttersTimer. No shuttersDevHash found for device name $shuttersDev"
     );
     my %funcHash;
     $shutters->setShuttersDev($shuttersDev);
