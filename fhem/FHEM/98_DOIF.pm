@@ -4484,14 +4484,14 @@ sub format_value {
   if ($val eq "") {
     $val="N/A";
     $format='%s';
-    $value=0;
+    $value=$min;
   } elsif ($val =~ /(-?\d+(\.\d+)?)/) {
     $format='%1.'.$dec.'f';
     $value=$1;
     $val=$value;
   } else {
     $format='%s';
-    $value=0;
+    $value=$min;
   }
   return($format,$value,$val);
 }
@@ -4553,12 +4553,12 @@ sub card
   my $out;
   my ($ic,$iscale,$ix,$iy,$rotate);
 
-  my ($size,$plot,$steps,$noFooter);
-  ($size,$plot,$steps,$noFooter)=split (/,/,$prop) if (defined $prop);
+  my ($size,$plot,$steps,$noFooter,$noColor);
+  ($size,$plot,$steps,$noFooter,$noColor)=split (/,/,$prop) if (defined $prop);
   $plot = "" if (!defined $plot);
   $steps = "" if (!defined $steps);
   $noFooter = "" if (!defined $noFooter);
-  
+  $noColor = "" if (!defined $noColor);
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4728,7 +4728,7 @@ sub card
   for (my $i=0;$i<=4;$i++) {
     my $v=($maxPlot-$minPlot)*(1-$i*0.25)+$minPlot;
     my ($color)= get_color($v,$min,$max,$minColor,$maxColor,$func); 
-    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,color($color,$lmm),"",sprintf($format,$v)); 
+    $out.= sprintf('<text text-anchor="end" x="-2.5" y="%s" style="fill:%s;font-size:7px;%s">%s</text>',$i*12.5+2,$noColor ? "#CCCCCC":color($color,$lmm),"",sprintf($format,$v)); 
   } 
   
   my $timebeginn=$time-$hours*3600;
