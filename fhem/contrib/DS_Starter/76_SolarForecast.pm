@@ -2111,26 +2111,26 @@ sub _transferMeterValues {
   $gco  = ReadingsNum ($medev, $gc, 0) * $gcuf;                                               # aktueller Bezug (W)
   $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;                                               # aktuelle Einspeisung (W)
     
+  my $params;
+  
   if ($gc eq "-gfeedin") {                                                                    # Spezialfall gcon bei neg. gfeedin                                                                                      # Spezialfall: bei negativen gfeedin -> $gco = abs($gf), $gf = 0
-      $gfin = ReadingsNum ($medev, $gf, 0) * $gfuf;
-      if($gfin <= 0) {
-          $gco  = abs($gfin);
-          $gfin = 0;
-      }
-      else {
-          $gco = 0;
-      }
+      $params = {
+          dev  => $medev,
+          rdg  => $gf,
+          rdgf => $gfuf
+      };     
+      
+      ($gfin,$gco) = substSpecialCases ($params);
   }
   
   if ($gf eq "-gcon") {                                                                       # Spezialfall gfeedin bei neg. gcon
-      $gco = ReadingsNum ($medev, $gc, 0) * $gcuf;                                            # aktueller Bezug (W)
-      if($gco <= 0) {
-          $gfin = abs($gco);
-          $gco  = 0;
-      }
-      else {
-          $gfin = 0;
-      }
+      $params = {
+          dev  => $medev,
+          rdg  => $gc,
+          rdgf => $gcuf
+      };      
+      
+      ($gco,$gfin) = substSpecialCases ($params);
   }
   
   push @$daref, "Current_GridConsumption<>".(int $gco)." W";
