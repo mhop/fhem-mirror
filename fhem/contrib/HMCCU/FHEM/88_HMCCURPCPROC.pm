@@ -4,11 +4,11 @@
 #
 #  $Id: 88_HMCCURPCPROC.pm 18745 2019-02-26 17:33:23Z zap $
 #
-#  Version 4.4.013
+#  Version 4.4.014
 #
 #  Subprocess based RPC Server module for HMCCU.
 #
-#  (c) 2020 by zap (zap01 <at> t-online <dot> de)
+#  (c) 2021 by zap (zap01 <at> t-online <dot> de)
 #
 ##############################################################################
 #
@@ -39,7 +39,7 @@ require "$attr{global}{modpath}/FHEM/88_HMCCU.pm";
 ######################################################################
 
 # HMCCURPC version
-my $HMCCURPCPROC_VERSION = '4.4.013';
+my $HMCCURPCPROC_VERSION = '4.4.014';
 
 # Maximum number of events processed per call of Read()
 my $HMCCURPCPROC_MAX_EVENTS = 100;
@@ -266,14 +266,15 @@ sub HMCCURPCPROC_Define ($$)
 	my $rpcip = '';
 	my $iface;
 	my $usage = 'Usage: define $name HMCCURPCPROC { CCUHost | iodev={device} } { RPCPort | RPCInterface }';
+	my $errSource = "HMCCURPCPROC [$name]";
 	
 	$hash->{version} = $HMCCURPCPROC_VERSION;
 
 	if (exists($h->{iodev})) {
 		$ioname = $h->{iodev};
 		return $usage if (scalar(@$a) < 3);
-		return "HMCCU I/O device $ioname not found" if (!exists($defs{$ioname}));
-		return "Device $ioname is not a HMCCU device" if ($defs{$ioname}->{TYPE} ne 'HMCCU');
+		return "$errSource HMCCU I/O device $ioname not found" if (!exists($defs{$ioname}));
+		return "$errSource Device $ioname is not a HMCCU device" if ($defs{$ioname}->{TYPE} ne 'HMCCU');
 		$ioHash = $defs{$ioname};
 		if (scalar(@$a) < 4) {
 			$hash->{host} = $ioHash->{host};
@@ -310,8 +311,10 @@ sub HMCCURPCPROC_Define ($$)
 		foreach my $d (keys %defs) {
 			my $dh = $defs{$d};
 			next if (!exists ($dh->{TYPE}) || !exists ($dh->{NAME}) || $dh->{TYPE} ne 'HMCCU');
-			if ($dh->{ccuip} eq $rpcip) { $ioHash = $dh;	last; }
+			if ($dh->{ccuip} eq $rpcip) { $ioHash = $dh; last; }
 		}
+		
+		return $errSource."HMCCU I/O device not found" if (!defined($ioHash));
 	}
 
 	# Store some definitions for delayed initialization
@@ -322,15 +325,15 @@ sub HMCCURPCPROC_Define ($$)
 		# Interactive define command while CCU not ready or no IO device defined
 		if (!defined($ioHash)) {
 			my ($ccuactive, $ccuinactive) = HMCCU_IODeviceStates ();
-			return $ccuinactive > 0 ?
-				'CCU and/or IO device not ready. Please try again later' :
-				'Cannot detect IO device';
+			return $errSource.($ccuinactive > 0 ?
+				' CCU and/or IO device not ready. Please try again later' :
+				' Cannot detect IO device');
 		}
 	}
 	else {
 		# CCU not ready during FHEM start
-		if (!defined ($ioHash) || $ioHash->{ccustate} ne 'active') {
-			HMCCU_Log ($hash, 2, 'Cannot detect IO device, maybe CCU not ready. Trying later ...');
+		if ($ioHash->{ccustate} ne 'active') {
+			HMCCU_Log ($hash, 2, 'CCU not ready. Trying later ...');
 			readingsSingleUpdate ($hash, 'state', 'Pending', 1);
 			$hash->{ccudevstate} = 'pending';
 			return undef;
@@ -339,11 +342,11 @@ sub HMCCURPCPROC_Define ($$)
 
 	# Initialize FHEM device, set IO device
 	my $rc = HMCCURPCPROC_InitDevice ($ioHash, $hash);
-	return "Invalid port or interface $iface" if ($rc == 1);
-	return "Can't assign I/O device $ioname" if ($rc == 2);
-	return "Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
-	return "RPC device for CCU/port already exists" if ($rc == 4);
-	return "Cannot connect to CCU ".$hash->{host}." interface $iface" if ($rc == 5);
+	return "$errSource Invalid port or interface $iface" if ($rc == 1);
+	return "$errSource Can't assign I/O device $ioname" if ($rc == 2);
+	return "$errSource Invalid local IP address ".$hash->{hmccu}{localaddr} if ($rc == 3);
+	return "$errSource RPC device for CCU/port already exists" if ($rc == 4);
+	return "$errSource Cannot connect to CCU ".$hash->{host}." interface $iface" if ($rc == 5);
 
 	return undef;
 }

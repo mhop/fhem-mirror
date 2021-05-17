@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.027
+#  Version 4.8.028
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.027';
+$HMCCU_CONFIG_VERSION = '4.8.028';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -103,6 +103,9 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 	'BLIND' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
 	},
+	'BLIND_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
+	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
 	},
@@ -159,6 +162,8 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 
 %HMCCU_READINGS = (
 	'BLIND' =>
+		'(C#\.)?LEVEL$:+pct',
+	'BLIND_TRANSMITTER' =>
 		'(C#\.)?LEVEL$:+pct',
 	'BLIND_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
@@ -388,6 +393,9 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'webCmd' => 'pct:open:close:stop',
 		'widgetOverride' => 'pct:slider,0,10,100'
 	},
+	'BLIND_TRANSMITTER' => {
+		'substexcl' => 'pct',
+	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'substexcl' => 'pct',
 		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
@@ -507,6 +515,9 @@ $HMCCU_CONFIG_VERSION = '4.8.027';
 		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
+	},
+	'BLIND_TRANSMITTER' => {
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' },

@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.046
+#  Version 4.4.047
 #
 #  (c) 2021 zap (zap01 <at> t-online <dot> de)
 #
@@ -376,44 +376,38 @@ sub HMCCUDEV_Set ($@)
 	return ($opt eq '?' ? undef : 'Cannot perform set commands. CCU busy')
 		if (HMCCU_IsRPCStateBlocking ($ioHash));
 
-	# Get state and control datapoints
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($hash);
-
-	# Get additional commands
-	my $cmdList = $hash->{hmccu}{cmdlist}{set} // '';
-
-	# Some commands require a control channel and datapoint
-	if ($lcopt =~ /^(control|toggle)$/) {
-		return HMCCU_SetError ($hash, -14) if ($cd eq '');
-		return HMCCU_SetError ($hash, -12) if ($cc eq '');
-		return HMCCU_SetError ($hash, -8, $cd)
-			if (!HMCCU_IsValidDatapoint ($hash, $hash->{ccutype}, $cc, $cd, 2));
-		return HMCCU_SetError ($hash, -7) if ($cc >= $hash->{hmccu}{channels});
+	# Build set command syntax
+	my $syntax = 'clear defaults:reset,update';
+	
+	# Command readingFilter depends on readable datapoints
+	my @dpRList = ();
+	my $dpRCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 5, \@dpRList);
+	$syntax .= ' readingFilter:multiple-strict,'.join(',', @dpRList) if ($dpRCount > 0);
+	
+	# Commands only available in read/write mode
+	if ($hash->{readonly} ne 'yes') {
+		$syntax .= ' config';
+		my $dpWCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 2);
+		$syntax .= ' datapoint' if ($dpWCount > 0);
+		my $addCmds = $hash->{hmccu}{cmdlist}{set} // '';
+		$syntax .= " $addCmds" if ($addCmds ne '');
 	}
-
-	my $result = '';
-	my $rc;
-
+	
 	# Log commands
 	HMCCU_Log ($hash, 3, "set $name $opt ".join (' ', @$a))
 		if ($opt ne '?' && (HMCCU_IsFlag ($name, 'logCommand') || HMCCU_IsFlag ($ioName, 'logCommand'))); 
 	
 	if ($lcopt eq 'control') {
-		my $value = shift @$a // return HMCCU_SetError ($hash, "Usage: set $name control {value}");
-		my $stateVals = HMCCU_GetStateValues ($hash, $cd, $cc);
-		$rc = HMCCU_SetMultipleDatapoints ($hash,
-			{ "001.$hash->{ccuif}.$hash->{ccuaddr}:$cc.$cd" => HMCCU_Substitute ($value, $stateVals, 1, undef, '') }
-		);
-		return HMCCU_SetError ($hash, HMCCU_Min(0, $rc));
+		return HMCCU_ExecuteSetControlCommand ($hash, $a, $h);
 	}
 	elsif ($lcopt eq 'datapoint') {
-		return HMCCU_ExecuteSetDatapointCommand ($hash, $a, $h, $cc, $cd);
+		return HMCCU_ExecuteSetDatapointCommand ($hash, $a, $h);
 	}
 	elsif ($lcopt eq 'toggle') {
-		return HMCCU_ExecuteToggleCommand ($hash, $cc, $cd);
+		return HMCCU_ExecuteToggleCommand ($hash);
 	}
 	elsif (exists($hash->{hmccu}{roleCmds}{set}{$opt})) {
-		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'set', $opt, $cc, $a, $h);
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'set', $opt, $a, $h);
 	}
 	elsif ($lcopt eq 'clear') {
 		return HMCCU_ExecuteSetClearCommand ($hash, $a);
@@ -428,26 +422,13 @@ sub HMCCUDEV_Set ($@)
 	}
 	elsif ($lcopt eq 'defaults') {
 		my $mode = shift @$a // 'update';
-		$rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => $cc });
+		my $rc = HMCCU_SetDefaultAttributes ($hash, { mode => $mode, role => undef, roleChn => undef });
 		$rc = HMCCU_SetDefaults ($hash) if (!$rc);
 		HMCCU_RefreshReadings ($hash) if ($rc);
 		return HMCCU_SetError ($hash, $rc == 0 ? 'No default attributes found' : 'OK');
 	}
 	else {
-		my $retmsg = 'clear defaults:reset,update';
-
-		my @dpRList = ();
-		my $dpRCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 5, \@dpRList);
-		$retmsg .= ' readingFilter:multiple-strict,'.join(',', @dpRList) if ($dpRCount > 0);
-		
-		if ($hash->{readonly} ne 'yes') {
-			$retmsg .= ' config';
-			my $dpWCount = HMCCU_GetValidDatapoints ($hash, $hash->{ccutype}, -1, 2);
-			$retmsg .= ' datapoint' if ($dpWCount > 0);
-			$retmsg .= " $cmdList" if ($cmdList ne '');
-		}
-		# return AttrTemplate_Set ($hash, $retmsg, $name, $opt, @$a);
-		return $retmsg;
+		return "Unknown argument $opt choose one of $syntax";
 	}
 }
 
@@ -478,14 +459,19 @@ sub HMCCUDEV_Get ($@)
 	my $ccuaddr = $hash->{ccuaddr};
 	my $ccuif = $hash->{ccuif};
 	my $ccuflags = AttrVal ($name, 'ccuflags', 'null');
-	my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($hash);
 
-	# Get additional commands
-	my $cmdList = $hash->{hmccu}{cmdlist}{get} // '';
-
-	my $result = '';
-	my $rc;
-
+	# Build set command syntax
+	my $syntax = 'update:noArg config:noArg paramsetDesc:noArg deviceInfo:noArg values:noArg';
+	
+	# Command datapoint depends on readable datapoints
+	my @dpRList;
+	my $dpRCount = HMCCU_GetValidDatapoints ($hash, $ccutype, -1, 1, \@dpRList);   
+	$syntax .= ' datapoint:'.join(",", @dpRList) if ($dpRCount > 0);
+	
+	# Additional device specific commands
+	my $addCmds = $hash->{hmccu}{cmdlist}{get} // '';
+	$syntax .= " $addCmds" if ($addCmds ne '');
+	
 	# Log commands
 	HMCCU_Log ($hash, 3, "get $name $opt ".join (' ', @$a))
 		if ($opt ne '?' && $ccuflags =~ /logCommand/ || HMCCU_IsFlag ($ioName, 'logCommand')); 
@@ -498,6 +484,7 @@ sub HMCCUDEV_Get ($@)
 			return HMCCU_SetError ($hash, -7) if ($chn >= $hash->{hmccu}{channels});
 		}
 		else {
+			my ($sc, $sd, $cc, $cd) = HMCCU_GetSCDatapoints ($hash);
 			return HMCCU_SetError ($hash, -11) if ($sc eq '');
 			$objname = $sc.'.'.$objname;
 		}
@@ -506,14 +493,14 @@ sub HMCCUDEV_Get ($@)
 			if (!HMCCU_IsValidDatapoint ($hash, $ccutype, undef, $objname, 1));
 
 		$objname = $ccuif.'.'.$ccuaddr.':'.$objname;
-		($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
+		my ($rc, $result) = HMCCU_GetDatapoint ($hash, $objname, 0);
 
 		return HMCCU_SetError ($hash, $rc, $result) if ($rc < 0);
-		HMCCU_SetState ($hash, "OK") if (exists ($hash->{STATE}) && $hash->{STATE} eq "Error");
 		return $result;
 	}
 	elsif ($lcopt eq 'deviceinfo') {
-		return HMCCU_ExecuteGetDeviceInfoCommand ($ioHash, $hash, $ccuaddr, $sc, $sd, $cc, $cd);
+		my $extended = shift @$a;
+		return HMCCU_ExecuteGetDeviceInfoCommand ($ioHash, $hash, $ccuaddr, defined($extended) ? 1 : 0);
 	}
 	elsif ($lcopt =~ /^(config|values|update)$/) {
 		my @addList = ($ccuaddr);
@@ -522,26 +509,19 @@ sub HMCCUDEV_Get ($@)
 		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($devDesc));
 		push @addList, split (',', $devDesc->{CHILDREN});
 
-		my $resp = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $lcopt, \@addList);
-		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($resp));
-		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $resp);
+		my $result = HMCCU_ExecuteGetParameterCommand ($ioHash, $hash, $lcopt, \@addList);
+		return HMCCU_SetError ($hash, "Can't get device description") if (!defined($result));
+		return HMCCU_DisplayGetParameterResult ($ioHash, $hash, $result);
 	}
 	elsif ($lcopt eq 'paramsetdesc') {
-		$result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
+		my $result = HMCCU_ParamsetDescToStr ($ioHash, $hash);
 		return defined($result) ? $result : HMCCU_SetError ($hash, "Can't get device model");
 	}
 	elsif (exists($hash->{hmccu}{roleCmds}{get}{$opt})) {
-		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $cc, $a, $h);
+		return HMCCU_ExecuteRoleCommand ($ioHash, $hash, 'get', $opt, $a, $h);
 	}
 	else {
-		my $retmsg = "HMCCUDEV: Unknown argument $opt, choose one of";
-		$retmsg .= ' update:noArg config:noArg paramsetDesc:noArg deviceInfo:noArg values:noArg';
-		my @dpList;
-		my $dpCount = HMCCU_GetValidDatapoints ($hash, $ccutype, -1, 1, \@dpList);   
-		$retmsg .= ' datapoint:'.join(",", @dpList) if ($dpCount > 0);
-		$retmsg .= " $cmdList" if ($cmdList ne '');
-
-		return $retmsg;
+		return "Unknown argument $opt choose one of $syntax";
 	}
 }
 
@@ -723,7 +703,7 @@ sub HMCCUDEV_Get ($@)
       <li><b>get &lt;name&gt; defaults</b><br/>
       	<a href="#HMCCUCHNget">see HMCCUCHN</a>
       </li><br/>
-      <li><b>get &lt;name&gt; deviceinfo</b><br/>
+      <li><b>get &lt;name&gt; deviceinfo ['extended']</b><br/>
          Display information about device and channels:<br/>
          <ul>
          <li>all channels and datapoints of device with datapoint values and types</li>
