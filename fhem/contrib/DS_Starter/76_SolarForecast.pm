@@ -1294,10 +1294,6 @@ sub Attr {
       readingsSingleUpdate($hash, "state", $val, 1);
   }
     
-  if($aName eq "icon") {
-      $_[2] = "consumerAdviceIcon";
-  }
-    
   if ($cmd eq "set") {
       if ($aName eq "interval") {
           unless ($aVal =~ /^[0-9]+$/x) {return "The value for $aName is not valid. Use only figures 0-9 !";}
@@ -1366,18 +1362,18 @@ sub _attrconsumer {                      ## no critic "not used"
   else {      
       my $day  = strftime "%d", localtime(time);                                           # aktueller Tag  (range 01 to 31)
       my $type = $hash->{TYPE};
-      my ($no) = $aName =~ /consumer([0-9]+)/xs;
+      my ($co) = $aName =~ /consumer([0-9]+)/xs;
   
-      deleteReadingspec ($hash, "consumer${no}.*");
+      deleteReadingspec ($hash, "consumer${co}.*");
       
       for my $i (1..24) {                                                                  # Consumer aus History löschen
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${no}"};
-          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${no}"};
+          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csmt${co}"};
+          delete $data{$type}{$name}{pvhist}{$day}{sprintf("%02d",$i)}{"csme${co}"};
       }
       
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csmt${no}"};
-      delete $data{$type}{$name}{pvhist}{$day}{99}{"csme${no}"};
-      delete $data{$type}{$name}{consumers}{$no};                                          # Consumer Hash Verbraucher löschen
+      delete $data{$type}{$name}{pvhist}{$day}{99}{"csmt${co}"};
+      delete $data{$type}{$name}{pvhist}{$day}{99}{"csme${co}"};
+      delete $data{$type}{$name}{consumers}{$co};                                          # Consumer Hash Verbraucher löschen
   }  
 
   InternalTimer(gettimeofday()+5, "FHEM::SolarForecast::createNotifyDev", $hash, 0);
@@ -1434,7 +1430,7 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  writeCacheToFile ($hash, "pvhist", $pvhcache.$name);               # Cache File für PV History schreiben
+  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
   writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
   
 return; 
@@ -1655,7 +1651,7 @@ sub createStringConfig {                 ## no critic "not used"
       return qq{The string configuration is empty.\nPlease check the settings of inverterStrings, modulePeakString, moduleDirection, moduleTiltAngle};
   }
   
-  my @sca = keys %{$data{$type}{$name}{strings}};                                                # Gegencheck ob nicht mehr Strings in inverterStrings enthalten sind als eigentlich verwendet
+  my @sca = keys %{$data{$type}{$name}{strings}};                                               # Gegencheck ob nicht mehr Strings in inverterStrings enthalten sind als eigentlich verwendet
   my @tom;
   for my $sn (@istrings) {
       next if ($sn ~~ @sca);
@@ -2316,9 +2312,10 @@ sub _manageConsumerData {
       
       my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
       my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
-    
-      my (undef,undef,undef,$starttime) = timestampToTimestring ($startts) if($startts);
-      my (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts)  if($stopts);
+      
+      my ($starttime,$stoptime);
+      (undef,undef,undef,$starttime) = timestampToTimestring ($startts) if($startts);
+      (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts)  if($stopts);
  
       $data{$type}{$name}{consumers}{$c}{state} = $costate;
       
@@ -2370,11 +2367,12 @@ sub __calcEnergyPieces {
   }
   
   for my $h (1..$hours) {
-      my $he = $epiecef                       if($h == 1               );                      # kalk. Energieverbrauch Startstunde
-      $he    = $epiecem                       if($h >  1 && $h < $hours);                      # kalk. Energieverbrauch Folgestunde(n)
-      $he    = $epiecel                       if($h == $hours          );                      # kalk. Energieverbrauch letzte Stunde
+      my $he;
+      $he = $epiecef                       if($h == 1               );                         # kalk. Energieverbrauch Startstunde
+      $he = $epiecem                       if($h >  1 && $h < $hours);                         # kalk. Energieverbrauch Folgestunde(n)
+      $he = $epiecel                       if($h == $hours          );                         # kalk. Energieverbrauch letzte Stunde
       
-      $he    = $epiecef + $epiecel + $epiecem if($h == $hours && $hours == 1);                 # kalk. Energieverbrauch wenn max. 1 Stunde Laufzeit
+      $he = $epiecef + $epiecel + $epiecem if($h == $hours && $hours == 1);                    # kalk. Energieverbrauch wenn max. 1 Stunde Laufzeit
       
       $data{$type}{$name}{consumers}{$c}{epieces}{${h}} = sprintf('%.2f', $he);      
   }
@@ -6443,21 +6441,21 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
 =for :application/json;q=META.json 76_SolarForecast.pm
 {
-  "abstract": "Visualization of solar predictions for PV systems",
+  "abstract": "Creation of solar predictions for PV systems",
   "x_lang": {
     "de": {
-      "abstract": "Visualisierung von solaren Vorhersagen für PV Anlagen"
+      "abstract": "Erstellung solarer Vorhersagen von PV Anlagen"
     }
   },
   "keywords": [
-    "sma",
+    "inverter",
     "photovoltaik",
     "electricity",
-    "portal",
-    "smaportal",
+    "forecast",
     "graphics",
-    "longpoll",
-    "refresh"
+    "Autarky",
+    "Consumer",
+    "PV"
   ],
   "version": "v1.1.1",
   "release_status": "testing",
@@ -6475,6 +6473,13 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       "requires": {
         "FHEM": 5.00918799,
         "perl": 5.014,
+        "POSIX": 0,
+        "GPUtils": 0,
+        "Encode": 0,
+        "utf8": 0,
+        "JSON": 4.020,
+        "Data::Dumper": 0,
+        "FHEM::SynoModules::SMUtils": 1.220,
         "Time::HiRes": 0        
       },
       "recommends": {
