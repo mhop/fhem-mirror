@@ -187,6 +187,7 @@
 #                 Workaround für Forum #561
 #                 Neue Readings für "*ValueReadAt"
 #                 
+# 2021-05-17      set 
 #
 #   ToDo:         timeout konfigurierbar machen
 #				  Attribute implementieren und dokumentieren
@@ -1230,9 +1231,15 @@ sub vitoconnect_Set {
             "{\"temperature\":$args[0]}", $name, $opt, @args );
         return;
     }
-    elsif ( $opt eq "WW-Solltemperatur" ) {
+		elsif ( $opt eq "WW-Solltemperatur" ) {
         vitoconnect_action( $hash,
             "heating.dhw.temperature/setTargetTemperature",
+            "{\"temperature\":$args[0]}", $name, $opt, @args );
+        return;
+    }
+	elsif ( $opt eq "WW-Temperatur_2" ) {
+        vitoconnect_action( $hash,
+            "heating.dhw.temperature.temp2/setTargetTemperature",
             "{\"temperature\":$args[0]}", $name, $opt, @args );
         return;
     }
@@ -1243,7 +1250,6 @@ sub vitoconnect_Set {
             $t += ONE_DAY;
             $end = $t->strftime("%Y-%m-%d");
         }
-
         vitoconnect_action(
             $hash,
             "heating.operating.programs.holiday/schedule",
@@ -1277,6 +1283,7 @@ sub vitoconnect_Set {
       . "WW-Zeitplan:textField-long "
       . "WW-Haupttemperatur:slider,10,1,60 "
       . "WW-Solltemperatur:slider,10,1,60 "
+	  . "WW-Temperatur_2:slider,10,1,60 "
       . "Urlaub_Start "
       . "Urlaub_Ende "
       . "Urlaub_unschedule:noArg ";
@@ -1671,13 +1678,11 @@ sub vitoconnect_getResourceCallback {
                 1
             );
             if ( $items->{statusCode} eq "401" ) {
-
                 #  EXPIRED TOKEN
                 vitoconnect_getCode($hash);
                 return;
             }
             elsif ( $items->{statusCode} eq "404" ) {
-
                 # DEVICE_NOT_FOUND
                 Log3 $name, 1, "$name - Device not found: Optolink prüfen!";
                 InternalTimer( gettimeofday() + $hash->{intervall},
@@ -1685,7 +1690,6 @@ sub vitoconnect_getResourceCallback {
                 return;
             }
             elsif ( $items->{statusCode} eq "429" ) {
-
                 # RATE_LIMIT_EXCEEDED
                 Log3 $name, 1,
                   "$name - Anzahl der möglichen API Calls in überschritten!";
@@ -1694,7 +1698,6 @@ sub vitoconnect_getResourceCallback {
                 return;
             }
             elsif ( $items->{statusCode} eq "502" ) {
-
                 # DEVICE_COMMUNICATION_ERROR error: Bad Gateway
                 Log3 $name, 1, "$name - temporärer API Fehler";
                 InternalTimer( gettimeofday() + $hash->{intervall},
