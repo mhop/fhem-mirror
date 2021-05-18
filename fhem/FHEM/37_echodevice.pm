@@ -2,6 +2,9 @@
 #
 ##############################################
 #
+# 2021.05.18 v0.2.11
+# - FEATURE: Unterstützung A1DL2DVDQVK3Q Fire Tab HD 10
+#
 # 2021.04.26 v0.2.10
 # - CHANGE:  Logeintrag "[Echodevice] [echodevice_SendCommand] [12] IGNORIERE Command=activities Abfrage in CMD_Queue schon vorhanden!" auf Loglevel 4 geändert
 # - FEATURE: Unterstützung AIPK7MM90V7TB Echo Show Gen3
@@ -460,7 +463,7 @@ use Time::Piece;
 use lib ('./FHEM/lib', './lib');
 use MP3::Info;
 
-my $ModulVersion     = "0.2.10";
+my $ModulVersion     = "0.2.11";
 my $AWSPythonVersion = "0.0.3";
 my $NPMLoginTyp		 = "unbekannt";
 my $QueueNumber      = 0;
@@ -4347,6 +4350,7 @@ sub echodevice_getModel($){
 	elsif($ModelNumber eq "A7WXQPH584YP"   || $ModelNumber eq "Echo Gen2")				{return "Echo Gen2";}
 	elsif($ModelNumber eq "A3C9PE6TNYLTCH" || $ModelNumber eq "Echo Multiroom")  		{return "Echo Multiroom";}
 	elsif($ModelNumber eq "AP1F6KUH00XPV"  || $ModelNumber eq "Echo Stereopaar")		{return "Echo Stereopaar";}
+	elsif($ModelNumber eq "A1DL2DVDQVK3Q" || $ModelNumber eq "Fire Tab HD 10")			{return "Fire Tab HD 10";}
 	elsif($ModelNumber eq "A3R9S4ZZECZ6YL" || $ModelNumber eq "Fire Tab HD 10")			{return "Fire Tab HD 10";}
 	elsif($ModelNumber eq "A3L0T0VL9A921N" || $ModelNumber eq "Fire Tab HD 8")			{return "Fire Tab HD 8";}
 	elsif($ModelNumber eq "A2M4YX06LWP8WI" || $ModelNumber eq "Fire Tab 7")				{return "Fire Tab 7";}	
