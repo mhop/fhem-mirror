@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - feature: 73_AutoShuttersControl: add abort rain unprotection waiting time
  - bugfix:  lib/FHEM/Core/Authentication/Passwords.pm
                change commandref
  - bugfix:  98_WeekdayTimer: send delay also applied at startup
