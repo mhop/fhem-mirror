@@ -1,8 +1,8 @@
-REV 24457
+REV 24466
 DIR unused
-UPD 2021-05-16_07:45:04 362517 ./CHANGED
+UPD 2021-05-18_07:45:02 362644 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2021-04-30_07:45:03 43180 ./MAINTAINER.txt
+UPD 2021-05-18_07:45:02 43195 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
 UPD 2019-06-14_07:45:02 25544 ./fhem.cfg.demo
 UPD 2021-05-02_07:45:13 168058 ./fhem.pl
@@ -473,7 +473,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2021-04-20_07:45:04 50457 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2021-05-14_07:45:03 351652 FHEM/98_DOIF.pm
+UPD 2021-05-18_07:45:02 351734 FHEM/98_DOIF.pm
 UPD 2020-08-16_07:45:02 114179 FHEM/98_DOIFtools.pm
 UPD 2021-04-09_07:45:07 38670 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
@@ -512,7 +512,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2021-04-20_18:03:40 70658 FHEM/98_WeekdayTimer.pm
+UPD 2021-05-18_07:45:02 71075 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -556,7 +556,7 @@ UPD 2021-05-06_07:45:02 90141 FHEM/98_todoist.pm
 UPD 2019-12-19_07:45:02 23488 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
 UPD 2017-09-27_07:45:02 7883 FHEM/98_version.pm
-UPD 2021-04-06_07:45:03 92419 FHEM/98_vitoconnect.pm
+UPD 2021-05-18_07:45:02 92700 FHEM/98_vitoconnect.pm
 UPD 2021-01-24_07:45:03 8535 FHEM/98_weblink.pm
 UPD 2021-02-18_07:45:03 71993 FHEM/98_weekprofile.pm
 UPD 2021-04-15_07:45:26 20417 FHEM/99_SUNRISE_EL.pm
@@ -735,23 +735,24 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2021-05-16_07:45:08 4503608 docs/commandref.html
+UPD 2021-05-18_07:45:06 4504040 docs/commandref.html
 UPD 2021-05-13_07:45:09 2779923 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-17_07:45:10 241051 docs/commandref_modular.html
-UPD 2021-05-17_07:45:12 252046 docs/commandref_modular_DE.html
+UPD 2021-05-18_07:45:10 241317 docs/commandref_modular.html
+UPD 2021-05-18_07:45:11 252312 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
 UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
-UPD 2021-01-30_07:45:03 74370 lib/FHEM/Automation/ShuttersControl.pm
+UPD 2021-05-18_07:45:02 74406 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2020-06-23_07:45:04 2701 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2021-01-30_07:45:03 11787 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2020-06-23_07:45:04 7300 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
-UPD 2021-04-30_07:45:03 110822 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
+UPD 2021-05-18_07:45:02 108537 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
 UPD 2021-03-13_07:45:12 40675 lib/FHEM/Automation/ShuttersControl/Helper.pm
+UPD 2021-05-18_07:45:02 5214 lib/FHEM/Automation/ShuttersControl/Rainprotection.pm
 UPD 2020-07-27_07:45:02 2545 lib/FHEM/Automation/ShuttersControl/Roommate.pm
 UPD 2021-04-30_07:45:03 25377 lib/FHEM/Automation/ShuttersControl/Shading.pm
 UPD 2021-03-13_07:45:12 31536 lib/FHEM/Automation/ShuttersControl/Shutters.pm
