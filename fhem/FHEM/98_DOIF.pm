@@ -5282,9 +5282,16 @@ sub icon_temp_temp_ring {
 
 sub ring
 {
-  my ($val,$min,$max,$minColor,$maxColor,$unit,$size,$func,$decfont,$mode,$lightness,$lnum,$icon) = @_;
+  my ($val,$min,$max,$minColor,$maxColor,$unit,$sizeHalf,$func,$decfont,$mode,$lightness,$lnum,$icon) = @_;
   my $out;
    
+  my ($size,$half);
+  ($size,$half)=split (/,/,$sizeHalf) if (defined $sizeHalf);
+  $size=100 if (!defined $size or $size eq "");
+  $half="" if (!defined $half);
+  
+  
+    
   my ($monochrom,$minMax,$innerRing,$pointer);
   ($monochrom,$minMax,$innerRing,$pointer)=split (/,/,$mode) if (defined $mode);
  
@@ -5337,7 +5344,7 @@ sub ring
  
   $value=$max if ($value>$max);
   $value=$min if ($value<$min);
-  $size=100 if (!defined $size);
+
 
   my $prop=0;
   $prop=($value-$min)/($max-$min) if ($max-$min);
@@ -5376,9 +5383,26 @@ sub ring
   if (defined $icon and $icon ne "") {
     $ic="$ic\@".color($currColor,$li) if ($ic !~ /@/); 
   }
+  my ($div,$maxArc,$minArc,$yNum,$yUnit,$high);
+  
+  if ($half eq "1") {
+    $div=2;
+    $maxArc=230;
+    $minArc=50;
+    $yNum=27;
+    $yUnit=14;
+    $high=29;
+  } else {
+    $div=1;
+    $maxArc=280;
+    $minArc=0;
+    $yNum=34;
+    $yUnit=47;
+    $high=58;
+  }
   my $width=int($size/100*63);
   my $height=int($size/100*58);
-  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 58" width="%d" height="%d" style="width:%dpx; height:%dpx">',$width,$height,$width,$height);
+  $out.= sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 63 %d" width="%d" height="%d" style="width:%dpx; height:%dpx">',$high,$width,$height/$div,$width,$height/$div);
   $out.= '<defs>';
   $out.= '<linearGradient id="gradbackring1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" style="stop-color:rgb(64,64,64);stop-opacity:0.9"/><stop offset="1" style="stop-color:rgb(24, 24, 24);stop-opacity:0.9"/></linearGradient>';
   if (!defined $pointer) {
@@ -5394,25 +5418,25 @@ sub ring
   $out.='</defs>';
   $out.='<circle cx="41" cy="30" r="26.5" fill="url(#gradbackring1)" />';
   $out.='<g stroke="url(#grad_ring1stroke)" fill="none" stroke-width="3.5">';
-  $out.=describeArc(41, 30, 28, 0, 280);
+  $out.=describeArc(41, 30, 28, $minArc, $maxArc);
   $out.='</g>';
   if (defined $pointer) {
     $out.='<g stroke="'.color($currColor,$lr).'" fill="none" stroke-width="3.5">';
-    $out.=describeArc(41, 30, 28, int($prop*280-$pointer/2), int($prop*280+$pointer/2));
+    $out.=describeArc(41, 30, 28, int(($prop*($maxArc-$minArc)+$minArc-$pointer/2)*10)/10, int(($prop*($maxArc-$minArc)+$minArc+$pointer/2)*10)/10);
   } else {
     $out.=sprintf('<g stroke="url(#grad_ring1_%s_%s_%s)" fill="none" stroke-width="2.5">',$currColor,$minColor,(defined $lr ? $lr:0));
-    $out.=describeArc(41, 30, 28, 0, int($prop*280));
+    $out.=describeArc(41, 30, 28, $minArc, int(($prop*($maxArc-$minArc)+$minArc)*10)/10);
   }
   $out.='</g>';
   
   if (defined $innerRing and $innerRing) {
     if (ref($func) eq "ARRAY"){
-      my $from=0;
+      my $from=$minArc;
       my $diff=$max-$min;
       for (my $i=0;$i<@{$func};$i+=2) {
         my $curr=${$func}[$i];
         my $color=${$func}[$i+1];
-        my $to=int(($curr-$min)/$diff*280);
+        my $to=int((($curr-$min)/$diff*($maxArc-$minArc)+$minArc)*10)/10;
         $out.=sprintf('<g stroke="%s" fill="none" stroke-width="1" style="%s">',color($color,$lir),($innerRing eq "1" ? "":$innerRing));
         $out.=describeArc(41, 30, 25.5, $from, $to);
         $out.='</g>';
@@ -5421,7 +5445,7 @@ sub ring
     } else {
       $out.='</g>';
       $out.=sprintf('<g stroke="url(#grad_ring_max_%s_%s_%s)" fill="none" stroke-width="1" opacity="0.8" style="%s">',$minCol,$maxColor,(defined $lir ? $lir:0),($innerRing eq "1" ? "":$innerRing));
-      $out.=describeArc(41, 30, 25.5, 0, 280);
+      $out.=describeArc(41, 30, 25.5, $minArc, $maxArc);
       $out.='</g>';
     }
   }
@@ -5441,13 +5465,13 @@ sub ring
   my ($valInt,$valDec)=split(/\./,sprintf($format,$val));
   if (defined $valDec) {
       $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s<tspan style="font-size:85%%;">.%s</tspan></text>',
-                     ($icflag ? 41:34),color($currColor,$ln),(defined ($icon) ? 15:18),$fontformat,$valInt,$valDec);
+                     ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 15:18,$fontformat,$valInt,$valDec);
   } else {
     $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;font-weight:bold;%s">%s</text>',
-                   ($icflag ? 41:34),color($currColor,$ln),(defined ($icon) ? 15:18),$fontformat,$valInt);
+                   ($icflag ? 41:$yNum),color($currColor,$ln),(defined $icon or $half eq "1") ? 15:18,$fontformat,$valInt);
   }
   $out.= sprintf('<text text-anchor="middle" x="41" y="%s" style="fill:%s;font-size:%spx;%s">%s</text>',
-                 ($icflag ? 50.5:47),color($currColor,$lu),($icflag ? 8:10),$unitformat,$unit) if (defined $unit);
+                 ($icflag ? 50.5:$yUnit),color($currColor,$lu),($icflag or $half eq "1") ? 8:10,$unitformat,$unit) if (defined $unit);
   
   if (defined $minMax and $minMax) {
     $out.= sprintf('<text text-anchor="middle" x="23" y="58" style="fill:%s;font-size:6px;%s">%s</text>',color($minCol,$lmm),($minMax eq "1" ? "":$minMax),$min);
