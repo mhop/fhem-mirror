@@ -57,22 +57,6 @@ use strict;
 use warnings;
 use utf8;
 
-use GPUtils qw(GP_Import);
-
-## Import der FHEM Funktionen
-BEGIN {
-    GP_Import(
-        qw(
-          defs
-          ReadingsVal
-          readingsSingleUpdate
-          gettimeofday
-          InternalTimer
-          CommandSet
-          Log3)
-    );
-}
-
 sub new {
     my $class = shift;
     my $self  = {
@@ -114,15 +98,15 @@ sub setHardLockOut {
         && $FHEM::Automation::ShuttersControl::shutters->getLockOutCmd ne
         'none' )
     {
-        CommandSet( undef, $self->{shuttersDev} . ' inhibit ' . $cmd )
+        ::CommandSet( undef, $self->{shuttersDev} . ' inhibit ' . $cmd )
           if ( $FHEM::Automation::ShuttersControl::shutters->getLockOutCmd eq
             'inhibit' );
-        CommandSet( undef,
+        ::CommandSet( undef,
             $self->{shuttersDev} . ' '
               . ( $cmd eq 'on' ? 'blocked' : 'unblocked' ) )
           if ( $FHEM::Automation::ShuttersControl::shutters->getLockOutCmd eq
             'blocked' );
-        CommandSet( undef,
+        ::CommandSet( undef,
             $self->{shuttersDev} . ' '
               . ( $cmd eq 'on' ? 'protectionOn' : 'protectionOff' ) )
           if ( $FHEM::Automation::ShuttersControl::shutters->getLockOutCmd eq
@@ -245,8 +229,8 @@ sub setDriveCmd {
             && $FHEM::Automation::ShuttersControl::ascDev->getSelfDefense eq
             'on' )
         {
-            InternalTimer(
-                gettimeofday() +
+            ::InternalTimer(
+                ::gettimeofday() +
                   $FHEM::Automation::ShuttersControl::shutters
                   ->getSelfDefenseAbsentDelay,
                 \&FHEM::Automation::ShuttersControl::_SetCmdFn, \%h
@@ -257,8 +241,8 @@ sub setDriveCmd {
         elsif ( $offSetStart > 0
             && !$FHEM::Automation::ShuttersControl::shutters->getNoDelay )
         {
-            InternalTimer(
-                gettimeofday() + int(
+            ::InternalTimer(
+                ::gettimeofday() + int(
                     rand($offSet) +
                       $FHEM::Automation::ShuttersControl::shutters
                       ->getDelayStart
@@ -354,14 +338,14 @@ sub setPosSetCmd {
 
 sub setLastDriveReading {
     my $self            = shift;
-    my $shuttersDevHash = $defs{ $self->{shuttersDev} };
+    my $shuttersDevHash = $::defs{ $self->{shuttersDev} };
 
     my %h = (
         devHash   => $shuttersDevHash,
         lastDrive => $FHEM::Automation::ShuttersControl::shutters->getLastDrive,
     );
 
-    InternalTimer( gettimeofday() + 0.1,
+    ::InternalTimer( ::gettimeofday() + 0.1,
         \&FHEM::Automation::ShuttersControl::_setShuttersLastDriveDelayed,
         \%h );
     return;
@@ -375,7 +359,7 @@ sub setLastPos {
 
     $self->{ $self->{shuttersDev} }{lastPos}{VAL} = $position
       if ( defined($position) );
-    $self->{ $self->{shuttersDev} }{lastPos}{TIME} = int( gettimeofday() )
+    $self->{ $self->{shuttersDev} }{lastPos}{TIME} = int( ::gettimeofday() )
       if ( defined( $self->{ $self->{shuttersDev} }{lastPos} ) );
     return;
 }
@@ -386,11 +370,11 @@ sub setLastManPos {
 
     $self->{ $self->{shuttersDev} }{lastManPos}{VAL} = $position
       if ( defined($position) );
-    $self->{ $self->{shuttersDev} }{lastManPos}{TIME} = int( gettimeofday() )
+    $self->{ $self->{shuttersDev} }{lastManPos}{TIME} = int( ::gettimeofday() )
       if ( defined( $self->{ $self->{shuttersDev} }{lastManPos} )
         && defined( $self->{ $self->{shuttersDev} }{lastManPos}{TIME} ) );
     $self->{ $self->{shuttersDev} }{lastManPos}{TIME} =
-      int( gettimeofday() ) - 86400
+      int( ::gettimeofday() ) - 86400
       if ( defined( $self->{ $self->{shuttersDev} }{lastManPos} )
         && !defined( $self->{ $self->{shuttersDev} }{lastManPos}{TIME} ) );
     return;
@@ -468,6 +452,15 @@ sub setRainProtectionStatus {    # Werte protected, unprotected
     my $value = shift;
 
     $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL} = $value
+      if ( defined($value) );
+    return;
+}
+
+sub setRainUnprotectionDelayObj {
+    my $self  = shift;
+    my $value = shift;
+
+    $self->{ $self->{shuttersDev} }->{RainProtection}->{UNPROTECTIONDELAYOBJVAL} = $value
       if ( defined($value) );
     return;
 }
@@ -666,7 +659,7 @@ sub getLastDrive {
     my $self = shift;
 
     $self->{ $self->{shuttersDev} }{lastDrive} =
-      ReadingsVal( $self->{shuttersDev}, 'ASC_ShuttersLastDrive', 'none' )
+      ::ReadingsVal( $self->{shuttersDev}, 'ASC_ShuttersLastDrive', 'none' )
       if ( !defined( $self->{ $self->{shuttersDev} }{lastDrive} ) );
 
     return $self->{ $self->{shuttersDev} }{lastDrive};
@@ -753,6 +746,21 @@ sub getRainProtectionStatus {    # Werte protected, unprotected
         )
         ? $self->{ $self->{shuttersDev} }->{RainProtection}->{VAL}
         : 'unprotected'
+    );
+}
+
+sub getRainUnprotectionDelayObj {
+    my $self = shift;
+
+    return (
+        (
+            defined( $self->{ $self->{shuttersDev} }->{RainProtection} )
+              && defined(
+                $self->{ $self->{shuttersDev} }->{RainProtection}->{UNPROTECTIONDELAYOBJVAL}
+              )
+        )
+        ? $self->{ $self->{shuttersDev} }->{RainProtection}->{UNPROTECTIONDELAYOBJVAL}
+        : 'none'
     );
 }
 
@@ -857,7 +865,7 @@ sub getRoommatesLastStatus {
 sub getOutTemp {
     my $self = shift;
 
-    return ReadingsVal(
+    return ::ReadingsVal(
         $FHEM::Automation::ShuttersControl::shutters->_getTempSensor,
         $FHEM::Automation::ShuttersControl::shutters->getTempSensorReading,
         -100 );
@@ -866,7 +874,7 @@ sub getOutTemp {
 sub getIdleDetection {
     my $self = shift;
 
-    return ReadingsVal(
+    return ::ReadingsVal(
         $self->{shuttersDev},
         $FHEM::Automation::ShuttersControl::shutters->_getIdleDetectionReading,
         'none'
@@ -891,7 +899,7 @@ sub setShadingStatus {
 
     $self->{ $self->{shuttersDev} }{ShadingStatus}{VAL} = $value
       if ( defined($value) );
-    $self->{ $self->{shuttersDev} }{ShadingStatus}{TIME} = int( gettimeofday() )
+    $self->{ $self->{shuttersDev} }{ShadingStatus}{TIME} = int( ::gettimeofday() )
       if ( defined( $self->{ $self->{shuttersDev} }{ShadingStatus} ) );
 
     return;
@@ -909,7 +917,7 @@ sub setShadingLastStatus {
     $self->{ $self->{shuttersDev} }{ShadingLastStatus}{VAL} = $value
       if ( defined($value) );
     $self->{ $self->{shuttersDev} }{ShadingLastStatus}{TIME} =
-      int( gettimeofday() )
+      int( ::gettimeofday() )
       if ( defined( $self->{ $self->{shuttersDev} }{ShadingLastStatus} ) );
     $self->{ $self->{shuttersDev} }{ShadingManualDriveStatus}{VAL} = 0
       if ( $value eq 'out' );

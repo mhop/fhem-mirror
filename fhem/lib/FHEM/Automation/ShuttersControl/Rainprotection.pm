@@ -79,24 +79,33 @@ sub RainProcessing {
             && $FHEM::Automation::ShuttersControl::shutters->getStatus !=
             $rainClosedPos
             && $FHEM::Automation::ShuttersControl::shutters
-            ->getRainProtectionStatus eq 'unprotected' )
+                 ->getRainProtectionStatus eq 'unprotected'
+            || ( $FHEM::Automation::ShuttersControl::shutters
+                   ->getRainProtectionStatus eq 'unprotected'
+              && $FHEM::Automation::ShuttersControl::shutters
+                   ->getRainUnprotectionDelayObj ne 'none')
+          )
         {
             _RainProtected();
         }
         elsif ( ( $val == 0 || $val < $triggerMin )
             && $FHEM::Automation::ShuttersControl::shutters->getStatus ==
-            $rainClosedPos
+              $rainClosedPos
             && IsAfterShuttersManualBlocking($shuttersDev)
             && $FHEM::Automation::ShuttersControl::shutters
-            ->getRainProtectionStatus eq 'protected' )
+                 ->getRainProtectionStatus eq 'protected' )
         {
             my %funcHash = (
                 shuttersdevice => $shuttersDev,
             );
 
+            $FHEM::Automation::ShuttersControl::shutters->setRainUnprotectionDelayObj(\%funcHash);
             ::InternalTimer( ::gettimeofday() + $FHEM::Automation::ShuttersControl::ascDev->getRainWaitingTime
                 , \&_RainUnprotected
                 , \%funcHash );
+            
+            $FHEM::Automation::ShuttersControl::shutters
+                ->setRainProtectionStatus('unprotected');
         }
     }
 
@@ -105,6 +114,11 @@ sub RainProcessing {
 
 ### es muss noch beobachtet werden ob die Auswahl des Rollos welches bearbeitet werden soll bestehen bleibt oder mit in die neuen Funktionen übergeben werden muss
 sub _RainProtected {
+    ::RemoveInternalTimer($FHEM::Automation::ShuttersControl::shutters->getRainUnprotectionDelayObj)
+        if($FHEM::Automation::ShuttersControl::shutters->getRainUnprotectionDelayObj ne 'none');
+        
+    $FHEM::Automation::ShuttersControl::shutters->setRainUnprotectionDelayObj('none');
+
     $FHEM::Automation::ShuttersControl::shutters->setLastDrive(
             'rain protected');
         $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
@@ -123,20 +137,26 @@ sub _RainUnprotected {
 
     $FHEM::Automation::ShuttersControl::shutters->setLastDrive(
             'rain un-protected');
-        $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
-            (
-                    $FHEM::Automation::ShuttersControl::shutters->getIsDay
-                ? $FHEM::Automation::ShuttersControl::shutters->getLastPos
-                : (
-                    $FHEM::Automation::ShuttersControl::shutters
-                        ->getPrivacyDownStatus == 2
-                    ? $FHEM::Automation::ShuttersControl::shutters
-                        ->getPrivacyDownPos
-                    : $FHEM::Automation::ShuttersControl::shutters
-                        ->getClosedPos
-                )
+
+    if ( $FHEM::Automation::ShuttersControl::shutters->getRainUnprotectionDelayObj ne 'none' ) {
+        ::RemoveInternalTimer($FHEM::Automation::ShuttersControl::shutters->getRainUnprotectionDelayObj);
+        $FHEM::Automation::ShuttersControl::shutters->setRainUnprotectionDelayObj('none');
+    }
+
+    $FHEM::Automation::ShuttersControl::shutters->setDriveCmd(
+        (
+                $FHEM::Automation::ShuttersControl::shutters->getIsDay
+            ? $FHEM::Automation::ShuttersControl::shutters->getLastPos
+            : (
+                $FHEM::Automation::ShuttersControl::shutters
+                    ->getPrivacyDownStatus == 2
+                ? $FHEM::Automation::ShuttersControl::shutters
+                    ->getPrivacyDownPos
+                : $FHEM::Automation::ShuttersControl::shutters
+                    ->getClosedPos
             )
-        );
+        )
+    );
 
         $FHEM::Automation::ShuttersControl::shutters
             ->setRainProtectionStatus('unprotected');

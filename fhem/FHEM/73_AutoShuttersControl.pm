@@ -1265,7 +1265,7 @@ sub Initialize {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v0.10.13",
+  "version": "v0.10.14",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],

@@ -282,7 +282,7 @@ sub _getRainSensor {
         ? $pos
         : $FHEM::Automation::ShuttersControl::shutters->getClosedPos );
     $self->{ASC_rainSensor}->{waitingTime} =
-      ( $pos ne 'none' ? $wait : 900 );
+      ( $wait ne 'none' ? $wait : 0 );
 
     return $self->{ASC_rainSensor}->{device};
 }
