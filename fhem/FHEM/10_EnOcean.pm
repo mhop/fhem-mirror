@@ -768,18 +768,19 @@ sub EnOcean_Initialize($) {
   }
   my $subTypeList = join(",", sort grep { !$subTypeList{$_}++ } @subTypeList);
 
+  $hash->{AttrFn} = "EnOcean_Attr";
   $hash->{AutoCreate} = {"EnO.*" => {ATTR => "creator:autocreate", FILTER => "%NAME"}};
-  $hash->{noAutocreatedFilelog} = 1;
-  $hash->{Match} = "^EnOcean:";
   $hash->{DefFn} = "EnOcean_Define";
   $hash->{DeleteFn} = "EnOcean_Delete";
-  $hash->{UndefFn} = "EnOcean_Undef";
+  $hash->{GetFn} = "EnOcean_Get";
+  $hash->{Match} = "^EnOcean:";
+  $hash->{noAutocreatedFilelog} = 1;
+  $hash->{NotifyFn} = "EnOcean_Notify";
+  #$hash->{NotifyOrderPrefix} = "45-";
   $hash->{ParseFn} = "EnOcean_Parse";
   $hash->{SetFn} = "EnOcean_Set";
  #$hash->{StateFn} = "EnOcean_State";
-  $hash->{GetFn} = "EnOcean_Get";
-  $hash->{NotifyFn} = "EnOcean_Notify";
-  $hash->{AttrFn} = "EnOcean_Attr";
+  $hash->{UndefFn} = "EnOcean_Undef";
   $hash->{AttrList} = "IODev do_not_notify:select,0,1 ignore:0,1 dummy:0,1 " .
                       "showtime:select,0,1 " .
                       "actualTemp angleMax:slider,-180,20,180 alarmAction alwaysUpdateReadings:select,0,1 " .
@@ -851,7 +852,6 @@ sub EnOcean_Initialize($) {
   } else {
     Log3 undef, 2, "EnOcean XML functions are not available.";
   }
-  #$hash->{NotifyOrderPrefix} = "45-";
   return undef;
 }
 
@@ -11909,6 +11909,7 @@ sub EnOcean_Parse($$) {
         my $battery = $db[1] & 0x80 ? 'low' : 'ok';
         push @event, "1:battery:$battery";
         push @event, "1:batteryPercent:". ($db[1] & 0x7F);
+        push @event, "1:burglaryAlarm:off";
         my %errorStatus = (
           0 => "ok",
           1 => "error",
