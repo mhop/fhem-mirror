@@ -1,6 +1,6 @@
-REV 24466
+REV 24474
 DIR unused
-UPD 2021-05-18_07:45:02 362644 ./CHANGED
+UPD 2021-05-19_07:45:07 362808 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2021-05-18_07:45:02 43195 ./MAINTAINER.txt
 UPD 2021-04-19_07:45:05 41645 ./configDB.pm
@@ -52,7 +52,7 @@ UPD 2015-07-28_14:05:31 15566 FHEM/10_CUL_IR.pm
 UPD 2021-03-06_07:45:08 16817 FHEM/10_DUOFERNSTICK.pm
 UPD 2018-03-12_07:45:04 44764 FHEM/10_EIB.pm
 UPD 2019-01-23_07:45:02 30674 FHEM/10_EQ3BT.pm
-UPD 2021-05-06_07:45:02 1039179 FHEM/10_EnOcean.pm
+UPD 2021-05-19_07:45:07 1039223 FHEM/10_EnOcean.pm
 UPD 2021-04-22_07:45:03 37970 FHEM/10_FBDECT.pm
 UPD 2020-12-21_07:45:02 84007 FHEM/10_FRM.pm
 UPD 2020-07-17_07:45:03 17872 FHEM/10_FS10.pm
@@ -210,7 +210,7 @@ UPD 2015-07-28_14:05:31 10162 FHEM/37_SHC.pm
 UPD 2015-07-28_14:05:31 31303 FHEM/37_SHCdev.pm
 UPD 2018-07-10_07:45:14 56428 FHEM/37_Spotify.pm
 UPD 2017-01-02_07:45:02 7617 FHEM/37_dash_dhcp.pm
-UPD 2021-04-27_07:45:02 249714 FHEM/37_echodevice.pm
+UPD 2021-05-19_07:45:07 249899 FHEM/37_echodevice.pm
 UPD 2019-10-05_07:45:03 22167 FHEM/37_fakeRoku.pm
 UPD 2019-04-14_07:45:03 79219 FHEM/37_harmony.pm
 UPD 2020-04-17_07:45:02 152805 FHEM/37_plex.pm
@@ -380,7 +380,7 @@ UPD 2020-06-07_07:45:04 221694 FHEM/72_FRITZBOX.pm
 UPD 2021-03-23_07:45:03 28884 FHEM/72_TA_CMI_JSON.pm
 UPD 2020-10-26_07:45:03 225504 FHEM/72_XiaomiDevice.pm
 UPD 2019-10-25_07:45:03 51131 FHEM/73_AMADCommBridge.pm
-UPD 2021-04-30_07:45:03 98037 FHEM/73_AutoShuttersControl.pm
+UPD 2021-05-19_07:45:07 98037 FHEM/73_AutoShuttersControl.pm
 UPD 2021-04-14_07:45:03 231723 FHEM/73_DoorBird.pm
 UPD 2021-04-30_07:45:03 147447 FHEM/73_ElectricityCalculator.pm
 UPD 2021-04-27_07:45:02 46231 FHEM/73_GardenaSmartBridge.pm
@@ -473,7 +473,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2021-04-20_07:45:04 50457 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2021-05-18_07:45:02 351734 FHEM/98_DOIF.pm
+UPD 2021-05-19_07:45:07 352364 FHEM/98_DOIF.pm
 UPD 2020-08-16_07:45:02 114179 FHEM/98_DOIFtools.pm
 UPD 2021-04-09_07:45:07 38670 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
@@ -739,8 +739,8 @@ UPD 2021-05-18_07:45:06 4504040 docs/commandref.html
 UPD 2021-05-13_07:45:09 2779923 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-18_07:45:10 241317 docs/commandref_modular.html
-UPD 2021-05-18_07:45:11 252312 docs/commandref_modular_DE.html
+UPD 2021-05-19_07:45:15 241317 docs/commandref_modular.html
+UPD 2021-05-19_07:45:16 252312 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -748,20 +748,20 @@ UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
 UPD 2021-05-18_07:45:02 74406 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2020-06-23_07:45:04 2701 lib/FHEM/Automation/ShuttersControl/Dev.pm
-UPD 2021-01-30_07:45:03 11787 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
+UPD 2021-05-19_07:45:07 11786 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
 UPD 2020-06-23_07:45:04 7300 lib/FHEM/Automation/ShuttersControl/Dev/Readings.pm
 UPD 2021-05-18_07:45:02 108537 lib/FHEM/Automation/ShuttersControl/EventProcessingFunctions.pm
 UPD 2021-03-13_07:45:12 40675 lib/FHEM/Automation/ShuttersControl/Helper.pm
-UPD 2021-05-18_07:45:02 5214 lib/FHEM/Automation/ShuttersControl/Rainprotection.pm
+UPD 2021-05-19_07:45:07 6250 lib/FHEM/Automation/ShuttersControl/Rainprotection.pm
 UPD 2020-07-27_07:45:02 2545 lib/FHEM/Automation/ShuttersControl/Roommate.pm
 UPD 2021-04-30_07:45:03 25377 lib/FHEM/Automation/ShuttersControl/Shading.pm
-UPD 2021-03-13_07:45:12 31536 lib/FHEM/Automation/ShuttersControl/Shutters.pm
+UPD 2021-05-19_07:45:07 31945 lib/FHEM/Automation/ShuttersControl/Shutters.pm
 UPD 2021-01-30_07:45:03 52570 lib/FHEM/Automation/ShuttersControl/Shutters/Attr.pm
 UPD 2020-06-23_07:45:04 2952 lib/FHEM/Automation/ShuttersControl/Shutters/Readings.pm
 UPD 2020-06-23_07:45:04 2222 lib/FHEM/Automation/ShuttersControl/Window.pm
 UPD 2021-01-30_07:45:03 4025 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2020-06-23_07:45:04 2337 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
-UPD 2021-04-23_07:45:03 6019 lib/FHEM/Core/Authentication/Passwords.pm
+UPD 2021-05-19_07:45:07 5977 lib/FHEM/Core/Authentication/Passwords.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
 UPD 2021-04-09_07:45:07 39454 lib/FHEM/HTTPMOD/Utils.pm
