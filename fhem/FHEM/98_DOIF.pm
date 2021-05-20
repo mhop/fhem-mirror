@@ -3868,6 +3868,11 @@ DOIF_Shutdown
 {
   my ($hash) = @_;
   DOIF_killBlocking($hash);
+  if (defined $hash->{collect}) {
+    foreach my $dev_reading (keys %{$hash->{collect}}) {
+      DOIF_collect_save_values($hash,$dev_reading);
+    }
+  }
   return undef;
 }
 
