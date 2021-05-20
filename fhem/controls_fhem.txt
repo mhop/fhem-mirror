@@ -1,4 +1,4 @@
-REV 24474
+REV 24476
 DIR unused
 UPD 2021-05-19_07:45:07 362808 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -512,7 +512,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2021-05-18_07:45:02 71075 FHEM/98_WeekdayTimer.pm
+UPD 2021-05-20_07:45:02 71401 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -739,8 +739,8 @@ UPD 2021-05-18_07:45:06 4504040 docs/commandref.html
 UPD 2021-05-13_07:45:09 2779923 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-19_07:45:15 241317 docs/commandref_modular.html
-UPD 2021-05-19_07:45:16 252312 docs/commandref_modular_DE.html
+UPD 2021-05-20_07:45:10 241317 docs/commandref_modular.html
+UPD 2021-05-20_07:45:11 252312 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
