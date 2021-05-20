@@ -4167,7 +4167,7 @@ setreading DEVICE attrTemplateVersion 20200522 or prior
 
 # The rockrobo device for valetudo RE
 name:roborockRE
-filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*valetudo[/].*
+filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*\/valetudo.*
 desc:use this for a rooted Xiamoni Vacuum / Roborock with valetudo RE installed. For details visit https://github.com/rand256/valetudo/wiki<br>NOTE: Only tested with Gen1, Forum Board MQTT<br> 
 order:X_03a
 par:BASE_TOPIC; is typically valetudo; {(split '/',ReadingsVal("DEVICE",'subscriptions','valetudo/rockrobo'))[0]}
