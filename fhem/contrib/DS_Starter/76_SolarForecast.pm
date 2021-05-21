@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
   "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
                            "fix createNotifyDev for currentBatteryDev ",
@@ -592,6 +593,7 @@ sub Set {
   my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
   my $prop  = shift @a;
   my $prop1 = shift @a;
+  my $prop2 = shift @a;
   
   return if(IsDisabled($name));
   
@@ -643,7 +645,8 @@ sub Set {
       opt   => $opt,
       arg   => $arg,
       prop  => $prop,
-      prop1 => $prop1
+      prop1 => $prop1,
+      prop2 => $prop2
   };
     
   if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
@@ -1019,11 +1022,18 @@ sub _setreset {                          ## no critic "not used"
   my $type  = $hash->{TYPE};
   
   if($prop eq "pvHistory") {
-      my $day = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
+      my $day   = $paref->{prop1} // "";                                       # ein bestimmter Tag der pvHistory angegeben ?
+      my $dhour = $paref->{prop2} // "";                                       # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
       if ($day) {
-          delete $data{$type}{$name}{pvhist}{$day};
-          Log3($name, 3, qq{$name - Day "$day" of pvHistory deleted});
+          if($dhour) {
+              delete $data{$type}{$name}{pvhist}{$day}{$dhour};
+              Log3($name, 3, qq{$name - Hour "$dhour" of day "$day" deleted in pvHistory});             
+          }
+          else {
+              delete $data{$type}{$name}{pvhist}{$day};
+              Log3($name, 3, qq{$name - Day "$day" deleted in pvHistory});
+          }
       }
       else {
           delete $data{$type}{$name}{pvhist};
@@ -5909,13 +5919,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
 
       <ul>
          <table>  
-         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                            </td></tr>         
-            <tr><td> <b>consumerPlanning</b>  </td><td>löscht die Planungsdaten aller registrierten Verbraucher                </td></tr>
-            <tr><td>                          </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:   </td></tr>
-            <tr><td>                          </td><td>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt;       </td></tr>
-            <tr><td> <b>pvHistory</b>         </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                 </td></tr>
-            <tr><td>                          </td><td>Um nur einen bestimmten historischen Tag zu löschen:                    </td></tr>
-            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt;                            </td></tr>
+         <colgroup> <col width=25%> <col width=75%> </colgroup>                                                                                                   </td></tr>         
+            <tr><td> <b>consumerPlanning</b>  </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                   </td></tr>
+            <tr><td>                          </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                      </td></tr>
+            <tr><td>                          </td><td>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt;                                          </td></tr>
+            <tr><td> <b>pvHistory</b>         </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                    </td></tr>
+            <tr><td>                          </td><td>Um einen bestimmten historischen Tag zu löschen:                                                           </td></tr>
+            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset pvHistory 08)                  </td></tr>
+            <tr><td>                          </td><td>Um eine bestimmte Stunde eines historischer Tages zu löschen:                                              </td></tr>
+            <tr><td>                          </td><td>set &lt;name&gt; reset pvHistory &lt;Tag&gt; &lt;Stunde&gt;  (z.B. set &lt;name&gt; reset pvHistory 08 10) </td></tr>
          </table>
       </ul>      
       </li>
