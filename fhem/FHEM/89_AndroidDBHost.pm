@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.2
+# Version 0.3
 #
 # FHEM Integration for Android Debug Bridge
 #
@@ -45,6 +45,7 @@ package AndroidDBHost;
 use strict;
 use warnings;
 
+use Data::Dumper;
 use IPC::Open3;
 
 use SetExtensions;
@@ -59,6 +60,7 @@ BEGIN {
         readingsBulkUpdateIfChanged
         readingsBeginUpdate
         readingsEndUpdate
+		  devspec2array
         Log3
         AttrVal
         ReadingsVal
@@ -67,6 +69,7 @@ BEGIN {
         init_done
         deviceEvents
         gettimeofday
+        defs
     ))
 };
 
@@ -172,8 +175,33 @@ sub CheckADBServer ($)
 	}
 	
 	readingsSingleUpdate ($hash, 'state', $newState, 1);
+
+	# Update status of client devices
+	UpdateClientStates ($hash) if ($newState eq 'running');
 	
 	return $newState eq 'running' ? 1 : 0;
+}
+
+##############################################################################
+# Update connection states of client devices
+##############################################################################
+
+sub UpdateClientStates ($)
+{
+	my $hash = shift;
+	
+	my $device = GetDeviceList ($hash) // return 0;
+
+	foreach my $d (keys %defs) {
+		my $clHash = $defs{$d};
+		if ($clHash->{TYPE} eq 'AndroidDB') {
+			my $clState = $device->{$clHash->{ADBDevice}} // 'disconnected';
+			$clState =~ s/device/connected/;
+			readingsSingleUpdate ($clHash, 'state', $clState, 1);
+		}
+	}
+	
+	return 1;
 }
 
 ##############################################################################
@@ -199,7 +227,7 @@ sub Set ($@)
 	my $opt = shift @$a // return 'No set command specified';
 
 	# Preprare list of available commands
-	my $options = 'command start:noArg stop:noArg';
+	my $options = 'command disconnectAll:noArg start:noArg stop:noArg';
 
 	$opt = lc($opt);
 
@@ -225,6 +253,11 @@ sub Set ($@)
 		my ($rc, $result, $error) = Execute ($hash, $command, '.*', @$a);
 		return $result.$error;
 	}
+	elsif ($opt eq 'disconnect') {
+		my ($rc, $result, $error) = Execute ($Hash, 'disconnect', 'disconnected');
+		UpdateClientStates ($hash);
+		return "Disconnecting all devices failed $result $error" if ($rc == 0);
+	}
 	else {
 		return "Unknown argument $opt, choose one of $options";
 	}
@@ -242,7 +275,7 @@ sub Get ($@)
 	my $opt = shift @$a // return 'No get command specified';
 	
 	# Prepare list of available commands
-	my $options = 'status:noArg';
+	my $options = 'devices:noArg status:noArg';
 	
 	$opt = lc($opt);
 	
@@ -250,6 +283,22 @@ sub Get ($@)
 		my $status = IsADBServerRunning ($hash) ? 'running' : 'stopped';
 		readingsSingleUpdate ($hash, 'state', $status, 1);
 		return "ADB server $status";
+	}
+	elsif ($opt eq 'devices') {
+		my $device = GetDeviceList ($hash) // return 'Cannot read device list';
+		my @clDevices = devspec2array ('TYPE=AndroidDB');
+		my $list = '<html>List of devices:<br/><br/>';
+		foreach my $d (keys %$device) {
+			my @f = ();
+			foreach my $cd (@clDevices) {
+				if (exists($defs{$cd}) && $defs{$cd}{ADBDevice} eq $d) {
+					push @f, $cd;
+				}
+			}
+			$list .= sprintf ('%22s %20s %s<br/>', $d, join(',', @f), $device->{$d});
+		}
+		$list .= '</html>';
+		return $list;
 	}
 	else {
 		return "Unknown argument $opt, choose one of $options";
@@ -316,7 +365,7 @@ sub Execute ($@)
 #  -1 = Error
 #   0 = No active connections
 #   1 = Current device connected
-#   2 = Multiple devices connected (need to disconnect)
+#   2 = Other / multiple device(s) connected (need to disconnect)
 ##############################################################################
 
 sub IsConnected ($)
@@ -326,14 +375,13 @@ sub IsConnected ($)
 	my $ioHash = $clHash->{IODev} // return -1;
 	
 	# Get active connections
-	my ($rc, $result, $error) = Execute ($ioHash, 'devices', 'list');
-	return -1 if ($rc == 0);
+	my $device = GetDeviceList ($ioHash) // return -1;
+	my $devCount = keys %$device;
 
-	my @devices = $result =~ /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]+)/g;
-	if (scalar(@devices) == 1 && $devices[0] eq $clHash->{ADBDevice}) {
-		return 1;
+	if ($devCount == 1) {
+		return exists($device->{$clHash->{ADBDevice}}) ? 1 : 2;
 	}
-	elsif (scalar(@devices) > 1) {
+	elsif ($devCount > 1) {
 		return 2;
 	}
 
@@ -396,6 +444,27 @@ sub Disconnect ($)
 }
 
 ##############################################################################
+# Get list of devices
+##############################################################################
+
+sub GetDeviceList ($)
+{
+	my $hash = shift;
+
+	my ($rc, $result, $error) = Execute ($hash, 'devices');
+	return undef if ($rc == 0);	
+
+	my %devState = ();
+	my @devices = $result =~ /([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}:[0-9]+\s+[a-zA-Z0-9]+)/g;
+	foreach my $d (@devices) {
+		my ($address, $state) = split /\s+/, $d;
+		$devState{$address} = $state // 'disconnected';
+	}
+
+	return \%devState;
+}
+
+##############################################################################
 # Execute commmand and return status code and command output
 #
 # Return value:
@@ -455,15 +524,18 @@ sub TCPConnect ($$$)
 	Dependencies: Perl module IPC::Open3, Android Platform Tools
    <br/><br/>
    Android DB Platform Tools installation:<br/>
-   Debian/Raspbian: apt-get install android-sdk-platform-tools<br/>
-   Windows/MacOSX/Linux x86: <a href="https://developer.android.com/studio/releases/platform-tools">Android Developer Portal</a>
-   <br/><br/>
+   <ul>
+   <li>Debian/Raspbian: apt-get install android-sdk-platform-tools</li>
+   <li>Windows/MacOSX/Linux x86: <a href="https://developer.android.com/studio/releases/platform-tools">Android Developer Portal</a></li>
+   </ul>
+   <br/>
    <a name="AndroidDBHostdefine"></a>
    <b>Define</b><br/><br/>
    <ul>
       <code>define &lt;name&gt; AndroidDBHost [server=&lt;host&gt;}[:&lt;port&gt;]] [adb=&lt;path&gt;]</code><br/><br/>
 		The parameter 'host' is the hostname of the system, where the ADB server is running. Default is 'localhost'.
-		Parameter 'adb' can be used to specify the path to the adb command (must include 'adb' or 'adb.exe').
+		Parameter 'adb' can be used to specify the path to the adb command (must include 'adb' or 'adb.exe').<br/>
+		<b>Note:</b> The adb command must be executable by the account under which FHEM is running.
    </ul>
    <br/>
 </ul>

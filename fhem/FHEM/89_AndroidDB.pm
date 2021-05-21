@@ -4,7 +4,7 @@
 #
 # 89_AndroidDB
 #
-# Version 0.2
+# Version 0.3
 #
 # FHEM Integration for Android Devices
 #
@@ -195,12 +195,60 @@ sub Attr ($@)
 				$PRESET{_custom_}{$macroName} = $macroKeycodes;
 			}
 		}
+		elsif ($attrName eq 'preset' && $attrVal =~ /^\@(.+)$/) {
+			if (!LoadPreset ($hash, $1)) {
+				Log3 $hash, 2, "Can't load preset from file $1";
+			}
+		}
 	}
 	elsif ($cmd eq 'del') {
 		delete $PRESET{_custom_} if (exists($PRESET{_custom_}));
 	}
 
 	return undef;
+}
+
+##############################################################################
+# Load macro definitions from file
+# File format:
+#  - Lines starting with a # are treated as comments
+#  - Lines containing a single word are setting the preset name for the
+#    following lines
+#  - Lines in format Name:KeyList are defining a macro. KeyList is a comma 
+#    separated list of keycodes.
+##############################################################################
+
+sub LoadPreset ($$)
+{
+	my ($hash, $fileName) = @_;
+
+	my @lines;	
+	if (open (PRESETFILE, "<$fileName")) {
+		@lines = <PRESETFILE>;
+		close (PRESETFILE);
+	}
+	else {
+		return 0;
+	}
+	
+	chomp @lines;
+	my $presetName = '';
+	
+	foreach my $l (@lines) {
+		next if ($l =~ /^#/);	# Comments are allowed
+		my ($macroName, $keyList) = split (':', $l);
+		if (!defined($keyList)) {
+			$presetName = $macroName;
+			next;
+		}
+		elsif (defined($keyList) && $presetName eq '') {
+			Log3 $hash, 2, "Preset name must be specified before first macro definition in file $fileName";
+			return 0;
+		}
+		$PRESET{$presetName}{$macroName} = $keyList;
+	}
+	
+	return 1;
 }
 
 1;
@@ -258,10 +306,21 @@ sub Attr ($@)
 		Several macro definitions can be specified by seperating them using a blank character.
 	</li><br/>
 	<a name="preset"></a>
-	<li><b>preset &lt;Preset&gt;</b><br/>
-		Select a preset of keycode macros. If the same macro name is defined in the selected
+	<li><b>preset {&lt;PresetName&gt;|@&lt;PresetFileName&gt;}</b><br/>
+		Select a preset of keycode macros or load a set of macros from a preset defintion
+		file. If the same macro name is defined in the selected
 		preset and in attribute 'macros', the definition in the 'macros' attribute overwrites
-		the definition in the preset.
+		the definition in the preset.<br/>
+		A preset defintion file is using the following format:<br/>
+		<pre>
+		# Comment
+		PresetName1
+		MacroName1:KeyCode[,...]
+		MacroName2:KeyCode[,...]
+		...
+		PresetName2
+		...
+		</pre>
 	</li><br/>
 </ul>
 
