@@ -604,7 +604,8 @@ FHEM/lib/SHC_packet_layout.xml  rr2000            Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
-lib/FHEM/Core/Timer/Helper.pm sidey79             FHEM Development
+lib/FHEM/Core/Timer/Helper.pm    sidey79          FHEM Development
+lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/API.pm      DS_Starter       Sonstiges
 lib/FHEM/SynoModules/SMUtils.pm  DS_Starter       Sonstiges
 lib/FHEM/SynoModules/ErrCodes.pm DS_Starter       Sonstiges
