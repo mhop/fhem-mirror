@@ -4492,7 +4492,7 @@ set DEVICE attrTemplate sonos2mqtt_bridge
 attr DEVICE getList Favorites:noArg Favorites {sonos2mqtt($NAME,$EVENT)}
 attr DEVICE setList PauseAll:noArg $\DEVICETOPIC/cmd/pauseall\
 CheckSubscription:noArg $\DEVICETOPIC/cmd/check-subscriptions
-attr SonosBridge userReadings favlist:Favorites.* {sonos2mqtt_ur($name,'favlist')},\
+attr DEVICE userReadings favlist:Favorites.* {sonos2mqtt_ur($name,'favlist')},\
 grouplist:Favorites.* {sonos2mqtt_ur($name,'grouplist')}
 {sonos2mqtt_setup('a:model=sonos2mqtt_bridge')}
 defmod n_configSonos notify global:DEFINED.MQTT2_RINCON_[A-Z0-9]+|MQTT2_RINCON_[A-Z0-9]+:IPAddress:.* {sonos2mqtt_nty($NAME,$EVENT)}
