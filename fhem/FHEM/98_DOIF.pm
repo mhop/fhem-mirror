@@ -1334,18 +1334,23 @@ sub accu_setValue
 }
 
 sub DOIF_collect_save_values {
-  my ($hash,$dev_reading)=@_;
-  foreach my $hours (keys %{$hash->{collect}{"$dev_reading"}}) {
-    if (ref($hash->{collect}{$dev_reading}{$hours}{values}) eq "ARRAY") {
-      my @va=@{$hash->{collect}{$dev_reading}{$hours}{values}};
-      my @ta=@{$hash->{collect}{$dev_reading}{$hours}{times}};
-      for (@va) { $_ = "" if (!defined $_); };
-      for (@ta) { $_ = "" if (!defined $_); };
-      my $dim=$hash->{collect}{$dev_reading}{$hours}{dim};
-      my $devReading=$dev_reading;
-      $devReading =~ s/ /_/g;
-      ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_values",join(",",@va),0);
-      ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_times",join(",",@ta),0);
+  my ($hash)=@_;
+  foreach my $key (keys %{$defs{$hash->{NAME}}{READINGS}}) {
+    delete $defs{$hash->{NAME}}{READINGS}{$key} if ($key =~ /^\.col/);
+  }
+  foreach my $dev_reading (keys %{$hash->{collect}}) {
+    foreach my $hours (keys %{$hash->{collect}{"$dev_reading"}}) {
+      if (ref($hash->{collect}{$dev_reading}{$hours}{values}) eq "ARRAY") {
+        my @va=@{$hash->{collect}{$dev_reading}{$hours}{values}};
+        my @ta=@{$hash->{collect}{$dev_reading}{$hours}{times}};
+        for (@va) { $_ = "" if (!defined $_); };
+        for (@ta) { $_ = "" if (!defined $_); };
+        my $dim=$hash->{collect}{$dev_reading}{$hours}{dim};
+        my $devReading=$dev_reading;
+        $devReading =~ s/ /_/g;
+        ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_values",join(",",@va),0);
+        ::readingsSingleUpdate($hash,".col_".$dim."_".$devReading."_".$hours."_times",join(",",@ta),0);
+      }
     }
   }
 } 
@@ -1658,23 +1663,24 @@ sub ReplaceReadingDoIf
                $hours=$num;
              }
            }
-           delete $hash->{collect}{"$name $reading"}{$hours};
            AddRegexpTriggerDoIf($hash,"collect","","collect",$name,$reading);
-           $hash->{collect}{"$name $reading"}{$hours}{hours}=$hours;
-           $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
-           my $values=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_values","");
-           my $times=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_times","");
-           my $va;
-           my $ta;
-           @{$va}=split (",",$values);
-           for (@{$va}) { $_ = undef if ($_ eq ""); };
-           @{$ta}=split (",",$times);
-           for (@{$ta}) { $_ = undef if ($_ eq ""); };
-           $hash->{collect}{"$name $reading"}{$hours}{values}=$va;
-           $hash->{collect}{"$name $reading"}{$hours}{times}=$ta;
-           $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
-           collect_setValue($hash,$name,$reading,$hours);
-           ##collect_get_min_max_DoIf(\%{$hash->{collect}{"$name $reading"}{$hours}});
+           if (ref($hash->{collect}{"$name $reading"}{$hours}{values}) ne "ARRAY") {
+             delete $hash->{collect}{"$name $reading"}{$hours};
+             $hash->{collect}{"$name $reading"}{$hours}{hours}=$hours;
+             $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
+             my $values=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_values","");
+             my $times=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_times","");
+             my $va;
+             my $ta;
+             @{$va}=split (",",$values);
+             for (@{$va}) { $_ = undef if ($_ eq ""); };
+             @{$ta}=split (",",$times);
+             for (@{$ta}) { $_ = undef if ($_ eq ""); };
+             $hash->{collect}{"$name $reading"}{$hours}{values}=$va;
+             $hash->{collect}{"$name $reading"}{$hours}{times}=$ta;
+             $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
+             collect_setValue($hash,$name,$reading,$hours);
+           }
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
           $regExp =$1;
           $output=$2;
@@ -2841,9 +2847,7 @@ DOIF_Notify($$)
   
   if ($dev->{NAME} eq "global" and (EventCheckDoif($dev->{NAME},"global",$eventa,'^SAVE$'))) {
     if (defined $hash->{collect}) {
-      foreach my $dev_reading (keys %{$hash->{collect}}) {
-        DOIF_collect_save_values($hash,$dev_reading);
-      }
+      DOIF_collect_save_values($hash);
     }
   }
   
@@ -3869,9 +3873,7 @@ DOIF_Shutdown
   my ($hash) = @_;
   DOIF_killBlocking($hash);
   if (defined $hash->{collect}) {
-    foreach my $dev_reading (keys %{$hash->{collect}}) {
-      DOIF_collect_save_values($hash,$dev_reading);
-    }
+    DOIF_collect_save_values($hash);
   }
   return undef;
 }
@@ -4539,6 +4541,10 @@ sub get_color {
 sub card
 {
   my ($collect,$header,$icon,$min,$max,$minColor,$maxColor,$unit,$func,$decfont,$prop,$model,$lightness) = @_;
+  
+  if (!defined ${$collect}{hours}) {
+    return("");
+  }
   my $val=${$collect}{value};
   my $a=@{$collect}{values};
   my $maxVal = ${$collect}{max_value};
