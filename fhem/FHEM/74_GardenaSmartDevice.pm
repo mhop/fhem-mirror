@@ -63,8 +63,8 @@ use warnings;
 use POSIX;
 use FHEM::Meta;
 use Time::Local;
-
-#use Data::Dumper;    # only for debugging
+use Time::Piece;
+use Time::Seconds;
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -164,7 +164,7 @@ BEGIN {
 #-- Export to main context with different name
 GP_Export(
     qw(
-      Initialize
+        Initialize
       )
 );
 
@@ -209,6 +209,13 @@ sub Define {
     $hash->{helper}{STARTINGPOINTID}            = '';
     $hash->{helper}{schedules_paused_until_id}  = '';
     $hash->{helper}{eco_mode_id}                = '';
+    # IrrigationControl valve control max 6
+    $hash->{helper}{schedules_paused_until_1_id}  = '';
+    $hash->{helper}{schedules_paused_until_2_id}  = '';
+    $hash->{helper}{schedules_paused_until_3_id}  = '';
+    $hash->{helper}{schedules_paused_until_4_id}  = '';
+    $hash->{helper}{schedules_paused_until_5_id}  = '';
+    $hash->{helper}{schedules_paused_until_6_id}  = '';
 
     CommandAttr( undef,
         "$name IODev $modules{GardenaSmartBridge}{defptr}{BRIDGE}->{NAME}" )
@@ -282,6 +289,18 @@ sub Set {
     my $abilities;
     my $service_id;
     my $mainboard_version   = ReadingsVal( $name, 'mower_type-mainboard_version', 0.0 );
+
+    #set default abilitie ... overwrite in cmd to change
+    $abilities = 'mower'
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
+    $abilities = 'watering'
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24'
+        || AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
+    $abilities = 'power'
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
+    $abilities = 'manual_watering'
+      if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
+
     ### mower  
     # service_id (eco, parkuntilfurhternotice, startpoints)
     if ( lc $cmd eq 'parkuntilfurthernotice' ) {
@@ -383,14 +402,35 @@ sub Set {
           . ',"valve_id":'
           . $valve_id . '}}';
     }
+    elsif ( $cmd eq 'closeAllValves' ){
+      $payload = '"name":"close_all_valves","parameters":{}';
+    }
+    elsif ( $cmd =~ /.*ScheduleValve/ ){
+      my $valve_id = $aArg->[0];
+      my $duration = (( defined($aArg->[1]) ? ( ((Time::Piece->new)+(ONE_HOUR *  $aArg->[1]) - (Time::Piece->new)->tzoffset )->datetime ).'.000Z' : '2040-12-31T22:00:00.000Z'));
+
+      $abilities = 'irrigation_settings';
+      $service_id = $hash->{helper}->{'schedules_paused_until_'.$valve_id.'_id'};
+      $payload = '"settings":{"name":"schedules_paused_until_'
+                  . $valve_id
+                  . '", "value":"'
+                  . ($cmd eq 'resumeScheduleValve' ? '' : $duration )
+                  . '","device":"'
+                  . $hash->{DEVICEID}
+                  . '"}';
+    }
     ### Sensors
     elsif ( lc $cmd eq 'refresh' ) {
 
         my $sensname = $aArg->[0];
         if ( lc $sensname eq 'temperature' ) {
-            $payload   = '"name":"measure_ambient_temperature"';
-            $abilities = 'ambient_temperature';
-
+            if ( ReadingsVal( $name, 'device_info-category', 'sensor' ) eq 'sensor') {
+              $payload   = '"name":"measure_ambient_temperature"';
+              $abilities = 'ambient_temperature';
+            } else {
+              $payload   = '"name":"measure_soil_temperature"';
+              $abilities = 'soil_temperature';
+            }
         }
         elsif ( lc $sensname eq 'light' ) {
             $payload   = '"name":"measure_light"';
@@ -401,6 +441,7 @@ sub Set {
             $payload   = '"name":"measure_soil_humidity"';
             $abilities = 'humidity';
         }
+        
 
     }
     else {
@@ -408,35 +449,28 @@ sub Set {
         my $list = '';
 
         $list .=
-'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,1,60 startpoint'
+'parkUntilFurtherNotice:noArg parkUntilNextTimer:noArg startResumeSchedule:noArg startOverrideTimer:slider,0,1,240 startpoint'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
 
         $list .= 'manualOverride:slider,1,1,59 cancelOverride:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
         $list .=
-'manualDurationValve1:slider,1,1,59 manualDurationValve2:slider,1,1,59 manualDurationValve3:slider,1,1,59 manualDurationValve4:slider,1,1,59 manualDurationValve5:slider,1,1,59 manualDurationValve6:slider,1,1,59 cancelOverrideValve1:noArg cancelOverrideValve2:noArg cancelOverrideValve3:noArg cancelOverrideValve4:noArg cancelOverrideValve5:noArg cancelOverrideValve6:noArg'
+'closeAllValves:noArg stopScheduleValve:selectnumbers,1,1,6,0,lin resumeScheduleValve:selectnumbers,1,1,6,0,lin manualDurationValve1:slider,1,1,90 manualDurationValve2:slider,1,1,90 manualDurationValve3:slider,1,1,90 manualDurationValve4:slider,1,1,90 manualDurationValve5:slider,1,1,90 manualDurationValve6:slider,1,1,90 cancelOverrideValve1:noArg cancelOverrideValve2:noArg cancelOverrideValve3:noArg cancelOverrideValve4:noArg cancelOverrideValve5:noArg cancelOverrideValve6:noArg'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24' );
 
-        $list .= 'refresh:temperature,light,humidity'
+        $list .= 'refresh:temperature,humidity'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' );
+        # add light for old sensors
+        $list .= ',light'
+          if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' 
+            && ReadingsVal($name, 'device_info-category', 'unknown') eq 'sensor' );
 
         $list .= 'on:noArg off:noArg on-for-timer:slider,0,1,60'
           if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
 
         return "Unknown argument $cmd, choose one of $list";
     }
-    
-    $abilities = 'mower'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' )
-      && ($abilities !~ /mower_settings|mower_timer/);
-    $abilities = 'watering'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'ic24'
-        || AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
-    $abilities = 'power'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'power' );
-    $abilities = 'manual_watering'
-      if ( AttrVal( $name, 'model', 'unknown' ) eq 'electronic_pressure_pump' );
 
     $hash->{helper}{deviceAction} = $payload;
     readingsSingleUpdate( $hash, "state", "send command to gardena cloud", 1 );
@@ -536,7 +570,7 @@ sub WriteReadings {
                     . $propertie->{name} ne 'light-light'
                     && ref( $propertie->{value} ) ne "HASH" );
 
-                readingsBulkUpdate(
+                readingsBulkUpdateIfChanged(
                     $hash,
                     $decode_json->{abilities}[$abilities]{name} . '-'
                       . $propertie->{name},
@@ -605,7 +639,8 @@ sub WriteReadings {
         #Log3 $name, 1, " - IST ARRAY" if ( ref( $decode_json->{settings}[$settings]{value} ) eq "ARRAY");
 
         if (   exists($decode_json->{settings}[$settings]{name})
-          && ( $decode_json->{settings}[$settings]{name} eq 'schedules_paused_until' 
+          && ( 
+            $decode_json->{settings}[$settings]{name} =~ /schedules_paused_until_?\d?$/
             || $decode_json->{settings}[$settings]{name} eq 'eco_mode' )
            )
         {  
@@ -648,8 +683,13 @@ sub WriteReadings {
         $settings--;
     } while ( $settings >= 0 );
 
+    
+    my $online_state = ReadingsVal($name , 'device_info-connection_status', 'unknown');
+      
     readingsBulkUpdate( $hash, 'state',
-        ReadingsVal( $name, 'mower-status', 'readingsValError' ) )
+        $online_state eq 'online' ?
+          ReadingsVal( $name, 'mower-status', 'readingsValError') : 'offline'
+        )
       if ( AttrVal( $name, 'model', 'unknown' ) eq 'mower' );
     readingsBulkUpdate(
         $hash, 'state',
@@ -661,16 +701,19 @@ sub WriteReadings {
         )
     ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'watering_computer' );
 
-    readingsBulkUpdate(
-        $hash, 'state',
-        'T: '
-          . ReadingsVal( $name, 'ambient_temperature-temperature',
-            'readingsValError' )
-          . '°C, H: '
-          . ReadingsVal( $name, 'humidity-humidity', 'readingsValError' )
-          . '%, L: '
-          . ReadingsVal( $name, 'light-light', 'readingsValError' ) . 'lux'
-    ) if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' );
+
+    if ( AttrVal( $name, 'model', 'unknown' ) eq 'sensor' ) {
+      my $state_string = ( ReadingsVal($name, 'device_info-category', 'unknown') eq 'sensor') ?  'T: ' .ReadingsVal( $name, 'ambient_temperature-temperature', 'readingsValError' ) . '°C, ' :  'T: ' .ReadingsVal( $name, 'soil_temperature-temperature', 'readingsValError' ) . '°C, ' ;
+      $state_string .=  'H: '. ReadingsVal( $name, 'humidity-humidity', 'readingsValError' ). '%';
+      $state_string .= ', L: ' . ReadingsVal( $name, 'light-light', 'readingsValError' ) . 'lux' if (ReadingsVal($name, 'device_info-category', 'unknown') eq 'sensor');
+      
+      # if ( $online_state eq 'offline') {
+      #   readingsBulkUpdate( $hash, 'humidity-humidity', '-1' );
+      #   readingsBulkUpdate( $hash, 'ambient_temperature-temperature', '-1' ) if (ReadingsVal($name, 'device_info-category', 'unknown') eq 'sensor');
+      #   readingsBulkUpdate( $hash, 'light-light', '-1' ) if (ReadingsVal($name, 'device_info-category', 'unknown') eq 'sensor');
+      # }
+      readingsBulkUpdate($hash, 'state', $online_state eq 'online' ? $state_string : 'offline' )
+    }
 
     readingsBulkUpdate(
         $hash, 'state',
@@ -1091,6 +1134,10 @@ sub SetPredefinedStartPoints {
             <li>set NAME startpoint enable 1</li>
             <li>set NAME startpoint disable 3 enable 1</li>
         </ul>
+
+        <li>resumeScheduleValve - start schedule irrigation on valve n</li>
+        <li>stopScheduleValve - stop schedule irrigation on valve n  (Default: 2040-12-31T22:00:00.000Z) | optional params hours (now + hours)</li>
+        <li>closeAllValves - close all valves</li>
     </ul>
 </ul>
 
@@ -1235,6 +1282,9 @@ sub SetPredefinedStartPoints {
             <li>set NAME startpoint enable 1</li>
             <li>set NAME startpoint disable 3 enable 1</li>
         </ul>
+        <li>resumeScheduleValve - Startet Bew&aauml;sserung am Ventil n nach Zeitplan</li>
+        <li>stopScheduleValve - Setzt Bew&aauml;sserung am Ventil n aus (Default: 2040-12-31T22:00:00.000Z) | Optionaler Parameter Stunden (Jetzt + Stunden)</li>
+        <li>closeAllValves - Stopt Bew&aauml;sserung an allen Ventilen </li> 
     </ul>
 </ul>
 
@@ -1257,7 +1307,7 @@ sub SetPredefinedStartPoints {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.3",
+  "version": "v2.4.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],

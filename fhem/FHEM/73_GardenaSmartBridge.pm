@@ -2,7 +2,7 @@
 #
 # Developed with Kate
 #
-#  (c) 2017-2011 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2021 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -57,7 +57,6 @@
 package FHEM::GardenaSmartBridge;
 use GPUtils qw(GP_Import GP_Export);
 
-#use Data::Dumper;    #only for Debugging
 
 use strict;
 use warnings;
@@ -70,7 +69,7 @@ my $missingModul = '';
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
   or $missingModul .= "Encode ";
 
-# eval "use JSON;1"            || $missingModul .= 'JSON ';
+# eval "use JSON;1" || $missingModul .= 'JSON ';
 eval "use IO::Socket::SSL;1" or $missingModul .= 'IO::Socket::SSL ';
 
 # try to use JSON::MaybeXS wrapper
@@ -147,7 +146,6 @@ if ($@) {
 ## Import der FHEM Funktionen
 #-- Run before package compilation
 BEGIN {
-
     # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
@@ -183,7 +181,7 @@ BEGIN {
 #-- Export to main context with different name
 GP_Export(
     qw(
-      Initialize
+        Initialize
       )
 );
 
@@ -1219,7 +1217,7 @@ sub createHttpValueStrings {
     $uri = '/auth/token' if ( !defined( $hash->{helper}{session_id} ) );
 
     if ( defined( $hash->{helper}{locations_id} ) ) {
-        if ( defined($abilities) && $abilities eq 'mower_settings' ) {
+        if ( defined($abilities) && $abilities =~ /.*_settings/ ) {
 
             $method = 'PUT';
             my $dhash = $modules{GardenaSmartDevice}{defptr}{$deviceId};
@@ -1231,7 +1229,7 @@ sub createHttpValueStrings {
               . $service_id
               if ( defined($abilities)
                 && defined($payload)
-                && $abilities eq 'mower_settings' );
+                && $abilities =~ /.*_settings/ );
 
         } # park until next schedules or override
         elsif (defined($abilities)
@@ -1254,9 +1252,9 @@ sub createHttpValueStrings {
             && $abilities eq 'watering' )
         {
             my $valve_id;
-            $method = 'PUT';
 
             if ( $payload =~ m#watering_timer_(\d)# ) {
+                $method = 'PUT';
                 $valve_id = $1;
             }
             $uri .=
@@ -1264,8 +1262,7 @@ sub createHttpValueStrings {
               . $deviceId
               . '/abilities/'
               . $abilities
-              . '/properties/watering_timer_'
-              . $valve_id;
+              . ( defined($valve_id) ? '/properties/watering_timer_'. $valve_id : '/command')
 
         }
         elsif (defined($abilities)
@@ -1442,7 +1439,7 @@ sub DeletePassword {
   <ul>
     <li>debugJSON - JSON Fehlermeldungen</li>
     <li>disable - Schaltet die Datenübertragung der Bridge ab</li>
-    <li>interval - Abfrageinterval in Sekunden (default: 300)</li>
+    <li>interval - Abfrageinterval in Sekunden (default: 60)</li>
     <li>gardenaAccountEmail - Email Adresse, die auch in der GardenaApp verwendet wurde</li>
   </ul>
 </ul>
@@ -1466,7 +1463,7 @@ sub DeletePassword {
   ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v2.2.2",
+  "version": "v2.4.0",
   "author": [
     "Marko Oldenburg <leongaultier@gmail.com>"
   ],
