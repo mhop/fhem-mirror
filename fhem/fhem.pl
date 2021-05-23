@@ -2479,12 +2479,22 @@ CommandSetReading($$)
     return "$sdev: bad reading name '$b1' (allowed chars: A-Za-z/\\d_\\.-)"
       if(!goodReadingName($b1));
 
+
+    if($b1 eq "IODev") {
+      my $ret = fhem_setIoDev($hash, $b[2]);
+      if($ret) {
+        push @rets, $ret;
+        next;
+      }
+    }
+
     if($hash->{".updateTime"}) { # Called from userReadings, #110375
       Log 1, "'setreading $def' called form userReadings is prohibited";
       return;
     } else {
       readingsSingleUpdate($hash, $b1, $b[2], 1, $timestamp);
     }
+    
   }
   return join("\n", @rets);
 }
@@ -2958,6 +2968,10 @@ fhem_setIoDev($$)
     return "unknown IODev $val specified";
   }
 
+  return "$hash->{NAME}: not setting IODev to $val, as different attr exists"
+        if(AttrVal($hash->{NAME}, "IODev", "") ne $val);
+    
+
   $hash->{IODev} = $defs{$val};
   delete($defs{$val}{".clientArray"}); # Force a recompute
   if(!$init_done) {
@@ -3195,6 +3209,14 @@ CommandSetstate($$)
         next;
       }
 
+      if($sname eq "IODev") {
+        my $ret = fhem_setIoDev($d, $sval);
+        if($ret) {
+          push @rets, $ret if($init_done);
+          next;
+        }
+      }
+
       Log3 $d, 3,
          "$sdev: bad reading name '$sname' (allowed chars: A-Za-z/\\d_\\.-)"
         if(!goodReadingName($sname));
@@ -3206,13 +3228,6 @@ CommandSetstate($$)
         $d->{READINGS}{$sname}{TIME} = $tim;
       }
 
-      if($sname eq "IODev") {
-        my $ret = fhem_setIoDev($d, $sval);
-        if($ret) {
-          push @rets, $ret if($init_done);
-          next;
-        }
-      }
 
     } else {
 
