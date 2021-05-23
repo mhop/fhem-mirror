@@ -952,7 +952,7 @@ attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/SENSOR:.* { json2nameValue($EVENT,'',$JSONMAP) }\
-  TELETOPIC/INFO.:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  TELETOPIC/INFO.:.* { $EVENT =~ m,^..Info[1-3]..(.+).$, ?  json2nameValue($1,'',$JSONMAP) : json2nameValue($EVENT,'',$JSONMAP) }\
   TELETOPIC/UPTIME:.* { json2nameValue($EVENT,'',$JSONMAP) }\
   STATTOPIC/POWER1:.* state\
   STATTOPIC/RESULT:.* { json2nameValue($EVENT,'',$JSONMAP) }
@@ -961,7 +961,7 @@ attr DEVICE setStateList on off toggle
 attr DEVICE comment NOTE: For on-for-timer SetExtensions are used. You may add on-for-timer option running on the device. The following is limited to 1h max duration, but will not affect future simple "on" commands:<br>on-for-timer {my $duration = $EVTPART1*10; 'cmnd/CMNDTOPIC/Backlog POWER1 1; delay '.$duration.'; POWER1 0'}<br>See the "Praxisbeispiele" in the wiki for "pulseTime1" alternative option and it's restrictions.
 attr DEVICE autocreate 0
 attr DEVICE model tasmota_basic_state_power1
-setreading DEVICE attrTemplateVersion 20210515
+setreading DEVICE attrTemplateVersion 20210523
 option:{ CALLSPEECHRECOGN }
 set DEVICE attrTemplate speechcontrol_type_switch
 
