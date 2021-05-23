@@ -662,6 +662,7 @@ my %zwave_modelIdAlias = ( "0175-0004-000a" => "devolo_Siren",
                            "010f-0203-1000" => "Fibaro_FGS223",
                            "0108-0004-000a" => "Philio_PSE02", # DLink DCH-Z510
                            "013c-0004-000a" => "Philio_PSE02", # Zipato Siren
+                           "0131-0003-1083" => "zipato_Siren",
                            "0115-0100-0102" => "ZME_KFOB" );
 
 # Patching certain devices.
@@ -702,7 +703,12 @@ our %zwave_deviceSpecial;
                alarmAmbulanceOn=>"05000000000a030000",
                alarmPoliceOn   =>"05000000000a010000",
                alarmDoorchimeOn=>"050000000006160000",
-               alarmBeepOn     =>"05000000000a050000" } } }
+               alarmBeepOn     =>"05000000000a050000" } } },
+
+   zipato_Siren => {
+     ALARM => {
+      set => { doorbellOn      =>"05000000ff061600" } } }
+
 #   ZME_KFOB => {
 #     ZWAVEPLUS_INFO => {
 #      # Example only. ORDER must be >= 50
