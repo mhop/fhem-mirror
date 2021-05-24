@@ -645,14 +645,15 @@ sub
 finish_init()
 {
   foreach my $d (keys %defs) {
-    if($defs{$d}{IODevMissing}) {
-      if($defs{$d}{IODevName} && $defs{$defs{$d}{IODevName}}) {
-        $defs{$d}{IODev} = $defs{$defs{$d}{IODevName}};
-        delete $defs{$d}{IODevName};
+    my $hash = $defs{$d};
+    if($hash->{IODevMissing}) {
+      if($hash->{IODevName} && $defs{$hash->{IODevName}}) {
+        fhem_setIoDev($hash, $hash->{IODevName});
       } else {
-        AssignIoPort($defs{$d}); # For fhem.cfg editors?
+        AssignIoPort($hash); # For fhem.cfg editors?
       }
-      delete $defs{$d}{IODevMissing};
+      delete $hash->{IODevMissing};
+      delete $hash->{IODevName};
     }
   }
 
@@ -2213,6 +2214,31 @@ CommandDefMod($$)
 #############
 # internal
 sub
+fhem_setIoDev($$)
+{
+  my ($hash, $val) = @_;
+
+  if(!$val || !defined($defs{$val})) {
+    if(!$init_done) {
+      $hash->{IODevMissing} = 1;
+      $hash->{IODevName} = $val;
+    }
+    return "unknown IODev $val specified";
+  }
+
+  return "$hash->{NAME}: not setting IODev to $val, as different attr exists"
+        if(AttrVal($hash->{NAME}, "IODev", "") ne $val);
+    
+  $hash->{IODev} = $defs{$val};
+  setReadingsVal($hash, "IODev", $val, TimeNow()); # 120603
+  delete($defs{$val}{".clientArray"}); # Force a recompute
+  delete($hash->{IODevMissing});
+  delete($hash->{IODevName});
+  return undef;
+}
+
+# Searches for a possible IODev, choosing the last defined compatible one.
+sub
 AssignIoPort($;$)
 {
   my ($hash, $proposed) = @_;
@@ -2223,7 +2249,7 @@ AssignIoPort($;$)
   $proposed = ReadingsVal($hn, "IODev", undef) if(!$proposed);
   
   if($proposed && $defs{$proposed} && IsDisabled($proposed) != 1) {
-    $hash->{IODev} = $defs{$proposed};
+    fhem_setIoDev($hash, $proposed);
 
   } else {
     # Set the I/O device, search for the last compatible one.
@@ -2237,25 +2263,19 @@ AssignIoPort($;$)
       if($cl && $defs{$p}{NAME} ne $hn) {      # e.g. RFR
         my @fnd = grep { $hash->{TYPE} =~ m/^$_$/; } split(":", $cl);
         if(@fnd) {
-          $hash->{IODev} = $defs{$p};
-          $proposed = $p;
+          fhem_setIoDev($hash, $p);
           last;
         }
       }
     }
   }
 
-  if($hash->{IODev} && $proposed) {
-    setReadingsVal($hash, "IODev", $proposed, TimeNow()); # 120603
-    delete($defs{$proposed}{".clientArray"});
-    return;
+  return if($hash->{IODev});
 
+  if($init_done) {
+    Log 3, "No I/O device found for $hn";
   } else {
-    if($init_done) {
-      Log 3, "No I/O device found for $hn";
-    } else {
-      $hash->{IODevMissing} = 1;
-    }
+    $hash->{IODevMissing} = 1;
   }
   return undef;
 }
@@ -2954,34 +2974,6 @@ GlobalAttr($$$$)
   return undef;
 }
 
-#####################################
-sub
-fhem_setIoDev($$)
-{
-  my ($hash, $val) = @_;
-
-  if(!$val || !defined($defs{$val})) {
-    if(!$init_done) {
-      $hash->{IODevMissing} = 1;
-      $hash->{IODevName} = $val;
-    }
-    return "unknown IODev $val specified";
-  }
-
-  return "$hash->{NAME}: not setting IODev to $val, as different attr exists"
-        if(AttrVal($hash->{NAME}, "IODev", "") ne $val);
-    
-
-  $hash->{IODev} = $defs{$val};
-  delete($defs{$val}{".clientArray"}); # Force a recompute
-  if(!$init_done) {
-    delete($hash->{IODevMissing});
-    delete($hash->{IODevName});
-  }
-
-  return undef;
-}
-
 sub
 CommandAttr($$)
 {
@@ -3140,8 +3132,6 @@ CommandAttr($$)
       if($ret) {
         push @rets, $ret if($init_done);
         next;
-      } else {
-        setReadingsVal($hash, "IODev", $attrVal, TimeNow());
       }
     }
 
