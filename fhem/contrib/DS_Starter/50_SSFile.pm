@@ -767,7 +767,7 @@ sub __fillUploadQueue {
   # Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
 
   for my $sn (keys %{$found}) {
-      my $fname  = (split "\/", $found->{$sn}{lfile})[-1];       
+      my $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);       
       my $mtime  = $found->{$sn}{mtime}  * 1000;                                       # Angabe in Millisekunden
       my $crtime = $found->{$sn}{crtime} * 1000;                                       # Angabe in Millisekunden
       my $dir    = $remDir.$found->{$sn}{ldir};                                        # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
@@ -1700,7 +1700,7 @@ sub execOp_parse {
             
             $errorcode = $jdata->{error}->{code};
             $cherror   = $jdata->{error}->{errors};                                   
-            $error     = expErrors($hash,$errorcode);                                 # Fehlertext zum Errorcode ermitteln
+            $error     = expErrors($hash,$errorcode) // q{};                          # Fehlertext zum Errorcode ermitteln
             
             if ($error =~ /not found/) {
                 $error .= " New error: ".($cherror // "'  '");
