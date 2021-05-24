@@ -71,6 +71,7 @@ use POSIX qw(strftime);
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;                                                    
 use Encode;
+use Encode::Guess;
 use File::Find;
 use File::Glob ':bsd_glob';
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -767,7 +768,12 @@ sub __fillUploadQueue {
   # Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
 
   for my $sn (keys %{$found}) {
-      my $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);       
+      my $fname  = (split "\/", $found->{$sn}{lfile})[-1];
+      my $enc    = guess_encoding($fname, qw/utf8/);
+      if(!ref $enc ) {
+          $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);
+      }
+      # my $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);        
       my $mtime  = $found->{$sn}{mtime}  * 1000;                                       # Angabe in Millisekunden
       my $crtime = $found->{$sn}{crtime} * 1000;                                       # Angabe in Millisekunden
       my $dir    = $remDir.$found->{$sn}{ldir};                                        # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
