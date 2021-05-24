@@ -123,7 +123,8 @@ sub Define {
   my $type     = shift @arr;
   my $device   = shift @arr;
 
-  _DeleteTimer($hash);
+  #_DeleteTimer($hash);
+  deleteAllRegIntTimer($hash);
   my $delVariables = "(CONDITION|COMMAND|profile|Profil)";
   map { delete $hash->{$_} if m{\A$delVariables.*}xms }  keys %{$hash};
 
@@ -1114,6 +1115,11 @@ sub checkDelayedExecution {
 
       Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skipped by new timer at $hash->{profil}{$time}{TIME}, delayedExecutionCond returned $verzoegerteAusfuehrung" );
       deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash);
+      #xxxxx add logic for last timer of day
+      resetRegIntTimer($time, $hash->{profil}{$time}{EPOCH}, \&WeekdayTimer_Update, $hash, 0) 
+        if $hash->{profil}{$time}{EPOCH} > time 
+        && (isAnActiveTimer ($hash, $hash->{profil}{$time}{TAGE}, $hash->{profil}{$time}{PARA}, $hash->{profil}{$time}{WE_Override}) 
+        || isAnActiveTimer ($hash, $hash->{helper}{WEDAYS}{0} ? [7]:[8], $hash->{profil}{$time}{PARA}, $hash->{profil}{$time}{WE_Override}) );
     }
     $hash->{VERZOEGRUNG_IDX} = $time;
     resetRegIntTimer("$time", $nextRetry, \&WeekdayTimer_Update, $hash, 0);
@@ -1170,6 +1176,11 @@ sub checkDelayedExecution {
           if ( defined $hash->{VERZOEGRUNG_IDX} && $hash->{VERZOEGRUNG_IDX} != $time ) {
               Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skipped by new timer at $hash->{profil}{$time}{TIME} while window contact returned open state");
               deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash);
+              #xxxxx add logic for last timer of day
+              resetRegIntTimer($time, $hash->{profil}{$time}{EPOCH}, \&WeekdayTimer_Update, $hash, 0) 
+                if $hash->{profil}{$time}{EPOCH} > time 
+                && (isAnActiveTimer ($hash, $hash->{profil}{$time}{TAGE}, $hash->{profil}{$time}{PARA}, $hash->{profil}{$time}{WE_Override}) 
+                || isAnActiveTimer ($hash, $hash->{helper}{WEDAYS}{0} ? [7]:[8], $hash->{profil}{$time}{PARA}, $hash->{profil}{$time}{WE_Override}) );
           }
           $hash->{VERZOEGRUNG_IDX} = $time;
           resetRegIntTimer("$time", $nextRetry, \&WeekdayTimer_Update, $hash, 0);
