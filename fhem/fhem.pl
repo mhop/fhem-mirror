@@ -2226,8 +2226,9 @@ fhem_setIoDev($$)
     return "unknown IODev $val specified";
   }
 
+  my $av = AttrVal($hash->{NAME}, "IODev", "");
   return "$hash->{NAME}: not setting IODev to $val, as different attr exists"
-        if(AttrVal($hash->{NAME}, "IODev", "") ne $val);
+        if($av && $av ne $val);
     
   $hash->{IODev} = $defs{$val};
   setReadingsVal($hash, "IODev", $val, TimeNow()); # 120603
