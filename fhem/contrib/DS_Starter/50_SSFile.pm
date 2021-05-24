@@ -144,6 +144,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ",
   "0.8.0"  => "18.03.2021  extend commandref, switch to 'stable' ",
   "0.7.7"  => "07.01.2021  avoid FHEM crash if Cache file content is not valid JSON format ",
   "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
@@ -766,12 +767,12 @@ sub __fillUploadQueue {
   # Log3 ($name, 3, "$name - all explored files for upload:\n".Dumper $found);
 
   for my $sn (keys %{$found}) {
-      my $fname  = (split "\/", $found->{$sn}{lfile})[-1];
-      my $mtime  = $found->{$sn}{mtime}  * 1000;                        # Angabe in Millisekunden
-      my $crtime = $found->{$sn}{crtime} * 1000;                        # Angabe in Millisekunden
-      my $dir    = $remDir.$found->{$sn}{ldir};                         # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
+      my $fname  = (split "\/", $found->{$sn}{lfile})[-1];       
+      my $mtime  = $found->{$sn}{mtime}  * 1000;                                       # Angabe in Millisekunden
+      my $crtime = $found->{$sn}{crtime} * 1000;                                       # Angabe in Millisekunden
+      my $dir    = $remDir.$found->{$sn}{ldir};                                        # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
       
-      if($struc eq "false") {                                           # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
+      if($struc eq "false") {                                                          # Ziel nicht Struktur erhaltend (alle Files landen im Zielverzeichnis ohne Unterverzeichnisse)
           $dir = $remDir;
       }
       
@@ -1657,7 +1658,7 @@ sub execOp_parse {
                 return;
             }
             
-            $jdata = decode_json($myjson);
+            eval { $jdata = decode_json($myjson); };                          ## no critic 'eval not tested'  #Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531
             
             Log3($name, 5, "$name - JSON returned: ". Dumper $jdata);
        
