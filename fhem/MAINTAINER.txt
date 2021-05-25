@@ -267,6 +267,7 @@ FHEM/49_TBot_List.pm         viegener             Unterstützende Dienste
 FHEM/50_HP1000.pm            loredo               Unterstützende Dienste/Wettermodule
 FHEM/50_MOBILEALERTSGW.pm    MarkusF              Sonstige Systeme
 FHEM/50_SSChatBot.pm         DS_Starter           Sonstiges
+FHEM/50_SSFile.pm            DS_Starter           Sonstiges
 FHEM/50_TelegramBot.pm       viegener             Unterstützende Dienste
 FHEM/50_WS300.pm             Dirk                 SlowRF
 FHEM/51_I2C_BH1750.pm        arnoaugustin         Einplatinencomputer (bitte auch PM)

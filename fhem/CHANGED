@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - new:     50_SSFile: Module that integrates Synology Sile Station
  - bugfix:  98_WeekdayTimer: CONDITION now again is checked for entire day
  - feature: 74_GardenaSmartDevice: add support for SmartIrrigationControl
               add custom schedule breake ic24
