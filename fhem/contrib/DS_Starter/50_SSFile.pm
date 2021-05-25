@@ -145,7 +145,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ",
+  "0.8.1"  => "24.05.2021  fix FHEM crash when malfomed JSON is received ".
+                           "Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531 ",
   "0.8.0"  => "18.03.2021  extend commandref, switch to 'stable' ",
   "0.7.7"  => "07.01.2021  avoid FHEM crash if Cache file content is not valid JSON format ",
   "0.7.6"  => "20.12.2020  minor change to avoid increase memory ",
@@ -769,11 +770,12 @@ sub __fillUploadQueue {
 
   for my $sn (keys %{$found}) {
       my $fname  = (split "\/", $found->{$sn}{lfile})[-1];
-      my $enc    = guess_encoding($fname, qw/utf8/);
+      
+      my $enc    = guess_encoding($fname, qw/utf8/);                                   # check ob Name UTF8 kodiert, Forum: https://forum.fhem.de/index.php/topic,115371.msg1158531.html#msg1158531
       if(!ref $enc ) {
-          $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);
+          $fname  = encode ("utf8", $fname);
       }
-      # my $fname  = encode ("utf8", (split "\/", $found->{$sn}{lfile})[-1]);        
+       
       my $mtime  = $found->{$sn}{mtime}  * 1000;                                       # Angabe in Millisekunden
       my $crtime = $found->{$sn}{crtime} * 1000;                                       # Angabe in Millisekunden
       my $dir    = $remDir.$found->{$sn}{ldir};                                        # zusammengesetztes Zielverzeichnis (Struktur erhaltend - default)
@@ -2782,6 +2784,7 @@ return $out;
         "Time::HiRes": 0,
         "HttpUtils": 0,
         "Encode": 0,
+        "Encode::Guess": 0,
         "FHEM::SynoModules::API": 0,
         "FHEM::SynoModules::SMUtils": 0,
         "FHEM::SynoModules::ErrCodes": 0,
