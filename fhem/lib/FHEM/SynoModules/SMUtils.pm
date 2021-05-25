@@ -26,6 +26,7 @@
 #########################################################################################################################
 
 # Version History
+# 1.23.0   new sub evalDecodeJSON
 # 1.22.0   new sub addCHANGED
 # 1.21.0   new sub timestringToTimestamp / createReadingsFromArray
 # 1.20.7   change to defined ... in sub _addSendqueueSimple
@@ -72,6 +73,7 @@ our @EXPORT_OK = qw(
                      getCredentials
                      showStoredCredentials
                      evaljson
+                     evalDecodeJSON
                      login
                      logout
                      setActiveToken
@@ -1080,9 +1082,9 @@ sub evaljson {
       return ($success,$myjson);
   }
   
-  eval {decode_json($myjson)} or do {
+  eval {decode_json($myjson)} or do {                                                            
       if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
-              $OpMode =~ m/^.*_hls$/x ) {                                                    # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
+              $OpMode =~ m/^.*_hls$/x ) {                                                        # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
           Log3($name, 5, "$name - HLS-activation data return: $myjson");
           
           if ($myjson =~ m/{"success":true}/x) {
@@ -1101,6 +1103,51 @@ sub evaljson {
   };
   
 return ($success,$myjson);
+}
+
+###############################################################################
+#         testet und decodiert einen übergebenen JSON-String
+#         Die dekodierten Daten werden zurück gegeben bzw. im
+#         SSCam-Kontext angepasst
+###############################################################################
+sub evalDecodeJSON { 
+  my $hash    = shift // carp $carpnohash                   && return;
+  my $myjson  = shift // carp "got no string for JSON test" && return;
+  my $OpMode  = $hash->{OPMODE};
+  my $name    = $hash->{NAME};
+  
+  my $success = 1;
+  my $decoded = q{};
+  
+  if($nojsonmod) {
+      $success = 0;
+      Log3($name, 1, "$name - ERROR: Perl module 'JSON' is missing. You need to install it.");
+      return ($success,$myjson);
+  }
+  
+  eval {$decoded = decode_json($myjson)} or do {
+      if( ($hash->{HELPER}{RUNVIEW} && $hash->{HELPER}{RUNVIEW} =~ m/^live_.*hls$/x) || 
+              $OpMode =~ m/^.*_hls$/x ) {                                                        # SSCam: HLS aktivate/deaktivate bringt kein JSON wenn bereits aktiviert/deaktiviert
+          Log3($name, 5, "$name - HLS-activation data return: $myjson");
+          
+          if ($myjson =~ m/{"success":true}/x) {
+              $success = 1;
+              $myjson  = '{"success":true}';
+              $decoded = decode_json($myjson);             
+          }
+      } 
+      else {
+          $success = 0;
+          $decoded = q{};
+          
+          my $errorcode = "9000";         
+          my $error     = expErrors($hash,$errorcode);                                          # Fehlertext zum Errorcode ermitteln
+            
+          setReadingErrorState ($hash, $error, $errorcode);  
+      }
+  };
+  
+return ($success,$decoded);
 }
 
 ####################################################################################  
