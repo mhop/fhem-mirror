@@ -13,6 +13,7 @@ use strict;
 use warnings;
 use SetExtensions;
 use Scalar::Util qw(looks_like_number);
+use List::Util qw(sum);
 
 my %I2C_ADS1x1x_Config =
 (
@@ -105,6 +106,7 @@ sub I2C_ADS1x1x_Initialize($) {
 												"a3_mode:RTD,NTC,RAW,RES,off ".
 												"a0_res a1_res a2_res a3_res ".
 												"a0_r0 a1_r0 a2_r0 a3_r0 ".
+												"a0_avg a1_avg a2_avg a3_avg ".
 												"a0_bval a1_bval a2_bval a3_bval ".												
 												"a0_gain:6V,4V,2V,1V,0.5V,0.25V ".
 												"a1_gain:6V,4V,2V,1V,0.5V,0.25V ".
@@ -417,10 +419,23 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 			( $refvoltage/$mask) * 									# normiere anhand der Auflösung 2^15 im positiven Bereich
 			( 1.0 - (2.0 *  (($value & ($mask+1)) >> ($bits-1)))); 		# bei gesetzten Bit 2^15 Faktor -1, ansonsten +1	($mask+1 = 0x8000/0x800)
 
+			my $sensor= $clientmsg->{sensor};
+
+			#Build average with floating windows to smoothe shaky sensors
+			my @avg=();
+			my $avgs=$hash->{helper}{"a".$sensor};
+			if (defined $avgs) {
+				@avg=@$avgs;
+			}
+			my $avgmax=AttrVal($name,"a".$sensor."_avg",1);
+			push @avg,$voltage;
+			while (@avg>$avgmax) { shift @avg; }
+			$hash->{helper}{"a".$sensor}=[@avg];
+			$voltage=sum(@avg)/@avg;
+			
 			#rounded voltage only for reading, continue calculation will full precision
 			my $voltager = sprintf( '%.' . AttrVal($clientHash->{NAME}, 'decimals', 3) . 'f', $voltage 	); 
 			Log3 $hash,5 , "$name:voltage=$voltage, ref=".$I2C_ADS1x1x_Config{'Gain'}{$gain}{refVoltage};
-			my $sensor= $clientmsg->{sensor};
      		readingsBulkUpdate($hash, "a".$sensor."_voltage", $voltager) if (ReadingsVal($name,"a".$sensor."_voltage",0) != $voltager);
 			my $divider=AttrVal($name,"a".$sensor."_res",1000);
 			my $highvoltage=AttrVal($name,"sys_voltage",3.3);
@@ -458,11 +473,10 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 =item summary_DE liest/konvertiert Daten eines via angeschlossenen ADS1x1x A/D Wandlers
 =begin html
 
-<a name="I2C_ADS1x1x"></a>
 <h3>I2C_ADS1x1x</h3>
 (en | <a href="commandref_DE.html#I2C_ADS1x1x">de</a>)
 <ul>
-	<a name="I2C_ADS1x1x"></a>
+<a id="I2C_ADS1x1x"></a>
 		Provides an interface to an ADS1x1x A/D converter via I2C.<br>
 		The I2C messages are send through an I2C interface module like <a href="#RPII2C">RPII2C</a>, <a href="#FRM">FRM</a>
 		or <a href="#NetzerI2C">NetzerI2C</a> so this device must be defined first.<br><br>
@@ -487,7 +501,7 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		</code>
 		<br>
 		<br><b>Attribute <a href="#IODev">IODev</a> must be set. This is typically the name of a defined <a href="#RPII2C">RPII2C</a> device </b><br>         
-	<a name="I2C_ADS1x1xDefine"></a><br>
+	<a id="I2C_ADS1x1x-define"></a><br>
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_ADS1x1x &lt;I2C Address&gt;</code><br>
@@ -495,11 +509,11 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		<br>
 	</ul>
 
-	<a name="I2C_ADS1x1xSet"></a>
+	<a id="I2C_ADS1x1x-set"></a>
 	<b>Set</b>
 	<ul>
 		<li><b>update</b><br>
-		<a name="update"></a>
+		<a id="I2C_ADS1x1x-set-update"></a>
 		<code>set &lt;name&gt; update</code><br>
 		Trigger a reading. Resets the timers so the first reading will start within 1s - 
 		continuing with the other channels based on the polling_interleave attribute.<br>
@@ -507,12 +521,12 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		</li>
 	</ul>
 
-	<a name="I2C_ADS1x1xAttr"></a>
+	<a id="I2C_ADS1x1x-attr"></a>
 	<b>Attributes</b>
 	<ul>
 	    
 		<li><b>device</b><br>
-			<a name="device"></a>
+			<a id="I2C_ADS1x1x-attr-device"></a>
 			Defines the Texas Instruments ADS1x1x device that is actually being used.
 			<ul>
 				<li>ADS1013 - 12Bit, 1 channel</li>
@@ -529,37 +543,37 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		</li>
 		<br>
 		<li><b>poll_interval</b><br>
-			<a name="poll_interval"></a>
+			<a id="I2C_ADS1x1x-attr-poll_interval"></a>
 			Set the polling interval in minutes to query a new reading from enabled channels<br>
 			By setting this number to 0, the device can be set to manual mode (new readings only by "set update").<br>
 			<b>Default:</b> 5, valid values: decimal number<br>
 		</li>
 		<br>
 		<li><b>poll_interleave</b><br>
-			<a name="poll_interleave"></a>
+			<a id="I2C_ADS1x1x-attr-poll_interleave"></a>
 			Interleave between reading 2 channels in seconds (only valid for multi channel devices). 
 			Can be used to distribute the load more evenly.<br>
 			<b>Default</b>: 0.008, valid values: decimal number<br>
 		</li>	
 		<br>
 		<li><b>sys_voltage</b><br>
-			<a name="sys_voltage"></a>
+			<a id="I2C_ADS1x1x-attr-sys_voltage"></a>
 			System voltage running the chip and typically connected to the pull-up resistor (e.g. 3.3V with a Raspberry Pi)<br>
 			<b>Default:</b> 3.3, valid values: float number<br>
 		</li>
 		<br>
 		<li><b>decimals</b><br>
-			<a name="decimals"></a>
+			<a id="I2C_ADS1x1x-attr-decimals"></a>
 			Number of decimals (after the decimal point) for voltage and resistance to make results more readable. 
 			Calculations are still based on full precision. Temperatures are fixed to one decimal.<br>
 			<b>Default:</b> 3, valid values: 0,1,2,3,4,5<br>
 		</li>
 		<br>
 		<li><b>a[0-3]_gain</b><br>
-			<a name="a0_gain"></a>
-			<a name="a1_gain"></a>
-			<a name="a2_gain"></a>
-			<a name="a3_gain"></a>
+			<a id="I2C_ADS1x1x-attr-a0_gain"></a>
+			<a id="I2C_ADS1x1x-attr-a1_gain"></a>
+			<a id="I2C_ADS1x1x-attr-a2_gain"></a>
+			<a id="I2C_ADS1x1x-attr-a3_gain"></a>
 			Gain amplifier value (sensibility and range of measurement) used per channel a0-a3. 
 			Standard is 4V which can measure a range between 0 and 4 Volts. 
 			If measuring smaller voltage, the amplification can be increased to get more accurate readings. 
@@ -568,10 +582,10 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		</li>
 		<br>
 		<li><b>a[0-3]_mode</b><br>
-			<a name="a0_mode"></a>
-			<a name="a1_mode"></a>
-			<a name="a2_mode"></a>
-			<a name="a3_mode"></a>
+			<a id="I2C_ADS1x1x-attr-a0_mode"></a>
+			<a id="I2C_ADS1x1x-attr-a1_mode"></a>
+			<a id="I2C_ADS1x1x-attr-a2_mode"></a>
+			<a id="I2C_ADS1x1x-attr-a3_mode"></a>
 			Determines how the results are interpreted.
 			<ul>
 			<li>off: The channel is not measured</li>
@@ -586,35 +600,43 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 		</li>
 		<br>		
 		<li><b>a[0-3]_res</b><br>
-			<a name="a0_res"></a>
-			<a name="a1_res"></a>
-			<a name="a2_res"></a>
-			<a name="a3_res"></a>
+			<a id="I2C_ADS1x1x-attr-a0_res"></a>
+			<a id="I2C_ADS1x1x-attr-a1_res"></a>
+			<a id="I2C_ADS1x1x-attr-a2_res"></a>
+			<a id="I2C_ADS1x1x-attr-a3_res"></a>
 			Value of pull-up resistor for resistance and temperature measurement. Connected between A0 and VCC (defined in "sys_voltage")<br>
 			<b>Default:</b> 1000, valid values: float numbers<br>
 		</li>
 		<br>		
 		<li><b>a[0-3]_r0</b><br>
-			<a name="a0_r0"></a>
-			<a name="a1_r0"></a>
-			<a name="a2_r0"></a>
-			<a name="a3_r0"></a>
+			<a id="I2C_ADS1x1x-attr-a0_r0"></a>
+			<a id="I2C_ADS1x1x-attr-a1_r0"></a>
+			<a id="I2C_ADS1x1x-attr-a2_r0"></a>
+			<a id="I2C_ADS1x1x-attr-a3_r0"></a>
 			Reference resistance for temperature measurements at 0°C (for RTD) and 25°C (for NTC) in Ohm.<br>
 			<b>Default:</b> 1000.0 in RTD and 50000.0 in NTC mode, valid values: float numbers<br>
 		</li>
 		<br>		
 		<li><b>a[0-3]_bval</b><br>
-			<a name="a0_bval"></a>
-			<a name="a1_bval"></a>
-			<a name="a2_bval"></a>
-			<a name="a3_bval"></a>
+			<a id="I2C_ADS1x1x-attr-a0_bval"></a>
+			<a id="I2C_ADS1x1x-attr-a1_bval"></a>
+			<a id="I2C_ADS1x1x-attr-a2_bval"></a>
+			<a id="I2C_ADS1x1x-attr-a3_bval"></a>
 			B-Value for NTC Thermistors (define the increase from the base value).<br>
 			<b>Default</b>: 3950.0, valid values: float numbers<br>
 		</li>
 		<br>		
-		<br>
+		<li><b>a[0-3]_avg</b><br>
+			<a id="I2C_ADS1x1x-attr-a0_avg"></a>
+			<a id="I2C_ADS1x1x-attr-a1_avg"></a>
+			<a id="I2C_ADS1x1x-attr-a2_avg"></a>
+			<a id="I2C_ADS1x1x-attr-a3_avg"></a>
+			Sometimes measurements can fluctuate. To get smoother values, this attribute will enable creating an average of n numbers, which should result in more stable results.<br>
+			<b>Default</b>: 1, valid values: integers<br>
+		</li>
+		<br>		
 		<li><b>data_rate (1/16x,1/8x,1/4x,1/2x,1x,2x,4x,8x )</b><br>
-			<a name="data_rate"></a>
+			<a id="I2C_ADS1x1x-attr-data_rate"></a>
 			<ul>
 			Conversion speed - default is 1x. The 12-bit chips use 1600 SPS as default rate, while the 16-bit chips are slower with 128 SPS. 
 			Below table translates the settings based on the actual device used.<br><br>
@@ -677,7 +699,6 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 	<br>
 	<ul>
 		<li><b>operation_mode</b><br>
-			<a name="operation_mode"></a>
 			<ul>
 			Not implemented, since Continuous Mode make no sense when using multiple input registers and is meant to read values in very high speed (e.g. one value every 8 ms) which IMHO makes no sense with FHEM.<br> 
 			<li>SingleShot: Do one reading and then power down</li>
@@ -702,7 +723,7 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 			</ul>
 		</li>
 		<br>		
-		<li>latching_comparator (on|off)<br>
+		<li><b>latching_comparator (on|off)</b><br>
 			<ul>
 			Not implemented.
 			</ul>
@@ -718,25 +739,24 @@ sub I2C_ADS1x1x_I2CRec($@) {				# ueber CallFn vom physical aufgerufen
 
 =begin html_DE
 
-<a name="I2C_ADS1x1x"></a>
 <h3>I2C_ADS1x1x</h3>
 (<a href="commandref.html#I2C_ADS1x1x">en</a> | de)
 <ul>
-	<a name="I2C_ADS1x1x"></a>
+	<a id="I2C_ADS1x1x"></a>
 		Bitte englische Dokumentation verwenden.<br>
-	<a name="I2C_ADS1x1xDefine"></a><br>
+	<a id="I2C_ADS1x1x-define"></a><br>
 	<b>Define</b>
 	<ul>
 		<code>define &lt;name&gt; I2C_ADS1x1x &lt;I2C Address&gt;</code><br>
 		Der Wert <code>&lt;I2C Address&gt;</code> ist ohne das Richtungsbit<br>
 	</ul>
 
-	<a name="I2C_ADS1x1xSet"></a>
+	<a id="I2C_ADS1x1x-attr-set"></a>
 	<b>Set</b>
 	<ul>
 	</ul>
 
-	<a name="I2C_ADS1x1xAttr"></a>
+	<a id="I2C_ADS1x1x-attr"></a>
 	<b>Attribute</b>
 	<ul>
 		<li>poll_interval<br>
