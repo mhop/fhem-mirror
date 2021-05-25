@@ -5,6 +5,7 @@ import cloudscraper
 import email
 import imaplib
 import re
+from html.parser import HTMLParser
 
 class Arlo:
     def __init__(self, tfa_mail_check) -> None:
@@ -55,7 +56,6 @@ class Arlo:
             error("getFactors not successful, response code " + str(r.status_code))
             return
 
-        factor_id = None
         for factor in data["items"]:
             if factor["factorType"] == "EMAIL":
                 self._auth_tfa(factor["factorId"])
@@ -173,15 +173,25 @@ class TfaMailCheck:
         res, msg = self._imap.fetch(msg_id, "(RFC822)")
         for part in email.message_from_bytes(msg[0][1]).walk():
             if part.get_content_type() == "text/html":
-                for line in part.get_payload().splitlines():
-                    code = re.match(r"^\W*(\d{6})\W*$", line)
-                    if code is not None:
-                        self._imap.store(msg_id, "+FLAGS", "\\Deleted")
-                        return code.group(1)
+                code_filter = CodeFilter()
+                code_filter.feed(part.get_payload())
+                if code_filter.code:
+                    self._imap.store(msg_id, "+FLAGS", "\\Deleted")
+                    return code_filter.code
 
     def close(self):
         self._imap.close()
         self._imap.logout()
+
+class CodeFilter(HTMLParser):
+    code = None
+    def handle_data(self, data):
+        if self.code:
+            return
+        line = data.strip().replace("=09", "")
+        match = re.match(r"\d{6}", line)
+        if match:
+            self.code = match.group(0)
 
 
 def status(status):
