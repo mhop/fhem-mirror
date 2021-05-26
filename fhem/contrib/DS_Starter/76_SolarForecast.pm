@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.47.0" => "26.05.2021  add flowGraphic, attr flowGraphicSize ",
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
   "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
@@ -262,8 +263,8 @@ my %hqtxt = (                                                                   
   ist   => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
              DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}        },
   mps   => { EN => qq{Please specify the total peak power for every string with "set LINK modulePeakString"},
-             DE => qq{Bitte geben sie die Gesamtspitzenleistung für jeden String mit "set LINK modulePeakString" an}   },
-  mdr   => { EN => qq{Please specify the module  direction with "set LINK moduleDirection"},
+             DE => qq{Bitte geben sie die Gesamtspitzenleistung von jedem String mit "set LINK modulePeakString" an}   },
+  mdr   => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
              DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
   mta   => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
@@ -471,6 +472,7 @@ sub Initialize {
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
+                                "flowGraphicSize:slider,100,50,500 ".
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "headerAlignment:center,left,right ".                                       
@@ -3202,39 +3204,45 @@ return;
 #              FHEMWEB Fn
 ################################################################
 sub FwFn {
-  my ($FW_wname, $d, $room, $pageHash) = @_;                       # pageHash is set for summaryFn.
-  my $hash = $defs{$d};
+  my ($FW_wname, $name, $room, $pageHash) = @_;                       # pageHash is set for summaryFn.
+  my $hash = $defs{$name};
   my $height;
   
   RemoveInternalTimer($hash, \&pageRefresh);
   $hash->{HELPER}{FW} = $FW_wname;
        
-  my $link  = forecastGraphic ($d);
-
-  my $alias = AttrVal($d, "alias", $d);                            # Linktext als Aliasname oder Devicename setzen
-  my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$d">$alias</a>}; 
+  my $foreg = forecastGraphic ($name);
   
-  my $ret = "";
-  if(IsDisabled($d)) {
-      $height = AttrNum($d, 'beamHeight', 200);   
+  my $flowgh = AttrVal     ($name, "flowGraphicSize", 300);
+  my $flowg  = flowGraphic ($name, $flowgh);
+
+  my $alias  = AttrVal($name, "alias", $name);                                  # Linktext als Aliasname oder Devicename setzen
+  my $dlink  = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
+  
+  my $ret = q{};
+  
+  if(IsDisabled($name)) {
+      $height = AttrNum($name, 'beamHeight', 200);   
       $ret   .= "<table class='roomoverview'>";
       $ret   .= "<tr style='height:".$height."px'>";
       $ret   .= "<td>";
-      $ret   .= qq{Solar forecast graphic device <a href="$FW_ME$FW_subdir?detail=$d">$d</a> is disabled}; 
+      $ret   .= qq{Solar forecast graphic device <a href="$FW_ME$FW_subdir?detail=$name">$name</a> is disabled}; 
       $ret   .= "</td>";
       $ret   .= "</tr>";
       $ret   .= "</table>";
   } 
   else {
-      $ret .= "<span>$dlink </span><br>"  if(AttrVal($d,"showLink",0));
-      $ret .= $link;  
+      $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
+      $ret .= $foreg;
+      $ret .= "\n";
+      $ret .= $flowg;   
   }
   
   # Autorefresh nur des aufrufenden FHEMWEB-Devices
-  my $al = AttrVal($d, "autoRefresh", 0);
+  my $al = AttrVal($name, "autoRefresh", 0);
   if($al) {  
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3 ($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   }
 
 return $ret;
@@ -3243,17 +3251,17 @@ return $ret;
 ################################################################
 sub pageRefresh { 
   my $hash = shift;
-  my $d    = $hash->{NAME};
+  my $name = $hash->{NAME};
   
   # Seitenrefresh festgelegt durch SolarForecast-Attribut "autoRefresh" und "autoRefreshFW"
-  my $rd = AttrVal($d, "autoRefreshFW", $hash->{HELPER}{FW});
+  my $rd = AttrVal($name, "autoRefreshFW", $hash->{HELPER}{FW});
   { map { FW_directNotify("#FHEMWEB:$_", "location.reload('true')", "") } $rd }       ## no critic 'Map blocks'
   
-  my $al = AttrVal($d, "autoRefresh", 0);
+  my $al = AttrVal($name, "autoRefresh", 0);
   
   if($al) {      
       InternalTimer(gettimeofday()+$al, \&pageRefresh, $hash, 0);
-      Log3 ($d, 5, "$d - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
+      Log3 ($name, 5, "$name - next start of autoRefresh: ".FmtDateTime(gettimeofday()+$al));
   } 
   else {
       RemoveInternalTimer($hash, \&pageRefresh);
@@ -3297,91 +3305,39 @@ return $ret;
 }
 
 ###############################################################################
-#                  Subroutine für Vorhersagegrafik
+#                            Vorhersagegrafik
 ###############################################################################
 sub forecastGraphic {                                                                     ## no critic 'complexity'
   my $name = shift;
   my $ftui = shift // "";
-  
   my $hash = $defs{$name};
+  
   my $ret  = "";
   
-  my ($val,$height);
-  my ($z2,$z3,$z4);
-  my $he;                                                                                  # Balkenhöhe
+  my ($val,$z2,$z3,$z4,$he);
 
   my $hfcg = $data{$hash->{TYPE}}{$name}{html};                                            #(hfcg = hash forecast graphic)
 
-  ##########################################################
   # Kontext des SolarForecast-Devices speichern für Refresh
+  ##########################################################
   $hash->{HELPER}{SPGDEV}    = $name;                                                      # Name des aufrufenden SMAPortalSPG-Devices
   $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SMAPortalSPG-Devices (wenn Detailansicht)
   
-  my $lang   = AttrVal     ("global", "language",        "EN");
-  my $fcdev  = ReadingsVal ($name, "currentForecastDev",  "" );                            # Forecast Device (Wetter) 
-  my $radev  = ReadingsVal ($name, "currentRadiationDev", "" );                            # Forecast Device (Wetter) 
-  my $indev  = ReadingsVal ($name, "currentInverterDev",  "" );                            # Inverter Device
-  my $medev  = ReadingsVal ($name, "currentMeterDev",     "" );                            # Meter Device
-
-  my $pv0    = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);
-  my $is     = ReadingsVal  ($name, "inverterStrings",          undef);                    # String Konfig
-  my $peak   = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
-  my $dir    = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
-  my $ta     = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
+  # Setup Vollständigkeit prüfen
+  ###############################
+  my $incomplete = _checkSetupComplete ($hash);
+  return $incomplete if($incomplete);
   
-  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peak || !defined $pv0 || !$dir || !$ta) {
-      my $link = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
-      $height  = AttrNum($name, 'beamHeight', 200);   
-      $ret    .= "<table class='roomoverview'>";
-      $ret    .= "<tr style='height:".$height."px'>";
-      $ret    .= "<td>";
-      
-      if(!$fcdev) {                                                                        ## no critic 'Cascading'
-          $ret .= $hqtxt{cfd}{$lang};
-      }
-      elsif(!$radev) {
-          $ret .= $hqtxt{crd}{$lang};   
-      }
-      elsif(!$indev) {
-          $ret .= $hqtxt{cid}{$lang}; 
-      }
-      elsif(!$medev) {
-          $ret .= $hqtxt{mid}{$lang}; 
-      }
-      elsif(!$is) {
-          $ret .= $hqtxt{ist}{$lang}; 
-      }
-      elsif(!$peak) {
-          $ret .= $hqtxt{mps}{$lang};  
-      }
-      elsif(!$dir) {
-          $ret .= $hqtxt{mdr}{$lang};
-      }
-      elsif(!$ta) {
-          $ret .= $hqtxt{mta}{$lang};  
-      }
-      elsif(!defined $pv0) {
-          $ret .= $hqtxt{awd}{$lang};   
-      }
-      
-      $ret   .= "</td>";
-      $ret   .= "</tr>";
-      $ret   .= "</table>";
-      $ret    =~ s/LINK/$link/gxs;
-      return $ret;
-  }
-
-  my $cclv                    = "L05";
-  my @pgCDev                  = split(',',AttrVal($name,"consumerList",""));            # definierte Verbraucher ermitteln
-  my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
-
-  $legend = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
   
-  ###################################
   # Verbraucherlegende und Steuerung
   ###################################
   my $legend_txt;
+  my $cclv                    = "L05";
+  my @pgCDev                  = split(',',AttrVal($name,"consumerList",""));            # definierte Verbraucher ermitteln
+  my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
+  $legend                     = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
+  
   if ($legend) {
       for (@pgCDev) {
           my($txt,$im) = split(':',$_);                                                 # $txt ist der Verbrauchername
@@ -3419,46 +3375,38 @@ sub forecastGraphic {                                                           
       }
   }
 
-  ###################################
   # Parameter f. Anzeige extrahieren
   ###################################  
-  my $maxhours   =  AttrNum ($name, 'hourCount',             24   );
-  my $offset     =  AttrNum ($name, 'historyHour',            0   );
-
-  my $hourstyle  =  AttrVal ($name, 'hourStyle',              ''  );
-
-  my $colorfc    =  AttrVal ($name, 'beam1Color',         '000000');
-  my $colorc     =  AttrVal ($name, 'beam2Color',         'C4C4A7');
-  my $fcolor1    =  AttrVal ($name, 'beam1FontColor',     'C4C4A7');
-  my $fcolor2    =  AttrVal ($name, 'beam2FontColor',     '000000');
-             
-  my $beam1cont  =  AttrVal ($name, 'beam1Content',   'pvForecast');
-  my $beam2cont  =  AttrVal ($name, 'beam2Content',   'pvForecast'); 
-
-  my $icon       =  AttrVal ($name, 'consumerAdviceIcon', undef   );
-  my $html_start =  AttrVal ($name, 'htmlStart',          undef   );                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_end   =  AttrVal ($name, 'htmlEnd',            undef   );                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
-
-  my $lotype     =  AttrVal ($name, 'layoutType',       'single'  );
-  my $kw         =  AttrVal ($name, 'Wh/kWh',              'Wh'   );
-
-  $height        =  AttrNum ($name, 'beamHeight',           200   );
-  my $width      =  AttrNum ($name, 'beamWidth',              6   );                      # zu klein ist nicht problematisch
-  my $w          =  $width*$maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $fsize      =  AttrNum ($name, 'spaceSize',             24   );
-  my $maxVal     =  AttrNum ($name, 'maxValBeam',             0   );                      # dyn. Anpassung der Balkenhöhe oder statisch ?
-
-  my $show_night =  AttrNum ($name, 'showNight',              0   );                      # alle Balken (Spalten) anzeigen ?
-  my $show_diff  =  AttrVal ($name, 'showDiff',            'no'   );                      # zusätzliche Anzeige $di{} in allen Typen
-  my $weather    =  AttrNum ($name, 'showWeather',            1   );
-  my $colorw     =  AttrVal ($name, 'weatherColor',      'FFFFFF' );                      # Wetter Icon Farbe
-  my $colorwn    =  AttrVal ($name, 'weatherColorNight',  $colorw );                      # Wetter Icon Farbe Nacht
-
-  my $wlalias    =  AttrVal ($name, 'alias',              $name   );
-  my $header     =  AttrNum ($name, 'showHeader',             1   ); 
-  my $hdrAlign   =  AttrVal ($name, 'headerAlignment', 'center'   );                      # ermöglicht per attr die Ausrichtung der Tabelle zu setzen
-  my $hdrDetail  =  AttrVal ($name, 'headerDetail',       'all'   );                      # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-
+  my $maxhours   =  AttrNum ($name,    'hourCount',                24);
+  my $offset     =  AttrNum ($name,    'historyHour',               0);
+  my $hourstyle  =  AttrVal ($name,    'hourStyle',                '');
+  my $colorfc    =  AttrVal ($name,    'beam1Color',         '000000');
+  my $colorc     =  AttrVal ($name,    'beam2Color',         'C4C4A7');
+  my $fcolor1    =  AttrVal ($name,    'beam1FontColor',     'C4C4A7');
+  my $fcolor2    =  AttrVal ($name,    'beam2FontColor',     '000000');     
+  my $beam1cont  =  AttrVal ($name,    'beam1Content',   'pvForecast');
+  my $beam2cont  =  AttrVal ($name,    'beam2Content',   'pvForecast'); 
+  my $icon       =  AttrVal ($name,    'consumerAdviceIcon',    undef);
+  my $html_start =  AttrVal ($name,    'htmlStart',             undef);                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
+  my $html_end   =  AttrVal ($name,    'htmlEnd',               undef);                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
+  my $lotype     =  AttrVal ($name,    'layoutType',         'single');
+  my $kw         =  AttrVal ($name,    'Wh/kWh',                 'Wh');
+  my $height     =  AttrNum ($name,    'beamHeight',              200);
+  my $width      =  AttrNum ($name,    'beamWidth',                 6);                      # zu klein ist nicht problematisch
+  my $w          =  $width*$maxhours;                                                        # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
+  my $fsize      =  AttrNum ($name,    'spaceSize',                24);
+  my $maxVal     =  AttrNum ($name,    'maxValBeam',                0);                      # dyn. Anpassung der Balkenhöhe oder statisch ?
+  my $show_night =  AttrNum ($name,    'showNight',                 0);                      # alle Balken (Spalten) anzeigen ?
+  my $show_diff  =  AttrVal ($name,    'showDiff',               'no');                      # zusätzliche Anzeige $di{} in allen Typen
+  my $weather    =  AttrNum ($name,    'showWeather',               1);
+  my $colorw     =  AttrVal ($name,    'weatherColor',       'FFFFFF');                      # Wetter Icon Farbe
+  my $colorwn    =  AttrVal ($name,    'weatherColorNight',   $colorw);                      # Wetter Icon Farbe Nacht
+  my $wlalias    =  AttrVal ($name,    'alias',                 $name);
+  my $header     =  AttrNum ($name,    'showHeader',                1); 
+  my $hdrAlign   =  AttrVal ($name,    'headerAlignment',    'center');                      # ermöglicht per attr die Ausrichtung der Tabelle zu setzen
+  my $hdrDetail  =  AttrVal ($name,    'headerDetail',          'all');                      # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+  my $lang       =  AttrVal ("global", 'language',               'EN');
+  
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
@@ -3502,7 +3450,6 @@ sub forecastGraphic {                                                           
       $pvCu .= "&nbsp;W";
   }
 
-  ##########################
   # Headerzeile generieren 
   ##########################  
   if ($header) {
@@ -3530,8 +3477,8 @@ sub forecastGraphic {                                                           
 
       $header = "<table align=\"$hdrAlign\">"; 
 
-      #########################################
-      # Header Link + Status + Update Button      
+      # Header Link + Status + Update Button     
+      #########################################      
       if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
           my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
           
@@ -3597,8 +3544,9 @@ sub forecastGraphic {                                                           
           $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td title='$pvcanz' colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
       }
       
-      ########################
+      
       # Header Information pv 
+      ########################
       if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
           $header .= "<tr>";
           $header .= "<td><b>PV&nbsp;=></b></td>"; 
@@ -3609,8 +3557,9 @@ sub forecastGraphic {                                                           
           $header .= "</tr>";
       }
       
-      ########################
-      # Header Information co 
+      
+      # Header Information co
+      ########################      
       if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
           $header .= "<tr>";
           $header .= "<td><b>CO&nbsp;=></b></td>";
@@ -3624,7 +3573,6 @@ sub forecastGraphic {                                                           
       $header .= "</table>";     
   }
 
-  ##########################
   # Werte aktuelle Stunde
   ##########################
   my $day;
@@ -3685,7 +3633,6 @@ sub forecastGraphic {                                                           
 
   $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
-  ###########################################################
   # get consumer list and display it in portalGraphics
   ###########################################################  
   for (@pgCDev) {
@@ -3693,8 +3640,8 @@ sub forecastGraphic {                                                           
       $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
       $_        =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
     
-      ##################################
       #check if listed device is planned
+      ##################################
       if (ReadingsVal($name, $itemName."_Planned", "no") eq "yes") {
           #get start and end hour
           my ($start, $end);                                                                     # werden auf Balken Pos 0 - 23 umgerechnet, nicht auf Stunde !!, Pos = 24 -> ungültige Pos = keine Anzeige
@@ -3712,8 +3659,8 @@ sub forecastGraphic {                                                           
           $end     = int($end);
           my $flag = 0;                                                                          # default kein Tagesverschieber
 
-          #######################################
           #correct the hour for accurate display
+          #######################################
           if ($start < $hfcg->{0}{time}) {                                                       # gridconsumption seems to be tomorrow
               $start = 24-$hfcg->{0}{time}+$start;
               $flag  = 1;
@@ -3803,7 +3750,7 @@ sub forecastGraphic {                                                           
   }
 
   #Log3 ($hash,3,Dumper($hfcg));
-  ######################################
+  
   # Tabellen Ausgabe erzeugen
   ######################################
  
@@ -4004,8 +3951,8 @@ sub forecastGraphic {                                                           
               my $sicon = 1;                                                    
               #$ret .= $is{$i} if (defined ($is{$i}) && $sicon);
 
-              ##################################
               # inject the new icon if defined
+              ##################################
               #$ret .= consinject($hash,$i,@pgCDev) if($s);
                       
               $ret .= "</td></tr>";
@@ -4047,8 +3994,8 @@ sub forecastGraphic {                                                           
           $ret .= "<tr class='odd' style='height:".$z2."px'>";
           $ret .= "<td align='center' class='smaportal' ".$style1.">$val";
              
-          ##################################
           # inject the new icon if defined
+          ##################################
           #$ret .= consinject($hash,$i,@pgCDev) if($s);
              
           $ret .= "</td></tr>";
@@ -4117,8 +4064,8 @@ sub forecastGraphic {                                                           
 
   $ret .= "<td class='smaportal'></td></tr>";
 
-  ###################
   # Legende unten
+  #################
   if ($legend_txt && ($legend eq 'bottom')) {
       $ret .= "<tr class='odd'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
@@ -4129,6 +4076,205 @@ sub forecastGraphic {                                                           
   $ret .= $html_end if (defined($html_end));
   $ret .= "</html>";
 
+return $ret;
+}
+
+################################################################
+#       Vollständigkeit Setup prüfen
+################################################################
+sub _checkSetupComplete {                                
+  my $hash  = shift;
+  my $ret   = q{};
+  my $name  = $hash->{NAME};
+  
+  my $is    = ReadingsVal  ($name, "inverterStrings",          undef);                    # String Konfig
+  my $fcdev = ReadingsVal  ($name, "currentForecastDev",       undef);                    # Forecast Device (Wetter)
+  my $radev = ReadingsVal  ($name, "currentRadiationDev",      undef);                    # Forecast Device (Wetter) 
+  my $indev = ReadingsVal  ($name, "currentInverterDev",       undef);                    # Inverter Device
+  my $medev = ReadingsVal  ($name, "currentMeterDev",          undef);                    # Meter Device
+  my $peak  = ReadingsVal  ($name, "modulePeakString",         undef);                    # String Peak
+  my $pv0   = NexthoursVal ($hash, "NextHour00", "pvforecast", undef);
+  my $dir   = ReadingsVal  ($name, "moduleDirection",          undef);                    # Modulausrichtung Konfig
+  my $ta    = ReadingsVal  ($name, "moduleTiltAngle",          undef);                    # Modul Neigungswinkel Konfig
+  
+  if(!$is || !$fcdev || !$radev || !$indev || !$medev || !$peak || !defined $pv0 || !$dir || !$ta) {
+      my $link   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$name</a>};  
+      my $height = AttrNum ($name,    'beamHeight',  200);
+      my $lang   = AttrVal ("global", "language",   "EN");      
+      
+      $ret    .= "<table class='roomoverview'>";
+      $ret    .= "<tr style='height:".$height."px'>";
+      $ret    .= "<td>";
+      
+      if(!$fcdev) {                                                                        ## no critic 'Cascading'
+          $ret .= $hqtxt{cfd}{$lang};
+      }
+      elsif(!$radev) {
+          $ret .= $hqtxt{crd}{$lang};   
+      }
+      elsif(!$indev) {
+          $ret .= $hqtxt{cid}{$lang}; 
+      }
+      elsif(!$medev) {
+          $ret .= $hqtxt{mid}{$lang}; 
+      }
+      elsif(!$is) {
+          $ret .= $hqtxt{ist}{$lang}; 
+      }
+      elsif(!$peak) {
+          $ret .= $hqtxt{mps}{$lang};  
+      }
+      elsif(!$dir) {
+          $ret .= $hqtxt{mdr}{$lang};
+      }
+      elsif(!$ta) {
+          $ret .= $hqtxt{mta}{$lang};  
+      }
+      elsif(!defined $pv0) {
+          $ret .= $hqtxt{awd}{$lang};   
+      }
+      
+      $ret   .= "</td>";
+      $ret   .= "</tr>";
+      $ret   .= "</table>";
+      $ret    =~ s/LINK/$link/gxs;
+      return $ret;
+  }
+  
+return;
+}
+
+################################################################
+#                  Energieflußgrafik
+################################################################
+sub flowGraphic {
+    my $name = shift;
+    my $h    = shift;
+    
+    my $fs           = ($h < 300) ? '48px' : '32px';
+    my $style        = 'width:'.$h.'px; height:'.$h.'px;';
+
+    my $inactive     = 'stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2;';
+    my $active       = 'stroke-dashoffset: 20; stroke-dasharray: 10; animation: dash 0.5s linear; animation-iteration-count: infinite; opacity: 0.8;' ;
+
+    my $cpv          = ReadingsNum($name, 'Current_PV', 0);
+    my $sun_color    = ($cpv) ? 'orange' : 'gray';
+
+    my $cgc          = ReadingsNum($name, 'Current_GridConsumption', 0);
+    my $cgc_style    = ($cgc) ? $active : $inactive;
+    my $cgc_color    = ($cgc) ? 'red'   : 'gray';
+
+    my $cgfi         = ReadingsNum($name, 'Current_GridFeedIn', 0);
+    my $cgfi_style   = ($cgfi) ? $active  : $inactive;
+    my $cgfi_color   = ($cgfi) ? 'yellow' : 'gray';
+
+    my $csc          = ReadingsNum($name, 'Current_SelfConsumption', 0);
+    my $csc_style    = ($csc) ? $active  : $inactive;
+    my $csc_color    = ($csc) ? 'yellow' : 'gray';
+
+    my $batin        = ReadingsNum($name, 'Current_PowerBatIn', 0);
+    my $batin_style  = ($batin) ? $active  : $inactive;
+    my $batin_color  = ($batin) ? 'yellow' : 'gray';
+
+    my $batout       = ReadingsNum($name, 'Current_PowerBatOut' , 0);
+    my $batout_style = ($batout) ? $active  : $inactive;
+    my $batout_color = ($batout) ? 'yellow' : 'gray';
+
+    my $grid_color   = ($cgfi) ? 'green' : 'red'; 
+    $grid_color      = 'gray' if (!$cgfi && !$cgc && $batout); # dritte Farbe
+
+    my $ret = qq{
+        <table class="roomoverview">
+        <tr><td><table class="block fbcalllist"><tr align="center"><td>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" style="$style">
+
+		<g fill="$sun_color" transform="translate(150,90) scale(0.03,-0.03)" stroke="none">
+		<path d="M715 2608 c-28 -15 -45 -38 -45 -62 0 -12 63 -83 167 -188 179 -180 199 -192 243 -148 43 43 31 63 -142 236 -90 89 -172 165 -183 168 -11 3 -29 0 -40 -6z"/>
+		<path d="M1207 2609 c-38 -22 -39 -55 -5 -136 35 -86 57 -113 91 -113 31 0 67 35 67 65 0 36 -49 147 -77 173 -26 24 -48 27 -76 11z"/>
+		<path d="M1373 2236 c-103 -33 -194 -114 -241 -214 l-27 -57 0 -295 0 -295 33 -67 c39 -81 121 -158 202 -190 51 -21 73 -23 328 -26 229 -3 282 -1 330 13 125 36 226 134 263 255 19 63 20 88 17 337 l-3 269 -32 65 c-39 80 -111 150 -191 187 l-57 27 -290 2 c-220 2 -300 -1 -332 -11z m633 -143 c57 -30 111 -97 129 -157 21 -71 21 -461 0 -532 -19 -63 -72 -126 -133 -156 -46 -22 -54 -23 -312 -23 -258 0 -266 1 -312 23 -27 13 -64 42 -83 65 -60 70 -67 114 -63 385 3 261 5 270 72 340 71 76 98 81 406 79 242 -2 257 -3 296 -24z"/>
+		<path d="M585 2130 c-23 -25 -22 -67 1 -90 31 -30 264 -119 288 -111 33 12 52 54 41 87 -9 24 -29 36 -135 81 -135 58 -168 63 -195 33z"/>
+		<path d="M20 1720 c-27 -27 -25 -66 5 -96 l25 -25 416 3 c398 3 416 4 430 22 20 28 17 73 -6 96 -19 19 -33 20 -435 20 -402 0 -416 -1 -435 -20z"/>
+		<path d="M2400 1380 c-25 -25 -26 -64 -2 -88 18 -18 159 -82 180 -82 24 0 62 43 62 71 0 37 -21 54 -105 90 -79 34 -108 36 -135 9z"/>
+		<path d="M725 1325 c-128 -54 -155 -72 -155 -106 0 -27 39 -69 65 -69 37 0 248 91 273 118 35 37 18 91 -33 106 -12 3 -70 -15 -150 -49z"/>
+		<path d="M733 817 c-260 -260 -293 -296 -293 -324 0 -35 38 -73 73 -73 14 0 119 97 314 292 262 262 293 296 293 325 0 35 -38 73 -74 73 -14 0 -116 -95 -313 -293z"/>
+		<path d="M2225 1085 c-14 -13 -25 -34 -25 -46 0 -16 51 -74 167 -191 145 -146 171 -168 199 -168 37 0 67 29 67 66 0 22 -35 61 -170 195 -118 118 -176 169 -192 169 -12 0 -33 -11 -46 -25z"/>
+		<path d="M1970 932 c-28 -9 -50 -35 -50 -59 0 -32 88 -243 114 -271 27 -31 72 -26 99 10 l20 27 -49 122 c-63 156 -86 186 -134 171z"/>
+		<path d="M1288 913 c-16 -17 -118 -254 -118 -271 0 -5 9 -21 21 -36 25 -32 70 -35 97 -6 22 23 113 246 112 276 0 48 -80 73 -112 37z"/>
+		<path d="M1620 902 l-25 -20 0 -415 c0 -394 1 -416 19 -436 24 -26 77 -28 99 -3 15 17 17 61 17 433 0 317 -3 419 -12 432 -21 27 -70 32 -98 9z"/>
+		</g>
+
+	    <g transform="translate(200,50)">
+            <g>
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(45)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(90)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(135)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(180)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(225)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(270)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <g transform="rotate(315)">
+                <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
+            </g>
+            <circle cx="0" cy="0" fill="$sun_color" r="16" stroke="orange" stroke-width="2"/>
+        </g>
+
+        <g id="home" fill="grey" transform="translate(0,150),scale(4)">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+            </g>	
+
+        <g id="grid" fill="$grid_color" transform="translate(150,310),scale(3.5)">
+            <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
+        </g>
+
+        <g id="battery" fill="#090" stroke="#090" transform="translate(300,170),scale(.2)">
+            <line x1="75"  y1="30"  x2="75"  y2="280" style="stroke-width: 12px;"></line>
+            <line x1="225" y1="30"  x2="225" y2="280" style="stroke-width: 12px;"></line>
+            <line x1="69"  y1="30"  x2="231" y2="30"  style="stroke-width: 12px;"></line>
+            <line x1="69"  y1="284" x2="231" y2="285" style="stroke-width: 12px;"></line>
+            <line x1="105" y1="20"  x2="195" y2="20"  style="stroke-width: 25px;"></line>
+
+            <rect id="bat25"  x="92" y="221" width="116" height="48" style="stroke-width:0px;"></rect>
+            <rect id="bat50"  x="92" y="163" width="116" height="48" style="stroke-width:0px;"></rect>
+            <rect id="bat75"  x="92" y="105" width="116" height="48" style="stroke-width:0px;"></rect>
+            <rect id="bat100" x="92" y="47"  width="116" height="48" style="stroke-width:0px;"></rect>
+        </g>
+
+        <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
+
+            <path id="pv-home" style="$csc_style" d="M270,100 L270,180 C270,270,270,270,180,270 L100,270" stroke="$csc_color" />
+                <text id="pv-home-txt" x="210" y="240" style="fill: #ccc; font-size: $fs; text-anchor: end;">$csc</text>
+
+            <path id="pv-grid"   style="$cgfi_style"  d="M300,100 L300,500" stroke="$cgfi_color" />
+                <text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: start;">$cgfi</text>
+
+            <path id="grid-home" style="$cgc_style"  d="M270,500 L270,420 C270,330,270,330,180,330 L100,330" stroke="$cgc_color" />
+                <text id="grid-home-txt" x="210" y="390" style="fill: #ccc; font-size: $fs; text-anchor: end;">$cgc</text>
+
+
+            <path id="bat-home"  style="$batout_style" d="M500,300 L100,300"  stroke="$batout_color" />
+            <text id="bat-home-txt"  x="390" y="351" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batout</text>
+
+            <path id="pv-bat"    style="$batin_style" d="M330,100 L330,180 C330,270,330,270,420,270 L500,270" stroke="$batin_color" />
+            <text id="pv-bat-txt"    x="390" y="245" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batin</text>
+        </g>
+        
+        </svg></td></tr></table></td></tr></table>
+    };
+    
 return $ret;
 }
 
