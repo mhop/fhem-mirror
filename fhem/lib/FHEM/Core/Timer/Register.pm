@@ -5,7 +5,7 @@ use warnings;
 
 use Carp qw( carp );
 use Scalar::Util qw( weaken );
-use version; our $VERSION = qv('1.0.0');
+use version; our $VERSION = qv('1.0.1');
 
 use Exporter ('import');use GPUtils qw(GP_Import);
 
@@ -70,7 +70,16 @@ sub resetRegIntTimer {
     my $hash     = shift // carp q[No hash reference specified] && return;
     my $initFlag = shift // 0;
 
-    deleteSingleRegIntTimer( $modifier, $hash );
+    my $timerName = "$hash->{NAME}_$modifier";
+    my $fnHash    = $hash->{TIMER}{$timerName};
+
+    if ( defined $fnHash ) {
+        ::Log3( $hash, '5', "[$hash->{NAME}] resetting Timer: $timerName" );
+        ::RemoveInternalTimer($fnHash);
+        ::InternalTimer( $time, $callback, $fnHash, $initFlag );
+        return $fnHash;
+    } 
+
     return setRegIntTimer ( $modifier, $time, $callback, $hash, $initFlag );
 }
 
