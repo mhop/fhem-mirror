@@ -743,12 +743,8 @@ sub DOIF_summaryFn ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
   my $ret = "";
-  # if ($hash->{uiTable}{shownostate}) {
-   # return "";
-  # }
-  #Log3 $d,1,"vor DOIF_RegisterEvalAll uiState d: $d";
+  return undef if($attr{$d} && $attr{$d}{disable});
   $ret=DOIF_RegisterEvalAll($hash,$d,"uiState");
-  #Log3 $d,1,"nach DOIF_RegisterEvalAll";
   return $ret;
 }
 
@@ -756,7 +752,8 @@ sub DOIF_detailFn ($$$$) {
   my ($FW_wname, $d, $room, $pageHash) = @_; # pageHash is set for summaryFn.
   my $hash = $defs{$d};
   my $ret = "";
-  return "" if (defined $hash->{"uiTable"}{shownouitable} and $FW_room =~ /$hash->{"uiTable"}{shownouitable}/);
+  return undef if($attr{$d} && $attr{$d}{disable});
+  return undef if (defined $hash->{"uiTable"}{shownouitable} and $FW_room =~ /$hash->{"uiTable"}{shownouitable}/);
   $ret=DOIF_RegisterEvalAll($hash,$d,"uiTable");
   return $ret;
 }
@@ -1281,9 +1278,10 @@ sub ReadingValDoIf
             return (($a[-1]-$a[0])/$a[0]);
           }
         }
-      } elsif ($regExp =~ /^(col(\d*)(.?))/) {
-        my $num=$2;
-        my $time=$3;
+      } elsif ($regExp =~ /^((\d*)col(\d*)(.?))/) {
+        my $dim= $2 eq "" ? 72:$2; 
+        my $num=$3;
+        my $time=$4;
         my $hours=24;
         if ($num ne "") {
          if($time eq "d") {
@@ -1649,10 +1647,11 @@ sub ReplaceReadingDoIf
              $hash->{accu}{"$name $reading"}{dim}=$dim;
              @{$hash->{accu}{"$name $reading"}{value}}=();
            }
-        } elsif ($format =~ /^(col(\d*)(.?))/) {
+        } elsif ($format =~ /^((\d*)col(\d*)(.?))/) {
            $regExp =$1;
-           my $num=$2;
-           my $time=$3;
+           my $dim= $2 eq "" ? 72:$2;           
+           my $num=$3;
+           my $time=$4;
            my $hours=24;
            if ($num ne "") {
              if($time eq "d") {
@@ -1664,10 +1663,10 @@ sub ReplaceReadingDoIf
              }
            }
            AddRegexpTriggerDoIf($hash,"collect","","collect",$name,$reading);
-           if (ref($hash->{collect}{"$name $reading"}{$hours}{values}) ne "ARRAY") {
+           if (ref($hash->{collect}{"$name $reading"}{$hours}{values}) ne "ARRAY" or $dim != $hash->{collect}{"$name $reading"}{$hours}{dim}) {
              delete $hash->{collect}{"$name $reading"}{$hours};
              $hash->{collect}{"$name $reading"}{$hours}{hours}=$hours;
-             $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
+             $hash->{collect}{"$name $reading"}{$hours}{dim}=$dim;
              my $values=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_values","");
              my $times=::ReadingsVal($hash->{NAME},".col_".$hash->{collect}{"$name $reading"}{$hours}{dim}."_".$name."_".$reading."_".$hours."_times","");
              my $va;
@@ -1678,7 +1677,7 @@ sub ReplaceReadingDoIf
              for (@{$ta}) { $_ = undef if ($_ eq ""); };
              $hash->{collect}{"$name $reading"}{$hours}{values}=$va;
              $hash->{collect}{"$name $reading"}{$hours}{times}=$ta;
-             $hash->{collect}{"$name $reading"}{$hours}{dim}=72;
+             $hash->{collect}{"$name $reading"}{$hours}{dim}=$dim;
              collect_setValue($hash,$name,$reading,$hours);
            }
         } elsif ($format =~ /^(d[^:]*)(?::(.*))?/) {
@@ -4542,7 +4541,7 @@ sub card
 {
   my ($collect,$header,$icon,$min,$max,$minColor,$maxColor,$unit,$func,$decfont,$prop,$model,$lightness) = @_;
   
-  if (!defined ${$collect}{hours}) {
+  if (!defined $collect or !defined ${$collect}{hours}) {
     return("");
   }
   my $val=${$collect}{value};
@@ -4556,20 +4555,25 @@ sub card
   my $minValSlot = ${$collect}{min_value_slot};
   my $hours = ${$collect}{hours};
   my $time = ${$collect}{time};
-  my $bwidth=160;
   my $bheight=88;
   my $htrans=0;
   my $dim=${$collect}{dim};
+
  
   my $out;
   my ($ic,$iscale,$ix,$iy,$rotate);
 
-  my ($size,$plot,$steps,$noFooter,$noColor);
-  ($size,$plot,$steps,$noFooter,$noColor)=split (/,/,$prop) if (defined $prop);
+  my ($size,$plot,$steps,$noFooter,$noColor,$hring,$bwidth);
+  ($size,$plot,$steps,$noFooter,$noColor,$hring,$bwidth)=split (/,/,$prop) if (defined $prop);
   $plot = "" if (!defined $plot);
   $steps = "" if (!defined $steps);
   $noFooter = "" if (!defined $noFooter);
   $noColor = "" if (!defined $noColor);
+  $bwidth=160 if (!defined $bwidth or $bwidth eq "");
+  $hring = "" if (!defined $hring);
+  
+  my $chart_dim= $hring eq "1" ? $bwidth-36: $bwidth-88 ;
+  my $x_prop=int($chart_dim/$dim*100)/100;
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
@@ -4585,7 +4589,7 @@ sub card
   ($lr,$lir,$lmm,$lu,$ln,$li)=split (/,/,$lightness) if (defined $lightness);
   $unit="" if (!defined $unit);
   
-  if (defined $header) {
+  if (defined $header or $hring) {
     $htrans = 24;
     $bheight += 24;
   }
@@ -4704,8 +4708,10 @@ sub card
   $out.= '</defs>';
   $out.= sprintf('<rect x="11" y="0" width="%d" height="%d" rx="2" ry="2" fill="url(#gradcardback)"/>',$bwidth-2,$bheight);
 
-  if (defined $header) {
-    $out.= sprintf('<text text-anchor="start" x="14" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',$header_style,$header_txt); 
+
+  $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />' if (defined $header or $hring);
+  if (defined $header or $hring) {
+    $out.= sprintf('<text text-anchor="start" x="%s" y="19" style="fill:#CCCCCC; font-size:12.5px;%s">%s</text>',$hring eq "1" ? 34:14,$header_style,$header_txt) if (defined $header); 
     if (defined $icon and $icon ne "" and  $icon ne " ") {
       my $svg_icon=::FW_makeImage($ic);
       if(!($svg_icon =~ s/\sheight="[^"]*"/ height="18"/)) {
@@ -4714,26 +4720,33 @@ sub card
       if(!($svg_icon =~ s/\swidth="[^"]*"/ width="18"/)) {
           $svg_icon =~ s/svg/svg width="18"/ 
       }
-      $out.='<g transform="translate(147,2) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
+      $out.='<g transform="translate('.($hring eq "1" ? 14:$bwidth-11).',2) scale('.$iscale.') rotate('.$rotate.',9,9) ">';
       $out.= $svg_icon;
       $out.='</g>';
     }
-    $out.='<polyline points="11,23 169,23"  style="stroke:gray; stroke-width:0.7" />';
+    $out.='<polyline points="11,23 '.($bwidth+9).',23"  style="stroke:gray; stroke-width:0.7" />';
+    if ($hring) {
+      $out.=sprintf('<g transform="translate(%s,1)">',$chart_dim);
+      $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,"70,1",$func,$decfont,$model,$lightness,undef, undef);
+      $out.='</g>';
+    }
   }
+  
   $out.= sprintf('<g transform="translate(0,%d)">',$htrans);
-  $out.='<polyline points="11,73 169,73"  style="stroke:gray; stroke-width:0.7" />' if (!$noFooter);
-  $out.= sprintf('<svg width="%s" height="72">',$dim+44);
+  $out.='<polyline points="11,73 '.($bwidth+9).',73"  style="stroke:gray; stroke-width:0.7" />' if (!$noFooter);
+  $out.= sprintf('<svg width="%s" height="72">',$chart_dim+44);
   $out.= '<g transform="translate(35,8) scale(1) ">';
   my $points="";
   my $v;
   my $last;
 
- 
-  $out.= '<rect x="-1" y="-0.5" width="'.($dim+1.5).'" height="51" rx="1" ry="1" fill="url(#gradcardback)"/>';
+  
+  ##$out.= '<rect x="-1" y="-0.5" width="'.($dim+1.5).'" height="51" rx="1" ry="1" fill="url(#gradcardback)"/>';
+  $out.= '<rect x="-1" y="-0.5" width="'.($chart_dim+1.5).'" height="51" rx="1" ry="1" fill="url(#gradcardback)"/>';
 
   for (my $i=1;$i<4;$i++) {
     my $y=$i*12.5;
-    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1"/>',$y,$dim,$y);
+    $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1"/>',$y,$chart_dim,$y);
   }
   
   for (my $i=0;$i<=4;$i++) {
@@ -4766,13 +4779,13 @@ sub card
     my ($sec,$minutes,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($timebeginn);
     my $beginhour=int($hour/$scale)*$scale;
     my $diffminutes=($hour-$beginhour)*60+$minutes;
-    my $pos=int ($diffminutes/($scale*60)*1000)/100; 
-  
+    my $pos=(int ($diffminutes/($scale*60)*1000)/100-9)*$x_prop; 
+
    ## $out.=sprintf('<text text-anchor="middle" x="-0.5" y="60" style="fill:#CCCCCC;font-size:7px">%02d</text>',$beginhour) if ($pos == 0);
     for (my $i=0;$i<$strokes;$i++) {
       my $h=$beginhour+($i+1)*$scale;
       $hour=($h >= 24 ? $h % 24:$h);
-      my $x=int(($i*($dim/$strokes)-$pos+9)*10)/10;
+      my $x=int(($i*($chart_dim/$strokes)-$pos)*100)/100;
       $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50) if ($x >= 0);
       if ($hour == 0) {
         if ($hours <= 168) {
@@ -4786,11 +4799,11 @@ sub card
     }
   } else {
     for (my $i=0;$i<2;$i++) {
-      my $x=int((($i+1)*($dim/3)-1)*10)/10;
+      my $x=int((($i+1)*($chart_dim/3)-1)*10)/10;
       $out.=sprintf('<polyline points="%s,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-dasharray:1,1; stroke-opacity:1" />',$x,0,$x,50);
     }
     for (my $i=0;$i<=3;$i++) {
-      my $x=int(($i*($dim/3)-1)*10)/10;
+      my $x=int(($i*($chart_dim/3)-1)*10)/10;
       if  ($hours <=168) {
         $out.=sprintf('<text text-anchor="middle" x="%s" y="60" style="fill:#CCCCCC;font-size:7px">%s</text>',$x,::strftime("%H:%M",localtime($time-$hours*3600*(1-$i/3))));
       } elsif ($hours <=168*7 and $hours % 24 == 0) {
@@ -4800,6 +4813,7 @@ sub card
       }
     }
   }
+
   my $j=0;
   if (@{$a} > 0) {
     if (!defined ${$a}[0]) {
@@ -4817,37 +4831,38 @@ sub card
       $v=${$a}[0];
     }
 
-    $points.="$j,$xpos ";
+    $points.=$j*$x_prop.",$xpos ";
     $last=(50-int(($v*$m+$n)*10)/10);
-    $points.="$j,".$last." ";
+    $points.=$j*$x_prop.",$last ";
     $j++;
     
     for (my $i=$j;$i<@{$a};$i++) {
       if (defined ${$a}[$i]) {
-        $points.="$i,".$last." " if (!defined ${$a}[$i-1] or $steps eq "1"); 
+        $points.=$i*$x_prop.",$last " if (!defined ${$a}[$i-1] or $steps eq "1"); 
         $last=(50-int((${$a}[$i]*$m+$n)*10)/10);
-        $points.="$i,".$last." ";
+        $points.=$i*$x_prop.",$last ";
       }
     }
-    $points.=$dim.",".$last." " if ($steps eq "1");
-    $points.=$dim.",".(50-int(($val*$m+$n)*10)/10)." ";
-    $out.=sprintf('<path d="M%s,%s L',$dim,$xpos);
+    $points.=$chart_dim.",".$last." " if ($steps eq "1");
+    $points.=$chart_dim.",".(50-int(($val*$m+$n)*10)/10)." ";
+    $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
     $out.= $points;
     $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
   }
-  $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-opacity:1" />',$xpos,$dim,$xpos);
+  $out.=sprintf('<polyline points="0,%s %s,%s"  style="stroke:gray; stroke-width:0.2; stroke-opacity:1" />',$xpos,$chart_dim,$xpos);
 
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$dim,(50-int(($value*$m+$n)*10)/10),color($currColor,$ln));
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxValSlot);
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minValSlot);
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),color($currColor,$ln));
   $out.= '</g>';
   $out.= '</svg>';
 
-  $out.=sprintf('<g transform="translate(%s,6)">',$dim+39);
-  $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
-  $out.='</g>';
-  
-  $out.=sprintf('<text text-anchor="middle" x="139" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',::strftime("%H:%M:%S",localtime($time)));
+  if (!$hring) {
+    $out.=sprintf('<g transform="translate(%s,6)">',$chart_dim+39);
+    $out.= ui_Table::ring($val,$min,$max,$minColor,$maxColor,$unit,92,$func,$decfont,$model,$lightness,undef,(defined $header or !defined $icon) ? undef: $icon);
+    $out.='</g>';
+    $out.=sprintf('<text text-anchor="middle" x="%s" y="68" style="fill:#CCCCCC;font-size:8px">%s</text>',$bwidth-21,::strftime("%H:%M:%S",localtime($time)));
+  }
 
   if ($noFooter ne "1") {
     if (defined $maxValTime) {
@@ -4856,15 +4871,15 @@ sub card
       } else {
         $out.= sprintf('<text text-anchor="start" x="12" y="85" style="fill:#CCCCCC;font-size:8px">▲%s</text>',::strftime("%a %H:%M",localtime($maxValTime)));
       }
-      $out.= sprintf('<text text-anchor="end" x="87" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
+      $out.= sprintf('<text text-anchor="end" x="%s" y="85" style="fill:%s;font-size:9px;%s">%s</text>',$bwidth/2+7,color($maxValColor,$lmm),"",sprintf($format,${$collect}{max_value}));
     }
     if (defined $minValTime) {
       if ($hours > 168) {
-        $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',::strftime("%d.%m %H:%M",localtime($minValTime)));
+        $out.= sprintf('<text text-anchor="start" x="%s" y="85" style="fill:#CCCCCC;font-size:7px">•▼%s</text>',$bwidth/2+9,::strftime("%d.%m %H:%M",localtime($minValTime)));
       } else {
-        $out.= sprintf('<text text-anchor="start" x="89" y="85" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',::strftime("%a %H:%M",localtime($minValTime)));
+        $out.= sprintf('<text text-anchor="start" x="%s" y="85" style="fill:#CCCCCC;font-size:8px">•▼%s</text>',$bwidth/2+9,::strftime("%a %H:%M",localtime($minValTime)));
       }
-      $out.= sprintf('<text text-anchor="end" x="167" y="85" style="fill:%s;font-size:9px;%s">%s</text>',color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
+      $out.= sprintf('<text text-anchor="end" x="%s" y="85" style="fill:%s;font-size:9px;%s">%s</text>', $bwidth+7,color($minValColor,$lmm),"",sprintf($format,${$collect}{min_value}));
     }
   }
  	$out.='</g>';
