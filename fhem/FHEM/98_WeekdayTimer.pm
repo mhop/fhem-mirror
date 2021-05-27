@@ -100,7 +100,7 @@ sub Initialize {
   $hash->{DeleteFn} = \&Delete;
   $hash->{GetFn}    = \&Get;
   $hash->{AttrFn}   = \&Attr;
-  $hash->{UpdFn}    = \&WeekdayTimer_Update;
+  $hash->{UpdFn}    = \&WDT_Update;
   $hash->{AttrList} = "disable:0,1 delayedExecutionCond WDT_delayedExecutionDevices WDT_Group switchInThePast:0,1 commandTemplate WDT_eventMap:textField-long WDT_sendDelay:slider,0,1,300,1 $readingFnAttributes";
   return;
 }
@@ -159,7 +159,7 @@ sub Undef {
   my $arg = shift // return;
 
   deleteAllRegIntTimer($hash);
-  deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash) if defined $hash->{VERZOEGRUNG_IDX}; 
+  deleteSingleRegIntTimer($hash->{DELAYED_IDX},$hash) if defined $hash->{DELAYED_IDX}; 
 
   #delete $modules{$hash->{TYPE}}{defptr}{$hash->{NAME}};
   return deleteSingleRegIntTimer('SetTimerOfDay', $hash);
@@ -170,7 +170,7 @@ sub WDT_Start {
   my $hash = shift // return;
   my $name = $hash->{NAME};
   my $def = $hash->{DEF};
-  deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash) if defined ($hash->{VERZOEGRUNG_IDX}); 
+  deleteSingleRegIntTimer($hash->{DELAYED_IDX},$hash) if defined ($hash->{DELAYED_IDX}); 
   my @arr = split m{\s+}xms, $def;
   my $device   = shift @arr;
 
@@ -211,13 +211,13 @@ sub WDT_Start {
   }
 
   _Profile ($hash);
-  delete $hash->{VERZOEGRUNG};
-  delete $hash->{VERZOEGRUNG_IDX};
+  delete $hash->{DELAYED};
+  delete $hash->{DELAYED_IDX};
 
   $attr{$name}{commandTemplate} =
      'set $NAME '. checkIfDeviceIsHeatingType($hash) .' $EVENT' if !defined $attr{$name}{commandTemplate};
 
-  WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+  WDT_SetTimerOfDay({ HASH => $hash});
 
   return if !$init_done;
   return join('\n', @errors) if (@errors); 
@@ -229,7 +229,7 @@ sub Delete {
 
   deleteAllRegIntTimer($hash);
   RemoveInternalTimer($hash);
-  deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash) if defined $hash->{VERZOEGRUNG_IDX}; 
+  #deleteSingleRegIntTimer($hash->{DELAYED_IDX},$hash) if defined $hash->{DELAYED_IDX}; 
   return;
 }
 
@@ -245,10 +245,10 @@ sub Set {
 
   if ($v eq 'enable') {
     Log3( $hash, 3, "[$name] set $name $v" );
-    if (AttrVal($name, "disable", 0)) {
+    if (AttrVal($name, 'disable', 0)) {
       CommandAttr(undef, "$name disable 0");
     } else {
-      WeekdayTimer_SetTimerOfDay({ HASH => $hash});
+      WDT_SetTimerOfDay({ HASH => $hash});
     }
     return;
   } 
@@ -718,15 +718,15 @@ sub _SetTimerForMidnightUpdate {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
   my $midnightPlus5Seconds = getSwitchtimeEpoch  ($now, 0, 0, 5, 1);
-  deleteSingleRegIntTimer('midnight', $hash,\&WeekdayTimer_SetTimerOfDay);
-  $fnHash = setRegIntTimer('midnight', $midnightPlus5Seconds, \&WeekdayTimer_SetTimerOfDay, $hash, 0) if !AttrVal($hash->{NAME},'disable',0);
+  deleteSingleRegIntTimer('midnight', $hash);
+  $fnHash = setRegIntTimer('midnight', $midnightPlus5Seconds, \&WDT_SetTimerOfDay, $hash, 0) if !AttrVal($hash->{NAME},'disable',0);
   $fnHash->{SETTIMERATMIDNIGHT} = 1;
 
   return;
 }
 
 ################################################################################
-sub WeekdayTimer_SetTimerOfDay {
+sub WDT_SetTimerOfDay {
   my $fnHash = shift // return;
   my $hash = $fnHash->{HASH} // $fnHash;
   return if !defined $hash;
@@ -812,7 +812,7 @@ sub _SetTimer {
     if ( $timToSwitch - $now > -5 || defined $hash->{SETTIMERATMIDNIGHT} ) {
       if($isActiveTimer) {
         Log3( $hash, 4, "[$name] setTimer - timer seems to be active today: ".join( q{},@{$tage})."|$time|$para" );
-        resetRegIntTimer("$idx", $timToSwitch + AttrVal($name,'WDT_sendDelay',0), \&WeekdayTimer_Update, $hash, 0);
+        resetRegIntTimer($idx, $timToSwitch + AttrVal($name,'WDT_sendDelay',0), \&WDT_Update, $hash, 0);
       } else {
         Log3( $hash, 4, "[$name] setTimer - timer seems to be NOT active today: ".join(q{},@{$tage})."|$time|$para ". $hash->{CONDITION} );
         deleteSingleRegIntTimer("$idx", $hash);
@@ -835,7 +835,7 @@ sub _SetTimer {
   return if !$switchInThePast || !defined $aktTime || checkDelayedExecution($hash, $aktParameter, $aktIdx );
     # alle in der Vergangenheit liegenden Schaltungen sammeln und
     # nach 5 Sekunden in der Reihenfolge der Schaltzeiten
-    # durch WeekdayTimer_delayedTimerInPast() als Timer einstellen
+    # durch WDT_delayedTimerInPast() als Timer einstellen
     # die Parameter merken wir uns kurzzeitig im hash
     #    modules{WeekdayTimer}{timerInThePast}
     my $device = $hash->{DEVICE};
@@ -843,7 +843,7 @@ sub _SetTimer {
 
     #my $parameter = $modules{WeekdayTimer}{timerInThePast}{$device}{$aktTime} // [];
     my $parameter = $hash->{helper}{timerInThePast}{$aktTime} // [];
-    push @{$parameter},["$aktIdx", $aktTime, \&WeekdayTimer_Update, $hash, 0];
+    push @{$parameter},[$aktIdx, $aktTime, \&WDT_Update, $hash, 0];
     $hash->{helper}{timerInThePast}{$device}{$aktTime} = $parameter;
     #$modules{WeekdayTimer}{timerInThePast}{$device}{$aktTime} = $parameter;
 
@@ -854,13 +854,13 @@ sub _SetTimer {
     #$tipHash = $hash->{helper}{timerInThePastHash} = $tipHash;
     $hash->{helper}{timerInThePastHash} = $tipHash;
 
-    resetRegIntTimer('delayed', time + 5 + AttrVal($name,'WDT_sendDelay',0), \&WeekdayTimer_delayedTimerInPast, $tipHash, 0);
+    resetRegIntTimer('delayed', time + 5 + AttrVal($name,'WDT_sendDelay',0), \&WDT_delayedTimerInPast, $tipHash, 0);
 
   return;
 }
 
 ################################################################################
-sub WeekdayTimer_delayedTimerInPast {
+sub WDT_delayedTimerInPast {
   my $fnHash = shift // return;
   my ($hash, $modifier) = ($fnHash->{HASH}, $fnHash->{MODIFIER});
 
@@ -897,7 +897,7 @@ sub _checkTimerReset {
   return if 
     !isAnActiveTimer ($hash, $hash->{profil}{$idx}{TAGE}, $hash->{profil}{$idx}{PARA}, $hash->{profil}{$idx}{WE_Override}) 
     && !isAnActiveTimer ($hash, $hash->{helper}{WEDAYS}{0} ? [7]:[8], $hash->{profil}{$idx}{PARA}, $hash->{profil}{$idx}{WE_Override});
-  resetRegIntTimer($idx, $hash->{profil}{$idx}{EPOCH}, \&WeekdayTimer_Update, $hash, 0); 
+  resetRegIntTimer($idx, $hash->{profil}{$idx}{EPOCH}, \&WDT_Update, $hash, 0); 
   return;
 }
 
@@ -962,7 +962,7 @@ sub _DeleteTimer {
 }
 
 ################################################################################
-sub WeekdayTimer_Update {
+sub WDT_Update {
   my $fnHash = shift // return;
   my $hash = $fnHash->{HASH} // $fnHash;
   return if (!defined($hash));
@@ -994,8 +994,8 @@ sub WeekdayTimer_Update {
     $activeTimer      = isAnActiveTimer ($hash, $dieGanzeWoche, $newParam, $overrulewday);
     $activeTimerState = isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
     Log3( $hash, 4, "[$name] Update   - past timer activated" );
-    deleteSingleRegIntTimer($idx, $hash, 1);
-    setRegIntTimer($idx, $timToSwitch, \&WeekdayTimer_Update, $hash, 0) if $timToSwitch > $now && ($activeTimerState || $activeTimer );
+    deleteSingleRegIntTimer($idx, $hash);#, 1);
+    setRegIntTimer($idx, $timToSwitch, \&WDT_Update, $hash, 0) if $timToSwitch > $now && ($activeTimerState || $activeTimer );
   } else {
     $activeTimer = isAnActiveTimer ($hash, $tage, $newParam, $overrulewday);
     $activeTimerState = $activeTimer;
@@ -1117,19 +1117,19 @@ sub checkDelayedExecution {
   Log3( $hash, 4, "[$name] result of delayedExecutionCond: $logtext" );
 
   if ($verzoegerteAusfuehrung) {
-    if ( !defined $hash->{VERZOEGRUNG} ) {
+    if ( !defined $hash->{DELAYED} ) {
       Log3( $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - delayedExecutionCond: '$verzoegerteAusfuehrungCond' is TRUE" );
     }
-    if ( defined $hash->{VERZOEGRUNG_IDX} && $hash->{VERZOEGRUNG_IDX}!=$idx) {
+    if ( defined $hash->{DELAYED_IDX} && $hash->{DELAYED_IDX}!=$idx) {
       #Prüfen, ob der nächste Timer überhaupt für den aktuellen Tag relevant ist!
 
-      Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skipped by new timer at $hash->{profil}{$idx}{TIME}, delayedExecutionCond returned $verzoegerteAusfuehrung" );
-      deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash);
+      Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{DELAYED_IDX}}{TIME} skipped by new timer at $hash->{profil}{$idx}{TIME}, delayedExecutionCond returned $verzoegerteAusfuehrung" );
+      deleteSingleRegIntTimer($hash->{DELAYED_IDX},$hash);
       _checkTimerReset($hash, $idx); 
     }
-    $hash->{VERZOEGRUNG_IDX} = $idx;
-    resetRegIntTimer($idx, $nextRetry, \&WeekdayTimer_Update, $hash, 0);
-    $hash->{VERZOEGRUNG} = 1;
+    $hash->{DELAYED_IDX} = $idx;
+    resetRegIntTimer($idx, $nextRetry, \&WDT_Update, $hash, 0);
+    $hash->{DELAYED} = 1;
     return $verzoegerteAusfuehrung;
   }
 
@@ -1176,26 +1176,26 @@ sub checkDelayedExecution {
       Log3( $hash, 5, "[$name] sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'" );
 
       if ( $windowStatus =~  m{\A$statusReg\z}xms ) {
-          if ( !defined $hash->{VERZOEGRUNG} ) {
+          if ( !defined $hash->{DELAYED} ) {
               Log3( $hash, 3, "[$name] switch of $hash->{DEVICE} delayed - sensor '$fk' Reading/Attribute '$reading' is '$windowStatus'" );
           }
-          if ( defined $hash->{VERZOEGRUNG_IDX} && $hash->{VERZOEGRUNG_IDX} != $idx ) {
-              Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{VERZOEGRUNG_IDX}}{TIME} skipped by new timer at $hash->{profil}{$idx}{TIME} while window contact returned open state");
-              deleteSingleRegIntTimer($hash->{VERZOEGRUNG_IDX},$hash);
+          if ( defined $hash->{DELAYED_IDX} && $hash->{DELAYED_IDX} != $idx ) {
+              Log3( $hash, 3, "[$name] timer at $hash->{profil}{$hash->{DELAYED_IDX}}{TIME} skipped by new timer at $hash->{profil}{$idx}{TIME} while window contact returned open state");
+              deleteSingleRegIntTimer($hash->{DELAYED_IDX},$hash);
               #xxxxx add logic for last timer of day
               _checkTimerReset($hash, $idx); 
           }
-          $hash->{VERZOEGRUNG_IDX} = $idx;
-          resetRegIntTimer($idx, $nextRetry, \&WeekdayTimer_Update, $hash, 0);
-          $hash->{VERZOEGRUNG} = 1;
+          $hash->{DELAYED_IDX} = $idx;
+          resetRegIntTimer($idx, $nextRetry, \&WDT_Update, $hash, 0);
+          $hash->{DELAYED} = 1;
           return 1
       }
   }
-  if ( $hash->{VERZOEGRUNG} ) {
+  if ( $hash->{DELAYED} ) {
     Log3( $hash, 3, "[$name] delay of switching $hash->{DEVICE} stopped." );
+    delete $hash->{DELAYED};
   }
-  delete $hash->{VERZOEGRUNG};
-  delete $hash->{VERZOEGRUNG_IDX} if defined $hash->{VERZOEGRUNG_IDX};
+  delete $hash->{DELAYED_IDX} if defined $hash->{DELAYED_IDX};
   _checkTimerReset($hash, $idx); 
   return 0;
 }
@@ -1327,9 +1327,9 @@ sub Attr {
     ###RemoveInternalTimer($fnHash);
     readingsSingleUpdate ($hash, 'disabled',  $attrVal, 1);
     $attr{$name}{$attrName} = $attrVal;
-    return RemoveInternalTimer($hash,\&WeekdayTimer_SetTimerOfDay) if $attrVal;
+    return RemoveInternalTimer($hash,\&WDT_SetTimerOfDay) if $attrVal;
     return WDT_Start($hash);
-    #return WeekdayTimer_SetTimerOfDay( { HASH => $hash} ) if !$attrVal;
+    #return WDT_SetTimerOfDay( { HASH => $hash} ) if !$attrVal;
   }
   if ( $attrName eq 'weekprofile' ) {
     $attr{$name}{$attrName} = $attrVal;
