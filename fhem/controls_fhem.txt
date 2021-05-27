@@ -1,4 +1,4 @@
-REV 24513
+REV 24517
 DIR unused
 UPD 2021-05-26_07:45:02 363246 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -266,7 +266,7 @@ UPD 2021-01-05_07:45:03 47251 FHEM/49_TBot_List.pm
 UPD 2019-04-26_07:45:03 63794 FHEM/50_HP1000.pm
 UPD 2019-05-18_07:45:03 30113 FHEM/50_MOBILEALERTSGW.pm
 UPD 2020-11-29_07:45:02 103026 FHEM/50_SSChatBot.pm
-UPD 2021-05-26_07:45:02 127854 FHEM/50_SSFile.pm
+UPD 2021-05-27_07:45:04 127854 FHEM/50_SSFile.pm
 UPD 2020-10-22_07:45:02 167085 FHEM/50_TelegramBot.pm
 UPD 2015-07-28_14:05:31 18601 FHEM/50_WS300.pm
 UPD 2016-10-06_07:45:12 19924 FHEM/51_I2C_BH1750.pm
@@ -644,7 +644,7 @@ UPD 2021-01-09_07:45:04 70537 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2019-06-28_07:45:03 4953 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2021-05-24_07:45:03 319530 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2021-05-27_07:45:04 320120 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -740,8 +740,8 @@ UPD 2021-05-26_07:45:06 4524208 docs/commandref.html
 UPD 2021-05-26_07:45:09 2799344 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-26_07:45:10 243020 docs/commandref_modular.html
-UPD 2021-05-26_07:45:11 254018 docs/commandref_modular_DE.html
+UPD 2021-05-27_07:45:11 243020 docs/commandref_modular.html
+UPD 2021-05-27_07:45:12 254018 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
