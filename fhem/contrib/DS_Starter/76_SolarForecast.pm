@@ -1081,8 +1081,10 @@ sub _setreset {                          ## no critic "not used"
   if($prop eq "currentBatteryDev") {
       readingsDelete($hash, "Current_PowerBatIn");
       readingsDelete($hash, "Current_PowerBatOut");
+      readingsDelete($hash, "Current_BatCharge");
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
+      delete $data{$type}{$name}{current}{batcharge};
   }
   
   if($prop eq "currentInverterDev") {
