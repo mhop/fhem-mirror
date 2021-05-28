@@ -1,4 +1,4 @@
-REV 24517
+REV 24523
 DIR unused
 UPD 2021-05-26_07:45:02 363246 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -474,7 +474,7 @@ UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2021-04-20_07:45:04 50457 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
 UPD 2018-01-10_07:45:02 60933 FHEM/98_DLNARenderer.pm
-UPD 2021-05-23_07:45:02 352666 FHEM/98_DOIF.pm
+UPD 2021-05-28_07:45:02 353804 FHEM/98_DOIF.pm
 UPD 2020-08-16_07:45:02 114179 FHEM/98_DOIFtools.pm
 UPD 2021-04-09_07:45:07 38670 FHEM/98_DSBMobile.pm
 UPD 2017-11-06_07:45:02 40228 FHEM/98_Dooya.pm
@@ -513,7 +513,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
-UPD 2021-05-26_07:45:02 69801 FHEM/98_WeekdayTimer.pm
+UPD 2021-05-28_07:45:02 69517 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
 UPD 2019-05-27_07:45:02 12847 FHEM/98_apptime.pm
@@ -647,7 +647,7 @@ UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
 UPD 2021-05-27_07:45:04 320120 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-02-23_07:45:06 13896 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
-UPD 2021-01-28_07:45:03 10504 FHEM/lib/AttrTemplate/speechcontrol.template
+UPD 2021-05-28_07:45:02 9415 FHEM/lib/AttrTemplate/speechcontrol.template
 UPD 2020-11-02_07:45:03 24410 FHEM/lib/AttrTemplate/zwave.template
 UPD 2018-01-23_07:45:02 9355 FHEM/lib/EnO_ReCom_Device_Descr.xml
 UPD 2015-07-28_14:05:30 11604 FHEM/lib/LiquidCrystal.pm
@@ -740,8 +740,8 @@ UPD 2021-05-26_07:45:06 4524208 docs/commandref.html
 UPD 2021-05-26_07:45:09 2799344 docs/commandref_DE.html
 UPD 2021-04-17_07:45:03 82614 docs/commandref_frame.html
 UPD 2021-04-17_07:45:03 92522 docs/commandref_frame_DE.html
-UPD 2021-05-27_07:45:11 243020 docs/commandref_modular.html
-UPD 2021-05-27_07:45:12 254018 docs/commandref_modular_DE.html
+UPD 2021-05-28_07:45:10 243020 docs/commandref_modular.html
+UPD 2021-05-28_07:45:11 254018 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
