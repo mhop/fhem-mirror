@@ -116,7 +116,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.47.0" => "26.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
+  "0.48.0" => "28.05.2021  new optional key ready in consumer attribute ",
+  "0.47.0" => "28.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
   "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
@@ -2560,13 +2561,15 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom  = ConsumerVal ($hash, $c, "oncom", "");                      # Set Command für "on"
-  if($oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {    # Verbraucher Start ist geplant && Startzeit überschritten
-      my $surplus = CurrentVal  ($hash, "surplus",          0);           # aktueller Überschuß
-      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);           # Consumer Planungsmode
-      my $power   = ConsumerVal ($hash, $c, "power",        0);           # Consumer nominale Leistungsaufnahme (W)
+  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                        # Set Command für "on"
+  my $ready  = ConsumerVal ($hash, $c, "ready",   1);
+ 
+  if($ready && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {       # Verbraucher Start ist geplant && Startzeit überschritten
+      my $surplus = CurrentVal  ($hash, "surplus",          0);                        # aktueller Überschuß
+      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                        # Consumer Planungsmode
+      my $power   = ConsumerVal ($hash, $c, "power",        0);                        # Consumer nominale Leistungsaufnahme (W)
       
-      if($mode eq "must" || $surplus >= $power) {                         # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      if($mode eq "must" || $surplus >= $power) {                                      # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
           my (undef,undef,undef,$starttime)                 = timestampToTimestring ($t);
           my $stopdiff                                      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
@@ -2626,7 +2629,7 @@ sub _transferBatteryValues {
   $boutunit //= $binunit;
   $binunit  //= $boutunit;
   
-  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit), totalin: $bin ($binunit), totalout: $bout ($boutunit)");
+  Log3 ($name, 5, "$name - collect Battery data: device=$badev, pin=$pin ($piunit), pout=$pou ($pounit), totalin: $bin ($binunit), totalout: $bout ($boutunit), charge: $batchr");
   
   my $piuf   = $piunit   =~ /^kW$/xi  ? 1000 : 1;
   my $pouf   = $pounit   =~ /^kW$/xi  ? 1000 : 1;
@@ -3155,8 +3158,6 @@ return;
 
 ################################################################
 #         Grunddaten aller registrierten Consumer speichern
-#         $acref - übergebene Referenz Hash zum Füllen
-#                  mit Consumer Infos
 ################################################################
 sub collectAllRegConsumers {
   my $paref = shift;
@@ -3190,6 +3191,7 @@ sub collectAllRegConsumers {
       my $ctype     = $hc->{type}     // $defctype;
       my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
       my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                               # Wh
+      my $ready     = ReadingsVal ($consumer, $hc->{ready}, 1);                                # Reading für Ready-Bit -> Einschalten möglich ?
 
       $data{$type}{$name}{consumers}{$c}{name}      = $consumer;                               # Name des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{alias}     = $alias;                                  # Alias des Verbrauchers (Device)
@@ -3201,6 +3203,7 @@ sub collectAllRegConsumers {
       $data{$type}{$name}{consumers}{$c}{icon}      = $hc->{icon}    // q{};                   # Icon für den Verbraucher
       $data{$type}{$name}{consumers}{$c}{oncom}     = $hc->{on}      // q{};                   # Setter Einschaltkommando 
       $data{$type}{$name}{consumers}{$c}{offcom}    = $hc->{off}     // q{};                   # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{ready}     = $ready;                                  # 1 - Einschalten soll möglich sein, 0 - nicht 
       $data{$type}{$name}{consumers}{$c}{retotal}   = $rtot          // q{};                   # Reading der Leistungsmessung
       $data{$type}{$name}{consumers}{$c}{uetotal}   = $utot          // q{};                   # Unit der Leistungsmessung
   }
@@ -4305,7 +4308,6 @@ sub flowGraphic {
             <path id="pv-grid"   style="$cgfi_style"  d="M300,100 L300,500" stroke="$cgfi_color" />
                <text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: '
         };
-      #"
 
       $ret .= (!$hasbat) ? 'middle;" transform="translate(-120,620) rotate(-90)"' : 'start;"';
 
@@ -6389,7 +6391,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>      
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [ready=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br>
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
         sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br><br>
@@ -6410,6 +6412,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>mintime</b></td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
             <tr><td> <b>on</b>     </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>    </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
+            <tr><td> <b>ready</b>  </td><td>Reading im Verbraucherdevice welches das Einschalten des Verbrauchers freigibt bzw. blockiert (optional)                         </td></tr>
+            <tr><td>               </td><td>Readingwert = 1: Einshalten freigegeben,  Readingwert = 0: Einshalten blockiert                                                  </td></tr>
             <tr><td> <b>etotal</b> </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
          </table>
          </ul>
