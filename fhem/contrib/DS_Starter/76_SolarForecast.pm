@@ -6428,9 +6428,18 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        </li>
        <br>
        
+       <a id="SolarForecast-attr-flowGraphicAnimate"></a>
+       <li><b>flowGraphicAnimate </b><br>
+         Animiert die Energieflußgrafik sofern angezeigt. 
+         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
+         (default: 0)
+       </li>
+       <br>
+       
        <a id="SolarForecast-attr-flowGraphicSize"></a>
        <li><b>flowGraphicSize &lt;Pixel&gt; </b><br>
-         Größe der Energieflußgrafik sofern angezeigt. Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
+         Größe der Energieflußgrafik sofern angezeigt. 
+         Siehe auch Attribut <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>. <br>
          (default: 300)
        </li>
        <br>
