@@ -3059,8 +3059,8 @@ sub _calcSummaries {
   my $batout  = CurrentVal ($hash, "powerbatout",         0);                                           # aktuelle Batterieentladung
   
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
-  my $selfconsumption     = int ($pvgen - $gfeedin);
-  my $surplus             = int ($pvgen-$consumption);                                                  # aktueller Überschuß
+  my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
   $selfconsumptionrate    = sprintf("%.0f", $selfconsumption / $pvgen * 100) if($pvgen);
@@ -4218,7 +4218,7 @@ sub flowGraphic {
   my $cgfi_style   = $cgfi ? $active  : $inactive;
   my $cgfi_color   = $cgfi ? 'yellow' : 'gray';
 
-  my $csc          = ReadingsNum($name, 'Current_Consumption', 0);
+  my $csc          = ReadingsNum($name, 'Current_SelfConsumption', 0);
   my $csc_style    = $csc ? $active  : $inactive;
   my $csc_color    = $csc ? 'yellow' : 'gray';
 
@@ -4245,8 +4245,8 @@ sub flowGraphic {
 
   my $ret = qq{
       <table class="roomoverview">
-      <tr><td><table class="block"><tr align="center"><td>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" style="$style">
+      <tr><td><table class="block"><tr align="center" class="odd"><td>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style">
       <style>$animation</style>
       <g transform="translate(200,50)">
         <g>
@@ -4283,50 +4283,53 @@ sub flowGraphic {
       <g id="grid" fill="$grid_color" transform="translate(150,310),scale(3.5)">
           <path d="M15.3,2H8.7L2,6.46V10H4V8H8v2.79l-4,9V22H6V20.59l6-3.27,6,3.27V22h2V19.79l-4-9V8h4v2h2V6.46ZM14,4V6H10V4ZM6.3,6,8,4.87V6Zm8,6L15,13.42,12,15,9,13.42,9.65,12ZM7.11,17.71,8.2,15.25l1.71.93Zm8.68-2.46,1.09,2.46-2.8-1.53ZM14,10H10V8h4Zm2-5.13L17.7,6H16Z"/>
       </g>
-    };
+  };
 
 
-    if ($hasbat) {
-        $ret .= qq{
-          <g fill="$batcolor" stroke="$batcolor" transform="translate(270,135),scale(.33)">
-          <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
-          <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
-        };
-        
-        $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 24);
-        $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 49);
-        $ret .= '<path d="m 221.141,166.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 74);
-        $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 90);
-        $ret .= '</g>';
-    }
-
-     $ret .= qq{
-          <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
-            <path id="pv-home" style="$csc_style" d="M270,100 L270,180 C270,270,270,270,180,270 L100,270" stroke="$csc_color" />
-                <text id="pv-home-txt" x="210" y="240" style="fill: #ccc; font-size: $fs; text-anchor: end;">$csc</text>
-
-            <path id="pv-grid"   style="$cgfi_style"  d="M300,100 L300,500" stroke="$cgfi_color" />
-               <text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: '
-        };
-
-      $ret .= (!$hasbat) ? 'middle;" transform="translate(-120,620) rotate(-90)"' : 'start;"';
-
+  if ($hasbat) {
       $ret .= qq{
-            >$cgfi</text>
-            <path id="grid-home" style="$cgc_style"  d="M270,500 L270,420 C270,330,270,330,180,330 L100,330" stroke="$cgc_color" />
-                <text id="grid-home-txt" x="210" y="390" style="fill: #ccc; font-size: $fs; text-anchor: end;">$cgc</text>
+        <g fill="$batcolor" stroke="$batcolor" transform="translate(270,135),scale(.33)">
+        <path d="m 134.65625,89.15625 c -6.01649,0 -11,4.983509 -11,11 l 0,180 c 0,6.01649 4.98351,11 11,11 l 95.5,0 c 6.01631,0 11,-4.9825 11,-11 l 0,-180 c 0,-6.016491 -4.98351,-11 -11,-11 l -95.5,0 z m 0,10 95.5,0 c 0.60951,0 1,0.390491 1,1 l 0,180 c 0,0.6085 -0.39231,1 -1,1 l -95.5,0 c -0.60951,0 -1,-0.39049 -1,-1 l 0,-180 c 0,-0.609509 0.39049,-1 1,-1 z"/>
+        <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
+      };
+        
+      $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 24);
+      $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 49);
+      $ret .= '<path d="m 221.141,166.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 74);
+      $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 90);
+      $ret .= '</g>';
+  }
+
+  $ret .= qq{
+    <g transform="translate(50,50),scale(0.5)" stroke-width="27" fill="none">
+      <path id="pv-home"  style="$csc_style"  d="M270,100 L270,180 C270,270,270,270,180,270 L100,270" stroke="$csc_color" />
+      <path id="pv-grid"  style="$cgfi_style" d="M300,100 L300,500" stroke="$cgfi_color" />
+  };
+
+  $ret .= qq{<text id="pv-home-txt" x="210" y="240" style="fill: #ccc; font-size: $fs; text-anchor: end;">$csc</text>}   if ($csc);
+  $ret .= qq{<text id="pv-home-txt" x="400" y="15"  style="fill: #ccc; font-size: $fs; text-anchor: start;">$cpv</text>} if ($cpv);
+  $ret .= qq{<text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: '}; #"
+
+  $ret .= (!$hasbat) ? 'middle;>" transform="translate(-120,620) rotate(-90)"' : 'start;">';
+
+  $ret .= $cgfi if ($cgfi);
+
+  $ret .= qq{</text><path id="grid-home" style="$cgc_style"  d="M270,500 L270,420 C270,330,270,330,180,330 L100,330" stroke="$cgc_color" />};
+  $ret .= qq{<text id="grid-home-txt" x="210" y="390" style="fill: #ccc; font-size: $fs; text-anchor: end;">$cgc</text>} if ($cgc);
+
+
+  if ($hasbat) {
+      $ret .= qq{    
+          <path id="bat-home" style="$batout_style" d="M500,300 L100,300"  stroke="$batout_color" />
+          <path id="pv-bat"   style="$batin_style"  d="M330,100 L330,180 C330,270,330,270,420,270 L500,270" stroke="$batin_color" />
+          <text x="0" y="500" style="fill: #ccc; font-size: $fs; text-anchor: middle;" transform="translate(150,300) rotate(-90)">$soc %</text>
       };
 
-     $ret .= qq{    
-            <path id="bat-home"  style="$batout_style" d="M500,300 L100,300"  stroke="$batout_color" />
-            <text id="bat-home-txt"  x="390" y="351" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batout</text>
+      $ret .= qq{<text id="bat-home-txt"  x="390" y="351" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batout</text>} if ($batout);
+      $ret .= qq{<text id="pv-bat-txt"    x="390" y="245" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batin</text>}  if ($batin);
+  }
 
-            <path id="pv-bat"    style="$batin_style" d="M330,100 L330,180 C330,270,330,270,420,270 L500,270" stroke="$batin_color" />
-            <text id="pv-bat-txt"    x="390" y="245" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batin</text>
-            <text x="0" y="500" style="fill: #ccc; font-size: $fs; text-anchor: middle;" transform="translate(150,300) rotate(-90)">$soc %</text>
-      } if ($hasbat);
-
-      $ret .= qq{</g></svg></td></tr></table></td></tr></table>};
+  $ret .= qq{</g></svg></td></tr></table></td></tr></table>};
       
 return $ret;
 }
