@@ -6413,7 +6413,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>on</b>     </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>    </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>ready</b>  </td><td>Reading im Verbraucherdevice welches das Einschalten des Verbrauchers freigibt bzw. blockiert (optional)                         </td></tr>
-            <tr><td>               </td><td>Readingwert = 1: Einshalten freigegeben,  Readingwert = 0: Einshalten blockiert                                                  </td></tr>
+            <tr><td>               </td><td>Readingwert = 1: Einshalten freigegeben,  Readingwert = 0: Einschalten blockiert                                                  </td></tr>
             <tr><td> <b>etotal</b> </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
          </table>
          </ul>
