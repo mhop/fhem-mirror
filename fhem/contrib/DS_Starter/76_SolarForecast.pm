@@ -2044,7 +2044,8 @@ sub _transferInverterValues {
   
   my $pvuf   = $pvunit =~ /^kW$/xi ? 1000 : 1;
   my $pv     = ReadingsNum ($indev, $pvread, 0) * $pvuf;                                      # aktuelle Erzeugung (W)  
-      
+  $pv        = $pv < 0 ? 0 : $pv;                                                             # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159718.html#msg1159718
+  
   push @$daref, "Current_PV<>". $pv." W";                                          
   $data{$type}{$name}{current}{generation} = $pv;                                             # Hilfshash Wert current generation Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
   
