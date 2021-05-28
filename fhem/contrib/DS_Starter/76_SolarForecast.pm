@@ -470,7 +470,6 @@ sub Initialize {
                                 "beam2FontColor:colorpicker,RGB ".
                                 "beamHeight ".
                                 "beamWidth ".
-                                # "consumerList ".
                                 # "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
@@ -3286,14 +3285,21 @@ sub entryGraphic {
   my $incomplete = _checkSetupComplete ($hash);
   return $incomplete if($incomplete);
   
+  # Kontext des SolarForecast-Devices speichern für Refresh
+  ##########################################################
+  $hash->{HELPER}{SPGDEV}    = $name;                                                      # Name des aufrufenden SolarForecastSPG-Devices
+  $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SolarForecastSPG-Device die Funktion aufrief
+  $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SolarForecastSPG-Devices (wenn Detailansicht)
+
+  
   # Parameter f. Anzeige extrahieren
   ###################################   
-  my $width    = AttrNum ($name, 'beamWidth',           6);                                    # zu klein ist nicht problematisch  
+  my $width    = AttrNum ($name, 'beamWidth',           6);                                # zu klein ist nicht problematisch  
   my $maxhours = AttrNum ($name, 'hourCount',          24);
-  my $colorw   = AttrVal ($name, 'weatherColor', 'FFFFFF');                                    # Wetter Icon Farbe
+  my $colorw   = AttrVal ($name, 'weatherColor', 'FFFFFF');                                # Wetter Icon Farbe
   
-  my $alias    = AttrVal ($name, "alias", $name);                                              # Linktext als Aliasname oder Devicename setzen
-  my $gsel     = AttrVal ($name, 'graphicSelect', 'both');                                     # Auswahl der anzuzeigenden Grafiken
+  my $alias    = AttrVal ($name, "alias", $name);                                          # Linktext als Aliasname oder Devicename setzen
+  my $gsel     = AttrVal ($name, 'graphicSelect', 'both');                                 # Auswahl der anzuzeigenden Grafiken
   my $dlink    = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
     
   my $ret = q{};
@@ -3429,30 +3435,20 @@ sub forecastGraphic {                                                           
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $ftui  = $paref->{ftui};
-  
-  my $ret  = "";
-  
-  my ($val,$z2,$z3,$z4,$he);
 
-  my $hfcg = $data{$hash->{TYPE}}{$name}{html};                                            #(hfcg = hash forecast graphic)
-
-  # Kontext des SolarForecast-Devices speichern für Refresh
-  ##########################################################
-  $hash->{HELPER}{SPGDEV}    = $name;                                                      # Name des aufrufenden SMAPortalSPG-Devices
-  $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SMAPortalSPG-Device die Funktion aufrief
-  $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SMAPortalSPG-Devices (wenn Detailansicht)
+  my $hfcg  = $data{$hash->{TYPE}}{$name}{html};                                          #(hfcg = hash forecast graphic)
   
   # Verbraucherlegende und Steuerung
   ###################################
   my $legend_txt;
   my $cclv                    = "L05";
-  my @pgCDev                  = split(',',AttrVal($name,"consumerList",""));            # definierte Verbraucher ermitteln
+  my @pgCDev                  = split(',',AttrVal($name,"consumerList",""));              # definierte Verbraucher ermitteln
   my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
   $legend                     = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
   
   if ($legend) {
       for (@pgCDev) {
-          my($txt,$im) = split(':',$_);                                                 # $txt ist der Verbrauchername
+          my($txt,$im) = split(':',$_);                                                   # $txt ist der Verbrauchername
           my $cmdon   = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt on')\"";
           my $cmdoff  = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt off')\"";
           my $cmdauto = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt auto')\"";
@@ -3869,12 +3865,15 @@ sub forecastGraphic {                                                           
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
+  
+  my ($val,$z2,$z3,$z4,$he);
+  my $ret = "";
 
   $ret  = "<html>";
   $ret .= $html_start if (defined($html_start));
-  $ret .= "<style>TD.smaportal {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+  $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
   $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
-  $ret .= "<tr><td class='smaportal'>";
+  $ret .= "<tr><td class='solarfc'>";
   $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
 
   if ($header) {                                                                                            # Header ausgeben 
@@ -3889,7 +3888,7 @@ sub forecastGraphic {                                                           
   }
 
   if ($weather) {
-      $ret .= "<tr class='even'><td class='smaportal'></td>";                                               # freier Platz am Anfang
+      $ret .= "<tr class='even'><td class='solarfc'></td>";                                               # freier Platz am Anfang
 
       my $ii;
       for my $i (0..($maxhours*2)-1) {
@@ -3913,7 +3912,7 @@ sub forecastGraphic {                                                           
                   Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
               
-              $ret .= "<td title='$title' class='smaportal' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
+              $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
               # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
           } 
           else { 
@@ -3922,11 +3921,11 @@ sub forecastGraphic {                                                           
           }
       }
 
-      $ret .= "<td class='smaportal'></td></tr>";                                            # freier Platz am Ende der Icon Zeile
+      $ret .= "<td class='solarfc'></td></tr>";                                              # freier Platz am Ende der Icon Zeile
   }
 
   if($show_diff eq 'top') {                                                                  # Zusätzliche Zeile Ertrag - Verbrauch
-      $ret .= "<tr class='even'><td class='smaportal'></td>";                                # freier Platz am Anfang
+      $ret .= "<tr class='even'><td class='solarfc'></td>";                                  # freier Platz am Anfang
       my $ii;
       for my $i (0..($maxhours*2)-1) {                                                       # gleiche Bedingung wie oben
           next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
@@ -3935,12 +3934,12 @@ sub forecastGraphic {                                                           
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val; # negative Zahlen in Fettschrift, 0 aber ohne +
-          $ret .= "<td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td>"; 
+          $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
-      $ret .= "<td class='smaportal'></td></tr>";                                            # freier Platz am Ende 
+      $ret .= "<td class='solarfc'></td></tr>";                                              # freier Platz am Ende 
   }
 
-  $ret .= "<tr class='even'><td class='smaportal'></td>";                                    # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='even'><td class='solarfc'></td>";                                      # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
   for my $i (0..($maxhours*2)-1) {                                                           # gleiche Bedingung wie oben
@@ -4051,14 +4050,14 @@ sub forecastGraphic {                                                           
 
           $ret .="<table width='100%' height='100%'>";                                                  # mit width=100% etwas bessere Füllung der Balken
           $ret .="<tr class='even' style='height:".$he."px'>";
-          $ret .="<td class='smaportal' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
+          $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
 
           if ($hfcg->{$i}{beam1} || $show_night) {                                                      # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
               $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';                     # Syntaxhilight 
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
-              $ret .= "<td align='center' class='smaportal' ".$style.">";
+              $ret .= "<td align='center' class='solarfc' ".$style.">";
                       
               my $sicon = 1;                                                    
               #$ret .= $is{$i} if (defined ($is{$i}) && $sicon);
@@ -4078,7 +4077,7 @@ sub forecastGraphic {                                                           
           $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
 
           # der Freiraum oben kann beim größten Balken ganz entfallen
-          $ret .="<tr class='even' style='height:".$he."px'><td class='smaportal'></td></tr>" if ($he);
+          $ret .="<tr class='even' style='height:".$he."px'><td class='solarfc'></td></tr>" if ($he);
 
           if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
@@ -4104,7 +4103,7 @@ sub forecastGraphic {                                                           
           }
 
           $ret .= "<tr class='odd' style='height:".$z2."px'>";
-          $ret .= "<td align='center' class='smaportal' ".$style1.">$val";
+          $ret .= "<td align='center' class='solarfc' ".$style1.">$val";
              
           # inject the new icon if defined
           ##################################
@@ -4114,7 +4113,7 @@ sub forecastGraphic {                                                           
 
           if ($z3) {                                                                                     # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
               $ret .= "<tr class='odd' style='height:".$z3."px'>";
-              $ret .= "<td align='center' class='smaportal' ".$style2.">$v</td></tr>";
+              $ret .= "<td align='center' class='solarfc' ".$style2.">$v</td></tr>";
           }
       }
 
@@ -4127,54 +4126,54 @@ sub forecastGraphic {                                                           
 
           if ($val) {
               $ret .= "<tr class='even' style='height:".$he."px'>";
-              $ret .= "<td class='smaportal' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
+              $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
           }
 
           if ($hfcg->{$i}{diff} >= 0) {                                                                 # mit Farbe 1 colorfc füllen
               $style .= " background-color:#$colorfc'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                  # Sonderfall , 1px dünnen Strich ausgeben
               $ret  .= "<tr class='odd' style='height:".$z2."px'>";
-              $ret  .= "<td align='center' class='smaportal' ".$style.">";
+              $ret  .= "<td align='center' class='solarfc' ".$style.">";
               $ret  .= "</td></tr>";
           } 
           else {                                                                                        # ohne Farbe
               $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                      # Sonderfall, hier wird die 0 gebraucht !
               if ($z2 && $val) {                                                                        # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
                   $ret .= "<tr class='even' style='height:".$z2."px'>";
-                  $ret .= "<td class='smaportal'></td></tr>";
+                  $ret .= "<td class='solarfc'></td></tr>";
               }
           }
         
           if ($hfcg->{$i}{diff} < 0) {                                                                  # Negativ Balken anzeigen ?
               $style .= " background-color:#$colorc'";                                                  # mit Farbe 2 colorc füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
-              $ret   .= "<td align='center' class='smaportal' ".$style."></td></tr>";
+              $ret   .= "<td align='center' class='solarfc' ".$style."></td></tr>";
           }
           elsif ($z3) {                                                                                 # ohne Farbe
               $ret .= "<tr class='even' style='height:".$z3."px'>";
-              $ret .= "<td class='smaportal'></td></tr>";
+              $ret .= "<td class='solarfc'></td></tr>";
           }
 
           if($z4) {                                                                                     # kann entfallen wenn auch z3 0 ist
               $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '&nbsp;';
               $ret .= "<tr class='even' style='height:".$z4."px'>";
-              $ret .= "<td class='smaportal' style='vertical-align:top'>".$val."</td></tr>";
+              $ret .= "<td class='solarfc' style='vertical-align:top'>".$val."</td></tr>";
           }
       }
 
       if ($show_diff eq 'bottom') {                                                                     # zusätzliche diff Anzeige
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;'); # negative Zahlen in Fettschrift, 0 aber ohne +
-          $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
+          $ret .= "<tr class='even'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
       }
 
-      $ret .= "<tr class='even'><td class='smaportal' style='vertical-align:bottom; text-align:center;'>";
+      $ret .= "<tr class='even'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
       $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
       $thishour = 99 if ($hfcg->{$i}{time} == $thishour);                                               # nur einmal verwenden !
       $ret .="</td></tr></table></td>";                                                   
   }
 
-  $ret .= "<td class='smaportal'></td></tr>";
+  $ret .= "<td class='solarfc'></td></tr>";
 
   # Legende unten
   #################
