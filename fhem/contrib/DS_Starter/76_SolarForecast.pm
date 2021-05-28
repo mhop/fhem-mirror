@@ -116,7 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.47.0" => "26.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect ",
+  "0.47.0" => "26.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
   "0.46.0" => "16.05.2021  integrate intotal, outtotal to currentBatteryDev, set maxconsumer to 9 ",
   "0.45.1" => "13.05.2021  change the calc of etotal at the beginning of every hour in _transferInverterValues ".
@@ -474,7 +474,8 @@ sub Initialize {
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
-                                "flowGraphicSize: ".
+                                "flowGraphicSize ".
+                                "flowGraphicAnimate:1,0 ".
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
                                 "graphicSelect:both,flow,forecast ".
@@ -3330,6 +3331,7 @@ sub entryGraphic {
       hdrDetail  => AttrVal ($name,    'headerDetail',            'all'),                      # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
       lang       => AttrVal ("global", 'language',                 'EN'),
       flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
+      flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
   };
   
   if(IsDisabled($name)) {   
@@ -4190,30 +4192,32 @@ return $ret;
 #                  Energieflußgrafik
 ################################################################
 sub flowGraphic {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $flowgh = $paref->{flowgh};
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $flowgh   = $paref->{flowgh};
+  my $flowgani = $paref->{flowgani};
     
   my $style        = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
   my $fs           = ($flowgh < 300) ? '48px' : '32px';
+  my $animation    = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
 
   my $inactive     = 'stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2;';
   my $active       = 'stroke-dashoffset: 20; stroke-dasharray: 10; animation: dash 0.5s linear; animation-iteration-count: infinite; opacity: 0.8;' ;
 
   my $cpv          = ReadingsNum($name, 'Current_PV', 0);
-  my $sun_color    = ($cpv) ? 'orange' : 'gray';
+  my $sun_color    = $cpv ? 'orange' : 'gray';
 
   my $cgc          = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgc_style    = ($cgc) ? $active : $inactive;
-  my $cgc_color    = ($cgc) ? 'red'   : 'gray';
+  my $cgc_style    = $cgc ? $active : $inactive;
+  my $cgc_color    = $cgc ? 'red'   : 'gray';
 
   my $cgfi         = ReadingsNum($name, 'Current_GridFeedIn', 0);
-  my $cgfi_style   = ($cgfi) ? $active  : $inactive;
-  my $cgfi_color   = ($cgfi) ? 'yellow' : 'gray';
+  my $cgfi_style   = $cgfi ? $active  : $inactive;
+  my $cgfi_color   = $cgfi ? 'yellow' : 'gray';
 
-  my $csc          = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $csc_style    = ($csc) ? $active  : $inactive;
-  my $csc_color    = ($csc) ? 'yellow' : 'gray';
+  my $csc          = ReadingsNum($name, 'Current_Consumption', 0);
+  my $csc_style    = $csc ? $active  : $inactive;
+  my $csc_color    = $csc ? 'yellow' : 'gray';
 
   my $batin        = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout       = ReadingsNum($name, 'Current_PowerBatOut', undef);
@@ -4228,18 +4232,19 @@ sub flowGraphic {
       $soc    = 0;
   }
 
-  my $batin_style  = ($batin)  ? $active  : $inactive;
-  my $batin_color  = ($batin)  ? 'yellow' : 'gray';
-  my $batout_style = ($batout) ? $active  : $inactive;
-  my $batout_color = ($batout) ? 'yellow' : 'gray';
+  my $batin_style  = $batin  ? $active  : $inactive;
+  my $batin_color  = $batin  ? 'yellow' : 'gray';
+  my $batout_style = $batout ? $active  : $inactive;
+  my $batout_color = $batout ? 'yellow' : 'gray';
 
-  my $grid_color   = ($cgfi) ? 'green' : 'red'; 
+  my $grid_color   = $cgfi ? 'green' : 'red'; 
   $grid_color      = 'gray' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
 
   my $ret = qq{
       <table class="roomoverview">
       <tr><td><table class="block"><tr align="center"><td>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" style="$style">
+      <style>$animation</style>
       <g transform="translate(200,50)">
         <g>
             <line fill="none" stroke="$sun_color" stroke-linecap="round" stroke-width="5" transform="translate(0,9)" x1="0" x2="0" y1="16" y2="24" />
