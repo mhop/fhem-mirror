@@ -4310,7 +4310,7 @@ sub flowGraphic {
   $ret .= qq{<text id="pv-home-txt" x="400" y="15"  style="fill: #ccc; font-size: $fs; text-anchor: start;">$cpv</text>} if ($cpv);
   $ret .= qq{<text id="pv-grid-txt" x="330" y="490" style="fill: #ccc; font-size: $fs; text-anchor: '};
 
-  $ret .= $hasbat ? 'start;">' : 'middle;">';
+  $ret .= (!$hasbat) ? 'middle;" transform="translate(-120,620) rotate(-90)">' : 'start;">';
 
   $ret .= $cgfi if ($cgfi);
 
