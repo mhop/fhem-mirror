@@ -116,6 +116,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend ",
   "0.48.0" => "28.05.2021  new optional key ready in consumer attribute ",
   "0.47.0" => "28.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
@@ -470,7 +471,7 @@ sub Initialize {
                                 "beam2FontColor:colorpicker,RGB ".
                                 "beamHeight ".
                                 "beamWidth ".
-                                # "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
+                                "consumerLegend:none,icon_top,icon_bottom,text_top,text_bottom ".
                                 # "consumerAdviceIcon ".
                                 "cloudFactorDamping:slider,0,1,100 ".
                                 "disable:1,0 ".
@@ -1331,7 +1332,8 @@ sub Attr {
       aVal  => $aVal
   };
   
-  $aName = "consumer" if($aName =~ /consumer/xs);
+  $aName = "consumer" if($aName =~ /consumer?(\d+)$/xs);
+  
   if($hattr{$aName} && defined &{$hattr{$aName}{fn}}) {
       my $ret = q{};
       $ret    = &{$hattr{$aName}{fn}} ($params); 
@@ -3190,22 +3192,23 @@ sub collectAllRegConsumers {
       
       my $ctype     = $hc->{type}     // $defctype;
       my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
-      my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                               # Wh
-      my $ready     = ReadingsVal ($consumer, $hc->{ready}, 1);                                # Reading für Ready-Bit -> Einschalten möglich ?
+      my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                                  # Wh
+      my $ready     = ReadingsVal ($consumer, $hc->{ready}, 1);                                   # Reading für Ready-Bit -> Einschalten möglich ?
 
-      $data{$type}{$name}{consumers}{$c}{name}      = $consumer;                               # Name des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{alias}     = $alias;                                  # Alias des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{type}      = $hc->{type}    // $defctype;             # Typ des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{power}     = $hc->{power};                            # Leistungsaufnahme des Verbrauchers in W
-      $data{$type}{$name}{consumers}{$c}{avgenergy} = $avgenergy;                              # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}   = $hc->{mintime} // $hef{$ctype}{mt};      # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mode}      = $hc->{mode}    // $defcmode;             # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}      = $hc->{icon}    // q{};                   # Icon für den Verbraucher
-      $data{$type}{$name}{consumers}{$c}{oncom}     = $hc->{on}      // q{};                   # Setter Einschaltkommando 
-      $data{$type}{$name}{consumers}{$c}{offcom}    = $hc->{off}     // q{};                   # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{ready}     = $ready;                                  # 1 - Einschalten soll möglich sein, 0 - nicht 
-      $data{$type}{$name}{consumers}{$c}{retotal}   = $rtot          // q{};                   # Reading der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{uetotal}   = $utot          // q{};                   # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{name}         = $consumer;                               # Name des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{alias}        = $alias;                                  # Alias des Verbrauchers (Device)
+      $data{$type}{$name}{consumers}{$c}{type}         = $hc->{type}    // $defctype;             # Typ des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{power}        = $hc->{power};                            # Leistungsaufnahme des Verbrauchers in W
+      $data{$type}{$name}{consumers}{$c}{avgenergy}    = $avgenergy;                              # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mintime}      = $hc->{mintime} // $hef{$ctype}{mt};      # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mode}         = $hc->{mode}    // $defcmode;             # Planungsmode des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{icon}         = $hc->{icon}    // q{};                   # Icon für den Verbraucher
+      $data{$type}{$name}{consumers}{$c}{oncom}        = $hc->{on}      // q{};                   # Setter Einschaltkommando 
+      $data{$type}{$name}{consumers}{$c}{offcom}       = $hc->{off}     // q{};                   # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{autoreading}  = $hc->{ready}   // q{};                   # Readingname zur Automaticsteuerung
+      $data{$type}{$name}{consumers}{$c}{ready}        = $ready;                                  # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
+      $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot          // q{};                   # Reading der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot          // q{};                   # Unit der Leistungsmessung
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -3438,48 +3441,65 @@ sub forecastGraphic {                                                           
   my $ftui  = $paref->{ftui};
 
   my $hfcg  = $data{$hash->{TYPE}}{$name}{html};                                          #(hfcg = hash forecast graphic)
+  my $type  = $hash->{TYPE};
   
   # Verbraucherlegende und Steuerung
   ###################################
-  my $legend_txt;
-  my $cclv                    = "L05";
-  my @pgCDev                  = split(',',AttrVal($name,"consumerList",""));              # definierte Verbraucher ermitteln
-  my ($legend_style, $legend) = split('_',AttrVal($name,'consumerLegend','icon_top'));
+  my $legend_txt;            
+  my @pgCDev                  = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
+  my ($legend_style, $legend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
   $legend                     = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
   
   if ($legend) {
-      for (@pgCDev) {
-          my($txt,$im) = split(':',$_);                                                   # $txt ist der Verbrauchername
-          my $cmdon   = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt on')\"";
-          my $cmdoff  = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt off')\"";
-          my $cmdauto = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name $txt auto')\"";
+      for my $c (@pgCDev) {          
+          my $cname   = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
+          my $calias  = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
+          my $cicon   = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
+          my $oncom   = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
+          my $offcom  = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
+          my $autord  = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
+          my $auto    = ConsumerVal ($hash, $c, "ready",        1);                                  # Automatic Mode
+          
+          my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $cname $oncom')"};
+          my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $cname $offcom')"};
+          my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=setreading $cname $autord 1')"};
+          my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=setreading $cname $autord 0')"};
           
           if ($ftui eq "ftui") {
-              $cmdon   = "\"ftui.setFhemStatus('set $name $txt on')\"";
-              $cmdoff  = "\"ftui.setFhemStatus('set $name $txt off')\"";
-              $cmdauto = "\"ftui.setFhemStatus('set $name $txt auto')\"";      
+              $cmdon      = qq{"ftui.setFhemStatus('set $cname $oncom')"};
+              $cmdoff     = qq{"ftui.setFhemStatus('set $cname $offcom')"};
+              $cmdautoon  = qq{"ftui.setFhemStatus('set $cname setreading $cname $autord 1')"};  
+              $cmdautooff = qq{"ftui.setFhemStatus('set $cname setreading $cname $autord 0')"};                
           }
           
-          my $swstate  = ReadingsVal($name,"${cclv}_".$txt."_Switch", "undef");
+          $cmdon      = q{} if(!$oncom);
+          $cmdoff     = q{} if(!$offcom);
+          $cmdautoon  = q{} if(!$autord); 
+          $cmdautooff = q{} if(!$autord);           
+          
+          my $swstate  = ConsumerVal ($hash, $c, "state", "undef");                                       # Schaltzustand des Consumerdevices
           my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
           
-          if($swstate eq "off") {
-              $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
+          if($cmdautoon && $swstate eq "off" && !$auto) {
+              $swicon = "<a title='Status: Aus -> Automatic einschalten' onClick=$cmdautoon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
           } 
-          elsif ($swstate eq "on") {
-              $swicon = "<a onClick=$cmdauto><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+          elsif ($cmdon && $swstate eq "off") {
+              $swicon = "<a title='Status: Aus mit Automatic -> einschalten' onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>"; 
           } 
-          elsif ($swstate =~ /off.*automatic.*/ix) {
-              $swicon = "<a onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+          elsif ($cmdautooff && $swstate eq "on" && $auto) {
+              $swicon = "<a title='Status: Ein mit Automatic -> Automatic ausschalten' onClick=$cmdautooff><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+          }
+          elsif ($cmdoff && $swstate eq "on") {
+              $swicon = "<a title='Status: Ein -> ausschalten' onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
           }
           
-          if ($legend_style eq 'icon') {                                                           # mögliche Umbruchstellen mit normalen Blanks vorsehen !
-              $legend_txt .= $txt.'&nbsp;'.FW_makeImage($im).' '.$swicon.'&nbsp;&nbsp;'; 
+          if ($legend_style eq 'icon') {                                                                  # mögliche Umbruchstellen mit normalen Blanks vorsehen !
+              $legend_txt .= $calias.'&nbsp;'.FW_makeImage($cicon).' '.$swicon.'&nbsp;&nbsp;'; 
           } 
           else {
-              my (undef,$co) = split('\@',$im);
-              $co            = '#cccccc' if (!$co);                                                # Farbe per default
-              $legend_txt   .= '<font color=\''.$co.'\'>'.$txt.'</font> '.$swicon.'&nbsp;&nbsp;';  # hier auch Umbruch erlauben
+              my (undef,$ci) = split('\@',$cicon);
+              $ci            = '#cccccc' if (!$ci);                                                       # Farbe per default
+              $legend_txt   .= '<font color=\''.$ci.'\'>'.$calias.'</font> '.$swicon.'&nbsp;&nbsp;';      # hier auch Umbruch erlauben
           }
       }
   }
@@ -3499,7 +3519,6 @@ sub forecastGraphic {                                                           
   my $html_start =  $paref->{html_start};                    # beliebige HTML Strings die vor der Grafik ausgegeben werden
   my $html_end   =  $paref->{html_end};                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
   my $lotype     =  $paref->{lotype};
-  my $kw         =  $paref->{kw};
   my $height     =  $paref->{height};
   my $width      =  $paref->{width};                         # zu klein ist nicht problematisch
   my $w          =  $paref->{w};                             # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
@@ -3512,175 +3531,17 @@ sub forecastGraphic {                                                           
   my $colorwn    =  $paref->{colorwn};                       # Wetter Icon Farbe Nacht
   my $wlalias    =  $paref->{wlalias};
   my $header     =  $paref->{header}; 
-  my $hdrAlign   =  $paref->{hdrAlign};                      # ermöglicht per attr die Ausrichtung der Tabelle zu setzen
-  my $hdrDetail  =  $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
   my $lang       =  $paref->{lang};
+  my $kw         =  $paref->{kw};
   
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
-  $icon    = FW_makeImage($icon) if (defined($icon));
-  my $co4h = ReadingsNum ($name,"NextHours_Sum04_ConsumptionForecast", 0);
-  my $coRe = ReadingsNum ($name,"RestOfDayConsumptionForecast",        0); 
-  my $coTo = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",        0);
-  my $coCu = ReadingsNum ($name,"Current_Consumption",                 0);
-
-  my $pv4h = ReadingsNum ($name,"NextHours_Sum04_PVforecast",          0);
-  my $pvRe = ReadingsNum ($name,"RestOfDayPVforecast",                 0); 
-  my $pvTo = ReadingsNum ($name,"Tomorrow_PVforecast",                 0);
-  my $pvCu = ReadingsNum ($name,"Current_PV",                          0);
-  
-  my $pcfa = ReadingsVal ($name,"pvCorrectionFactor_Auto", "off");
-  
-  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
-  my ($pcf,$pcq) = split "/", $pvcorrf00;
-  my $pvcanz     = "factor: $pcf / quality: $pcq";
-  $pcq           =~ s/m/-1/xs;
-  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
-
-  if ($kw eq 'kWh') {
-      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
-      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
-      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
-      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
-      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
-      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
-      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
-      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
-  } 
-  else {
-      $co4h .= "&nbsp;Wh";
-      $coRe .= "&nbsp;Wh";
-      $coTo .= "&nbsp;Wh";
-      $coCu .= "&nbsp;W";
-      $pv4h .= "&nbsp;Wh";
-      $pvRe .= "&nbsp;Wh";
-      $pvTo .= "&nbsp;Wh";
-      $pvCu .= "&nbsp;W";
-  }
+  $icon = FW_makeImage($icon) if (defined($icon));
 
   # Headerzeile generieren 
   ##########################  
-  if ($header) {
-      my $alias   = AttrVal ($name,    "alias",    $name );                                         # Linktext als Aliasname
-      my $dlink   = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>};      
-      my $lup     = ReadingsTimestamp($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
-
-      my $lupt    = "last&nbsp;update:";
-      my $autoct  = "automatic&nbsp;correction:";
-      my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
-      my $lblPv4h = "next&nbsp;4h:";
-      my $lblPvRe = "remain&nbsp;today:";
-      my $lblPvTo = "tomorrow:";
-      my $lblPvCu = "actual";
-     
-      if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
-          $lupt    = "Stand:";
-          $autoct  = "automatische&nbsp;Korrektur:";
-          $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
-          $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
-          $lblPvRe = "Rest&nbsp;heute:";
-          $lblPvTo = "morgen:";
-          $lblPvCu = "aktuell";
-      }
-
-      $header = "<table align=\"$hdrAlign\">"; 
-
-      # Header Link + Status + Update Button     
-      #########################################      
-      if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-          my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-          
-          $lup = "$year-$month-$day&nbsp;$time";
-          if($lang eq "DE") {
-             $lup = "$day.$month.$year&nbsp;$time"; 
-          }
-
-          my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')\"";               # Update Button generieren        
-
-          if ($ftui eq "ftui") {
-              $cmdupdate = "\"ftui.setFhemStatus('get $name data')\"";     
-          }
-
-          my $upstate  = ReadingsVal($name, "state", "");
-
-          ## Update-Icon
-          ##############
-          my $upicon;
-          if ($upstate =~ /updated|successfully|switched/ix) {
-              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
-          } 
-          elsif ($upstate =~ /running/ix) {
-              $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
-          } 
-          elsif ($upstate =~ /initialized/ix) {
-              $upicon = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\"></a>";
-          } 
-          else {
-              $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
-          }
-
-          ## Autokorrektur-Icon
-          ######################
-          my $acicon;
-          if ($pcfa eq "on") {
-              $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
-          } 
-          elsif ($pcfa eq "off") {
-              $acicon = "off";
-          } 
-          elsif ($pcfa =~ /standby/ix) {
-              my ($rtime) = $pcfa =~ /for (.*?) hours/x;
-              $acicon     = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">&nbsp;(Start in ".$rtime." h)";
-          } 
-          else {
-              $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
-          }
-          
-          ## Qualitäts-Icon
-          ######################
-          my $pcqicon;
-          
-          $pcqicon = $pcq < 3 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
-                     $pcq < 5 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
-                     "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
-          $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
-          
-  
-          ## erste Header-Zeilen
-          #######################
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                                    </tr>";
-          $header .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td title='$pvcanz' colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
-      }
-      
-      
-      # Header Information pv 
-      ########################
-      if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
-          $header .= "<tr>";
-          $header .= "<td><b>PV&nbsp;=></b></td>"; 
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>"; 
-          $header .= "<td><b>$lblPv4h</b></td> <td align=right>$pv4h</td>"; 
-          $header .= "<td><b>$lblPvRe</b></td> <td align=right>$pvRe</td>"; 
-          $header .= "<td><b>$lblPvTo</b></td> <td align=right>$pvTo</td>"; 
-          $header .= "</tr>";
-      }
-      
-      
-      # Header Information co
-      ########################      
-      if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
-          $header .= "<tr>";
-          $header .= "<td><b>CO&nbsp;=></b></td>";
-          $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>";           
-          $header .= "<td><b>$lblPv4h</b></td> <td align=right>$co4h</td>"; 
-          $header .= "<td><b>$lblPvRe</b></td> <td align=right>$coRe</td>"; 
-          $header .= "<td><b>$lblPvTo</b></td> <td align=right>$coTo</td>"; 
-          $header .= "</tr>"; 
-      }
-
-      $header .= "</table>";     
-  }
+  $header = _forecastGraphicHeader ($paref);
 
   # Werte aktuelle Stunde
   ##########################
@@ -3742,8 +3603,8 @@ sub forecastGraphic {                                                           
 
   $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
-  # get consumer list and display it in portalGraphics
-  ###########################################################  
+  # get consumer list and display it in Graphics
+  ################################################ 
   for (@pgCDev) {
       my ($itemName, undef) = split(':',$_);
       $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
@@ -3789,8 +3650,7 @@ sub forecastGraphic {                                                           
       } 
       else { 
           $_ .= ":24:24"; 
-      } 
-      Log3 ($name, 4, "$name - Consumer planned data: $_");
+      }
   }
 
   $maxVal    = !$maxVal ? $hfcg->{0}{beam1} : $maxVal;                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
@@ -4192,6 +4052,181 @@ return $ret;
 }
 
 ################################################################
+#         forecastGraphic Headerzeile generieren 
+################################################################
+sub _forecastGraphicHeader {                                
+  my $paref  = shift;
+  my $header = $paref->{header};
+  
+  return if(!$header);
+  
+  my $hdrAlign  = $paref->{hdrAlign};                      # ermöglicht per attr die Ausrichtung der Tabelle zu setzen
+  my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+  my $ftui      = $paref->{ftui};
+  my $lang      = $paref->{lang};
+  my $name      = $paref->{name};
+  my $hash      = $paref->{hash};
+  my $kw        = $paref->{kw};
+       
+  my $lup       = ReadingsTimestamp ($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
+ 
+  my $pcfa      = ReadingsVal ($name,"pvCorrectionFactor_Auto",         "off");
+  my $co4h      = ReadingsNum ($name,"NextHours_Sum04_ConsumptionForecast", 0);
+  my $coRe      = ReadingsNum ($name,"RestOfDayConsumptionForecast",        0); 
+  my $coTo      = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",        0);
+  my $coCu      = ReadingsNum ($name,"Current_Consumption",                 0);
+  my $pv4h      = ReadingsNum ($name,"NextHours_Sum04_PVforecast",          0);
+  my $pvRe      = ReadingsNum ($name,"RestOfDayPVforecast",                 0); 
+  my $pvTo      = ReadingsNum ($name,"Tomorrow_PVforecast",                 0);
+  my $pvCu      = ReadingsNum ($name,"Current_PV",                          0);
+  
+  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
+  my ($pcf,$pcq) = split "/", $pvcorrf00;
+  my $pvcanz     = "factor: $pcf / quality: $pcq";
+  $pcq           =~ s/m/-1/xs;
+  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
+
+  if ($kw eq 'kWh') {
+      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
+      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
+      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
+      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
+      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
+      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
+      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
+      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
+  } 
+  else {
+      $co4h .= "&nbsp;Wh";
+      $coRe .= "&nbsp;Wh";
+      $coTo .= "&nbsp;Wh";
+      $coCu .= "&nbsp;W";
+      $pv4h .= "&nbsp;Wh";
+      $pvRe .= "&nbsp;Wh";
+      $pvTo .= "&nbsp;Wh";
+      $pvCu .= "&nbsp;W";
+  }
+  
+  my $lupt    = "last&nbsp;update:";
+  my $autoct  = "automatic&nbsp;correction:";
+  my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
+  my $lblPv4h = "next&nbsp;4h:";
+  my $lblPvRe = "remain&nbsp;today:";
+  my $lblPvTo = "tomorrow:";
+  my $lblPvCu = "actual";
+ 
+  if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
+      $lupt    = "Stand:";
+      $autoct  = "automatische&nbsp;Korrektur:";
+      $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
+      $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
+      $lblPvRe = "Rest&nbsp;heute:";
+      $lblPvTo = "morgen:";
+      $lblPvCu = "aktuell";
+  }
+
+  $header = "<table align=\"$hdrAlign\">"; 
+
+  # Header Link + Status + Update Button     
+  #########################################      
+  if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
+      my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+      
+      $lup = "$year-$month-$day&nbsp;$time";
+      if($lang eq "DE") {
+         $lup = "$day.$month.$year&nbsp;$time"; 
+      }
+
+      my $cmdupdate = "\"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')\"";               # Update Button generieren        
+
+      if ($ftui eq "ftui") {
+          $cmdupdate = "\"ftui.setFhemStatus('get $name data')\"";     
+      }
+
+      my $upstate  = ReadingsVal($name, "state", "");
+
+      ## Update-Icon
+      ##############
+      my $upicon;
+      if ($upstate =~ /updated|successfully|switched/ix) {
+          $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+      } 
+      elsif ($upstate =~ /running/ix) {
+          $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+      } 
+      elsif ($upstate =~ /initialized/ix) {
+          $upicon = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\"></a>";
+      } 
+      else {
+          $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
+      }
+
+      ## Autokorrektur-Icon
+      ######################
+      my $acicon;
+      if ($pcfa eq "on") {
+          $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+      } 
+      elsif ($pcfa eq "off") {
+          $acicon = "off";
+      } 
+      elsif ($pcfa =~ /standby/ix) {
+          my ($rtime) = $pcfa =~ /for (.*?) hours/x;
+          $acicon     = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">&nbsp;(Start in ".$rtime." h)";
+      } 
+      else {
+          $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+      }
+      
+      ## Qualitäts-Icon
+      ######################
+      my $pcqicon;
+      
+      $pcqicon = $pcq < 3 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
+                 $pcq < 5 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
+                 "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
+      
+
+      ## erste Header-Zeilen
+      #######################
+      my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
+      my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
+      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                                    </tr>";
+      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td title='$pvcanz' colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
+  }
+  
+  # Header Information pv 
+  ########################
+  if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
+      $header .= "<tr>";
+      $header .= "<td><b>PV&nbsp;=></b></td>"; 
+      $header .= "<td><b>$lblPvCu</b></td> <td align=right>$pvCu</td>"; 
+      $header .= "<td><b>$lblPv4h</b></td> <td align=right>$pv4h</td>"; 
+      $header .= "<td><b>$lblPvRe</b></td> <td align=right>$pvRe</td>"; 
+      $header .= "<td><b>$lblPvTo</b></td> <td align=right>$pvTo</td>"; 
+      $header .= "</tr>";
+  }
+  
+  
+  # Header Information co
+  ########################      
+  if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
+      $header .= "<tr>";
+      $header .= "<td><b>CO&nbsp;=></b></td>";
+      $header .= "<td><b>$lblPvCu</b></td> <td align=right>$coCu</td>";           
+      $header .= "<td><b>$lblPv4h</b></td> <td align=right>$co4h</td>"; 
+      $header .= "<td><b>$lblPvRe</b></td> <td align=right>$coRe</td>"; 
+      $header .= "<td><b>$lblPvTo</b></td> <td align=right>$coTo</td>"; 
+      $header .= "</tr>"; 
+  }
+
+  $header .= "</table>";
+  
+return $header;
+}
+
+################################################################
 #                  Energieflußgrafik
 ################################################################
 sub flowGraphic {
@@ -4200,33 +4235,33 @@ sub flowGraphic {
   my $flowgh   = $paref->{flowgh};
   my $flowgani = $paref->{flowgani};
     
-  my $style        = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
-  my $fs           = ($flowgh < 300) ? '48px' : '32px';
-  my $animation    = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
+  my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
+  my $fs         = ($flowgh < 300) ? '48px' : '32px';
+  my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
 
-  my $inactive     = 'stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2;';
-  my $active       = 'stroke-dashoffset: 20; stroke-dasharray: 10; animation: dash 0.5s linear; animation-iteration-count: infinite; opacity: 0.8;' ;
+  my $inactive   = 'stroke-dashoffset: 20; stroke-dasharray: 10; opacity: 0.2;';
+  my $active     = 'stroke-dashoffset: 20; stroke-dasharray: 10; animation: dash 0.5s linear; animation-iteration-count: infinite; opacity: 0.8;' ;
 
-  my $cpv          = ReadingsNum($name, 'Current_PV', 0);
-  my $sun_color    = $cpv ? 'orange' : 'gray';
+  my $cpv        = ReadingsNum($name, 'Current_PV', 0);
+  my $sun_color  = $cpv ? 'orange' : 'gray';
 
-  my $cgc          = ReadingsNum($name, 'Current_GridConsumption', 0);
-  my $cgc_style    = $cgc ? $active : $inactive;
-  my $cgc_color    = $cgc ? 'red'   : 'gray';
+  my $cgc        = ReadingsNum($name, 'Current_GridConsumption', 0);
+  my $cgc_style  = $cgc ? $active : $inactive;
+  my $cgc_color  = $cgc ? 'red'   : 'gray';
 
-  my $cgfi         = ReadingsNum($name, 'Current_GridFeedIn', 0);
-  my $cgfi_style   = $cgfi ? $active  : $inactive;
-  my $cgfi_color   = $cgfi ? 'yellow' : 'gray';
+  my $cgfi       = ReadingsNum($name, 'Current_GridFeedIn', 0);
+  my $cgfi_style = $cgfi ? $active  : $inactive;
+  my $cgfi_color = $cgfi ? 'yellow' : 'gray';
 
-  my $csc          = ReadingsNum($name, 'Current_SelfConsumption', 0);
-  my $csc_style    = $csc ? $active  : $inactive;
-  my $csc_color    = $csc ? 'yellow' : 'gray';
+  my $csc        = ReadingsNum($name, 'Current_SelfConsumption', 0);
+  my $csc_style  = $csc ? $active  : $inactive;
+  my $csc_color  = $csc ? 'yellow' : 'gray';
 
-  my $batin        = ReadingsNum($name, 'Current_PowerBatIn',  undef);
-  my $batout       = ReadingsNum($name, 'Current_PowerBatOut', undef);
-  my $soc          = ReadingsNum($name, 'Current_BatCharge',     100);
-  my $batcolor     = ($soc > 10) ? 'green' : 'red';
-  my $hasbat       = 1;
+  my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
+  my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
+  my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
+  my $batcolor   = ($soc < 26) ? 'red' : ($soc < 76) ? 'yellow' : 'green';
+  my $hasbat     = 1;
 
   if (!defined($batin) && !defined($batout)) {
       $hasbat = 0;
@@ -4293,10 +4328,10 @@ sub flowGraphic {
         <path d="m 169.625,69.65625 c -6.01649,0 -11,4.983509 -11,11 l 0,14 10,0 0,-14 c 0,-0.609509 0.39049,-1 1,-1 l 25.5,0 c 0.60951,0 1,0.390491 1,1 l 0,14 10,0 0,-14 c 0,-6.016491 -4.98351,-11 -11,-11 l -25.5,0 z"/>
       };
         
-      $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 24);
-      $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 49);
-      $ret .= '<path d="m 221.141,166.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 74);
-      $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 90);
+      $ret .= '<path d="m 221.141,266.334 c 0,3.313 -2.688,6 -6,6 h -65.5 c -3.313,0 -6,-2.688 -6,-6 v -6 c 0,-3.314 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.686 6,6 v 26 z"/>'     if ($soc > 12);
+      $ret .= '<path d="m 221.141,213.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 38);
+      $ret .= '<path d="m 221.141,166.667 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -20 c 0,-3.313 2.687,-6 6,-6 l 65.5,-20 c 3.313,0 6,2.687 6,6 v 20 z"/>' if ($soc > 63);
+      $ret .= '<path d="m 221.141,120 c 0,3.313 -2.688,6 -6,6 l -65.5,20 c -3.313,0 -6,-2.687 -6,-6 v -26 c 0,-3.313 2.687,-6 6,-6 h 65.5 c 3.313,0 6,2.687 6,6 v 6 z"/>'          if ($soc > 88);
       $ret .= '</g>';
   }
 
@@ -6391,7 +6426,15 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          Größere Werte vermindern, kleinere Werte erhöhen tendenziell den prognostizierten PV Ertrag.<br>
          (default: 35)         
        </li>  
-       <br>      
+       <br> 
+
+       <a id="SolarForecast-attr-consumerLegend"></a>
+       <li><b>consumerLegend </b><br>
+         Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher SolarForecast Device 
+         registriert sind. <br>
+         (default: icon_top)
+       </li>
+       <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [ready=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br>
