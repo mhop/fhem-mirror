@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - bugfix:  89_AndroidDBHost: Fixed module not loaded error
  - change:  48_MieleAtHome: use id-tag instead of name-tag for docs
  - new:     50_SSFile: Module that integrates Synology Sile Station
  - bugfix:  98_WeekdayTimer: CONDITION now again is checked for entire day

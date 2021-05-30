@@ -4,7 +4,7 @@
 #
 # 89_AndroidDBHost
 #
-# Version 0.3
+# Version 0.4
 #
 # FHEM Integration for Android Debug Bridge
 #
@@ -254,7 +254,7 @@ sub Set ($@)
 		return $result.$error;
 	}
 	elsif ($opt eq 'disconnect') {
-		my ($rc, $result, $error) = Execute ($Hash, 'disconnect', 'disconnected');
+		my ($rc, $result, $error) = Execute ($hash, 'disconnect', 'disconnected');
 		UpdateClientStates ($hash);
 		return "Disconnecting all devices failed $result $error" if ($rc == 0);
 	}
