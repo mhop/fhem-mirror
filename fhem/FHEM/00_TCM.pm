@@ -28,28 +28,29 @@ sub TCM_CSUM($);
 sub TCM_Initialize($) {
   my ($hash) = @_;
   # Provider
-  $hash->{ReadFn} = "TCM_Read";
-  $hash->{WriteFn} = "TCM_Write";
-  $hash->{ReadyFn} = "TCM_Ready";
-  $hash->{Clients} = ":EnOcean:";
   my %matchList= (
     "1:EnOcean" => "^EnOcean:",
   );
+  $hash->{Clients} = "EnOcean";
   $hash->{MatchList} = \%matchList;
+  $hash->{ReadFn} = "TCM_Read";
+  $hash->{ReadyFn} = "TCM_Ready";
+  $hash->{WriteFn} = "TCM_Write";
   # Normal devices
+  $hash->{AttrFn} = "TCM_Attr";
   $hash->{DefFn} = "TCM_Define";
   $hash->{FingerprintFn} = "TCM_Fingerprint";
-  $hash->{UndefFn} = "TCM_Undef";
+  $hash->{NotifyFn} = "TCM_Notify";
+  $hash->{NotifyOrderPrefix} = "45-";
   $hash->{GetFn} = "TCM_Get";
   $hash->{SetFn} = "TCM_Set";
-  $hash->{NotifyFn} = "TCM_Notify";
-  $hash->{AttrFn} = "TCM_Attr";
+  $hash->{ShutdownFn} = "TCM_Shutdown";
+  $hash->{UndefFn} = "TCM_Undef";
   $hash->{AttrList} = "assignIODev:select,no,yes baseID .baseIDSaved blockSenderID:own,no .chipIDSaved comModeUTE:auto,biDir,uniDir comType:TCM,RS485 do_not_notify:1,0 " .
                       "dummy:1,0 fingerprint:off,on learningDev:all,teachMsg learningMode:always,demand,nearfield " .
-                      "msgCounter:select,off,on sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
+                      "msgCounter:select,off,on rcvIDShift sendInterval:0,25,40,50,100,150,200,250 smartAckMailboxMax:slider,0,1,20 " .
                       "smartAckLearnMode:simple,advance,advanceSelectRep";
-  $hash->{ShutdownFn} = "TCM_Shutdown";
-  $hash->{NotifyOrderPrefix} = "45-";
+  return undef;
 }
 
 # Define
@@ -389,7 +390,7 @@ sub TCM_CRC8($) {
 sub TCM_Read($) {
   my ($hash) = @_;
   my $buf = DevIo_SimpleRead($hash);
-  return "" if(!defined($buf));
+  return "" if (!defined($buf));
   my $name = $hash->{NAME};
   my $blockSenderID = AttrVal($name, "blockSenderID", "own");
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
@@ -411,10 +412,12 @@ sub TCM_Read($) {
 
       if($net =~ m/^0B(..)(........)(........)(..)/) {
         # Receive Radio Telegram (RRT)
-        my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
+        my ($org, $d1, $id, $status) = ($1, $2, $3, $4);
         my $packetType = 1;
+        # shift rcvID range
+        $id = sprintf("%08X", hex($id) + hex($attr{$name}{rcvIdShift})) if (defined $attr{$name}{rcvIdShift});
         # Re-translate the ORG to RadioORG / TCM310 equivalent
-        my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
+        my %orgmap = ("05" => "F6", "06" => "D5", "07" => "A5");
         if($orgmap{$org}) {
           $org = $orgmap{$org};
         } else {
@@ -432,8 +435,10 @@ sub TCM_Read($) {
         # Receive Message Telegram (RMT)
         my $msg = TCM_Parse120($hash, $net, 1);
         if (($msg eq 'OK') && ($net =~ m/^8B(..)(........)(........)(..)/)){
-          my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
+          my ($org, $d1, $id, $status) = ($1, $2, $3, $4);
           my $packetType = 1;
+          # shift rcvID range
+          $id = sprintf("%08X", hex($id) + hex($attr{$name}{rcvIDShift})) if (defined $attr{$name}{rcvIDShift});
           # Re-translate the ORG to RadioORG / TCM310 equivalent
           my %orgmap = ("05" => "F6", "06" => "D5", "07" => "A5");
           if($orgmap{$org}) {
@@ -1371,7 +1376,7 @@ sub TCM_Attr(@) {
   } elsif ($attrName eq "baseID") {
     if (!defined $attrVal){
 
-    } elsif ($attrVal !~ m/^[Ff]{2}[\dA-Fa-f]{6}$/) {
+    } elsif ($attrVal !~ m/^[Ff]{2}[\dA-Fa-f]{4}[08]0$/ || $attrVal =~ m/^[Ff]{8}$/) {
       Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     } else {
@@ -1444,6 +1449,14 @@ sub TCM_Attr(@) {
       RemoveInternalTimer($hash, 'TCM_msgCounter');
       InternalTimer(time() + 60, 'TCM_msgCounter', $hash, 0);
     } else {
+      Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
+      CommandDeleteAttr(undef, "$name $attrName");
+    }
+
+  } elsif ($attrName eq "rcvIDShift") {
+    if (!defined $attrVal){
+
+    } elsif ($attrVal !~ m/^[\dA-Fa-f]{6}[08]0$/ || $attrVal =~ m/^[Ff]{8}$/) {
       Log3 $name, 2, "TCM $name attribute-value [$attrName] = $attrVal wrong";
       CommandDeleteAttr(undef, "$name $attrName");
     }
@@ -1684,7 +1697,7 @@ sub TCM_Shutdown($) {
   <a name="TCMset"></a>
   <b>Set</b><br>
   <ul><b>ESP2 (TCM 120)</b><br>
-    <li>baseID [FF800000 ... FFFFFF80]<br>
+    <li>baseID [FF000000 ... FFFFFF80]<br>
       Set the BaseID.<br>
       Note: The firmware executes this command only up to then times to prevent misuse.</li>
     <li>modem_off<br>
@@ -1709,7 +1722,7 @@ sub TCM_Shutdown($) {
   <br><br>
   </ul>
   <ul><b>ESP3 (TCM 310x, TCM 410J, TCM 515, USB 300, USB400J, USB 515)</b><br>
-    <li>baseID [FF800000 ... FFFFFF80]<br>
+    <li>baseID [FF000000 ... FFFFFF80]<br>
       Set the BaseID.<br>
       Note: The firmware executes this command only up to then times to prevent misuse.</li>
     <li>baudrate [00|01|02|03]<br>
@@ -1858,9 +1871,10 @@ sub TCM_Shutdown($) {
       Block receiving telegrams with a TCM SenderID sent by repeaters.
     </li>
     <li><a href="#attrdummy">dummy</a></li>
-    <li><a name="TCM_baseID">baseID</a> &lt;FF800000 ... FFFFFF80&gt;,
+    <li><a name="TCM_baseID">baseID</a> &lt;FF000000 ... FFFFFF80&gt;,
       [baseID] = <none> is default.<br>
       Set Transceiver baseID and override automatic allocation. Use this attribute only if the IODev does not allow automatic allocation.
+      The BaseID must be set in increments of 0x80.
     </li>
     <li><a name="TCM_fingerprint">fingerprint</a> &lt;off|on&gt;,
       [fingerprint] = off is default.<br>
@@ -1895,6 +1909,11 @@ sub TCM_Shutdown($) {
       [msgCounter] = off is default.<br>
       Counts the received and sent messages in the last day, last hour, and minute, see internals MsgRcvPerDay, MsgSndPerDay,
       MsgRcvPerHour, MsgSndPerHour, MsgRcvPerMin MsgSndPerMin.
+    </li>
+    <li><a name="TCM_rcvIDShift">rcvIDShift</a> &lt;00000080 ... FFFFFF80&gt;,
+      [rcvIDShift] = <none> is default.<br>
+      Shift the address range of the received data telegrams. The attribute is supported only for the ESP2 protocol.
+      The rcvIDShift must be set in increments of 0x80.
     </li>
     <li><a name="TCM_sendInterval">sendInterval</a> &lt;0 ... 250&gt;<br>
       ESP2: [sendInterval] = 100 ms is default.<br>
