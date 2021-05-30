@@ -2653,7 +2653,7 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                        # Set Command für "on"
+  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                  # Set Command für "on"
   my $ready  = ConsumerVal ($hash, $c, "ready",   1);
  
   if($ready && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {       # Verbraucher Start ist geplant && Startzeit überschritten
@@ -2676,8 +2676,8 @@ sub __switchConsumer {
   
   ## Verbraucher ausschalten
   ############################
-  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                # Set Command für "off"
-  if($offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {          # Verbraucher nicht switched off && Stopzeit überschritten
+  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                          # Set Command für "off"
+  if($ready && $offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {          # Verbraucher nicht switched off && Stopzeit überschritten
       CommandSet(undef,"$cname $offcom");
       (undef,undef,undef,$stoptime)                 = timestampToTimestring ($t);
       $data{$type}{$name}{consumers}{$c}{planstate} = "switched off: ".$stoptime;
