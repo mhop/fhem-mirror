@@ -1357,9 +1357,18 @@ sub collect_setValue
 {
   my ($hash,$name,$reading,$hours)=@_;
 
+  my $collect=\%{$hash->{collect}{"$name $reading"}{$hours}};
+  my $r=ReadingsVal($name,$reading,0);
+  my $seconds=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
+  $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : "N/A");
+  ${$collect}{value}=$r;
+  ${$collect}{time}=$seconds;
+  return if ($r eq "N/A");
+  
+  
   my $diff_slots=1;
   my $last_slot;
-  my $collect=\%{$hash->{collect}{"$name $reading"}{$hours}};
+
   
   my $dim=${$collect}{dim};
   my $va=${$collect}{values};
@@ -1370,11 +1379,6 @@ sub collect_setValue
   if (@{$ta} == $dim) {
     $last_slot=int (${$ta}[-1]/$seconds_per_slot);
   }
-
-  my $r=ReadingsVal($name,$reading,0);
-  $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : 0);
-  my $seconds=time_str2num(ReadingsTimestamp($name, $reading, "1970-01-01 01:00:00"));
-
   my $slot_nr=int ($seconds/$seconds_per_slot);
   if (defined $last_slot) {
     $diff_slots=$slot_nr-$last_slot;
@@ -1407,8 +1411,7 @@ sub collect_setValue
     ${$ta}[$dim-1]=$seconds;  
   }
   
-  ${$collect}{value}=$r;
-  ${$collect}{time}=$seconds;
+
     
   my $maxVal;
   my $maxValTime;
@@ -4497,6 +4500,7 @@ sub format_value {
     $val=$value;
   } else {
     $format='%s';
+    $val="N/A";
     $value=$min;
   }
   return($format,$value,$val);
@@ -4843,8 +4847,10 @@ sub card
         $points.=$i*$x_prop.",$last ";
       }
     }
-    $points.=$chart_dim.",".$last." " if ($steps eq "1");
-    $points.=$chart_dim.",".(50-int(($val*$m+$n)*10)/10)." ";
+    if ($val ne "N/A") {
+      $points.=$chart_dim.",".$last." " if ($steps eq "1");
+      $points.=$chart_dim.",".(50-int(($val*$m+$n)*10)/10)." ";
+    }
     $out.=sprintf('<path d="M%s,%s L',$chart_dim,$xpos);
     $out.= $points;
     $out.= sprintf('" style="fill:url(#gradplotLight_%s_%s_%s);stroke:url(#gradplot_%s_%s_%s);stroke-width:0.5" />',$topValColor,$bottomValColor,(defined $lr ? $lr:0),$topValColor,$bottomValColor,(defined $lr ? $lr:0));
@@ -4853,7 +4859,7 @@ sub card
 
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7" />',$maxValSlot*$x_prop,(50-int((${$a}[$maxValSlot]*$m+$n)*10)/10),color($maxValColor,$ln)) if (defined $maxValSlot);
   $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"/>,',$minValSlot*$x_prop,(50-int((${$a}[$minValSlot]*$m+$n)*10)/10),color($minValColor,$ln)) if (defined $minValSlot);
-  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),color($currColor,$ln));
+  $out.=sprintf('<circle cx="%s" cy="%s" r="2" fill="%s"  opacity="0.7"> <animate attributeName="opacity" values="0.0;1;0.0" dur="2s" repeatCount="indefinite"/></circle>',$chart_dim,(50-int(($value*$m+$n)*10)/10),color($currColor,$ln)) if ($val ne "N/A");
   $out.= '</g>';
   $out.= '</svg>';
 
