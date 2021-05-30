@@ -51,6 +51,7 @@ BEGIN {
           AttrVal
           AttrNum
           CommandSet
+          CommandSetReading
           data
           defs
           delFromDevAttrList
@@ -116,7 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend ",
+  "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend, no negative val Current_SelfConsumption, Current_PV ",
   "0.48.0" => "28.05.2021  new optional key ready in consumer attribute ",
   "0.47.0" => "28.05.2021  add flowGraphic, attr flowGraphicSize, graphicSelect, flowGraphicAnimate ",
   "0.46.1" => "21.05.2021  set <> reset pvHistory <day> <hour> ",
@@ -193,6 +194,7 @@ my %hset = (                                                                # Ha
   currentRadiationDev     => { fn => \&_setcurrentRadiationDev    },
   modulePeakString        => { fn => \&_setmodulePeakString       },
   inverterStrings         => { fn => \&_setinverterStrings        },
+  consumerAction          => { fn => \&_setconsumerAction         },
   currentInverterDev      => { fn => \&_setinverterDevice         },
   currentMeterDev         => { fn => \&_setmeterDevice            },
   currentBatteryDev       => { fn => \&_setbatteryDevice          },
@@ -272,6 +274,17 @@ my %hqtxt = (                                                                   
              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
   awd   => { EN => qq{Awaiting data from Solar Forecast devices ...},
              DE => qq{Warten auf Daten von Solarvorhersagegeräten ...}                                                 },
+);
+
+my %htitles = (                                                                                                 # Hash Hilfetexte
+  iaaf  => { EN => qq{Off (automatic mode off) -> Enable automatic mode}, 
+             DE => qq{Aus (Automatikmodus aus) -> Automatik freigeben}       },
+  iave  => { EN => qq{Off (automatic mode) -> Switch on consumer},
+             DE => qq{Aus (Automatikmodus) -> Verbraucher einschalten}       },
+  ieas  => { EN => qq{On (automatic mode) -> Lock automatic mode},
+             DE => qq{Ein (Automatikmodus) -> Automatik sperren}             },
+  ieva  => { EN => qq{On (automatic mode off) -> Switch off consumer},
+             DE => qq{Ein (Automatikmodus aus) -> Verbraucher ausschalten}   },
 );
 
 my %weather_ids = (
@@ -597,6 +610,7 @@ sub Set {
   return "\"set X\" needs at least an argument" if ( @a < 2 );
   my $name  = shift @a;
   my $opt   = shift @a;
+  my @args  = @a;
   my $arg   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
   my $prop  = shift @a;
   my $prop1 = shift @a;
@@ -647,13 +661,14 @@ sub Set {
              ;
             
   my $params = {
-      hash  => $hash,
-      name  => $name,
-      opt   => $opt,
-      arg   => $arg,
-      prop  => $prop,
-      prop1 => $prop1,
-      prop2 => $prop2
+      hash    => $hash,
+      name    => $name,
+      opt     => $opt,
+      arg     => $arg,
+      argsref => \@args,
+      prop    => $prop,
+      prop1   => $prop1,
+      prop2   => $prop2
   };
     
   if($hset{$opt} && defined &{$hset{$opt}{fn}}) {
@@ -1132,6 +1147,45 @@ sub _setwriteHistory {                   ## no critic "not used"
 return $ret;
 }
 
+################################################################
+#              Setter consumerAction
+#      ohne Menüeintrag ! für Aktivität aus Grafik
+################################################################
+sub _setconsumerAction {                 ## no critic "not used"
+  my $paref   = shift;
+  my $hash    = $paref->{hash};
+  my $name    = $paref->{name};
+  my $opt     = $paref->{opt};
+  my $arg     = $paref->{arg};
+  my $argsref = $paref->{argsref};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  }
+  
+  my @args = @{$argsref};
+  
+  my $action = shift @args;                                                 # z.B. set, setreading
+  my $cname  = shift @args;                                                 # Consumername
+  my $tail   = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @args;     # restliche Befehlsargumente ## no critic 'Map blocks'
+  
+  if($action eq "set") {
+      CommandSet (undef,"$cname $tail");
+  }
+  
+  if($action eq "setreading") {
+      CommandSetReading (undef,"$cname $tail");
+  }
+  
+  Log3($name, 4, qq{$name - Consumer Action received / executed: "$action $cname $tail"});
+  
+  centralTask ($hash);
+  # RemoveInternalTimer($hash, "FHEM::SolarForecast::centralTask");
+  # InternalTimer      (gettimeofday()+0.5, "FHEM::SolarForecast::centralTask", $hash, 0);
+
+return;
+}
+
 ###############################################################
 #                  SolarForecast Get
 ###############################################################
@@ -1411,12 +1465,48 @@ sub Notify {
   my $dev_hash = shift;
   my $myName   = $myHash->{NAME};                                                         # Name des eigenen Devices
   my $devName  = $dev_hash->{NAME};                                                       # Device welches Events erzeugt hat
- 
+  
+  return;                                                            # !! ZUR ZEIT NICHT GENUTZT !!
+  
   return if(IsDisabled($myName) || !$myHash->{NOTIFYDEV}); 
   
-  my $events = deviceEvents($dev_hash, 1);  
+  my $events = deviceEvents($dev_hash, 1);
   return if(!$events);
- 
+  
+  my $cdref     = CurrentVal ($myHash, "consumerdevs", "");                                # alle registrierten Consumer
+  my @consumers = ();
+  @consumers    = @{$cdref} if(ref $cdref eq "ARRAY");
+  
+  return if(!@consumers);
+  
+  if($devName ~~ @consumers) {
+      my $cindex;
+      my $type = $myHash->{TYPE};
+      for my $c (sort{$a<=>$b} keys %{$data{$type}{$myName}{consumers}}) {
+          my $cname = ConsumerVal ($myHash, $c, "name", "");
+          if($devName eq $cname) {
+              $cindex = $c; 
+              last;
+          }       
+      }
+      
+      my $autoreading = ConsumerVal ($myHash, $cindex, "autoreading", "");  
+      
+      for my $event (@{$events}) {
+          $event  = "" if(!defined($event));
+          my @evl = split(/\s+/x, $event);
+                    
+          my @parts   = split(/: /,$event, 2);
+          my $reading = shift @parts;
+
+          if ($reading eq "state" || $reading eq $autoreading) {
+              Log3 ($myName, 4, qq{$myName - start centralTask by Notify - $devName:$reading});
+              RemoveInternalTimer($myHash, "FHEM::SolarForecast::centralTask");
+              InternalTimer      (gettimeofday()+0.5, "FHEM::SolarForecast::centralTask", $myHash, 0);
+          }          
+      }
+  }
+   
 return;
 }
 
@@ -3062,6 +3152,7 @@ sub _calcSummaries {
   
   my $consumption         = int ($pvgen - $gfeedin + $gcon - $batin + $batout);
   my $selfconsumption     = int ($pvgen - $gfeedin - $batin);
+  $selfconsumption        = $selfconsumption < 0 ? 0 : $selfconsumption;
   my $surplus             = int ($pvgen - $consumption);                                                # aktueller Überschuß
   my $selfconsumptionrate = 0;
   my $autarkyrate         = 0;
@@ -3168,6 +3259,8 @@ sub collectAllRegConsumers {
   
   my $type  = $hash->{TYPE};
   
+  delete $data{$type}{$name}{current}{consumerdevs};
+  
   for my $c (1..$maxconsumer) {
       $c           = sprintf "%02d", $c;
       my $consumer = AttrVal ($name, "consumer${c}", "");
@@ -3181,6 +3274,8 @@ sub collectAllRegConsumers {
           Log3 ($name, 1, "$name - $err");
           next; 
       }
+      
+      push @{$data{$type}{$name}{current}{consumerdevs}}, $consumer;                                    # alle Consumerdevices in CurrentHash eintragen
       
       my $alias = AttrVal ($consumer, "alias", $consumer);
       
@@ -3434,75 +3529,26 @@ return;
 ###############################################################################
 #                            Vorhersagegrafik
 ###############################################################################
-sub forecastGraphic {                                                                     ## no critic 'complexity'
+sub forecastGraphic {                                 ## no critic 'complexity'
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $ftui  = $paref->{ftui};
 
-  my $hfcg  = $data{$hash->{TYPE}}{$name}{html};                                          #(hfcg = hash forecast graphic)
+  my $hfcg  = $data{$hash->{TYPE}}{$name}{html};                                                    #(hfcg = hash forecast graphic)
   my $type  = $hash->{TYPE};
   
   # Verbraucherlegende und Steuerung
-  ###################################
-  my $legend_txt;            
-  my @pgCDev                  = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
-  my ($legend_style, $legend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
-  $legend                     = '' if(($legend_style eq 'none') || (!int(@pgCDev)));
+  ###################################           
+  my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
+  my ($clegendstyle, $clegend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
+  $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
+  $paref->{consumersref}       = \@consumers;
+  $paref->{clegend}            = $clegend;
+  $paref->{clegendstyle}       = $clegendstyle;
   
-  if ($legend) {
-      for my $c (@pgCDev) {          
-          my $cname   = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
-          my $calias  = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
-          my $cicon   = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
-          my $oncom   = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
-          my $offcom  = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
-          my $autord  = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
-          my $auto    = ConsumerVal ($hash, $c, "ready",        1);                                  # Automatic Mode
-          
-          my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $cname $oncom')"};
-          my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $cname $offcom')"};
-          my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=setreading $cname $autord 1')"};
-          my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=setreading $cname $autord 0')"};
-          
-          if ($ftui eq "ftui") {
-              $cmdon      = qq{"ftui.setFhemStatus('set $cname $oncom')"};
-              $cmdoff     = qq{"ftui.setFhemStatus('set $cname $offcom')"};
-              $cmdautoon  = qq{"ftui.setFhemStatus('set $cname setreading $cname $autord 1')"};  
-              $cmdautooff = qq{"ftui.setFhemStatus('set $cname setreading $cname $autord 0')"};                
-          }
-          
-          $cmdon      = q{} if(!$oncom);
-          $cmdoff     = q{} if(!$offcom);
-          $cmdautoon  = q{} if(!$autord); 
-          $cmdautooff = q{} if(!$autord);           
-          
-          my $swstate  = ConsumerVal ($hash, $c, "state", "undef");                                       # Schaltzustand des Consumerdevices
-          my $swicon   = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
-          
-          if($cmdautoon && $swstate eq "off" && !$auto) {
-              $swicon = "<a title='Status: Aus -> Automatic einschalten' onClick=$cmdautoon><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
-          } 
-          elsif ($cmdon && $swstate eq "off") {
-              $swicon = "<a title='Status: Aus mit Automatic -> einschalten' onClick=$cmdon><img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>"; 
-          } 
-          elsif ($cmdautooff && $swstate eq "on" && $auto) {
-              $swicon = "<a title='Status: Ein mit Automatic -> Automatic ausschalten' onClick=$cmdautooff><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
-          }
-          elsif ($cmdoff && $swstate eq "on") {
-              $swicon = "<a title='Status: Ein -> ausschalten' onClick=$cmdoff><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
-          }
-          
-          if ($legend_style eq 'icon') {                                                                  # mögliche Umbruchstellen mit normalen Blanks vorsehen !
-              $legend_txt .= $calias.'&nbsp;'.FW_makeImage($cicon).' '.$swicon.'&nbsp;&nbsp;'; 
-          } 
-          else {
-              my (undef,$ci) = split('\@',$cicon);
-              $ci            = '#cccccc' if (!$ci);                                                       # Farbe per default
-              $legend_txt   .= '<font color=\''.$ci.'\'>'.$calias.'</font> '.$swicon.'&nbsp;&nbsp;';      # hier auch Umbruch erlauben
-          }
-      }
-  }
+  my $legendtxt                = _forecastGraphicConsumerLegend ($paref); 
+  
 
   # Parameter f. Anzeige extrahieren
   ###################################  
@@ -3605,7 +3651,7 @@ sub forecastGraphic {                                                           
 
   # get consumer list and display it in Graphics
   ################################################ 
-  for (@pgCDev) {
+  for (@consumers) {
       my ($itemName, undef) = split(':',$_);
       $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
       $_        =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
@@ -3743,9 +3789,9 @@ sub forecastGraphic {                                                           
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td></tr>";
   }
 
-  if ($legend_txt && ($legend eq 'top')) {
+  if ($legendtxt && ($clegend eq 'top')) {
       $ret .= "<tr class='odd'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legend_txt</td></tr>";
+      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td></tr>";
   }
 
   if ($weather) {
@@ -3925,7 +3971,7 @@ sub forecastGraphic {                                                           
 
               # inject the new icon if defined
               ##################################
-              #$ret .= consinject($hash,$i,@pgCDev) if($s);
+              #$ret .= consinject($hash,$i,@consumers) if($s);
                       
               $ret .= "</td></tr>";
           }
@@ -3968,7 +4014,7 @@ sub forecastGraphic {                                                           
              
           # inject the new icon if defined
           ##################################
-          #$ret .= consinject($hash,$i,@pgCDev) if($s);
+          #$ret .= consinject($hash,$i,@consumers) if($s);
              
           $ret .= "</td></tr>";
 
@@ -4038,10 +4084,10 @@ sub forecastGraphic {                                                           
 
   # Legende unten
   #################
-  if ($legend_txt && ($legend eq 'bottom')) {
+  if ($legendtxt && ($clegend eq 'bottom')) {
       $ret .= "<tr class='odd'>";
       $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-      $ret .= "$legend_txt</td></tr>";
+      $ret .= "$legendtxt</td></tr>";
   }
 
   $ret .=  "</table></td></tr></table>";
@@ -4049,6 +4095,86 @@ sub forecastGraphic {                                                           
   $ret .= "</html>";
 
 return $ret;
+}
+
+################################################################
+#         Verbraucherlegende und Steuerung 
+################################################################
+sub _forecastGraphicConsumerLegend {                                
+  my $paref   = shift;
+  my $clegend = $paref->{clegend};
+ 
+  return if(!$clegend );
+  
+  my $consumersref = $paref->{consumersref};
+  my $hash         = $paref->{hash};
+  my $name         = $paref->{name};
+  my $ftui         = $paref->{ftui};
+  my $clegendstyle = $paref->{clegendstyle};
+  my $lang         = $paref->{lang};
+  
+  my ($legendtxt,$staticon);
+  my @clegends;
+
+  for my $c (@{$consumersref}) {          
+      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
+      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
+      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
+      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
+      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
+      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
+      my $auto       = ConsumerVal ($hash, $c, "ready",        1);                                  # Automatic Mode
+      
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
+      
+      if ($ftui eq "ftui") {
+          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"};                
+      }
+      
+      $cmdon      = q{} if(!$oncom);
+      $cmdoff     = q{} if(!$offcom);
+      $cmdautoon  = q{} if(!$autord); 
+      $cmdautooff = q{} if(!$autord); 
+
+      my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
+      my $swicon  = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\">";
+      
+      if($cmdautoon && $swstate eq "off" && !$auto) {
+          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
+          $swicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
+      } 
+      elsif ($cmdon && $swstate eq "off") {
+          $staticon = FW_makeImage('ios_off_till_fill@orange', $htitles{iave}{$lang});
+          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
+      } 
+      elsif ($cmdautooff && $swstate eq "on" && $auto) {
+          $staticon = FW_makeImage('ios_on_till_fill@green', $htitles{ieas}{$lang});
+          $swicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
+      }
+      elsif ($cmdoff && $swstate eq "on") {
+          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
+          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+      }
+      
+      if ($clegendstyle eq 'icon') {                                                                   # mögliche Umbruchstellen mit normalen Blanks vorsehen !
+          push @clegends, $calias.'&nbsp;'.FW_makeImage($cicon).' '.$swicon; 
+      } 
+      else {
+          my (undef,$co) = split('\@',$cicon);
+          $co            = '#cccccc' if (!$co);                                                        # Farbe per default
+          push @clegends, '<font color=\''.$co.'\'>'.$calias.'</font> '.$swicon;
+      }
+  }
+  
+  $legendtxt = join("&nbsp;&nbsp;|&nbsp;&nbsp;", @clegends);
+  
+return $legendtxt;
 }
 
 ################################################################
@@ -4281,7 +4407,7 @@ sub flowGraphic {
   my $ret = qq{
       <table class="roomoverview">
       <tr><td><table class="block"><tr align="center" class="odd"><td>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style" id="SVGPLOT">
       <style>$animation</style>
       <g transform="translate(200,50)">
         <g>
@@ -4373,11 +4499,11 @@ return $ret;
 #                 Inject consumer icon
 ################################################################
 sub consinject {
-  my ($hash,$i,@pgCDev) = @_;
-  my $name              = $hash->{NAME};
-  my $ret               = "";
+  my ($hash,$i,@consumers) = @_;
+  my $name                 = $hash->{NAME};
+  my $ret                  = "";
 
-  for (@pgCDev) {
+  for (@consumers) {
       if ($_) {
           my ($cons,$im,$start,$end) = split (':', $_);
           Log3 ($name, 4, "$name - Consumer to show -> $cons, relative to current time -> start: $start, end: $end") if($i<1); 
@@ -5691,7 +5817,7 @@ sub NexthoursVal {
 return $def;
 }
 
-################################################################
+#############################################################################
 # Wert des current-Hash zurückliefern
 # Usage:
 # CurrentVal ($hash, $key, $def)
@@ -5699,6 +5825,7 @@ return $def;
 # $key: generation          - aktuelle PV Erzeugung
 #       genslidereg         - Schieberegister PV Erzeugung (Array)
 #       h4fcslidereg        - Schieberegister 4h PV Forecast (Array)
+#       consumerdevs        - alle registrierten Consumerdevices (Array)
 #       gridconsumption     - aktueller Netzbezug
 #       powerbatin          - Batterie Ladeleistung
 #       powerbatout         - Batterie Entladeleistung
@@ -5706,7 +5833,7 @@ return $def;
 #       tomorrowconsumption - Verbrauch des kommenden Tages
 # $def: Defaultwert
 #
-################################################################
+#############################################################################
 sub CurrentVal {
   my $hash = shift;
   my $key  = shift;
@@ -6440,7 +6567,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [ready=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br>
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
-        sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br><br>
+        sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
+        <br><br>
          <ul>   
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
@@ -6458,8 +6586,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>mintime</b></td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
             <tr><td> <b>on</b>     </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>    </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>ready</b>  </td><td>Reading im Verbraucherdevice welches das Einschalten des Verbrauchers freigibt bzw. blockiert (optional)                         </td></tr>
-            <tr><td>               </td><td>Readingwert = 1: Einschalten freigegeben,  Readingwert = 0: Einschalten blockiert                                                  </td></tr>
+            <tr><td> <b>ready</b>  </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
+            <tr><td>               </td><td>Readingwert = 1: Schalten freigegeben,  0: Schalten blockiert                                                                    </td></tr>
             <tr><td> <b>etotal</b> </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
          </table>
          </ul>
