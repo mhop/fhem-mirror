@@ -1409,6 +1409,8 @@ sub _attrconsumer {                      ## no critic "not used"
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
   
+  return if(!$init_done);
+  
   if($cmd eq "set") {
       my ($a,$h) = parseParams ($aVal);
       my $codev  = $a->[0] // "";
@@ -5900,11 +5902,14 @@ return $def;
 1;
 
 =pod
-=item summary    Visualization of solar predictions for PV systems
-=item summary_DE Visualisierung von solaren Vorhersagen für PV Anlagen
+=item summary    Visualization of solar predictions for PV systems and Consumer control
+=item summary_DE Visualisierung von solaren Vorhersagen für PV Anlagen und Verbrauchersteuerung
 
 =begin html
 
+<a id="SolarForecast"></a>
+<h3>SolarForecast</h3>
+<br>
 
 =end html
 =begin html_DE
@@ -5948,7 +5953,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     hinterlegt: <br><br>
 
       <ul>
-         <table>  
+         <table>
          <colgroup> <col width=35%> <col width=65%> </colgroup>
             <tr><td> <b>currentForecastDev</b>   </td><td>DWD_OpenData Device welches Wetterdaten liefert     </td></tr>
             <tr><td> <b>currentRadiationDev </b> </td><td>DWD_OpenData Device welches Strahlungsdaten liefert </td></tr>
@@ -6120,7 +6125,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       Im ausgewählten DWD_OpenData Device müssen mindestens diese Attribute gesetzt sein: <br><br>
 
       <ul>
-         <table>  
+         <table> 
          <colgroup> <col width=25%> <col width=75%> </colgroup>
             <tr><td> <b>forecastDays</b>            </td><td>1                                                                                             </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>Rad1h                                                                                         </td></tr>
@@ -6745,8 +6750,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <ul>   
        <table>  
        <colgroup> <col width=5%> <col width=95%> </colgroup>
-          <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                         </td></tr>
-          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an                                                                            </td></tr>
+          <tr><td> <b>single</b>  </td><td>- zeigt nur den primären Balken an                                                                               </td></tr>
+          <tr><td> <b>double</b>  </td><td>- zeigt den primären Balken und den sekundären Balken an                                                         </td></tr>
           <tr><td> <b>diff</b>    </td><td>- Differenzanzeige. Es gilt:  &lt;Differenz&gt; = &lt;Wert primärer Balken&gt; - &lt;Wert sekundärer Balken&gt;  </td></tr>
        </table>
        </ul>
