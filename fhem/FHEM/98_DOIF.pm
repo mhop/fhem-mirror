@@ -1363,56 +1363,53 @@ sub collect_setValue
   $r = ($r =~ /(-?\d+(\.\d+)?)/ ? $1 : "N/A");
   ${$collect}{value}=$r;
   ${$collect}{time}=$seconds;
-  return if ($r eq "N/A");
-  
   
   my $diff_slots=1;
   my $last_slot;
 
-  
   my $dim=${$collect}{dim};
   my $va=${$collect}{values};
   my $ta=${$collect}{times};
   
-  my $seconds_per_slot=$hours*3600/$dim;
-   
-  if (@{$ta} == $dim) {
-    $last_slot=int (${$ta}[-1]/$seconds_per_slot);
-  }
-  my $slot_nr=int ($seconds/$seconds_per_slot);
-  if (defined $last_slot) {
-    $diff_slots=$slot_nr-$last_slot;
-    if ($diff_slots > 0) {
-      if ($diff_slots >= $dim) {
-        ${$collect}{last_value}=${$collect}{value} if (defined ${$collect}{value});
-        @{$va}=();
-        @{$ta}=();
-      } else {
-        my @rv=splice (@{$va},0,$diff_slots);
-        my @rt=splice (@{$ta},0,$diff_slots);
-        if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{value} and ${$collect}{value} != ${$va}[$dim-$diff_slots-1]) {
-          ${$va}[$dim-$diff_slots]=${$collect}{value};
-          ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*60*$seconds_per_slot;
-        }
-        for (my $i=@rv-1;$i>=0;$i--) {
-          if (defined ($rv[$i])) {
-            ${$collect}{last_value}=$rv[$i];
-            last;
+  if ($r ne "N/A") {
+    my $seconds_per_slot=$hours*3600/$dim;
+     
+    if (@{$ta} == $dim) {
+      $last_slot=int (${$ta}[-1]/$seconds_per_slot);
+    }
+    my $slot_nr=int ($seconds/$seconds_per_slot);
+    if (defined $last_slot) {
+      $diff_slots=$slot_nr-$last_slot;
+      if ($diff_slots > 0) {
+        if ($diff_slots >= $dim) {
+          ${$collect}{last_value}=${$collect}{value} if (defined ${$collect}{value});
+          @{$va}=();
+          @{$ta}=();
+        } else {
+          my @rv=splice (@{$va},0,$diff_slots);
+          my @rt=splice (@{$ta},0,$diff_slots);
+          if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{value} and ${$collect}{value} != ${$va}[$dim-$diff_slots-1]) {
+            ${$va}[$dim-$diff_slots]=${$collect}{value};
+            ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*60*$seconds_per_slot;
+          }
+          for (my $i=@rv-1;$i>=0;$i--) {
+            if (defined ($rv[$i])) {
+              ${$collect}{last_value}=$rv[$i];
+              last;
+            }
           }
         }
       }
     }
-  }
 
-  ${$collect}{avg} = defined ${$collect}{max_value} ? (${$collect}{max_value}-${$collect}{min_value})/2 + ${$collect}{min_value}: $r;
-  
-  if (!defined ${$va}[$dim-1] or  $r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1]) {
-    ${$va}[$dim-1]=$r;
-    ${$ta}[$dim-1]=$seconds;  
-  }
-  
-
+    ${$collect}{avg} = defined ${$collect}{max_value} ? (${$collect}{max_value}-${$collect}{min_value})/2 + ${$collect}{min_value}: $r;
     
+    if (!defined ${$va}[$dim-1] or  $r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1]) {
+      ${$va}[$dim-1]=$r;
+      ${$ta}[$dim-1]=$seconds;  
+    }
+  }
+   
   my $maxVal;
   my $maxValTime;
   my $maxValSlot;
@@ -4651,16 +4648,26 @@ sub card
   my $scaling=0;
   
   if ($plot ne "1" and $minVal ne $maxVal) {
-      $scaling=1;
+    $scaling=1;
+    if ($val ne "N/A") {
       $minPlot=($value < $minVal ? $value : $minVal);
       $maxPlot=($value > $maxVal ? $value : $maxVal);
+    } else {
+      $minPlot=$minVal;
+      $maxPlot=$maxVal;
+    }
   } else {
-    
-      my $minimum=(($value<$min and $value<$minVal) ? $value:($min<$minVal) ? $min:$minVal);
-      my $maximum=(($value>$max and $value>$maxVal) ? $value:($max>$maxVal) ? $max:$maxVal);
-
-      $minPlot=(($min < 0 and $minVal > 0) ? 0 : $minimum);
-      $maxPlot=(($max > 0 and $maxVal < 0) ? 0 : $maximum);
+    my $minimum;
+    my $maximum;
+    if ($val ne "N/A") {
+      $minimum=(($value<$min and $value<$minVal) ? $value:($min<$minVal) ? $min:$minVal);
+      $maximum=(($value>$max and $value>$maxVal) ? $value:($max>$maxVal) ? $max:$maxVal);
+    } else {
+      $minimum=(($min<$minVal) ? $min:$minVal);
+      $maximum=(($max>$maxVal) ? $max:$maxVal);
+    }
+    $minPlot=(($min < 0 and $minVal > 0) ? 0 : $minimum);
+    $maxPlot=(($max > 0 and $maxVal < 0) ? 0 : $maximum);
   }
   
   my ($m,$n)=m_n($minPlot,0,$maxPlot,50);
