@@ -448,6 +448,7 @@ my %hef = (                                                                     
 # $data{$type}{$name}{nexthours}                                                 # NextHours Werte
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
 # $data{$type}{$name}{html}                                                      # hfcg = hash forecast graphic
+# $data{$type}{$name}{strings}                                                   # Stringkonfiguration
 
 ################################################################
 #               Init Fn
@@ -4726,16 +4727,19 @@ sub calcPVforecast {
   
   for my $st (@strings) {                                                                             # für jeden String der Config ..
       my $peak   = $stch->{"$st"}{peak};                                                              # String Peak (kWp)
+      $peak     *= 1000;                                                                              # Peak in W
       my $ta     = $stch->{"$st"}{tilt};                                                              # Neigungswinkel Solarmodule
       my $moddir = $stch->{"$st"}{dir};                                                               # Ausrichtung der Solarmodule
       
       my $af     = $hff{$ta}{$moddir} / 100;                                                          # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
       
-      my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf * 1000);
+      my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf);
+      
+      $pv        = $peak if($pv > $peak);
   
       my $lh = {                                                                                      # Log-Hash zur Ausgabe
           "moduleDirection"          => $moddir,
-          "modulePeakString"         => $peak,
+          "modulePeakString"         => $peak." W",
           "moduleTiltAngle"          => $ta,
           "Area factor"              => $af,
           "Cloudcover"               => $cloudcover,
@@ -4760,8 +4764,10 @@ sub calcPVforecast {
       Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
       
       $pvsum   += $pv;
-      $peaksum += $peak * 1000;                                                                      # kWp in Wp umrechnen
+      $peaksum += $peak;                                                                      # kWp in Wp umrechnen
   }
+  
+  $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # insgesamt installierte Peakleistung in W
     
   my $logao         = qq{};
   $paref->{pvsum}   = $pvsum;
