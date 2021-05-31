@@ -3612,7 +3612,6 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   $hfcg->{0}{day}      = $day;
   # $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);   <-falsch !!
   $hfcg->{0}{mktime}   = timestringToTimestamp ($t);                                                  # gleich die Unix Zeit dazu holen
-  Log3 ($hash, 1, "$name - $hfcg->{0}{mktime}");
   
   my $val1 = 0;
   my $val2 = 0;
