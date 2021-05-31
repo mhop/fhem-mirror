@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.49.3" => "31.05.2021  improve calcPVforecast pvcorrfactor for multistring configuration ",
   "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
   "0.49.1" => "30.05.2021  no consumer check during start Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959  ",
   "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend, no negative val Current_SelfConsumption, Current_PV ",
@@ -4729,58 +4730,70 @@ sub calcPVforecast {
   }
   
   my $pvsum   = 0;      
-  my $peaksum = 0;                                                                                    # Summe der installierten Peak Leistung
+  my $peaksum = 0; 
+  my ($lh,$sq);                                                                                    
   
   for my $st (@strings) {                                                                             # für jeden String der Config ..
       my $peak   = $stch->{"$st"}{peak};                                                              # String Peak (kWp)
-      $peak     *= 1000;                                                                              # Peak in W
+      $peak     *= 1000;                                                                              # kWp in Wp umrechnen
       my $ta     = $stch->{"$st"}{tilt};                                                              # Neigungswinkel Solarmodule
       my $moddir = $stch->{"$st"}{dir};                                                               # Ausrichtung der Solarmodule
       
       my $af     = $hff{$ta}{$moddir} / 100;                                                          # Flächenfaktor: http://www.ing-büro-junge.de/html/photovoltaik.html
       
-      my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $hc * $ccf * $rcf);
-      
-      $pv        = $peak if($pv > $peak);
+      my $pv     = sprintf "%.1f", ($rad * $af * $kJtokWh * $peak * $pr * $ccf * $rcf);
   
-      my $lh = {                                                                                      # Log-Hash zur Ausgabe
-          "moduleDirection"          => $moddir,
-          "modulePeakString"         => $peak." W",
-          "moduleTiltAngle"          => $ta,
-          "Area factor"              => $af,
-          "Cloudcover"               => $cloudcover,
-          "CloudRange"               => $range,
-          "CloudCorrFoundInStore"    => $hcfound,
-          "CloudFactorDamping"       => $clouddamp." %",
-          "Cloudfactor"              => $ccf,
-          "Rainprob"                 => $rainprob,
-          "Rainfactor"               => $rcf,
-          "RainFactorDamping"        => $raindamp." %",
-          "pvCorrectionFactor"       => $hc,
-          "Radiation"                => $rad,
-          "Factor kJ to kWh"         => $kJtokWh,
-          "PV generation"            => $pv." Wh"
+      $lh = {                                                                                         # Log-Hash zur Ausgabe
+          "moduleDirection"              => $moddir,
+          "modulePeakString"             => $peak." W",
+          "moduleTiltAngle"              => $ta,
+          "Area factor"                  => $af,
+          "Cloudcover"                   => $cloudcover,
+          "CloudRange"                   => $range,
+          "CloudCorrFoundInStore"        => $hcfound,
+          "CloudFactorDamping"           => $clouddamp." %",
+          "Cloudfactor"                  => $ccf,
+          "Rainprob"                     => $rainprob,
+          "Rainfactor"                   => $rcf,
+          "RainFactorDamping"            => $raindamp." %",
+          "Radiation"                    => $rad,
+          "Factor kJ to kWh"             => $kJtokWh,
+          "PV generation forecast (raw)" => $pv." Wh"
       };  
       
-      my $sq;
+      $sq = q{};
       for my $idx (sort keys %{$lh}) {
           $sq .= $idx." => ".$lh->{$idx}."\n";             
       }
 
-      Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." string: $st ->\n$sq");
+      Log3 ($name, 4, "$name - PV forecast calc (raw) for $reld Hour ".sprintf("%02d",$chour+1)." string $st ->\n$sq");
       
       $pvsum   += $pv;
-      $peaksum += $peak;                                                                      # kWp in Wp umrechnen
+      $peaksum += $peak;                                                                            
   }
   
   $data{$type}{$name}{current}{allstringspeak} = $peaksum;                                           # insgesamt installierte Peakleistung in W
-    
+  
+  $pvsum *= $hc;                                                                                     # Korrekturfaktor anwenden
+  $pvsum  = $peaksum if($pvsum > $peaksum);
+      
   my $logao         = qq{};
   $paref->{pvsum}   = $pvsum;
   $paref->{peaksum} = $peaksum;
   ($pvsum, $logao)  = _70percentRule ($paref); 
   
-  Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: $pvsum ".$logao);
+  $lh = {                                                                                            # Log-Hash zur Ausgabe
+      "PV correction factor"   => $hc,
+      "PV correction quality"  => $hq,
+      "PV generation forecast" => $pvsum." Wh ".$logao,
+  };
+  
+  $sq = q{};
+  for my $idx (sort keys %{$lh}) {
+      $sq .= $idx." => ".$lh->{$idx}."\n";             
+  }
+  
+  Log3 ($name, 4, "$name - PV forecast calc for $reld Hour ".sprintf("%02d",$chour+1)." summary: \n$sq");
  
 return $pvsum;
 }
