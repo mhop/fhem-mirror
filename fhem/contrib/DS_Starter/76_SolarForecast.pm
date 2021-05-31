@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
   "0.49.1" => "30.05.2021  no consumer check during start Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959  ",
   "0.49.0" => "29.05.2021  consumer legend, attr consumerLegend, no negative val Current_SelfConsumption, Current_PV ",
   "0.48.0" => "28.05.2021  new optional key ready in consumer attribute ",
@@ -3597,8 +3598,8 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   ##########################
   my $day;
 
-  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
-  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+  my $t                               = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
+  my (undef,undef,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
   $thishour++;
   
@@ -3609,8 +3610,10 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   $hfcg->{0}{day_str}  = $day_str;
   $day                 = int($day_str);
   $hfcg->{0}{day}      = $day;
-  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month),$year);                         # gleich die Unix Zeit dazu holen
-
+  # $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);   <-falsch !!
+  $hfcg->{0}{mktime}   = timestringToTimestamp ($t);                                                  # gleich die Unix Zeit dazu holen
+  Log3 ($hash, 1, "$name - $hfcg->{0}{mktime}");
+  
   my $val1 = 0;
   my $val2 = 0;
   my $val3 = 0;
@@ -3726,15 +3729,15 @@ sub forecastGraphic {                                 ## no critic 'complexity'
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
-              my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i)));
+              my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs(($offset)-$i)));
               
               # Sonderfall Mitternacht
-              $ds                  = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
+              $ds   = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
               
-              $val1                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
-              $val2                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
-              $val3                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
-              $val4                = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
+              $val1 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvfc",  0);
+              $val2 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "pvrl",  0); 
+              $val3 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "gcons", 0);
+              $val4 = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "confc", 0);
               
               $hfcg->{$i}{weather} = HistoryVal ($hash, $ds, $hfcg->{$i}{time_str}, "weatherid", undef);
           }
@@ -3853,6 +3856,7 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   $ret .= "<tr class='even'><td class='solarfc'></td>";                                      # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
+  
   for my $i (0..($maxhours*2)-1) {                                                           # gleiche Bedingung wie oben
       next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
       $ii++;
@@ -4043,9 +4047,9 @@ sub forecastGraphic {                                 ## no critic 'complexity'
           if ($hfcg->{$i}{diff} >= 0) {                                                                 # mit Farbe 1 colorfc füllen
               $style .= " background-color:#$colorfc'";
               $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                  # Sonderfall , 1px dünnen Strich ausgeben
-              $ret  .= "<tr class='odd' style='height:".$z2."px'>";
-              $ret  .= "<td align='center' class='solarfc' ".$style.">";
-              $ret  .= "</td></tr>";
+              $ret   .= "<tr class='odd' style='height:".$z2."px'>";
+              $ret   .= "<td align='center' class='solarfc' ".$style.">";
+              $ret   .= "</td></tr>";
           } 
           else {                                                                                        # ohne Farbe
               $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                      # Sonderfall, hier wird die 0 gebraucht !
@@ -4078,10 +4082,10 @@ sub forecastGraphic {                                 ## no critic 'complexity'
           $ret .= "<tr class='even'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
       }
 
-      $ret .= "<tr class='even'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
-      $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
+      $ret     .= "<tr class='even'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
+      $ret     .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
       $thishour = 99 if ($hfcg->{$i}{time} == $thishour);                                               # nur einmal verwenden !
-      $ret .="</td></tr></table></td>";                                                   
+      $ret     .="</td></tr></table></td>";                                                   
   }
 
   $ret .= "<td class='solarfc'></td></tr>";
