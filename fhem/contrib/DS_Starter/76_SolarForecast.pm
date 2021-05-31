@@ -288,6 +288,16 @@ my %htitles = (                                                                 
              DE => qq{Ein (Automatikmodus) -> Automatik sperren}             },
   ieva  => { EN => qq{On (automatic mode off) -> Switch off consumer},
              DE => qq{Ein (Automatikmodus aus) -> Verbraucher ausschalten}   },
+  upd   => { EN => qq{Update},
+             DE => qq{Update}                                                },
+  on    => { EN => qq{switched on},
+             DE => qq{eingeschaltet}                                         },
+  off   => { EN => qq{switched off},
+             DE => qq{ausgeschaltet}                                         },
+  undef => { EN => qq{undefined},
+             DE => qq{undefiniert}                                           },
+  dela  => { EN => qq{delayed},
+             DE => qq{verzoegert}                                            },
 );
 
 my %weather_ids = (
@@ -4281,44 +4291,49 @@ sub _forecastGraphicHeader {
 
       ## Update-Icon
       ##############
-      my $upicon;
+      my ($upicon,$img);
       if ($upstate =~ /updated|successfully|switched/ix) {
-          $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\"></a>";
+          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
+          $upicon = "<a onClick=$cmdupdate>$img</a>";
       } 
       elsif ($upstate =~ /running/ix) {
-          $upicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\"></a>";
+          $img    = FW_makeImage('10px-kreis-gelb.png', 'running');
+          $upicon = "<a>$img</a>";
       } 
       elsif ($upstate =~ /initialized/ix) {
-          $upicon = "<img src=\"$FW_ME/www/images/default/1px-spacer.png\"></a>";
+          $img    = FW_makeImage('1px-spacer.png', 'initialized');
+          $upicon = "<a>$img</a>";
       } 
       else {
-          $upicon = "<a onClick=$cmdupdate><img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\"></a>";
+          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang});
+          $upicon = "<a onClick=$cmdupdate>$img</a>";
       }
 
       ## Autokorrektur-Icon
       ######################
       my $acicon;
       if ($pcfa eq "on") {
-          $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+          $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang});
       } 
       elsif ($pcfa eq "off") {
           $acicon = "off";
       } 
       elsif ($pcfa =~ /standby/ix) {
           my ($rtime) = $pcfa =~ /for (.*?) hours/x;
-          $acicon     = "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">&nbsp;(Start in ".$rtime." h)";
+          $img        = FW_makeImage('10px-kreis-gelb.png', $htitles{dela}{$lang});
+          $acicon     = "$img&nbsp;(Start in ".$rtime." h)";
       } 
       else {
-          $acicon = "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">";
+          $acicon = FW_makeImage('10px-kreis-rot.png', $htitles{undef}{$lang});
       }
       
       ## Qualitäts-Icon
       ######################
       my $pcqicon;
       
-      $pcqicon = $pcq < 3 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-rot.png\">"   :
-                 $pcq < 5 ? "<img src=\"$FW_ME/www/images/default/10px-kreis-gelb.png\">"  :
-                 "<img src=\"$FW_ME/www/images/default/10px-kreis-gruen.png\">";
+      $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png')  :  
+                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png') :  
+                 FW_makeImage('10px-kreis-gruen.png');              
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
       
 
