@@ -117,6 +117,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.50.0" => "01.06.2021  real switch off time in consumerXX_planned_stop when finished, change key 'ready' to 'auto' ".
+                           "consider switch on Time limits (consumer keys notbefore/notafter) ",
   "0.49.5" => "01.06.2021  change pv correction factor to 1 if no historical factors found (only with automatic correction) ",
   "0.49.4" => "01.06.2021  fix wrong display at month change and using historyHour ",
   "0.49.3" => "31.05.2021  improve calcPVforecast pvcorrfactor for multistring configuration ",
@@ -2532,7 +2534,7 @@ sub __planSwitchTimes {
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($hash, $idx, "pvforecast", 0 );
       my $confc   = NexthoursVal ($hash, $idx, "confc",      0 );
-      my $surplus = $pvfc-$confc;                                                  # Energieüberschuß
+      my $surplus = $pvfc-$confc;                                                          # Energieüberschuß
       next if($surplus <= 0);
       
       my ($hour) = $idx =~ /NextHour(\d+)/xs;
@@ -2578,7 +2580,7 @@ sub __planSwitchTimes {
   my $mintime  = ConsumerVal ($hash, $c, "mintime", $defmintime);
   my $stopdiff = ceil($mintime / 60) * 3600;
   
-  my ($startts,$stopts,$stoptime,$starttime,$maxts,$half);
+  # my ($startts,$stopts,$stoptime,$starttime,$maxts,$half);
   
   $paref->{maxref}   = \%max;
   $paref->{mintime}  = $mintime;
@@ -2587,26 +2589,32 @@ sub __planSwitchTimes {
   if($mode eq "can") {                                                                                 # Verbraucher kann geplant werden
       for my $ts (sort{$a<=>$b} keys %mtimes) {
           if($mtimes{$ts}{surplus} >= $epiece1) {                                                      # die früheste Startzeit sofern Überschuß größer als Bedarf 
-              $startts                      = timestringToTimestamp ($mtimes{$ts}{starttime});         # Unix Timestamp für geplanten Switch on
-              $stopts                       = $startts + $stopdiff;
-              (undef,undef,undef,$stoptime) = timestampToTimestring ($stopts);
+              my $starttime                    = $mtimes{$ts}{starttime};
+              $paref->{starttime}              = $starttime;
+              $starttime                       = ___switchonTimelimits ($paref);
+              
+              delete $paref->{starttime};
+              
+              my $startts                      = timestringToTimestamp ($starttime);                   # Unix Timestamp für geplanten Switch on
+              my $stopts                       = $startts + $stopdiff;
+              my (undef,undef,undef,$stoptime) = timestampToTimestring ($stopts);
               
               $data{$type}{$name}{consumers}{$c}{planswitchon}  = $startts;
               $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;
-              $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$mtimes{$ts}{starttime}." - ".$stoptime;             
+              $data{$type}{$name}{consumers}{$c}{planstate}     = "planned: ".$starttime." - ".$stoptime;             
               last;
           }
       }
   }
-  else {                                                                                                   # Verbraucher _muß_ geplant werden
+  else {                                                                                               # Verbraucher _muß_ geplant werden
       for my $o (sort{$a<=>$b} keys %max) {
-          next if(!$max{$o}{today});                                                                       # der max-Wert ist _nicht_ heute
+          next if(!$max{$o}{today});                                                                   # der max-Wert ist _nicht_ heute
           $paref->{elem} = $o;
           ___planMust ($paref);        
           last;
       }
 
-      if(!ConsumerVal ($hash, $c, "planstate", undef)) {                                                   # es konnte keine Planung für den aktuellen Tag erstellt werden
+      if(!ConsumerVal ($hash, $c, "planstate", undef)) {                                               # es konnte keine Planung mit max für den aktuellen Tag erstellt werden -> Zwangsplanung mit ersten Wert
               my $p = (sort{$a<=>$b} keys %max)[0];
               $paref->{elem} = $p;
               ___planMust ($paref);
@@ -2633,11 +2641,17 @@ sub ___planMust {
   my $stopdiff = $paref->{stopdiff};
 
   my $type     = $hash->{TYPE};
-  
+
   my $maxts                         = timestringToTimestamp ($maxref->{$elem}{starttime});           # Unix Timestamp des max. Überschusses heute
   my $half                          = ceil ($mintime / 2 / 60);                                      # die halbe Gesamtlaufzeit in h als Vorlaufzeit einkalkulieren   
   my $startts                       = $maxts - ($half * 3600); 
   my (undef,undef,undef,$starttime) = timestampToTimestring ($startts);
+  
+  $paref->{starttime}               = $starttime;
+  $starttime                        = ___switchonTimelimits ($paref);
+  delete $paref->{starttime};
+  
+  $startts                          = timestringToTimestamp ($starttime);
   my $stopts                        = $startts + $stopdiff;
   my (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts);
   
@@ -2646,6 +2660,45 @@ sub ___planMust {
   $data{$type}{$name}{consumers}{$c}{planswitchoff} = $stopts;                                       # Unix Timestamp für geplanten Switch off
 
 return;
+}
+
+################################################################
+#   Einschaltgrenzen berücksichtigen und Korrektur 
+#   zurück liefern
+################################################################
+sub ___switchonTimelimits {
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $name      = $paref->{name};
+  my $c         = $paref->{consumer};
+  my $starttime = $paref->{starttime};
+
+  my $origtime    = $starttime;
+  my $notbefore   = ConsumerVal ($hash, $c, "notbefore", "");
+  my $notafter    = ConsumerVal ($hash, $c, "notafter",  "");
+  my ($starthour) = $starttime =~ /\s(\d{2}):/xs;
+  
+  my $subst;
+  
+  if(int $starthour < int $notbefore) {
+      $starthour = $notbefore;
+      $subst     = 1;
+  }
+  
+  if(int $starthour > int $notafter) {
+      $starthour = $notafter;
+      $subst     = 1;
+  } 
+  
+  $starthour = sprintf("%02d", $starthour);
+  $starttime =~ s/\s(\d{2}):/ $starthour:/x;             
+  
+  if($subst) {
+      my $cname = ConsumerVal ($hash, $c, "name", "");
+      Log3 ($name, 4, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to notbefore/notafter conditions});
+  }
+
+return $starttime;
 }
 
 ################################################################
@@ -2671,15 +2724,15 @@ sub __switchConsumer {
   
   ## Verbraucher einschalten
   ############################
-  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                  # Set Command für "on"
-  my $ready  = ConsumerVal ($hash, $c, "ready",   1);
+  my $oncom  = ConsumerVal ($hash, $c, "oncom",  "");                                            # Set Command für "on"
+  my $auto   = ConsumerVal ($hash, $c, "auto",   1);
  
-  if($ready && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {       # Verbraucher Start ist geplant && Startzeit überschritten
-      my $surplus = CurrentVal  ($hash, "surplus",          0);                        # aktueller Überschuß
-      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                        # Consumer Planungsmode
-      my $power   = ConsumerVal ($hash, $c, "power",        0);                        # Consumer nominale Leistungsaufnahme (W)
+  if($auto && $oncom && $pstate =~ /planned/xs && $startts && $t >= $startts) {                  # Verbraucher Start ist geplant && Startzeit überschritten
+      my $surplus = CurrentVal  ($hash, "surplus",          0);                                  # aktueller Überschuß
+      my $mode    = ConsumerVal ($hash, $c, "mode", $defcmode);                                  # Consumer Planungsmode
+      my $power   = ConsumerVal ($hash, $c, "power",        0);                                  # Consumer nominale Leistungsaufnahme (W)
       
-      if($mode eq "must" || $surplus >= $power) {                                      # "Muss"-Planung oder Überschuß > Leistungsaufnahme
+      if($mode eq "must" || $surplus >= $power) {                                                # "Muss"-Planung oder Überschuß > Leistungsaufnahme
           CommandSet(undef,"$cname $oncom");
           my (undef,undef,undef,$starttime)                 = timestampToTimestring ($t);
           my $stopdiff                                      = ceil(ConsumerVal ($hash, $c, "mintime", $defmintime) / 60) * 3600;
@@ -2694,12 +2747,13 @@ sub __switchConsumer {
   
   ## Verbraucher ausschalten
   ############################
-  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                          # Set Command für "off"
-  if($ready && $offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {          # Verbraucher nicht switched off && Stopzeit überschritten
+  my $offcom = ConsumerVal ($hash, $c, "offcom", "");                                             # Set Command für "off"
+  if($auto && $offcom && $pstate !~ /switched\soff/xs && $stopts && $t >= $stopts) {              # Verbraucher nicht switched off && Stopzeit überschritten
       CommandSet(undef,"$cname $offcom");
-      (undef,undef,undef,$stoptime)                 = timestampToTimestring ($t);
-      $data{$type}{$name}{consumers}{$c}{planstate} = "switched off: ".$stoptime;
-      $state                                        = qq{Consumer "$calias" switched off};
+      (undef,undef,undef,$stoptime)                     = timestampToTimestring ($t);
+      $data{$type}{$name}{consumers}{$c}{planstate}     = "switched off: ".$stoptime;
+      $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t;                                     # tatsächliche Ausschaltzeit
+      $state                                            = qq{Consumer "$calias" switched off};
       Log3 ($name, 2, "$name - $state");
   } 
   
@@ -3306,22 +3360,24 @@ sub collectAllRegConsumers {
       my $ctype     = $hc->{type}     // $defctype;
       my $hours     = ($hc->{mintime} // $hef{$ctype}{mt}) / 60;
       my $avgenergy = $hc->{power} * $hours * $hef{$ctype}{tot};                                  # Wh
-      my $ready     = ReadingsVal ($consumer, $hc->{ready}, 1);                                   # Reading für Ready-Bit -> Einschalten möglich ?
+      my $auto      = ReadingsVal ($consumer, $hc->{auto}, 1);                                    # Reading für Ready-Bit -> Einschalten möglich ?
 
       $data{$type}{$name}{consumers}{$c}{name}         = $consumer;                               # Name des Verbrauchers (Device)
       $data{$type}{$name}{consumers}{$c}{alias}        = $alias;                                  # Alias des Verbrauchers (Device)
-      $data{$type}{$name}{consumers}{$c}{type}         = $hc->{type}    // $defctype;             # Typ des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{type}         = $hc->{type}      // $defctype;           # Typ des Verbrauchers
       $data{$type}{$name}{consumers}{$c}{power}        = $hc->{power};                            # Leistungsaufnahme des Verbrauchers in W
       $data{$type}{$name}{consumers}{$c}{avgenergy}    = $avgenergy;                              # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mintime}      = $hc->{mintime} // $hef{$ctype}{mt};      # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
-      $data{$type}{$name}{consumers}{$c}{mode}         = $hc->{mode}    // $defcmode;             # Planungsmode des Verbrauchers
-      $data{$type}{$name}{consumers}{$c}{icon}         = $hc->{icon}    // q{};                   # Icon für den Verbraucher
-      $data{$type}{$name}{consumers}{$c}{oncom}        = $hc->{on}      // q{};                   # Setter Einschaltkommando 
-      $data{$type}{$name}{consumers}{$c}{offcom}       = $hc->{off}     // q{};                   # Setter Ausschaltkommando
-      $data{$type}{$name}{consumers}{$c}{autoreading}  = $hc->{ready}   // q{};                   # Readingname zur Automaticsteuerung
-      $data{$type}{$name}{consumers}{$c}{ready}        = $ready;                                  # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
-      $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot          // q{};                   # Reading der Leistungsmessung
-      $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot          // q{};                   # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{mintime}      = $hc->{mintime}   // $hef{$ctype}{mt};    # Initialwert min. Einschalt- bzw. Zykluszeit (evtl. Überschreiben in manageConsumerData)
+      $data{$type}{$name}{consumers}{$c}{mode}         = $hc->{mode}      // $defcmode;           # Planungsmode des Verbrauchers
+      $data{$type}{$name}{consumers}{$c}{icon}         = $hc->{icon}      // q{};                 # Icon für den Verbraucher
+      $data{$type}{$name}{consumers}{$c}{oncom}        = $hc->{on}        // q{};                 # Setter Einschaltkommando 
+      $data{$type}{$name}{consumers}{$c}{offcom}       = $hc->{off}       // q{};                 # Setter Ausschaltkommando
+      $data{$type}{$name}{consumers}{$c}{autoreading}  = $hc->{auto}      // q{};                 # Readingname zur Automatiksteuerung
+      $data{$type}{$name}{consumers}{$c}{auto}         = $auto;                                   # Automaticsteuerung: 1 - Automatic ein, 0 - Automatic aus 
+      $data{$type}{$name}{consumers}{$c}{retotal}      = $rtot            // q{};                 # Reading der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{uetotal}      = $utot            // q{};                 # Unit der Leistungsmessung
+      $data{$type}{$name}{consumers}{$c}{notbefore}    = $hc->{notbefore} // q{};                 # nicht einschalten vor Stunde in 24h Format (00-23)
+      $data{$type}{$name}{consumers}{$c}{notafter}     = $hc->{notafter}  // q{};                 # nicht einschalten nach Stunde in 24h Format (00-23)
   }
   
   Log3 ($name, 5, "$name - all registered consumers:\n".Dumper $data{$type}{$name}{consumers});
@@ -4142,7 +4198,7 @@ sub _forecastGraphicConsumerLegend {
       my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
       my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
       my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
-      my $auto       = ConsumerVal ($hash, $c, "ready",        1);                                  # Automatic Mode
+      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
       
       my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
       my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
@@ -6362,7 +6418,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
   <ul>       
     <ul>
       <a id="SolarForecast-get-data"></a>
-      <li><b>data </b> <br> 
+      <li><b>data </b> <br><br> 
       Startet die Datensammlung zur Bestimmung der solaren Vorhersage und anderer Werte.
       </li>      
     </ul>
@@ -6370,7 +6426,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-forecastQualities"></a>
-      <li><b>forecastQualities </b> <br>
+      <li><b>forecastQualities </b> <br><br>
       Zeigt die aktuell verwendeten Korrekturfaktoren mit der jeweiligen Startzeit zur Bestimmung der PV Vorhersage sowie 
       deren Qualitäten an.
       Die Qualität ergibt sich aus der Anzahl der bereits in der Vergangenheit bewerteten Tage mit einer 
@@ -6381,7 +6437,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-html"></a>
-      <li><b>html </b> <br>
+      <li><b>html </b> <br><br>
       Die Solar Grafik wird als HTML-Code abgerufen und wiedergegeben.
       </li>      
     </ul>
@@ -6389,7 +6445,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-nextHours"></a>
-      <li><b>nextHours </b> <br>  
+      <li><b>nextHours </b> <br><br> 
       Listet die erwarteten Werte der kommenden Stunden auf. <br><br>
       
       <ul>
@@ -6415,7 +6471,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
-      <li><b>pvHistory </b> <br>
+      <li><b>pvHistory </b> <br><br>
       Listet die historischen Werte der letzten Tage (max. 31) sortiert nach dem Tagesdatum und Stunde. 
       Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit 
       von 08 - 09 Uhr. <br><br>
@@ -6449,7 +6505,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-pvCircular"></a>
-      <li><b>pvCircular </b> <br>
+      <li><b>pvCircular </b> <br><br>
       Listet die vorhandenen Werte im Ringspeicher auf.  
       Die Stundenangaben beziehen sich auf die Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit von 08 - 09 Uhr.      
       Erläuterung der Werte: <br><br>
@@ -6480,7 +6536,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-stringConfig"></a>
-      <li><b>stringConfig </b> <br>
+      <li><b>stringConfig </b> <br><br>
       Zeigt die aktuelle Stringkonfiguration. Dabei wird gleichzeitig eine Plausibilitätsprüfung vorgenommen und das Ergebnis
       sowie eventuelle Anweisungen zur Fehlerbehebung ausgegeben. 
       </li>      
@@ -6489,7 +6545,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-valConsumerMaster"></a>
-      <li><b>valConsumerMaster </b> <br> 
+      <li><b>valConsumerMaster </b> <br><br>
       Listet die aktuell ermittelten Stammdaten der im Device registrierten Verbraucher auf.
       </li>      
     </ul>
@@ -6497,7 +6553,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     
     <ul>
       <a id="SolarForecast-get-valCurrent"></a>
-      <li><b>valCurrent </b> <br>
+      <li><b>valCurrent </b> <br><br>
       Listet die aktuell ermittelten Werte auf.
       </li>      
     </ul>
@@ -6608,7 +6664,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
        <br>       
        
        <a id="SolarForecast-attr-consumer" data-pattern="consumer.*"></a>
-       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [ready=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br>
+       <li><b>consumerXX &lt;Device Name&gt; type=&lt;type&gt; power=&lt;power&gt; [mode=&lt;mode&gt;] [icon=&lt;Icon&gt;] [mintime=&lt;minutes&gt;] [on=&lt;Kommando&gt;] [off=&lt;Kommando&gt;] [notbefore=&lt;Stunde&gt;] [notafter=&lt;Stunde&gt;] [auto=&lt;Readingname&gt;] [etotal=&lt;Readingname&gt;:&lt;Einheit&gt;] </b><br><br>
+        
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
         sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
@@ -6616,30 +6673,33 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <ul>   
          <table>  
          <colgroup> <col width=10%> <col width=90%> </colgroup>
-            <tr><td> <b>type</b>   </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                               </td></tr>
-            <tr><td>               </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmschine                                                                          </td></tr>
-            <tr><td>               </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
-            <tr><td>               </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
-            <tr><td>               </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
-            <tr><td>               </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                            </td></tr>          
-            <tr><td> <b>power</b>  </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                              </td></tr>            
-            <tr><td> <b>mode</b>   </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                         </td></tr>
-            <tr><td>               </td><td><b>can</b>  - der Verbaucher kann angeschaltet werden wenn genügend Energie bereitsteht (default)                                </td></tr>
-            <tr><td>               </td><td><b>must</b> - der Verbaucher muß einmal am Tag angeschaltet werden auch wenn nicht genügend Energie vorhanden ist                </td></tr>
-            <tr><td> <b>icon</b>   </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                         </td></tr>
-            <tr><td> <b>mintime</b></td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
-            <tr><td> <b>on</b>     </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>off</b>    </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>ready</b>  </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
-            <tr><td>               </td><td>Readingwert = 1: Schalten freigegeben,  0: Schalten blockiert                                                                    </td></tr>
-            <tr><td> <b>etotal</b> </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
+            <tr><td> <b>type</b>       </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                               </td></tr>
+            <tr><td>                   </td><td><b>dishwasher</b>     - Verbaucher ist eine Spülmschine                                                                          </td></tr>
+            <tr><td>                   </td><td><b>dryer</b>          - Verbaucher ist ein Wäschetrockner                                                                        </td></tr>
+            <tr><td>                   </td><td><b>washingmachine</b> - Verbaucher ist eine Waschmaschine                                                                        </td></tr>
+            <tr><td>                   </td><td><b>heater</b>         - Verbaucher ist ein Heizstab                                                                              </td></tr>
+            <tr><td>                   </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                            </td></tr>          
+            <tr><td> <b>power</b>      </td><td>typische Leistungsaufnahme des Verbrauchers (siehe Datenblatt) in W                                                              </td></tr>            
+            <tr><td> <b>mode</b>       </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                         </td></tr>
+            <tr><td>                   </td><td><b>can</b>  - der Verbaucher kann angeschaltet werden wenn genügend Energie bereitsteht (default)                                </td></tr>
+            <tr><td>                   </td><td><b>must</b> - der Verbaucher muß einmal am Tag angeschaltet werden auch wenn nicht genügend Energie vorhanden ist                </td></tr>
+            <tr><td> <b>icon</b>       </td><td>Icon zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                                                         </td></tr>
+            <tr><td> <b>mintime</b>    </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
+            <tr><td> <b>on</b>         </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
+            <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
+            <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
+            <tr><td> <b>notbefore</b>  </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
+            <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht vor angegebener Stunde (01..23) ausschalten (optional)                                                         </td></tr>
+            <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
+            <tr><td>                   </td><td>Readingwert = 1: Schalten freigegeben (default),  0: Schalten blockiert                                                          </td></tr>
+            <tr><td> <b>etotal</b>     </td><td>Reading welches die Summe der verbrauchten Energie liefert und der Einheit (Wh/kWh) (optional)                                   </td></tr>
          </table>
          </ul>
        <br>
       
        <ul>
          <b>Beispiel: </b> <br>
-         attr wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on etotal=total:kWh <br>
+         attr wallplug icon=scene_dishwasher@orange type=dishwasher mode=can power=2500 on=on off=off notafter=20 etotal=total:kWh <br>
        </ul> 
        </li>  
        <br>
