@@ -4730,10 +4730,12 @@ sub calcPVforecast {
       $hq      //= 0;
       if (!defined $hc) {
           $hcfound = "no";
-          $hc      = 1.00;                                                                            # keine Korrektur  
+          $hc      = 1;                                                                               # keine Korrektur  
           $hq      = 0;
       }
   }
+  
+  $hc = sprintf "%.2f", $hc;
 
   $data{$type}{$name}{nexthours}{"NextHour".sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
@@ -4892,10 +4894,7 @@ sub calcVariance {
       if($cdone eq "done") {
           Log3 ($name, 5, "$name - pvCorrectionFactor Hour: ".sprintf("%02d",$h)." already calculated");
           next;
-      }
-
-      #my $oldfac   = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$h), 1);                    # bisher definierter Korrekturfaktor
-      #$oldfac      = 1 if(1*$oldfac == 0);    
+      }    
       
       Log3 ($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
