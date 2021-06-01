@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.49.5" => "01.06.2021  change pv correction factor to 1 if no historical factors found (only with automatic correction) ",
   "0.49.4" => "01.06.2021  fix wrong display at month change and using historyHour ",
   "0.49.3" => "31.05.2021  improve calcPVforecast pvcorrfactor for multistring configuration ",
   "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
@@ -2918,7 +2919,7 @@ sub _estConsumptionForecast {
        my $tomavg                                        = int (($totcon/$dnum)-$ddiff);
        $data{$type}{$name}{current}{tomorrowconsumption} = $tomavg;                                      # Durchschnittsverbrauch aller (gleicher) Wochentage
     
-       Log3 ($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
+       Log3 ($name, 4, "$name - estimated Consumption for tomorrow: $tomavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
   }
   else {
       $data{$type}{$name}{current}{tomorrowconsumption} = "Wait for more days with a consumption figure";
@@ -2985,7 +2986,7 @@ sub _estConsumptionForecast {
                delete $paref->{histname};  
            }          
            
-           Log3 ($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: $consumerco");
+           Log3 ($name, 4, "$name - estimated Consumption for $nhday -> starttime: $nhtime, con: $conavg, days for avg: $dnum, hist. consumption registered consumers: ".sprintf "%.2f", $consumerco);
       }     
   }
   
@@ -4705,7 +4706,7 @@ sub calcPVforecast {
   my $chour      = strftime "%H", localtime($t+($num*3600));                                          # aktuelle Stunde
   my $reld       = $fd == 0 ? "today" : $fd == 1 ? "tomorrow" : "unknown";
   
-  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1);               # PV Korrekturfaktor (auto oder manuell)
+  my $pvcorr     = ReadingsNum ($name, "pvCorrectionFactor_".sprintf("%02d",$fh+1), 1.00);            # PV Korrekturfaktor (auto oder manuell)
   my $hc         = $pvcorr;                                                                           # Voreinstellung RAW-Korrekturfaktor 
   my $hcfound    = "use manual correction factor";
   my $hq         = "m";
@@ -4728,8 +4729,8 @@ sub calcPVforecast {
       ($hc, $hq) = CircularAutokorrVal ($hash, sprintf("%02d",$fh+1), $range, undef);                 # Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange
       $hq      //= 0;
       if (!defined $hc) {
-          $hcfound = "no - use raw correction factor";
-          $hc      = $pvcorr;                                                                         # nutze RAW-Korrekturfaktor  
+          $hcfound = "no";
+          $hc      = 1.00;                                                                            # keine Korrektur  
           $hq      = 0;
       }
   }
@@ -4765,7 +4766,6 @@ sub calcPVforecast {
           "Area factor"                  => $af,
           "Cloudcover"                   => $cloudcover,
           "CloudRange"                   => $range,
-          "CloudCorrFoundInStore"        => $hcfound,
           "CloudFactorDamping"           => $clouddamp." %",
           "Cloudfactor"                  => $ccf,
           "Rainprob"                     => $rainprob,
@@ -4798,6 +4798,7 @@ sub calcPVforecast {
   ($pvsum, $logao)  = _70percentRule ($paref); 
   
   $lh = {                                                                                            # Log-Hash zur Ausgabe
+      "CloudCorrFoundInStore"  => $hcfound,
       "PV correction factor"   => $hc,
       "PV correction quality"  => $hq,
       "PV generation forecast" => $pvsum." Wh ".$logao,
@@ -4900,7 +4901,7 @@ sub calcVariance {
       
       $paref->{hour}                    = $h;
       my ($pvavg,$fcavg,$anzavg,$range) = calcAvgFromHistory ($paref);                                    # historische PV / Forecast Vergleichswerte ermitteln
-      $anzavg                         //= 0;                                                              # der aktuelle Wert ist dann der erste AVG im Store
+      $anzavg                         //= 1;                                                              # der aktuelle Wert ist nun der erste AVG im Store
       $pvval                            = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                        # Ertrag aktuelle Stunde berücksichtigen
       $fcval                            = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                        # Vorhersage aktuelle Stunde berücksichtigen
       
@@ -5057,7 +5058,7 @@ sub setPVhistory {
   my $wid            = $paref->{wid}           // -1;
   my $wcc            = $paref->{wcc}           // 0;                       # Wolkenbedeckung
   my $wrp            = $paref->{wrp}           // 0;                       # Wahrscheinlichkeit von Niederschlag
-  my $pvcorrf        = $paref->{pvcorrf}       // "1/0";                   # pvCorrectionFactor
+  my $pvcorrf        = $paref->{pvcorrf}       // "1.00/0";                # pvCorrectionFactor
   my $temp           = $paref->{temp};                                     # Außentemperatur
   
   my $type = $hash->{TYPE};
