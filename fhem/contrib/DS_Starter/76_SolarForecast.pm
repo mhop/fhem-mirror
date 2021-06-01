@@ -117,6 +117,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.49.4" => "01.06.2021  fix wrong display at month change and using historyHour ",
   "0.49.3" => "31.05.2021  improve calcPVforecast pvcorrfactor for multistring configuration ",
   "0.49.2" => "31.05.2021  fix time calc in sub forecastGraphic ",
   "0.49.1" => "30.05.2021  no consumer check during start Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959  ",
@@ -3738,8 +3739,8 @@ sub forecastGraphic {                                 ## no critic 'complexity'
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
-              my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs(($offset)-$i)));
-              
+              my $ds = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs(($offset)+$i)));       # V0.49.4
+
               # Sonderfall Mitternacht
               $ds   = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * (abs($offset)-$i+1))) if ($hfcg->{$i}{time} == 24);
               
