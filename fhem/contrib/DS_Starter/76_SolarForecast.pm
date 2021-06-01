@@ -3598,6 +3598,8 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   my $lang       =  $paref->{lang};
   my $kw         =  $paref->{kw};
   
+  $lotype        = 'single' if ($beam1cont eq $beam2cont);   # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+  
   # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
   # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
  
@@ -3664,8 +3666,6 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
   $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
   $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
-
-  $lotype = 'single' if ($beam1cont eq $beam2cont);                                              # User Auswahl überschreiben wenn beide Werte die gleiche Basis haben !
 
   # get consumer list and display it in Graphics
   ################################################ 
@@ -4334,7 +4334,7 @@ sub _forecastGraphicHeader {
       
       $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
                  $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
-                 FW_makeImage('10px-kreis-gruen.png');              
+                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);              
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
       
 
@@ -4884,6 +4884,7 @@ sub calcVariance {
   my @da;
   for my $h (1..23) {
       next if(!$chour || $h > $chour);
+      
       my $fcval = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$h)."_PVforecast", 0);
       next if(!$fcval);
  
