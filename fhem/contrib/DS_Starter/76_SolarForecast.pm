@@ -6395,18 +6395,18 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <ul>
          <table>  
          <colgroup> <col width=8%> <col width=92%> </colgroup>
-            <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                       </td></tr>
-            <tr><td> <b>today</b>    </td><td>=1 wenn Startdatum am aktuellen Tag                                          </td></tr>
-            <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch                                                  </td></tr>
-            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                </td></tr> 
-            <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                            </td></tr>
-            <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor und dessen Qualität                     </td></tr>
-            <tr><td>                 </td><td>/m - manuell                                                                 </td></tr>
-            <tr><td>                 </td><td>/0 - Faktor nicht in Store gefunden - pvCorrectionFactor_XX wird genutzt     </td></tr>
-            <tr><td>                 </td><td>/1...X - Korrekturfaktor aus Store genutzt (höhere Zahl = bessere Qualität)  </td></tr>
-            <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                              </td></tr>
-            <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                </td></tr>
-            <tr><td> <b>temp</b>     </td><td>vorhergesagte Außentemperatur                                                </td></tr>
+            <tr><td> <b>pvfc</b>     </td><td>erwartete PV Erzeugung                                                             </td></tr>
+            <tr><td> <b>today</b>    </td><td>=1 wenn Startdatum am aktuellen Tag                                                </td></tr>
+            <tr><td> <b>confc</b>    </td><td>erwarteter Energieverbrauch                                                        </td></tr>
+            <tr><td> <b>wid</b>      </td><td>ID des vorhergesagten Wetters                                                      </td></tr> 
+            <tr><td> <b>wcc</b>      </td><td>vorhergesagter Grad der Bewölkung                                                  </td></tr>
+            <tr><td> <b>correff</b>  </td><td>effektiv verwendeter Korrekturfaktor/Qualität                                      </td></tr>
+            <tr><td>                 </td><td>Faktor/m - manuell                                                                 </td></tr>
+            <tr><td>                 </td><td>Faktor/0 - Korrekturfaktor nicht in Store vorhanden (default wird verwendet)       </td></tr>
+            <tr><td>                 </td><td>Faktor/1...X - Korrekturfaktor aus Store genutzt (höhere Zahl = bessere Qualität)  </td></tr>
+            <tr><td> <b>wrp</b>      </td><td>vorhergesagter Grad der Regenwahrscheinlichkeit                                    </td></tr>
+            <tr><td> <b>Rad1h</b>    </td><td>vorhergesagte Globalstrahlung                                                      </td></tr>
+            <tr><td> <b>temp</b>     </td><td>vorhergesagte Außentemperatur                                                      </td></tr>
          </table>
       </ul>
       </li>      
