@@ -3609,8 +3609,8 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   ##########################
   my $day;
 
-  my $t                               = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
-  my (undef,undef,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
+  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
   $thishour++;
   
@@ -3621,8 +3621,7 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   $hfcg->{0}{day_str}  = $day_str;
   $day                 = int($day_str);
   $hfcg->{0}{day}      = $day;
-  # $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);   <-falsch !!
-  $hfcg->{0}{mktime}   = timestringToTimestamp ($t);                                                  # gleich die Unix Zeit dazu holen
+  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                  # gleich die Unix Zeit dazu holen                                                
   
   my $val1 = 0;
   my $val2 = 0;
