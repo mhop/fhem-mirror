@@ -4331,8 +4331,8 @@ sub _forecastGraphicHeader {
       ######################
       my $pcqicon;
       
-      $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png')  :  
-                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png') :  
+      $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
+                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
                  FW_makeImage('10px-kreis-gruen.png');              
       $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
       
@@ -4341,8 +4341,8 @@ sub _forecastGraphicHeader {
       #######################
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
-      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                                    </tr>";
-      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td title='$pvcanz' colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
+      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\">".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                    </tr>";
+      $header  .= "<tr><td colspan=\"3\" align=\"left\"><b>          </b></td><td colspan=\"3\" align=\"left\">".$autoct."&nbsp;"              .$acicon."</td><td colspan=\"2\" align=\"left\">".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
   }
   
   # Header Information pv 
