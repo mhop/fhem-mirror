@@ -4207,30 +4207,37 @@ setreading DEVICE attrTemplateVersion 20210510
 
 # contributed by Otto123, source: https://forum.fhem.de/index.php/topic,94495.msg1062312.html#msg1062312
 name:worx_landroid
-desc:Template for a Worx Landroid mower.<br>The complete setup is described in this <a href="https://forum.fhem.de/index.php/topic,111959.0.html">Forum Thread</a><br>Not all features may be available on all models and firmwares!
+desc:Template for a Worx Landroid mower.<br>The complete Setup is described in this <a href="https://forum.fhem.de/index.php/topic,111959.0.html">Forum Thread</a><br>Some Features requires support by model and firmware!
 filter:TYPE=MQTT2_DEVICE
 order:X_05
 par:BASE_TOPIC;base topic: the Mower BoardID (2019: PRM100);{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^\/:]+)[\/].+, ? $1 : undef }
-par:DEV_ID;the MAC of the Mower (Device Info);{ AttrVal("DEVICE","readingList","") =~ m,[^\/]+[\/]([0-9A-Z]+)[\/]commandOut:.*, ? $1 : undef }
-par:ICON;ICON as set, defaults to audio_volume_low;{ AttrVal("DEVICE","icon","scene_robo_lawnmower") }
+par:DEV_ID;the MAC of the Mower (Device Info);{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^\/]+[\/]([0-9A-Z]+), ? $1 : undef }
+par:ICON;ICON as set, defaults to scene_robo_lawnmower;{ AttrVal("DEVICE","icon","scene_robo_lawnmower") }
+defmod DEVICE MQTT2_\DEVICE
+deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE icon ICON
-attr DEVICE readingList BASE_TOPIC/DEV_ID/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
-attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:serialNumber\
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE alias Mover
+attr DEVICE event-on-change-reading .*
+attr DEVICE readingList $\DEVICETOPIC/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:SerialNumber\
 dat_le:mowerErrorIndex dat_ls:mowerStatusIndex\
 cfg_rd:mowerRainDelay cfg_sc_m:mowerActiveIndex cfg_sc_p:mowerTimeCorrection\
 dat_bt_t:batteryTemperature dat_bt_v:batteryVoltage dat_bt_p:batteryPercent dat_bt_nr:batteryChargeCycle dat_bt_c:batteryCharging\
 dat_st_b:totalBladeTime dat_st_d:totalDistance dat_st_wt:totalTime dat_st_bl:borderLength\
 dat_dmp_1:directionPitch dat_dmp_2:directionRoll dat_dmp_3:directionYaw
-attr DEVICE setList mowerRainDelay:slider,0,30,1440 BASE_TOPIC/DEV_ID/commandIn {"rd":$EVTPART1}\
-  mowerTimeCorrection:slider,-100,1,100 BASE_TOPIC/DEV_ID/commandIn {"sc":{"p":$EVTPART1}}\
-  startBorderCut:noArg BASE_TOPIC/DEV_ID/commandIn {"sc":{"ots":{"bc":1,"wtm":0}}}\
-  startOneTime:slider,10,10,720 BASE_TOPIC/DEV_ID/commandIn {"sc":{"ots":{"bc":0,"wtm":$EVTPART1}}}\
-  startParty:slider,60,60,2880 BASE_TOPIC/DEV_ID/commandIn {"sc":{"distm":$EVTPART1}}\
-  startMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":1}\
-  pauseMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":2}\
-  stopMower:noArg BASE_TOPIC/DEV_ID/commandIn {"cmd":3}\
-  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq(BASE_TOPIC/DEV_ID/commandIn $payload)}
-attr DEVICE userReadings mowerActive:mowerActiveIndex.* {my %activeState = (\
+attr DEVICE setList mowerRainDelay:slider,0,30,1440 $\DEVICETOPIC/commandIn {"rd":$EVTPART1}\
+  mowerTimeCorrection:slider,-100,1,100 $\DEVICETOPIC/commandIn {"sc":{"p":$EVTPART1}}\
+  startBorderCut:noArg $\DEVICETOPIC/commandIn {"sc":{"ots":{"bc":1,"wtm":0}}}\
+  startOneTime:slider,10,10,720 $\DEVICETOPIC/commandIn {"sc":{"ots":{"bc":0,"wtm":$EVTPART1}}}\
+  startMower:noArg $\DEVICETOPIC/commandIn {"cmd":1}\
+  pauseMower:noArg $\DEVICETOPIC/commandIn {"cmd":2}\
+  stopMower:noArg $\DEVICETOPIC/commandIn {"cmd":3}\
+  PartyTime:slider,0,10,2880 $\DEVICETOPIC/commandIn {"sc":{"distm":$EVTPART1}}\
+  PartyMode:on,off { my %hash = ( 'on' => 2, 'off' => 1);qq($\DEVICETOPIC/commandIn {"sc":{"m":$hash{$EVTPART1}}})}\
+  x_raw_payload:textField { my $payload = $EVENT;$payload =~ s/$EVTPART0 //g; qq($\DEVICETOPIC/commandIn $payload)}
+attr DEVICE stateFormat Active: mowerActive, Status: mowerStatusTxt, Error: mowerErrorTxt
+attr DEVICE userReadings mowerActive:mowerActiveIndex:.* {my %activeState = (\
  0 => "No",\
  1 => "Yes",\
  2 => "Party"\
@@ -4276,7 +4283,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  17 => "Battery temp out of range"\
 ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
 attr DEVICE model worx_landroid_mover
-setreading DEVICE attrTemplateVersion 20210426
+setreading DEVICE attrTemplateVersion 20210602
 
 
 ###########################################
