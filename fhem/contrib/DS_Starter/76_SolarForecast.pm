@@ -2674,28 +2674,28 @@ sub ___switchonTimelimits {
   my $starttime = $paref->{starttime};
 
   my $origtime    = $starttime;
-  my $notbefore   = ConsumerVal ($hash, $c, "notbefore", "");
-  my $notafter    = ConsumerVal ($hash, $c, "notafter",  "");
+  my $notbefore   = ConsumerVal ($hash, $c, "notbefore", 0);
+  my $notafter    = ConsumerVal ($hash, $c, "notafter",  0);
   my ($starthour) = $starttime =~ /\s(\d{2}):/xs;
   
-  my $subst;
+  my $change = q{};
   
-  if(int $starthour < int $notbefore) {
+  if($notbefore && int $starthour < int $notbefore) {
       $starthour = $notbefore;
-      $subst     = 1;
+      $change     = "notbefore";
   }
   
-  if(int $starthour > int $notafter) {
+  if($notafter && int $starthour > int $notafter) {
       $starthour = $notafter;
-      $subst     = 1;
+      $change     = "notafter";
   } 
   
   $starthour = sprintf("%02d", $starthour);
   $starttime =~ s/\s(\d{2}):/ $starthour:/x;             
   
-  if($subst) {
+  if($change) {
       my $cname = ConsumerVal ($hash, $c, "name", "");
-      Log3 ($name, 4, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to notbefore/notafter conditions});
+      Log3 ($name, 4, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to $change conditions});
   }
 
 return $starttime;
