@@ -358,12 +358,12 @@ FHEM2FHEM_Attr(@)
 =item summary_DE verbindet zwei FHEM Installationen
 =begin html
 
-<a name="FHEM2FHEM"></a>
+<a id="FHEM2FHEM"></a>
 <h3>FHEM2FHEM</h3>
 <ul>
   FHEM2FHEM is a helper module to connect separate FHEM installations.
   <br><br>
-  <a name="FHEM2FHEMdefine"></a>
+  <a id="FHEM2FHEM-define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL]
@@ -439,36 +439,37 @@ FHEM2FHEM_Attr(@)
   </ul>
   <br>
 
-  <a name="FHEM2FHEMset"></a>
+  <a id="FHEM2FHEM-set"></a>
   <b>Set </b>
   <ul>
     <li>reopen<br>
 	Reopens the connection to the device and reinitializes it.</li><br>
   </ul>
 
-  <a name="FHEM2FHEMget"></a>
+  <a id="FHEM2FHEM-get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="FHEM2FHEMattr"></a>
+  <a id="FHEM2FHEM-attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#disable">disable</a></li>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-    <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
+    <li><a id="FHEM2FHEM-eventOnly">eventOnly</a><br>
       if set, generate only events, do not set corresponding readings.
       This is a compatibility feature, available only for LOG-Mode.
       </li>
-    <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
+    <li><a id="FHEM2FHEM-attr-addStateEvent">addStateEvent</a><br>
       if set, state events are transmitted correctly. Notes: this is relevant
       only with LOG mode, setting it will generate an additional "reappeared"
       Log entry, and the remote FHEM must support inform onWithState (i.e. must
       be up to date).
       </li>
-    <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
-      do not publish events matching &lt;regexp&gt;
+    <li><a id="FHEM2FHEM-attr-excludeEvents">excludeEvents &lt;regexp&gt;</a>
+      do not publish events matching &lt;regexp&gt;. Note: ^ and $ are
+      automatically added to the regexp, like in notify, FileLog, etc.
       </li>
-    <li><a name="#FHEM2FHEMsetState">setState</a>
+    <li><a id="FHEM2FHEM-attr-setState">setState</a>
       if set to 1, and there is a local device with the same name, then remote
       set commands will be executed for the local device.
       </li>
@@ -480,12 +481,12 @@ FHEM2FHEM_Attr(@)
 
 =begin html_DE
 
-<a name="FHEM2FHEM"></a>
+<a id="FHEM2FHEM"></a>
 <h3>FHEM2FHEM</h3>
 <ul>
    FHEM2FHEM ist ein Hilfsmodul, um mehrere FHEM-Installationen zu verbinden.
    <br><br>
-   <a name="FHEM2FHEMdefine"></a>
+   <a id="FHEM2FHEM-define"></a>
    <b>Define</b>
    <ul>
     <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL] [LOG:regexp|RAW:devicename] {portpassword}
@@ -572,37 +573,38 @@ FHEM2FHEM_Attr(@)
    </ul>
    <br>
 
-   <a name="FHEM2FHEMset"></a>
+   <a id="FHEM2FHEM-set"></a>
    <b>Set </b>
    <ul>
      <li>reopen<br>
  	&Ouml;ffnet die Verbindung erneut.</li>
    </ul>
 
-   <a name="FHEM2FHEMget"></a>
+   <a id="FHEM2FHEM-get"></a>
    <b>Get</b> <ul>N/A</ul><br>
 
-   <a name="FHEM2FHEMattr"></a>
+   <a id="FHEM2FHEM-attr"></a>
    <b>Attribute</b>
    <ul>
      <li><a href="#dummy">dummy</a></li>
      <li><a href="#disable">disable</a></li>
      <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
-     <li><a name="#FHEM2FHEMeventOnly">eventOnly</a><br>
+     <li><a id="FHEM2FHEM-attr-eventOnly">eventOnly</a><br>
        falls gesetzt, werden nur die Events generiert, und es wird kein
        Reading aktualisiert. Ist nur im LOG-Mode aktiv.
        </li>
-     <li><a name="#FHEM2FHEMaddStateEvent">addStateEvent</a><br>
+     <li><a id="FHEM2FHEM-attr-addStateEvent">addStateEvent</a><br>
        falls gesetzt, werden state Events als solche uebertragen. Zu beachten:
        das Attribut ist nur f&uuml;r LOG-Mode relevant, beim Setzen wird eine
        zus&auml;tzliche reopened Logzeile generiert, und die andere Seite muss
        aktuell sein.
        </li>
-     <li><a name="#FHEM2FHEMexcludeEvents">excludeEvents &lt;regexp&gt;</a>
+     <li><a id="FHEM2FHEM-attr-excludeEvents">excludeEvents &lt;regexp&gt;</a>
        die auf das &lt;regexp&gt; zutreffende Events werden nicht
-       bereitgestellt.
+       bereitgestellt. Achtung: ^ und $ werden automatisch hinzugefuuml;gt, wie
+       bei notify, FileLog, usw.
        </li>
-     <li><a name="#FHEM2FHEMsetState">setState</a>
+     <li><a id="FHEM2FHEM-attr-setState">setState</a>
        falls gesetzt (auf 1), und ein lokales Ger&auml;t mit dem gleichen Namen
        existiert, dann werden set Befehle vom entfernten Ger&auml;t als Solches
        &uuml;bertragen.
