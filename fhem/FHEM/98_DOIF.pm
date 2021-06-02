@@ -1385,13 +1385,15 @@ sub collect_setValue
           ${$collect}{last_value}=${$collect}{value} if (defined ${$collect}{value});
           @{$va}=();
           @{$ta}=();
+          ${$collect}{last}=undef;
         } else {
           my @rv=splice (@{$va},0,$diff_slots);
           my @rt=splice (@{$ta},0,$diff_slots);
-          if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{value} and ${$collect}{value} != ${$va}[$dim-$diff_slots-1]) {
-            ${$va}[$dim-$diff_slots]=${$collect}{value};
-            ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*60*$seconds_per_slot;
+          if ($diff_slots > 1 and !defined ${$va}[$dim-$diff_slots] and defined ${$collect}{last} and ${$va}[$dim-$diff_slots-1] != ${$collect}{last}) {
+            ${$va}[$dim-$diff_slots]=${$collect}{last};
+            ${$ta}[$dim-$diff_slots]=(int(${$ta}[$dim-$diff_slots-1]/$seconds_per_slot)+1)*$seconds_per_slot;
           }
+          ${$collect}{last}=undef;
           for (my $i=@rv-1;$i>=0;$i--) {
             if (defined ($rv[$i])) {
               ${$collect}{last_value}=$rv[$i];
@@ -1404,9 +1406,11 @@ sub collect_setValue
 
     ${$collect}{avg} = defined ${$collect}{max_value} ? (${$collect}{max_value}-${$collect}{min_value})/2 + ${$collect}{min_value}: $r;
     
-    if (!defined ${$va}[$dim-1] or  $r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1]) {
+    if (!defined ${$va}[$dim-1] or ($r >= ${$collect}{avg} and $r > ${$va}[$dim-1] or $r < ${$collect}{avg} and $r < ${$va}[$dim-1])) {
       ${$va}[$dim-1]=$r;
       ${$ta}[$dim-1]=$seconds;  
+    } elsif (${$va}[$dim-1] != $r) {
+       ${$collect}{last}=$r;
     }
   }
    
