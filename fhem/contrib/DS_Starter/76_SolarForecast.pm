@@ -2695,7 +2695,7 @@ sub ___switchonTimelimits {
   
   if($change) {
       my $cname = ConsumerVal ($hash, $c, "name", "");
-      Log3 ($name, 4, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to $change conditions});
+      Log3 ($name, 3, qq{$name - Planned starttime "$cname" changed from "$origtime" to "$starttime" due to $change condition});
   }
 
 return $starttime;
