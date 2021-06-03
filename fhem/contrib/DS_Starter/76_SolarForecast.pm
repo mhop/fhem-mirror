@@ -311,8 +311,8 @@ my %htitles = (                                                                 
              DE => qq{undefiniert}                                           },
   dela  => { EN => qq{delayed},
              DE => qq{verzoegert}                                            },
-  cnsm  => { EN => qq{Consumer Control},
-             DE => qq{Verbrauchersteuerung}                                  },
+  cnsm  => { EN => qq{Consumer},
+             DE => qq{Verbraucher}                                           },
   eiau  => { EN => qq{On/Off},
              DE => qq{Ein/Aus}                                               },
   auto  => { EN => qq{Automatic},
@@ -4451,15 +4451,36 @@ sub _forecastGraphicConsumerLegend {
   my $lang         = $paref->{lang};
   my $dstyle       = $paref->{dstyle};                        # TD-Style
   
-  my ($staticon);
+  my $staticon;
   
   ## Tabelle Start
   #################
-  my $ctable = qq{<table align='left' width='60%'>}; 
+  my $ctable = qq{<table align='left' width='100%'>}; 
   $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
-  $ctable   .= qq{<td $dstyle>$htitles{cnsm}{$lang}</td><td></td><td $dstyle>$htitles{eiau}{$lang}</td><td $dstyle>$htitles{auto}{$lang}</td>};
+  
+  $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
+  $ctable   .= qq{<td>                                                        </td>};
+  $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
+  $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+  
+  my $cnum   = @{$consumersref}; 
+  if($cnum > 1) {
+      $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
+      $ctable   .= qq{<td>                                                        </td>};
+      $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
+      $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+  }
+  else {
+      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
+      $ctable   .= qq{<td>         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
+      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
+      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};    
+  }
+  
   $ctable   .= qq{</tr>};
-
+  
+  my $modulo = 1;
+  
   for my $c (@{$consumersref}) {          
       my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
       my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
@@ -4490,7 +4511,7 @@ sub _forecastGraphicConsumerLegend {
       my $swicon  = q{};
       my $auicon  = q{};
       
-      $ctable .= qq{<tr>};
+      $ctable .= qq{<tr>} if($modulo % 2);
       
       if(!$auto) {
           $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
@@ -4514,15 +4535,25 @@ sub _forecastGraphicConsumerLegend {
       
       if ($clegendstyle eq 'icon') {                                                                   
           $cicon   = FW_makeImage($cicon);
-          $ctable .= "<td $dstyle>$calias</td><td style='text-align:center' $dstyle>$cicon</td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
+          
+          $ctable .= "<td style='text-align:left'   $dstyle>$calias  </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$cicon   </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$swicon  </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$auicon  </td>";
       } 
       else {
           my (undef,$co) = split('\@',$cicon);
           $co      = '' if (!$co);                                                                        
-          $ctable .= "<td $dstyle><font color='$co'>$calias</font></td><td> </td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
+          
+          $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
+          $ctable .= "<td>                                                                   </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$swicon                          </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
       }
       
-      $ctable .= qq{</tr>};
+      $ctable .= qq{</tr>} if(!($modulo % 2));
+      
+      $modulo++;
   }
   
   $ctable .= qq{</table>};
