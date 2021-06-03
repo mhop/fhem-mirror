@@ -33,7 +33,8 @@ use Encode;
 use utf8;
 eval "use JSON;1;" or my $jsonabs = "JSON";               ## no critic 'eval' # Debian: apt-get install libjson-perl
 
-use FHEM::SynoModules::SMUtils qw( evaljson  
+use FHEM::SynoModules::SMUtils qw(
+                                   evaljson  
                                    moduleVersion
                                    trim
                                  );                       # Hilfsroutinen Modul
@@ -117,7 +118,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.50.3" => "03.06.2021  some bugfixing ",
+  "0.51.0" => "03.06.2021  some bugfixing, Calculation of PV correction factors refined, new setter plantConfiguration ".
+                           "delete getter stringConfig ",
   "0.50.2" => "02.06.2021  more refactoring, delete attr headerAlignment, consumerlegend as table ",
   "0.50.1" => "02.06.2021  switch to mathematical rounding of cloudiness range ",
   "0.50.0" => "01.06.2021  real switch off time in consumerXX_planned_stop when finished, change key 'ready' to 'auto' ".
@@ -209,6 +211,7 @@ my %hset = (                                                                # Ha
   currentMeterDev         => { fn => \&_setmeterDevice            },
   currentBatteryDev       => { fn => \&_setbatteryDevice          },
   energyH4Trigger         => { fn => \&_setenergyH4Trigger        },
+  plantConfiguration      => { fn => \&_setplantConfiguration     },
   powerTrigger            => { fn => \&_setpowerTrigger           },
   pvCorrectionFactor_05   => { fn => \&_setpvCorrectionFactor     },
   pvCorrectionFactor_06   => { fn => \&_setpvCorrectionFactor     },
@@ -244,7 +247,6 @@ my %hget = (                                                                # Ha
   pvCircular        => { fn => \&_getlistPVCircular,         needcred => 0 },
   forecastQualities => { fn => \&_getForecastQualities,      needcred => 0 },
   nextHours         => { fn => \&_getlistNextHours,          needcred => 0 },
-  stringConfig      => { fn => \&_getstringConfig,           needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -265,25 +267,29 @@ my %hff = (                                                                     
   "90" => { N => 33,  NE => 43,  E => 62,  SE => 78,  S => 85,  SW => 78,  W => 62,  NW => 43  },
 );                                                                                          # mt  = default mintime (Minuten)
 
-my %hqtxt = (                                                                                                 # Hash Setup Texte
-  cfd   => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"}, 
-             DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                },
-  crd   => { EN => qq{Please select the Radiation forecast device with "set LINK currentRadiationDev"},
-             DE => qq{Bitte geben sie das Strahlungsvorhersage Device mit "set LINK currentRadiationDev" an}           },
-  cid   => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
-             DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                  },
-  mid   => { EN => qq{Please specify the device for energy measurement with "set LINK currentMeterDev"},
-             DE => qq{Bitte geben sie das Device zur Energiemessung mit "set LINK currentMeterDev" an}                 },
-  ist   => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
-             DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}        },
-  mps   => { EN => qq{Please specify the total peak power for every string with "set LINK modulePeakString"},
-             DE => qq{Bitte geben sie die Gesamtspitzenleistung von jedem String mit "set LINK modulePeakString" an}   },
-  mdr   => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
-             DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
-  mta   => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
-             DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
-  awd   => { EN => qq{Awaiting data from Solar Forecast devices ...},
-             DE => qq{Warten auf Daten von Solarvorhersagegeräten ...}                                                 },
+my %hqtxt = (                                                                                                 # Hash (Setup) Texte
+  cfd    => { EN => qq{Please select the Weather forecast device with "set LINK currentForecastDev"}, 
+              DE => qq{Bitte geben sie das Wettervorhersage Device mit "set LINK currentForecastDev" an}                },
+  crd    => { EN => qq{Please select the Radiation forecast device with "set LINK currentRadiationDev"},
+              DE => qq{Bitte geben sie das Strahlungsvorhersage Device mit "set LINK currentRadiationDev" an}           },
+  cid    => { EN => qq{Please specify the Inverter device with "set LINK currentInverterDev"},
+              DE => qq{Bitte geben sie das Wechselrichter Device mit "set LINK currentInverterDev" an}                  },
+  mid    => { EN => qq{Please specify the device for energy measurement with "set LINK currentMeterDev"},
+              DE => qq{Bitte geben sie das Device zur Energiemessung mit "set LINK currentMeterDev" an}                 },
+  ist    => { EN => qq{Please define all of your used string names with "set LINK inverterStrings"},
+              DE => qq{Bitte geben sie alle von Ihnen verwendeten Stringnamen mit "set LINK inverterStrings" an}        },
+  mps    => { EN => qq{Please specify the total peak power for every string with "set LINK modulePeakString"},
+              DE => qq{Bitte geben sie die Gesamtspitzenleistung von jedem String mit "set LINK modulePeakString" an}   },
+  mdr    => { EN => qq{Please specify the module direction with "set LINK moduleDirection"},
+              DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
+  mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
+              DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
+  awd    => { EN => qq{Awaiting data from Solar Forecast devices ...},
+              DE => qq{Warten auf Daten von Solarvorhersagegeräten ...}                                                 },
+  strok  => { EN => qq{Congratulations &#128522, your string configuration checked without found errors !},
+              DE => qq{Herzlichen Glückwunsch &#128522, Ihre String-Konfiguration wurde ohne gefundene Fehler geprüft!} },
+  strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !},
+              DE => qq{Oh nein &#128577, Ihre String-Konfiguration ist inkonsistent.\nBitte überprüfen Sie die Einstellungen von modulePeakString, moduleDirection, moduleTiltAngle !}},
 );
 
 my %htitles = (                                                                                                 # Hash Hilfetexte
@@ -438,6 +444,7 @@ my $defslidenum  = 3;                                                           
 
 my $pvhcache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVH_SolarForecast_";   # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache     = $attr{global}{modpath}."/FHEM/FhemUtils/PVC_SolarForecast_";   # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
+my $plantcfg     = $attr{global}{modpath}."/FHEM/FhemUtils/PVCfg_SolarForecast_"; # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
 
 my $calcmaxd     = 30;                                                            # Anzahl Tage die zur Berechnung Vorhersagekorrektur verwendet werden
 my @dweattrmust  = qw(TTT Neff R101 ww SunUp SunRise SunSet);                     # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
@@ -473,7 +480,6 @@ my %hef = (                                                                     
 # $data{$type}{$name}{pvhist}                                                    # historische Werte       
 # $data{$type}{$name}{nexthours}                                                 # NextHours Werte
 # $data{$type}{$name}{consumers}                                                 # Consumer Hash
-# $data{$type}{$name}{html}                                                      # hfcg = hash forecast graphic
 # $data{$type}{$name}{strings}                                                   # Stringkonfiguration
 
 ################################################################
@@ -679,6 +685,7 @@ sub Set {
              "modulePeakString ".
              "moduleTiltAngle ".
              "moduleDirection ".
+             "plantConfiguration:check,save,restore ".
              "powerTrigger:textField-long ".
              "pvCorrectionFactor_Auto:on,off ".
              "reset:$resets ".
@@ -721,6 +728,7 @@ sub _setcurrentForecastDev {              ## no critic "not used"
 
   readingsSingleUpdate($hash, "currentForecastDev", $prop, 1);
   createNotifyDev     ($hash);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -740,6 +748,7 @@ sub _setcurrentRadiationDev {              ## no critic "not used"
 
   readingsSingleUpdate($hash, "currentRadiationDev", $prop, 1);
   createNotifyDev     ($hash);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -771,6 +780,7 @@ sub _setinverterDevice {                 ## no critic "not used"
 
   readingsSingleUpdate($hash, "currentInverterDev", $arg, 1);
   createNotifyDev     ($hash);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -784,7 +794,8 @@ sub _setinverterStrings {                ## no critic "not used"
   my $name  = $paref->{name};
   my $prop  = $paref->{prop} // return qq{no inverter strings specified};
 
-  readingsSingleUpdate($hash, "inverterStrings", $prop, 1);
+  readingsSingleUpdate($hash, "inverterStrings", $prop,    1);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   
 return qq{REMINDER - After setting or changing "inverterStrings" please check / set all module parameter (e.g. moduleTiltAngle) again !};
 }
@@ -820,6 +831,7 @@ sub _setmeterDevice {                    ## no critic "not used"
 
   readingsSingleUpdate($hash, "currentMeterDev", $arg, 1);
   createNotifyDev     ($hash);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -855,6 +867,7 @@ sub _setbatteryDevice {                  ## no critic "not used"
 
   readingsSingleUpdate($hash, "currentBatteryDev", $arg, 1);
   createNotifyDev     ($hash);
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -884,6 +897,8 @@ sub _setpowerTrigger {                    ## no critic "not used"
           return qq{The key "$key" is invalid. Please consider the commandref.};
       }
   }
+  
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
   readingsSingleUpdate($hash, "powerTrigger", $arg, 1);
 
@@ -915,6 +930,8 @@ sub _setenergyH4Trigger {                ## no critic "not used"
           return qq{The key "$key" is invalid. Please consider the commandref.};
       }
   }
+  
+  writeDataToFile     ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
   readingsSingleUpdate($hash, "energyH4Trigger", $arg, 1);
 
@@ -948,6 +965,8 @@ sub _setmodulePeakString {               ## no critic "not used"
   
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
+  
+  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -978,7 +997,9 @@ sub _setmoduleTiltAngle {                ## no critic "not used"
   readingsSingleUpdate($hash, "moduleTiltAngle", $arg, 1);
     
   my $ret = createStringConfig ($hash);
-  return $ret if($ret);  
+  return $ret if($ret);
+
+  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben  
 
 return;
 }
@@ -1010,7 +1031,65 @@ sub _setmoduleDirection {                ## no critic "not used"
   
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
+  
+  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
 
+return;
+}
+
+################################################################
+#                      Setter plantConfiguration
+################################################################
+sub _setplantConfiguration {             ## no critic "not used"
+  my $paref = shift;
+  my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
+  my $opt   = $paref->{opt};
+  my $arg   = $paref->{arg};
+
+  if(!$arg) {
+      return qq{The command "$opt" needs an argument !};
+  } 
+  
+  if($arg eq "check") {      
+      my $ret = checkStringConfig ($hash); 
+      return qq{<html>$ret</html>};
+  }
+  
+  if($arg eq "save") {
+      my $error = writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+      if($error) {
+          return $error;
+      }
+      else {
+          return qq{Plant Configuration has been written to file "$plantcfg.$name"};
+      }
+  }
+  
+  if($arg eq "restore") {
+      my ($error, @pvconf) = FileRead ($plantcfg.$name);                                        
+      
+      if(!$error) {
+          my $rbit = 0;
+          for my $elem (@pvconf) {
+              my ($reading, $val) = split "<>", $elem;
+              next if(!$reading || !defined $val);
+              CommandSetReading (undef,"$name $reading $val");
+              $rbit = 1;
+          }          
+          
+          if($rbit) {
+              return qq{Plant Configuration restored from file "$plantcfg.$name"};
+          }
+          else {
+              return qq{The Plant Configuration file "$plantcfg.$name" was empty, nothing restored};
+          }
+      }
+      else {
+          return $error;
+      }      
+  }
+  
 return;
 }
 
@@ -1097,11 +1176,13 @@ sub _setreset {                          ## no critic "not used"
   
   if($prop eq "powerTrigger") {
       deleteReadingspec ($hash, "powerTrigger.*");
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
       return;
   }
   
   if($prop eq "energyH4Trigger") {
       deleteReadingspec ($hash, "energyH4Trigger.*");
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
       return;
   }
 
@@ -1119,6 +1200,8 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{autarkyrate};
       delete $data{$type}{$name}{current}{selfconsumption};
       delete $data{$type}{$name}{current}{selfconsumptionrate};
+      
+      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   }
   
   if($prop eq "currentBatteryDev") {
@@ -1128,15 +1211,18 @@ sub _setreset {                          ## no critic "not used"
       delete $data{$type}{$name}{current}{powerbatout};
       delete $data{$type}{$name}{current}{powerbatin};
       delete $data{$type}{$name}{current}{batcharge};
+      
+      writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
   }
   
   if($prop eq "currentInverterDev") {
       readingsDelete    ($hash, "Current_PV");
       deleteReadingspec ($hash, ".*_PVreal" );
+      writeDataToFile   ($hash, "plantconfig", $plantcfg.$name);           # Anlagenkonfiguration File schreiben
   }
   
-  if($prop eq "consumerPlanning") {                                      # Verbraucherplanung resetten
-      my $c = $paref->{prop1} // "";                                     # bestimmten Verbraucher setzen falls angegeben
+  if($prop eq "consumerPlanning") {                                        # Verbraucherplanung resetten
+      my $c = $paref->{prop1} // "";                                       # bestimmten Verbraucher setzen falls angegeben
       
       if ($c) {
           deleteConsumerPlanning ($hash, $c);
@@ -1167,8 +1253,8 @@ sub _setwriteHistory {                   ## no critic "not used"
   
   my $ret;
   
-  $ret = writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
-  $ret = writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  $ret = writeDataToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  $ret = writeDataToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
 
 return $ret;
 }
@@ -1230,7 +1316,6 @@ sub Get {
                 "nextHours:noArg ".
                 "pvCircular:noArg ".
                 "pvHistory:noArg ".
-                "stringConfig:noArg ".
                 "valCurrent:noArg "
                 ;
                 
@@ -1354,18 +1439,6 @@ sub _getlistvalConsumerMaster {
   my $hash  = $paref->{hash};
   
   my $ret   = listDataPool ($hash, "consumer");
-                    
-return $ret;
-}
-
-###############################################################
-#                       Getter stringConfig
-###############################################################
-sub _getstringConfig {
-  my $paref = shift;
-  my $hash  = $paref->{hash};
- 
-  my $ret = checkStringConfig ($hash);
                     
 return $ret;
 }
@@ -1568,8 +1641,8 @@ sub Shutdown {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
-  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
+  writeDataToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
   
 return; 
 }
@@ -1607,22 +1680,121 @@ sub Delete {
   my $arg   = shift;
   my $name  = $hash->{NAME};
   
-  my $file  = $pvhcache.$name;                                      # Cache File PV History löschen
+  my $file  = $pvhcache.$name;                                                # Cache File PV History löschen
   my $error = FileDelete($file);      
 
   if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting cache file "$file": $error}); 
+      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
   }
   
   $error = qq{};
-  $file  = $pvccache.$name;                                         # Cache File PV Circular löschen
+  $file  = $pvccache.$name;                                                   # Cache File PV Circular löschen
   $error = FileDelete($file); 
   
   if ($error) {
-      Log3 ($name, 1, qq{$name - ERROR deleting cache file "$file": $error}); 
+      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
+  }
+  
+
+  $error = qq{};
+  $file  = $plantcfg.$name;                                                   # File Anlagenkonfiguration löschen
+  $error = FileDelete($file); 
+  
+  if ($error) {
+      Log3 ($name, 1, qq{$name - ERROR deleting file "$file": $error}); 
   }
       
 return;
+}
+
+################################################################
+#        Timer für historische Daten schreiben
+################################################################
+sub periodicWriteCachefiles {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
+  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
+  
+  return if(IsDisabled($name));
+  
+  writeDataToFile ($hash, "circular",    $pvccache.$name);             # Cache File für PV Circular schreiben
+  writeDataToFile ($hash, "pvhist",      $pvhcache.$name);             # Cache File für PV History schreiben
+  
+return;
+}
+
+################################################################
+#             Daten in File wegschreiben
+################################################################
+sub writeDataToFile {  
+  my $hash      = shift;
+  my $cachename = shift;
+  my $file      = shift;
+
+  my $name = $hash->{NAME};
+  my $type = $hash->{TYPE};
+  
+  my @data;
+  
+  if($cachename eq "plantconfig") {
+      @data = _savePlantConfig ($hash);
+      return "Plant configuration is empty, no data has been written" if(!@data);
+  }
+  else {
+      return if(!$data{$type}{$name}{$cachename});
+      my $json = encode_json ($data{$type}{$name}{$cachename});
+      push @data, $json;
+  }
+  
+  my $error = FileWrite($file, @data);
+  
+  if ($error) {
+      my $err = qq{ERROR writing cache file "$file": $error};
+      Log3 ($name, 1, "$name - $err");
+      readingsSingleUpdate($hash, "state", "ERROR writing cache file $file - $error", 1);
+      return $err;          
+  }
+  else {
+      my $lw = gettimeofday(); 
+      $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
+      readingsSingleUpdate($hash, "state", "wrote cachefile $cachename successfully", 1);
+  }
+   
+return; 
+}
+
+################################################################
+#          Anlagenkonfiguration sichern
+################################################################
+sub _savePlantConfig {  
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  
+  my @pvconf;
+  
+  my @aconfigs = qw(
+                     currentBatteryDev
+                     currentForecastDev
+                     currentInverterDev
+                     currentMeterDev
+                     currentRadiationDev
+                     inverterStrings
+                     moduleDirection
+                     modulePeakString
+                     moduleTiltAngle
+                     powerTrigger
+                     energyH4Trigger
+                   );
+
+  for my $cfg (@aconfigs) {
+      my $val = ReadingsVal($name, $cfg, "");
+      next if(!$val);
+      push @pvconf, $cfg."<>".$val;    
+  } 
+   
+return @pvconf; 
 }
 
 ################################################################
@@ -1811,59 +1983,6 @@ sub controlParams {
   my $interval = AttrVal($name, "interval", $definterval);           # 0 wenn manuell gesteuert
 
 return $interval;
-}
-
-################################################################
-#        Timer für historische Daten schreiben
-################################################################
-sub periodicWriteCachefiles {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  
-  RemoveInternalTimer($hash, "FHEM::SolarForecast::periodicWriteCachefiles");
-  InternalTimer      (gettimeofday()+$whistrepeat, "FHEM::SolarForecast::periodicWriteCachefiles", $hash, 0);
-  
-  return if(IsDisabled($name));
-  
-  writeCacheToFile ($hash, "circular", $pvccache.$name);             # Cache File für PV Circular schreiben
-  writeCacheToFile ($hash, "pvhist",   $pvhcache.$name);             # Cache File für PV History schreiben
-  
-return;
-}
-
-################################################################
-#       historische Daten in File wegschreiben
-################################################################
-sub writeCacheToFile {  
-  my $hash      = shift;
-  my $cachename = shift;
-  my $file      = shift;
-
-  my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
-  
-  return if(!$data{$type}{$name}{$cachename});
-  
-  my @pvh;
-  
-  my $json  = encode_json ($data{$type}{$name}{$cachename});
-  push @pvh, $json;
-  
-  my $error = FileWrite($file, @pvh);
-  
-  if ($error) {
-      my $err = qq{ERROR writing cache file "$file": $error};
-      Log3 ($name, 1, "$name - $err");
-      readingsSingleUpdate($hash, "state", "ERROR writing cache file $file - $error", 1);
-      return $err;          
-  }
-  else {
-      my $lw = gettimeofday(); 
-      $hash->{HISTFILE} = "last write time: ".FmtTime($lw)." File: $file" if($cachename eq "pvhist");
-      readingsSingleUpdate($hash, "state", "wrote cachefile $cachename successfully", 1);
-  }
-   
-return; 
 }
 
 ################################################################
@@ -5013,11 +5132,11 @@ sub calcVariance {
       
       Log3 ($name, 5, "$name - Hour: ".sprintf("%02d",$h).", Today PVreal: $pvval, PVforecast: $fcval");
       
-      $paref->{hour}                    = $h;
-      my ($pvavg,$fcavg,$anzavg,$range) = calcAvgFromHistory ($paref);                                    # historische PV / Forecast Vergleichswerte ermitteln
-      $anzavg                         //= 1;                                                              # der aktuelle Wert ist nun der erste AVG im Store
-      $pvval                            = $pvavg ? ($pvval + $pvavg) / 2 : $pvval;                        # Ertrag aktuelle Stunde berücksichtigen
-      $fcval                            = $fcavg ? ($fcval + $fcavg) / 2 : $fcval;                        # Vorhersage aktuelle Stunde berücksichtigen
+      $paref->{hour}                  = $h;
+      my ($pvhis,$fchis,$dnum,$range) = calcAvgFromHistory ($paref);                                      # historische PV / Forecast Vergleichswerte ermitteln
+      $dnum                           = $dnum  ? $dnum++ : 1;                                                                # der aktuelle Wert ist nun der erste AVG im Store
+      $pvval                          = $pvhis ? ($pvval + $pvhis) / $dnum : $pvval;                      # Ertrag aktuelle Stunde berücksichtigen
+      $fcval                          = $fchis ? ($fcval + $fchis) / $dnum : $fcval;                      # Vorhersage aktuelle Stunde berücksichtigen
       
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
       $oldfac             = 1 if(1*$oldfac == 0);
@@ -5038,13 +5157,13 @@ sub calcVariance {
           Log3 ($name, 5, "$name - write correction factor into circular Hash: Factor $factor, Hour $h, Range $range");
           
           $data{$type}{$name}{circular}{sprintf("%02d",$h)}{pvcorrf}{$range} = $factor;                  # Korrekturfaktor für Bewölkung Range 0..10 für die jeweilige Stunde als Datenquelle eintragen
-          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $anzavg;                  # Korrekturfaktor Qualität
+          $data{$type}{$name}{circular}{sprintf("%02d",$h)}{quality}{$range} = $dnum;                    # Korrekturfaktor Qualität
       }
       else {
           $range = "";
       }
       
-      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, found history days in range: $anzavg)";
+      push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."<>".$factor." (automatic - old factor: $oldfac, cloudiness range: $range, days in range: $dnum)";
       push @da, "pvCorrectionFactor_".sprintf("%02d",$h)."_autocalc<>done";    
   }
   
@@ -5105,7 +5224,7 @@ sub calcAvgFromHistory {
       
       Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $range");
       
-      my $anzavg       = 0;      
+      my $dnum         = 0;      
       my ($pvrl,$pvfc) = (0,0);
             
       for my $dayfa (@efa) {
@@ -5121,24 +5240,24 @@ sub calcAvgFromHistory {
           if($range == $histwcc) {               
               $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
               $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
-              $anzavg++;
+              $dnum++;
               Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range identical: $range Day/hour $dayfa/$hour included.");
-              last if( $anzavg == $calcd);
+              last if( $dnum == $calcd);
           }
           else {
               Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range different: $range/$histwcc Day/hour $dayfa/$hour discarded.");
           }
       }
       
-      if(!$anzavg) {
+      if(!$dnum) {
           Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set -> no historical averages calculated");
           return (undef,undef,undef,$range);
       }
       
-      my $pvavg = sprintf "%.2f", $pvrl / $anzavg;
-      my $fcavg = sprintf "%.2f", $pvfc / $anzavg;
+      my $pvhis = sprintf "%.2f", $pvrl;
+      my $fchis = sprintf "%.2f", $pvfc;
       
-      return ($pvavg,$fcavg,$anzavg,$range);
+      return ($pvhis,$fchis,$dnum,$range);
   }
   
 return;
@@ -5596,6 +5715,7 @@ sub checkStringConfig {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   my $stch = $data{$type}{$name}{strings};
+  my $lang = AttrVal ("global", 'language', 'EN');
   
   my $sub = sub { 
       my $string = shift;
@@ -5614,16 +5734,16 @@ sub checkStringConfig {
   my $sc;
   my $cf = 0;
   for my $sn (sort keys %{$stch}) {
-      my $sp = $sn." => ".$sub->($sn)."\n";
+      my $sp = $sn." => ".$sub->($sn)."<br>";
       $cf    = 1 if($sp !~ /dir.*?peak.*?tilt/x);             # Test Vollständigkeit: z.B. Süddach => dir: S, peak: 5.13, tilt: 45
       $sc   .= $sp;
   }
   
   if($cf) {                             
-      $sc .= "\n\nOh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !";
+      $sc .= "<br><br>".encode ("utf8", $hqtxt{strnok}{$lang});
   }
   else {
-      $sc .= "\n\nCongratulations &#128522, your string configuration checked without found errors !";
+      $sc .= "<br><br>".encode ("utf8", $hqtxt{strok}{$lang});
   }
       
 return $sc;
@@ -6143,7 +6263,7 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
   
     <ul>
       <a id="SolarForecast-set-currentBatteryDev"></a>
-      <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt; outtotal=&lt;Readingname&gt;:&lt;Einheit&gt; charge=&lt;Readingname&gt;]  </b> <br><br> 
+      <li><b>currentBatteryDev &lt;Meter Device Name&gt; pin=&lt;Readingname&gt;:&lt;Einheit&gt; pout=&lt;Readingname&gt;:&lt;Einheit&gt; [intotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [outtotal=&lt;Readingname&gt;:&lt;Einheit&gt;] [charge=&lt;Readingname&gt;]  </b> <br><br> 
       
       Legt ein beliebiges Device und seine Readings zur Lieferung der Batterie Leistungsdaten fest. 
       Das Modul geht davon aus dass der numerische Wert der Readings immer positiv ist.
@@ -6400,6 +6520,25 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
     <br>
     
     <ul>
+      <a id="SolarForecast-set-plantConfiguration"></a>
+      <li><b>plantConfiguration </b> <br><br> 
+       
+       Je nach ausgewählter Kommandooption werden folgende Operationen ausgeführt: <br><br>
+
+      <ul>
+         <table>  
+         <colgroup> <col width=25%> <col width=75%> </colgroup>
+            <tr><td> <b>check</b>     </td><td>Zeigt die aktuelle Stringkonfiguration. Es wird gleichzeitig eine Plausibilitätsprüfung      </td></tr>
+            <tr><td>                  </td><td>vorgenommen und das Ergebnis sowie eventuelle Anweisungen zur Fehlerbehebung ausgegeben.     </td></tr>
+            <tr><td> <b>save</b>      </td><td>sichert wichtige Parameter der Anlagenkonfiguration                                          </td></tr>
+            <tr><td> <b>restore</b>   </td><td>stellt eine gesicherte Anlagenkonfiguration wieder her                                       </td></tr>
+         </table>
+      </ul>        
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
       <a id="SolarForecast-set-powerTrigger"></a>
       <li><b>powerTrigger &lt;1on&gt;=&lt;Wert&gt; &lt;1off&gt;=&lt;Wert&gt; [&lt;2on&gt;=&lt;Wert&gt; &lt;2off&gt;=&lt;Wert&gt; ...] </b> <br><br>  
       
@@ -6606,15 +6745,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          </table>
       </ul>
       
-      </li>      
-    </ul>
-    <br>
-    
-    <ul>
-      <a id="SolarForecast-get-stringConfig"></a>
-      <li><b>stringConfig </b> <br><br>
-      Zeigt die aktuelle Stringkonfiguration. Dabei wird gleichzeitig eine Plausibilitätsprüfung vorgenommen und das Ergebnis
-      sowie eventuelle Anweisungen zur Fehlerbehebung ausgegeben. 
       </li>      
     </ul>
     <br>
