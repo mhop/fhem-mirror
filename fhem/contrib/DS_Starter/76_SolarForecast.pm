@@ -3737,7 +3737,9 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   my $ftui  = $paref->{ftui};
   
   my $type  = $hash->{TYPE};
-  my $hfcg  = {};                                                                                   #(hfcg = hash forecast graphic)
+  
+  my %hfch;
+  my $hfcg  = \%hfch;                                                                               #(hfcg = hash forecast graphic)
   
   # Verbraucherlegende und Steuerung
   ###################################           
@@ -3799,8 +3801,6 @@ sub forecastGraphic {                                 ## no critic 'complexity'
   my $val3       = $back->{val3};
   my $val4       = $back->{val4};
   my $thishour   = $back->{thishour};
-  $hfcg          = $back->{hfcg};
-
 
   # get consumer list and display it in Graphics
   ################################################ 
@@ -4600,7 +4600,6 @@ sub _forecastGraphicFirstHour {
       val3     => $val3,
       val4     => $val4,
       thishour => $thishour,
-      hfcg     => $hfcg,
   };
 
 return ($back);
