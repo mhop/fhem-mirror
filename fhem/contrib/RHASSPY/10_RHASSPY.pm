@@ -345,7 +345,7 @@ sub Define {
 
     $hash->{defaultRoom} = $defaultRoom;
     my $language = $h->{language} // shift @{$anon} // lc AttrVal('global','language','en');
-    $hash->{MODULE_VERSION} = '0.4.19';
+    $hash->{MODULE_VERSION} = '0.4.21';
     $hash->{baseUrl} = $Rhasspy;
     initialize_Language($hash, $language) if !defined $hash->{LANGUAGE} || $hash->{LANGUAGE} ne $language;
     $hash->{LANGUAGE} = $language;
@@ -940,7 +940,7 @@ sub _analyze_rhassypAttr {
             my($unnamed, $named) = parseParams($val);
             my $combined = _combineHashes( $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene}, $named);
             for (keys %{$combined}) {
-                delete $combined->{$_} if $combined->{$_} eq 'none' || $named->{all} eq 'none';
+                delete $combined->{$_} if $combined->{$_} eq 'none' || defined $named->{all} && $named->{all} eq 'none';
             }
             keys %{$combined} ?
                 $hash->{helper}{devicemap}{devices}{$device}{intents}{SetScene}->{SetScene} = $combined
@@ -1145,10 +1145,12 @@ sub _analyze_genDevType_setter {
         for my $scname (split m{,}xms, $+{scnames}) {
             my $clscene = $scname;
             # cleanup HUE scenes
-            if ($clscene =~ m{[#]\[id}xms) {
+            if ($clscene =~ m{[#]}xms) {
+                #next if $clscene =~ m{[#]\[id}xms;
                 $clscene = (split m{[#]\[id}xms, $clscene)[0] if $clscene =~ m{[#]\[id}xms; 
                 $clscene =~ s{[#]}{ }gxm;
-                $scname =~ s{.*[#]\[(id=.+)]}{$1}xms;
+                $scname =~ s{.*[#]\[(id=.+)]}{$1}xms if $scname =~ m{[#]\[id}xms;
+                $scname =~ s{[#]}{ }gxm;
             }
             $mapping->{SetScene}->{SetScene}->{$scname} = $clscene;
         }
@@ -1437,7 +1439,7 @@ sub getAllRhasspyNamesAndGroupsByIntent {
     for my $device (devspec2array($hash->{devspec})) {
         next if !defined $hash->{helper}{devicemap}{devices}{$device}{intents}->{$intent};
         push @names, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{names}; 
-        push @groups, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{groups}; 
+        push @groups, split m{,}x, $hash->{helper}{devicemap}{devices}{$device}->{groups} if defined $hash->{helper}{devicemap}{devices}{$device}->{groups}; 
     }
 
     @names  = uniq(@names);
@@ -1709,17 +1711,16 @@ sub getDevicesByGroup {
     my $data = shift // return;
 
     my $group = $data->{Group} // return;
-    #my $room  = $data->{Room}  // return;
     my $room  = getRoomName($hash, $data);
 
     my $devices = {};
 
     for my $dev (keys %{$hash->{helper}{devicemap}{devices}}) {
         my $allrooms = $hash->{helper}{devicemap}{devices}{$dev}->{rooms};
-        next if $room ne 'global' && $allrooms !~ m{\b$room(?:[\b:\s]|\Z)}x;
+        next if $room ne 'global' && $allrooms !~ m{\b$room(?:[\b:\s]|\Z)}i; ##no critic qw(RequireExtendedFormatting)
 
         my $allgroups = $hash->{helper}{devicemap}{devices}{$dev}->{groups} // next;
-        next if $allgroups !~ m{\b$group(?:[\b:\s]|\Z)}x;
+        next if $allgroups !~ m{\b$group\b}i; ##no critic qw(RequireExtendedFormatting)
 
         my $specials = $hash->{helper}{devicemap}{devices}{$dev}{group_specials};
         my $label = $specials->{partOf} // $dev;
@@ -2086,7 +2087,7 @@ my $dispatchFns = {
     SetColorGroup       => \&handleIntentSetColorGroup,
     SetScene            => \&handleIntentSetScene,
     GetTime             => \&handleIntentGetTime,
-    GetWeekday          => \&handleIntentGetWeekday,
+    GetDate             => \&handleIntentGetDate,
     SetTimer            => \&handleIntentSetTimer,
     ConfirmAction       => \&handleIntentConfirmAction,
     CancelAction        => \&handleIntentCancelAction,
@@ -3396,17 +3397,21 @@ sub handleIntentSetScene{
         $device = getDeviceByName($hash, $room, $data->{Device});
         $mapping = getMapping($hash, $device, 'SetScene', undef, defined $hash->{helper}{devicemap});
         # restore HUE scenes
+        $scene = qq([$scene]) if $scene =~ m{id=.+}xms;
+=pod
         if ($scene =~ m{id=.+}xms) {
             my $allset = getAllSets($device);
             if ($allset =~ m{\bscene:(?<scnames>[\S]+)}xm) {
                 for my $scname (split m{,}xms, $+{scnames}) {
                     if ($scname =~ m{$scene}xms) {
                         $scene = $scname;
+                        $scene =~ s{[#]}{ }gxm;
                         last $scname;
                     }
                 }
             }
         }
+=cut
 
         # Mapping found?
         return respond ($hash, $data->{requestType}, $data->{sessionId}, $data->{siteId}, getResponse($hash, 'NoValidData')) if !$device || !defined $mapping;
@@ -3442,12 +3447,12 @@ sub handleIntentGetTime {
 }
 
 
-# Handle incoming "GetWeekday" intents
-sub handleIntentGetWeekday {
+# Handle incoming "GetDate" intents
+sub handleIntentGetDate {
     my $hash = shift // return;
     my $data = shift // return;
 
-    Log3($hash->{NAME}, 5, "handleIntentGetWeekday called");
+    Log3($hash->{NAME}, 5, "handleIntentGetDate called");
 
     my $weekDay  = strftime( '%A', localtime );
     $weekDay  = $hash->{helper}{lng}{words}->{$weekDay} if defined $hash->{helper}{lng}{words}->{$weekDay};
@@ -4607,7 +4612,7 @@ yellow=rgb FFFF00</code></p>
   <li>SetColor</li>
   <li>SetColorGroup</li>
   <li>GetTime</li>
-  <li>GetWeekday</li>
+  <li>GetDate</li>
   <li>SetTimer</li>
   <li>ConfirmAction</li>
   <li>CancelAction</li>
