@@ -117,8 +117,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "0.50.2" => "01.06.2021  more refactoring, delete attr headerAlignment, consumerlegend as table ",
-  "0.50.1" => "01.06.2021  switch to mathematical rounding of cloudiness range ",
+  "0.50.3" => "03.06.2021  some bugfixing ",
+  "0.50.2" => "02.06.2021  more refactoring, delete attr headerAlignment, consumerlegend as table ",
+  "0.50.1" => "02.06.2021  switch to mathematical rounding of cloudiness range ",
   "0.50.0" => "01.06.2021  real switch off time in consumerXX_planned_stop when finished, change key 'ready' to 'auto' ".
                            "consider switch on Time limits (consumer keys notbefore/notafter) ",
   "0.49.5" => "01.06.2021  change pv correction factor to 1 if no historical factors found (only with automatic correction) ",
@@ -304,8 +305,8 @@ my %htitles = (                                                                 
              DE => qq{undefiniert}                                           },
   dela  => { EN => qq{delayed},
              DE => qq{verzoegert}                                            },
-  cnsm  => { EN => qq{Consumer},
-             DE => qq{Verbraucher}                                           },
+  cnsm  => { EN => qq{Consumer Control},
+             DE => qq{Verbrauchersteuerung}                                  },
   eiau  => { EN => qq{On/Off},
              DE => qq{Ein/Aus}                                               },
   auto  => { EN => qq{Automatic},
@@ -2748,7 +2749,7 @@ sub __switchConsumer {
           $data{$type}{$name}{consumers}{$c}{planswitchon}  = $t;
           $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t + $stopdiff;
           $state                                            = qq{Consumer "$calias" switched on};
-          Log3 ($name, 2, "$name - $state");
+          Log3 ($name, 2, "$name - $state (Automatic = $auto)");
       }
   }
   
@@ -2761,7 +2762,7 @@ sub __switchConsumer {
       $data{$type}{$name}{consumers}{$c}{planstate}     = "switched off: ".$stoptime;
       $data{$type}{$name}{consumers}{$c}{planswitchoff} = $t;                                     # tatsächliche Ausschaltzeit
       $state                                            = qq{Consumer "$calias" switched off};
-      Log3 ($name, 2, "$name - $state");
+      Log3 ($name, 2, "$name - $state (Automatic = $auto)");
   } 
   
   $paref->{state} = $state;
@@ -2789,8 +2790,8 @@ sub _transferBatteryValues {
   
   my ($pin,$piunit)    = split ":", $h->{pin};                                                # Readingname/Unit für aktuelle Batterieladung
   my ($pou,$pounit)    = split ":", $h->{pout};                                               # Readingname/Unit für aktuelle Batterieentladung
-  my ($bin,$binunit)   = split ":", $h->{intotal};                                            # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
-  my ($bout,$boutunit) = split ":", $h->{outtotal};                                           # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
+  my ($bin,$binunit)   = split ":", $h->{intotal}  // "-:-";                                  # Readingname/Unit der total in die Batterie eingespeisten Energie (Zähler)
+  my ($bout,$boutunit) = split ":", $h->{outtotal} // "-:-";                                  # Readingname/Unit der total aus der Batterie entnommenen Energie (Zähler)
   my $batchr           = $h->{charge} // "";                                                  # Readingname Ladezustand Batterie
   
   return if(!$pin || !$pou);
@@ -2807,11 +2808,11 @@ sub _transferBatteryValues {
   my $binuf  = $binunit  =~ /^kWh$/xi ? 1000 : 1;
   my $boutuf = $boutunit =~ /^kWh$/xi ? 1000 : 1;  
   
-  my $pbo       = ReadingsNum ($badev, $pou,     0) * $pouf;                                   # aktuelle Batterieentladung (W)
-  my $pbi       = ReadingsNum ($badev, $pin,     0) * $piuf;                                   # aktueller Batterieladung (W)
-  my $btotout   = ReadingsNum ($badev, $bout,    0) * $boutuf;                                 # totale Batterieentladung (Wh)
-  my $btotin    = ReadingsNum ($badev, $bin,     0) * $binuf;                                  # totale Batterieladung (Wh)
-  my $batcharge = ReadingsNum ($badev, $batchr, 50);
+  my $pbo       = ReadingsNum ($badev, $pou,      0) * $pouf;                                  # aktuelle Batterieentladung (W)
+  my $pbi       = ReadingsNum ($badev, $pin,      0) * $piuf;                                  # aktueller Batterieladung (W)
+  my $btotout   = ReadingsNum ($badev, $bout,     0) * $boutuf;                                # totale Batterieentladung (Wh)
+  my $btotin    = ReadingsNum ($badev, $bin,      0) * $binuf;                                 # totale Batterieladung (Wh)
+  my $batcharge = ReadingsNum ($badev, $batchr, "-");
   
   my $params;
   
@@ -4132,102 +4133,6 @@ return $ret;
 }
 
 ################################################################
-#         Verbraucherlegende und Steuerung 
-################################################################
-sub _forecastGraphicConsumerLegend {                                
-  my $paref   = shift;
-  my $clegend = $paref->{clegend};
- 
-  return if(!$clegend );
-  
-  my $consumersref = $paref->{consumersref};
-  my $hash         = $paref->{hash};
-  my $name         = $paref->{name};
-  my $ftui         = $paref->{ftui};
-  my $clegendstyle = $paref->{clegendstyle};
-  my $lang         = $paref->{lang};
-  my $dstyle       = $paref->{dstyle};                        # TD-Style
-  
-  my ($staticon);
-  
-  ## Tabelle Start
-  #################
-  my $ctable = qq{<table align='left' width='60%'>}; 
-  $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
-  $ctable   .= qq{<td $dstyle>$htitles{cnsm}{$lang}</td><td></td><td $dstyle>$htitles{eiau}{$lang}</td><td $dstyle>$htitles{auto}{$lang}</td>};
-  $ctable   .= qq{</tr>};
-
-  for my $c (@{$consumersref}) {          
-      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
-      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
-      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
-      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
-      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
-      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
-      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
-      
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
-      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
-      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
-      
-      if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"};                
-      }
-      
-      $cmdon      = q{} if(!$oncom);
-      $cmdoff     = q{} if(!$offcom);
-      $cmdautoon  = q{} if(!$autord); 
-      $cmdautooff = q{} if(!$autord); 
-
-      my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
-      my $swicon  = q{};
-      my $auicon  = q{};
-      
-      $ctable .= qq{<tr>};
-      
-      if(!$auto) {
-          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
-          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
-      } 
-      
-      if ($auto) {
-          $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
-          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
-      }
-      
-      if ($cmdon && $swstate eq "off") {
-          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
-          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
-      } 
-      
-      if ($cmdoff && $swstate eq "on") {
-          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
-          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
-      }
-      
-      if ($clegendstyle eq 'icon') {                                                                   
-          $cicon   = FW_makeImage($cicon);
-          $ctable .= "<td $dstyle>$calias</td><td style='text-align:center' $dstyle>$cicon</td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
-      } 
-      else {
-          my (undef,$co) = split('\@',$cicon);
-          $co      = '#cccccc' if (!$co);                                                                        
-          $ctable .= "<td $dstyle><font color='$co'>$calias</font></td><td> </td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
-      }
-      
-      $ctable .= qq{</tr>};
-  }
-  
-  $ctable .= qq{</table>};
-  
-return $ctable;
-}
-
-################################################################
 #         forecastGraphic Headerzeile generieren 
 ################################################################
 sub _forecastGraphicHeader {                                
@@ -4321,7 +4226,7 @@ sub _forecastGraphicHeader {
           $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
       }
 
-      my $upstate  = ReadingsVal($name, "state", "");
+      my $upstate = ReadingsVal($name, "state", "");
 
       ## Update-Icon
       ##############
@@ -4376,8 +4281,8 @@ sub _forecastGraphicHeader {
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
  
-      $header  .= "<tr><td colspan=\"3\" align=\"left\" $dstyle><b>".$dlink."</b></td><td colspan=\"3\" align=\"left\" $dstyle>".$lupt.  "&nbsp;".$lup."&nbsp;".$upicon."</td>                                                                           </tr>";
-      $header  .= "<tr><td colspan=\"3\" align=\"left\" $dstyle><b>          </b></td><td colspan=\"3\" align=\"left\" $dstyle>".$autoct."&nbsp;"              .$acicon."</td><td colspan=\"2\" align=\"left\" $dstyle>".$lbpcq."&nbsp;" .$pcqicon. "</td></tr>";
+      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td>                                                         </td></tr>};
+      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b>        </b></td><td colspan="3" align="left" $dstyle> $autoct &nbsp;             $acicon </td><td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon </td></tr>};
   }
   
   # Header Information pv 
@@ -4405,9 +4310,105 @@ sub _forecastGraphicHeader {
       $header .= "</tr>"; 
   }
 
-  $header .= "</table>";
+  $header .= qq{</table>};
   
 return $header;
+}
+
+################################################################
+#         Verbraucherlegende und Steuerung 
+################################################################
+sub _forecastGraphicConsumerLegend {                                
+  my $paref   = shift;
+  my $clegend = $paref->{clegend};
+ 
+  return if(!$clegend );
+  
+  my $consumersref = $paref->{consumersref};
+  my $hash         = $paref->{hash};
+  my $name         = $paref->{name};
+  my $ftui         = $paref->{ftui};
+  my $clegendstyle = $paref->{clegendstyle};
+  my $lang         = $paref->{lang};
+  my $dstyle       = $paref->{dstyle};                        # TD-Style
+  
+  my ($staticon);
+  
+  ## Tabelle Start
+  #################
+  my $ctable = qq{<table align='left' width='60%'>}; 
+  $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
+  $ctable   .= qq{<td $dstyle>$htitles{cnsm}{$lang}</td><td></td><td $dstyle>$htitles{eiau}{$lang}</td><td $dstyle>$htitles{auto}{$lang}</td>};
+  $ctable   .= qq{</tr>};
+
+  for my $c (@{$consumersref}) {          
+      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
+      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
+      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
+      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
+      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
+      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
+      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
+      
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
+      
+      if ($ftui eq "ftui") {
+          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"};                
+      }
+      
+      $cmdon      = q{} if(!$oncom);
+      $cmdoff     = q{} if(!$offcom);
+      $cmdautoon  = q{} if(!$autord); 
+      $cmdautooff = q{} if(!$autord); 
+
+      my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
+      my $swicon  = q{};
+      my $auicon  = q{};
+      
+      $ctable .= qq{<tr>};
+      
+      if(!$auto) {
+          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
+          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
+      } 
+      
+      if ($auto) {
+          $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
+          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
+      }
+      
+      if ($cmdon && $swstate eq "off") {
+          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
+          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
+      } 
+      
+      if ($cmdoff && $swstate eq "on") {
+          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
+          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+      }
+      
+      if ($clegendstyle eq 'icon') {                                                                   
+          $cicon   = FW_makeImage($cicon);
+          $ctable .= "<td $dstyle>$calias</td><td style='text-align:center' $dstyle>$cicon</td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
+      } 
+      else {
+          my (undef,$co) = split('\@',$cicon);
+          $co      = '' if (!$co);                                                                        
+          $ctable .= "<td $dstyle><font color='$co'>$calias</font></td><td> </td><td style='text-align:center' $dstyle>$swicon</td><td style='text-align:center' $dstyle>$auicon</td>";
+      }
+      
+      $ctable .= qq{</tr>};
+  }
+  
+  $ctable .= qq{</table>};
+  
+return $ctable;
 }
 
 ################################################################
@@ -4519,9 +4520,11 @@ sub flowGraphic {
 
   my $batin      = ReadingsNum($name, 'Current_PowerBatIn',  undef);
   my $batout     = ReadingsNum($name, 'Current_PowerBatOut', undef);
-  my $soc        = ReadingsNum($name, 'Current_BatCharge',     100);
-  my $batcolor   = ($soc < 26) ? 'red' : ($soc < 76) ? 'yellow' : 'green';
+  my $soc        = ReadingsNum($name, 'Current_BatCharge',      -1);
+  my $batcolor   = ($soc < 0) ? 'grey' : ($soc < 26) ? 'red' : ($soc < 76) ? 'yellow' : 'green';
+  
   my $hasbat     = 1;
+  $soc           = q{} if($soc < 0);
 
   if (!defined($batin) && !defined($batout)) {
       $hasbat = 0;
