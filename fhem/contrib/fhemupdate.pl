@@ -62,6 +62,7 @@ my @filelist2 = (
   "www/codemirror/.*",
   "www/gplot/.*.gplot",
   "www/images/fhemSVG/.*.svg",
+  "www/images/fhemSVG/weather/.*.svg",
   "www/images/openautomation/.*.svg",
   "www/images/openautomation/.*.txt",
   "www/images/default/.*",
