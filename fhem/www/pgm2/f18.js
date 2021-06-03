@@ -704,6 +704,8 @@ f18_setAttr(name, value, dontSave)
   var wn = $("body").attr("data-webName");
   FW_cmd(FW_root+"?cmd=attr "+wn+" styleData "+
          encodeURIComponent(JSON.stringify(f18_sd, undefined, 1))+"&XHR=1");
+  // for commandref background coloring
+  localStorage.setItem("styleData", JSON.stringify(f18_sd.f18));
 }
 
 function

@@ -3,7 +3,7 @@
 
 var fd_loadedHash={}, fd_loadedList=[], fd_all={}, fd_allCnt, fd_progress=0, 
     fd_lang, fd_offsets=[], fd_scrolled=0, fd_modLinks={}, csrfToken="X",
-    fd_modLangs={}, fd_mode = "FHEM";
+    fd_modLangs={}, fd_mode = "FHEM", fd_style;
 var fd_otherSrc = { "usb":"autocreate", "createlog":"autocreate" };
 
 
@@ -218,13 +218,15 @@ fd_csrfRefresh(callback)
 
 
 $(document).ready(function(){
+  if(fd_style) {
+    $("head style#f18_css").remove();
+    $("head").append("<style id='f18_css'>"+fd_style+"</style>");
+  }
   var p = location.pathname.split(/[_.]/);
   fd_lang = (p[1] == "modular" ? p[2] : p[1]);
   if(fd_lang == "html")
     fd_lang = "EN";
 
-  if(location.host == "fhem.de" || location.host == "commandref.fhem.de")
-    fd_mode = "static";
 
 
   $("div#modLinks").each(function(){
@@ -295,3 +297,22 @@ $(document).ready(function(){
 });
 
 $(window).resize(calcOffsets);
+
+if(location.host == "fhem.de" || location.host == "commandref.fhem.de")
+  fd_mode = "static";
+
+// Set f18 style from the localStorage
+var sdAsString = localStorage.getItem("styleData"), sd = {};
+if(sdAsString)
+  try { sd = JSON.parse(sdAsString) } catch(e) { console.log(e) }
+if(sd["cols.bg"]) {
+  fd_style = `
+    body.commandref {
+      background-color: #${sd["cols.bg"]};
+      color: #${sd["cols.fg"]};
+    }
+    a,h2,h3,h4 { color:#${sd["cols.link"]}; }
+    tr.odd { background-color:#${sd["cols.oddrow"]}; }
+    table.block { border:0; }
+    `;
+}
