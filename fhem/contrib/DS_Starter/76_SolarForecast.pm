@@ -4465,16 +4465,17 @@ sub _forecastGraphicConsumerLegend {
   
   my $cnum   = @{$consumersref}; 
   if($cnum > 1) {
-      $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
-      $ctable   .= qq{<td>                                                        </td>};
-      $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
-      $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+      $ctable .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
+      $ctable .= qq{<td>                                                        </td>};
+      $ctable .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
+      $ctable .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
   }
   else {
-      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
-      $ctable   .= qq{<td>         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
-      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};
-      $ctable   .= qq{<td $dstyle> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td>};    
+      my $blk  = '&nbsp;' x 8;
+      $ctable .= qq{<td $dstyle> $blk </td>};
+      $ctable .= qq{<td>         $blk </td>};
+      $ctable .= qq{<td $dstyle> $blk </td>};
+      $ctable .= qq{<td $dstyle> $blk </td>};   
   }
   
   $ctable   .= qq{</tr>};
