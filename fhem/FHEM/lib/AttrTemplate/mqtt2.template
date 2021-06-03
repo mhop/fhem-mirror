@@ -4217,7 +4217,7 @@ defmod DEVICE MQTT2_\DEVICE
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE icon ICON
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE alias Mover
+attr DEVICE alias Mower
 attr DEVICE event-on-change-reading .*
 attr DEVICE readingList $\DEVICETOPIC/commandOut:.* { json2nameValue($EVENT,'',$JSONMAP) }
 attr DEVICE jsonMap dat_rsi:wifiQuality dat_fw:firmware cfg_sn:SerialNumber\
@@ -4282,7 +4282,7 @@ mowerErrorTxt:mowerErrorIndex.* { my %errorCodes = (\
  16 => "Mower locked",\
  17 => "Battery temp out of range"\
 ); $errorCodes{ReadingsVal($name,"mowerErrorIndex","0")}}
-attr DEVICE model worx_landroid_mover
+attr DEVICE model worx_landroid_mower
 setreading DEVICE attrTemplateVersion 20210602
 
 
