@@ -118,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.51.1" => "04.06.2021  minor fixes ",
   "0.51.0" => "03.06.2021  some bugfixing, Calculation of PV correction factors refined, new setter plantConfiguration ".
                            "delete getter stringConfig ",
   "0.50.2" => "02.06.2021  more refactoring, delete attr headerAlignment, consumerlegend as table ",
@@ -4481,6 +4482,7 @@ sub _forecastGraphicConsumerLegend {
   $ctable   .= qq{</tr>};
   
   my $modulo = 1;
+  my $tro    = 0;
   
   for my $c (@{$consumersref}) {          
       my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
@@ -4512,7 +4514,10 @@ sub _forecastGraphicConsumerLegend {
       my $swicon  = q{};
       my $auicon  = q{};
       
-      $ctable .= qq{<tr>} if($modulo % 2);
+      if($modulo % 2){
+          $ctable .= qq{<tr>};
+          $tro     = 1;
+      }
       
       if(!$auto) {
           $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
@@ -4552,11 +4557,15 @@ sub _forecastGraphicConsumerLegend {
           $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
       }
       
-      $ctable .= qq{</tr>} if(!($modulo % 2));
+      if(!($modulo % 2)) {
+          $ctable .= qq{</tr>};
+          $tro     = 0;
+      }
       
       $modulo++;
   }
   
+  $ctable .= qq{</tr>} if($tro);
   $ctable .= qq{</table>};
   
 return $ctable;
@@ -6906,6 +6915,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
         Registriert einen Verbraucher &lt;Device Name&gt; beim SolarForecast Device. Dabei ist &lt;Device Name&gt;
         ein in FHEM bereits angelegtes Verbraucher Device, z.B. eine Schaltsteckdose. Die meisten Schlüssel sind optional,
         sind aber für bestimmte Funktionalitäten Voraussetzung und werden mit default-Werten besetzt. <br>
+        Ist der Schüssel "auto" definiert, kann der Automatikmodus in der integrierten Verbrauchergrafik mit den 
+        entsprechenden Drucktasten umgeschaltet werden.        
         <br><br>
          <ul>   
          <table>  
