@@ -6935,7 +6935,6 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
             <tr><td> <b>mintime</b>    </td><td>Mindestlaufzeit bzw. typische Laufzeit für einen Zyklus des Verbrauchers nach dem Einschalten in Minuten (default: Typ bezogen)  </td></tr>
             <tr><td> <b>on</b>         </td><td>Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
-            <tr><td> <b>off</b>        </td><td>Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                         </td></tr>
             <tr><td> <b>notbefore</b>  </td><td>Verbraucher nicht vor angegebener Stunde (01..23) einschalten (optional)                                                         </td></tr>
             <tr><td> <b>notafter</b>   </td><td>Verbraucher nicht vor angegebener Stunde (01..23) ausschalten (optional)                                                         </td></tr>
             <tr><td> <b>auto</b>       </td><td>Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)                            </td></tr>
