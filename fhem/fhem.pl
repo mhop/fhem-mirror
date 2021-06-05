@@ -2379,7 +2379,7 @@ CommandDeleteAttr($$)
 
     }
     addStructChange("deleteAttr", $sdev, join(" ", @a));
-    DoTrigger("global", "DELETEATTR $sdev ".join(" ",@a), 1) if($init_done);
+    DoTrigger("global", "DELETEATTR ".join(" ",@a), 1) if($init_done);
 
   }
 
