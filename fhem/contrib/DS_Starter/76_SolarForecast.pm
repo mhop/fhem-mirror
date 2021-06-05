@@ -118,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.51.2" => "05.06.2021  minor fixes ",
   "0.51.1" => "04.06.2021  minor fixes ",
   "0.51.0" => "03.06.2021  some bugfixing, Calculation of PV correction factors refined, new setter plantConfiguration ".
                            "delete getter stringConfig ",
@@ -2047,7 +2048,7 @@ sub _additionalActivities {
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
-          deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
+          deleteReadingspec ($hash, "pvCorrectionFactor_(\d+).*");
           
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
@@ -5174,14 +5175,14 @@ sub calcVariance {
       
       $paref->{hour}                  = $h;
       my ($pvhis,$fchis,$dnum,$range) = calcAvgFromHistory ($paref);                                      # historische PV / Forecast Vergleichswerte ermitteln
-      $dnum                           = $dnum  ? $dnum++ : 1;                                                                # der aktuelle Wert ist nun der erste AVG im Store
+      $dnum                           = $dnum  ? $dnum+1 : 1;                                             # der aktuelle Wert ist nun der erste AVG im Store
       $pvval                          = $pvhis ? ($pvval + $pvhis) / $dnum : $pvval;                      # Ertrag aktuelle Stunde berücksichtigen
       $fcval                          = $fchis ? ($fcval + $fchis) / $dnum : $fcval;                      # Vorhersage aktuelle Stunde berücksichtigen
       
       my ($oldfac, $oldq) = CircularAutokorrVal ($hash, sprintf("%02d",$h), $range, 0);                   # bisher definierter Korrekturfaktor/KF-Qualität der Stunde des Tages der entsprechenden Bewölkungsrange      
       $oldfac             = 1 if(1*$oldfac == 0);
       
-      Log3 ($name, 4, "$name - PV History -> average hour ($h) -> real: $pvval, forecast: $fcval");
+      Log3 ($name, 4, "$name - New PV Variance -> range: $range, hour: $h, days: $dnum, real: $pvval, forecast: $fcval");
       
       my $factor = sprintf "%.2f", ($pvval / $fcval);                                                     # Faktorberechnung: reale PV / Prognose
       if(abs($factor - $oldfac) > $maxvar) {
@@ -5281,21 +5282,23 @@ sub calcAvgFromHistory {
               $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
               $pvfc  += HistoryVal ($hash, $dayfa, $hour, "pvfc", 0);
               $dnum++;
-              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range identical: $range Day/hour $dayfa/$hour included.");
+              Log3 ($name, 5, "$name - PV History -> historical Day/hour $dayfa/$hour included - cloudiness range: $range");
               last if( $dnum == $calcd);
           }
           else {
-              Log3 ($name, 5, "$name - History Average -> current/historical cloudiness range different: $range/$histwcc Day/hour $dayfa/$hour discarded.");
+              Log3 ($name, 5, "$name - PV History -> current/historical cloudiness range different: $range/$histwcc Day/hour $dayfa/$hour discarded.");
           }
       }
       
       if(!$dnum) {
-          Log3 ($name, 5, "$name - History Average -> all cloudiness ranges were different/not set -> no historical averages calculated");
+          Log3 ($name, 5, "$name - PV History -> all cloudiness ranges were different/not set -> no historical averages calculated");
           return (undef,undef,undef,$range);
       }
       
       my $pvhis = sprintf "%.2f", $pvrl;
       my $fchis = sprintf "%.2f", $pvfc;
+      
+      Log3 ($name, 5, "$name - PV History -> Summary - cloudiness range: $range, days: $dnum, pvHist:$pvhis, fcHist:$fchis");
       
       return ($pvhis,$fchis,$dnum,$range);
   }
