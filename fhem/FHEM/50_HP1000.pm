@@ -412,7 +412,9 @@ sub HP1000_CGI() {
     my $result = "Initialized";
     my $webArgs;
     my $servertype;
-
+    
+    Log3 $name, 5, "HP1000 $name: called function HP1000_CGI()";
+    
     #TODO: should better be blocked in FHEMWEB already
     return ( "text/plain; charset=utf-8", "Booting up" )
       unless ($init_done);
@@ -466,7 +468,6 @@ sub HP1000_CGI() {
         }
 
         if (   !defined( $webArgs->{softwaretype} )
-            || !defined( $webArgs->{dateutc} )
             || !defined( $webArgs->{action} ) )
         {
             Log3 $name, 5,
@@ -514,18 +515,21 @@ sub HP1000_CGI() {
 
     HP1000_SetAliveState( $hash, 1 );
 
-    $hash->{IP}          = $defs{$FW_cname}{PEER};
-    $hash->{SERVER_TYPE} = $servertype;
-    $hash->{SWVERSION}   = $webArgs->{softwaretype};
-    $hash->{INTERVAL}    = (
-        $hash->{SYSTEMTIME_UTC}
-        ? time_str2num( $webArgs->{dateutc} ) -
-          time_str2num( $hash->{SYSTEMTIME_UTC} )
-        : 0
-    );
-    $hash->{SYSTEMTIME_UTC} = $webArgs->{dateutc};
-    $hash->{UPLOAD_TYPE}    = "default";
-    $hash->{UPLOAD_TYPE}    = "customize"
+    $hash->{IP}                         = $defs{$FW_cname}{PEER};
+    $hash->{SERVER_TYPE}                = $servertype;
+    $hash->{SWVERSION}                  = $webArgs->{softwaretype};
+
+    $hash->{INTERVAL}                   = (
+                                  $hash->{helper}->{SYSTEMTIME_UTC}
+                                ? strftime('%s',gmtime()) -
+                                  $hash->{helper}->{SYSTEMTIME_UTC}
+                                : 0
+                            );
+    $hash->{SYSTEMTIME_UTC}             = gmtime();
+    $hash->{helper}->{SYSTEMTIME_UTC}   = strftime('%s',gmtime());
+    
+    $hash->{UPLOAD_TYPE}                = "default";
+    $hash->{UPLOAD_TYPE}                = "customize"
       if ( defined( $webArgs->{solarradiation} ) );
 
     Log3 $name, 5,
@@ -588,16 +592,17 @@ sub HP1000_CGI() {
 
     # Filter values that seem bogus
     if ( AttrVal( $name, 'bogusFilter', 0 ) ne '0' ) {
-        foreach ($webArgs) {
-            next unless ( looks_like_number( $webArgs->{$_} ) );
-
-            if ( $webArgs->{$_} < -273.2 ) {
+        Log3 $name, 5,
+              "HP1000: Check data for bogus values";
+        foreach my $element (keys %{$webArgs}) {
+            next unless ( looks_like_number( $webArgs->{$element} ) );
+            if ( $webArgs->{$element} < -273.2 ) {
                 Log3 $name, 4,
                     "HP1000: "
                   . "Received value '"
-                  . $webArgs->{$_}
-                  . "' for '$_' seems out of range - removed from data set";
-                delete $webArgs->{$_};
+                  . $webArgs->{$element}
+                  . "' for '$element' seems out of range - removed from data set";
+                delete $webArgs->{$element};
             }
         }
     }
