@@ -154,6 +154,7 @@ ZWDongle_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
   $hash->{nrNAck} = 0;
+  $hash->{noDevIoSTATE} = 1;
   my @empty;
   $hash->{SendStack} = \@empty;
   ZWDongle_shiftSendStack($hash, 0, 5, undef); # Init variables
@@ -1033,7 +1034,7 @@ ZWDongle_Ready($)
   return undef if (IsDisabled($hash->{NAME}));
 
   return DevIo_OpenDev($hash, 1, "ZWDongle_DoInit")
-            if(ReadingsVal($hash->{NAME}, "state","") eq "disconnected");
+            if(DevIo_getState($hash) eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};

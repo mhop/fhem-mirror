@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use DevIo;
 use Time::HiRes qw(gettimeofday);
 
 sub FBAHA_Read($@);
@@ -18,8 +19,6 @@ sub
 FBAHA_Initialize($)
 {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}       = "FBAHA_Read";
@@ -54,6 +53,7 @@ FBAHA_Define($$)
   $hash->{Clients} = ":FBDECT:";
   my %matchList = ( "1:FBDECT" => ".*" );
   $hash->{MatchList} = \%matchList;
+  $hash->{noDevIoSTATE} = 1;
 
   DevIo_CloseDev($hash);
   $hash->{DeviceName} = $dev;
@@ -396,7 +396,7 @@ FBAHA_Ready($)
   my ($hash) = @_;
 
   return DevIo_OpenDev($hash, 1, "FBAHA_DoInit")
-                if($hash->{STATE} eq "disconnected");
+            if(DevIo_getState($hash) eq "disconnected");
   return 0;
 }
 

@@ -97,7 +97,7 @@ MQTT2_CLIENT_connect($)
 {
   my ($hash) = @_;
   return if($hash->{authError});
-  my $disco = (ReadingsVal($hash->{NAME}, "state", "") eq "disconnected");
+  my $disco = (DevIo_getState($hash) eq "disconnected");
   $hash->{connecting} = 1 if($disco && !$hash->{connecting});
   $hash->{nextOpenDelay} = 5;
   $hash->{BUF}="";

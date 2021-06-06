@@ -208,6 +208,7 @@ CUL_Define($$)
   $hash->{CMDS} = "";
   $hash->{Clients} = $clientsSlowRF;
   $hash->{MatchList} = \%matchListSlowRF;
+  $hash->{noDevIoSTATE} = 1;
 
   if($dev eq "none") {
     Log3 $name, 1, "$name device is none, commands will be echoed only";
@@ -962,7 +963,7 @@ CUL_Ready($)
   my ($hash) = @_;
 
   return DevIo_OpenDev($hash, 1, "CUL_DoInit", sub(){})
-                if($hash->{STATE} eq "disconnected");
+            if(DevIo_getState($hash) eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};

@@ -19,8 +19,19 @@ sub
 DevIo_setStates($$)
 {
   my ($hash, $val) = @_;
-  $hash->{STATE} = $val;
   setReadingsVal($hash, "state", $val, TimeNow());
+  if($hash->{noDevIoSTATE}) {
+    evalStateFormat($hash);
+  } else {
+    $hash->{STATE} = $val;
+  }
+}
+
+sub
+DevIo_getState($)
+{
+  my ($hash) = @_;
+  return ReadingsVal($hash->{NAME}, "state", "")
 }
 
 ########################
@@ -281,7 +292,7 @@ DevIo_Expect($$$)
   my ($hash, $msg, $timeout) = @_;
   my $name= $hash->{NAME};
   
-  my $state= $hash->{STATE};
+  my $state= DevIo_getState($hash);
   if($state ne "opened") {
     Log3 $name, 2, "Attempt to write to $state device.";
     return undef;
