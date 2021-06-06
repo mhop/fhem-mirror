@@ -2048,7 +2048,7 @@ sub _additionalActivities {
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
-          deleteReadingspec ($hash, "pvCorrectionFactor_(\d+).*");
+          deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
           
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
