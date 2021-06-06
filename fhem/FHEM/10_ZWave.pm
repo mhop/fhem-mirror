@@ -4944,7 +4944,7 @@ ZWAVE_parseRouteInfo($$$)
 
 
 ###################################
-# 0004000a03250300 (sensor binary off for id 11)
+# wakeup:notification for nodeIdHex 0c:
 # { ZWave_Parse($defs{zd}, "0004000c028407", "") }
 sub
 ZWave_Parse($$@)
