@@ -53,7 +53,7 @@ FBAHA_Define($$)
   $hash->{Clients} = ":FBDECT:";
   my %matchList = ( "1:FBDECT" => ".*" );
   $hash->{MatchList} = \%matchList;
-  $hash->{noDevIoSTATE} = 1;
+  $hash->{devioNoSTATE} = 1;
 
   DevIo_CloseDev($hash);
   $hash->{DeviceName} = $dev;

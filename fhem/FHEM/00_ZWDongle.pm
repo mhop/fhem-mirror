@@ -154,7 +154,7 @@ ZWDongle_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{CallbackNr} = 0;
   $hash->{nrNAck} = 0;
-  $hash->{noDevIoSTATE} = 1;
+  $hash->{devioNoSTATE} = 1;
   my @empty;
   $hash->{SendStack} = \@empty;
   ZWDongle_shiftSendStack($hash, 0, 5, undef); # Init variables

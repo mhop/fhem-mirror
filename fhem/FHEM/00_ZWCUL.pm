@@ -92,7 +92,7 @@ ZWCUL_Define($$)
   my %matchList = ( "1:ZWave" => "^[0-9A-Fa-f]+\$",
                     "2:STACKABLE"=>"^\\*" );
   $hash->{MatchList} = \%matchList;
-  $hash->{noDevIoSTATE} = 1;
+  $hash->{devioNoSTATE} = 1;
 
   if($dev eq "none") {
     Log3 $name, 1, "$name device is none, commands will be echoed only";

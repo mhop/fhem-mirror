@@ -208,7 +208,7 @@ CUL_Define($$)
   $hash->{CMDS} = "";
   $hash->{Clients} = $clientsSlowRF;
   $hash->{MatchList} = \%matchListSlowRF;
-  $hash->{noDevIoSTATE} = 1;
+  $hash->{devioNoSTATE} = 1;
 
   if($dev eq "none") {
     Log3 $name, 1, "$name device is none, commands will be echoed only";

@@ -20,7 +20,7 @@ DevIo_setStates($$)
 {
   my ($hash, $val) = @_;
   setReadingsVal($hash, "state", $val, TimeNow());
-  if($hash->{noDevIoSTATE}) {
+  if($hash->{devioNoSTATE}) {
     evalStateFormat($hash);
   } else {
     $hash->{STATE} = $val;
