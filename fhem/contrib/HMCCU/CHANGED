@@ -1,8 +1,9 @@
+ - bugfix:  88_HMCCU.pm: Release candidate 6
  - bugfix:  88_HMCCU.pm: Release candidate 5
  - bugfix:  88_HMCCU.pm: Release candidate 4
  - bugfix:  88_HMCCU.pm: Release candidate 3
  - bugfix:  88_HMCCU.pm: Release candidate 2
  - bugfix:  88_HMCCU.pm: Fixed bug in set defaults command
- - bugfix:  88_HMCCU.pm: Fixed state/controldatapoint bug during FHEM start
+ - bugfix:  88_HMCCU.pm: Fixed state-/controldatapoint bug during FHEM start
  - bugfix:  88_HMCCU.pm: Fixed some bugs. New command set readingFilter
  - bugfix:  88_HMCCU.pm: Fixed device detection bugs

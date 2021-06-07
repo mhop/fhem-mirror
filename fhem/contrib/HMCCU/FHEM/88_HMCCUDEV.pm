@@ -4,7 +4,7 @@
 #
 #  $Id: 88_HMCCUDEV.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.4.047
+#  Version 4.4.048
 #
 #  (c) 2021 zap (zap01 <at> t-online <dot> de)
 #
@@ -257,9 +257,9 @@ sub HMCCUDEV_InitDevice ($$)
 			$gdcount = scalar (@devlist);
 		}
 
-		return 3 if ($gdcount == 0);
+#		return 3 if ($gdcount == 0);
 		
-		$devHash->{ccugroup} = join (',', @devlist);
+		$devHash->{ccugroup} = join (',', @devlist) if (scalar(@devlist) > 0);
 	}
 
 	return 0;

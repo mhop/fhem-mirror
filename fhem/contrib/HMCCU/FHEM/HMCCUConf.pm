@@ -4,7 +4,7 @@
 #
 #  $Id: HMCCUConf.pm 18552 2019-02-10 11:52:28Z zap $
 #
-#  Version 4.8.028
+#  Version 4.8.030
 #
 #  Configuration parameters for HomeMatic devices.
 #
@@ -28,7 +28,7 @@ use vars qw(%HMCCU_CHN_DEFAULTS);
 use vars qw(%HMCCU_DEV_DEFAULTS);
 use vars qw(%HMCCU_SCRIPTS);
 
-$HMCCU_CONFIG_VERSION = '4.8.028';
+$HMCCU_CONFIG_VERSION = '4.8.030';
 
 ######################################################################
 # Map subtype to default role. Subtype is only available for HMIP
@@ -95,7 +95,7 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
 	},
 	'KEY_TRANSCEIVER' => {
-		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
+		F => 3, S => 'PRESS_SHORT', C => '', V => '', P => 1
 	},
 	'VIRTUAL_KEY' => {
 		F => 3, S => 'PRESS_SHORT', C => 'PRESS_SHORT', V => 'pressed:true', P => 1
@@ -108,6 +108,9 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 	},
 	'BLIND_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
+	},
+	'SHUTTER_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'open:100,close:0', P => 2
@@ -123,6 +126,9 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 	},
 	'DIMMER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
+	},
+	'DIMMER_TRANSMITTER' => {
+		F => 3, S => 'LEVEL', C => '', V => '', P => 1
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
 		F => 3, S => 'LEVEL', C => 'LEVEL', V => 'on:100,off:0', P => 2
@@ -167,9 +173,13 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'(C#\.)?LEVEL$:+pct',
 	'BLIND_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
+	'SHUTTER_TRANSMITTER' =>
+		'(C#\.)?LEVEL$:+pct',
 	'SHUTTER_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
 	'DIMMER' =>
+		'(C#\.)?LEVEL$:+pct',
+	'DIMMER_TRANSMITTER' =>
 		'(C#\.)?LEVEL$:+pct',
 	'DIMMER_VIRTUAL_RECEIVER' =>
 		'(C#\.)?LEVEL$:+pct',
@@ -253,11 +263,6 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'duration' => 'I:DURATION_VALUE:?duration I:DURATION_UNIT:#unit'
 	},
 	'KEY' => {
-		'on' => 'V:PRESS_SHORT:1',
-		'off' => 'V:PRESS_SHORT:1',
-		'press' => 'V:PRESS_SHORT:1'
-	},
-	'KEY_TRANSCEIVER' => {
 		'on' => 'V:PRESS_SHORT:1',
 		'off' => 'V:PRESS_SHORT:1',
 		'press' => 'V:PRESS_SHORT:1'
@@ -383,9 +388,7 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'webCmd' => 'press'
 	},
 	'KEY_TRANSCEIVER' => {
-		'event-on-update-reading' => 'PRESS.*',
-		'cmdIcon' => 'press:taster',
-		'webCmd' => 'press'
+		'event-on-update-reading' => 'PRESS.*'
 	},
 	'BLIND' => {
 		'substexcl' => 'pct',
@@ -401,6 +404,9 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'cmdIcon' => 'open:fts_shutter_up stop:fts_shutter_manual close:fts_shutter_down',
 		'webCmd' => 'pct:open:close:stop',
 		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'SHUTTER_TRANSMITTER' => {
+		'substexcl' => 'pct',
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'substexcl' => 'pct',
@@ -419,6 +425,9 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'substexcl' => 'pct',
 		'webCmd' => 'pct',
 		'widgetOverride' => 'pct:slider,0,10,100'
+	},
+	'DIMMER_TRANSMITTER' => {
+		'substexcl' => 'pct'
 	},
 	'DIMMER_VIRTUAL_RECEIVER' => {
 		'cmdIcon' => 'on:general_an off:general_aus',
@@ -523,6 +532,9 @@ $HMCCU_CONFIG_VERSION = '4.8.028';
 		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' },
 		'DIRECTION' => { '0' => 'none', '1' => 'up', '2' => 'down' },
 		'WORKING' =>   { '0' => 'no', 'false' => 'no', '1' => 'yes', 'true' => 'yes' }
+	},
+	'SHUTTER_TRANSMITTER' => {
+		'LEVEL' =>     { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
 	},
 	'SHUTTER_VIRTUAL_RECEIVER' => {
 		'LEVEL' => { '0' => 'closed', '100' => 'open', 'close' => '0', 'open' => '100' }
