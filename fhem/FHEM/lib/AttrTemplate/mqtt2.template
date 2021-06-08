@@ -11,7 +11,7 @@
 ###########################################
 name:General_Info
 filter:TYPE=MQTT2_DEVICE
-desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread</a> for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
+desc: <a href="https://forum.fhem.de/index.php/topic,94495.0.html">Forum Thread for <br>- suggesting new templates <br>- bug reports on mqtt2.template<br>NOTE: Some templates are only visible in case the existing device configuration meets some minimum requirements, e.g. the CID starting with "zigbee"! <br>Have a look in the mqtt2.template file itself to get more info
 order:000000
 
 ###############
@@ -76,7 +76,7 @@ desc:Adds a new ignoreRegexp to the courrent IO device of device it is applied t
 order:0000022
 par:IODEVNAME;Name of the IO-Device; { InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',''))) }
 par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if shelly is included, otherwise it will be added;{ my $old = AttrVal(InternalVal("DEVICE","LASTInputDev",AttrVal("DEVICE","IODev",undef)),'ignoreRegexp','shellies/[^:"]+/command'); 'shellies/[^:"]+/command' =~ m{$old} ? $old : $old.'|shellies/[^:"]+/command' }
-option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef))),'ignoreRegexp','not_set');return 0}
+option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})),'ignoreRegexp','not_set');return 0}
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 
 
@@ -86,8 +86,8 @@ desc:Expands existing or adds a ignoreRegexp to the courrent IO device of device
 order:000002a
 farewell:template has been applied successfully. If you will not be redirected to IODev detail page, no changes have been made.<br>Check further extending the ignoreRegexp by yourself!
 par:IODEVNAME;Name of the IO-Device; { InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',''))) }
-par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef))),'ignoreRegexp','homeassistant/[^:"]+/config'); 'homeassistant/[^:"]+/config' =~ m/$old/ ? $old : $old.'|homeassistant/[^:"]+/config' }
-option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef))),'ignoreRegexp','not_set');return 0}
+par:NEWIGNOREREGEXP;NEWIGNOREREGEXP as set if homeassistant is included, otherwise it will be added;{ my $old = AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})),'ignoreRegexp','homeassistant/[^:"]+/config'); 'homeassistant/[^:"]+/config' =~ m/$old/ ? $old : $old.'|homeassistant/[^:"]+/config' }
+option:{return 1 if 'NEWIGNOREREGEXP' ne AttrVal(InternalVal('DEVICE','LASTInputDev',AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME})),'ignoreRegexp','not_set');return 0}
 attr IODEVNAME ignoreRegexp NEWIGNOREREGEXP
 { fhem "trigger $FW_wname JS:location.href='$FW_ME?detail=IODEVNAME'" if($cl && $cl->{TYPE} eq "FHEMWEB") }
 
@@ -980,7 +980,7 @@ order:A_01x
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 attr DEVICE readingList \
   TELETOPIC/LWT:.* LWT\
   TELETOPIC/STATE:.* { json2nameValue($EVENT,'',$JSONMAP) }\
@@ -1284,7 +1284,7 @@ order:A_02b
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:CALLSPEECHRECOGN;Set this to 0 to not set any speech recogn. related attributes;{ 1 } 
 par:BCKLGCMND;Send out configuration command via backlog?;{ 1 }
 par:ICON;ICON as set, defaults to fts_shutter_updown;{ AttrVal("DEVICE","icon","fts_shutter_updown") }
@@ -1333,7 +1333,7 @@ commands may need restart to take effect.\
 For calibration, use of more than one shutter device and further information on the available commands see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/</a>.
 farewell:template has been applied successfully. Now it's recommended to set shutter's open and close duration and 50% position, see short instruction in comment attribute or the <br><a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a>.
 attr DEVICE model tasmota_2ch_shutter_invert_1
-setreading DEVICE attrTemplateVersion 20210526
+setreading DEVICE attrTemplateVersion 20210607
 option:{ CALLSPEECHRECOGN } 
 set DEVICE attrTemplate speechcontrol_type_blind
 
@@ -1343,7 +1343,7 @@ name:tasmota_2ch_shutter_invert_0
 filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Configures a dual chanel tasmota device as shutter; needs some configuration of firmware compilation to operate, see <a href="https://tasmota.github.io/docs/Blinds-and-Shutters/">Tasmota wiki</a><br> and <a href="https://forum.fhem.de/index.php/topic,98366.msg917091.html#msg917091">Forum Thread</a><br>NOTE: This template will configure the shutter in Homematic-style with pct 100% = open. For ROLLO style device with pct 0% = open shutter. Use template tasmota_2ch_shutter_invert_1 instead. 
 order:A_02b1
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:BCKLGCMND;Send out configuration command via backlog?;{ 1 }
 set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 \BCKLGCMND=0
@@ -1353,7 +1353,7 @@ set IO_DEV publish CMNDTOPIC/Restart 1
 option:global
 attr DEVICE devStateIcon opening:fts_shutter_up@red closing:fts_shutter_down@red Online:10px-kreis-gruen Offline:10px-kreis-rot 100:fts_shutter_10 0:fts_shutter_100 9\d.*:fts_shutter_10 8\d.*:fts_shutter_20 7\d.*:fts_shutter_30 6\d.*:fts_shutter_40 5\d.*:fts_shutter_50 4\d.*:fts_shutter_60 3\d.*:fts_shutter_70 2\d.*:fts_shutter_80 1\d.*:fts_shutter_90 \b\d\b.*:fts_shutter_90
 attr DEVICE model tasmota_2ch_shutter_invert_0
-setreading DEVICE attrTemplateVersion 20210526
+setreading DEVICE attrTemplateVersion 20210607
 
 
 # tasmota 4ch as double shutter device.
@@ -1363,7 +1363,7 @@ desc:Configures a four channel tasmota device as two shutters; needs some additi
 order:A_02b2
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:BCKLGCMND;Send out configuration command via backlog?;{ 1 }
 set DEVICE attrTemplate tasmota_2ch_shutter_invert_1 \BCKLGCMND=0
 option:{BCKLGCMND}
@@ -1390,7 +1390,7 @@ attr DEVICE_CH2 readingList \
    STATTOPIC/SHUTTER2:.* state\
    STATTOPIC/SHUTTER2:.* pct
 attr DEVICE,DEVICE_CH2 model tasmota_4ch_two_shutters_invert_0
-setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210526
+setreading DEVICE,DEVICE_CH2 attrTemplateVersion 20210607
 set DEVICE,DEVICE_CH2 attrTemplate speechcontrol_type_blind
 
 # based on a proposal by twdotnet, https://forum.fhem.de/index.php/topic,94495.msg1137400.html#msg1137400
@@ -1411,7 +1411,7 @@ par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingL
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:SETCHANNELINFO;Set this to 0 to not set channelinfo;{ 1 }
 par:ICON;ICON as set, defaults to taster;{ AttrVal("DEVICE","icon","taster") }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 # autoconfigure device
 option:{RADIO_NO_TEMPLATE}
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SwitchMode1 SWITCHMODE1; SwitchMode2 SWITCHMODE2; SwitchMode3 SWITCHMODE3; SetOption26 1; SetOption114 1; SaveData 1
@@ -1455,7 +1455,7 @@ attr DEVICE_CH3 setList \
 option:{SETCHANNELINFO}
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model tasmota_shelly_i3
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210526
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20210607
 
 
 # sonoff 4 channel device flashed with Tasmota.
@@ -1503,7 +1503,7 @@ par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readi
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
 par:ICON;ICON as set, defaults to hue_filled_outlet;{ AttrVal("DEVICE","icon","hue_filled_outlet") }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:LONGITUDE;Read longitude set in FHEM;{ AttrVal("global","longitude","8.686")}
 par:LATITUDE;Read latitude set in FHEM;{ AttrVal("global","latitude","50.112")}
 par:ALTITUDE;Read altitude set in FHEM;{ AttrVal("global","altitude","0")}
@@ -1622,7 +1622,7 @@ set IO_DEV publish CMNDTOPIC/status
 set IO_DEV publish CMNDTOPIC/restart 1
 farewell:Template has been applied successfully. Wait some seconds for reboot to complete and watch readings get populated.
 attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB model tasmota_3socketUSB_channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB attrTemplateVersion 20210526
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_USB attrTemplateVersion 20210607
 
 
 # tasmota 4ch as one FHEM device.
@@ -1961,7 +1961,7 @@ order:A_05c
 attr DEVICE icon tuer_fenster_kontakt
 attr DEVICE jsonMap TuyaReceived_Cmnd:0 TuyaReceived_CmndData:0 TuyaReceived_Data:0
 attr DEVICE autocreate 0
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
@@ -1984,7 +1984,7 @@ attr DEVICE readingList \
 attr DEVICE stateFormat LWT\
 state
 attr DEVICE model tasmota_window_sensor_MC400A
-setreading DEVICE attrTemplateVersion 20210526
+setreading DEVICE attrTemplateVersion 20210607
 
 
 name:tasmota_set_lowercase_texts_and_state1
@@ -1992,7 +1992,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change ON, OFF etc. sent from tasmota side to lowercase. <br>After applying the template you might consider to delete or change stateFormat, eventMap and/or userReadings attribute values
 order:A_01z
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SaveData 1
 
 name:tasmota_set_uppercase_texts_and_state1
@@ -2000,7 +2000,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to all tasmota devices <br>NOTE: This template will change on, off etc. sent from tasmota side to uppercase. NOTE: this  template only exists for compability reasons to older MQTT implementations; not recommended for other user groups
 order:A_01z1
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 OFF; StateText2 ON; StateText3 TOGGLE; StateText4 HOLD; SetOption26 1
 attr DEVICE userReadings state:POWER1:.* { lc(ReadingsVal($name,"POWER1","")) }
 
@@ -2009,7 +2009,7 @@ filter:TYPE=MQTT2_DEVICE:FILTER=readingList=.*(tele|cmnd|stat).*
 desc:Applies to single relay tasmota devices <br>NOTE: this  template only exists for compability reasons to other HA solutions; not recommended for usage in FHEM context
 order:A_01z2
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/SetOption26 0
 attr DEVICE userReadings state:POWER:.* { lc(ReadingsVal($name,"POWER","")) }
 
@@ -2024,7 +2024,7 @@ farewell:template has been applied successfully. <br>Note: some changes have bee
 par:CMNDTOPIC;Command topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}cmnd$3" : undef }
 par:TELETOPIC;info topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}tele$3" : undef }
 par:STATTOPIC;ack topic prefix, without trailing /;{ AttrVal("DEVICE","readingList","") =~ m,([^:]*)\b(tele|cmnd|stat)(/.*)?/LWT:, ? "${1}stat$3" : undef }
-par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)) }
+par:IO_DEV;Currently used IO;{ AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}) }
 set IO_DEV publish CMNDTOPIC/Backlog StateText1 off; StateText2 on; StateText3 toggle; StateText4 hold; SetOption26 1; SetOption89 1; SetOption83 1; SaveData 1
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 attr DEVICE icon ICON
@@ -2053,7 +2053,7 @@ attr DEVICE devStateIcon Online:10px-kreis-gruen@green Offline:10px-kreis-rot@re
 set IO_DEV publish CMNDTOPIC/restart 1
 attr DEVICE model tasmota_zigbee2tasmota_bridge
 deletereading -q DEVICE (?!associatedWith).*
-setreading DEVICE attrTemplateVersion 20210526
+setreading DEVICE attrTemplateVersion 20210607
 { AttrTemplate_Initialize() }
 
 
@@ -3884,7 +3884,7 @@ desc:Use this with an OpenMQTTGateway. This template is meant to configure a bri
 order:X_02
 par:BASE_ID;BASE_ID typically is home;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/]O[^/]*M[^/]*G[^/]*[/].*:, ? $1 : undef }
 par:DEVNAME;DEVNAME typically contains OpenMQTTGateway;{ AttrVal("DEVICE","readingList","") =~ m,([^:]+)[/](O[^/]*M[^/]*G[^/]*)[/].*:, ? $2 : undef }
-par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)),'clientId','mosquitto') eq InternalVal('DEVICE','DEF','mosquitto') ? 'oMQTTgw_MCU' : InternalVal('DEVICE','DEF','mosquitto')}
+par:DEVCID;CID of the device as written in the DEF; { InternalVal(AttrVal('DEVICE','IODev',InternalVal('DEVICE','IODev',undef)->{NAME}),'clientId','mosquitto') eq InternalVal('DEVICE','DEF','mosquitto') ? 'oMQTTgw_MCU' : InternalVal('DEVICE','DEF','mosquitto')}
 par:ICON;ICON as set, defaults to MQTT;{ AttrVal("DEVICE","icon","mqtt") }
 deletereading -q DEVICE (?!associatedWith).*
 attr DEVICE bridgeRegexp\
@@ -3906,7 +3906,7 @@ LWT\
 attr DEVICE icon ICON
 attr DEVICE devStateIcon online:10px-kreis-gruen offline.*:10px-kreis-rot
 attr DEVICE model OpenMQTTGateway_MCU
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20210607
 { AttrTemplate_Initialize() }
 
 name:OpenMQTTGateway_BT_scanner
