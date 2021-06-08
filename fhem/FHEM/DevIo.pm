@@ -31,7 +31,7 @@ sub
 DevIo_getState($)
 {
   my ($hash) = @_;
-  return ReadingsVal($hash->{NAME}, "state", "")
+  return ReadingsVal($hash->{NAME}, "state", "disconnected")
 }
 
 ########################
