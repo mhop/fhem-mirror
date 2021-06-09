@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - feature  OpenWeatherMapAPI: add wind_gust
  - bugfix:  50_HP1000: change time format for Internal SYSTEMTIME_UTC
  - bugfix:  73_AutoShuttersControl: add multiple Condition
                                     for fixing shutter drives
