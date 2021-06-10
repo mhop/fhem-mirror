@@ -40,9 +40,9 @@ use warnings;
 use Math::Trig;
 use Time::Local qw(timelocal_nocheck);
 use List::Util qw(max min);
-use Scalar::Util qw( weaken );
-use GPUtils qw(GP_Import GP_Export);
-#eval { use FHEM::Core::Timer::Helper qw( addTimer removeTimer optimizeLOT ); 1 };
+use Scalar::Util qw(looks_like_number);
+use GPUtils qw(GP_Import);
+#use POSIX qw(strftime);
 use FHEM::Meta;
 use FHEM::Core::Timer::Register qw(:ALL);
 
@@ -58,10 +58,8 @@ BEGIN {
           DAYSECONDS
           HOURSECONDS
           MINUTESECONDS
-          sr_alt
           CommandAttr
           CommandModify
-          looks_like_number
           devspec2array
           notifyRegexpChanged
           deviceEvents
@@ -78,16 +76,16 @@ BEGIN {
           IsDisabled
           Log3
           InternalTimer
-          hms2h
-          h2hms_fmt
           FmtTime
           FmtDateTime
-          strftime
           perlSyntaxCheck
           EvalSpecials
           AnalyzePerlCommand
           AnalyzeCommandChain
           stacktrace
+          sr_alt
+          hms2h
+          h2hms_fmt
           )
     );
 }
@@ -227,9 +225,9 @@ sub Twilight_Notify {
     my $max = int(@{$events});
     my $ret = "";
     for (my $i = 0; $i < $max; $i++) {
-        my $s = $events->[$i];
-        $s = "" if(!defined($s));
-        my $found = ($wname =~ m/^$re$/x || "$wname:$s" =~ m/^$re$/sx);
+        my $s = $events->[$i] // q{''};
+        #$s = "" if(!defined($s));
+        my $found = ($wname =~ m{\A$re\z}x || "$wname:$s" =~ m{\A$re\z}sx);
 
         return Twilight_HandleWeatherData( $hash, 1) if $found;
     }
@@ -332,7 +330,7 @@ sub Twilight_HandleWeatherData {
         readingsBulkUpdate( $hash, 'sr_weather', $nextEventTime ) if $inNotify;
         readingsBulkUpdate( $hash, 'nextEventTime', $nextEventTime ) if $nextevent eq 'sr_weather';
     } elsif ( $sr_passed ) {
-        deleteSingleRegIntTimer( 'sr_weather', $hash, \&Twilight_fireEvent);
+        deleteSingleRegIntTimer( 'sr_weather', $hash );
         readingsBulkUpdate( $hash, 'sr_weather', $nextEventTime );
         if ( $nextevent eq 'sr_weather' ) {
             readingsBulkUpdate( $hash, 'nextEvent', 'ss_weather' ) ;
@@ -351,7 +349,7 @@ sub Twilight_HandleWeatherData {
         readingsBulkUpdate( $hash, 'ss_weather', $nextEventTime ) if $inNotify;
         readingsBulkUpdate( $hash, 'nextEventTime', $nextEventTime ) if $nextevent eq 'ss_weather' && !$ss_passed;
     } elsif ( $ss_passed ) {
-        deleteSingleRegIntTimer( 'ss_weather', $hash, \&Twilight_fireEvent );
+        deleteSingleRegIntTimer( 'ss_weather', $hash );
         readingsBulkUpdate( $hash, 'ss_weather', $nextEventTime );
         if ( $nextevent eq 'ss_weather' ) {
             readingsBulkUpdate( $hash, 'nextEvent', 'ss_indoor' ) ;
@@ -622,7 +620,7 @@ sub Twilight_TwilightTimes {
     for my $ereignis ( sort keys %{ $hash->{TW} } ) {
         next if ( $whitchTimes eq 'weather' && $ereignis !~ m{weather}x );
 
-        deleteSingleRegIntTimer( $ereignis, $hash, \&Twilight_fireEvent );
+        deleteSingleRegIntTimer( $ereignis, $hash );
         
         if ( defined $hash->{TW}{$ereignis}{TIME} && ($hash->{TW}{$ereignis}{TIME} > $now || $firstrun) ) { # had been > 0
             setRegIntTimer( $ereignis, $hash->{TW}{$ereignis}{TIME},
@@ -732,7 +730,8 @@ sub Twilight_getWeatherHorizon {
     my $weather_horizon = $result / 12.5; 
     $hash->{WEATHER_CORRECTION} = $weather_horizon if $setInternal;
     $weather_horizon += $hash->{INDOOR_HORIZON};
-    my $doy = strftime("%j",localtime);
+    #my $doy = strftime("%j",localtime);
+    my $doy = (localtime)[7]+1;
     my $declination =  0.4095*sin(0.016906*($doy-80.086));
     
     $weather_horizon = min( 89-$hash->{helper}{'.LATITUDE'}+$declination, $weather_horizon );
