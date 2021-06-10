@@ -118,6 +118,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "0.51.3" => "10.06.2021  more refactoring, add 'none' to graphicSelect ",
   "0.51.2" => "05.06.2021  minor fixes ",
   "0.51.1" => "04.06.2021  minor fixes ",
   "0.51.0" => "03.06.2021  some bugfixing, Calculation of PV correction factors refined, new setter plantConfiguration ".
@@ -286,8 +287,8 @@ my %hqtxt = (                                                                   
               DE => qq{Bitte geben Sie die Modulausrichtung mit "set LINK moduleDirection" an}                          },
   mta    => { EN => qq{Please specify the module tilt angle with "set LINK moduleTiltAngle"},
               DE => qq{Bitte geben Sie den Modulneigungswinkel mit "set LINK moduleTiltAngle" an}                       },
-  awd    => { EN => qq{Awaiting data from Solar Forecast devices ...},
-              DE => qq{Warten auf Daten von Solarvorhersagegeräten ...}                                                 },
+  awd    => { EN => qq{Waiting for solar forecast data ...},
+              DE => qq{Warten auf Solarvorhersagedaten ...}                                                             },
   strok  => { EN => qq{Congratulations &#128522, your string configuration checked without found errors !},
               DE => qq{Herzlichen Glückwunsch &#128522, Ihre String-Konfiguration wurde ohne gefundene Fehler geprüft!} },
   strnok => { EN => qq{Oh no &#128577, your string configuration is inconsistent.\nPlease check the settings of modulePeakString, moduleDirection, moduleTiltAngle !},
@@ -527,7 +528,7 @@ sub Initialize {
                                 "flowGraphicAnimate:1,0 ".
                                 "follow70percentRule:1,dynamic,0 ".
                                 "forcePageRefresh:1,0 ".
-                                "graphicSelect:both,flow,forecast ".                                     
+                                "graphicSelect:both,flow,forecast,none ".                                     
                                 "headerDetail:all,co,pv,pvco,statusLink ".
                                 "historyHour:slider,-23,-1,0 ".
                                 "hourCount:slider,4,1,24 ".
@@ -1034,7 +1035,7 @@ sub _setmoduleDirection {                ## no critic "not used"
   my $ret = createStringConfig ($hash);
   return $ret if($ret);
   
-  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);             # Anlagenkonfiguration File schreiben
+  writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -1127,6 +1128,7 @@ return;
 sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   my $paref = shift;
   my $hash  = $paref->{hash};
+  my $name  = $paref->{name};
   my $opt   = $paref->{opt};
   my $prop  = $paref->{prop} // return qq{no correction value specified};
   
@@ -1135,6 +1137,8 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
   if($prop eq "off") {
       deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
   }
+  
+   writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration sichern
 
 return;
 }
@@ -1777,6 +1781,7 @@ sub _savePlantConfig {
   my @pvconf;
   
   my @aconfigs = qw(
+                     pvCorrectionFactor_Auto
                      currentBatteryDev
                      currentForecastDev
                      currentInverterDev
@@ -1824,7 +1829,7 @@ sub centralTask {
   #deleteReadingspec ($hash, "moduleEfficiency");
   #deleteReadingspec ($hash, "RestOfDay_PV");
   #deleteReadingspec ($hash, "CurrentHourPVforecast");
-  #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast");
+  #deleteReadingspec ($hash, "NextHours_Sum00_PVforecast"); 
 
   my $interval = controlParams ($name); 
   
@@ -2042,14 +2047,21 @@ sub _additionalActivities {
           push @$daref, "LastHourPVreal<>".$pvrl."<>".$ts;
           
           $gcon = ReadingsNum($name, "Today_Hour24_GridConsumption", 0);
-          push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts;         
+          push @$daref, "LastHourGridconsumptionReal<>".$gcon."<>".$ts;
+
+          writeDataToFile ($hash, "plantconfig", $plantcfg.$name);                           # Anlagenkonfiguration sichern          
           
           deleteReadingspec ($hash, "Today_Hour.*_Grid.*");
           deleteReadingspec ($hash, "Today_Hour.*_PV.*");
           deleteReadingspec ($hash, "Today_Hour.*_Bat.*");
           deleteReadingspec ($hash, "powerTrigger_.*");
-          deleteReadingspec ($hash, "pvCorrectionFactor_.*_autocalc");
-          
+          if(ReadingsVal ($name, "pvCorrectionFactor_Auto", "off") eq "on") {
+              for my $n (1..24) {
+                  $n = sprintf "%02d", $n;
+                  deleteReadingspec ($hash, "pvCorrectionFactor_${n}.*");
+              }
+          }
+                  
           delete $hash->{HELPER}{INITCONTOTAL};
           delete $hash->{HELPER}{INITFEEDTOTAL};
           
@@ -3596,19 +3608,23 @@ sub entryGraphic {
   
   # Parameter f. Anzeige extrahieren
   ###################################   
-  my $width    = AttrNum ($name, 'beamWidth',           6);                                # zu klein ist nicht problematisch  
-  my $maxhours = AttrNum ($name, 'hourCount',          24);
-  my $colorw   = AttrVal ($name, 'weatherColor', 'FFFFFF');                                # Wetter Icon Farbe
+  my $width      = AttrNum ($name, 'beamWidth',           6);                              # zu klein ist nicht problematisch  
+  my $maxhours   = AttrNum ($name, 'hourCount',          24);
+  my $colorw     = AttrVal ($name, 'weatherColor', 'FFFFFF');                              # Wetter Icon Farbe
   
-  my $alias    = AttrVal ($name, "alias", $name);                                          # Linktext als Aliasname oder Devicename setzen
-  my $gsel     = AttrVal ($name, 'graphicSelect', 'both');                                 # Auswahl der anzuzeigenden Grafiken
-  my $dlink    = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
-    
+  my $alias      = AttrVal ($name, "alias", $name);                                        # Linktext als Aliasname oder Devicename setzen
+  my $gsel       = AttrVal ($name, 'graphicSelect', 'both');                               # Auswahl der anzuzeigenden Grafiken
+  my $dlink      = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
+
+  my $html_start = AttrVal ($name, 'htmlStart', undef);                                    # beliebige HTML Strings die vor der Grafik ausgegeben werden
+  my $html_end   = AttrVal ($name, 'htmlEnd',   undef);                                    # beliebige HTML Strings die nach der Grafik ausgegeben werden
+  my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
+  
   my $ret = q{};
   
-  return $ret if ($gsel eq "none");
+  # return $ret if ($gsel eq "none");
   
-  my $params = {
+  my $paref = {
       hash       => $hash,
       name       => $name,
       ftui       => $ftui,
@@ -3622,14 +3638,11 @@ sub entryGraphic {
       fcolor2    => AttrVal ($name,    'beam2FontColor',       '000000'),  
       beam1cont  => AttrVal ($name,    'beam1Content',     'pvForecast'),
       beam2cont  => AttrVal ($name,    'beam2Content',     'pvForecast'), 
-      icon       => AttrVal ($name,    'consumerAdviceIcon',      undef),
-      html_start => AttrVal ($name,    'htmlStart',               undef),                      # beliebige HTML Strings die vor der Grafik ausgegeben werden
-      html_end   => AttrVal ($name,    'htmlEnd',                 undef),                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
+      caicon     => AttrVal ($name,    'consumerAdviceIcon',      undef),                      # Consumer AdviceIcon
       lotype     => AttrVal ($name,    'layoutType',           'single'),
       kw         => AttrVal ($name,    'Wh/kWh',                   'Wh'),
       height     => AttrNum ($name,    'beamHeight',                200),
       width      => $width,
-      w          => $width * $maxhours,                                                        # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
       fsize      => AttrNum ($name,    'spaceSize',                  24),
       maxVal     => AttrNum ($name,    'maxValBeam',                  0),                      # dyn. Anpassung der Balkenhöhe oder statisch ?
       show_night => AttrNum ($name,    'showNight',                   0),                      # alle Balken (Spalten) anzeigen ?
@@ -3646,19 +3659,98 @@ sub entryGraphic {
   };
   
   if(IsDisabled($name)) {   
-      $ret      .= "<table class='roomoverview'>";
-      $ret      .= "<tr style='height:".$params->{height}."px'>";
-      $ret      .= "<td>";
-      $ret      .= qq{SolarForecast device <a href="$FW_ME$FW_subdir?detail=$name">$name</a> is disabled}; 
-      $ret      .= "</td>";
-      $ret      .= "</tr>";
-      $ret      .= "</table>";
+      $ret .= "<table class='roomoverview'>";
+      $ret .= "<tr style='height:".$paref->{height}."px'>";
+      $ret .= "<td>";
+      $ret .= qq{SolarForecast device <a href="$FW_ME$FW_subdir?detail=$name">$name</a> is disabled}; 
+      $ret .= "</td>";
+      $ret .= "</tr>";
+      $ret .= "</table>";
   } 
   else {
       $ret .= "<span>$dlink </span><br>"  if(AttrVal($name,"showLink",0));
-      $ret .= forecastGraphic ($params) if($gsel eq "both" || $gsel eq "forecast");
-      $ret .= "\n";
-      $ret .= flowGraphic     ($params) if($gsel eq "both" || $gsel eq "flow");
+      
+      $ret .= "<html>";
+      $ret .= $html_start if (defined($html_start));
+      $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
+      $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
+      $ret .= "<tr><td class='solarfc'>";
+      
+      # Headerzeile generieren 
+      ##########################  
+      my $header       = _graphicHeader ($paref);
+      $paref->{header} = $header;
+      
+      # Verbraucherlegende und Steuerung
+      ###################################           
+      my $legendtxt       = _graphicConsumerLegend ($paref);
+      $paref->{legendtxt} = $legendtxt;
+      
+      $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
+
+      if ($header) {                                                                                            # Header ausgeben 
+          $ret .= "<tr class='odd'>";                                                                           # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
+          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
+          $ret .= "</tr>";
+      }
+      
+      my $clegend = $paref->{clegend};
+      
+      if ($legendtxt && ($clegend eq 'top')) {
+          $ret .= "<tr class='odd'>";
+          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td>";
+          $ret .= "</tr>";
+      }
+                  
+      if($gsel eq "both" || $gsel eq "forecast") {
+          my %hfch;
+          my $hfcg  = \%hfch;                                                                           #(hfcg = hash forecast graphic)
+          
+          # Werte aktuelle Stunde
+          ########################## 
+          $paref->{hfcg}     = $hfcg;
+          $paref->{thishour} = _beamGraphicFirstHour ($paref);
+
+          # get consumer list and display it in Graphics
+          ################################################ 
+          _showConsumerInGraphicBeam ($paref);
+
+          # Werte restliche Stunden
+          ###########################
+          my $back         = _beamGraphicRemainingHours ($paref);
+          $paref->{maxVal} = $back->{maxVal};                                                           # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxCon} = $back->{maxCon};                                                                       
+          $paref->{maxDif} = $back->{maxDif};                                                           # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                           # für Typ diff
+
+          #Log3 ($hash,3,Dumper($hfcg));
+          
+          # Balkengrafik
+          ################
+          $ret .= _beamGraphic ($paref);   
+      }
+      
+      if($gsel eq "both" || $gsel eq "flow") {
+          $ret  .= "<tr class='even'>";
+          my $fg = _flowGraphic ($paref);
+          $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$fg</td>";
+          $ret  .= "</tr>";
+      }
+      
+      # Legende unten
+      #################
+      if ($legendtxt && ($clegend eq 'bottom')) {
+          $ret .= "<tr class='odd'>";
+          $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
+          $ret .= "$legendtxt</td></tr>";
+      }
+      
+      $ret .= "</table>";
+      
+      $ret .= "</td></tr>";
+      $ret .= "</table>";
+      $ret .= $html_end if (defined($html_end));
+      $ret .= "</html>";
   }
  
 return $ret;
@@ -3729,83 +3821,205 @@ sub _checkSetupComplete {
 return;
 }
 
-###############################################################################
-#                            Vorhersagegrafik
-###############################################################################
-sub forecastGraphic {                                 ## no critic 'complexity'
+################################################################
+#         forecastGraphic Headerzeile generieren 
+################################################################
+sub _graphicHeader {                                
+  my $paref  = shift;
+  my $header = $paref->{header};
+  
+  return if(!$header);
+  
+  my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
+  my $ftui      = $paref->{ftui};
+  my $lang      = $paref->{lang};
+  my $name      = $paref->{name};
+  my $hash      = $paref->{hash};
+  my $kw        = $paref->{kw};
+  my $dstyle    = $paref->{dstyle};                        # TD-Style
+       
+  my $lup       = ReadingsTimestamp ($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
+ 
+  my $pcfa      = ReadingsVal ($name,"pvCorrectionFactor_Auto",         "off");
+  my $co4h      = ReadingsNum ($name,"NextHours_Sum04_ConsumptionForecast", 0);
+  my $coRe      = ReadingsNum ($name,"RestOfDayConsumptionForecast",        0); 
+  my $coTo      = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",        0);
+  my $coCu      = ReadingsNum ($name,"Current_Consumption",                 0);
+  my $pv4h      = ReadingsNum ($name,"NextHours_Sum04_PVforecast",          0);
+  my $pvRe      = ReadingsNum ($name,"RestOfDayPVforecast",                 0); 
+  my $pvTo      = ReadingsNum ($name,"Tomorrow_PVforecast",                 0);
+  my $pvCu      = ReadingsNum ($name,"Current_PV",                          0);
+  
+  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
+  my ($pcf,$pcq) = split "/", $pvcorrf00;
+  my $pvcanz     = "factor: $pcf / quality: $pcq";
+  $pcq           =~ s/m/-1/xs;
+  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
+
+  if ($kw eq 'kWh') {
+      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
+      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
+      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
+      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
+      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
+      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
+      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
+      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
+  } 
+  else {
+      $co4h .= "&nbsp;Wh";
+      $coRe .= "&nbsp;Wh";
+      $coTo .= "&nbsp;Wh";
+      $coCu .= "&nbsp;W";
+      $pv4h .= "&nbsp;Wh";
+      $pvRe .= "&nbsp;Wh";
+      $pvTo .= "&nbsp;Wh";
+      $pvCu .= "&nbsp;W";
+  }
+  
+  my $lupt    = "last&nbsp;update:";
+  my $autoct  = "automatic&nbsp;correction:";
+  my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
+  my $lblPv4h = "next&nbsp;4h:";
+  my $lblPvRe = "remain&nbsp;today:";
+  my $lblPvTo = "tomorrow:";
+  my $lblPvCu = "actual:";
+ 
+  if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
+      $lupt    = "Stand:";
+      $autoct  = "automatische&nbsp;Korrektur:";
+      $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
+      $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
+      $lblPvRe = "Rest&nbsp;heute:";
+      $lblPvTo = "morgen:";
+      $lblPvCu = "aktuell:";
+  }
+  
+  ## Header Start
+  #################
+  $header = qq{<table width='100%'>}; 
+
+  # Header Link + Status + Update Button     
+  #########################################      
+  if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
+      my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
+      
+      $lup = "$year-$month-$day&nbsp;$time";
+      if($lang eq "DE") {
+         $lup = "$day.$month.$year&nbsp;$time"; 
+      }
+
+      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')"};               # Update Button generieren        
+
+      if ($ftui eq "ftui") {
+          $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
+      }
+
+      my $upstate = ReadingsVal($name, "state", "");
+
+      ## Update-Icon
+      ##############
+      my ($upicon,$img);
+      if ($upstate =~ /updated|successfully|switched/ix) {
+          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
+          $upicon = "<a onClick=$cmdupdate>$img</a>";
+      } 
+      elsif ($upstate =~ /running/ix) {
+          $img    = FW_makeImage('10px-kreis-gelb.png', 'running');
+          $upicon = "<a>$img</a>";
+      } 
+      elsif ($upstate =~ /initialized/ix) {
+          $img    = FW_makeImage('1px-spacer.png', 'initialized');
+          $upicon = "<a>$img</a>";
+      } 
+      else {
+          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang});
+          $upicon = "<a onClick=$cmdupdate>$img</a>";
+      }
+
+      ## Autokorrektur-Icon
+      ######################
+      my $acicon;
+      if ($pcfa eq "on") {
+          $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang});
+      } 
+      elsif ($pcfa eq "off") {
+          $acicon = "off";
+      } 
+      elsif ($pcfa =~ /standby/ix) {
+          my ($rtime) = $pcfa =~ /for (.*?) hours/x;
+          $img        = FW_makeImage('10px-kreis-gelb.png', $htitles{dela}{$lang});
+          $acicon     = "$img&nbsp;(Start in ".$rtime." h)";
+      } 
+      else {
+          $acicon = FW_makeImage('10px-kreis-rot.png', $htitles{undef}{$lang});
+      }
+      
+      ## Qualitäts-Icon
+      ######################
+      my $pcqicon;
+      
+      $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
+                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
+                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);              
+      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
+      
+
+      ## erste Header-Zeilen
+      #######################
+      my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
+      my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
+ 
+      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td>                                                         </td></tr>};
+      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b>        </b></td><td colspan="3" align="left" $dstyle> $autoct &nbsp;             $acicon </td><td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon </td></tr>};
+  }
+  
+  # Header Information pv 
+  ########################
+  if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
+      $header .= "<tr>";
+      $header .= "<td $dstyle><b>PV&nbsp;=></b></td>";
+      $header .= "<td $dstyle><b>$lblPvCu</b></td> <td align=right $dstyle>$pvCu</td>";
+      $header .= "<td $dstyle><b>$lblPv4h</b></td> <td align=right $dstyle>$pv4h</td>";
+      $header .= "<td $dstyle><b>$lblPvRe</b></td> <td align=right $dstyle>$pvRe</td>";
+      $header .= "<td $dstyle><b>$lblPvTo</b></td> <td align=right $dstyle>$pvTo</td>";  
+      $header .= "</tr>";
+  }
+  
+  
+  # Header Information co
+  ########################      
+  if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
+      $header .= "<tr>";
+      $header .= "<td $dstyle><b>CO&nbsp;=></b></td>";
+      $header .= "<td $dstyle><b>$lblPvCu</b></td><td align=right $dstyle>$coCu</td>";           
+      $header .= "<td $dstyle><b>$lblPv4h</b></td><td align=right $dstyle>$co4h</td>";
+      $header .= "<td $dstyle><b>$lblPvRe</b></td><td align=right $dstyle>$coRe</td>";
+      $header .= "<td $dstyle><b>$lblPvTo</b></td><td align=right $dstyle>$coTo</td>"; 
+      $header .= "</tr>"; 
+  }
+
+  $header .= qq{</table>};
+  
+return $header;
+}
+
+################################################################
+#    Consumer in forecastGraphic (Balken) anzeigen
+#    (Hat zur Zeit keine Wirkung !)
+################################################################
+sub _showConsumerInGraphicBeam {
   my $paref = shift;
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
-  my $ftui  = $paref->{ftui};
+  my $hfcg  = $paref->{hfcg};
   
   my $type  = $hash->{TYPE};
   
-  my %hfch;
-  my $hfcg  = \%hfch;                                                                               #(hfcg = hash forecast graphic)
-  
-  # Verbraucherlegende und Steuerung
-  ###################################           
-  my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
-  my ($clegendstyle, $clegend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
-  $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
-  $paref->{consumersref}       = \@consumers;
-  $paref->{clegend}            = $clegend;
-  $paref->{clegendstyle}       = $clegendstyle;
-  my $legendtxt                = _forecastGraphicConsumerLegend ($paref); 
-  
-  # Parameter f. Anzeige extrahieren
-  ###################################  
-  my $maxhours   =  $paref->{maxhours};
-  my $offset     =  $paref->{offset};
-  my $hourstyle  =  $paref->{hourstyle};
-  my $colorfc    =  $paref->{colorfc};
-  my $colorc     =  $paref->{colorc};
-  my $fcolor1    =  $paref->{fcolor1};
-  my $fcolor2    =  $paref->{fcolor2};    
-  my $beam1cont  =  $paref->{beam1cont};
-  my $beam2cont  =  $paref->{beam2cont}; 
-  my $icon       =  $paref->{icon};
-  my $html_start =  $paref->{html_start};                    # beliebige HTML Strings die vor der Grafik ausgegeben werden
-  my $html_end   =  $paref->{html_end};                      # beliebige HTML Strings die nach der Grafik ausgegeben werden
-  my $lotype     =  $paref->{lotype};
-  my $height     =  $paref->{height};
-  my $width      =  $paref->{width};                         # zu klein ist nicht problematisch
-  my $w          =  $paref->{w};                             # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
-  my $fsize      =  $paref->{fsize};
-  my $maxVal     =  $paref->{maxVal};                        # dyn. Anpassung der Balkenhöhe oder statisch ?
-  my $show_night =  $paref->{show_night};                    # alle Balken (Spalten) anzeigen ?
-  my $show_diff  =  $paref->{show_diff};                     # zusätzliche Anzeige $di{} in allen Typen
-  my $weather    =  $paref->{weather};
-  my $colorw     =  $paref->{colorw};                        # Wetter Icon Farbe
-  my $colorwn    =  $paref->{colorwn};                       # Wetter Icon Farbe Nacht
-  my $wlalias    =  $paref->{wlalias};
-  my $header     =  $paref->{header}; 
-  my $lang       =  $paref->{lang};
-  my $kw         =  $paref->{kw};
-  
-  $lotype        = 'single' if ($beam1cont eq $beam2cont);   # User Auswahl Layout überschreiben bei gleichen Beamcontent !
-  
-  # Icon Erstellung, mit @<Farbe> ergänzen falls einfärben
-  # Beispiel mit Farbe:  $icon = FW_makeImage('light_light_dim_100.svg@green');
- 
-  $icon = FW_makeImage($icon) if (defined($icon));
-
-  # Headerzeile generieren 
-  ##########################  
-  $header = _forecastGraphicHeader ($paref);
-
-  # Werte aktuelle Stunde
-  ########################## 
-  $paref->{hfcg} = $hfcg;
-  my $back       = _forecastGraphicFirstHour ($paref);
-  my $val1       = $back->{val1};
-  my $val2       = $back->{val2};
-  my $val3       = $back->{val3};
-  my $val4       = $back->{val4};
-  my $thishour   = $back->{thishour};
-
   # get consumer list and display it in Graphics
   ################################################ 
+  my @consumers = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};                          # definierte Verbraucher ermitteln
+  
   for (@consumers) {
       my ($itemName, undef) = split(':',$_);
       $itemName =~ s/^\s+|\s+$//gx;                                                              # trim it, if blanks were used
@@ -3853,9 +4067,233 @@ sub forecastGraphic {                                 ## no critic 'complexity'
           $_ .= ":24:24"; 
       }
   }
+  
+return;
+}
 
-  $maxVal    = !$maxVal ? $hfcg->{0}{beam1} : $maxVal;                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
+################################################################
+#         Verbraucherlegende und Steuerung 
+################################################################
+sub _graphicConsumerLegend {                                
+  my $paref                    = shift;
+  my $hash                     = $paref->{hash};
+  my $name                     = $paref->{name};
+  my $type                     = $hash->{TYPE};
+  my ($clegendstyle, $clegend) = split('_', AttrVal($name, 'consumerLegend', 'icon_top'));
+  my @consumers                = sort{$a<=>$b} keys %{$data{$type}{$name}{consumers}};              # definierte Verbraucher ermitteln
+  $clegend                     = '' if(($clegendstyle eq 'none') || (!int(@consumers)));
+  $paref->{clegend}            = $clegend;
+  
+  return if(!$clegend );
+  
+  my $ftui   = $paref->{ftui};
+  my $lang   = $paref->{lang};
+  my $dstyle = $paref->{dstyle};                        # TD-Style
+  
+  my $staticon;
+  
+  ## Tabelle Start
+  #################
+  my $ctable = qq{<table align='left' width='100%'>}; 
+  $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
+  
+  $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
+  $ctable   .= qq{<td>                                                        </td>};
+  $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
+  $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+  
+  my $cnum   = @consumers; 
+  if($cnum > 1) {
+      $ctable .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
+      $ctable .= qq{<td>                                                        </td>};
+      $ctable .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
+      $ctable .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
+  }
+  else {
+      my $blk  = '&nbsp;' x 8;
+      $ctable .= qq{<td $dstyle> $blk </td>};
+      $ctable .= qq{<td>         $blk </td>};
+      $ctable .= qq{<td $dstyle> $blk </td>};
+      $ctable .= qq{<td $dstyle> $blk </td>};   
+  }
+  
+  $ctable   .= qq{</tr>};
+  
+  my $modulo = 1;
+  my $tro    = 0;
+  
+  for my $c (@consumers) {          
+      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
+      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
+      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
+      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
+      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
+      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
+      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
+      
+      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
+      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
+      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
+      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
+      
+      if ($ftui eq "ftui") {
+          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
+          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
+          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
+          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"};                
+      }
+      
+      $cmdon      = q{} if(!$oncom);
+      $cmdoff     = q{} if(!$offcom);
+      $cmdautoon  = q{} if(!$autord); 
+      $cmdautooff = q{} if(!$autord); 
 
+      my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
+      my $swicon  = q{};
+      my $auicon  = q{};
+      
+      if($modulo % 2){
+          $ctable .= qq{<tr>};
+          $tro     = 1;
+      }
+      
+      if(!$auto) {
+          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
+          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
+      } 
+      
+      if ($auto) {
+          $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
+          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
+      }
+      
+      if ($cmdon && $swstate eq "off") {
+          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
+          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
+      } 
+      
+      if ($cmdoff && $swstate eq "on") {
+          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
+          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
+      }
+      
+      if ($clegendstyle eq 'icon') {                                                                   
+          $cicon   = FW_makeImage($cicon);
+          
+          $ctable .= "<td style='text-align:left'   $dstyle>$calias  </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$cicon   </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$swicon  </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$auicon  </td>";
+      } 
+      else {
+          my (undef,$co) = split('\@',$cicon);
+          $co      = '' if (!$co);                                                                        
+          
+          $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
+          $ctable .= "<td>                                                                   </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$swicon                          </td>";
+          $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
+      }
+      
+      if(!($modulo % 2)) {
+          $ctable .= qq{</tr>};
+          $tro     = 0;
+      }
+      
+      $modulo++;
+  }
+  
+  $ctable .= qq{</tr>} if($tro);
+  $ctable .= qq{</table>};
+  
+return $ctable;
+}
+
+################################################################
+#    Werte aktuelle Stunde für forecastGraphic
+################################################################
+sub _beamGraphicFirstHour {
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $hfcg      = $paref->{hfcg};
+  my $offset    = $paref->{offset};
+  my $hourstyle = $paref->{hourstyle};
+  my $beam1cont = $paref->{beam1cont};
+  my $beam2cont = $paref->{beam2cont};
+
+  my $day;
+
+  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
+  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+  my ($val1,$val2,$val3,$val4)         = (0,0,0,0);
+  
+  $thishour++;
+  
+  $hfcg->{0}{time_str} = $thishour;
+  $thishour            = int($thishour);                                                                    # keine führende Null
+
+  $hfcg->{0}{time}     = $thishour;
+  $hfcg->{0}{day_str}  = $day_str;
+  $day                 = int($day_str);
+  $hfcg->{0}{day}      = $day;
+  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                        # gleich die Unix Zeit dazu holen                                                
+
+  if ($offset) {
+      $hfcg->{0}{time} += $offset;
+
+      if ($hfcg->{0}{time} < 0) {
+          $hfcg->{0}{time}   += 24;
+          my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));       # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
+          $hfcg->{0}{day}     = int($n_day);
+          $hfcg->{0}{day_str} = $n_day;
+      }
+
+      $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
+      
+      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvfc",  0);
+      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
+      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
+      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "confc", 0);
+
+      # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
+      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "weatherid", undef);
+  }
+  else {
+      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
+      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvrl",  0);
+      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, "gcons", 0);
+      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, "confc", 0);
+
+      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
+      #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
+  }
+
+  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
+  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
+  $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
+
+return ($thishour);
+}
+
+################################################################
+#    Werte restliche Stunden für forecastGraphic
+################################################################
+sub _beamGraphicRemainingHours {
+  my $paref     = shift;
+  my $hash      = $paref->{hash};
+  my $hfcg      = $paref->{hfcg};
+  my $offset    = $paref->{offset};
+  my $maxhours  = $paref->{maxhours};
+  my $hourstyle = $paref->{hourstyle};
+  my $beam1cont = $paref->{beam1cont};
+  my $beam2cont = $paref->{beam2cont};
+  my $maxVal    = $paref->{maxVal};                                                                     # dyn. Anpassung der Balkenhöhe oder statisch ?
+
+  $maxVal  //= $hfcg->{0}{beam1};                                                                       # Startwert wenn kein Wert bereits via attr vorgegeben ist
+
+  my ($val1,$val2,$val3,$val4);
+  
   my $maxCon = $hfcg->{0}{beam1};                                                                       
   my $maxDif = $hfcg->{0}{diff};                                                                        # für Typ diff
   my $minDif = $hfcg->{0}{diff};                                                                        # für Typ diff
@@ -3915,42 +4353,65 @@ sub forecastGraphic {                                 ## no critic 'complexity'
 
       $maxVal = $hfcg->{$i}{beam1} if ($hfcg->{$i}{beam1} > $maxVal); 
       $maxCon = $hfcg->{$i}{beam2} if ($hfcg->{$i}{beam2} > $maxCon);
-      $maxDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff} > $maxDif);
-      $minDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff} < $minDif);
+      $maxDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff}  > $maxDif);
+      $minDif = $hfcg->{$i}{diff}  if ($hfcg->{$i}{diff}  < $minDif);
   }
 
-  #Log3 ($hash,3,Dumper($hfcg));
+  my $back = {
+      maxVal => $maxVal,
+      maxCon => $maxCon,
+      maxDif => $maxDif,
+      minDif => $minDif,
+  };
+
+return ($back);
+}
+
+################################################################
+#    Balkenausgabe für forecastGraphic
+################################################################
+sub _beamGraphic {
+  my $paref      = shift;
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my $hfcg       = $paref->{hfcg};
+  my $header     = $paref->{header}; 
+  my $maxhours   = $paref->{maxhours};
+  my $legendtxt  = $paref->{legendtxt};
+  my $weather    = $paref->{weather};
+  my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
+  my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
+  my $colorw     = $paref->{colorw};                         # Wetter Icon Farbe
+  my $colorwn    = $paref->{colorwn};                        # Wetter Icon Farbe Nacht
+  my $lotype     = $paref->{lotype};
+  my $height     = $paref->{height};
+  my $fsize      = $paref->{fsize};
+  my $kw         = $paref->{kw};
+  my $width      = $paref->{width};
+  my $colorfc    = $paref->{colorfc};
+  my $colorc     = $paref->{colorc};
+  my $fcolor1    = $paref->{fcolor1};
+  my $fcolor2    = $paref->{fcolor2}; 
+  my $offset     = $paref->{offset};
+  my $thishour   = $paref->{thishour};
+  my $maxVal     = $paref->{maxVal};                         # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  my $maxCon     = $paref->{maxCon};                                                                       
+  my $maxDif     = $paref->{maxDif};                                                           
+  my $minDif     = $paref->{minDif}; 
+  my $beam1cont  = $paref->{beam1cont};
+  my $beam2cont  = $paref->{beam2cont};
   
-  # Tabellen Ausgabe erzeugen
-  ######################################
- 
+  $lotype        = 'single' if ($beam1cont eq $beam2cont);   # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
   # Die Tabelle ist recht schmal angelegt, aber nur so lassen sich Umbrüche erzwingen
   
   my ($val,$z2,$z3,$z4,$he);
-  my $ret = "";
-
-  $ret  = "<html>";
-  $ret .= $html_start if (defined($html_start));
-  $ret .= "<style>TD.solarfc {text-align: center; padding-left:1px; padding-right:1px; margin:0px;}</style>";
-  $ret .= "<table class='roomoverview' width='$w' style='width:".$w."px'><tr class='devTypeTr'></tr>";
-  $ret .= "<tr><td class='solarfc'>";
-  $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
-
-  if ($header) {                                                                                            # Header ausgeben 
-      $ret .= "<tr class='odd'>";
-      # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td></tr>";
-  }
-
-  if ($legendtxt && ($clegend eq 'top')) {
-      $ret .= "<tr class='odd'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td></tr>";
-  }
+  my $ret;
 
   if ($weather) {
-      $ret .= "<tr class='even'><td class='solarfc'></td>";                                               # freier Platz am Anfang
+      $ret .= "<tr class='even'><td class='solarfc'></td>";                                                # freier Platz am Anfang
 
       my $ii;
       for my $i (0..($maxhours*2)-1) {
@@ -3969,7 +4430,7 @@ sub forecastGraphic {                                 ## no critic 'complexity'
               $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
               $val        = FW_makeImage($icon_name);
 
-              if ($val eq $icon_name) {                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+              if ($val eq $icon_name) {                                                                     # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
                   $val = '<b>???<b/>';                                                       
                   Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
@@ -3979,40 +4440,40 @@ sub forecastGraphic {                                 ## no critic 'complexity'
           } 
           else { 
               $ret .= "<td></td>";  
-              $hfcg->{$i}{weather} = undef;                                                  # ToDo : prüfen ob noch nötig
+              $hfcg->{$i}{weather} = undef;                                                                 # ToDo : prüfen ob noch nötig
           }
       }
 
-      $ret .= "<td class='solarfc'></td></tr>";                                              # freier Platz am Ende der Icon Zeile
+      $ret .= "<td class='solarfc'></td></tr>";                                                             # freier Platz am Ende der Icon Zeile
   }
 
-  if($show_diff eq 'top') {                                                                  # Zusätzliche Zeile Ertrag - Verbrauch
-      $ret .= "<tr class='even'><td class='solarfc'></td>";                                  # freier Platz am Anfang
+  if($show_diff eq 'top') {                                                                                 # Zusätzliche Zeile Ertrag - Verbrauch
+      $ret .= "<tr class='even'><td class='solarfc'></td>";                                                 # freier Platz am Anfang
       my $ii;
-      for my $i (0..($maxhours*2)-1) {                                                       # gleiche Bedingung wie oben
+      for my $i (0..($maxhours*2)-1) {                                                                      # gleiche Bedingung wie oben
           next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-          $ii++;                                                                             # wieviele Stunden haben wir bisher angezeigt ?
-          last if ($ii > $maxhours);                                                         # vorzeitiger Abbruch
+          $ii++;                                                                                            # wieviele Stunden haben wir bisher angezeigt ?
+          last if ($ii > $maxhours);                                                                        # vorzeitiger Abbruch
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val; # negative Zahlen in Fettschrift, 0 aber ohne +
+          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val;                # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
-      $ret .= "<td class='solarfc'></td></tr>";                                              # freier Platz am Ende 
+      $ret .= "<td class='solarfc'></td></tr>";                                                             # freier Platz am Ende 
   }
 
-  $ret .= "<tr class='even'><td class='solarfc'></td>";                                      # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='even'><td class='solarfc'></td>";                                                     # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
   
-  for my $i (0..($maxhours*2)-1) {                                                           # gleiche Bedingung wie oben
+  for my $i (0..($maxhours*2)-1) {                                                                          # gleiche Bedingung wie oben
       next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
       $ii++;
       last if ($ii > $maxhours);
 
       # Achtung Falle, Division by Zero möglich, 
       # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
-      $height = 200 if (!$height);                                                           # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $height = 200 if (!$height);                                                                          # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
       $maxVal = 1   if (!int $maxVal);
       $maxCon = 1   if (!$maxCon);
 
@@ -4232,425 +4693,24 @@ sub forecastGraphic {                                 ## no critic 'complexity'
 
       $ret     .= "<tr class='even'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
       $ret     .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
-      $thishour = 99 if ($hfcg->{$i}{time} == $thishour);                                               # nur einmal verwenden !
-      $ret     .="</td></tr></table></td>";                                                   
+      
+      if($hfcg->{$i}{time} == $thishour) {
+          $thishour = 99;                                                                               # nur einmal verwenden !
+      }
+      
+      $ret .="</td></tr></table></td>";                                                   
   }
 
-  $ret .= "<td class='solarfc'></td></tr>";
-
-  # Legende unten
-  #################
-  if ($legendtxt && ($clegend eq 'bottom')) {
-      $ret .= "<tr class='odd'>";
-      $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
-      $ret .= "$legendtxt</td></tr>";
-  }
-
-  $ret .=  "</table></td></tr></table>";
-  $ret .= $html_end if (defined($html_end));
-  $ret .= "</html>";
+  $ret .= "<td class='solarfc'></td>";
+  $ret .= "</tr>";
 
 return $ret;
 }
 
 ################################################################
-#         forecastGraphic Headerzeile generieren 
-################################################################
-sub _forecastGraphicHeader {                                
-  my $paref  = shift;
-  my $header = $paref->{header};
-  
-  return if(!$header);
-  
-  my $hdrDetail = $paref->{hdrDetail};                     # ermöglicht den Inhalt zu begrenzen, um bspw. passgenau in ftui einzubetten
-  my $ftui      = $paref->{ftui};
-  my $lang      = $paref->{lang};
-  my $name      = $paref->{name};
-  my $hash      = $paref->{hash};
-  my $kw        = $paref->{kw};
-  my $dstyle    = $paref->{dstyle};                        # TD-Style
-       
-  my $lup       = ReadingsTimestamp ($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
- 
-  my $pcfa      = ReadingsVal ($name,"pvCorrectionFactor_Auto",         "off");
-  my $co4h      = ReadingsNum ($name,"NextHours_Sum04_ConsumptionForecast", 0);
-  my $coRe      = ReadingsNum ($name,"RestOfDayConsumptionForecast",        0); 
-  my $coTo      = ReadingsNum ($name,"Tomorrow_ConsumptionForecast",        0);
-  my $coCu      = ReadingsNum ($name,"Current_Consumption",                 0);
-  my $pv4h      = ReadingsNum ($name,"NextHours_Sum04_PVforecast",          0);
-  my $pvRe      = ReadingsNum ($name,"RestOfDayPVforecast",                 0); 
-  my $pvTo      = ReadingsNum ($name,"Tomorrow_PVforecast",                 0);
-  my $pvCu      = ReadingsNum ($name,"Current_PV",                          0);
-  
-  my $pvcorrf00  = NexthoursVal($hash, "NextHour00", "pvcorrf", "-/m");
-  my ($pcf,$pcq) = split "/", $pvcorrf00;
-  my $pvcanz     = "factor: $pcf / quality: $pcq";
-  $pcq           =~ s/m/-1/xs;
-  my $pvfc00     =  NexthoursVal($hash, "NextHour00", "pvforecast", undef);
-
-  if ($kw eq 'kWh') {
-      $co4h = sprintf("%.1f" , $co4h/1000)."&nbsp;kWh";
-      $coRe = sprintf("%.1f" , $coRe/1000)."&nbsp;kWh";
-      $coTo = sprintf("%.1f" , $coTo/1000)."&nbsp;kWh";
-      $coCu = sprintf("%.1f" , $coCu/1000)."&nbsp;kW";
-      $pv4h = sprintf("%.1f" , $pv4h/1000)."&nbsp;kWh";
-      $pvRe = sprintf("%.1f" , $pvRe/1000)."&nbsp;kWh";
-      $pvTo = sprintf("%.1f" , $pvTo/1000)."&nbsp;kWh";
-      $pvCu = sprintf("%.1f" , $pvCu/1000)."&nbsp;kW";
-  } 
-  else {
-      $co4h .= "&nbsp;Wh";
-      $coRe .= "&nbsp;Wh";
-      $coTo .= "&nbsp;Wh";
-      $coCu .= "&nbsp;W";
-      $pv4h .= "&nbsp;Wh";
-      $pvRe .= "&nbsp;Wh";
-      $pvTo .= "&nbsp;Wh";
-      $pvCu .= "&nbsp;W";
-  }
-  
-  my $lupt    = "last&nbsp;update:";
-  my $autoct  = "automatic&nbsp;correction:";
-  my $lbpcq   = "correction&nbsp;quality&nbsp;current&nbsp;hour:";      
-  my $lblPv4h = "next&nbsp;4h:";
-  my $lblPvRe = "remain&nbsp;today:";
-  my $lblPvTo = "tomorrow:";
-  my $lblPvCu = "actual:";
- 
-  if($lang eq "DE") {                                                                           # Header globales Sprachschema Deutsch
-      $lupt    = "Stand:";
-      $autoct  = "automatische&nbsp;Korrektur:";
-      $lbpcq   = encode("utf8", "Korrekturqualität&nbsp;akt.&nbsp;Stunde:");          
-      $lblPv4h = encode("utf8", "nächste&nbsp;4h:");
-      $lblPvRe = "Rest&nbsp;heute:";
-      $lblPvTo = "morgen:";
-      $lblPvCu = "aktuell:";
-  }
-  
-  ## Header Start
-  #################
-  $header = qq{<table width='100%'>}; 
-
-  # Header Link + Status + Update Button     
-  #########################################      
-  if($hdrDetail eq "all" || $hdrDetail eq "statusLink") {
-      my ($year, $month, $day, $time) = $lup =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
-      
-      $lup = "$year-$month-$day&nbsp;$time";
-      if($lang eq "DE") {
-         $lup = "$day.$month.$year&nbsp;$time"; 
-      }
-
-      my $cmdupdate = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=get $name data')"};               # Update Button generieren        
-
-      if ($ftui eq "ftui") {
-          $cmdupdate = qq{"ftui.setFhemStatus('get $name data')"};     
-      }
-
-      my $upstate = ReadingsVal($name, "state", "");
-
-      ## Update-Icon
-      ##############
-      my ($upicon,$img);
-      if ($upstate =~ /updated|successfully|switched/ix) {
-          $img    = FW_makeImage('10px-kreis-gruen.png', $htitles{upd}{$lang});
-          $upicon = "<a onClick=$cmdupdate>$img</a>";
-      } 
-      elsif ($upstate =~ /running/ix) {
-          $img    = FW_makeImage('10px-kreis-gelb.png', 'running');
-          $upicon = "<a>$img</a>";
-      } 
-      elsif ($upstate =~ /initialized/ix) {
-          $img    = FW_makeImage('1px-spacer.png', 'initialized');
-          $upicon = "<a>$img</a>";
-      } 
-      else {
-          $img    = FW_makeImage('10px-kreis-rot.png', $htitles{upd}{$lang});
-          $upicon = "<a onClick=$cmdupdate>$img</a>";
-      }
-
-      ## Autokorrektur-Icon
-      ######################
-      my $acicon;
-      if ($pcfa eq "on") {
-          $acicon = FW_makeImage('10px-kreis-gruen.png', $htitles{on}{$lang});
-      } 
-      elsif ($pcfa eq "off") {
-          $acicon = "off";
-      } 
-      elsif ($pcfa =~ /standby/ix) {
-          my ($rtime) = $pcfa =~ /for (.*?) hours/x;
-          $img        = FW_makeImage('10px-kreis-gelb.png', $htitles{dela}{$lang});
-          $acicon     = "$img&nbsp;(Start in ".$rtime." h)";
-      } 
-      else {
-          $acicon = FW_makeImage('10px-kreis-rot.png', $htitles{undef}{$lang});
-      }
-      
-      ## Qualitäts-Icon
-      ######################
-      my $pcqicon;
-      
-      $pcqicon = $pcq < 3 ? FW_makeImage('10px-kreis-rot.png',  $pvcanz) :  
-                 $pcq < 5 ? FW_makeImage('10px-kreis-gelb.png', $pvcanz) :  
-                 FW_makeImage('10px-kreis-gruen.png', $pvcanz);              
-      $pcqicon = "-" if(!$pvfc00 || $pcq == -1);
-      
-
-      ## erste Header-Zeilen
-      #######################
-      my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
-      my $dlink = qq{<a href="$FW_ME$FW_subdir?detail=$name">$alias</a>}; 
- 
-      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b> $dlink </b></td><td colspan="3" align="left" $dstyle> $lupt   &nbsp; $lup &nbsp; $upicon </td><td>                                                         </td></tr>};
-      $header  .= qq{<tr><td colspan="3" align="left" $dstyle><b>        </b></td><td colspan="3" align="left" $dstyle> $autoct &nbsp;             $acicon </td><td colspan="3" align="left" $dstyle> $lbpcq &nbsp; $pcqicon </td></tr>};
-  }
-  
-  # Header Information pv 
-  ########################
-  if($hdrDetail eq "all" || $hdrDetail eq "pv" || $hdrDetail eq "pvco") {   
-      $header .= "<tr>";
-      $header .= "<td $dstyle><b>PV&nbsp;=></b></td>";
-      $header .= "<td $dstyle><b>$lblPvCu</b></td> <td align=right $dstyle>$pvCu</td>";
-      $header .= "<td $dstyle><b>$lblPv4h</b></td> <td align=right $dstyle>$pv4h</td>";
-      $header .= "<td $dstyle><b>$lblPvRe</b></td> <td align=right $dstyle>$pvRe</td>";
-      $header .= "<td $dstyle><b>$lblPvTo</b></td> <td align=right $dstyle>$pvTo</td>";  
-      $header .= "</tr>";
-  }
-  
-  
-  # Header Information co
-  ########################      
-  if($hdrDetail eq "all" || $hdrDetail eq "co" || $hdrDetail eq "pvco") {
-      $header .= "<tr>";
-      $header .= "<td $dstyle><b>CO&nbsp;=></b></td>";
-      $header .= "<td $dstyle><b>$lblPvCu</b></td><td align=right $dstyle>$coCu</td>";           
-      $header .= "<td $dstyle><b>$lblPv4h</b></td><td align=right $dstyle>$co4h</td>";
-      $header .= "<td $dstyle><b>$lblPvRe</b></td><td align=right $dstyle>$coRe</td>";
-      $header .= "<td $dstyle><b>$lblPvTo</b></td><td align=right $dstyle>$coTo</td>"; 
-      $header .= "</tr>"; 
-  }
-
-  $header .= qq{</table>};
-  
-return $header;
-}
-
-################################################################
-#         Verbraucherlegende und Steuerung 
-################################################################
-sub _forecastGraphicConsumerLegend {                                
-  my $paref   = shift;
-  my $clegend = $paref->{clegend};
- 
-  return if(!$clegend );
-  
-  my $consumersref = $paref->{consumersref};
-  my $hash         = $paref->{hash};
-  my $name         = $paref->{name};
-  my $ftui         = $paref->{ftui};
-  my $clegendstyle = $paref->{clegendstyle};
-  my $lang         = $paref->{lang};
-  my $dstyle       = $paref->{dstyle};                        # TD-Style
-  
-  my $staticon;
-  
-  ## Tabelle Start
-  #################
-  my $ctable = qq{<table align='left' width='100%'>}; 
-  $ctable   .= qq{<tr style='font-weight:bold; text-align:center'>};
-  
-  $ctable   .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
-  $ctable   .= qq{<td>                                                        </td>};
-  $ctable   .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
-  $ctable   .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
-  
-  my $cnum   = @{$consumersref}; 
-  if($cnum > 1) {
-      $ctable .= qq{<td style='text-align:left' $dstyle> $htitles{cnsm}{$lang}  </td>};
-      $ctable .= qq{<td>                                                        </td>};
-      $ctable .= qq{<td $dstyle>                         $htitles{eiau}{$lang}  </td>};
-      $ctable .= qq{<td $dstyle>                         $htitles{auto}{$lang}  </td>};
-  }
-  else {
-      my $blk  = '&nbsp;' x 8;
-      $ctable .= qq{<td $dstyle> $blk </td>};
-      $ctable .= qq{<td>         $blk </td>};
-      $ctable .= qq{<td $dstyle> $blk </td>};
-      $ctable .= qq{<td $dstyle> $blk </td>};   
-  }
-  
-  $ctable   .= qq{</tr>};
-  
-  my $modulo = 1;
-  my $tro    = 0;
-  
-  for my $c (@{$consumersref}) {          
-      my $cname      = ConsumerVal ($hash, $c, "name",        "");                                  # Name des Consumerdevices
-      my $calias     = ConsumerVal ($hash, $c, "alias",   $cname);                                  # Alias des Consumerdevices
-      my $cicon      = ConsumerVal ($hash, $c, "icon",        "");                                  # Icon des Consumerdevices     
-      my $oncom      = ConsumerVal ($hash, $c, "oncom",       "");                                  # Consumer Einschaltkommando
-      my $offcom     = ConsumerVal ($hash, $c, "offcom",      "");                                  # Consumer Ausschaltkommando
-      my $autord     = ConsumerVal ($hash, $c, "autoreading", "");                                  # Readingname f. Automatiksteuerung
-      my $auto       = ConsumerVal ($hash, $c, "auto",         1);                                  # Automatic Mode
-      
-      my $cmdon      = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $oncom')"};
-      my $cmdoff     = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction set $cname $offcom')"};
-      my $cmdautoon  = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 1')"};
-      my $cmdautooff = qq{"FW_cmd('$FW_ME$FW_subdir?XHR=1&cmd=set $name consumerAction setreading $cname $autord 0')"};
-      
-      if ($ftui eq "ftui") {
-          $cmdon      = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $oncom')"};
-          $cmdoff     = qq{"ftui.setFhemStatus('set $name consumerAction set $cname $offcom')"};
-          $cmdautoon  = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 1')"};  
-          $cmdautooff = qq{"ftui.setFhemStatus('set $name consumerAction set $cname setreading $cname $autord 0')"};                
-      }
-      
-      $cmdon      = q{} if(!$oncom);
-      $cmdoff     = q{} if(!$offcom);
-      $cmdautoon  = q{} if(!$autord); 
-      $cmdautooff = q{} if(!$autord); 
-
-      my $swstate = ConsumerVal ($hash, $c, "state", "undef");                                        # Schaltzustand des Consumerdevices
-      my $swicon  = q{};
-      my $auicon  = q{};
-      
-      if($modulo % 2){
-          $ctable .= qq{<tr>};
-          $tro     = 1;
-      }
-      
-      if(!$auto) {
-          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
-          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
-      } 
-      
-      if ($auto) {
-          $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
-          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
-      }
-      
-      if ($cmdon && $swstate eq "off") {
-          $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
-          $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>"; 
-      } 
-      
-      if ($cmdoff && $swstate eq "on") {
-          $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});  
-          $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
-      }
-      
-      if ($clegendstyle eq 'icon') {                                                                   
-          $cicon   = FW_makeImage($cicon);
-          
-          $ctable .= "<td style='text-align:left'   $dstyle>$calias  </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$cicon   </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$swicon  </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$auicon  </td>";
-      } 
-      else {
-          my (undef,$co) = split('\@',$cicon);
-          $co      = '' if (!$co);                                                                        
-          
-          $ctable .= "<td style='text-align:left'   $dstyle><font color='$co'>$calias </font></td>";
-          $ctable .= "<td>                                                                   </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$swicon                          </td>";
-          $ctable .= "<td style='text-align:center' $dstyle>$auicon                          </td>";
-      }
-      
-      if(!($modulo % 2)) {
-          $ctable .= qq{</tr>};
-          $tro     = 0;
-      }
-      
-      $modulo++;
-  }
-  
-  $ctable .= qq{</tr>} if($tro);
-  $ctable .= qq{</table>};
-  
-return $ctable;
-}
-
-################################################################
-#    Werte aktuelle Stunde für forecastGraphic
-################################################################
-sub _forecastGraphicFirstHour {
-  my $paref     = shift;
-  my $hash      = $paref->{hash};
-  my $hfcg      = $paref->{hfcg};
-  my $offset    = $paref->{offset};
-  my $hourstyle = $paref->{hourstyle};
-  my $beam1cont = $paref->{beam1cont};
-  my $beam2cont = $paref->{beam2cont};
-
-  my $day;
-
-  my $t                                = NexthoursVal ($hash, "NextHour00", "starttime", '0000-00-00 24');
-  my ($year,$month,$day_str,$thishour) = $t =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
-  my ($val1,$val2,$val3,$val4)         = (0,0,0,0);
-  
-  $thishour++;
-  
-  $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour);                                                                    # keine führende Null
-
-  $hfcg->{0}{time}     = $thishour;
-  $hfcg->{0}{day_str}  = $day_str;
-  $day                 = int($day_str);
-  $hfcg->{0}{day}      = $day;
-  $hfcg->{0}{mktime}   = fhemTimeLocal(0,0,$thishour,$day,int($month)-1,$year-1900);                        # gleich die Unix Zeit dazu holen                                                
-
-  if ($offset) {
-      $hfcg->{0}{time} += $offset;
-
-      if ($hfcg->{0}{time} < 0) {
-          $hfcg->{0}{time}   += 24;
-          my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));       # Achtung : Tageswechsel - day muss jetzt neu berechnet werden !
-          $hfcg->{0}{day}     = int($n_day);
-          $hfcg->{0}{day_str} = $n_day;
-      }
-
-      $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time});
-      
-      $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvfc",  0);
-      $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "pvrl",  0);
-      $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "gcons", 0);
-      $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "confc", 0);
-
-      # $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
-      $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, "weatherid", undef);
-  }
-  else {
-      $val1 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvfc",  0);
-      $val2 = CircularVal ($hash, $hfcg->{0}{time_str}, "pvrl",  0);
-      $val3 = CircularVal ($hash, $hfcg->{0}{time_str}, "gcons", 0);
-      $val4 = CircularVal ($hash, $hfcg->{0}{time_str}, "confc", 0);
-
-      $hfcg->{0}{weather} = CircularVal ($hash, $hfcg->{0}{time_str}, "weatherid", undef);
-      #$val4   = (ReadingsVal($name,"ThisHour_IsConsumptionRecommended",'no') eq 'yes' ) ? $icon : undef;
-  }
-
-  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
-  $hfcg->{0}{beam1}    = ($beam1cont eq 'pvForecast') ? $val1 : ($beam1cont eq 'pvReal') ? $val2 : ($beam1cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{beam2}    = ($beam2cont eq 'pvForecast') ? $val1 : ($beam2cont eq 'pvReal') ? $val2 : ($beam2cont eq 'gridconsumption') ? $val3 : $val4;
-  $hfcg->{0}{diff}     = $hfcg->{0}{beam1} - $hfcg->{0}{beam2};
-  
-  my $back = {
-      val1     => $val1,
-      val2     => $val2,
-      val3     => $val3,
-      val4     => $val4,
-      thishour => $thishour,
-  };
-
-return ($back);
-}
-
-################################################################
 #                  Energieflußgrafik
 ################################################################
-sub flowGraphic {
+sub _flowGraphic {
   my $paref    = shift;
   my $name     = $paref->{name};
   my $flowgh   = $paref->{flowgh};
@@ -4700,10 +4760,14 @@ sub flowGraphic {
 
   my $grid_color   = $cgfi ? 'green' : 'red'; 
   $grid_color      = 'gray' if (!$cgfi && !$cgc && $batout);                                    # dritte Farbe
-
-  my $ret = qq{
-      <table class="roomoverview">
-      <tr><td><table class="block"><tr align="center" class="odd"><td>
+  
+  my $ret;
+  #$ret .= qq{<table class="roomoverview">};
+  #$ret .= qq{<tr><td>};
+  #$ret .= qq{<table class="block"><tr align="center" class="odd">};
+  #$ret .= qq{<td>};
+  
+  $ret .= qq{
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="5 15 380 380" style="$style" id="SVGPLOT">
       <style>$animation</style>
       <g transform="translate(200,50)">
@@ -4787,7 +4851,11 @@ sub flowGraphic {
       $ret .= qq{<text id="pv-bat-txt"    x="390" y="245" style="fill: #ccc; font-size: $fs; text-anchor: start;">$batin</text>}  if ($batin);
   }
 
-  $ret .= qq{</g></svg></td></tr></table></td></tr></table>};
+  $ret .= qq{</g></svg>};
+  #$ret .= qq{</td></tr>};
+  #$ret .= qq{</table>};
+  #$ret .= qq{</td></tr>};
+  #$ret .= qq{</table>};
       
 return $ret;
 }
@@ -4994,7 +5062,7 @@ sub calcPVforecast {
   my $cloudcover = NexthoursVal ($hash, "NextHour".sprintf("%02d",$num), "cloudcover", 0);            # effektive Wolkendecke nächste Stunde X
   my $ccf        = 1 - ((($cloudcover - $cloud_base)/100) * $clouddamp/100);                          # Cloud Correction Faktor mit Steilheit und Fußpunkt
   
-  my $range      = calcCloudRange ($cloudcover);                                                      # V 0.50.1                                                           # Range errechnen
+  my $range      = calcRange ($cloudcover);                                                           # V 0.50.1                                                           # Range errechnen
 
   ## Ermitteln des relevanten Autokorrekturfaktors
   if ($uac eq "on") {                                                                                 # Autokorrektur soll genutzt werden
@@ -5143,8 +5211,8 @@ sub calcVariance {
   
   $idts = timestringToTimestamp ($idts);
 
-  if($t - $idts < 86400) {
-      my $rmh = sprintf "%.1f", ((86400 - ($t - $idts)) / 3600);
+  if($t - $idts < 7200) {
+      my $rmh = sprintf "%.1f", ((7200 - ($t - $idts)) / 3600);
       Log3 ($name, 4, "$name - Variance calculation in standby. It starts in $rmh hours."); 
       readingsSingleUpdate($hash, "pvCorrectionFactor_Auto", "on (remains in standby for $rmh hours)", 0); 
       return;      
@@ -5261,7 +5329,7 @@ sub calcAvgFromHistory {
           return;
       }
            
-      my $range = calcCloudRange ($chwcc);                                                 # V 0.50.1       
+      my $range = calcRange ($chwcc);                                                      # V 0.50.1       
       
       Log3 ($name, 4, "$name - cloudiness range of day/hour $day/$hour is: $range");
       
@@ -5276,7 +5344,7 @@ sub calcAvgFromHistory {
               next;
           }  
         
-          $histwcc = calcCloudRange ($histwcc);                                            # V 0.50.1       
+          $histwcc = calcRange ($histwcc);                                                 # V 0.50.1       
 
           if($range == $histwcc) {               
               $pvrl  += HistoryVal ($hash, $dayfa, $hour, "pvrl", 0);
@@ -5307,9 +5375,9 @@ return;
 }
 
 ################################################################
-#                 Bewölkungsrange berechnen
+#            Bewölkungs- bzw. Regenrange berechnen
 ################################################################
-sub calcCloudRange {
+sub calcRange {
   my $range = shift;
   
   $range = sprintf("%.0f", $range/10); 
@@ -6607,8 +6675,8 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
       <li><b>pvCorrectionFactor_Auto &lt;on | off&gt; </b> <br><br>  
       
       Schaltet die automatische Vorhersagekorrektur ein/aus. <br>
-      Ist die Automatik eingeschaltet, wird nach einer Mindestlaufzeit von FHEM bzw. des Moduls von 24 Stunden für jede Stunde 
-      ein Korrekturfaktor der Solarvorhersage berechnet und intern dauerhaft gespeichert.
+      Ist die Automatik eingeschaltet, wird für jede Stunde ein Korrekturfaktor der Solarvorhersage berechnet und intern 
+      gespeichert.
       Dazu wird die tatsächliche Energieerzeugung mit dem vorhergesagten Wert des aktuellen Tages und Stunde verglichen, 
       die Korrekturwerte historischer Tage unter Berücksichtigung der Bewölkung einbezogen und daraus ein neuer Korrekturfaktor 
       abgeleitet. Es werden nur historische Daten mit gleicher Bewölkungsrange einbezogen. <br>
@@ -7009,8 +7077,9 @@ Ein/Ausschaltzeiten sowie deren Ausführung vom SolarForecast Modul übernehmen 
          <table>  
          <colgroup> <col width=15%> <col width=85%> </colgroup>
             <tr><td> <b>flow</b>       </td><td>zeigt die Energieflußgrafik an                          </td></tr>
-            <tr><td> <b>forecast</b>   </td><td>zeigt die Verhersagegrafik an                           </td></tr>
+            <tr><td> <b>forecast</b>   </td><td>zeigt die Vorhersagegrafik an                           </td></tr>
             <tr><td> <b>both</b>       </td><td>zeigt Energiefluß- und Vorhersagegrafik an (default)    </td></tr>
+            <tr><td> <b>none</b>       </td><td>es wird keine Grafik angezeigt                          </td></tr>
          </table>
          </ul> 
        </li>
