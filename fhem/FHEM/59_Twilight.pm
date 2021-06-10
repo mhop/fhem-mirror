@@ -355,8 +355,10 @@ sub Twilight_HandleWeatherData {
             readingsBulkUpdate( $hash, 'nextEvent', 'ss_indoor' ) ;
             readingsBulkUpdate( $hash, 'nextEventTime', FmtTime( $hash->{TW}{ss_indoor}{TIME} ) ) ;
             readingsBulkUpdate( $hash, 'aktEvent', 'ss_weather' );
-            readingsBulkUpdate( $hash, 'state', '8' );
-            readingsBulkUpdate( $hash, 'light', '4' );
+            #readingsBulkUpdate( $hash, 'state', '8' );
+            #readingsBulkUpdate( $hash, 'light', '4' );
+            readingsBulkUpdate( $hash, 'state', '7' );
+            readingsBulkUpdate( $hash, 'light', '5' );
         }
     }
 
