@@ -163,7 +163,7 @@ if($cmd eq 'queue') {
 	   return qq($topic $payload);
     }
 }
-
+if($cmd eq 'snoozeAlarm') {return qq($topic ).sonos2mqtt_command('AVTransportService.SnoozeAlarm','InstanceID',0,'Duration',$payload) }
 #if($cmd eq 'test') {Log 1, "Das Device $NAME hat ausgeloest, die uuid ist >$uuid< der Befehl war >$cmd< der Teil danach sah so aus: $payload"}
 if($cmd eq 'test') {Log 1, (split(' ', $EVENT,3))[2]}
 if($cmd eq 'x_raw_payload') {return qq($topic $payload)}
@@ -266,6 +266,9 @@ if ($devspec eq 'a:model=sonos2mqtt_bridge'){
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Favorites:.* Favorites');
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Reply:.* Reply');
    sonos2mqtt_mod_list($devspec,'getList','Reply:Favorites,Radios,Playlists Reply'.q( {sonos2mqtt($NAME,$EVENT)}));
+   sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,'devicetopic','sonos').'/alarms:.* Alarms');
+   sonos2mqtt_mod_list($devspec,'getList','listalarms:noArg Alarms $DEVICETOPIC/cmd/listalarm');
+   sonos2mqtt_mod_list($devspec,'setList','setalarm:textField $DEVICETOPIC/cmd/setalarm');
    return undef
 }
 
@@ -285,6 +288,9 @@ for (devspec2array($devspec)) {
     if (grep {/$mn/} @tv) {sonos2mqtt_mod_list($_,'setList','input:Queue,TV'.q( {sonos2mqtt($NAME,$EVENT)}))}
     if (grep {/$mn/} @line) {sonos2mqtt_mod_list($_,'setList','input:Queue,Line_In'.q( {sonos2mqtt($NAME,$EVENT)}))}
     sonos2mqtt_mod_list($_,'setList','joinGroup:'.ReadingsVal($bridge,'grouplist','').q( {sonos2mqtt($NAME,$EVENT)}));
+    sonos2mqtt_mod_list($_,'setList','alarm:textField { sonos2mqtt_alarm($NAME,$EVENT) }');
+    sonos2mqtt_mod_list($_,'setList','snoozeAlarm:textField { sonos2mqtt($NAME,$EVENT) }');
+    sonos2mqtt_mod_list($_,'readingList','$DEVICETOPIC/status/(.*)/avtransport:.* { sonos2mqtt_reading($NAME,$EVENT,$TOPIC) }');
 #    sonos2mqtt_mod_list($_,'setList','playFav:'.ReadingsVal($bridge,'favlist','').q( {sonos2mqtt($NAME,$EVENT)}));
     fhem("set $_ volumeUp; set $_ volumeDown"); # trick to initiate the userReadings 
   }
@@ -396,12 +402,92 @@ my $acmd = shift // return 'error';
    return encode_json {'command' => 'adv-command','input' => {%h_input}};
 }
 
+ ####### handle alarms
+#
+# syntax:
+# set SonosBridge listalarms
+# set Speaker alarm enable|disable|update all|id[,id]|json
+#
+#######
+sub sonos2mqtt_alarm 
+{
+use JSON;
+my ($NAME,$EVENT)=@_;
+my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
+my $alarms = ReadingsVal($bridge,'Alarms','');
+my $decoded = decode_json(ReadingsVal($bridge,'Alarms',''));
+my @array=@{$decoded};
+# part using with bridge
+if ($NAME eq $bridge) {
+  my @speakers = devspec2array('a:model=sonos2mqtt_speaker');
+    foreach my $speaker (@speakers) {
+      my @ids;
+      my @als;
+      for (@array) {
+        if (ReadingsVal($speaker,'uuid','') eq $_->{'RoomUUID'}) {
+          push @ids, $_->{'ID'} ;
+          push @als, to_json($_);
+	    }
+      }
+      my $AlarmListIDs = join ",", @ids;
+      my $AlarmList = join ",", @als;
+      if ($AlarmListIDs) {
+         fhem("setreading $speaker AlarmListIDs $AlarmListIDs")
+         } else {fhem("deletereading $speaker AlarmListIDs")}
+      if ($AlarmList) {
+         fhem("setreading $speaker AlarmList $AlarmList")
+         } else {fhem("deletereading $speaker AlarmList")}
+    }
+  return '';
+ }
+# part using with speakers
+my @arr = split(' ',$EVENT);
+my $cmd = lc shift @arr;
+if ($cmd eq 'alarm') {
+   my $acmd = lc shift @arr;
+   my $ids = shift @arr //return 'all|id[,id]|json missing, usage alarm enable|disable|update all|id[,id]|json';
+   my %t=('enable'=>'true','disable'=>'false');
+   if ($acmd eq 'update') {
+      fhem(qq(set $bridge setalarm $ids));
+      return '';
+   } elsif ($acmd eq 'enable' or $acmd eq 'disable') {
+       if ($ids eq "all") { $ids = ReadingsVal($NAME,"AlarmListIDs","")}
+       for (split ',',$ids) {
+         fhem(qq(set $bridge setalarm {"ID":$_,"Enabled":$t{$acmd}}));
+       }
+     return '';
+   }
+ } else {return 'usage alarm enable|disable|update all|id[,id]|json'}
+}
+
+sub sonos2mqtt_reading
+{
+my ($NAME,$EVENT,$TOPIC)=@_;
+my $uuid = ReadingsVal($NAME,'uuid','');
+my $player = lc( ReadingsVal($NAME,'name','') );
+$TOPIC =~ m,.*/status/(.*)/avtransport,;
+if ( $1 eq $uuid or $1 eq $player ) { 
+    my %hash;
+    if ($EVENT =~ m/"AlarmRunning":(true|false)/) {$hash{"AlarmRunning"}=$1}
+    if ($EVENT =~ m/"SleepTimerGeneration":(\d+)/) {$hash{"SleepTimerGeneration"}=$1}
+    if ($EVENT =~ m/"SnoozeRunning":(true|false)/) {$hash{"SnoozeRunning"}=$1}
+    return \%hash
+  }
+}
+
+
 1;
 =pod
+=item summary    generic MQTT2 Sonos Devices based on sonos2mqtt.
+=item summary_DE generische MQTT2 Sonos Ger&#228;te auf Basis von sonos2mqtt
 =begin html
+
 Some Subroutines for generic MQTT2 Sonos Devices based on sonos2mqtt.
+
 =end html
 =begin html_DE
-Enthaelt einige Subroutinen fuer generische MQTT2 Sonos Geraete auf Basis von sonos2mqtt.
+
+Enthaelt einige Subroutinen fuer generische MQTT2 Sonos Ger&#228;te auf Basis von sonos2mqtt.
+
 =end html_DE
 =cut

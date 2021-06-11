@@ -61,8 +61,9 @@ return '/custom_command '.$ret
 1;
 =pod
 =item summary    generic MQTT2 Xiaomi Roborock Devices rooted with valetudo RE
-=item summary_DE generische MQTT2 Xiaomi Roborock Devices gerootet mit valetudo RE
+=item summary_DE generische MQTT2 Xiaomi Roborock Ger&#228;t gerootet mit valetudo RE
 =begin html
+
 Some Subroutines for generic MQTT2 Xiaomi Roborock Devices rooted with valetudo RE.
 <a id="MQTT2 Xiaomi Roborock"></a>
 <h3>MQTT2 Xiaomi Roborock</h3>
@@ -79,8 +80,11 @@ Some Subroutines for generic MQTT2 Xiaomi Roborock Devices rooted with valetudo 
   </ul>
   <br>
 </ul>
+
 =end html
 =begin html_DE
-Enthaelt einige Subroutinen fuer generische MQTT2 Xiaomi Roborock Devices gerootet mit valetudo RE.
+
+Enthaelt einige Subroutinen fuer generische MQTT2 Xiaomi Roborock Ger&#228;te gerootet mit valetudo RE.
+
 =end html_DE
 =cut
