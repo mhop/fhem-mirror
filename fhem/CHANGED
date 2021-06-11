@@ -1,5 +1,6 @@
-# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
+﻿# Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it. 
+ - change:  60_allergy: removed deprecated extended API
  - feature  OpenWeatherMapAPI: add wind_gust
  - bugfix:  50_HP1000: change time format for Internal SYSTEMTIME_UTC
  - bugfix:  73_AutoShuttersControl: add multiple Condition
