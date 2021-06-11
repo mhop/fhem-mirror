@@ -256,6 +256,11 @@ my %hattr = (                                                                # H
   consumer => { fn => \&_attrconsumer },
 );
 
+my %htr = (                                                                  # Hash even/odd für <tr>
+  0 => { cl => 'even' },
+  1 => { cl => 'odd' },
+);
+
 my %hff = (                                                                                           # Flächenfaktoren 
   "0"  => { N => 100, NE => 100, E => 100, SE => 100, S => 100, SW => 100, W => 100, NW => 100 },     # http://www.ing-büro-junge.de/html/photovoltaik.html
   "10" => { N => 90,  NE => 93,  E => 100, SE => 105, S => 107, SW => 105, W => 100, NW => 93  },
@@ -3605,7 +3610,6 @@ sub entryGraphic {
   $hash->{HELPER}{SPGROOM}   = $FW_room   ? $FW_room   : "";                               # Raum aus dem das SolarForecastSPG-Device die Funktion aufrief
   $hash->{HELPER}{SPGDETAIL} = $FW_detail ? $FW_detail : "";                               # Name des SolarForecastSPG-Devices (wenn Detailansicht)
 
-  
   # Parameter f. Anzeige extrahieren
   ###################################   
   my $width      = AttrNum ($name, 'beamWidth',           6);                              # zu klein ist nicht problematisch  
@@ -3620,15 +3624,12 @@ sub entryGraphic {
   my $html_end   = AttrVal ($name, 'htmlEnd',   undef);                                    # beliebige HTML Strings die nach der Grafik ausgegeben werden
   my $w          = $width * $maxhours;                                                     # gesammte Breite der Ausgabe , WetterIcon braucht ca. 34px
   
-  my $ret = q{};
-  
-  # return $ret if ($gsel eq "none");
-  
   my $paref = {
       hash       => $hash,
       name       => $name,
       ftui       => $ftui,
       maxhours   => $maxhours,
+      modulo     => 1,
       dstyle     => qq{style='padding-left: 10px; padding-right: 10px; padding-top: 3px; padding-bottom: 3px;'},     # TD-Style
       offset     => AttrNum ($name,    'historyHour',                 0),
       hourstyle  => AttrVal ($name,    'hourStyle',                  ''),
@@ -3657,6 +3658,8 @@ sub entryGraphic {
       flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
       flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
   };
+  
+  my $ret = q{};
   
   if(IsDisabled($name)) {   
       $ret .= "<table class='roomoverview'>";
@@ -3687,24 +3690,32 @@ sub entryGraphic {
       $paref->{legendtxt} = $legendtxt;
       
       $ret .= "\n<table class='block'>";                                                                        # das \n erleichtert das Lesen der debug Quelltextausgabe
-
+      my $m = $paref->{modulo} % 2;
+      
       if ($header) {                                                                                            # Header ausgeben 
-          $ret .= "<tr class='odd'>";                                                                           # mit einem extra <td></td> ein wenig mehr Platz machen, ergibt i.d.R. weniger als ein Zeichen
+          $ret .= "<tr class='$htr{$m}{cl}'>";                                                                  
           $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$header</td>";
           $ret .= "</tr>";
+          
+          $paref->{modulo}++;
       }
       
       my $clegend = $paref->{clegend};
+      $m          = $paref->{modulo} % 2;
       
       if ($legendtxt && ($clegend eq 'top')) {
-          $ret .= "<tr class='odd'>";
+          $ret .= "<tr class='$htr{$m}{cl}'>";
           $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$legendtxt</td>";
           $ret .= "</tr>";
+          
+          $paref->{modulo}++;
       }
+      
+      $m = $paref->{modulo} % 2;
                   
       if($gsel eq "both" || $gsel eq "forecast") {
           my %hfch;
-          my $hfcg  = \%hfch;                                                                           #(hfcg = hash forecast graphic)
+          my $hfcg  = \%hfch;                                                                                   #(hfcg = hash forecast graphic)
           
           # Werte aktuelle Stunde
           ########################## 
@@ -3718,10 +3729,10 @@ sub entryGraphic {
           # Werte restliche Stunden
           ###########################
           my $back         = _beamGraphicRemainingHours ($paref);
-          $paref->{maxVal} = $back->{maxVal};                                                           # Startwert wenn kein Wert bereits via attr vorgegeben ist
+          $paref->{maxVal} = $back->{maxVal};                                                                  # Startwert wenn kein Wert bereits via attr vorgegeben ist
           $paref->{maxCon} = $back->{maxCon};                                                                       
-          $paref->{maxDif} = $back->{maxDif};                                                           # für Typ diff
-          $paref->{minDif} = $back->{minDif};                                                           # für Typ diff
+          $paref->{maxDif} = $back->{maxDif};                                                                  # für Typ diff
+          $paref->{minDif} = $back->{minDif};                                                                  # für Typ diff
 
           #Log3 ($hash,3,Dumper($hfcg));
           
@@ -3730,17 +3741,23 @@ sub entryGraphic {
           $ret .= _beamGraphic ($paref);   
       }
       
+      $m = $paref->{modulo} % 2;
+      
       if($gsel eq "both" || $gsel eq "flow") {
-          $ret  .= "<tr class='even'>";
+          $ret  .= "<tr class='$htr{$m}{cl}'>";
           my $fg = _flowGraphic ($paref);
           $ret  .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>$fg</td>";
           $ret  .= "</tr>";
+          
+          $paref->{modulo}++;
       }
+      
+      $m = $paref->{modulo} % 2;
       
       # Legende unten
       #################
       if ($legendtxt && ($clegend eq 'bottom')) {
-          $ret .= "<tr class='odd'>";
+          $ret .= "<tr class='$htr{$m}{cl}'>";
           $ret .= "<td colspan='".($maxhours+2)."' align='center' style='word-break: normal'>";
           $ret .= "$legendtxt</td></tr>";
       }
@@ -4375,9 +4392,7 @@ sub _beamGraphic {
   my $hash       = $paref->{hash};
   my $name       = $paref->{name};
   my $hfcg       = $paref->{hfcg};
-  my $header     = $paref->{header}; 
   my $maxhours   = $paref->{maxhours};
-  my $legendtxt  = $paref->{legendtxt};
   my $weather    = $paref->{weather};
   my $show_night = $paref->{show_night};                     # alle Balken (Spalten) anzeigen ?
   my $show_diff  = $paref->{show_diff};                      # zusätzliche Anzeige $di{} in allen Typen
@@ -4394,14 +4409,14 @@ sub _beamGraphic {
   my $fcolor2    = $paref->{fcolor2}; 
   my $offset     = $paref->{offset};
   my $thishour   = $paref->{thishour};
-  my $maxVal     = $paref->{maxVal};                         # Startwert wenn kein Wert bereits via attr vorgegeben ist
+  my $maxVal     = $paref->{maxVal};                         
   my $maxCon     = $paref->{maxCon};                                                                       
   my $maxDif     = $paref->{maxDif};                                                           
   my $minDif     = $paref->{minDif}; 
   my $beam1cont  = $paref->{beam1cont};
   my $beam2cont  = $paref->{beam2cont};
   
-  $lotype        = 'single' if ($beam1cont eq $beam2cont);   # User Auswahl Layout überschreiben bei gleichen Beamcontent !
+  $lotype        = 'single' if ($beam1cont eq $beam2cont);                                                       # User Auswahl Layout überschreiben bei gleichen Beamcontent !
 
   # Wenn Table class=block alleine steht, zieht es bei manchen Styles die Ausgabe auf 100% Seitenbreite
   # lässt sich durch einbetten in eine zusätzliche Table roomoverview eindämmen
@@ -4409,71 +4424,78 @@ sub _beamGraphic {
   
   my ($val,$z2,$z3,$z4,$he);
   my $ret;
+  
+  my $m = $paref->{modulo} % 2;
 
   if ($weather) {
-      $ret .= "<tr class='even'><td class='solarfc'></td>";                                                # freier Platz am Anfang
+      $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                              # freier Platz am Anfang
 
       my $ii;
       for my $i (0..($maxhours*2)-1) {
-
           last if (!exists($hfcg->{$i}{weather}));
-          next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-          # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
-          $ii++;                                                                                            # wieviele Stunden Icons haben wir bisher beechnet  ?
+          next if (!$show_night  && defined($hfcg->{$i}{weather}) 
+                                 && ($hfcg->{$i}{weather} > 99) 
+                                 && !$hfcg->{$i}{beam1} 
+                                 && !$hfcg->{$i}{beam2});
+                                                                                                                 # Lässt Nachticons aber noch durch wenn es einen Wert gibt , ToDo : klären ob die Nacht richtig gesetzt wurde
+          $ii++;                                                                                                 # wieviele Stunden Icons haben wir bisher beechnet  ?
           last if ($ii > $maxhours);
-
-          # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
+                                                                                                                 # ToDo : weather_icon sollte im Fehlerfall Title mit der ID besetzen um in FHEMWEB sofort die ID sehen zu können
           if (exists($hfcg->{$i}{weather}) && defined($hfcg->{$i}{weather})) {
               my ($icon_name, $title) = $hfcg->{$i}{weather} > 100 ? weather_icon($hfcg->{$i}{weather}-100) : weather_icon($hfcg->{$i}{weather});
               Log3 ($name, 4, "$name - unknown weather id: ".$hfcg->{$i}{weather}.", please inform the maintainer") if($icon_name eq 'unknown');
-
+                  
               $icon_name .= ($hfcg->{$i}{weather} < 100 ) ? '@'.$colorw  : '@'.$colorwn;
               $val        = FW_makeImage($icon_name);
 
-              if ($val eq $icon_name) {                                                                     # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
+              if ($val eq $icon_name) {                                                                          # passendes Icon beim User nicht vorhanden ! ( attr web iconPath falsch/prüfen/update ? )
                   $val = '<b>???<b/>';                                                       
                   Log3 ($name, 2, qq{$name - the icon $hfcg->{$i}{weather} not found. Please check attribute "iconPath" of your FHEMWEB instance and/or update your FHEM software});
               }
               
-              $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";   # title -> Mouse Over Text
-              # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
+              $ret .= "<td title='$title' class='solarfc' width='$width' style='margin:1px; vertical-align:middle align:center; padding-bottom:1px;'>$val</td>";
           } 
-          else { 
+          else {                                                                                                 # mit $hfcg->{$i}{weather} = undef kann man unten leicht feststellen ob für diese Spalte bereits ein Icon ausgegeben wurde oder nicht
               $ret .= "<td></td>";  
-              $hfcg->{$i}{weather} = undef;                                                                 # ToDo : prüfen ob noch nötig
+              $hfcg->{$i}{weather} = undef;                                                                      # ToDo : prüfen ob noch nötig
           }
       }
 
-      $ret .= "<td class='solarfc'></td></tr>";                                                             # freier Platz am Ende der Icon Zeile
+      $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende der Icon Zeile
   }
 
-  if($show_diff eq 'top') {                                                                                 # Zusätzliche Zeile Ertrag - Verbrauch
-      $ret .= "<tr class='even'><td class='solarfc'></td>";                                                 # freier Platz am Anfang
+  if($show_diff eq 'top') {                                                                                      # Zusätzliche Zeile Ertrag - Verbrauch
+      $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";
       my $ii;
-      for my $i (0..($maxhours*2)-1) {                                                                      # gleiche Bedingung wie oben
-          next if (!$show_night  && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
-          $ii++;                                                                                            # wieviele Stunden haben wir bisher angezeigt ?
-          last if ($ii > $maxhours);                                                                        # vorzeitiger Abbruch
+      for my $i (0..($maxhours*2)-1) {                                                                           # gleiche Bedingung wie oben
+          next if (!$show_night && ($hfcg->{$i}{weather} > 99) 
+                                && !$hfcg->{$i}{beam1} 
+                                && !$hfcg->{$i}{beam2});
+          $ii++;                                                                                                 # wieviele Stunden haben wir bisher angezeigt ?
+          last if ($ii > $maxhours);                                                                             # vorzeitiger Abbruch
 
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
-          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val;                # negative Zahlen in Fettschrift, 0 aber ohne +
+          $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val>0) ? '+'.$val : $val;                     # negative Zahlen in Fettschrift, 0 aber ohne +
           $ret .= "<td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td>"; 
       }
-      $ret .= "<td class='solarfc'></td></tr>";                                                             # freier Platz am Ende 
+      $ret .= "<td class='solarfc'></td></tr>";                                                                  # freier Platz am Ende 
   }
 
-  $ret .= "<tr class='even'><td class='solarfc'></td>";                                                     # Neue Zeile mit freiem Platz am Anfang
+  $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc'></td>";                                                  # Neue Zeile mit freiem Platz am Anfang
 
   my $ii = 0;
   
-  for my $i (0..($maxhours*2)-1) {                                                                          # gleiche Bedingung wie oben
-      next if (!$show_night  && defined($hfcg->{$i}{weather}) && ($hfcg->{$i}{weather} > 99) && !$hfcg->{$i}{beam1} && !$hfcg->{$i}{beam2});
+  for my $i (0..($maxhours*2)-1) {                                                                               # gleiche Bedingung wie oben
+      next if (!$show_night && defined($hfcg->{$i}{weather}) 
+                            && ($hfcg->{$i}{weather} > 99) 
+                            && !$hfcg->{$i}{beam1} 
+                            && !$hfcg->{$i}{beam2});
       $ii++;
       last if ($ii > $maxhours);
 
       # Achtung Falle, Division by Zero möglich, 
       # maxVal kann gerade bei kleineren maxhours Ausgaben in der Nacht leicht auf 0 fallen  
-      $height = 200 if (!$height);                                                                          # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
+      $height = 200 if (!$height);                                                                               # Fallback, sollte eigentlich nicht vorkommen, außer der User setzt es auf 0
       $maxVal = 1   if (!int $maxVal);
       $maxCon = 1   if (!$maxCon);
 
@@ -4492,26 +4514,26 @@ sub _beamGraphic {
           # z3 - der Verbrauch , bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
           # z2 und z3 nach Bedarf tauschen, wenn der Verbrauch größer als der Ertrag ist
 
-          $maxVal = $maxCon if ($maxCon > $maxVal);                                         # wer hat den größten Wert ?
+          $maxVal = $maxCon if ($maxCon > $maxVal);                                                              # wer hat den größten Wert ?
 
-          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                    # Beam1 oben , Beam2 unten
+          if ($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                         # Beam1 oben , Beam2 unten
               $z2 = $hfcg->{$i}{beam1}; $z3 = $hfcg->{$i}{beam2}; 
           } 
-          else {                                                                            # tauschen, Verbrauch ist größer als Ertrag
+          else {                                                                                                 # tauschen, Verbrauch ist größer als Ertrag
               $z3 = $hfcg->{$i}{beam1}; $z2 = $hfcg->{$i}{beam2}; 
           }
 
           $he = int(($maxVal-$z2)/$maxVal*$height);
           $z2 = int(($z2 - $z3)/$maxVal*$height);
 
-          $z3 = int($height - $he - $z2);                                                   # was von maxVal noch übrig ist
+          $z3 = int($height - $he - $z2);                                                                        # was von maxVal noch übrig ist
               
-          if ($z3 < int($fsize/2)) {                                                        # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
+          if ($z3 < int($fsize/2)) {                                                                             # dünnen Strichbalken vermeiden / ca. halbe Zeichenhöhe
               $z2 += $z3; $z3 = 0; 
           }
       }
 
-      if ($lotype eq 'diff') {                                                              # Typ diff
+      if ($lotype eq 'diff') {                                                              
           # Berechnung der Zonen
           # he - freier der Raum über den Balken , Zahl positiver Wert + fsize
           # z2 - positiver Balken inkl Icon
@@ -4519,48 +4541,46 @@ sub _beamGraphic {
           # z4 - Zahl negativer Wert + fsize
 
           my ($px_pos,$px_neg);
-          my $maxValBeam = 0;                                                               # ToDo:  maxValBeam noch aus Attribut maxValBeam ableiten
+          my $maxValBeam = 0;                                                                                    # ToDo:  maxValBeam noch aus Attribut maxValBeam ableiten
 
-          if ($maxValBeam) {                                                                # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
+          if ($maxValBeam) {                                                                                     # Feste Aufteilung +/- , jeder 50 % bei maxValBeam = 0
               $px_pos = int($height/2);
-              $px_neg = $height - $px_pos;                                                  # Rundungsfehler vermeiden
+              $px_neg = $height - $px_pos;                                                                       # Rundungsfehler vermeiden
           } 
-          else {                                                                            # Dynamische hoch/runter Verschiebung der Null-Linie        
-              if ($minDif >= 0 ) {                                                          # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
+          else {                                                                                                 # Dynamische hoch/runter Verschiebung der Null-Linie        
+              if ($minDif >= 0 ) {                                                                               # keine negativen Balken vorhanden, die Positiven bekommen den gesammten Raum
                   $px_neg = 0;
                   $px_pos = $height;
               } 
               else {
                   if ($maxDif > 0) {
-                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));     # Wieviel % entfallen auf unten ?
-                      $px_pos = $height-$px_neg;                                            # der Rest ist oben
+                      $px_neg = int($height * abs($minDif) / ($maxDif + abs($minDif)));                          # Wieviel % entfallen auf unten ?
+                      $px_pos = $height-$px_neg;                                                                 # der Rest ist oben
                   }
-                  else {                                                                    # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
+                  else {                                                                                         # keine positiven Balken vorhanden, die Negativen bekommen den gesammten Raum
                       $px_neg = $height;
                       $px_pos = 0;
                   }
               }
           }
 
-          if ($hfcg->{$i}{diff} >= 0) {                                                   # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
+          if ($hfcg->{$i}{diff} >= 0) {                                                                          # Zone 2 & 3 mit ihren direkten Werten vorbesetzen
               $z2 = $hfcg->{$i}{diff};
               $z3 = abs($minDif);
           } 
           else {
               $z2 = $maxDif;
-              $z3 = abs($hfcg->{$i}{diff});                                               # Nur Betrag ohne Vorzeichen
+              $z3 = abs($hfcg->{$i}{diff});                                                                      # Nur Betrag ohne Vorzeichen
           }
-     
-          # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
-          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);                        # Teilung durch 0 vermeiden
+                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
+          $he = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2)/$maxDif*$px_pos);                                 # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $he) ;
 
-          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg);              # Teilung durch 0 unbedingt vermeiden
+          $z4 = (!$px_neg || !$minDif) ? 0 : int((abs($minDif)-$z3)/abs($minDif)*$px_neg);                       # Teilung durch 0 unbedingt vermeiden
           $z3 = ($px_neg - $z4);
-
-          # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
+                                                                                                                 # Beiden Zonen die Werte ausgeben könnten muß fsize als zusätzlicher Raum zugeschlagen werden !
           $he += $fsize; 
-          $z4 += $fsize if ($z3);                                                                       # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
+          $z4 += $fsize if ($z3);                                                                                # komplette Grafik ohne negativ Balken, keine Ausgabe von z3 & z4
       }
         
       # das style des nächsten TD bestimmt ganz wesentlich das gesammte Design
@@ -4572,13 +4592,13 @@ sub _beamGraphic {
       if ($lotype eq 'single') {
           $val = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
 
-          $ret .="<table width='100%' height='100%'>";                                                  # mit width=100% etwas bessere Füllung der Balken
-          $ret .="<tr class='even' style='height:".$he."px'>";
+          $ret .="<table width='100%' height='100%'>";                                                           # mit width=100% etwas bessere Füllung der Balken
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
           $ret .="<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val.'</td></tr>';
 
-          if ($hfcg->{$i}{beam1} || $show_night) {                                                      # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
+          if ($hfcg->{$i}{beam1} || $show_night) {                                                               # Balken nur einfärben wenn der User via Attr eine Farbe vorgibt, sonst bestimmt class odd von TR alleine die Farbe
               my $style = "style=\"padding-bottom:0px; vertical-align:top; margin-left:auto; margin-right:auto;";
-              $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';                     # Syntaxhilight 
+              $style   .= defined $colorfc ? " background-color:#$colorfc\"" : '"';                              # Syntaxhilight 
 
               $ret .= "<tr class='odd' style='height:".$z3."px;'>";
               $ret .= "<td align='center' class='solarfc' ".$style.">";
@@ -4599,9 +4619,8 @@ sub _beamGraphic {
           my $style =  "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
 
           $ret .="<table width='100%' height='100%'>\n";                                                         # mit width=100% etwas bessere Füllung der Balken
-
-          # der Freiraum oben kann beim größten Balken ganz entfallen
-          $ret .="<tr class='even' style='height:".$he."px'><td class='solarfc'></td></tr>" if ($he);
+                                                                                                                 # der Freiraum oben kann beim größten Balken ganz entfallen
+          $ret .="<tr class='$htr{$m}{cl}' style='height:".$he."px'><td class='solarfc'></td></tr>" if ($he);
 
           if($hfcg->{$i}{beam1} > $hfcg->{$i}{beam2}) {                                                          # wer ist oben, Beam2 oder Beam1 ? Wert und Farbe für Zone 2 & 3 vorbesetzen
               $val     = formatVal6($hfcg->{$i}{beam1},$kw,$hfcg->{$i}{weather});
@@ -4635,71 +4654,73 @@ sub _beamGraphic {
              
           $ret .= "</td></tr>";
 
-          if ($z3) {                                                                                     # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
+          if ($z3) {                                                                                             # die Zone 3 lassen wir bei zu kleinen Werten auch ganz weg 
               $ret .= "<tr class='odd' style='height:".$z3."px'>";
               $ret .= "<td align='center' class='solarfc' ".$style2.">$v</td></tr>";
           }
       }
 
-      if ($lotype eq 'diff') {                                                                          # Type diff
+      if ($lotype eq 'diff') {                                                                                   # Type diff
           my $style = "style='padding-bottom:0px; padding-top:1px; vertical-align:top; margin-left:auto; margin-right:auto;";
-          $ret .= "<table width='100%' border='0'>\n";                                                  # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
+          $ret .= "<table width='100%' border='0'>\n";                                                           # Tipp : das nachfolgende border=0 auf 1 setzen hilft sehr Ausgabefehler zu endecken
 
           $val = ($hfcg->{$i}{diff} > 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '';
-          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                         # Sonderfall , hier wird die 0 gebraucht !
+          $val = '&nbsp;&nbsp;&nbsp;0&nbsp;&nbsp;' if ($hfcg->{$i}{diff} == 0);                                  # Sonderfall , hier wird die 0 gebraucht !
 
           if ($val) {
-              $ret .= "<tr class='even' style='height:".$he."px'>";
+              $ret .= "<tr class='$htr{$m}{cl}' style='height:".$he."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:bottom; color:#$fcolor1;'>".$val."</td></tr>";
           }
 
-          if ($hfcg->{$i}{diff} >= 0) {                                                                 # mit Farbe 1 colorfc füllen
+          if ($hfcg->{$i}{diff} >= 0) {                                                                          # mit Farbe 1 colorfc füllen
               $style .= " background-color:#$colorfc'";
-              $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                  # Sonderfall , 1px dünnen Strich ausgeben
+              $z2     = 1 if ($hfcg->{$i}{diff} == 0);                                                           # Sonderfall , 1px dünnen Strich ausgeben
               $ret   .= "<tr class='odd' style='height:".$z2."px'>";
               $ret   .= "<td align='center' class='solarfc' ".$style.">";
               $ret   .= "</td></tr>";
           } 
-          else {                                                                                        # ohne Farbe
-              $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                      # Sonderfall, hier wird die 0 gebraucht !
-              if ($z2 && $val) {                                                                        # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
-                  $ret .= "<tr class='even' style='height:".$z2."px'>";
+          else {                                                                                                 # ohne Farbe
+              $z2 = 2 if ($hfcg->{$i}{diff} == 0);                                                               # Sonderfall, hier wird die 0 gebraucht !
+              if ($z2 && $val) {                                                                                 # z2 weglassen wenn nicht unbedigt nötig bzw. wenn zuvor he mit val keinen Wert hatte
+                  $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z2."px'>";
                   $ret .= "<td class='solarfc'></td></tr>";
               }
           }
         
-          if ($hfcg->{$i}{diff} < 0) {                                                                  # Negativ Balken anzeigen ?
-              $style .= " background-color:#$colorc'";                                                  # mit Farbe 2 colorc füllen
+          if ($hfcg->{$i}{diff} < 0) {                                                                           # Negativ Balken anzeigen ?
+              $style .= " background-color:#$colorc'";                                                           # mit Farbe 2 colorc füllen
               $ret   .= "<tr class='odd' style='height:".$z3."px'>";
               $ret   .= "<td align='center' class='solarfc' ".$style."></td></tr>";
           }
-          elsif ($z3) {                                                                                 # ohne Farbe
-              $ret .= "<tr class='even' style='height:".$z3."px'>";
+          elsif ($z3) {                                                                                          # ohne Farbe
+              $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z3."px'>";
               $ret .= "<td class='solarfc'></td></tr>";
           }
 
-          if($z4) {                                                                                     # kann entfallen wenn auch z3 0 ist
+          if($z4) {                                                                                              # kann entfallen wenn auch z3 0 ist
               $val  = ($hfcg->{$i}{diff} < 0) ? formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather}) : '&nbsp;';
-              $ret .= "<tr class='even' style='height:".$z4."px'>";
+              $ret .= "<tr class='$htr{$m}{cl}' style='height:".$z4."px'>";
               $ret .= "<td class='solarfc' style='vertical-align:top'>".$val."</td></tr>";
           }
       }
 
-      if ($show_diff eq 'bottom') {                                                                     # zusätzliche diff Anzeige
+      if ($show_diff eq 'bottom') {                                                                              # zusätzliche diff Anzeige
           $val  = formatVal6($hfcg->{$i}{diff},$kw,$hfcg->{$i}{weather});
           $val  = ($hfcg->{$i}{diff} < 0) ?  '<b>'.$val.'<b/>' : ($val > 0 ) ? '+'.$val : $val if ($val ne '&nbsp;'); # negative Zahlen in Fettschrift, 0 aber ohne +
-          $ret .= "<tr class='even'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
+          $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:middle; text-align:center;'>$val</td></tr>"; 
       }
 
-      $ret     .= "<tr class='even'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
-      $ret     .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
+      $ret .= "<tr class='$htr{$m}{cl}'><td class='solarfc' style='vertical-align:bottom; text-align:center;'>";
+      $ret .= (($hfcg->{$i}{time} == $thishour) && ($offset < 0)) ? '<a class="changed" style="visibility:visible"><span>'.$hfcg->{$i}{time_str}.'</span></a>' : $hfcg->{$i}{time_str};
       
       if($hfcg->{$i}{time} == $thishour) {
-          $thishour = 99;                                                                               # nur einmal verwenden !
+          $thishour = 99;                                                                                        # nur einmal verwenden !
       }
       
       $ret .="</td></tr></table></td>";                                                   
   }
+  
+  $paref->{modulo}++;
 
   $ret .= "<td class='solarfc'></td>";
   $ret .= "</tr>";
