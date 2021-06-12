@@ -3688,6 +3688,7 @@ sub entryGraphic {
       lang       => AttrVal ("global", 'language',                 'EN'),
       flowgh     => AttrVal ($name,    'flowGraphicSize', $defflowGSize),                      # Größe Energieflußgrafik
       flowgani   => AttrVal ($name,    'flowGraphicAnimate',          0),                      # Animation Energieflußgrafik
+      css        => AttrVal ($name,    'Css',                   $cssdef),                      # Css Styles
   };
   
   my $ret = q{};
@@ -4778,11 +4779,11 @@ sub _flowGraphic {
   my $name       = $paref->{name};
   my $flowgh     = $paref->{flowgh};
   my $flowgani   = $paref->{flowgani};
+  my $css        = $paref->{css};
     
   my $style      = 'width:'.$flowgh.'px; height:'.$flowgh.'px;';
   my $fs         = $flowgh < 300 ? '48px' : '32px';
   my $animation  = $flowgani ? '@keyframes dash {  to {  stroke-dashoffset: 0;  } }' : '';             # Animation Ja/Nein
-  my $css        = AttrVal($name, 'Css', $cssdef);
 
   my $cpv        = ReadingsNum($name, 'Current_PV', 0);
   my $sun_color  = $cpv ? 'flowg sun_active' : 'flowg sun_inactive';
