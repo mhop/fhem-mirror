@@ -4526,7 +4526,7 @@ attr DEVICE devStateIcon (STOPPED|PAUSED_PLAYBACK):rc_PLAY:toggle PLAYING:rc_PAU
 attr DEVICE alias ALIAS
 attr DEVICE model sonos2mqtt_speaker
 attr DEVICE devicetopic BASE_TOPIC
-attr DEVICE userReadings Master:groupName.* {(split(' +',ReadingsVal($name,'groupName','')))[0]},\
+attr DEVICE userReadings Master:groupName.* {(split(' \+',ReadingsVal($name,'groupName','')))[0]},\
 isMaster:coordinatorUuid.* {ReadingsVal($name,'coordinatorUuid','') eq ReadingsVal($name,'uuid','')?1:0},\
 inGroup:groupName.* {ReadingsVal($name,'groupName','') =~ / \+ /?1:0},\
 inCouple:coordinatorUuid.* {(ReadingsVal($name,'coordinatorUuid','') ne ReadingsVal($name,'uuid','') and (index(ReadingsVal($name,'groupName',''), ReadingsVal($name,'name','')) != -1))?1:0},\
