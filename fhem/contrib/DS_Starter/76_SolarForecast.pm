@@ -330,6 +330,8 @@ my %htitles = (                                                                 
               DE => qq{Automatik}                                             },
   conrec => { EN => qq{Switching on the consumer recommended},
               DE => qq{Einschalten des Verbrauchers empfohlen}                },
+  pstate => { EN => qq{Planning status: <pstate>\nOn: <start>\nOff: <stop>},
+              DE => qq{Planungsstatus: <pstate>\n\nEin: <start>\nAus: <stop>} },
 );
 
 my %weather_ids = (
@@ -2944,9 +2946,10 @@ sub __planningStateandTimes {
   my $startts = ConsumerVal ($hash, $c, "planswitchon",  "");
   my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", "");
   
-  my ($starttime,$stoptime)      = ('','');
-  (undef,undef,undef,$starttime) = timestampToTimestring ($startts) if($startts);
-  (undef,undef,undef,$stoptime)  = timestampToTimestring ($stopts)  if($stopts);
+  my $starttime = '';
+  my $stoptime  = '';
+  $starttime    = timestampToTimestring ($startts) if($startts);
+  $stoptime     = timestampToTimestring ($stopts)  if($stopts);
   
 return ($pstate,$starttime,$stoptime);
 }
@@ -4223,6 +4226,14 @@ sub _graphicConsumerLegend {
           $isricon = "<a title= '$htitles{conrec}{$lang}'</a>".FW_makeImage($caicon, '');
       }
       
+      $paref->{consumer} = $c;
+      
+      my ($planstate,$starttime,$stoptime) = __planningStateandTimes ($paref);      
+      my $pstate = $htitles{pstate}{$lang};
+      $pstate    =~ s/<pstate>/$planstate/xs;
+      $pstate    =~ s/<start>/$starttime/xs;
+      $pstate    =~ s/<stop>/$stoptime/xs;      
+      
       if($modulo % 2){
           $ctable .= qq{<tr>};
           $tro     = 1;
@@ -4230,12 +4241,12 @@ sub _graphicConsumerLegend {
       
       if(!$auto) {
           $staticon = FW_makeImage('ios_off_fill@red', $htitles{iaaf}{$lang});
-          $auicon   = "<a title= '$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
+          $auicon   = "<a title= '$pstate\n\n$htitles{iaaf}{$lang}' onClick=$cmdautoon> $staticon</a>";
       } 
       
       if ($auto) {
           $staticon = FW_makeImage('ios_on_till_fill@orange', $htitles{ieas}{$lang});
-          $auicon   = "<a title='$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
+          $auicon   = "<a title='$pstate\n\n$htitles{ieas}{$lang}' onClick=$cmdautooff> $staticon</a>";
       }
       
       if ($cmdon && $swstate eq "off") {
@@ -4273,6 +4284,8 @@ sub _graphicConsumerLegend {
       
       $modulo++;
   }
+  
+  delete $paref->{consumer};
   
   $ctable .= qq{</tr>} if($tro);
   $ctable .= qq{</table>};
