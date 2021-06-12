@@ -38,6 +38,7 @@ if ($NAME eq $bridge){
       fhem("setreading $tts text ".ReadingsVal($tts,'text',' ').' '.$text.";sleep 0.4 tts;set $tts tts [$tts:text];sleep $tts:playing:.0 ;set $NAME notifyall [$tts:vol] [$tts:httpName];deletereading $tts text");
    }
    if($cmd eq 'Favorites') {return "$devicetopic/".ReadingsVal((devspec2array('a:model=sonos2mqtt_speaker'))[0],'uuid','').q(/control {"command": "adv-command","input": {"cmd": "GetFavorites","reply": "Favorites"}})}
+   if($cmd eq 'listalarms') {fhem("sleep $bridge:Alarms:.* ;{sonos2mqtt_alarm(\"$bridge\",'alarmlist')}");return "$devicetopic/cmd/listalarm"}
    if($cmd eq 'setplayFav') {sonos2mqtt_mod_list('a:model=sonos2mqtt_speaker','setList','playFav:'.sonos2mqtt_getList($bridge,'Favorites').' {sonos2mqtt($NAME,$EVENT)}')}
    if($cmd eq 'setjoinGroup') {sonos2mqtt_mod_list('a:model=sonos2mqtt_speaker','setList','joinGroup:'.ReadingsVal($NAME,'grouplist','').' {sonos2mqtt($NAME,$EVENT)}')}
    if($cmd eq 'Reply'){
@@ -259,12 +260,12 @@ my $bridge = (devspec2array('a:model=sonos2mqtt_bridge'))[0];
 if ($devspec eq 'a:model=sonos2mqtt_bridge'){
    sonos2mqtt_mod_list($devspec,'setList','notifyall:textField'.q( {sonos2mqtt($NAME,$EVENT)}));
    sonos2mqtt_mod_list($devspec,'setList','announcementall:textField'.q( {sonos2mqtt($NAME,$EVENT)}));
+   sonos2mqtt_mod_list($devspec,'setList','setalarm:textField $DEVICETOPIC/cmd/setalarm');
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Favorites:.* Favorites');
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,"devicetopic",'sonos').'/RINCON_([0-9A-Z]+)/Reply:.* Reply');
-   sonos2mqtt_mod_list($devspec,'getList','Reply:Favorites,Radios,Playlists Reply'.q( {sonos2mqtt($NAME,$EVENT)}));
    sonos2mqtt_mod_list($devspec,'readingList',AttrVal($bridge,'devicetopic','sonos').'/alarms:.* Alarms');
-   sonos2mqtt_mod_list($devspec,'getList','listalarms:noArg Alarms $DEVICETOPIC/cmd/listalarm');
-   sonos2mqtt_mod_list($devspec,'setList','setalarm:textField $DEVICETOPIC/cmd/setalarm');
+   sonos2mqtt_mod_list($devspec,'getList','Reply:Favorites,Radios,Playlists Reply'.q( {sonos2mqtt($NAME,$EVENT)}));
+   sonos2mqtt_mod_list($devspec,'getList','listalarms:noArg Alarms'.q( {sonos2mqtt($NAME,$EVENT)}));
    return undef
 }
 
